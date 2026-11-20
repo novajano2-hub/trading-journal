@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { formatFillTime } from './fill-time';
+import { fillTimeToUtc, formatFillTime, guessDateOrder } from './fill-time';
 
 describe('formatFillTime', () => {
   test('prints the brief examples in the clock format', () => {
@@ -57,5 +57,82 @@ describe('formatFillTime', () => {
   test('leap days follow the calendar', () => {
     expect(formatFillTime('2028-02-29 10:00')).toBe('29 FEB 10:00:00');
     expect(formatFillTime('2026-02-29 10:00')).toBe('2026-02-29 10:00');
+  });
+});
+
+const ny = { timeZone: 'America/New_York', dateOrder: 'mdy' } as const;
+
+describe('fillTimeToUtc', () => {
+  test('wall clock in the source timezone, across DST', () => {
+    expect(fillTimeToUtc('2026-07-15 09:30:00', ny)).toBe(
+      '2026-07-15T13:30:00.000Z',
+    );
+    expect(fillTimeToUtc('2026-12-15 09:30', ny)).toBe(
+      '2026-12-15T14:30:00.000Z',
+    );
+    expect(fillTimeToUtc('11/16/2026 2:05 PM', ny)).toBe(
+      '2026-11-16T19:05:00.000Z',
+    );
+    expect(
+      fillTimeToUtc('2026-11-16 23:30:00', { ...ny, timeZone: 'Asia/Tokyo' }),
+    ).toBe('2026-11-16T14:30:00.000Z');
+  });
+  test('a written Z or offset wins over the source timezone', () => {
+    expect(
+      fillTimeToUtc('2026-11-16T10:48:00Z', { ...ny, timeZone: 'Asia/Tokyo' }),
+    ).toBe('2026-11-16T10:48:00.000Z');
+    expect(fillTimeToUtc('2026-11-16T10:48:00+05:00', ny)).toBe(
+      '2026-11-16T05:48:00.000Z',
+    );
+  });
+  test('MetaTrader dotted dates and day-first dates', () => {
+    const london = { timeZone: 'Europe/London', dateOrder: 'dmy' } as const;
+    expect(fillTimeToUtc('2026.11.16 10:48:00', london)).toBe(
+      '2026-11-16T10:48:00.000Z',
+    );
+    expect(fillTimeToUtc('16/11/2026 10:48', london)).toBe(
+      '2026-11-16T10:48:00.000Z',
+    );
+    expect(
+      fillTimeToUtc('16/11/2026 10:48', { ...london, dateOrder: 'mdy' }),
+    ).toBeNull();
+  });
+  test('unparseable values and unknown zones give null', () => {
+    for (const raw of [
+      '',
+      'garbage',
+      '2026-02-30 10:00',
+      '2026-11-16',
+      '10:48:00',
+    ])
+      expect(fillTimeToUtc(raw, ny)).toBeNull();
+    expect(
+      fillTimeToUtc('2026-11-16 10:00', { ...ny, timeZone: 'Not/AZone' }),
+    ).toBeNull();
+  });
+  test('Z and offset forms validate their own date and clock, with no rollover', () => {
+    for (const raw of [
+      '2026-02-30T10:00Z',
+      '2026-02-30T10:00:00+05:00',
+      '2026-13-01T10:00Z',
+      '2026-11-16T24:00Z',
+      '2026-11-16T10:60Z',
+      '2026-11-16T10:00:61Z',
+      '2026-11-16T10:00+25:00',
+    ])
+      expect(fillTimeToUtc(raw, ny)).toBeNull();
+    expect(fillTimeToUtc('2028-02-29T10:00Z', ny)).toBe(
+      '2028-02-29T10:00:00.000Z',
+    );
+  });
+});
+
+describe('guessDateOrder', () => {
+  test('guessDateOrder', () => {
+    expect(guessDateOrder(['11/16/2026 10:00', '1/5/2026 9:05'])).toBe('mdy');
+    expect(guessDateOrder(['05/11/2026 10:00', '16/11/2026 09:00'])).toBe(
+      'dmy',
+    );
+    expect(guessDateOrder(['2026-11-16 10:00', 'x'])).toBe('mdy');
   });
 });

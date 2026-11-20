@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { localDate, localParts } from './time';
+import { isValidTimeZone, localDate, localParts } from './time';
 
 describe('time', () => {
   test('localDate respects the time zone', () => {
@@ -16,4 +16,10 @@ describe('time', () => {
       minute: 45,
     });
   });
+});
+
+test('isValidTimeZone', () => {
+  expect(isValidTimeZone('America/New_York')).toBe(true);
+  expect(isValidTimeZone('Not/AZone')).toBe(false);
+  expect(isValidTimeZone('')).toBe(false);
 });

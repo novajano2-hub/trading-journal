@@ -22,3 +22,14 @@ export function localParts(iso: string, timeZone: string): LocalParts {
     minute: d.getMinutes(),
   };
 }
+
+/** True when the runtime knows this IANA time zone. */
+export function isValidTimeZone(timeZone: string): boolean {
+  if (!timeZone) return false;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone });
+    return true;
+  } catch {
+    return false;
+  }
+}
