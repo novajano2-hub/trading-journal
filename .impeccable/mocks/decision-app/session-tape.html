@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Keel - Session tape</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F6F7F9;--surface:#FFFFFF;--sunken:#EFF1F4;--line:#E3E6EB;--line-2:#D3D8DF;--text:#0F1218;--muted:#4F5865;--faint:#687080;--accent:#2550E0;--accent-soft:#EAF0FE;--accent-ink:#1B3FB8;--gain:#087A54;--gain-soft:#E6F4EE;--loss:#C8283A;--loss-soft:#FBEBED}
+*{box-sizing:border-box}
+html,body{width:1440px;height:900px;overflow:hidden;margin:0}
+body{background:var(--bg);color:var(--text);font:13px/1.4 Geist,sans-serif;display:flex;flex-direction:column}
+.m{font-family:"Geist Mono",monospace}.g{color:var(--gain)}.l{color:var(--loss)}.f{color:var(--faint)}
+.top{height:56px;flex:none;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 16px;gap:24px}
+.brand{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:600;letter-spacing:-.02em}
+.k{width:22px;height:22px;border-radius:6px;background:var(--text);color:#fff;font-size:13px;display:grid;place-items:center}
+.tabs{display:flex;gap:2px;flex:1}
+.tab{padding:6px 11px;border-radius:7px;color:var(--muted);font-weight:500}
+.tab.on{background:var(--sunken);color:var(--text);box-shadow:0 1px 2px rgba(15,18,24,.08)}
+.ph{width:16px;height:16px;border-radius:4px;background:var(--sunken);display:inline-block;vertical-align:-3px;margin-right:6px}
+.btn{height:34px;padding:0 14px;border-radius:10px;border:1px solid var(--line-2);background:var(--surface);font:500 13px Geist,sans-serif;display:flex;align-items:center;color:var(--text)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.av{width:30px;height:30px;border-radius:50%;background:var(--accent-soft);color:var(--accent-ink);font-weight:600;font-size:12px;display:grid;place-items:center}
+.fr{height:48px;flex:none;display:flex;align-items:center;padding:0 16px;gap:8px}
+h1{font-size:22px;font-weight:600;letter-spacing:-.02em;margin:0 16px 0 0}
+.chip{height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--line);background:var(--surface);display:flex;align-items:center;color:var(--muted)}
+.chip.on{background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent-ink);font-weight:500}
+.seg{margin-left:auto;display:flex;padding:2px;background:var(--sunken);border-radius:7px}
+.seg span{padding:3px 12px;border-radius:5px;color:var(--muted);font-weight:500}
+.seg .on{background:#fff;color:var(--text);box-shadow:0 1px 2px rgba(15,18,24,.08)}
+main{flex:1;min-height:0;padding:0 16px 16px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px}
+.kpis{flex:none;height:72px;display:flex}
+.kpi{flex:1;padding:12px 20px;border-left:1px solid var(--line);display:flex;flex-direction:column;justify-content:center;gap:2px}
+.kpi:first-child{border:0}.kpi.w{flex:1.4}
+.kpi b{font:500 22px/1.15 "Geist Mono",monospace}.kpi small{font-size:12px;color:var(--faint)}
+.tape{flex:0 0 405px;display:flex;flex-direction:column;min-height:0}
+.hd{display:flex;align-items:baseline;gap:10px;padding:14px 16px 0;height:44px}
+.hd b{font-size:14px;font-weight:600}.hd span{font-size:12px;color:var(--faint)}
+.hd .r{margin-left:auto;display:flex;gap:14px}
+.body{flex:1;position:relative;padding-top:44px;display:flex;flex-direction:column;min-height:0}
+.pc{position:absolute;left:104px;right:136px;top:0;bottom:0}
+.band{position:absolute;left:0;width:15.385%;top:0;bottom:0;background:var(--accent-soft);opacity:.7}
+.bl{position:absolute;left:0;top:25px;height:19px;padding:0 8px 0 6px;font-size:12px;color:var(--accent-ink);font-weight:500;background:var(--accent-soft);white-space:nowrap;display:flex;align-items:center;border-radius:0 6px 6px 0}
+.gl{position:absolute;top:0;bottom:0;width:1px;background:var(--line)}
+.tk{position:absolute;top:4px;font:400 11px "Geist Mono",monospace;color:var(--faint);transform:translateX(-50%)}
+.row{flex:1;display:flex;padding:0 16px;border-top:1px solid var(--line);position:relative}
+.rl{width:88px;display:flex;flex-direction:column;justify-content:center;font-weight:500}
+.rl small{font-size:12px;color:var(--faint);font-weight:400}
+.rp{flex:1;position:relative}
+.rt{width:120px;text-align:right;display:flex;align-items:center;justify-content:flex-end;font:500 13px "Geist Mono",monospace}
+.p{position:absolute;height:22px;padding:0 8px;border:1px solid;border-radius:11px;display:flex;align-items:center;gap:6px;font:500 11px "Geist Mono",monospace;white-space:nowrap}
+.p.g{background:var(--gain-soft);border-color:var(--gain)}.p.l{background:var(--loss-soft);border-color:var(--loss)}
+.a{top:6px}.b{top:33px}
+.mc{font:500 10px Geist,sans-serif;background:var(--surface);border:1px solid var(--loss);border-radius:6px;padding:0 5px;line-height:15px}
+.low{flex:1;min-height:0;display:flex;gap:12px}
+.low .card{flex:1;padding:14px 16px;display:flex;flex-direction:column;min-width:0}
+.bars{flex:1;display:flex;gap:18px;align-items:flex-end;padding-top:6px;border-bottom:1px solid var(--line-2);margin-top:8px}
+.bc{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:4px;font:500 11px "Geist Mono",monospace}
+.bc i{display:block;width:100%;border-radius:4px 4px 0 0;background:var(--gain)}
+.hrs{display:flex;gap:18px;padding-top:4px;font:400 11px "Geist Mono",monospace;color:var(--faint)}.hrs span{flex:1;text-align:center}
+</style></head><body>
+<div class="top">
+ <div class="brand"><div class="k">K</div>Keel</div>
+ <div class="tabs"><span class="tab on">Dashboard</span><span class="tab">Trades</span><span class="tab">Calendar</span><span class="tab">Reports</span><span class="tab">Strategies</span><span class="tab">Notebook</span><span class="tab">Import</span><span class="tab">Prop firms</span><span class="tab">More</span></div>
+ <div class="btn"><span class="ph"></span>All accounts</div><div class="btn pri">Import</div><div class="av">MK</div>
+</div>
+<div class="fr"><h1>Dashboard</h1>
+ <span class="chip on m">16-20 Nov 2026</span><span class="chip">Symbol</span><span class="chip">Side</span><span class="chip">Strategy</span><span class="chip">Tags</span>
+ <div class="seg"><span>Gross</span><span class="on">Net</span></div></div>
+<main>
+ <div class="card kpis">
+  <div class="kpi w"><small>Net P&amp;L, this week</small><b class="g">+$2,727.50</b></div>
+  <div class="kpi"><small>Win rate</small><b>71.4%</b></div>
+  <div class="kpi"><small>Profit factor</small><b>4.59</b></div>
+  <div class="kpi"><small>Expectancy</small><b class="g">+$194.82</b></div>
+  <div class="kpi"><small>Trades</small><b>14</b></div>
+ </div>
+ <div class="card tape">
+  <div class="hd"><b>Session tape</b><span>Entry time of every trade, 09:30-16:00 ET</span>
+   <div class="r"><span><i class="ph" style="background:var(--gain-soft);border:1px solid var(--gain)"></i>Gain</span><span><i class="ph" style="background:var(--loss-soft);border:1px solid var(--loss)"></i>Loss</span></div></div>
+  <div class="body">
+   <div class="pc"><div class="band"></div>
+    <div class="gl" style="left:0"></div><div class="gl" style="left:7.69%"></div><div class="gl" style="left:23.08%"></div><div class="gl" style="left:38.46%"></div><div class="gl" style="left:53.85%"></div><div class="gl" style="left:69.23%"></div><div class="gl" style="left:84.62%"></div><div class="gl" style="left:100%"></div>
+    <span class="tk" style="left:0;transform:none;padding-left:4px">09:30</span><span class="tk" style="left:7.69%">10:00</span><span class="tk" style="left:23.08%">11:00</span><span class="tk" style="left:38.46%">12:00</span><span class="tk" style="left:53.85%">13:00</span><span class="tk" style="left:69.23%">14:00</span><span class="tk" style="left:84.62%">15:00</span><span class="tk" style="left:100%;transform:translateX(-100%);padding-right:4px">16:00</span>
+    <div class="bl"><span class="m" style="margin-right:6px">09:30-10:30</span>Opening hour: 7 of 14 trades, <span class="m" style="margin-left:5px">+$1,840.50</span></div></div>
+   <div class="row"><div class="rl">Mon 16<small class="m">3 trades</small></div><div class="rp">
+    <div class="p g a" style="left:1.03%">NQZ5 +$560.00</div><div class="p g b" style="left:5.64%">ESZ5 +$310.00</div><div class="p g a" style="left:17.95%">MNQZ5 +$150.00</div></div><div class="rt g">+$1,020.00</div></div>
+   <div class="row"><div class="rl">Tue 17<small class="m">2 trades</small></div><div class="rp">
+    <div class="p l a" style="left:3.85%">NQZ5 −$180.00</div><div class="p l a" style="left:56.41%">CLZ5 −$95.00</div></div><div class="rt l">−$275.00</div></div>
+   <div class="row"><div class="rl">Wed 18<small class="m">2 trades</small></div><div class="rp">
+    <div class="p g a" style="left:1.54%">NQZ5 +$420.00</div><div class="p g a" style="left:24.36%">AAPL +$120.00</div></div><div class="rt g">+$540.00</div></div>
+   <div class="row"><div class="rl">Thu 19<small class="m">4 trades</small></div><div class="rp">
+    <div class="p l a" style="left:2.05%">CLZ5 −$210.00</div><div class="p g b" style="left:4.36%">NQZ5 +$1,215.50</div><div class="p g a" style="left:28.21%">MNQZ5 +$88.50</div><div class="p g a" style="left:70.51%">AAPL +$142.00</div></div><div class="rt g">+$1,236.00</div></div>
+   <div class="row"><div class="rl">Fri 20<small class="m">3 trades</small></div><div class="rp">
+    <div class="p l a" style="left:5.38%">ESZ5 −$275.00<span class="mc">Moved stop</span></div><div class="p g b" style="left:18.46%">NQZ5 +$370.00</div><div class="p g a" style="left:61.54%">AAPL +$111.50</div></div><div class="rt g">+$206.50</div></div>
+  </div>
+ </div>
+ <div class="low">
+  <div class="card"><div class="hd" style="padding:0;height:auto"><b>Net P&amp;L by hour</b><span>Entry hour, ET, this week</span></div>
+   <div class="bars">
+    <div class="bc g">+$1,840.50<i style="height:100px"></i></div><div class="bc g">+$520.00<i style="height:28px"></i></div><div class="bc g">+$208.50<i style="height:11px"></i></div><div class="bc f">$0.00<i style="height:2px;background:var(--line-2)"></i></div><div class="bc g">+$16.50<i style="height:2px"></i></div><div class="bc g">+$142.00<i style="height:8px"></i></div><div class="bc f">$0.00<i style="height:2px;background:var(--line-2)"></i></div></div>
+   <div class="hrs"><span>09:00</span><span>10:00</span><span>11:00</span><span>12:00</span><span>13:00</span><span>14:00</span><span>15:00</span></div></div>
+  <div class="card"><div class="hd" style="padding:0;height:auto"><b>Equity, 1-20 Nov</b><span>Cumulative net P&amp;L</span><b class="m g" style="margin-left:auto;font-weight:500">+$4,812.50</b></div>
+   <svg viewBox="0 0 600 150" preserveAspectRatio="none" style="flex:1;width:100%;min-height:0;margin-top:8px">
+    <polygon points="10,140 10,129.1 51.4,133.8 92.9,117.9 134.3,115.4 175.7,124.3 217.1,101.4 258.6,95.8 300,109 341.4,90 382.9,85.8 424.3,59.3 465.7,66.5 507.1,52.5 548.6,20.4 590,15 590,140" fill="#2550E0" fill-opacity=".08"/>
+    <polyline points="10,129.1 51.4,133.8 92.9,117.9 134.3,115.4 175.7,124.3 217.1,101.4 258.6,95.8 300,109 341.4,90 382.9,85.8 424.3,59.3 465.7,66.5 507.1,52.5 548.6,20.4 590,15" fill="none" stroke="#2550E0" stroke-width="2" vector-effect="non-scaling-stroke"/>
+    <line x1="10" y1="140" x2="590" y2="140" stroke="#D3D8DF" vector-effect="non-scaling-stroke"/></svg>
+   <div class="hrs" style="justify-content:space-between"><span style="text-align:left">2 Nov</span><span>10 Nov</span><span style="text-align:right">20 Nov</span></div></div>
+ </div>
+</main></body></html>

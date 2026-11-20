@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Keel Dashboard: Plan vs actual</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F6F7F9;--surface:#FFFFFF;--sunken:#EFF1F4;--line:#E3E6EB;--line-2:#D3D8DF;--text:#0F1218;--muted:#4F5865;--faint:#687080;--accent:#2550E0;--accent-soft:#EAF0FE;--accent-ink:#1B3FB8;--gain:#087A54;--gain-soft:#E6F4EE;--loss:#C8283A;--loss-soft:#FBEBED;--warn:#B25E09;--warn-soft:#FDF1E4}
+*{box-sizing:border-box}
+html,body{width:1440px;height:900px;overflow:hidden;margin:0}
+body{background:var(--bg);color:var(--text);font:13px/1.4 Geist,sans-serif;display:flex}
+.m{font-family:"Geist Mono",monospace}.loss{color:var(--loss)}.gain{color:var(--gain)}.faint{color:var(--faint)}
+aside{width:220px;height:900px;background:var(--surface);border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:2px}
+.logo{font-size:18px;font-weight:600;letter-spacing:-.02em;padding:2px 8px 12px}
+.acct{display:flex;align-items:center;gap:8px;width:100%;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 10px;font:500 13px Geist,sans-serif;color:var(--text);margin-bottom:14px}
+.av{width:24px;height:24px;border-radius:6px;background:var(--accent-soft);color:var(--accent-ink);font-size:11px;font-weight:600;display:grid;place-items:center}
+.nav{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:10px;color:var(--muted);font-size:13.5px}
+.nav i{width:16px;height:16px;border-radius:4px;background:var(--sunken)}
+.nav.on{background:var(--accent-soft);color:var(--accent-ink);font-weight:500}
+.grp{font-size:12px;color:var(--faint);padding:14px 8px 4px}
+.nav.q{color:var(--faint)}
+main{flex:1;height:900px;display:flex;flex-direction:column}
+.top{height:56px;flex:none;display:flex;align-items:center;gap:8px;padding:0 20px;border-bottom:1px solid var(--line);background:var(--surface)}
+h1{font-size:22px;font-weight:600;letter-spacing:-.02em;margin:0 12px 0 0}
+.chip{border:1px solid var(--line);border-radius:6px;padding:4px 9px;font-size:12.5px;color:var(--muted);background:var(--surface)}
+.seg{margin-left:auto;display:flex;background:var(--sunken);border-radius:7px;padding:2px}
+.seg span{padding:3px 12px;font-size:12.5px;color:var(--muted);border-radius:5px}
+.seg .a{background:#fff;color:var(--text);font-weight:500;box-shadow:0 1px 2px rgba(15,18,24,.08)}
+.btn{background:var(--accent);color:#fff;border-radius:10px;padding:7px 16px;font-weight:500;font-size:13px}
+.body{flex:1;padding:20px;display:flex;flex-direction:column;gap:16px;min-height:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 20px}
+h2{font-size:14px;font-weight:600;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+h2 small{margin-left:auto;font-weight:400;font-size:12px;color:var(--faint)}
+.r1{height:288px;display:flex;gap:28px}
+.hero{width:290px;flex:none;border-right:1px solid var(--line);padding-right:28px;display:flex;flex-direction:column;justify-content:center}
+.hero .n{font:500 40px/1.1 "Geist Mono",monospace;letter-spacing:-.02em}
+.hero .c{margin-top:18px;padding:10px 12px;background:var(--loss-soft);border-radius:10px;color:var(--loss);font-weight:500;font-size:13.5px}
+.tbl{flex:1;display:flex;flex-direction:column}
+.row{display:grid;grid-template-columns:1fr 80px 170px 48px 128px;align-items:center;gap:16px;height:38px;border-top:1px solid var(--line);font-size:13px}
+.row.h{height:26px;border:0;font-size:12px;color:var(--faint)}
+.row .m{font-size:12.5px}.row .r{text-align:right}
+.trk{height:4px;border-radius:2px;background:var(--sunken)}.trk b{display:block;height:4px;border-radius:2px;background:var(--accent)}
+.tag{font-size:11.5px;font-weight:500;background:var(--loss-soft);color:var(--loss);border-radius:6px;padding:2px 7px;white-space:nowrap}
+.tag.g{background:var(--gain-soft);color:var(--gain)}
+.r2{height:268px;display:flex;gap:16px}.r2 .card{flex:1}
+.mrow{display:flex;align-items:center;gap:10px;height:40px;border-top:1px solid var(--line)}
+.mrow .m{margin-left:auto;font-size:12.5px}.mrow .cnt{width:66px;text-align:right;color:var(--muted);font-size:12.5px}
+.goal{padding:10px 0;border-top:1px solid var(--line)}
+.goal .l{display:flex;justify-content:space-between;align-items:center;font-size:13px}
+.goal .trk{margin:10px 0 6px;height:6px}.goal .trk b{height:6px;background:var(--gain)}
+.kg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.k{background:var(--sunken);border-radius:10px;padding:8px 12px}
+.k span{display:block;font-size:12px;color:var(--faint)}.k b{font:500 22px/1.25 "Geist Mono",monospace}
+.r3{flex:1}.r3 .card{height:100%;padding-bottom:8px}
+.tr{display:grid;grid-template-columns:130px 90px 70px 1fr 120px 200px;align-items:center;gap:16px;height:32px;border-top:1px solid var(--line);font-size:13px}
+.tr .m{font-size:12.5px}.tr .r{text-align:right}
+</style></head><body>
+<aside>
+<div class="logo">Keel</div>
+<button class="acct"><span class="av">MK</span>All accounts</button>
+<div class="nav on"><i></i>Dashboard</div><div class="nav"><i></i>Trades</div><div class="nav"><i></i>Calendar</div><div class="nav"><i></i>Reports</div><div class="nav"><i></i>Strategies</div><div class="nav"><i></i>Notebook</div><div class="nav"><i></i>Import</div><div class="nav"><i></i>Prop firms</div>
+<div class="grp">Not live yet</div>
+<div class="nav q"><i></i>Backtesting</div><div class="nav q"><i></i>Replay</div><div class="nav q"><i></i>Mentors</div><div class="nav q"><i></i>Assistant</div>
+<div class="nav" style="margin-top:auto"><i></i>Settings</div>
+</aside>
+<main>
+<div class="top"><h1>Dashboard</h1><span class="chip">1-20 Nov 2026</span><span class="chip">Symbol</span><span class="chip">Side</span><span class="chip">Strategy</span><span class="chip">Tags</span>
+<div class="seg"><span>Gross</span><span class="a">Net</span></div><span class="btn">Import</span></div>
+<div class="body">
+<section class="card r1">
+<div class="hero"><h2>Your plan, 1-20 Nov</h2><div class="n">91%</div><div class="faint" style="margin-top:4px">of rule checks kept</div><div class="c">Broken rules cost <span class="m">−$3,323.00</span></div></div>
+<div class="tbl">
+<div class="row h"><span>Rule</span><span class="r">Kept</span><span>Adherence</span><span class="r">%</span><span class="r">Cost when broken</span></div>
+<div class="row"><span style="display:flex;gap:8px;align-items:center">Stop stays where it was placed <span class="tag">Costliest</span></span><span class="m r">87 of 96</span><div class="trk"><b style="width:91%"></b></div><span class="m r">91%</span><span class="m r loss">−$1,140.00</span></div>
+<div class="row"><span>No new trade after two losses</span><span class="m r">14 of 17</span><div class="trk"><b style="width:82%"></b></div><span class="m r">82%</span><span class="m r loss">−$865.00</span></div>
+<div class="row"><span>Risk no more than 1R per trade</span><span class="m r">90 of 96</span><div class="trk"><b style="width:94%"></b></div><span class="m r">94%</span><span class="m r loss">−$720.00</span></div>
+<div class="row"><span>Entered on the range break</span><span class="m r">88 of 96</span><div class="trk"><b style="width:92%"></b></div><span class="m r">92%</span><span class="m r loss">−$598.00</span></div>
+<div class="row"><span>Max 6 trades a day</span><span class="m r">15 of 15</span><div class="trk"><b style="width:100%"></b></div><span class="m r">100%</span><span class="r faint">none</span></div>
+</div></section>
+<div class="r2">
+<section class="card"><h2>Mistakes, by cost<small>1-20 Nov</small></h2>
+<div class="mrow"><span class="tag">Moved stop</span><span class="m cnt">9 trades</span><span class="m loss">−$1,140.00</span></div>
+<div class="mrow"><span class="tag">Revenge trade</span><span class="m cnt">4 trades</span><span class="m loss">−$865.00</span></div>
+<div class="mrow"><span class="tag">Oversized</span><span class="m cnt">6 trades</span><span class="m loss">−$720.00</span></div>
+<div class="mrow"><span class="tag">Chased entry</span><span class="m cnt">8 trades</span><span class="m loss">−$598.00</span></div></section>
+<section class="card"><h2>Goals</h2>
+<div class="goal" style="border:0;padding-top:0"><div class="l"><span>Weekly net goal <span class="m">$1,500.00</span></span><span class="tag g">Reached</span></div><div class="trk"><b style="width:100%"></b></div><span class="m gain">+$2,727.50</span> <span class="faint">this week, 16-20 Nov</span></div>
+<div class="goal"><div class="l"><span>Daily loss limit <span class="m">$500.00</span></span><span class="m faint">14 of 15 days</span></div><div class="trk" style="margin-bottom:8px"><b style="width:93%;background:var(--accent)"></b></div><span class="faint">Kept 14 of 15 days. Broken Wed 11 Nov at</span> <span class="m loss">−$505.00</span></div></section>
+<section class="card"><h2>Performance</h2>
+<div class="kg"><div class="k"><span>Net P&amp;L</span><b class="gain">+$4,812.50</b></div><div class="k"><span>Win rate</span><b>54.2%</b></div><div class="k"><span>Profit factor</span><b>1.86</b></div><div class="k"><span>Expectancy</span><b>+$50.13</b></div></div>
+<svg viewBox="0 0 300 56" width="100%" height="56" preserveAspectRatio="none" style="margin-top:12px;display:block"><polygon points="0,56 0,49.5 21,51.4 43,44.8 64,43.8 86,47.5 107,38 129,35.6 150,41.1 171,33.2 193,31.5 214,20.5 236,23.4 257,17.6 279,4.2 300,2 300,56" fill="#2550E0" fill-opacity=".07"/><polyline points="0,49.5 21,51.4 43,44.8 64,43.8 86,47.5 107,38 129,35.6 150,41.1 171,33.2 193,31.5 214,20.5 236,23.4 257,17.6 279,4.2 300,2" fill="none" stroke="#2550E0" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg></section>
+</div>
+<section class="card r3"><h2>Recent trades<small>Today and yesterday</small></h2>
+<div class="tr" style="height:20px;border:0;font-size:12px;color:var(--faint)"><span>Time</span><span>Symbol</span><span>Side</span><span>Setup</span><span class="r">Net P&amp;L</span><span>Rules</span></div>
+<div class="tr"><span class="m">20 Nov 13:30</span><span class="m">AAPL</span><span>Long</span><span>Pullback</span><span class="m r gain">+$111.50</span><span class="faint">4 of 4 kept</span></div>
+<div class="tr"><span class="m">20 Nov 10:42</span><span class="m">NQZ5</span><span>Long</span><span>Opening range break</span><span class="m r gain">+$370.00</span><span class="faint">4 of 4 kept</span></div>
+<div class="tr"><span class="m">20 Nov 09:51</span><span class="m">ESZ5</span><span>Short</span><span><span class="tag">Moved stop</span></span><span class="m r loss">−$275.00</span><span class="loss">Broke: stop moved</span></div>
+<div class="tr"><span class="m">19 Nov 14:05</span><span class="m">AAPL</span><span>Long</span><span>Pullback</span><span class="m r gain">+$142.00</span><span class="faint">4 of 4 kept</span></div>
+</section>
+</div></main></body></html>

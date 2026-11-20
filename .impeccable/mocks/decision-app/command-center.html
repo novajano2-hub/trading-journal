@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Keel Dashboard - Command center</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F6F7F9;--surface:#fff;--sunken:#EFF1F4;--line:#E3E6EB;--line-2:#D3D8DF;--text:#0F1218;--muted:#4F5865;--faint:#687080;--accent:#2550E0;--accent-soft:#EAF0FE;--accent-ink:#1B3FB8;--gain:#087A54;--gain-soft:#E6F4EE;--loss:#C8283A;--loss-soft:#FBEBED;--warn:#B25E09;--warn-soft:#FDF1E4}
+html,body{width:1440px;height:900px;overflow:hidden;margin:0}
+*{box-sizing:border-box}
+body{font:13px/1.4 Geist,sans-serif;color:var(--text);background:var(--surface);display:flex}
+.m{font-family:"Geist Mono",monospace}.g{color:var(--gain)}.l{color:var(--loss)}.f{color:var(--faint)}
+.rail{width:56px;height:900px;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:4px}
+.keel{width:32px;height:32px;border-radius:8px;background:var(--accent);color:#fff;font-weight:600;display:grid;place-items:center;margin:0 0 12px}
+.ic{width:40px;height:36px;border-radius:10px;display:grid;place-items:center}
+.ic i{width:16px;height:16px;border-radius:4px;background:var(--sunken);display:block}
+.ic.on{background:var(--accent-soft)}.ic.on i{background:#C9D8FA}
+.hr{width:28px;height:1px;background:var(--line);margin:8px 0}
+.dim{opacity:.4}
+.mk{width:32px;height:32px;border-radius:16px;background:var(--sunken);border:1px solid var(--line-2);font-size:12px;font-weight:600;display:grid;place-items:center;margin-top:6px}
+.main{width:1384px;height:900px;display:flex;flex-direction:column}
+.hd{height:56px;flex:none;display:flex;align-items:center;gap:8px;padding:0 16px;border-bottom:1px solid var(--line)}
+.search{width:520px;height:36px;border:1px solid var(--line-2);border-radius:10px;display:flex;align-items:center;padding:0 8px 0 12px;color:var(--faint);margin-right:4px}
+.search span{flex:1}
+.key{font:500 11px "Geist Mono",monospace;color:var(--muted);background:var(--sunken);border:1px solid var(--line);border-radius:6px;padding:2px 6px}
+.tok{height:28px;display:flex;align-items:center;gap:6px;padding:0 8px 0 10px;border-radius:6px;background:var(--sunken);border:1px solid var(--line);color:var(--muted)}
+.tok b{font-weight:500;color:var(--text)}.tok u{text-decoration:none;color:var(--faint);font-size:14px;line-height:1}
+.sp{flex:1}
+.seg{display:flex;background:var(--sunken);border-radius:7px;padding:2px}
+.seg span{padding:4px 12px;border-radius:5px;color:var(--muted);font-weight:500}
+.seg .a{background:#fff;color:var(--text);box-shadow:0 1px 2px rgba(15,18,24,.08)}
+.btn{height:36px;padding:0 16px;border-radius:10px;background:var(--accent);color:#fff;font-weight:500;display:flex;align-items:center}
+.alert{height:32px;flex:none;background:var(--warn-soft);color:var(--warn);border-bottom:1px solid #F1D9BB;display:flex;align-items:center;padding:0 16px;gap:8px;font-weight:500}
+.alert .m{font-weight:500}
+.body{flex:1;display:grid;grid-template-columns:280px 1fr 440px;min-height:0}
+.col{border-right:1px solid var(--line);min-width:0}.col:last-child{border-right:0}
+.ph{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid var(--line);font-weight:600}
+.grp{border-bottom:1px solid var(--line)}
+.st{height:34px;display:flex;align-items:center;justify-content:space-between;padding:0 16px}
+.st span:first-child{color:var(--faint);font-size:12px}
+.st .m{font-size:13px;font-weight:500}
+.tabs{height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 16px}
+.tabs .t{font-weight:600}
+.ch{position:relative;margin:0 16px;height:340px}
+.ch svg{position:absolute;left:0;top:0;width:100%;height:100%}
+.yl{position:absolute;right:0;font:11px "Geist Mono",monospace;color:var(--faint);background:#fff;padding:0 2px;transform:translateY(-100%)}
+.bars{margin:6px 16px 0;height:140px;border-top:1px solid var(--line-2);position:relative;display:grid;grid-template-columns:repeat(15,1fr);border-top:0}
+.bars:before{content:"";position:absolute;left:0;right:0;top:70px;height:1px;background:var(--line-2)}
+.bc{position:relative}
+.bc i{position:absolute;left:50%;margin-left:-9px;width:18px;border-radius:2px}
+.bc .p{bottom:70px;background:var(--gain)}.bc .n{top:70px;background:var(--loss)}
+.dt{display:flex;justify-content:space-between;margin:4px 16px 0;font:11px "Geist Mono",monospace;color:var(--faint)}
+.cost{margin:14px 16px 0;padding-top:12px;border-top:1px solid var(--line)}
+.cost .lb{display:flex;justify-content:space-between;margin-bottom:8px}.cost .lb span:first-child{font-weight:600}
+.chips{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.chip{border-radius:6px;background:var(--loss-soft);padding:6px 8px;display:flex;flex-direction:column}
+.chip span{font-size:12px;color:var(--muted)}.chip .m{color:var(--loss);font-weight:500;font-size:12.5px}
+.r{height:30px;display:grid;grid-template-columns:92px 64px 48px 1fr 88px;align-items:center;padding:0 12px 0 10px;border-left:2px solid transparent;border-bottom:1px solid var(--line);font:12.5px "Geist Mono",monospace}
+.r .s{font-family:Geist,sans-serif;color:var(--muted)}
+.r .tag{font-family:Geist,sans-serif;font-size:12px;color:var(--muted);white-space:nowrap}
+.r .tag.mist{background:var(--loss-soft);color:var(--loss);border-radius:6px;padding:1px 6px;justify-self:start}
+.r em{font-style:normal;text-align:right;font-weight:500}
+.r.sel{background:var(--accent-soft);border-left-color:var(--accent);color:var(--accent-ink)}
+.r.sel .s{color:var(--accent-ink)}
+.r.h{height:30px;font:500 12px Geist,sans-serif;color:var(--faint);background:var(--bg);border-bottom:1px solid var(--line)}
+.r.h em{font-weight:500}.r.h .car{font-size:8px;color:var(--text);margin-left:3px}
+.hint{padding:10px 16px;font-size:12px;color:var(--faint)}
+</style></head><body>
+<nav class="rail">
+ <div class="keel">K</div>
+ <div class="ic on" title="Dashboard"><i></i></div>
+ <div class="ic" title="Trades"><i></i></div><div class="ic" title="Calendar"><i></i></div><div class="ic" title="Reports"><i></i></div>
+ <div class="ic" title="Strategies"><i></i></div><div class="ic" title="Notebook"><i></i></div><div class="ic" title="Import"><i></i></div><div class="ic" title="Prop firms"><i></i></div>
+ <div class="hr"></div>
+ <div class="ic dim" title="Backtesting - Not live yet"><i></i></div><div class="ic dim" title="Replay - Not live yet"><i></i></div><div class="ic dim" title="Mentors - Not live yet"><i></i></div><div class="ic dim" title="Assistant - Not live yet"><i></i></div>
+ <div class="sp"></div>
+ <div class="ic" title="Settings"><i></i></div>
+ <div class="mk">MK</div>
+</nav>
+<div class="main">
+ <header class="hd">
+  <div class="search"><span>Search trades, symbols, tags, or jump to a report</span><div class="key">⌘K</div></div>
+  <div class="tok">account: <b>All</b><u>×</u></div>
+  <div class="tok">date: <b class="m">1-20 Nov 2026</b><u>×</u></div>
+  <div class="sp"></div>
+  <div class="seg"><span>Gross</span><span class="a">Net</span></div>
+  <div class="btn">Import</div>
+ </header>
+ <div class="alert">Prop eval 50K: daily loss at <span class="m">78%</span> of its <span class="m">$1,000.00</span> limit</div>
+ <div class="body">
+  <section class="col">
+   <div class="ph">Performance <span class="f" style="font-weight:400;font-size:12px">Net, all accounts</span></div>
+   <div class="grp">
+    <div class="st"><span>Net P&amp;L</span><span class="m g">+$4,812.50</span></div>
+    <div class="st"><span>Gross P&amp;L</span><span class="m g">+$5,380.00</span></div>
+    <div class="st"><span>Fees</span><span class="m l">−$567.50</span></div>
+    <div class="st"><span>Trades</span><span class="m">96</span></div>
+   </div>
+   <div class="grp">
+    <div class="st"><span>Win rate</span><span class="m">54.2%</span></div>
+    <div class="st"><span>Profit factor</span><span class="m">1.86</span></div>
+    <div class="st"><span>Expectancy</span><span class="m g">+$50.13</span></div>
+   </div>
+   <div class="grp">
+    <div class="st"><span>Avg win</span><span class="m g">+$212.40</span></div>
+    <div class="st"><span>Avg loss</span><span class="m l">−$134.10</span></div>
+    <div class="st"><span>Max drawdown</span><span class="m l">−$1,240.00</span></div>
+   </div>
+   <div class="grp">
+    <div class="st"><span>Best day</span><span class="m g">+$1,236.00</span></div>
+    <div class="st"><span>Worst day</span><span class="m l">−$505.00</span></div>
+   </div>
+  </section>
+  <section class="col">
+   <div class="tabs"><span class="t">Equity and daily net P&amp;L</span>
+    <div class="seg"><span>1W</span><span class="a">1M</span><span>3M</span><span>YTD</span><span>All</span></div></div>
+   <div class="ch">
+    <svg viewBox="0 0 642 260" preserveAspectRatio="none">
+     <g stroke="#E3E6EB" stroke-width="1" vector-effect="non-scaling-stroke"><line x1="0" x2="642" y1="240" y2="240" vector-effect="non-scaling-stroke"/><line x1="0" x2="642" y1="152" y2="152" vector-effect="non-scaling-stroke"/><line x1="0" x2="642" y1="64" y2="64" vector-effect="non-scaling-stroke"/></g>
+     <polygon points="21,240 21,221.5 64,229.4 107,202.6 150,198.4 193,213.4 236,174.7 278,165.2 321,187.4 364,155.3 407,148.3 450,103.4 493,115.5 536,91.7 578,37.3 621,28.3 621,240" fill="#2550E0" fill-opacity=".07"/>
+     <polyline points="21,221.5 64,229.4 107,202.6 150,198.4 193,213.4 236,174.7 278,165.2 321,187.4 364,155.3 407,148.3 450,103.4 493,115.5 536,91.7 578,37.3 621,28.3" fill="none" stroke="#2550E0" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+    </svg>
+    <span class="yl" style="top:92.3%">$0</span><span class="yl" style="top:58.5%">$2,000</span><span class="yl" style="top:24.6%">$4,000</span>
+   </div>
+   <div class="bars">
+    <div class="bc"><i class="p" style="height:23px"></i></div><div class="bc"><i class="n" style="height:10px"></i></div><div class="bc"><i class="p" style="height:34px"></i></div><div class="bc"><i class="p" style="height:5px"></i></div><div class="bc"><i class="n" style="height:19px"></i></div>
+    <div class="bc"><i class="p" style="height:48px"></i></div><div class="bc"><i class="p" style="height:12px"></i></div><div class="bc"><i class="n" style="height:28px"></i></div><div class="bc"><i class="p" style="height:40px"></i></div><div class="bc"><i class="p" style="height:9px"></i></div>
+    <div class="bc"><i class="p" style="height:56px"></i></div><div class="bc"><i class="n" style="height:15px"></i></div><div class="bc"><i class="p" style="height:30px"></i></div><div class="bc"><i class="p" style="height:68px"></i></div><div class="bc"><i class="p" style="height:11px"></i></div>
+   </div>
+   <div class="dt"><span>2 Nov</span><span>9 Nov</span><span>16 Nov</span><span>20 Nov</span></div>
+   <div class="cost">
+    <div class="lb"><span>Cost of mistakes</span><span class="f" style="font-size:12px">1-20 Nov 2026</span></div>
+    <div class="chips">
+     <div class="chip"><span>Moved stop</span><span class="m">−$1,140.00</span></div>
+     <div class="chip"><span>Revenge trade</span><span class="m">−$865.00</span></div>
+     <div class="chip"><span>Oversized</span><span class="m">−$720.00</span></div>
+     <div class="chip"><span>Chased entry</span><span class="m">−$598.00</span></div>
+    </div>
+   </div>
+  </section>
+  <section class="col">
+   <div class="ph">Trades <span class="f" style="font-weight:400;font-size:12px">16-20 Nov, 14 trades</span></div>
+   <div class="r h"><span>Time<span class="car">▼</span></span><span>Symbol</span><span>Side</span><span>Setup</span><em>Net P&amp;L</em></div>
+   <div class="r"><span>20 Nov 13:30</span><span>AAPL</span><span class="s">Long</span><span class="tag">Pullback</span><em class="g">+$111.50</em></div>
+   <div class="r"><span>20 Nov 10:42</span><span>NQZ5</span><span class="s">Long</span><span class="tag">ORB</span><em class="g">+$370.00</em></div>
+   <div class="r sel"><span>20 Nov 09:51</span><span>ESZ5</span><span class="s">Short</span><span class="tag mist">Moved stop</span><em class="l">−$275.00</em></div>
+   <div class="r"><span>19 Nov 14:05</span><span>AAPL</span><span class="s">Long</span><span class="tag">Pullback</span><em class="g">+$142.00</em></div>
+   <div class="r"><span>19 Nov 11:20</span><span>MNQZ5</span><span class="s">Short</span><span class="tag">Fade</span><em class="g">+$88.50</em></div>
+   <div class="r"><span>19 Nov 09:47</span><span>NQZ5</span><span class="s">Long</span><span class="tag">ORB</span><em class="g">+$1,215.50</em></div>
+   <div class="r"><span>19 Nov 09:38</span><span>CLZ5</span><span class="s">Long</span><span class="tag">Breakout</span><em class="l">−$210.00</em></div>
+   <div class="r"><span>18 Nov 11:05</span><span>AAPL</span><span class="s">Long</span><span class="tag">Pullback</span><em class="g">+$120.00</em></div>
+   <div class="r"><span>18 Nov 09:36</span><span>NQZ5</span><span class="s">Long</span><span class="tag">ORB</span><em class="g">+$420.00</em></div>
+   <div class="r"><span>17 Nov 13:10</span><span>CLZ5</span><span class="s">Long</span><span class="tag">Breakout</span><em class="l">−$95.00</em></div>
+   <div class="r"><span>17 Nov 09:45</span><span>NQZ5</span><span class="s">Short</span><span class="tag">Breakout</span><em class="l">−$180.00</em></div>
+   <div class="r"><span>16 Nov 10:40</span><span>MNQZ5</span><span class="s">Short</span><span class="tag">Fade</span><em class="g">+$150.00</em></div>
+   <div class="r"><span>16 Nov 09:52</span><span>ESZ5</span><span class="s">Long</span><span class="tag">Pullback</span><em class="g">+$310.00</em></div>
+   <div class="r"><span>16 Nov 09:34</span><span>NQZ5</span><span class="s">Long</span><span class="tag">ORB</span><em class="g">+$560.00</em></div>
+   <div class="hint">J / K to move, Enter to open, T to tag</div>
+  </section>
+ </div>
+</div>
+</body></html>

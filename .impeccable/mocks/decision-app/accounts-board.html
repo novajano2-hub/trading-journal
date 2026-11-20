@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Keel Accounts board</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F6F7F9;--surface:#FFFFFF;--sunken:#EFF1F4;--line:#E3E6EB;--line-2:#D3D8DF;--text:#0F1218;--muted:#4F5865;--faint:#687080;--accent:#2550E0;--accent-soft:#EAF0FE;--accent-ink:#1B3FB8;--gain:#087A54;--gain-soft:#E6F4EE;--loss:#C8283A;--loss-soft:#FBEBED;--warn:#B25E09;--warn-soft:#FDF1E4}
+html,body{width:1440px;height:900px;overflow:hidden;margin:0}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:13px/1.4 Geist,sans-serif}
+.m{font-family:'Geist Mono',monospace}.g{color:var(--gain)}.l{color:var(--loss)}.f{color:var(--faint)}
+.top{height:56px;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 20px;gap:28px}
+.logo{display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px;letter-spacing:-.01em}
+.tile{width:22px;height:22px;border-radius:6px;background:var(--text);color:#fff;font-size:12px;display:grid;place-items:center}
+.tabs{display:flex;gap:2px;flex:1}.tabs span{padding:6px 12px;border-radius:7px;color:var(--muted);font-weight:500}
+.tabs .on{background:var(--sunken);color:var(--text)}
+.btn{background:var(--accent);color:#fff;border-radius:10px;padding:7px 16px;font-weight:500}
+.badge{width:30px;height:30px;border-radius:50%;background:var(--sunken);border:1px solid var(--line);display:grid;place-items:center;font-size:11px;font-weight:600}
+.filt{height:52px;display:flex;align-items:center;padding:0 20px;gap:10px}
+h1{font-size:22px;font-weight:600;letter-spacing:-.02em;margin:0 14px 0 0}
+.chip{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:4px 10px;color:var(--muted);display:flex;gap:6px;align-items:center}
+.chip b{font-weight:500;color:var(--text)}
+.seg{margin-left:auto;background:var(--sunken);border-radius:7px;padding:2px;display:flex}
+.seg span{padding:4px 14px;border-radius:5px;color:var(--muted);font-weight:500}
+.seg .on{background:#fff;color:var(--text);box-shadow:0 1px 2px rgba(15,18,24,.08)}
+main{padding:4px 20px 20px;display:flex;flex-direction:column;gap:16px;height:792px}
+.acc{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px}
+.a{padding:16px 18px;height:144px;display:flex;flex-direction:column}
+.a.sel{background:var(--accent-soft);border-color:var(--accent)}
+.a.sel .nm{color:var(--accent-ink)}
+.nm{font-weight:500;display:flex;align-items:center;gap:8px}
+.ic{width:16px;height:16px;border-radius:4px;background:var(--sunken);display:inline-block}
+.sel .ic{background:#fff}
+.bal{font-size:20px;font-weight:500;margin:8px 0 2px}
+.pl{font-size:12.5px}
+.run{margin-top:auto}.trk{height:4px;border-radius:2px;background:var(--sunken);margin-bottom:6px}
+.trk i{display:block;height:4px;border-radius:2px;background:var(--accent)}
+.trk.none{background:transparent;border-top:1px dashed var(--line-2);height:1px;margin:3px 0 9px}
+.rt{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:8px;align-items:center}
+.warn{background:var(--warn-soft);color:var(--warn);border-radius:6px;padding:1px 7px;font-weight:500;font-size:11.5px;white-space:nowrap}
+.cols{display:grid;grid-template-columns:1fr 540px;gap:16px;flex:1;min-height:0}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--line)}
+.kpis div{padding:16px 18px;border-right:1px solid var(--line)}.kpis div:last-child{border:0}
+.kpis .v{white-space:nowrap;font:500 22px 'Geist Mono',monospace;margin-top:4px;letter-spacing:-.02em}
+.kpis small{font-size:12px;color:var(--faint);font-family:'Geist Mono',monospace}
+.ch{padding:16px 18px;flex:1;display:flex;flex-direction:column}
+.ch .hd{display:flex;justify-content:space-between;font-weight:500;margin-bottom:10px}
+.plot{flex:1;border-left:1px solid var(--line);border-bottom:1px solid var(--line);position:relative;min-height:0}
+.plot svg{position:absolute;inset:0;width:100%;height:100%}
+.xs{display:flex;justify-content:space-between;margin-top:6px;font:11.5px 'Geist Mono',monospace;color:var(--faint)}
+.right{display:flex;flex-direction:column;gap:16px;min-height:0}
+.tb{padding:16px 18px 8px}.tb .hd{display:flex;justify-content:space-between;font-weight:500;margin-bottom:8px}
+.row{display:grid;grid-template-columns:92px 56px 46px 1fr 70px 46px;gap:8px;align-items:center;height:40px;border-top:1px solid var(--line);font:12.5px 'Geist Mono',monospace}
+.row.h{height:30px;border:0;font:12px Geist,sans-serif;color:var(--faint)}
+.row .t{font:12px Geist,sans-serif;color:var(--muted);white-space:nowrap}
+.tag{background:var(--sunken);border-radius:6px;padding:2px 7px;font:12px Geist,sans-serif;justify-self:start;white-space:nowrap}
+.tag.x{background:var(--loss-soft);color:var(--loss)}
+.rv{padding:16px 18px;flex:1}.rv div{padding:8px 0;border-top:1px solid var(--line);display:flex;justify-content:space-between;color:var(--muted)}
+.rv .hd{border:0;color:var(--text);font-weight:500;padding-top:0}
+.rv b{font:500 12.5px 'Geist Mono',monospace;color:var(--text)}
+</style></head><body>
+<div class="top"><div class="logo"><span class="tile">K</span>Keel</div>
+<div class="tabs"><span class="on">Dashboard</span><span>Trades</span><span>Calendar</span><span>Reports</span><span>Strategies</span><span>Notebook</span><span>Import</span><span>Prop firms</span><span>More</span></div>
+<span class="btn">Import</span><span class="badge">MK</span></div>
+<div class="filt"><h1>Dashboard</h1>
+<span class="chip">Date <b class="m">1-20 Nov 2026</b></span><span class="chip">Account <b>All accounts</b></span><span class="chip">Symbol</span><span class="chip">Side</span><span class="chip">Strategy</span><span class="chip">Tags</span>
+<div class="seg"><span>Gross</span><span class="on">Net</span></div></div>
+<main>
+<div class="acc">
+<div class="card a sel"><div class="nm"><i class="ic"></i>All accounts</div><div class="f" style="font-size:12px;margin-top:8px;color:var(--accent-ink)">Net P&amp;L, 3 accounts</div><div class="bal m g" style="font-size:26px;margin:2px 0">+$4,812.50</div><div class="run"><div class="trk none"></div><div class="rt">1 limit tracked across all accounts</div></div></div>
+<div class="card a"><div class="nm"><i class="ic"></i>Futures (live)</div><div class="bal m">$27,410.00</div><div class="pl m g">+$3,086.00 <span class="f">period</span></div><div class="run"><div class="trk none"></div><div class="rt">No firm limits</div></div></div>
+<div class="card a"><div class="nm"><i class="ic"></i>Prop eval 50K</div><div class="bal m">$51,860.00</div><div class="pl m g">+$1,860.00 <span class="f">period</span></div><div class="run"><div class="trk"><i style="width:66%"></i></div><div class="rt"><span><span class="m">$1,640.00</span> left of <span class="m">$2,500.00</span> trailing drawdown</span></div><div style="margin-top:5px"><span class="warn">Daily loss 78% of limit</span></div></div></div>
+<div class="card a"><div class="nm"><i class="ic"></i>Stocks (cash)</div><div class="bal m">$18,204.50</div><div class="pl m l">−$133.50 <span class="f">period</span></div><div class="run"><div class="trk none"></div><div class="rt">No firm limits</div></div></div>
+</div>
+<div class="cols">
+<div class="card" style="display:flex;flex-direction:column;min-height:0">
+<div class="kpis"><div><span class="f">Net P&amp;L</span><div class="v g">+$4,812.50</div></div><div><span class="f">Win rate</span><div class="v">54.2%</div><small>52 of 96</small></div><div><span class="f">Profit factor</span><div class="v">1.86</div></div><div><span class="f">Expectancy</span><div class="v g">+$50.13</div></div><div><span class="f">Max drawdown</span><div class="v l">−$1,240.00</div></div></div>
+<div class="ch"><div class="hd"><span>Equity curve, all accounts</span><span class="f m">Cumulative net P&amp;L, 1-20 Nov</span></div>
+<div class="plot"><svg viewBox="0 0 800 300" preserveAspectRatio="none"><polygon points="0,290 53,267 107,277 160,242 213,237 267,256 320,207 373,195 427,223 480,182 533,173 587,116 640,132 693,101 747,32 800,21 800,300 0,300" fill="#2550E0" fill-opacity=".07"/><polyline points="0,290 53,267 107,277 160,242 213,237 267,256 320,207 373,195 427,223 480,182 533,173 587,116 640,132 693,101 747,32 800,21" fill="none" stroke="#2550E0" stroke-width="2" vector-effect="non-scaling-stroke"/></svg></div>
+<div class="xs"><span>2 Nov</span><span>6 Nov</span><span>11 Nov</span><span>16 Nov</span><span>20 Nov</span></div></div></div>
+<div class="right">
+<div class="card tb"><div class="hd"><span>Recent trades</span><span class="f">View all</span></div>
+<div class="row h"><span>Time</span><span>Symbol</span><span>Side</span><span>Setup</span><span style="text-align:right">Net P&amp;L</span><span style="text-align:right">R</span></div>
+<div class="row"><span class="t m">20 Nov 10:42</span><span>NQZ5</span><span>Long</span><span class="tag">Opening range break</span><span class="g" style="text-align:right">+$370.00</span><span class="g" style="text-align:right">+1.8R</span></div>
+<div class="row"><span class="t m">20 Nov 09:51</span><span>ESZ5</span><span>Short</span><span class="tag x">Moved stop</span><span class="l" style="text-align:right">−$275.00</span><span class="l" style="text-align:right">−1.4R</span></div>
+<div class="row"><span class="t m">19 Nov 14:05</span><span>AAPL</span><span>Long</span><span class="tag">Pullback</span><span class="g" style="text-align:right">+$142.00</span><span class="g" style="text-align:right">+0.9R</span></div>
+<div class="row"><span class="t m">19 Nov 11:20</span><span>MNQZ5</span><span>Short</span><span class="tag">Fade</span><span class="g" style="text-align:right">+$88.50</span><span class="g" style="text-align:right">+0.6R</span></div>
+<div class="row"><span class="t m">19 Nov 09:38</span><span>CLZ5</span><span>Long</span><span class="tag">Breakout</span><span class="l" style="text-align:right">−$210.00</span><span class="l" style="text-align:right">−1.0R</span></div></div>
+<div class="card rv"><div class="hd"><span>Review queue, today</span></div><div>Trades untagged<b>3</b></div><div>Rule broken: Stop stays where it was placed<b>1</b></div><div>Daily review note<b>Not written</b></div></div>
+</div></div></main></body></html>

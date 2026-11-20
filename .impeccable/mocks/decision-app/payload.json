@@ -1,0 +1,46 @@
+{
+  "title": "Choose the app shell and Dashboard layout",
+  "question": "Three ways to lay out Keel's app around the same light look. Pick the one you want every app screen built on.",
+  "options": [
+    {
+      "id": "accounts-board",
+      "kind": "assigned",
+      "kicker": "THE ROLL",
+      "label": "Accounts board",
+      "lineage": "Kraken Pro home account cards, Gemini portfolio top bar",
+      "thesis": "Your accounts lead: every account is a card with its P&L and how far it sits from its own limits.",
+      "palette": ["#F6F7F9", "#FFFFFF", "#2550E0", "#087A54", "#C8283A"],
+      "materials": ["top navigation bar", "account cards with limit runways"],
+      "viewport": "Top bar with modules and account switcher; filter row; a row of account cards; combined equity chart; trades table.",
+      "risk": "Thinner for a trader with a single account.",
+      "html": ".impeccable/mocks/decision-app/accounts-board.html"
+    },
+    {
+      "id": "inspector-split",
+      "kind": "dealt",
+      "label": "Inspector split",
+      "lineage": "Copilot Money and Fey right-hand detail panels",
+      "thesis": "Click any bar, day or row and a right-hand inspector shows the trades behind that number.",
+      "palette": ["#F6F7F9", "#FFFFFF", "#2550E0", "#087A54", "#C8283A"],
+      "materials": ["icon rail", "persistent inspector panel"],
+      "viewport": "Narrow icon rail; filter bar; KPIs, equity and daily P&L in the main column; inspector on the right showing the selected day's trades.",
+      "risk": "Less width for charts on 13-inch laptops.",
+      "html": ".impeccable/mocks/decision-app/inspector-split.html"
+    },
+    {
+      "id": "review-desk",
+      "kind": "dealt",
+      "label": "Review desk",
+      "lineage": "Kraken Pro home: labelled sidebar, value plus chart, tabbed table, right rail",
+      "thesis": "A labelled sidebar and a working desk: performance in the middle, today's review and prop status in a right rail.",
+      "palette": ["#F6F7F9", "#FFFFFF", "#2550E0", "#087A54", "#C8283A"],
+      "materials": ["labelled sidebar", "right rail of review cards"],
+      "viewport": "Labelled sidebar; filter bar; net P&L with equity curve and KPI strip; tabbed trades table; right rail with review queue, prop status and month calendar.",
+      "risk": "Closest to the category standard; distinction rests on the details.",
+      "html": ".impeccable/mocks/decision-app/review-desk.html"
+    }
+  ],
+  "reroll": true,
+  "buildPath": { "value": "code" },
+  "steer": true
+}

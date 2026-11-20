@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Keel - Review desk</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F6F7F9;--surface:#FFFFFF;--sunken:#EFF1F4;--line:#E3E6EB;--line-2:#D3D8DF;--text:#0F1218;--muted:#4F5865;--faint:#687080;--accent:#2550E0;--accent-soft:#EAF0FE;--accent-ink:#1B3FB8;--gain:#087A54;--gain-soft:#E6F4EE;--loss:#C8283A;--loss-soft:#FBEBED;--warn:#B25E09;--warn-soft:#FDF1E4}
+*{box-sizing:border-box}
+html,body{width:1440px;height:900px;overflow:hidden;margin:0}
+body{background:var(--bg);color:var(--text);font:13px/1.4 Geist,system-ui,sans-serif;display:flex}
+.m,.num{font-family:"Geist Mono",ui-monospace,monospace}
+.gain{color:var(--gain)}.loss{color:var(--loss)}
+.faint{color:var(--faint);font-size:12px}
+aside{width:232px;height:900px;background:var(--surface);border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column}
+.logo{font-size:18px;font-weight:600;letter-spacing:-.02em;padding:2px 8px 14px}
+.acct{display:flex;align-items:center;gap:8px;width:100%;height:40px;padding:0 10px;border:1px solid var(--line-2);border-radius:10px;background:var(--surface);font:500 13px Geist;color:var(--text);text-align:left;margin-bottom:16px}
+.av{width:22px;height:22px;border-radius:6px;background:var(--accent-soft);color:var(--accent-ink);font-size:10px;font-weight:600;display:grid;place-items:center}
+.acct span:last-child{margin-left:auto;color:var(--faint)}
+.nav{display:flex;align-items:center;gap:10px;height:34px;padding:0 10px;border-radius:10px;color:var(--muted);font-weight:500}
+.nav i{width:16px;height:16px;border-radius:4px;background:var(--sunken);flex:none}
+.nav.on{background:var(--accent-soft);color:var(--accent-ink)}
+.nav.on i{background:#fff}
+.grp{padding:18px 10px 6px;font-size:12px;color:var(--faint)}
+.dim{color:var(--faint);font-weight:400}
+.sp{flex:1}
+.wrap{width:1208px;height:900px;display:flex;flex-direction:column}
+header{height:56px;flex:none;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:16px;padding:0 20px}
+h1{margin:0;font-size:22px;font-weight:600;letter-spacing:-.02em}
+.chips{display:flex;gap:6px;margin-left:8px}
+.chip{height:28px;padding:0 10px;border:1px solid var(--line-2);border-radius:6px;display:flex;align-items:center;gap:6px;color:var(--muted);font-weight:500;background:var(--surface)}
+.chip.d{font-family:"Geist Mono",monospace;font-size:12px;color:var(--text)}
+.seg{display:flex;background:var(--sunken);border-radius:7px;padding:2px;margin-left:auto}
+.seg b{font-weight:500;padding:3px 12px;border-radius:5px;color:var(--muted)}
+.seg b.on{background:#fff;color:var(--text);box-shadow:0 1px 2px rgba(15,18,24,.08)}
+.btn{height:34px;padding:0 16px;border:0;border-radius:10px;background:var(--accent);color:#fff;font:500 13px Geist}
+.body{flex:1;display:flex;gap:16px;padding:16px 20px;min-height:0}
+.centre{flex:1;min-width:0;display:flex;flex-direction:column;gap:16px}
+.rail{width:320px;flex:none;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 18px}
+.card h2{margin:0;font-size:14px;font-weight:600;letter-spacing:-.01em}
+.perf{height:376px;display:flex;flex-direction:column;flex:none}
+.hero{display:flex;align-items:baseline;gap:12px;margin-top:4px}
+.hero .num{font-size:38px;font-weight:500;letter-spacing:-.02em;line-height:1.15}
+.eq{flex:1;margin:6px 0 10px;min-height:0}
+.eq svg{width:100%;height:100%;display:block}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid var(--line);padding-top:12px}
+.kpi+.kpi{border-left:1px solid var(--line);padding-left:16px}
+.kpi .num{font-size:22px;font-weight:500;display:block;margin-top:2px;white-space:nowrap}
+.kpi .s{font:400 11.5px "Geist Mono",monospace;color:var(--faint)}
+.tbl{flex:1;padding:0;overflow:hidden;min-height:0}
+.tabs{display:flex;gap:4px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.tabs b{font-weight:500;padding:5px 12px;border-radius:5px;color:var(--muted)}
+.tabs b.on{background:#fff;color:var(--text);box-shadow:0 1px 2px rgba(15,18,24,.08);border:1px solid var(--line)}
+.tabs .tag{margin-left:6px;background:var(--loss-soft);color:var(--loss);border-radius:6px;padding:0 6px;font:500 11px "Geist Mono"}
+.row{display:grid;grid-template-columns:130px 90px 80px 1fr 110px 80px;align-items:center;height:36px;padding:0 20px;border-bottom:1px solid var(--line);font:400 12.5px "Geist Mono",monospace}
+.row.h{height:32px;font:500 12px Geist;color:var(--faint);background:var(--bg)}
+.row>:nth-child(n+5){text-align:right}
+.row .su{font-family:Geist}
+.mist{background:var(--loss-soft);color:var(--loss);border-radius:6px;padding:2px 8px;font:500 12px Geist}
+.row .su .t{background:var(--sunken);border-radius:6px;padding:2px 8px;font:500 12px Geist;color:var(--muted)}
+.q{display:flex;align-items:center;gap:10px;height:38px;border-bottom:1px solid var(--line)}
+.q:last-of-type{border:0}
+.q .bx{width:16px;height:16px;border:1.5px solid var(--line-2);border-radius:4px;flex:none}
+.q .c{margin-left:auto;font:500 12px "Geist Mono";background:var(--sunken);border-radius:6px;padding:1px 8px}
+.q .c.r{background:var(--loss-soft);color:var(--loss)}
+.review{border-color:var(--accent);box-shadow:0 1px 2px rgba(15,18,24,.06),0 8px 24px rgba(37,80,224,.06)}
+.review .btn{width:100%;margin-top:10px}
+.warn{display:inline-block;background:var(--warn-soft);color:var(--warn);border-radius:6px;padding:3px 9px;font-weight:500;margin:10px 0 6px}
+.kv{display:flex;justify-content:space-between;align-items:center;height:30px;border-top:1px solid var(--line)}
+.kv .m{font-size:12.5px}
+.cal{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:10px}
+.cal .wd{font-size:11px;color:var(--faint);text-align:center}
+.cal div.d{height:38px;border-radius:6px;padding:3px 5px;font:400 9.5px "Geist Mono",monospace;display:flex;flex-direction:column;justify-content:space-between}
+.cal .d i{font-style:normal;color:var(--faint);font-size:9px}
+.cal .g{background:var(--gain-soft);color:var(--gain)}
+.cal .l{background:var(--loss-soft);color:var(--loss)}
+.cal .t{outline:2px solid var(--accent);outline-offset:-2px}
+</style></head><body>
+<aside>
+  <div class="logo">Keel</div>
+  <button class="acct"><span class="av">MK</span>All accounts<span>v</span></button>
+  <div class="nav on"><i></i>Dashboard</div>
+  <div class="nav"><i></i>Trades</div><div class="nav"><i></i>Calendar</div><div class="nav"><i></i>Reports</div>
+  <div class="nav"><i></i>Strategies</div><div class="nav"><i></i>Notebook</div><div class="nav"><i></i>Import</div><div class="nav"><i></i>Prop firms</div>
+  <div class="grp">Not live yet</div>
+  <div class="nav dim"><i></i>Backtesting</div><div class="nav dim"><i></i>Replay</div><div class="nav dim"><i></i>Mentors</div><div class="nav dim"><i></i>Assistant</div>
+  <div class="sp"></div>
+  <div class="nav"><i></i>Settings</div>
+</aside>
+<div class="wrap">
+<header><h1>Dashboard</h1>
+  <div class="chips"><span class="chip d">1-20 Nov 2026</span><span class="chip">Symbol</span><span class="chip">Side</span><span class="chip">Strategy</span><span class="chip">Tags</span></div>
+  <div class="seg"><b>Gross</b><b class="on">Net</b></div><button class="btn">Import</button></header>
+<div class="body">
+<div class="centre">
+  <section class="card perf">
+    <div class="faint">Net P&amp;L</div>
+    <div class="hero"><span class="num gain">+$4,812.50</span><span class="faint m">96 trades</span></div>
+    <div class="eq"><svg viewBox="0 0 800 150" preserveAspectRatio="none"><polygon points="0,150 0,128.9 57,133.6 114,117.5 171,115 229,124 286,100.9 343,95.2 400,108.5 457,89.2 514,85 571,58 629,65.3 686,51 743,18.4 800,12.3 800,150" fill="#087A54" fill-opacity=".07"/><polyline points="0,128.9 57,133.6 114,117.5 171,115 229,124 286,100.9 343,95.2 400,108.5 457,89.2 514,85 571,58 629,65.3 686,51 743,18.4 800,12.3" fill="none" stroke="#087A54" stroke-width="2" vector-effect="non-scaling-stroke"/></svg></div>
+    <div class="kpis">
+      <div class="kpi"><span class="faint">Win rate</span><span class="num">54.2%</span><span class="s">52 of 96</span></div>
+      <div class="kpi"><span class="faint">Profit factor</span><span class="num">1.86</span><span class="s">&nbsp;</span></div>
+      <div class="kpi"><span class="faint">Expectancy</span><span class="num gain">+$50.13</span><span class="s">per trade</span></div>
+      <div class="kpi"><span class="faint">Avg win / loss</span><span class="num" style="font-size:18px;line-height:31px">$212.40 / <span class="loss">−$134.10</span></span><span class="s">&nbsp;</span></div>
+      <div class="kpi"><span class="faint">Max drawdown</span><span class="num loss">−$1,240.00</span><span class="s">&nbsp;</span></div>
+    </div>
+  </section>
+  <section class="card tbl">
+    <div class="tabs"><b class="on">Recent trades</b><b>Open positions</b><b>Rule breaks<span class="tag">1</span></b></div>
+    <div class="row h"><span>Time</span><span>Symbol</span><span>Side</span><span>Setup</span><span>Net P&amp;L</span><span>R</span></div>
+    <div class="row"><span>20 Nov 10:42</span><span>NQZ5</span><span class="su">Long</span><span class="su"><span class="t">Opening range break</span></span><span class="gain">+$370.00</span><span class="gain">+1.8R</span></div>
+    <div class="row"><span>20 Nov 09:51</span><span>ESZ5</span><span class="su">Short</span><span class="su"><span class="mist">Moved stop</span></span><span class="loss">−$275.00</span><span class="loss">−1.4R</span></div>
+    <div class="row"><span>19 Nov 14:05</span><span>AAPL</span><span class="su">Long</span><span class="su"><span class="t">Pullback</span></span><span class="gain">+$142.00</span><span class="gain">+0.9R</span></div>
+    <div class="row"><span>19 Nov 11:20</span><span>MNQZ5</span><span class="su">Short</span><span class="su"><span class="t">Fade</span></span><span class="gain">+$88.50</span><span class="gain">+0.6R</span></div>
+    <div class="row"><span>19 Nov 09:38</span><span>CLZ5</span><span class="su">Long</span><span class="su"><span class="t">Breakout</span></span><span class="loss">−$210.00</span><span class="loss">−1.0R</span></div>
+  </section>
+</div>
+<div class="rail">
+  <section class="card review"><h2>Today's review</h2>
+    <div class="q" style="margin-top:6px"><span class="bx"></span>Trades untagged<span class="c">3</span></div>
+    <div class="q"><span class="bx"></span>Rule broken<span class="c r">1</span></div>
+    <div class="q"><span class="bx"></span>Daily review not written<span class="c">0 of 1</span></div>
+    <button class="btn">Start review</button>
+  </section>
+  <section class="card"><h2>Prop eval 50K</h2>
+    <span class="warn">Daily loss 78% of limit</span>
+    <div class="kv"><span class="faint">Profit target</span><span class="m">62% of $3,000.00</span></div>
+    <div class="kv"><span class="faint">Trailing drawdown</span><span class="m">$1,640.00 left</span></div>
+    <div class="kv"><span class="faint">Trading days</span><span class="m">7 of 10</span></div>
+  </section>
+  <section class="card"><h2>November</h2>
+    <div class="cal"><span class="wd">Mon</span><span class="wd">Tue</span><span class="wd">Wed</span><span class="wd">Thu</span><span class="wd">Fri</span>
+      <div class="d g"><i>2</i>+420</div><div class="d l"><i>3</i>−180</div><div class="d g"><i>4</i>+610</div><div class="d g"><i>5</i>+95</div><div class="d l"><i>6</i>−340</div>
+      <div class="d g"><i>9</i>+880</div><div class="d g"><i>10</i>+215</div><div class="d l"><i>11</i>−505</div><div class="d g"><i>12</i>+730</div><div class="d g"><i>13</i>+160</div>
+      <div class="d g"><i>16</i>+1,020</div><div class="d l"><i>17</i>−275</div><div class="d g"><i>18</i>+540</div><div class="d g t"><i>19</i>+1,236</div><div class="d g"><i>20</i>+206</div>
+      <div class="d"><i>23</i></div><div class="d"><i>24</i></div><div class="d"><i>25</i></div><div class="d"><i>26</i></div><div class="d"><i>27</i></div>
+      <div class="d"><i>30</i></div></div>
+  </section>
+</div>
+</div></div>
+</body></html>
