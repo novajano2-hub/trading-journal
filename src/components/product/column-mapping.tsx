@@ -1,6 +1,6 @@
 import { ArrowRight, FileCsv } from '@phosphor-icons/react/dist/ssr';
 import type { PreviewField } from '@/domain/import/guess-columns';
-import type { Preview, PreviewTicket } from '@/domain/import/preview';
+import type { Preview, PreviewRow } from '@/domain/import/preview';
 
 /** Keel's name for each column the importer guesses, in table order. */
 const KEEL_COLUMNS: readonly [PreviewField, string][] = [
@@ -11,8 +11,8 @@ const KEEL_COLUMNS: readonly [PreviewField, string][] = [
   ['price', 'Price'],
 ];
 
-function cell(ticket: PreviewTicket | undefined, field: PreviewField): string {
-  const v = ticket?.[field];
+function cell(row: PreviewRow | undefined, field: PreviewField): string {
+  const v = row?.[field];
   if (v === undefined) return '';
   return field === 'side' ? (v === 'buy' ? 'Buy' : 'Sell') : v;
 }
@@ -59,7 +59,10 @@ export function ColumnMapping({
               <th scope="col" className="px-4 py-2.5 font-medium">
                 In Keel
               </th>
-              <th scope="col" className="px-4 py-2.5 font-medium">
+              <th
+                scope="col"
+                className="hidden px-4 py-2.5 font-medium md:table-cell"
+              >
                 First row
               </th>
             </tr>
@@ -72,7 +75,7 @@ export function ColumnMapping({
                   <ArrowRight size={14} aria-hidden="true" />
                 </td>
                 <td className="px-3 py-3 sm:px-4">{r.keel}</td>
-                <td className="px-3 py-3 font-mono text-faint sm:px-4">
+                <td className="hidden px-3 py-3 font-mono text-faint sm:px-4 md:table-cell">
                   {cell(first, r.field)}
                 </td>
               </tr>

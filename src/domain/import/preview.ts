@@ -5,7 +5,7 @@ import {
   type PreviewField,
 } from './guess-columns';
 
-export interface PreviewTicket {
+export interface PreviewRow {
   time?: string;
   symbol?: string;
   side?: 'buy' | 'sell';
@@ -16,7 +16,7 @@ export interface PreviewTicket {
 export interface Preview {
   headers: string[];
   guessed: Partial<Record<PreviewField, number>>;
-  tickets: PreviewTicket[];
+  tickets: PreviewRow[];
 }
 
 export class PreviewError extends Error {
@@ -41,7 +41,7 @@ export function previewFromText(csv: string, limit = 4): Preview {
   if (Object.keys(guessed).length === 0) throw new PreviewError('unrecognised');
 
   const tickets = rows.map((row) => {
-    const ticket: PreviewTicket = {};
+    const ticket: PreviewRow = {};
     const cell = (field: PreviewField): string | undefined => {
       const index = guessed[field];
       return index === undefined ? undefined : (row[index] ?? '').trim();
