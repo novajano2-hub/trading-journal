@@ -136,7 +136,7 @@ function decimalsOf(tickSize: number): number {
 }
 
 /** A price at the instrument's tick precision, e.g. 21100 → '21100.00' for NQ. */
-export function ticketPrice(t: Trade, price: number): string {
+export function fillPrice(t: Trade, price: number): string {
   return price.toFixed(decimalsOf(t.instrument.tickSize));
 }
 

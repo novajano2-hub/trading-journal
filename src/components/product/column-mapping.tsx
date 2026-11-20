@@ -35,7 +35,7 @@ export function ColumnMapping({
   /** Label the window as sample data. */
   sample?: boolean;
 }) {
-  const first = preview.tickets[0];
+  const first = preview.rows[0];
   const rows = KEEL_COLUMNS.flatMap(([field, keel]) => {
     const index = preview.guessed[field];
     return index === undefined

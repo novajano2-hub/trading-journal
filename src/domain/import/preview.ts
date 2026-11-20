@@ -1,4 +1,4 @@
-import Papa from 'papaparse';
+import { parseCsv } from './csv';
 import {
   guessColumns,
   normalizeSide,
@@ -6,6 +6,7 @@ import {
 } from './guess-columns';
 
 export interface PreviewRow {
+  rowIndex: number;
   time?: string;
   symbol?: string;
   side?: 'buy' | 'sell';
@@ -16,7 +17,7 @@ export interface PreviewRow {
 export interface Preview {
   headers: string[];
   guessed: Partial<Record<PreviewField, number>>;
-  tickets: PreviewRow[];
+  rows: PreviewRow[];
 }
 
 export class PreviewError extends Error {
@@ -29,38 +30,33 @@ export class PreviewError extends Error {
 }
 
 export function previewFromText(csv: string, limit = 4): Preview {
-  const { data } = Papa.parse<string[]>(csv, {
-    preview: limit + 1,
-    skipEmptyLines: true,
-  });
-  const [headerRow, ...rows] = data;
-  if (!headerRow) throw new PreviewError('empty');
+  const { headers, rows: records } = parseCsv(csv, { limit });
+  if (headers.length === 0) throw new PreviewError('empty');
 
-  const headers = headerRow.map((h) => h.trim());
   const guessed = guessColumns(headers);
   if (Object.keys(guessed).length === 0) throw new PreviewError('unrecognised');
 
-  const tickets = rows.map((row) => {
-    const ticket: PreviewRow = {};
+  const rows = records.map(({ rowIndex, cells }) => {
+    const row: PreviewRow = { rowIndex };
     const cell = (field: PreviewField): string | undefined => {
       const index = guessed[field];
-      return index === undefined ? undefined : (row[index] ?? '').trim();
+      return index === undefined ? undefined : (cells[index] ?? '');
     };
     const time = cell('time');
     const symbol = cell('symbol');
     const side = cell('side');
     const qty = cell('qty');
     const price = cell('price');
-    if (time !== undefined) ticket.time = time;
-    if (symbol !== undefined) ticket.symbol = symbol;
+    if (time !== undefined) row.time = time;
+    if (symbol !== undefined) row.symbol = symbol;
     if (side !== undefined) {
       const normalized = normalizeSide(side);
-      if (normalized) ticket.side = normalized;
+      if (normalized) row.side = normalized;
     }
-    if (qty !== undefined) ticket.qty = qty;
-    if (price !== undefined) ticket.price = price;
-    return ticket;
+    if (qty !== undefined) row.qty = qty;
+    if (price !== undefined) row.price = price;
+    return row;
   });
 
-  return { headers, guessed, tickets };
+  return { headers, guessed, rows };
 }

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { formatFillTime } from './fill-time';
 
 describe('formatFillTime', () => {
-  test('prints the brief examples in the ticket clock format', () => {
+  test('prints the brief examples in the clock format', () => {
     expect(formatFillTime('2026-11-16 10:48:00')).toBe('16 NOV 10:48:00');
     expect(formatFillTime('11/16/2026 2:05 PM')).toBe('16 NOV 14:05:00');
     expect(formatFillTime('garbage')).toBe('garbage');

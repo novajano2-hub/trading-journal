@@ -1,7 +1,7 @@
 import { CheckCircle, XCircle } from '@phosphor-icons/react/dist/ssr';
 import type { Trade } from '@/domain/types';
 import { formatMoney, formatPnl } from '@/lib/format';
-import { ticketPrice } from '@/lib/landing/sample-view';
+import { fillPrice } from '@/lib/landing/sample-view';
 import { shortTime } from '@/lib/time-format';
 import { SideChip } from '@/components/ui/chip';
 
@@ -11,7 +11,7 @@ export interface TradeCheck {
 }
 
 function grouped(t: Trade, price: number): string {
-  const fixed = ticketPrice(t, price);
+  const fixed = fillPrice(t, price);
   const digits = fixed.split('.')[1]?.length ?? 0;
   return Number(fixed).toLocaleString('en-US', {
     minimumFractionDigits: digits,

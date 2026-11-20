@@ -13,7 +13,7 @@ function daysIn(year: number, month: number): number {
 }
 
 /**
- * A fill time from the visitor's file, printed in the ticket clock format
+ * A fill time from the visitor's file, printed in the clock format
  * 'DD MMM HH:MM:SS'. The wall clock is kept exactly as written, since the
  * file's timezone is unknown. Anything not recognised is shown as it came.
  */

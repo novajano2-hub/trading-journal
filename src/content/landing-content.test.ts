@@ -29,7 +29,8 @@ describe('sample fills CSV', () => {
       qty: 3,
       price: 4,
     });
-    expect(preview.tickets[0]).toEqual({
+    expect(preview.rows[0]).toEqual({
+      rowIndex: 2,
       time: '2026-11-16 09:41:00',
       symbol: 'ESZ5',
       side: 'buy',

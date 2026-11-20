@@ -11,12 +11,12 @@ describe('previewFile', () => {
       type: 'application/octet-stream',
     });
     const preview = await previewFile(file);
-    expect(preview.tickets[0]).toMatchObject({ symbol: 'ESZ5' });
+    expect(preview.rows[0]).toMatchObject({ symbol: 'ESZ5' });
   });
 
   test('reads a .txt export', async () => {
     const file = new File([CSV], 'fills.txt', { type: 'text/plain' });
-    expect((await previewFile(file)).tickets).toHaveLength(1);
+    expect((await previewFile(file)).rows).toHaveLength(1);
   });
 
   test('rejects a .png as unrecognised', async () => {
