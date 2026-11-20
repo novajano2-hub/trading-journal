@@ -57,6 +57,11 @@ export function cutOffText(scope: Locator): Promise<string[]> {
           r.right -
           parseFloat(cs.borderRightWidth) -
           parseFloat(cs.paddingRight);
+        // A figure on one line: wrapping "21100.0 / 0" is no better than "21100…".
+        if (box.localName === 'dd' && range.getClientRects().length > 1) {
+          problems.push(`"${text}" wraps onto a second line`);
+          continue;
+        }
         if (ink.left < left - 0.5 || ink.right > right + 0.5) {
           problems.push(
             `"${text}" needs ${ink.width.toFixed(1)}px but its box holds ${(right - left).toFixed(1)}px`,
@@ -127,5 +132,82 @@ export function textContrast(target: Locator): Promise<number> {
     };
     const [hi, lo] = [lum(seen(fg)), lum(seen(bg))].sort((a, b) => b - a);
     return (hi! + 0.05) / (lo! + 0.05);
+  });
+}
+
+/**
+ * Every label or figure a rubber stamp lands on, per ticket in `scope`, plus
+ * any ticket whose contents run past its bottom edge. Rotation of the ticket
+ * itself is lifted while measuring (it is paint, not layout); the stamp keeps
+ * its own tilt, since that is the impression it leaves.
+ */
+export function stampCollisions(scope: Locator): Promise<string[]> {
+  return scope.evaluateAll(async (tickets) => {
+    await document.fonts.ready;
+    const turned: [HTMLElement, string][] = [];
+    for (const t of tickets)
+      for (
+        let a: HTMLElement | null = t as HTMLElement;
+        a;
+        a = a.parentElement
+      ) {
+        const cs = getComputedStyle(a);
+        if (cs.rotate === 'none' && cs.transform === 'none') continue;
+        turned.push([a, a.style.cssText]);
+        a.style.rotate = 'none';
+        a.style.transform = 'none';
+      }
+
+    const problems: string[] = [];
+    const hit = (a: DOMRect, b: DOMRect) =>
+      a.left < b.right &&
+      b.left < a.right &&
+      a.top < b.bottom &&
+      b.top < a.bottom;
+    for (const t of tickets) {
+      const name = t.getAttribute('aria-label');
+      const box = t.getBoundingClientRect();
+      const pad = parseFloat(getComputedStyle(t).paddingBottom);
+      for (const el of t.querySelectorAll<HTMLElement>('header, dl, p'))
+        if (el.getBoundingClientRect().bottom > box.bottom - pad + 0.5)
+          problems.push(
+            `${name}: its ${el.localName} runs past the bottom edge`,
+          );
+      for (const stamp of t.querySelectorAll<HTMLElement>('.rubber-stamp')) {
+        const s = stamp.getBoundingClientRect();
+        for (const el of t.querySelectorAll<HTMLElement>(
+          'dt, dd, header span, p > span',
+        )) {
+          if (el.closest('.sr-only') || !el.textContent?.trim()) continue;
+          if (hit(s, el.getBoundingClientRect()))
+            problems.push(
+              `${name}: ${stamp.textContent} covers "${el.textContent.trim()}"`,
+            );
+        }
+      }
+    }
+
+    for (const [el, css] of turned) el.style.cssText = css;
+    return problems;
+  });
+}
+
+/** True when every sampled point of `target` shows its own ticket, not one stacked over it. */
+export function inPlainView(target: Locator): Promise<boolean> {
+  return target.evaluate(async (el) => {
+    await document.fonts.ready;
+    const own = el.closest('article');
+    // Points are hit-tested in the viewport, so bring the stamp into it.
+    el.scrollIntoView({ block: 'center' });
+    const r = el.getBoundingClientRect();
+    for (const fx of [0.15, 0.32, 0.5, 0.68, 0.85])
+      for (const fy of [0.3, 0.5, 0.7]) {
+        const x = r.left + r.width * fx;
+        const y = r.top + r.height * fy;
+        // The stamp ignores the pointer, so this finds what lies at that spot.
+        const at = document.elementFromPoint(x, y);
+        if (!at || at.closest('article') !== own) return false;
+      }
+    return true;
   });
 }

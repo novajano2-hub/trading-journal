@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { cutOffText } from './figures';
+import { cutOffText, inPlainView, stampCollisions } from './figures';
 
 test('sample week and prop numbers come from the engine', async ({ page }) => {
   await page.goto('/');
@@ -39,6 +39,62 @@ test('hero and loop tickets print every figure in full', async ({ page }) => {
   expect(await cutOffText(page.getByTestId('ticket-sample'))).toEqual([]);
   const loop = page.getByRole('region', { name: /all the way round/i });
   expect(await cutOffText(loop.getByRole('listitem'))).toEqual([]);
+});
+
+test('hero stamps sit clear of figures, and RULE BROKEN shows in the stack', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const tickets = page.getByTestId('ticket-sample');
+  expect(await stampCollisions(tickets)).toEqual([]);
+  const broken = page
+    .getByTestId('ticket-stack')
+    .locator('.rubber-stamp', { hasText: 'RULE BROKEN' });
+  expect(await inPlainView(broken)).toBe(true);
+});
+
+test('each rack mark fills a real band, down to its card foot', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const rack = page.getByRole('region', { name: /every tool/i });
+  const marks = rack.locator('li svg:not(.lucide)');
+  await expect(marks).toHaveCount(9);
+  const bands = await marks.evaluateAll((svgs) =>
+    svgs.map((svg) => {
+      const card = svg.closest('.rack-card')!;
+      const box = card.getBoundingClientRect();
+      const foot =
+        box.bottom - parseFloat(getComputedStyle(card).paddingBottom);
+      const band = svg.parentElement!.getBoundingClientRect();
+      const ink = [
+        ...svg.querySelectorAll('path, rect, circle, polyline, text'),
+      ]
+        .map((el) => el.getBoundingClientRect())
+        .map(({ left, right, top, bottom }) => ({ left, right, top, bottom }))
+        .reduce((u, r) => ({
+          left: Math.min(u.left, r.left),
+          right: Math.max(u.right, r.right),
+          top: Math.min(u.top, r.top),
+          bottom: Math.max(u.bottom, r.bottom),
+        }));
+      return {
+        height: band.height,
+        toFoot: Math.abs(foot - band.bottom),
+        fill: Math.max(
+          (ink.right - ink.left) / band.width,
+          (ink.bottom - ink.top) / band.height,
+        ),
+      };
+    }),
+  );
+  for (const b of bands) {
+    // A band of real height that runs down to the lip, not an icon strip…
+    expect(b.height).toBeGreaterThanOrEqual(60);
+    expect(b.toFoot).toBeLessThan(1);
+    // …and a drawing scaled to it in at least one direction.
+    expect(b.fill).toBeGreaterThan(0.75);
+  }
 });
 
 test('the rack lifts on hover only when motion is welcome', async ({

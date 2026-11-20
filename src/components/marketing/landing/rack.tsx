@@ -25,11 +25,11 @@ const POCKET: Record<ModuleInfo['slug'], { span: string; card: string }> = {
   },
   notebook: {
     span: 'md:col-span-2 xl:col-span-2',
-    card: 'min-h-[300px] md:min-h-[248px]',
+    card: 'min-h-[272px] md:min-h-[248px]',
   },
   'prop-firms': {
     span: 'md:col-span-2 xl:col-span-2',
-    card: 'min-h-[276px] md:min-h-[270px]',
+    card: 'min-h-[248px] md:min-h-[270px]',
   },
   backtesting: {
     span: 'col-span-2 md:col-span-3 xl:col-span-3',
@@ -68,19 +68,20 @@ function CardFace({ m, view }: { m: ModuleInfo; view: SampleView }) {
       <span className="ruled mt-3 block text-[15px] leading-[28px] font-medium md:text-base md:leading-[28px]">
         {m.oneLine}
       </span>
-      {/* The card's one artifact, low on the card, beside the way in. */}
-      <span className="mt-auto flex items-end justify-between gap-2.5 pt-6">
-        <span className="flex min-w-0">
-          <RackMark slug={m.slug} view={view} />
-        </span>
-        {m.hasPage ? (
-          <ArrowUpRight
-            aria-hidden="true"
-            strokeWidth={1.75}
-            className="size-6 shrink-0"
-          />
-        ) : null}
+      {/* The card's one artifact fills the band the text leaves, down to the
+          lip, keeping clear of the way in at its foot. */}
+      <span
+        className={`relative mt-5 block min-h-[60px] flex-1 ${m.hasPage ? 'mr-9' : ''}`}
+      >
+        <RackMark slug={m.slug} view={view} />
       </span>
+      {m.hasPage ? (
+        <ArrowUpRight
+          aria-hidden="true"
+          strokeWidth={1.75}
+          className="absolute right-3.5 bottom-[38px] size-6 md:right-5"
+        />
+      ) : null}
     </>
   );
 }

@@ -6,12 +6,14 @@ import { OrderTicket } from './order-ticket';
 /**
  * Four resting places in the fan, back to front. Phones get a tighter,
  * narrower fan so nothing crosses the gutter; md and up follow the sketch.
+ * The front ticket rests low enough to leave the stamp band of the one
+ * beneath it in plain view: its RULE BROKEN is the point of the stack.
  */
 const SPOTS = [
   'z-[1] top-0 left-7 rotate-[5deg] md:top-5 md:left-[150px] md:rotate-[9deg]',
   'z-[2] top-10 left-4 rotate-[2.5deg] md:top-[70px] md:left-[110px] md:rotate-[4deg]',
   'z-[3] top-[104px] left-1 -rotate-2 md:top-[140px] md:left-[60px] md:-rotate-2',
-  'z-[4] top-[232px] left-[30px] -rotate-[4deg] md:top-[315px] md:left-[215px] md:-rotate-[7deg]',
+  'z-[4] top-[322px] left-[30px] -rotate-[4deg] md:top-[332px] md:left-[226px] md:-rotate-[7deg]',
 ] as const;
 
 const SPOT_BASE =
@@ -44,7 +46,7 @@ export function TicketStack(props: TicketStackProps) {
   return (
     <figure
       data-testid="ticket-stack"
-      className={`relative m-0 h-[476px] w-full md:h-[620px] md:w-[620px] ${className}`}
+      className={`relative m-0 h-[574px] w-full md:h-[620px] md:w-[620px] ${className}`}
     >
       <ol className="m-0 list-none p-0">
         {props.variant === 'sample'
@@ -53,11 +55,7 @@ export function TicketStack(props: TicketStackProps) {
               const spot = spotFor(i, n, true);
               return (
                 <li key={t.serial} className={`${SPOT_BASE} ${SPOTS[spot]}`}>
-                  <OrderTicket
-                    variant="sample"
-                    model={t}
-                    stampPlacement={spot <= 1 ? 'corner' : 'body'}
-                  />
+                  <OrderTicket variant="sample" model={t} />
                 </li>
               );
             })

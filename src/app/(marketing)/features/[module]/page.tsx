@@ -112,7 +112,7 @@ export default async function FeaturePage({
           >
             {view.heroTickets.map((t) => (
               <li key={t.serial} className="min-w-0">
-                <OrderTicket variant="sample" model={t} stampPlacement="body" />
+                <OrderTicket variant="sample" model={t} />
               </li>
             ))}
           </ul>
