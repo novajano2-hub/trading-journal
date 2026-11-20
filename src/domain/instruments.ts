@@ -1,3 +1,4 @@
+import { canonicalSymbol } from './trade-builder';
 import type { AssetClass, Instrument } from './types';
 
 export interface ResolveOptions {
@@ -5,7 +6,7 @@ export interface ResolveOptions {
   overrides?: Record<
     string,
     { pointValue: number; tickSize: number; assetClass?: AssetClass }
-  >; // keyed by root
+  >; // keyed by instrumentKey(symbol)
 }
 
 export const FUTURES: Readonly<
@@ -67,6 +68,15 @@ const CRYPTO_RE = new RegExp(
   `^(${CRYPTO_BASES.join('|')})[-/]?(${CRYPTO_QUOTES.join('|')})$`,
 );
 const STOCK_RE = /^[A-Z]{1,5}(\.[A-Z])?$/;
+
+/**
+ * The key a point value is remembered under: a futures-pattern symbol's root
+ * (ESZ5 and ESH6 are both ES), otherwise the canonical symbol.
+ */
+export function instrumentKey(symbol: string): string {
+  const s = canonicalSymbol(symbol);
+  return FUTURES_RE.exec(s)?.[1] ?? s;
+}
 
 function resolveFuture(
   symbol: string,
@@ -166,6 +176,19 @@ export function resolveInstrument(
       assetClass: 'stock',
       pointValue: 1,
       tickSize: 0.01,
+      quoteCurrency: 'USD',
+    };
+  }
+
+  const key = instrumentKey(trimmed);
+  const o = opts.overrides?.[key];
+  if (o) {
+    return {
+      symbol: trimmed,
+      root: key,
+      assetClass: o.assetClass ?? 'cfd',
+      pointValue: o.pointValue,
+      tickSize: o.tickSize,
       quoteCurrency: 'USD',
     };
   }

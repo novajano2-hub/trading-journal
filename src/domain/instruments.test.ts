@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { resolveInstrument } from './instruments';
+import { instrumentKey, resolveInstrument } from './instruments';
 
 describe('resolveInstrument', () => {
   test('futures roots with month code and year', () => {
@@ -95,5 +95,30 @@ describe('resolveInstrument', () => {
   test('garbage resolves to null', () => {
     expect(resolveInstrument('')).toBeNull();
     expect(resolveInstrument('12345')).toBeNull();
+  });
+});
+
+describe('remembered point values', () => {
+  test('instrumentKey names what a point value is entered for', () => {
+    expect(instrumentKey('/ESZ5')).toBe('ES');
+    expect(instrumentKey(' zcz5 ')).toBe('ZC');
+    expect(instrumentKey('M6EZ5')).toBe('M6E');
+    expect(instrumentKey('xauusd')).toBe('XAUUSD');
+    expect(instrumentKey('US30')).toBe('US30');
+  });
+  test('a remembered point value resolves a symbol no pattern knows', () => {
+    expect(resolveInstrument('XAUUSD')).toBeNull();
+    expect(
+      resolveInstrument('xauusd', {
+        overrides: { XAUUSD: { pointValue: 100, tickSize: 0.01 } },
+      }),
+    ).toEqual({
+      symbol: 'xauusd',
+      root: 'XAUUSD',
+      assetClass: 'cfd',
+      pointValue: 100,
+      tickSize: 0.01,
+      quoteCurrency: 'USD',
+    });
   });
 });
