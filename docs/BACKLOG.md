@@ -90,7 +90,14 @@ Origin key: **TZ** = TradeZella has it · **MTJ** = MyTradingJourney has it · *
 | E11 | Import picks its own **source timezone** (TradeZella has it), separate from the display timezone | Plan 2 |
 | E12 | Prop setup accepts daily loss as **% or $** (UI converts % against the starting balance) | Plan 5 (Prop firms) |
 | E13 | Verify the undocumented behaviours (breakeven in win %, profit factor with no losses, drawdown basis, fill grouping) against a real TradeZella test import, and align if they differ | When an account is available |
-| E14 | `PreviewTicket.rowIndex` so dropped tickets number by real file row ("Fill 0N") | Plan 2 |
+| E14 | `PreviewRow.rowIndex` so import preview rows number by real file row | Plan 2 |
 | E15 | **Don't publish the marketing site** until the app plans land: feature pages describe milestone-1 modules in the present tense | Release |
-| E16 | Design ceiling items from the finish review (optional): paper tooth/perforation on tickets, pit ornament in the FAQ and closing sections, punched time-clock imprint, more trader badges | Any |
-| E17 | Truthful mechanical stamps on a visitor's dropped tickets (e.g. OPEN, SCALED IN), if wanted later; today they print unstamped by approved decision | Plan 5 |
+| E16 | ~~Trading Floor ceiling items (tickets, pit ornament, time-clock imprint)~~. Dropped with the rejected world in Plan 3b | Dropped |
+| E17 | ~~Mechanical stamps on dropped tickets~~. Dropped with the rejected world in Plan 3b | Dropped |
+| E18 | Rename the leftover ticket identifiers (`ticketPrice`, `Preview.tickets`) to row/fill names; none reach visible copy | Plan 2 |
+| E19 | Number ticker: if JS loads but hydration fails, KPIs show $0.00; also starts about 300ms after hydration | Plan 4 |
+| E20 | `RuleList` carries landing-only tick hooks; split the landing animation from the app component | Plan 5 (Strategies) |
+| E21 | Test and type tidy: kv tuple looseness, `grouped()` Number re-parse, no motion-behaviour tests | Any |
+| E22 | Derive the "Trailing drawdown" label from `drawdownType` instead of hand-typing it | Plan 5 (Prop firms) |
+| E23 | "Get started" goes to /signup, which says accounts open with the release; point it at the real sign-up flow when auth lands | Plan 4 |
+| E24 | Optional design ceiling from the Plan 3b finish review: a hover/focus value readout on breakdown bars, and a row hover highlight on product trade rows | Plan 4 |
