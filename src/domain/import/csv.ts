@@ -26,16 +26,20 @@ export function parseCsv(text: string, opts: { limit?: number } = {}): ParsedCsv
   let delimiter = ',';
   const rows: CsvRow[] = [];
   let recordIndex = 0;
+  let headerSeen = false;
+
+  if (limit !== undefined && limit <= 0) return { headers, rows, delimiter };
 
   Papa.parse<string[]>(text, {
     skipEmptyLines: false,
     step: (result, parser) => {
       recordIndex += 1;
-      if (recordIndex === 1) delimiter = result.meta.delimiter || ',';
       const cells = result.data.map((c) => c.trim());
       if (cells.every((c) => c === '')) return;
-      if (recordIndex === 1) {
+      if (!headerSeen) {
+        headerSeen = true;
         headers = cells;
+        delimiter = result.meta.delimiter || ',';
         return;
       }
       rows.push({ rowIndex: recordIndex, cells });

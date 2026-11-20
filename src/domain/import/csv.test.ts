@@ -23,4 +23,12 @@ describe('parseCsv', () => {
   test('empty text', () => {
     expect(parseCsv('')).toEqual({ headers: [], rows: [], delimiter: ',' });
   });
+  test('leading blank and whitespace-only lines are skipped; the header keeps its file row', () => {
+    const p = parseCsv('\n  ,  \nSymbol\nES\n');
+    expect(p.headers).toEqual(['Symbol']);
+    expect(p.rows).toEqual([{ rowIndex: 4, cells: ['ES'] }]);
+  });
+  test('limit 0 collects no rows', () => {
+    expect(parseCsv('a,b\n1,2\n', { limit: 0 }).rows).toEqual([]);
+  });
 });

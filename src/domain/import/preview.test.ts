@@ -41,4 +41,9 @@ describe('previewFromText', () => {
   test('preview rows carry their file row', () => {
     expect(previewFromText('Symbol\n\nES\n').rows).toEqual([{ rowIndex: 3, symbol: 'ES' }]);
   });
+
+  test('a leading blank or whitespace-only line does not lose the header', () => {
+    expect(previewFromText('\nSymbol\nES\n').rows).toEqual([{ rowIndex: 3, symbol: 'ES' }]);
+    expect(previewFromText('  \nSymbol\nES\n').rows).toEqual([{ rowIndex: 3, symbol: 'ES' }]);
+  });
 });
