@@ -1,10 +1,11 @@
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 export const AUTH_CLOSED =
   'Accounts open with the app release. Until then, everything runs in your browser.';
 
 const INPUT =
-  'block h-11 w-full rounded-control border border-line-2 bg-surface-1 px-3.5 text-[15px] text-text';
+  'block h-11 w-full rounded-control border border-line-2 bg-surface-1 px-3.5 text-[15px] text-text disabled:cursor-not-allowed disabled:opacity-50';
 
 function Field({
   id,
@@ -32,6 +33,7 @@ function Field({
         type={type}
         autoComplete={autoComplete}
         required
+        disabled
         minLength={minLength}
         aria-describedby={`${id}-help ${id}-error`}
         className={INPUT}
@@ -49,11 +51,14 @@ function Field({
   );
 }
 
-/** Real fields, honest button: accounts do not exist until the app release. */
+/** Real fields, honest, disabled button: accounts do not exist until the app release. */
 function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   const login = mode === 'login';
   return (
     <form className="mt-9 flex max-w-[400px] flex-col gap-3" noValidate>
+      <p id="auth-note" className="text-sm leading-[1.55] text-muted">
+        {AUTH_CLOSED}
+      </p>
       <Field
         id="email"
         label="Email"
@@ -69,18 +74,14 @@ function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         autoComplete={login ? 'current-password' : 'new-password'}
         minLength={login ? undefined : 8}
       />
-      <button
+      <Button
         type="submit"
         disabled
-        aria-disabled="true"
         aria-describedby="auth-note"
-        className="mt-2 inline-flex h-11 w-full cursor-not-allowed items-center justify-center rounded-control border border-line bg-sunken px-[18px] text-[15px] font-medium text-muted"
+        className="mt-2 w-full disabled:cursor-not-allowed"
       >
         {login ? 'Log in' : 'Create account'}
-      </button>
-      <p id="auth-note" className="text-sm leading-[1.55] text-muted">
-        {AUTH_CLOSED}
-      </p>
+      </Button>
     </form>
   );
 }

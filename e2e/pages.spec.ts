@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { textContrast } from './figures';
 
 for (const path of [
   '/pricing',
@@ -39,12 +38,11 @@ for (const [path, name] of [
     await page.goto(path);
     const submit = page.getByRole('button', { name });
     await expect(submit).toBeDisabled();
-    await expect(submit).toHaveAttribute('aria-disabled', 'true');
+    await expect(page.getByLabel('Email', { exact: true })).toBeDisabled();
+    await expect(page.getByLabel('Password', { exact: true })).toBeDisabled();
     // The reason is visible and tied to the button.
     await expect(page.getByText(CLOSED)).toBeVisible();
     await expect(submit).toHaveAttribute('aria-describedby', /auth-note/);
-    await expect(submit).toHaveCSS('opacity', '1');
-    expect(await textContrast(submit)).toBeGreaterThanOrEqual(4.5);
     // Label above input, with a helper slot and an error slot below.
     for (const field of ['Email', 'Password']) {
       const input = page.getByLabel(field, { exact: true });
