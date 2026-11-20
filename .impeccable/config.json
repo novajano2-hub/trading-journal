@@ -20,6 +20,33 @@
         ],
         "createdAt": "2026-11-20T08:29:06.271Z",
         "reason": "Claude's call: the flagged element (loop.tsx ~L234) is an aria-hidden U-shaped connector line of the trade-loop diagram drawn with border-x/b and a rounded bottom, not an accent-bordered card"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/model-pick.html"
+        ],
+        "createdAt": "2026-11-20T11:02:39.971Z",
+        "reason": "Claude's call: archived decision-page sketch of a direction (two unchosen), not shipping code; its fonts belong to that sketch's world and predate DESIGN.md"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/challenger-darkroom.html"
+        ],
+        "createdAt": "2026-11-20T11:02:39.998Z",
+        "reason": "Claude's call: archived decision-page sketch of a direction (two unchosen), not shipping code; its fonts belong to that sketch's world and predate DESIGN.md"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/canon.html"
+        ],
+        "createdAt": "2026-11-20T11:02:40.024Z",
+        "reason": "Claude's call: archived decision-page sketch of a direction (two unchosen), not shipping code; its fonts belong to that sketch's world and predate DESIGN.md"
       }
     ]
   }
