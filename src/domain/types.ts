@@ -1,5 +1,3 @@
-import type { BreakevenRange, PnlBasis } from './metrics/context';
-
 export type Cents = number; // integer minor units of the P&L currency
 export type AssetClass =
   'stock' | 'option' | 'future' | 'forex' | 'crypto' | 'cfd';
@@ -128,6 +126,11 @@ export interface Workspace {
   name: string;
   kind: 'sample' | 'user';
 }
+/** Breakeven band, inclusive at both ends; percent ranges are fractions of Net ROI (0.001 = 0.1 %). */
+export type BreakevenRange =
+  | { unit: 'amount'; from: Cents; to: Cents }
+  | { unit: 'percent'; from: number; to: number };
+export type PnlBasis = 'net' | 'gross';
 export interface UserPrefs {
   timeZone: string;
   baseCurrency: string;

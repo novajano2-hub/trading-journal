@@ -1,12 +1,8 @@
 import { quoteToPnl } from '../currency';
 import { toCents } from '../money';
-import type { Cents, Trade } from '../types';
+import type { BreakevenRange, Cents, PnlBasis, Trade } from '../types';
 
-/** Breakeven band, inclusive at both ends; percent ranges are fractions of Net ROI (0.001 = 0.1 %). */
-export type BreakevenRange =
-  | { unit: 'amount'; from: Cents; to: Cents }
-  | { unit: 'percent'; from: number; to: number };
-export type PnlBasis = 'net' | 'gross';
+export type { BreakevenRange, PnlBasis } from '../types';
 
 export interface MetricContext {
   timeZone: string;

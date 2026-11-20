@@ -1,7 +1,7 @@
 import { localParts } from '../time';
 import { isClosed, type ClosedTrade } from '../trade-status';
 import type { Trade } from '../types';
-import type { MetricContext } from './context';
+import type { MetricContext, PnlBasis } from './context';
 import { rOf, summarize, type Summary } from './summary';
 
 export type BreakdownKey =
@@ -85,6 +85,8 @@ function fixed(
   }));
 }
 
+const basisPnl = (s: Summary) => (s.basis === 'gross' ? s.grossPnl : s.netPnl);
+
 function dynamic(
   closed: ClosedTrade[],
   keysOf: (t: ClosedTrade) => string[],
@@ -108,7 +110,7 @@ function dynamic(
   return rows.sort((a, b) => {
     if (a.key === NONE) return b.key === NONE ? 0 : 1;
     if (b.key === NONE) return -1;
-    return b.summary.netPnl - a.summary.netPnl;
+    return basisPnl(b.summary) - basisPnl(a.summary);
   });
 }
 
@@ -154,10 +156,10 @@ export function breakdown(
 }
 
 /** Histogram of R multiples over closed trades; contiguous [from, to) bins including empty ones. */
-export function rDistribution(trades: readonly Trade[], binWidth = 0.5): RBin[] {
+export function rDistribution(trades: readonly Trade[], binWidth = 0.5, basis: PnlBasis = 'net'): RBin[] {
   const idx = trades
     .filter(isClosed)
-    .map((t) => rOf(t))
+    .map((t) => rOf(t, basis))
     .filter((r): r is number => r !== undefined)
     .map((r) => Math.floor(r / binWidth + 1e-9));
   if (idx.length === 0) return [];

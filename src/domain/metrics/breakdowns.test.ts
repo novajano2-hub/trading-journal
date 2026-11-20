@@ -113,6 +113,28 @@ describe('breakdowns', () => {
     expect(rDistribution([makeTrade({ net: 100 })])).toEqual([]);
   });
 
+  test('R distribution follows the P&L basis', () => {
+    const t = [makeTrade({ net: -500, gross: 1000, fees: 1500, initialRisk: 1000 })];
+    expect(rDistribution(t).map((b) => [b.from, b.count])).toEqual([[-0.5, 1]]);
+    expect(rDistribution(t, 0.5, 'gross').map((b) => [b.from, b.count])).toEqual([[1, 1]]);
+  });
+
+  test('dynamic rows rank by the basis P&L', () => {
+    const t = [
+      makeTrade({ net: 100, gross: 200, fees: 100, instrument: resolveInstrument('ESZ5')! }),
+      makeTrade({ net: 300, gross: 300, fees: 0, instrument: resolveInstrument('NQZ5')! }),
+    ];
+    const order = (c: object) => breakdown(t, 'symbol', { ...ctx, ...c }).map((r) => r.key);
+    expect(order({})).toEqual(['NQ', 'ES']);
+    expect(order({ pnlBasis: 'gross' })).toEqual(['NQ', 'ES']);
+    const t2 = [
+      makeTrade({ net: 100, gross: 900, fees: 800, instrument: resolveInstrument('ESZ5')! }),
+      makeTrade({ net: 300, gross: 300, fees: 0, instrument: resolveInstrument('NQZ5')! }),
+    ];
+    expect(breakdown(t2, 'symbol', ctx).map((r) => r.key)).toEqual(['NQ', 'ES']);
+    expect(breakdown(t2, 'symbol', { ...ctx, pnlBasis: 'gross' }).map((r) => r.key)).toEqual(['ES', 'NQ']);
+  });
+
   test('status open with a closedAt is excluded from breakdowns and rDistribution', () => {
     const ghost = at('2026-03-09T13:45:00Z', { status: 'open', initialRisk: 1000 });
     const noClose = at('2026-03-09T13:45:00Z', { initialRisk: 1000 });

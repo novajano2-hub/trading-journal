@@ -1,5 +1,4 @@
-import type { BreakevenRange } from './metrics/context';
-import type { Cents } from './types';
+import type { BreakevenRange, Cents } from './types';
 
 /**
  * Classify a result against the breakeven range (inclusive at both ends).

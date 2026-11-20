@@ -5,6 +5,7 @@ import { isClosed } from '../trade-status';
 import type { Cents, Trade } from '../types';
 import { costBasis, pnlOf, type MetricContext, type PnlBasis } from './context';
 
+/** `netPnl`/`grossPnl` are always the true net and gross totals; `basis` says which one every other figure uses. */
 export interface Summary {
   closedCount: number; openCount: number; wins: number; losses: number; breakevens: number;
   netPnl: Cents; grossPnl: Cents; fees: Cents;
@@ -21,7 +22,7 @@ export interface Summary {
 }
 
 /** Realized R: P&L on the basis / initialRisk, only when initialRisk > 0. */
-export function rOf(trade: Trade, basis: PnlBasis = 'net'): number | undefined {
+export function rOf(trade: Trade, basis: PnlBasis): number | undefined {
   if (trade.initialRisk === undefined || !(trade.initialRisk > 0)) return undefined;
   return pnlOf(trade, basis) / trade.initialRisk;
 }
