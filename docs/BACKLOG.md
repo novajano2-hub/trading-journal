@@ -83,10 +83,14 @@ Origin key: **TZ** = TradeZella has it · **MTJ** = MyTradingJourney has it · *
 | E4 | ~~Unify metric signatures into one `MetricContext`~~. Done in the TradeZella alignment (40fa14c) | Done |
 | E5 | Clamp R-distribution tails (a tiny `initialRisk` creates thousands of bins) | Plan 5 (Reports) |
 | E6 | `canonicalSymbol` strips a leading `/` before resolving; confirm against real broker exports | Plan 2 |
-| E7 | Tooling: `.prettierignore` + format the repo once, `engines: node >=22`, pin Vite/Vitest (the native tsconfig paths option is experimental) | Plan 3 |
-| E8 | Review Next 16 scaffold defaults (`cacheComponents`, `partialPrefetching`), replace layout metadata and the boilerplate README | Plan 3 |
+| E7 | ~~Tooling: .prettierignore, format, engines, pins~~. Done in Plan 3 | Done |
+| E8 | ~~Next scaffold defaults, metadata, README~~. Done in Plan 3 | Done |
 | E9 | Thin test gaps: exact session boundaries, more negative half-even ties, ZB/ZN/6E/lowercase symbol parsing, `Math.max(...)` spread above ~100k trades | Any |
 | E10 | Manual **merge / split** of trades after import (TradeZella has it) | Plan 5 (Trades) |
 | E11 | Import picks its own **source timezone** (TradeZella has it), separate from the display timezone | Plan 2 |
 | E12 | Prop setup accepts daily loss as **% or $** (UI converts % against the starting balance) | Plan 5 (Prop firms) |
 | E13 | Verify the undocumented behaviours (breakeven in win %, profit factor with no losses, drawdown basis, fill grouping) against a real TradeZella test import, and align if they differ | When an account is available |
+| E14 | `PreviewTicket.rowIndex` so dropped tickets number by real file row ("Fill 0N") | Plan 2 |
+| E15 | **Don't publish the marketing site** until the app plans land: feature pages describe milestone-1 modules in the present tense | Release |
+| E16 | Design ceiling items from the finish review (optional): paper tooth/perforation on tickets, pit ornament in the FAQ and closing sections, punched time-clock imprint, more trader badges | Any |
+| E17 | Truthful mechanical stamps on a visitor's dropped tickets (e.g. OPEN, SCALED IN), if wanted later; today they print unstamped by approved decision | Plan 5 |
