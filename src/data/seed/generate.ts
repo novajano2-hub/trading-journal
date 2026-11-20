@@ -1,8 +1,6 @@
-import { TZDate } from '@date-fns/tz';
 import { settleExpiredOptions } from '@/domain/import/expiry';
 import { resolveInstrument } from '@/domain/instruments';
 import { riskFromStop } from '@/domain/metrics/summary';
-import { toCents } from '@/domain/money';
 import { localDate } from '@/domain/time';
 import { buildTrades } from '@/domain/trade-builder';
 import type {
@@ -15,21 +13,36 @@ import type {
   Tag,
   Trade,
 } from '@/domain/types';
+import { SAMPLE_WORKSPACE } from '../workspaces';
+import { DAY_MS, NY, dow, isWeekday, nyMs, parseYmd, ymd } from './calendar';
 import {
   CUSTOM_NAMES,
-  FOLDERS,
   MISTAKE_NAMES,
   NEGATIVE_EMOTIONS,
-  PHRASES,
   POSITIVE_EMOTIONS,
   STRATEGY_SEEDS,
   TAG_SEEDS,
-  bullets,
-  doc,
-  heading,
-  paragraph,
 } from './content';
+import {
+  ACCOUNT_SPECS,
+  CRYPTO_SPECS,
+  FOREX_SPECS,
+  FUTURES_SPECS,
+  OPTION_UNDERLYINGS,
+  STOCK_SPECS,
+  WEEKDAYS,
+  feesFor,
+  frontMonth,
+  optionSymbol,
+  snap,
+  snapQty,
+  type AccountSpec,
+  type InstSpec,
+} from './instruments';
+import { writeJournal } from './journal';
 import { createRandom, type Random } from './random';
+
+const WS = SAMPLE_WORKSPACE.id;
 
 export const SAMPLE_SEED = 20261120;
 
@@ -43,29 +56,21 @@ export interface SampleWorkspace {
   journal: JournalEntry[];
 }
 
-const WS = 'sample';
-const NY = 'America/New_York';
-const DAY_MS = 86_400_000;
-const WEEKDAYS = 126;
-const PROP_WEEKDAYS = 60; // the last 12 weeks
-
-// ---- calendar -------------------------------------------------------------
-
-const parseYmd = (s: string): number => {
-  const [y = 1970, m = 1, d = 1] = s.split('-').map(Number);
-  return Date.UTC(y, m - 1, d);
-};
-const ymd = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
-const dow = (ms: number): number => new Date(ms).getUTCDay();
-const isWeekday = (ms: number): boolean => dow(ms) >= 1 && dow(ms) <= 5;
-const mondayOf = (date: string): string => {
-  const ms = parseYmd(date);
-  return ymd(ms - ((dow(ms) + 6) % 7) * DAY_MS);
-};
-
 /** The last weekday strictly before `now`'s New York date. */
 export function sampleEndDate(now: string): string {
   let ms = parseYmd(localDate(now, NY)) - DAY_MS;
+  while (!isWeekday(ms)) ms -= DAY_MS;
+  return ymd(ms);
+}
+
+/** A real YYYY-MM-DD date; a weekend rolls back to the Friday before it. */
+function normalizeEndDate(endDate: string): string {
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(endDate) ||
+    ymd(parseYmd(endDate)) !== endDate
+  )
+    throw new Error(`endDate must be a real YYYY-MM-DD date, got "${endDate}"`);
+  let ms = parseYmd(endDate);
   while (!isWeekday(ms)) ms -= DAY_MS;
   return ymd(ms);
 }
@@ -79,241 +84,6 @@ function weekdaysEnding(endDate: string, count: number): string[] {
   }
   return out;
 }
-
-/** A New York wall-clock time as epoch milliseconds. */
-function nyMs(date: string, hour: number, minute: number, second = 0): number {
-  const [y = 1970, m = 1, d = 1] = date.split('-').map(Number);
-  return new TZDate(y, m - 1, d, hour, minute, second, NY).getTime();
-}
-const nyIso = (date: string, h: number, m: number): string =>
-  new Date(nyMs(date, h, m)).toISOString();
-
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTH_NAMES = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
-function dayLabel(date: string, withWeekday = true): string {
-  const ms = parseYmd(date);
-  const d = new Date(ms);
-  const base = `${d.getUTCDate()} ${MONTH_NAMES[d.getUTCMonth()]}`;
-  return withWeekday ? `${DAY_NAMES[dow(ms)]} ${base}` : base;
-}
-
-// ---- instruments and fees -------------------------------------------------
-
-interface InstSpec {
-  key: string;
-  cls: AssetClass;
-  /** Price walks are shared by instruments with the same walk key. */
-  walk: string;
-  price0: number;
-  vol: number;
-  tick: number;
-  dec: number;
-  stopAbs?: number;
-  stopPct?: number;
-  qtyMin: number;
-  qtyMax: number;
-  step: number;
-  weight: number;
-  riskMult?: number;
-}
-const fut = (
-  key: string,
-  walk: string,
-  price0: number,
-  tick: number,
-  stopAbs: number,
-  qtyMin: number,
-  qtyMax: number,
-  weight: number,
-): InstSpec => ({
-  key,
-  cls: 'future',
-  walk,
-  price0,
-  vol: 0.02,
-  tick,
-  dec: 2,
-  stopAbs,
-  qtyMin,
-  qtyMax,
-  step: 1,
-  weight,
-});
-const fx = (
-  key: string,
-  price0: number,
-  stopPct: number,
-  tick = 0.00001,
-  dec = 5,
-): InstSpec => ({
-  key,
-  cls: 'forex',
-  walk: key,
-  price0,
-  vol: 0.008,
-  tick,
-  dec,
-  stopPct,
-  qtyMin: 0.1,
-  qtyMax: 3,
-  step: 0.1,
-  weight: 1,
-});
-const stock = (
-  key: string,
-  price0: number,
-  stopPct: number,
-  weight: number,
-): InstSpec => ({
-  key,
-  cls: 'stock',
-  walk: key,
-  price0,
-  vol: 0.035,
-  tick: 0.01,
-  dec: 2,
-  stopPct,
-  qtyMin: 5,
-  qtyMax: 400,
-  step: 1,
-  weight,
-});
-
-const FUTURES_SPECS: InstSpec[] = [
-  fut('ES', 'ES', 5800, 0.25, 4, 1, 2, 30),
-  fut('NQ', 'NQ', 20800, 0.25, 16, 1, 2, 25),
-  fut('MES', 'ES', 5800, 0.25, 5, 2, 10, 20),
-  fut('MNQ', 'NQ', 20800, 0.25, 20, 2, 8, 15),
-  fut('CL', 'CL', 68, 0.01, 0.25, 1, 2, 6),
-  fut('GC', 'GC', 2700, 0.1, 3, 1, 1, 4),
-];
-const FOREX_SPECS: InstSpec[] = [
-  fx('EURUSD', 1.08, 0.0011),
-  fx('GBPUSD', 1.28, 0.0011),
-  fx('AUDUSD', 0.66, 0.0016),
-  fx('USDJPY', 150, 0.0012, 0.001, 3),
-];
-const STOCK_SPECS: InstSpec[] = [
-  stock('AAPL', 230, 0.005, 9),
-  stock('NVDA', 140, 0.007, 9),
-  stock('MSFT', 420, 0.005, 9),
-  stock('TSLA', 330, 0.008, 9),
-  stock('SPY', 590, 0.003, 9),
-];
-const OPTION_SPEC: InstSpec = {
-  key: 'OPT',
-  cls: 'option',
-  walk: 'OPT',
-  price0: 0,
-  vol: 0,
-  tick: 0.01,
-  dec: 2,
-  qtyMin: 1,
-  qtyMax: 10,
-  step: 1,
-  weight: 30,
-};
-const CRYPTO_SPECS: InstSpec[] = [
-  {
-    key: 'BTCUSD',
-    cls: 'crypto',
-    walk: 'BTCUSD',
-    price0: 95000,
-    vol: 0.06,
-    tick: 0.01,
-    dec: 2,
-    stopPct: 0.015,
-    qtyMin: 0.01,
-    qtyMax: 1,
-    step: 0.01,
-    weight: 13,
-    riskMult: 0.5,
-  },
-  {
-    key: 'ETHUSD',
-    cls: 'crypto',
-    walk: 'ETHUSD',
-    price0: 3300,
-    vol: 0.07,
-    tick: 0.01,
-    dec: 2,
-    stopPct: 0.02,
-    qtyMin: 0.1,
-    qtyMax: 20,
-    step: 0.1,
-    weight: 12,
-    riskMult: 0.5,
-  },
-];
-const MULTI_SPECS: InstSpec[] = [...STOCK_SPECS, OPTION_SPEC, ...CRYPTO_SPECS];
-const OPTION_UNDERLYINGS = STOCK_SPECS;
-
-const MONTH_CODES = 'FGHJKMNQUVXZ';
-/** Front-month futures symbol on a date (index futures roll mid-quarter-month). */
-function frontMonth(root: string, date: string): string {
-  const [y = 2026, m = 1, d = 1] = date.split('-').map(Number);
-  let year = y;
-  let month = m; // 1..12
-  if (root === 'ES' || root === 'NQ' || root === 'MES' || root === 'MNQ') {
-    month = Math.ceil(month / 3) * 3;
-    if (m === month && d >= 15) month += 3;
-  } else if (root === 'CL') {
-    month += 1;
-  } else {
-    month = Math.ceil((month + 1) / 2) * 2; // GC: even months
-  }
-  if (month > 12) {
-    month -= 12;
-    year += 1;
-  }
-  return `${root}${MONTH_CODES[month - 1]}${year % 10}`;
-}
-
-function optionSymbol(
-  underlying: string,
-  expiry: string,
-  right: 'C' | 'P',
-  strike: number,
-): string {
-  return `${underlying}${expiry.slice(2, 4)}${expiry.slice(5, 7)}${expiry.slice(8, 10)}${right}${String(Math.round(strike * 1000)).padStart(8, '0')}`;
-}
-
-function feesFor(
-  cls: AssetClass,
-  qty: number,
-  price: number,
-): { fees: number; commission: number } {
-  switch (cls) {
-    case 'future':
-      return { commission: toCents(qty * 2.25), fees: toCents(qty * 0.35) };
-    case 'forex':
-      return { commission: toCents(qty * 3.5), fees: 0 };
-    case 'stock':
-      return { commission: Math.max(100, toCents(qty * 0.005)), fees: 0 };
-    case 'option':
-      return { commission: toCents(qty * 0.65), fees: 0 };
-    default:
-      return { commission: 0, fees: toCents(qty * price * 0.001) };
-  }
-}
-
-const snap = (x: number, tick: number, dec: number): number =>
-  Number((Math.round(x / tick) * tick).toFixed(dec));
-const snapQty = (x: number, step: number): number =>
-  Number((Math.round(x / step) * step).toFixed(2));
 
 // ---- planning round trips -------------------------------------------------
 
@@ -335,75 +105,12 @@ interface Plan {
   stop: number;
 }
 
-interface AccountSpec {
-  id: string;
-  name: string;
-  broker: string;
-  type: Account['type'];
-  startingBalance: number;
-  specs: InstSpec[];
-  openH: number;
-  openM: number;
-  sessionMin: number;
-  activeProb: number;
-  perDay: [number, number];
-  risk: number; // dollars per trade
-  days: number;
-}
-const ACCOUNT_SPECS: AccountSpec[] = [
-  {
-    id: 'sample-futures',
-    name: 'Futures live',
-    broker: 'Sample futures broker',
-    type: 'live',
-    startingBalance: 5_000_000,
-    specs: FUTURES_SPECS,
-    openH: 9,
-    openM: 30,
-    sessionMin: 390,
-    activeProb: 0.95,
-    perDay: [3, 6],
-    risk: 300,
-    days: WEEKDAYS,
-  },
-  {
-    id: 'sample-forex-prop',
-    name: 'Forex evaluation',
-    broker: 'Sample prop firm',
-    type: 'prop-evaluation',
-    startingBalance: 10_000_000,
-    specs: FOREX_SPECS,
-    openH: 3,
-    openM: 0,
-    sessionMin: 510,
-    activeProb: 0.95,
-    perDay: [1, 4],
-    risk: 250,
-    days: PROP_WEEKDAYS,
-  },
-  {
-    id: 'sample-multi',
-    name: 'Stocks & options',
-    broker: 'Sample multi-asset broker',
-    type: 'live',
-    startingBalance: 2_500_000,
-    specs: MULTI_SPECS,
-    openH: 9,
-    openM: 30,
-    sessionMin: 390,
-    activeProb: 0.93,
-    perDay: [3, 6],
-    risk: 300,
-    days: WEEKDAYS,
-  },
-];
-
 /** Realised result of a plan in multiples of its stop distance. */
 function drawR(rng: Random, broke: boolean): number {
   if (rng.chance(broke ? 0.38 : 0.52))
     return broke
       ? Math.max(0.3, rng.around(1.0, 0.8))
-      : Math.max(0.4, rng.around(1.6, 1.0));
+      : Math.max(0.4, rng.around(1.55, 1.0));
   return -(broke
     ? Math.max(1.0, rng.around(1.45, 0.7))
     : Math.max(0.5, rng.around(0.95, 0.4)));
@@ -440,8 +147,9 @@ export function generateSampleWorkspace(opts: {
   seed: number;
   endDate: string;
 }): SampleWorkspace {
+  const endDate = normalizeEndDate(opts.endDate);
   const rng = createRandom(opts.seed);
-  const days = weekdaysEnding(opts.endDate, WEEKDAYS);
+  const days = weekdaysEnding(endDate, WEEKDAYS);
   const lastDay = days[days.length - 1]!;
 
   const accounts: Account[] = ACCOUNT_SPECS.map((a) => ({
@@ -515,7 +223,7 @@ export function generateSampleWorkspace(opts: {
           durSec,
           prices,
           reservedOptions,
-          opts.endDate,
+          endDate,
         );
         if (plan) plans.push(plan);
       }
@@ -564,7 +272,7 @@ export function generateSampleWorkspace(opts: {
     };
   });
 
-  const asOf = new Date(nyMs(opts.endDate, 23, 59, 59)).toISOString();
+  const asOf = new Date(nyMs(endDate, 23, 59, 59)).toISOString();
   const resolve = (symbol: string) => resolveInstrument(symbol);
   const settled = settleExpiredOptions(fills, resolve, asOf);
   const built = buildTrades(settled.executions, {
@@ -586,7 +294,7 @@ export function generateSampleWorkspace(opts: {
 
   return {
     seed: opts.seed,
-    endDate: opts.endDate,
+    endDate,
     accounts,
     strategies,
     tags,
@@ -659,11 +367,19 @@ function planTrade(
     Math.min(spec.qtyMax, Math.max(spec.qtyMin, riskUsd / usdPerUnit)),
     spec.step,
   );
+  if (spec.cls === 'stock') {
+    // Entry notional stays within 4x the account (intraday margin).
+    const cap = Math.floor((4 * (acct.startingBalance / 100)) / price);
+    qty = Math.min(qty, Math.max(spec.qtyMin, cap));
+  }
   qty = Math.max(spec.qtyMin, qty);
 
   const canSplit = qty >= 2 * spec.step;
-  const scaleIn = canSplit && rng.chance(0.15);
-  const splitExit = canSplit && !expire && rng.chance(0.25);
+  // Draw both rolls unconditionally so the random stream does not depend on sizing.
+  const scaleRoll = rng.chance(0.15);
+  const splitRoll = rng.chance(0.25);
+  const scaleIn = canSplit && scaleRoll;
+  const splitExit = canSplit && !expire && splitRoll;
   const side: Side = dir === 1 ? 'buy' : 'sell';
   const other: Side = dir === 1 ? 'sell' : 'buy';
   const at = (frac: number): number =>
@@ -841,157 +557,4 @@ function decorate(
       t.mfe = part(0, 0.3);
     }
   }
-}
-
-// ---- journal ----------------------------------------------------------------
-
-function money(cents: number): string {
-  const abs = Math.abs(Math.round(cents / 100));
-  const s = String(abs).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return `${cents < 0 ? '-' : '+'}$${s}`;
-}
-const picks = (rng: Random, xs: readonly string[], n: number): string[] => {
-  const pool = [...xs];
-  const out: string[] = [];
-  while (out.length < n && pool.length > 0)
-    out.push(...pool.splice(rng.int(0, pool.length - 1), 1));
-  return out;
-};
-
-function writeJournal(
-  rng: Random,
-  trades: readonly Trade[],
-  days: readonly string[],
-  lastDay: string,
-): JournalEntry[] {
-  const journal: JournalEntry[] = [];
-  const add = (e: Omit<JournalEntry, 'id' | 'workspaceId'>): JournalEntry => {
-    const entry: JournalEntry = {
-      id: `sample-journal-${String(journal.length + 1).padStart(4, '0')}`,
-      workspaceId: WS,
-      ...e,
-    };
-    journal.push(entry);
-    return entry;
-  };
-
-  const byDay = new Map<string, Trade[]>();
-  for (const t of trades) {
-    const d = localDate(t.openedAt, NY);
-    byDay.set(d, [...(byDay.get(d) ?? []), t]);
-  }
-
-  for (const date of days) {
-    const day = byDay.get(date);
-    if (!day) continue;
-    if (date === days[0] || rng.chance(0.75)) {
-      add({
-        kind: 'pre-market',
-        date,
-        title: `Plan for ${dayLabel(date)}`,
-        body: doc(
-          heading('Market view'),
-          paragraph(rng.pick(PHRASES.marketView)),
-          heading('Plan'),
-          bullets(picks(rng, PHRASES.planItems, 3)),
-          heading('Risk'),
-          paragraph(rng.pick(PHRASES.riskNotes)),
-        ),
-        linkedTradeIds: [],
-        folder: FOLDERS.plan,
-        updatedAt: nyIso(date, 8, 40 + rng.int(0, 15)),
-      });
-    }
-    if (date === lastDay || rng.chance(0.88)) {
-      const closed = day.filter((t) => t.status === 'closed');
-      const net = closed.reduce((s, t) => s + t.net, 0);
-      const w = closed.filter((t) => t.net > 0).length;
-      add({
-        kind: 'daily-review',
-        date,
-        title: `Daily review, ${dayLabel(date)}`,
-        body: doc(
-          heading('Summary'),
-          paragraph(
-            `${day.length} trades, ${w} won and ${closed.length - w} did not. Net ${money(net)} after costs.`,
-          ),
-          heading('What went well'),
-          bullets(picks(rng, PHRASES.wentWell, 2)),
-          heading('To improve'),
-          bullets(picks(rng, PHRASES.toImprove, 2)),
-          heading('Takeaway'),
-          paragraph(rng.pick(PHRASES.lessons)),
-        ),
-        linkedTradeIds: day.map((t) => t.id),
-        folder: FOLDERS.daily,
-        updatedAt: nyIso(date, 16, 30 + rng.int(0, 25)),
-      });
-    }
-  }
-
-  // Weekly recaps, one for each completed week.
-  const weeks = new Map<string, string[]>();
-  for (const d of days)
-    weeks.set(mondayOf(d), [...(weeks.get(mondayOf(d)) ?? []), d]);
-  for (const [monday, wdays] of weeks) {
-    const friday = ymd(parseYmd(monday) + 4 * DAY_MS);
-    if (!wdays.includes(friday)) continue;
-    const wt = wdays.flatMap((d) => byDay.get(d) ?? []);
-    const closed = wt.filter((t) => t.status === 'closed');
-    if (closed.length === 0) continue;
-    const net = closed.reduce((s, t) => s + t.net, 0);
-    const wins = closed.filter((t) => t.net > 0).length;
-    const best = closed.reduce((a, b) => (b.net > a.net ? b : a));
-    const worst = closed.reduce((a, b) => (b.net < a.net ? b : a));
-    add({
-      kind: 'weekly-recap',
-      date: friday,
-      title: `Week of ${dayLabel(monday, false)}`,
-      body: doc(
-        heading('The week in numbers'),
-        paragraph(
-          `${closed.length} closed trades, ${Math.round((wins / closed.length) * 100)}% winners, net ${money(net)}.`,
-        ),
-        bullets([
-          `Best trade: ${best.instrument.symbol} ${best.direction}, ${money(best.net)}.`,
-          `Worst trade: ${worst.instrument.symbol} ${worst.direction}, ${money(worst.net)}.`,
-        ]),
-        heading('Next week'),
-        bullets(picks(rng, PHRASES.weeklyFocus, 2)),
-      ),
-      linkedTradeIds: [...new Set([best.id, worst.id])],
-      folder: FOLDERS.weekly,
-      updatedAt: nyIso(friday, 17, 30 + rng.int(0, 20)),
-    });
-  }
-
-  // About 40 trade notes: the biggest results, then a random spread.
-  const closed = trades.filter((t) => t.status === 'closed');
-  const ranked = [...closed].sort((a, b) => b.net - a.net);
-  const chosen = new Set<Trade>([...ranked.slice(0, 8), ...ranked.slice(-8)]);
-  const rest = closed.filter((t) => !chosen.has(t));
-  while (chosen.size < 40 && rest.length > 0)
-    chosen.add(rest.splice(rng.int(0, rest.length - 1), 1)[0]!);
-  for (const t of trades.filter((x) => chosen.has(x))) {
-    const when = t.closedAt ?? t.openedAt;
-    const note = add({
-      kind: 'note',
-      date: localDate(when, NY),
-      title: `${t.instrument.symbol} ${t.direction}, ${money(t.net)}`,
-      body: doc(
-        paragraph(`Thesis: ${rng.pick(PHRASES.thesis)}`),
-        paragraph(`Execution: ${rng.pick(PHRASES.execution)}`),
-        paragraph(
-          `Result: ${money(t.net)} net. ${rng.pick(PHRASES.lessonsTrade)}`,
-        ),
-      ),
-      linkedTradeIds: [t.id],
-      folder: FOLDERS.note,
-      updatedAt: new Date(
-        Date.parse(when) + rng.int(10, 90) * 60_000,
-      ).toISOString(),
-    });
-    t.noteId = note.id;
-  }
-  return journal;
 }

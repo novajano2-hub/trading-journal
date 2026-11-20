@@ -5,7 +5,7 @@ import { dailyPnl } from '@/domain/metrics/days';
 import { summarize } from '@/domain/metrics/summary';
 import { evaluateProp } from '@/domain/prop/evaluate';
 import { toCents } from '@/domain/money';
-import { localDate } from '@/domain/time';
+import { localDate, localParts } from '@/domain/time';
 import type { Trade } from '@/domain/types';
 import {
   generateSampleWorkspace,
@@ -58,15 +58,19 @@ describe('sample workspace generator', () => {
       consistencyPct: 0.4,
     });
     const propTrades = s.trades.filter((t) => t.accountId === prop.id);
-    expect(
-      evaluateProp({
-        startingBalance: prop.startingBalance,
-        rules: prop.propRules!,
-        timeZone: NY,
-        now: '2026-11-19T22:00:00.000Z',
-        trades: propTrades,
-      }).overall,
-    ).not.toBe('breached');
+    for (const seed of [5, 99, SAMPLE_SEED]) {
+      const w = generateSampleWorkspace({ seed, endDate: '2026-11-19' });
+      const p = w.accounts[1]!;
+      expect(
+        evaluateProp({
+          startingBalance: p.startingBalance,
+          rules: p.propRules!,
+          timeZone: NY,
+          now: '2026-11-19T22:00:00.000Z',
+          trades: w.trades.filter((t) => t.accountId === p.id),
+        }).overall,
+      ).not.toBe('breached');
+    }
     // The evaluation trades only in the last 12 weeks.
     expect(
       differenceInCalendarDays(
@@ -75,6 +79,56 @@ describe('sample workspace generator', () => {
       ),
     ).toBeLessThanOrEqual(84);
     expect(propTrades.length).toBeGreaterThan(50);
+  });
+
+  test('the prop evaluation sits mid-way to its target with consistency met', () => {
+    const prop = s.accounts[1]!;
+    const status = evaluateProp({
+      startingBalance: prop.startingBalance,
+      rules: prop.propRules!,
+      timeZone: NY,
+      now: '2026-11-19T22:00:00.000Z',
+      trades: s.trades.filter((t) => t.accountId === prop.id),
+    });
+    const target = prop.propRules!.profitTarget;
+    expect(status.profit.current).toBeGreaterThanOrEqual(0.4 * target);
+    expect(status.profit.current).toBeLessThanOrEqual(0.7 * target);
+    expect(status.overall).toBe('in-progress');
+    expect(status.consistency?.met).toBe(true);
+  });
+
+  test('live account returns are plausible and stock size fits the account', () => {
+    for (const id of ['sample-futures', 'sample-multi']) {
+      const acct = s.accounts.find((a) => a.id === id)!;
+      const net = s.trades
+        .filter((t) => t.accountId === id && t.status === 'closed')
+        .reduce((sum, t) => sum + t.net, 0);
+      expect(net).not.toBe(0);
+      expect(net / acct.startingBalance).toBeGreaterThanOrEqual(-0.15);
+      expect(net / acct.startingBalance).toBeLessThanOrEqual(0.25);
+    }
+    for (const t of s.trades.filter(
+      (x) => x.instrument.assetClass === 'stock',
+    )) {
+      const acct = s.accounts.find((a) => a.id === t.accountId)!;
+      expect(t.avgEntry * t.maxPosition).toBeLessThanOrEqual(
+        (4 * acct.startingBalance) / 100,
+      );
+    }
+  });
+
+  test('end date is validated; a weekend rolls back to Friday', () => {
+    expect(() =>
+      generateSampleWorkspace({ seed: 1, endDate: 'yesterday' }),
+    ).toThrow(/YYYY-MM-DD/);
+    expect(() =>
+      generateSampleWorkspace({ seed: 1, endDate: '2026-02-30' }),
+    ).toThrow(/YYYY-MM-DD/);
+    const sat = generateSampleWorkspace({ seed: 1, endDate: '2026-11-21' });
+    expect(sat.endDate).toBe('2026-11-20');
+    expect(sat).toEqual(
+      generateSampleWorkspace({ seed: 1, endDate: '2026-11-20' }),
+    );
   });
 
   test('about 1,200 trades over about six months, across five asset classes', () => {
@@ -102,11 +156,9 @@ describe('sample workspace generator', () => {
 
   test('trades happen inside the New York session windows', () => {
     for (const t of s.trades) {
-      const times = t.executions.map((e) => e.time);
-      for (const iso of times) {
-        const d = new Date(iso);
-        expect(Number.isNaN(d.getTime())).toBe(false);
-      }
+      expect(localParts(t.openedAt, NY).weekday).toBeGreaterThanOrEqual(1);
+      expect(localParts(t.openedAt, NY).weekday).toBeLessThanOrEqual(5);
+      expect(localDate(t.openedAt, NY) <= '2026-11-19').toBe(true);
       if (t.executions.some((e) => e.id.endsWith(':expiry'))) continue;
       const parts = [t.openedAt, t.closedAt ?? t.openedAt].map((iso) => {
         const w = new Date(iso).toLocaleString('en-GB', {
