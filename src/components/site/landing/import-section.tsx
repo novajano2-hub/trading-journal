@@ -33,7 +33,7 @@ export function ImportSection() {
             ))}
           </ul>
         </div>
-        <ColumnMapping preview={preview} fileName="fills-november.csv" />
+        <ColumnMapping preview={preview} fileName="fills-november.csv" sample />
       </div>
     </section>
   );

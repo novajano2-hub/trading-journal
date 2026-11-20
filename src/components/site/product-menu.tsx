@@ -86,7 +86,7 @@ export function ProductMenu({
             >
               <span
                 aria-hidden="true"
-                className="grid size-8 shrink-0 place-items-center rounded-[8px] bg-accent-soft text-accent-ink"
+                className="grid size-8 shrink-0 place-items-center rounded-control bg-accent-soft text-accent-ink"
               >
                 <Icon size={18} />
               </span>

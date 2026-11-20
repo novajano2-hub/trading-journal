@@ -7,13 +7,13 @@ import { TradeRows } from '@/components/product/trade-rows';
 import { Chip } from '@/components/ui/chip';
 import { formatMoney, formatPct } from '@/lib/format';
 import type { SampleView } from '@/lib/landing/sample-view';
+import { dayLabel, setupName } from '@/lib/landing/sample-labels';
 import { shortTime } from '@/lib/time-format';
 import type { ModuleSlug } from '@/content/modules';
 
 /** The trade the sample shows moving its stop: rows open on it, rules grade it. */
 const FOCUS = 6;
 const ROW_SERIALS = [8, 6, 5];
-const STRATEGY = 'ORB';
 
 const Caption = () => (
   <p className="mt-3 text-xs text-faint">Sample data. Not a real account.</p>
@@ -61,7 +61,7 @@ function Analytics({ view }: { view: SampleView }) {
 function Strategies({ view }: { view: SampleView }) {
   const rules = view
     .checksFor(trade(view, FOCUS))
-    .map((c) => ({ ...c, who: STRATEGY }));
+    .map((c) => ({ ...c, who: setupName(view, trade(view, FOCUS)) }));
   return <RuleList rules={rules} label={`Rules for trade ${FOCUS}`} />;
 }
 
@@ -109,7 +109,7 @@ function Notebook({ view }: { view: SampleView }) {
   return (
     <div className="rounded-card border border-line bg-surface-1 p-5 shadow-[var(--shadow)]">
       <p className="font-mono text-xs text-faint">
-        Daily review, {view.weekLabel}
+        Daily review, {dayLabel(linked[0]!)}
       </p>
       <p className="mt-3 text-[15px] leading-[1.65]">
         Took the NQ breakout early and moved the stop when it came back. Second

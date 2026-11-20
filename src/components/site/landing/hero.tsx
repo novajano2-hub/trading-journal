@@ -99,7 +99,6 @@ export function Hero({ view }: { view: SampleView }) {
             <KpiStrip summary={view.summary} tickerDelay={T.tickers / 1000} />
             <EquityChart
               series={series}
-              draw="entrance"
               delayMs={T.curve}
               label={`Equity curve, sample week, from ${formatMoney(SAMPLE_START)} to ${formatMoney(end)}`}
             />

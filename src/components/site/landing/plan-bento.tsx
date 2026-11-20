@@ -3,7 +3,8 @@ import { RuleList } from '@/components/product/rule-list';
 import { Chip } from '@/components/ui/chip';
 import { formatMoney, formatPct } from '@/lib/format';
 import type { SampleView } from '@/lib/landing/sample-view';
-import { shortTime, weekdayOf } from '@/lib/time-format';
+import { dayLabel, setupName } from '@/lib/landing/sample-labels';
+import { shortTime } from '@/lib/time-format';
 import { SectionHeading } from './section-heading';
 import { TickIn } from './tick-in';
 
@@ -11,8 +12,6 @@ import { TickIn } from './tick-in';
 const RULES_SERIAL = 6;
 /** The two trades the review note covers. */
 const NOTE_SERIALS = [6, 7];
-/** The strategy the sample rules belong to. */
-const STRATEGY = 'ORB';
 
 const CELL = 'rounded-card border p-7';
 const INNER = 'mt-[22px] rounded-control border border-line bg-surface-1 px-4';
@@ -36,7 +35,9 @@ export function PlanBento({ view }: { view: SampleView }) {
   const bySerial = new Map(view.trades.map((t) => [t.serial, t]));
   const ruled = bySerial.get(RULES_SERIAL);
   if (!ruled) throw new Error(`Sample trade ${RULES_SERIAL} is missing`);
-  const rules = view.checksFor(ruled).map((c) => ({ ...c, who: STRATEGY }));
+  const rules = view
+    .checksFor(ruled)
+    .map((c) => ({ ...c, who: setupName(view, ruled) }));
   const { profit, drawdown, consistency } = view.prop;
 
   const noted = NOTE_SERIALS.flatMap((n) => bySerial.get(n) ?? []);
@@ -46,10 +47,6 @@ export function PlanBento({ view }: { view: SampleView }) {
       (id) =>
         view.tags.find((x) => x.id === id && x.category === 'mistake') ?? [],
     );
-  const day = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/New_York',
-  }).format(new Date(ruled.openedAt));
-  const dayLabel = `${weekdayOf(day, 'short')} ${new Date(`${day}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })}`;
 
   return (
     <section
@@ -80,10 +77,15 @@ export function PlanBento({ view }: { view: SampleView }) {
           data-testid="bento-cell"
           className={`${CELL} border-line bg-surface-1 lg:col-span-5`}
         >
-          <CellHead title="Prop rules after every trade">
-            Static, end-of-day or trailing drawdown, daily loss and consistency,
-            as your firm wrote them.
-          </CellHead>
+          <div className="flex items-start justify-between gap-4">
+            <CellHead title="Prop rules after every trade">
+              Static, end-of-day or trailing drawdown, daily loss and
+              consistency, as your firm wrote them.
+            </CellHead>
+            <span className="shrink-0 pt-1.5 text-xs text-faint">
+              Sample data
+            </span>
+          </div>
           <dl className={`${INNER} divide-y divide-line`}>
             <div className={STAT}>
               <dt className="text-muted">Profit target</dt>
@@ -127,7 +129,7 @@ export function PlanBento({ view }: { view: SampleView }) {
           </CellHead>
           <div className="rounded-control border border-line bg-surface-1 p-4">
             <p className="font-mono text-xs text-faint">
-              Daily review, {dayLabel}
+              Daily review, {dayLabel(ruled)}
             </p>
             <p className="mt-2 text-[15px] leading-[1.65]">
               Took the NQ breakout early and moved the stop when it came back.

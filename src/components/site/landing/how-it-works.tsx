@@ -10,6 +10,7 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import type { Icon } from '@phosphor-icons/react';
 import { Chip } from '@/components/ui/chip';
+import { SectionHeading } from './section-heading';
 import { guessColumns, type PreviewField } from '@/domain/import/guess-columns';
 import { formatPnl } from '@/lib/format';
 import type { SampleView } from '@/lib/landing/sample-view';
@@ -83,12 +84,10 @@ export function HowItWorks({ view }: { view: SampleView }) {
       className="scroll-mt-16 border-y border-line bg-surface-1 py-28"
     >
       <div className="mx-auto max-w-[1280px] px-5 sm:px-10">
-        <h2
+        <SectionHeading
           id="how-title"
-          className="max-w-[20ch] text-[42px] leading-[1.08] font-semibold tracking-[-0.035em]"
-        >
-          Keel does the logging. You do the review.
-        </h2>
+          title="Keel does the logging. You do the review."
+        />
         <ol className="mt-14 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
           <Step
             icon={UploadSimple}

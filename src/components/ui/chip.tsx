@@ -40,19 +40,3 @@ export function SideChip({ side }: { side: 'long' | 'short' }) {
     </span>
   );
 }
-
-/** Status pill: a dot plus a label. */
-export function StatusPill({
-  tone = 'neutral',
-  children,
-}: {
-  tone?: ChipTone;
-  children: ReactNode;
-}) {
-  return (
-    <Chip tone={tone}>
-      <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
-      {children}
-    </Chip>
-  );
-}
