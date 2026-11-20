@@ -48,7 +48,7 @@ export interface ImportPlan {
   createdAt: string;
   mapping: ImportMapping;
   rowCount: number;
-  /** To write, in serial order. */
+  /** To write, in serial order. Empty when blocked, like replacedTrades and flags. */
   trades: Trade[];
   /** Stored trades this import rebuilds. */
   replacedTrades: Trade[];
@@ -185,10 +185,26 @@ function buildTrips(
 }
 
 /**
- * The stored trade each rebuilt trade continues: the one whose first execution
- * it holds. Stored executions are rebuilt unchanged (the file's copy of one is a
- * duplicate row), so that id survives even when an overlapping export adds an
- * earlier fill. When the earlier fill reverses the position through it, the
+ * The execution a stored trade's identity rests on: the one its id names
+ * (`<account>:<symbol>:<execution id>`), or its first execution when that one
+ * is gone. An id carried over from an earlier merge keeps naming the same
+ * fill, so no rebuilt trade can take that id from the builder as well.
+ */
+function anchorOf(stored: Trade): string | undefined {
+  const prefix = `${stored.accountId}:${canonicalSymbol(stored.instrument.symbol)}:`;
+  const named = stored.id.startsWith(prefix)
+    ? stored.id.slice(prefix.length)
+    : undefined;
+  return named !== undefined && stored.executions.some((e) => e.id === named)
+    ? named
+    : stored.executions[0]?.id;
+}
+
+/**
+ * The stored trade each rebuilt trade continues: the one whose anchor it holds.
+ * Stored executions are rebuilt unchanged (the file's copy of one is a
+ * duplicate row), so the anchor survives even when an overlapping export adds
+ * an earlier fill. When the earlier fill reverses the position through it, the
  * builder splits it, and the part that still opens a position (`:b`) carries on.
  */
 function continuations(
@@ -197,12 +213,12 @@ function continuations(
 ): Map<Trade, Trade> {
   const out = new Map<Trade, Trade>();
   for (const stored of merged) {
-    const first = stored.executions[0]?.id;
-    if (first === undefined) continue;
+    const anchor = anchorOf(stored);
+    if (anchor === undefined) continue;
     const t = trades.find(
       (b) =>
         !out.has(b) &&
-        b.executions.some((e) => e.id === first || e.id === `${first}:b`),
+        b.executions.some((e) => e.id === anchor || e.id === `${anchor}:b`),
     );
     if (t) out.set(t, stored);
   }
@@ -217,18 +233,23 @@ function mergedRisk(built: Trade, stored: Trade): Cents | undefined {
     : stored.initialRisk;
 }
 
-/** The rebuilt trade keeps the stored trade's identity and the user's journaling. */
+/**
+ * The rebuilt trade keeps the stored trade's identity and the user's journaling.
+ * The planned stop, target and risk were set for the stored direction, so a
+ * rebuild that flips it drops them.
+ */
 function inherit(built: Trade, stored: Trade): Trade {
   const t: Trade = {
     ...built,
     id: stored.id,
     serial: stored.serial,
-    tagIds: stored.tagIds,
-    ruleChecks: stored.ruleChecks,
+    tagIds: [...stored.tagIds],
+    ruleChecks: stored.ruleChecks.map((r) => ({ ...r })),
   };
   if (stored.strategyId !== undefined) t.strategyId = stored.strategyId;
   if (stored.rating !== undefined) t.rating = stored.rating;
   if (stored.noteId !== undefined) t.noteId = stored.noteId;
+  if (built.direction !== stored.direction) return t;
   if (stored.plannedStop !== undefined) t.plannedStop = stored.plannedStop;
   if (stored.plannedTarget !== undefined)
     t.plannedTarget = stored.plannedTarget;
@@ -298,9 +319,10 @@ export function planImport(
   const valid = built.fingerprints.length + built.duplicateRows.length;
 
   const continued = continuations(built.trades, built.merged);
+  // A stable sort: trades opened together keep file and builder order.
   const fresh = built.trades
     .filter((t) => !continued.has(t))
-    .sort((a, b) => cmp(a.openedAt, b.openedAt) || cmp(a.id, b.id));
+    .sort((a, b) => cmp(a.openedAt, b.openedAt));
   fresh.forEach((t, i) => {
     t.serial = ctx.nextSerial + i;
   });
@@ -323,6 +345,20 @@ export function planImport(
           ? 'nothing-new'
           : null;
 
+  // A blocked plan is never committed, so it carries nothing to write.
+  const writes = blocked
+    ? { trades: [], replacedTrades: [], flags: [] }
+    : {
+        trades,
+        replacedTrades: built.merged,
+        flags: tradeFlags(
+          trades,
+          ctx.accountCurrency,
+          built.expired,
+          built.pnlFlags,
+        ),
+      };
+
   return {
     importId: meta.importId,
     workspaceId: ctx.workspaceId,
@@ -331,18 +367,11 @@ export function planImport(
     createdAt: meta.now,
     mapping,
     rowCount: parsed.rows.length,
-    trades,
-    replacedTrades: built.merged,
+    ...writes,
     issues,
     duplicateRows: built.duplicateRows,
     fingerprints: built.fingerprints,
     unresolvedKeys,
-    flags: tradeFlags(
-      trades,
-      ctx.accountCurrency,
-      built.expired,
-      built.pnlFlags,
-    ),
     blocked,
   };
 }

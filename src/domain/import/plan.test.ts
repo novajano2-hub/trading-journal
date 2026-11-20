@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { parseCsv } from './csv';
 import { guessMapping, type MappingOptions } from './mapping';
 import { planImport, type ImportContext } from './plan';
+import type { Trade } from '../types';
 
 const csv = readFileSync('e2e/fixtures/sample-fills.csv', 'utf8');
 const H = 'Date/Time,Symbol,Buy/Sell,Quantity,Price\n';
@@ -82,10 +83,17 @@ describe('planImport', () => {
   });
 
   test('a position closed by a later import is one trade keeping id, serial and tags (Review Focus 2)', () => {
-    const open = {
+    const open: Trade = {
       ...plan(H + '2026-11-16 09:41:00,ESZ5,Buy,2,6010\n').trades[0]!,
       serial: 7,
       tagIds: ['t1'],
+      strategyId: 's1',
+      rating: 4,
+      ruleChecks: [{ ruleId: 'r1', followed: true }],
+      noteId: 'n1',
+      plannedStop: 6000,
+      plannedTarget: 6030,
+      initialRisk: 100000, // riskFromStop of 2 @ 6010 to 6000
     };
     const p = plan(
       H + '2026-11-17 10:00:00,ESZ5,Sell,2,6015\n',
@@ -99,22 +107,32 @@ describe('planImport', () => {
         id: open.id,
         serial: 7,
         tagIds: ['t1'],
+        strategyId: 's1',
+        rating: 4,
+        ruleChecks: [{ ruleId: 'r1', followed: true }],
+        noteId: 'n1',
+        plannedStop: 6000,
+        plannedTarget: 6030,
+        initialRisk: 100000,
         status: 'closed',
         gross: 50000,
         importId: 'imp2',
       }),
     ]);
+    // Copies, not references shared with the stored trade.
+    expect(p.trades[0]!.tagIds).not.toBe(open.tagIds);
+    expect(p.trades[0]!.ruleChecks[0]).not.toBe(open.ruleChecks[0]);
   });
 
   describe('an overlapping export that adds an earlier fill (ruling 1)', () => {
     const first = plan(H + '2026-11-16 09:41:00,ESZ5,Buy,2,6010\n');
     const open = { ...first.trades[0]!, serial: 7, tagIds: ['t1'] };
-    const later = (rows: string) =>
+    const later = (rows: string, stored: Trade = open) =>
       plan(
         H + rows,
         ctx({
           nextSerial: 9,
-          openTrades: [open],
+          openTrades: [stored],
           fingerprints: first.fingerprints,
         }),
         {},
@@ -160,27 +178,103 @@ describe('planImport', () => {
         [9, false, 'short', []],
       ]);
     });
+
+    test('chained overlapping exports never give two trades one id', () => {
+      // imp2 adds buy 1 @ 09:30: still one open trade, carrying the imp1 id.
+      const imp2 = later(
+        '2026-11-16 09:30:00,ESZ5,Buy,1,6000\n2026-11-16 09:41:00,ESZ5,Buy,2,6010\n',
+      );
+      const stored = imp2.trades[0]!;
+      expect(stored).toMatchObject({ id: open.id, serial: 7, status: 'open' });
+      // imp3 adds sell 1 @ 09:35: 09:30-09:35 closes, 09:41 stays open.
+      const p = plan(
+        H +
+          '2026-11-16 09:30:00,ESZ5,Buy,1,6000\n2026-11-16 09:35:00,ESZ5,Sell,1,6005\n2026-11-16 09:41:00,ESZ5,Buy,2,6010\n',
+        ctx({
+          nextSerial: 9,
+          openTrades: [stored],
+          fingerprints: [...first.fingerprints, ...imp2.fingerprints],
+        }),
+        {},
+        'imp3',
+      );
+      const ids = p.trades.map((t) => t.id);
+      expect(new Set(ids).size).toBe(ids.length);
+      // The id names imp1:r2, so the identity stays with the trade holding it.
+      expect(
+        p.trades.map((t) => [
+          t.id === open.id,
+          t.serial,
+          t.status,
+          t.gross,
+          t.tagIds,
+          t.executions.map((e) => e.id),
+        ]),
+      ).toEqual([
+        [true, 7, 'open', 0, ['t1'], ['imp1:r2']],
+        [false, 9, 'closed', 25000, [], ['imp2:r2', 'imp3:r3']],
+      ]);
+    });
+
+    test('a merge that flips the direction keeps identity and journaling, not the plan', () => {
+      const journaled: Trade = {
+        ...open,
+        strategyId: 's1',
+        rating: 4,
+        ruleChecks: [{ ruleId: 'r1', followed: false }],
+        noteId: 'n1',
+        plannedStop: 6000,
+        plannedTarget: 6030,
+        initialRisk: 100000,
+      };
+      // An earlier sell 2 @ 09:30 makes the stored buy the short's exit.
+      const p = later(
+        '2026-11-16 09:30:00,ESZ5,Sell,2,6020\n2026-11-16 09:41:00,ESZ5,Buy,2,6010\n',
+        journaled,
+      );
+      expect(p.trades).toHaveLength(1);
+      const t = p.trades[0]!;
+      expect(t).toMatchObject({
+        id: open.id,
+        serial: 7,
+        tagIds: ['t1'],
+        strategyId: 's1',
+        rating: 4,
+        ruleChecks: [{ ruleId: 'r1', followed: false }],
+        noteId: 'n1',
+        direction: 'short',
+        status: 'closed',
+        gross: 100000,
+      });
+      expect(t).not.toHaveProperty('plannedStop');
+      expect(t).not.toHaveProperty('plannedTarget');
+      expect(t).not.toHaveProperty('initialRisk');
+    });
   });
 
   test('a merge keeps a user-entered risk and recomputes one derived from the stop (ruling 2)', () => {
     const stored = plan(H + '2026-11-16 09:41:00,ESZ5,Buy,2,6010\n').trades[0]!;
-    const merge = (initialRisk: number) =>
+    const merge = (o: Partial<Trade>) =>
       plan(
         H +
           '2026-11-16 09:50:00,ESZ5,Buy,1,6013\n2026-11-16 10:00:00,ESZ5,Sell,3,6020\n',
-        ctx({ openTrades: [{ ...stored, plannedStop: 6000, initialRisk }] }),
+        ctx({ openTrades: [{ ...stored, plannedStop: 6000, ...o }] }),
         {},
         'imp2',
       ).trades[0]!;
-    expect(merge(75000)).toMatchObject({
+    expect(merge({ initialRisk: 75000 })).toMatchObject({
       plannedStop: 6000,
       initialRisk: 75000,
     });
     // 100000 is riskFromStop at the old 2 @ 6010; the merged 3 @ 6011 is 165000.
-    expect(merge(100000)).toMatchObject({
+    expect(merge({ initialRisk: 100000 })).toMatchObject({
       plannedStop: 6000,
       initialRisk: 165000,
     });
+    // A stop without a risk stays without one.
+    const noRisk = merge({});
+    expect(noRisk.plannedStop).toBe(6000);
+    expect(noRisk).not.toHaveProperty('initialRisk');
   });
 
   test('slash, case and space variants of one symbol are one position (E6)', () => {
@@ -301,6 +395,64 @@ describe('planImport', () => {
       code: 'expired-worthless',
       expiry: '2026-11-20',
     });
+  });
+
+  test('closed-trade rows already imported are skipped (Review Focus 1)', () => {
+    const T = 'Open Time,Close Time,Symbol,Side,Qty,Entry Price,Exit Price\n';
+    const a = '2026-11-16 09:30:00,2026-11-16 09:45:00,ESZ5,Long,1,6000,6004';
+    const b = '2026-11-17 09:30:00,2026-11-17 09:45:00,ESZ5,Short,1,6010,6002';
+    const first = plan(T + a);
+    const p = plan(
+      T + a + '\n' + b,
+      ctx({ nextSerial: 2, fingerprints: first.fingerprints }),
+      {},
+      'imp2',
+    );
+    expect(p.duplicateRows).toEqual([2]);
+    expect(p.fingerprints).toHaveLength(1);
+    expect(p.trades).toEqual([
+      expect.objectContaining({ serial: 2, direction: 'short', gross: 40000 }),
+    ]);
+    expect(plan(T + a, ctx({ fingerprints: first.fingerprints })).blocked).toBe(
+      'nothing-new',
+    );
+  });
+
+  test('trades sharing an open time take serials in file order', () => {
+    const T = 'Open Time,Close Time,Symbol,Side,Qty,Entry Price,Exit Price\n';
+    const rows = Array.from(
+      { length: 10 },
+      (_, i) =>
+        `2026-11-16 09:30:00,2026-11-16 09:45:00,ESZ5,Long,1,6000,${6001 + i}`,
+    );
+    const p = plan(T + rows.join('\n'));
+    expect(p.trades.map((t) => [t.serial, t.executions[0]!.id])).toEqual(
+      rows.map((_, i) => [i + 1, `imp1:r${i + 2}:entry`]),
+    );
+  });
+
+  test('a blocked plan writes, replaces and flags nothing', () => {
+    const opt = plan(
+      H + '2026-11-18 10:00:00,AAPL  261120C00150000,Buy,1,1.50\n',
+      ctx(),
+      {},
+      'imp0',
+      '2026-11-19T00:00:00.000Z',
+    ).trades[0]!; // open, and expired by the next import
+    const es = H + '2026-11-16 09:41:00,ESZ5,Buy,2,6010\n';
+    const empty = { trades: [], replacedTrades: [], flags: [] };
+    expect(
+      plan(es, ctx({ openTrades: [opt], fingerprints: plan(es).fingerprints })),
+    ).toMatchObject({ blocked: 'nothing-new', ...empty });
+    expect(
+      plan(
+        es + '2026-11-16 09:41:00,ZCZ5,Buy,1,450\n',
+        ctx({ openTrades: [opt] }),
+      ),
+    ).toMatchObject({ blocked: 'unresolved-symbols', ...empty });
+    expect(
+      plan(H + 'x,ESZ5,Buy,0,1\n', ctx({ openTrades: [opt] })),
+    ).toMatchObject({ blocked: 'no-rows', ...empty });
   });
 
   test('nothing valid to import', () =>
