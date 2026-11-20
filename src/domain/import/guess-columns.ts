@@ -81,20 +81,29 @@ function normalize(value: string): string {
     .trim();
 }
 
-/** Guess which column holds each preview field. Exact synonym matches win over "contains" matches. */
-export function guessColumns(
+export function normalizeHeader(value: string): string {
+  return normalize(value);
+}
+
+/**
+ * Match each field to a header column. Exact synonym matches win over
+ * "contains" matches, and a column maps to at most one field.
+ */
+export function matchColumns<F extends string>(
   headers: readonly string[],
-): Partial<Record<PreviewField, number>> {
+  fields: readonly F[],
+  synonyms: Readonly<Record<F, readonly string[]>>,
+): Partial<Record<F, number>> {
   const norm = headers.map(normalize);
-  const result: Partial<Record<PreviewField, number>> = {};
+  const result: Partial<Record<F, number>> = {};
   const used = new Set<number>();
 
   const pass = (matches: (header: string, synonym: string) => boolean) => {
-    for (const field of FIELDS) {
+    for (const field of fields) {
       if (result[field] !== undefined) continue;
       const index = norm.findIndex(
         (h, i) =>
-          !used.has(i) && SYNONYMS[field].some((syn) => matches(h, syn)),
+          !used.has(i) && synonyms[field].some((syn) => matches(h, syn)),
       );
       if (index >= 0) {
         result[field] = index;
@@ -106,6 +115,13 @@ export function guessColumns(
   pass((h, syn) => h === syn);
   pass((h, syn) => ` ${h} `.includes(` ${syn} `));
   return result;
+}
+
+/** Guess which column holds each preview field. */
+export function guessColumns(
+  headers: readonly string[],
+): Partial<Record<PreviewField, number>> {
+  return matchColumns(headers, FIELDS, SYNONYMS);
 }
 
 export function normalizeSide(value: string): 'buy' | 'sell' | null {
