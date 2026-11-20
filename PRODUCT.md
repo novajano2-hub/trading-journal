@@ -74,9 +74,12 @@ The claim we can make truthfully is the complete loop under one subscription.
 ## Brand Commitments
 
 - Working name: **Keel**. It's a placeholder; the real name comes later.
-- Visual references come from the user's own picks on Mobbin, HorizonX and Refero-style galleries.
-- No look or copy taken from either source product.
-- The user explicitly rejects generic AI-looking output ("no AI slop").
+- **Visual direction (user-pinned, 2026-11-20).** A light, precise, pro-trading look built from the user's references: Kraken Pro, Coinbase Advanced, Gemini ActiveTrader and Public, plus Mobbin and HorizonX references.
+  - The approved mock is `.impeccable/mocks/rebrand/landing-v3.html`.
+  - Light is the default mode; dark is an explicit toggle.
+- **Rejected:** metaphor worlds (the earlier "Trading Floor" tickets and stamps), dark-mesh hero clichés, editorial serif display type, and anything that reads as AI-generated. The user's words: "no AI slop".
+- **Quality bars:** the design-taste-frontend and Impeccable skills. HorizonX coded components may be used directly under their commercial licence.
+- No look or copy is taken from TradeZella or MyTradingJourney.
 
 ## Evidence on Hand
 

@@ -7,33 +7,34 @@ related_targets: []
 
 # Landing page (marketing home)
 
-Mode: Persuade. Audience, job and evidence rules live in PRODUCT.md.
-Primary action: drop a broker CSV ("Build my journal"), with broker selection as the alternative.
-Proof: authored sample tickets and stats, each labelled as sample data. No customer counts, ratings or prices.
+Mode: Persuade. Audience, job and evidence rules are in PRODUCT.md.
+- **Primary action:** "Get started". The secondary is "See how it works", which scrolls to the flow section.
+- **No file upload on the landing page:** CSV import lives in the app.
+- **Proof:** live product components fed by the trading engine's sample week, labelled as sample. There are no customer counts, ratings or prices.
 
 ## Direction contract
 
-THESIS: Every trade is a ticket you file, stamp and review, and Keel does the filing. This page refuses the category default: a centred headline over a dark dashboard screenshot.
+THESIS: The product itself is the hero. Real Keel components show a real sample week, so a trader recognises their own review loop within seconds. This page refuses the dark-mesh centred hero and the metaphor-world landing.
 
-OWN-WORLD: Open-outcry pit ephemera.
-- Colour:
-  - jacket gold #F2B705 floods the marketing ground
-  - floor navy #151A2D is the ink
-  - ticket card stock #F4F6F8 for surfaces, with ruled field grids
-  - buy blue #2350C8 and sell red #D2352A, always inside a circled B/S letter
-  - time-clock purple #6B3FA0 for timestamps only
-- Type: Big Shoulders Display 900 uppercase for headlines and badges, Barlow for text, a dot-matrix face for timestamps.
-- States are rubber stamps: RULE BROKEN, A+ SETUP.
-- The trader badge is the account identity.
+OWN-WORLD: Light pro-trading.
+- **Colour:**
+  - ground #F6F7F9, white surfaces, hairlines #E3E6EB
+  - ink #0F1218, muted #4F5865
+  - a single cobalt accent #2550E0
+  - gain #087A54 and loss #C8283A, always paired with a sign or label
+- **Type:** Geist for all text, Geist Mono for every number.
+- **Shape:** chips 6px; buttons and inner panels 10px; cards and windows 16px.
+- **Icons and depth:** Phosphor icons; soft blue-tinted window shadows.
+- **Avoid:** eyebrows, em dashes and decorative dots.
 
-STORY: Visitors see sample fills filed as tickets with their mistakes stamped on them, then see their own fills print as tickets the moment they drop a CSV. They come to believe Keel files and grades every trade for them. Stamps land on a visitor's own tickets only once they have rules in the app; on the landing drop their tickets print unstamped and UNFILED (the user-approved spec decision of 2026-11-20: a new visitor has no rules, so any stamp would be invented).
+STORY: The visitor sees their own kind of week in a dashboard, understands that Keel logs and grades every trade, sees reports that answer "why", and clicks Get started.
 
 FIRST VIEWPORT:
-- Gold field. Badge logo top-left, condensed uppercase nav.
-- Left ~55%: "FILE EVERY TRADE. FIND THE PATTERN." at ~118px, a two-line lede, then the navy ticket-slot file drop with "Build my journal".
-- Right ~45%: a fanned stack of four sample tickets. The top one is a winning ES buy with its time stamp; one beneath is stamped RULE BROKEN. The stack is labelled as sample.
-- Signature interaction: on drop, the visitor's first fills print one by one into the stack, unstamped and UNFILED, with times in the world's clock format (DD MMM HH:MM:SS); stamps stay on the labelled sample tickets.
+- 64-68px nav.
+- **Split hero.** The left 5/12 holds the headline "Find out what's working in your trading." at about 58px over two to three lines, an 18-word subtext, and the Get started and See how it works buttons.
+- **Right 7/12:** a light dashboard window that bleeds right where there's room. It shows Net P&L, win rate, profit factor and expectancy ticking up, an equity line drawing in, and three trade rows. A trade-detail card overlaps the bottom left, showing one rule kept and one broken.
+- **Signature interaction:** the report tabs (Hour, Session, Setup, Symbol, Mistake) re-chart real engine breakdowns with a sliding active tab.
 
-FORM: Trading Floor, position 1 of 7 on the grounded list (Impeccable's pick, chosen by the user). seed:605531cca91c96c2
+FORM: User-pinned familiar direction built from Kraken Pro, Coinbase Advanced, Gemini ActiveTrader and Public, with no concept roll. seed: none (user-pinned direction, no roll)
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
