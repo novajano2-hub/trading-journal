@@ -11,7 +11,8 @@ import {
   OpenImportedTradeError,
   StalePlanError,
 } from '../repository';
-import { KeelDb, META } from './db';
+import { KeelDb } from './db';
+import { META } from './schema';
 import { createLocalRepository } from './local-repository';
 
 const M = 'mine';

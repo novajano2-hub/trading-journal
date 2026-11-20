@@ -3,7 +3,8 @@ import { expect, test } from 'vitest';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import { fixtureSample } from '../__fixtures__/sample';
 import { DuplicateNameError, NotFoundError } from '../repository';
-import { KeelDb, type ImportJobRecord } from './db';
+import { KeelDb } from './db';
+import type { ImportJobRecord } from './schema';
 import { createLocalRepository } from './local-repository';
 
 const S = 'sample';

@@ -2,7 +2,7 @@ import { isValidTimeZone } from '@/domain/time';
 import type { UserPrefs } from '@/domain/types';
 import { defaultPrefs, type PrefsRepo } from '../repository';
 import type { LocalContext } from './context';
-import { META } from './db';
+import { META } from './schema';
 
 /** Stores only the prefs the user set, so the rest keep following `defaultPrefs()` (e.g. the browser zone). */
 export function localPrefs(ctx: LocalContext): PrefsRepo {

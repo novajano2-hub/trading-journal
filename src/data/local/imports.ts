@@ -11,7 +11,8 @@ import {
 } from '../repository';
 import { USER_WORKSPACE } from '../workspaces';
 import type { LocalContext } from './context';
-import { META, type ImportJobRecord, type KeelDb } from './db';
+import type { KeelDb } from './db';
+import { META, type ImportJobRecord } from './schema';
 import { pruneJournalLinks } from './journal';
 import { rwTx } from './tx';
 

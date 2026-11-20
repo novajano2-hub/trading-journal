@@ -1,56 +1,12 @@
 import { Dexie, type Table } from 'dexie';
 import type {
   Account,
-  ImportJob,
   JournalEntry,
   Strategy,
   Tag,
   Trade,
 } from '@/domain/types';
-
-/** Dexie's own database: idb-keyval's `keel` database must never be version-upgraded. */
-export const DB_NAME = 'keel-data';
-
-export interface MetaRecord {
-  key: string;
-  value: unknown;
-}
-
-/** Keys of the `meta` table. */
-export const META = {
-  activeWorkspace: 'active-workspace',
-  prefs: 'prefs',
-  /** Value: `SeedMeta`. */
-  seed: 'seed:sample',
-  overrides: (ws: string) => `overrides:${ws}`,
-  /** Value: a number, bumped by every import commit and undo in the workspace. */
-  importRevision: (ws: string) => `import-revision:${ws}`,
-} as const;
-
-export interface SeedMeta {
-  seed: number;
-  endDate: string;
-  seededAt: string;
-}
-
-export interface ImportJobRecord extends ImportJob {
-  fingerprints: string[];
-  replacedTrades: Trade[];
-  /** Ids of the trades the commit wrote. */
-  tradeIds: string[];
-  /** The workspace's import revision this commit made; orders the commits. */
-  revision: number;
-}
-
-/** Every table whose rows belong to a workspace, keyed `[workspaceId+id]`. */
-export const DATA_TABLES = [
-  'trades',
-  'accounts',
-  'strategies',
-  'tags',
-  'journal',
-  'imports',
-] as const;
+import { DB_NAME, type ImportJobRecord, type MetaRecord } from './schema';
 
 type Key = [workspaceId: string, id: string];
 

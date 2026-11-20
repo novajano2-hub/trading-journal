@@ -10,7 +10,8 @@ import {
 } from '../repository';
 import type { SampleWorkspace } from '../seed/generate';
 import { SAMPLE_WORKSPACE, USER_WORKSPACE, WORKSPACES } from '../workspaces';
-import { KeelDb, type ImportJobRecord } from './db';
+import { KeelDb } from './db';
+import type { ImportJobRecord } from './schema';
 import { createLocalRepository } from './local-repository';
 
 const sample = async () => fixtureSample();

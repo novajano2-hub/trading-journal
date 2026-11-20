@@ -2,7 +2,8 @@ import type { Workspace } from '@/domain/types';
 import { NotFoundError, type WorkspacesRepo } from '../repository';
 import { SAMPLE_WORKSPACE, USER_WORKSPACE, WORKSPACES } from '../workspaces';
 import { writeSample, type LocalContext, type SampleSource } from './context';
-import { DATA_TABLES, META, type KeelDb } from './db';
+import type { KeelDb } from './db';
+import { DATA_TABLES, META } from './schema';
 
 const copy = (w: Workspace): Workspace => ({ ...w });
 

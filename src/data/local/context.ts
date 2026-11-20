@@ -1,6 +1,7 @@
 import { StorageUnavailableError } from '../repository';
 import type { SampleWorkspace } from '../seed/generate';
-import { DATA_TABLES, KeelDb, META, type SeedMeta } from './db';
+import type { KeelDb } from './db';
+import { DATA_TABLES, META, type SeedMeta } from './schema';
 
 /** What every local repo module works from. */
 export interface LocalContext {
@@ -44,10 +45,14 @@ export function createLocalContext(opts: LocalContextOptions): LocalContext {
   let ready: Promise<KeelDb> | undefined;
 
   async function openAndSeed(): Promise<KeelDb> {
-    instance ??= new KeelDb({
-      indexedDB: opts.indexedDB,
-      IDBKeyRange: opts.IDBKeyRange,
-    });
+    if (!instance) {
+      // Dexie loads with the store, never at module load or in a server render.
+      const { KeelDb } = await import('./db');
+      instance = new KeelDb({
+        indexedDB: opts.indexedDB,
+        IDBKeyRange: opts.IDBKeyRange,
+      });
+    }
     const db = await openWithin(instance, timeoutMs);
     if (!(await db.meta.get(META.seed))) {
       const at = now();
