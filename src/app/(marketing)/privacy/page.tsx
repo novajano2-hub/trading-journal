@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import {
   READ_P,
   ReadPage,
@@ -18,9 +19,15 @@ export default function PrivacyPage() {
     >
       <ReadSection id="files" title="Your files stay on this device">
         <p className={READ_P}>
-          When you drop a CSV or Excel file on Keel, it is read in your browser.
-          The trades built from it are stored in IndexedDB, a database inside
-          your browser, on this device. Nothing is uploaded.
+          When you drop a CSV or text file on Keel, your browser reads it to
+          preview its first rows. Nothing is uploaded.
+        </p>
+        <p className={READ_P}>
+          If you choose &ldquo;Map columns and continue&rdquo;, the file itself,
+          every column of it, is kept in IndexedDB, a database inside your
+          browser, on this device. It stays there until you remove it on the
+          import page or clear this site&apos;s data. No trades are built from
+          it yet. Only CSV or text files are accepted.
         </p>
       </ReadSection>
       <ReadSection id="accounts" title="Accounts">
@@ -31,8 +38,15 @@ export default function PrivacyPage() {
       </ReadSection>
       <ReadSection id="remove" title="Removing your data">
         <p className={READ_P}>
-          Because the data lives in your browser, clearing this site&apos;s data
-          in your browser settings removes it.
+          Remove the file with &ldquo;Remove file&rdquo; on{' '}
+          <Link
+            href="/app/import"
+            className="underline decoration-2 underline-offset-4"
+          >
+            /app/import
+          </Link>
+          , or clear this site&apos;s data in your browser settings. Because the
+          file lives only in your browser, either one removes it.
         </p>
       </ReadSection>
       <ReadSection id="later" title="What will change">

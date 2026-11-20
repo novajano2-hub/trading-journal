@@ -4,7 +4,7 @@ import { SECTION, AFTER_HEAD, SectionHead } from './section-head';
 const QUESTIONS = [
   {
     q: 'Which brokers work?',
-    a: 'Any broker that exports a CSV with five columns: time, symbol, side, quantity and price. Direct sync is on the roadmap.',
+    a: 'Any broker whose export is a CSV with five columns, time, symbol, side, quantity and price, can be previewed today. Direct sync is on the roadmap.',
   },
   {
     q: 'Where does my data go?',

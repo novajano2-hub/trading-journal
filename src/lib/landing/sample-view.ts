@@ -13,6 +13,7 @@ import { evaluateProp, type PropStatus } from '@/domain/prop/evaluate';
 import { buildTrades } from '@/domain/trade-builder';
 import type { Cents, PropRuleSet, Trade } from '@/domain/types';
 import { formatPnl } from '@/lib/format';
+import { ticketTime } from '@/lib/ticket-format';
 
 export { SAMPLE_EXECUTIONS, SAMPLE_START };
 
@@ -22,7 +23,7 @@ export interface TicketModel {
   symbol: string;
   qty: number;
   price: string;
-  time: string; // 'DD MMM HH:MM:SS' in America/New_York
+  time: string; // 'DD MMM HH:MM:SS' (capitals) in America/New_York
   netPnl: string;
   r?: string;
   stamp?: 'RULE BROKEN' | 'A+ SETUP';
@@ -62,24 +63,6 @@ function decimalsOf(tickSize: number): number {
   const s = String(tickSize);
   const i = s.indexOf('.');
   return i < 0 ? 0 : s.length - i - 1;
-}
-
-/** A fill time as printed on a ticket: 'DD MMM HH:MM:SS' in America/New_York. */
-export function ticketTime(iso: string): string {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('en-US', {
-      timeZone: TIME_ZONE,
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hourCycle: 'h23',
-    })
-      .formatToParts(new Date(iso))
-      .map((p) => [p.type, p.value]),
-  );
-  return `${parts.day} ${parts.month} ${parts.hour}:${parts.minute}:${parts.second}`;
 }
 
 /** A price at the instrument's tick precision, e.g. 21100 → '21100.00' for NQ. */

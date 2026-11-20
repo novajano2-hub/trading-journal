@@ -24,7 +24,7 @@ export const FEATURES: Record<ModuleSlug, FeatureContent> = {
         body: 'Keel matches fills first in, first out. Scale-ins, partial exits, reversals through flat and positions still open at the end of the file are all handled.',
       },
       {
-        title: 'Any CSV or Excel export',
+        title: 'Any CSV export',
         body: 'Map the columns once. Each row can be a fill, or a closed round trip with its entry and exit.',
       },
       {

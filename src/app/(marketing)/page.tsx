@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { ClosingSection } from '@/components/marketing/landing/closing';
 import { LoopSection } from '@/components/marketing/landing/loop';
 import { PropRulesSection } from '@/components/marketing/landing/prop-rules';
@@ -6,6 +7,12 @@ import { RackSection } from '@/components/marketing/landing/rack';
 import { SampleWeekSection } from '@/components/marketing/landing/sample-week';
 import { TicketSlotDrop } from '@/components/marketing/ticket-slot-drop';
 import { getSampleView } from '@/lib/landing/sample-view';
+
+export const metadata: Metadata = {
+  title: { absolute: 'Keel' },
+  description:
+    'Keel turns your broker’s fills into trade tickets. Drop a CSV to see your first fills filed.',
+};
 
 export default function MarketingHome() {
   const view = getSampleView();

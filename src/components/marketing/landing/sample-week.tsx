@@ -1,31 +1,20 @@
 import type { CSSProperties } from 'react';
 import { formatMoney, formatPct, formatPnl, formatRatio } from '@/lib/format';
 import { plotEquity, type Plotted } from '@/lib/landing/equity-plot';
+import { SAMPLE_START, type SampleView } from '@/lib/landing/sample-view';
 import {
-  SAMPLE_START,
+  MISSING,
+  onTradingDate,
   ticketTime,
-  type SampleView,
-} from '@/lib/landing/sample-view';
+  weekdayOf,
+} from '@/lib/ticket-format';
 import { RubberStamp } from '../rubber-stamp';
 import { AFTER_HEAD, SECTION, SectionHead } from './section-head';
 
-const MISSING = '—';
-
-/** 'YYYY-MM-DD' (already a local trading date) read at noon UTC so the label never shifts. */
-function onDate(
-  date: string,
-  opts: Intl.DateTimeFormatOptions,
-  locale = 'en-GB',
-) {
-  return new Date(`${date}T12:00:00Z`).toLocaleDateString(locale, {
-    ...opts,
-    timeZone: 'UTC',
-  });
-}
 const weekday = (date: string, style: 'short' | 'long' = 'short') =>
-  onDate(date, { weekday: style }, 'en-US');
+  weekdayOf(date, style);
 const dayMonth = (date: string) =>
-  onDate(date, { day: 'numeric', month: 'short' });
+  onTradingDate(date, { day: 'numeric', month: 'short' });
 
 function LedgerRow({
   label,

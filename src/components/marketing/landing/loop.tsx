@@ -1,12 +1,13 @@
 import { ArrowDown, ArrowRight, ArrowUp } from 'lucide-react';
 import type { Trade } from '@/domain/types';
 import { formatMoney, formatPnl } from '@/lib/format';
-import { ticketPrice, ticketTime } from '@/lib/landing/sample-view';
+import { ticketPrice } from '@/lib/landing/sample-view';
+import { MISSING, serialNumber, ticketTime } from '@/lib/ticket-format';
+import { Field, TicketFooter, TicketHeader } from '../order-ticket';
 import { RubberStamp } from '../rubber-stamp';
 import { SideMark } from '../side-mark';
 import { AFTER_HEAD, SECTION, SectionHead } from './section-head';
 
-const MISSING = '—';
 /** Authored sample wording: the rule the sample trade broke, and the fix noted on it. */
 const RULE = 'Stop in with the entry';
 const NOTE = 'Stop went in late. Fix: bracket order on every entry.';
@@ -27,7 +28,7 @@ interface LoopTicketModel {
 function toModel(t: Trade): LoopTicketModel {
   const first = t.executions[0];
   return {
-    number: `No. ${String(t.serial).padStart(6, '0')}`,
+    number: serialNumber(t.serial),
     side: first?.side ?? (t.direction === 'long' ? 'buy' : 'sell'),
     symbol: t.instrument.symbol,
     qty: String(t.maxPosition),
@@ -36,30 +37,6 @@ function toModel(t: Trade): LoopTicketModel {
     net: formatPnl(t.net, t.pnlCurrency),
     time: ticketTime(t.openedAt),
   };
-}
-
-function Field({
-  label,
-  value,
-  className = '',
-}: {
-  label: string;
-  value: string;
-  className?: string;
-}) {
-  return (
-    <div
-      className={`min-w-0 bg-stock px-1.5 pt-1 pb-0.5 @min-[300px]:px-2 ${className}`}
-    >
-      <dt className="text-[11px] leading-tight font-bold tracking-[0.16em] text-ink/70 uppercase">
-        {label}
-      </dt>
-      {/* Never cut off: a narrow ticket steps its figures down to 15px. */}
-      <dd className="text-[15px] leading-snug font-semibold wrap-anywhere @min-[240px]:text-[17px]">
-        {value}
-      </dd>
-    </div>
-  );
 }
 
 /**
@@ -80,10 +57,7 @@ function LoopTicket({
   const filed = stage >= 2 && stage <= 4;
   return (
     <div className="ticket-stock relative z-[1] flex h-[236px] flex-col rounded-[3px] px-2.5 pt-2.5 pb-2.5 text-ink @min-[240px]:px-3">
-      <p className="flex items-baseline justify-between border-b-[1.5px] border-ink pb-1.5 text-[11px] leading-none font-bold tracking-[0.18em]">
-        <span className="uppercase">Order ticket</span>
-        <span>{model.number}</span>
-      </p>
+      <TicketHeader number={model.number} compact />
       <dl className="mt-2 grid grid-cols-[36px_1fr_1fr] gap-px border border-rule bg-rule @min-[240px]:grid-cols-[40px_1fr_1fr] @min-[300px]:grid-cols-[44px_1fr_1fr]">
         <div className="row-span-2 flex items-center justify-center bg-stock">
           <dt className="sr-only">Side</dt>
@@ -91,14 +65,15 @@ function LoopTicket({
             <SideMark side={model.side} size="sm" />
           </dd>
         </div>
-        <Field label="Symbol" value={model.symbol} />
-        <Field label="Qty" value={model.qty} />
-        <Field label="In" value={model.entry} />
-        <Field label="Out" value={filed ? model.exit : MISSING} />
+        <Field label="Symbol" value={model.symbol} compact />
+        <Field label="Qty" value={model.qty} compact />
+        <Field label="In" value={model.entry} compact />
+        <Field label="Out" value={filed ? model.exit : MISSING} compact />
         <Field
           label="Net P&L"
           value={filed ? model.net : MISSING}
           className="col-span-3"
+          compact
         />
       </dl>
       {rule ? (
@@ -113,14 +88,12 @@ function LoopTicket({
           </span>
         </p>
       ) : null}
-      <p className="mt-auto flex items-baseline justify-between gap-3">
-        <span className="min-w-0 font-stamp text-[14px] leading-none tracking-[0.06em] text-stamp uppercase wrap-anywhere">
-          {model.time}
-        </span>
-        <span className="shrink-0 text-[11px] leading-none font-bold tracking-[0.2em] text-ink/70 uppercase">
-          {filed ? 'Filed' : 'Unfiled'}
-        </span>
-      </p>
+      <TicketFooter
+        time={model.time}
+        filed={filed}
+        compact
+        className="mt-auto"
+      />
       {stage === 3 || stage === 4 ? (
         <RubberStamp
           tone="sell"

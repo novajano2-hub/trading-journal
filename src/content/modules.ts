@@ -48,7 +48,8 @@ export const MODULES: readonly ModuleInfo[] = [
   {
     slug: 'prop-firms',
     name: 'Prop firms',
-    oneLine: 'Track challenge rules, drawdown and payouts.',
+    oneLine:
+      'Track profit target, daily loss limit, drawdown, trading days and consistency.',
     status: 'milestone-1',
     hasPage: true,
   },

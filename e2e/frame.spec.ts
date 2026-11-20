@@ -66,6 +66,55 @@ test('mobile sheet closes with Escape and restores focus', async ({ page }) => {
   await expect(menu).toBeFocused();
 });
 
+test('mobile sheet closes when focus tabs past its last link', async ({
+  page,
+}) => {
+  test.skip(!isMobile(), 'mobile only');
+  await page.goto('/');
+  const menu = page.getByRole('banner').getByRole('button', { name: 'Menu' });
+  await menu.click();
+  await expect(menu).toHaveAttribute('aria-expanded', 'true');
+  await page
+    .locator('#mobile-sheet')
+    .getByRole('link', { name: 'Get started' })
+    .focus();
+  await page.keyboard.press('Tab');
+  await expect(menu).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('#mobile-sheet')).toBeHidden();
+  // Focus is somewhere visible, never under the (now closed) sheet.
+  const stuck = await page.evaluate(() => document.body.style.overflow);
+  expect(stuck).toBe('');
+});
+
+test('mobile sheet closes and unlocks scrolling when the viewport reaches md', async ({
+  page,
+}) => {
+  test.skip(!isMobile(), 'mobile only');
+  await page.goto('/');
+  const menu = page.getByRole('banner').getByRole('button', { name: 'Menu' });
+  await menu.click();
+  expect(await page.evaluate(() => document.body.style.overflow)).toBe(
+    'hidden',
+  );
+  await page.setViewportSize({ width: 1024, height: 800 });
+  // At md the toggle is hidden, so address it without a role query.
+  await expect(
+    page.locator('button[aria-controls="mobile-sheet"]'),
+  ).toHaveAttribute('aria-expanded', 'false');
+  expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
+});
+
+test('Get started leads to the drop slot, not a dead-end signup', async ({
+  page,
+}) => {
+  await page.goto('/pricing');
+  const header = page.getByRole('banner');
+  if (isMobile()) await header.getByRole('button', { name: 'Menu' }).click();
+  await expect(
+    header.getByRole('link', { name: 'Get started' }),
+  ).toHaveAttribute('href', '/#drop');
+});
+
 test('footer carries the legal and module links', async ({ page }) => {
   await page.goto('/');
   const footer = page.getByRole('contentinfo');

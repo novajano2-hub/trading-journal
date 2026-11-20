@@ -56,8 +56,8 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         </span>
       </button>
       <p id="auth-note" className="m-0 text-[15px] leading-[1.5] font-medium">
-        Accounts open with the app release. Until then, everything runs in your
-        browser.
+        Accounts open with the app release. Until then, a file you drop stays in
+        your browser.
       </p>
     </form>
   );

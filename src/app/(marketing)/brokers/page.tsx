@@ -53,8 +53,9 @@ export default function BrokersPage() {
       title="Brokers and file formats"
       lede={
         <>
-          Keel reads a CSV or Excel export from your broker. Any export that
-          carries the columns below can be read.
+          Keel reads a CSV export from your broker, or a text file in the same
+          layout. Any export that carries the columns below can be previewed.
+          Excel files: export as CSV for now.
         </>
       }
     >
@@ -88,8 +89,9 @@ export default function BrokersPage() {
             Choose the date range you want to journal.
           </li>
           <li className="pt-2 pl-1">
-            Export or download it as CSV or Excel. Where there is a choice, pick
-            the fills or executions view, not account statements.
+            Export or download it as CSV (Excel files: export as CSV for now).
+            Where there is a choice, pick the fills or executions view, not
+            account statements.
           </li>
           <li className="pt-2 pl-1">
             <Link
@@ -98,7 +100,8 @@ export default function BrokersPage() {
             >
               Drop the file on the slot
             </Link>
-            . Keel reads it in your browser and builds your tickets.
+            . Keel reads it in your browser and prints your first fills as
+            tickets.
           </li>
         </ol>
       </ReadSection>
@@ -120,7 +123,8 @@ export default function BrokersPage() {
           ))}
         </dl>
         <p className={READ_P}>
-          Optional, used when present: {OPTIONAL.join(', ').toLowerCase()}.
+          Optional: {OPTIONAL.join(', ').toLowerCase()}. The full import (coming
+          with the app) can also read these.
         </p>
       </ReadSection>
 

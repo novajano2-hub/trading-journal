@@ -16,8 +16,8 @@ export default function PricingPage() {
         Pricing to be announced
       </h1>
       <p className="mt-6 max-w-[34em] text-lg leading-[1.45] font-medium md:mt-8 md:text-[21px]">
-        There is no plan or price to show yet, so none is shown. Build your
-        journal from your own trades now; it runs in your browser.
+        There is no plan or price to show yet, so none is shown. Drop a CSV now
+        to see your first fills filed as tickets.
       </p>
 
       <section

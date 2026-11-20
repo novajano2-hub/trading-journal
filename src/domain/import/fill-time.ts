@@ -1,17 +1,4 @@
-const MONTHS = [
-  'JAN',
-  'FEB',
-  'MAR',
-  'APR',
-  'MAY',
-  'JUN',
-  'JUL',
-  'AUG',
-  'SEP',
-  'OCT',
-  'NOV',
-  'DEC',
-] as const;
+import { formatClock } from '@/lib/ticket-format';
 
 const CLOCK = String.raw`(\d{1,2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:\s*([AaPp])\.?[Mm]\.?)?`;
 /** YYYY-MM-DD HH:MM[:SS], with a space or a T between date and time. */
@@ -20,8 +7,6 @@ const ISO = new RegExp(
 );
 /** MM/DD/YYYY HH:MM[:SS], month first as US brokers write it. */
 const US = new RegExp(String.raw`^(\d{1,2})/(\d{1,2})/(\d{4})\s+${CLOCK}$`);
-
-const two = (n: number) => String(n).padStart(2, '0');
 
 function daysIn(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -55,5 +40,5 @@ export function formatFillTime(raw: string): string {
     hour = (hour % 12) + (meridiem === 'p' ? 12 : 0);
   } else if (hour > 23) return raw;
 
-  return `${two(day)} ${MONTHS[month - 1]} ${two(hour)}:${two(minute)}:${two(second)}`;
+  return formatClock({ day, month, hour, minute, second });
 }

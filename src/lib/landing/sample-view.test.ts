@@ -44,7 +44,7 @@ describe('landing sample', () => {
     expect(v.heroTickets.map((t) => t.serial)).toEqual([8, 6, 5, 3]);
     expect(v.heroTickets.find((t) => t.serial === 5)!.stamp).toBe('A+ SETUP');
     expect(v.heroTickets[0]).toMatchObject({
-      time: '20 Nov 10:15:00',
+      time: '20 NOV 10:15:00',
       price: '6050.50',
       qty: 1,
     });

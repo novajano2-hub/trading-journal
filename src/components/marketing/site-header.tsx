@@ -24,7 +24,7 @@ export function SiteHeader() {
           Log in
         </Link>
         <Link
-          href="/signup"
+          href="/#drop"
           className="rounded bg-navy px-[22px] py-3 font-display text-[21px] font-bold tracking-[0.06em] text-gold uppercase no-underline"
         >
           Get started

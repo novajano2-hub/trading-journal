@@ -8,28 +8,29 @@ export interface ResolveOptions {
   >; // keyed by root
 }
 
-export const FUTURES: Record<string, { pointValue: number; tickSize: number }> =
-  {
-    ES: { pointValue: 50, tickSize: 0.25 },
-    MES: { pointValue: 5, tickSize: 0.25 },
-    NQ: { pointValue: 20, tickSize: 0.25 },
-    MNQ: { pointValue: 2, tickSize: 0.25 },
-    YM: { pointValue: 5, tickSize: 1 },
-    MYM: { pointValue: 0.5, tickSize: 1 },
-    RTY: { pointValue: 50, tickSize: 0.1 },
-    M2K: { pointValue: 5, tickSize: 0.1 },
-    CL: { pointValue: 1000, tickSize: 0.01 },
-    MCL: { pointValue: 100, tickSize: 0.01 },
-    GC: { pointValue: 100, tickSize: 0.1 },
-    MGC: { pointValue: 10, tickSize: 0.1 },
-    SI: { pointValue: 5000, tickSize: 0.005 },
-    NG: { pointValue: 10000, tickSize: 0.001 },
-    ZB: { pointValue: 1000, tickSize: 0.03125 },
-    ZN: { pointValue: 1000, tickSize: 0.015625 },
-    '6E': { pointValue: 125000, tickSize: 0.00005 },
-  };
+export const FUTURES: Readonly<
+  Record<string, { pointValue: number; tickSize: number }>
+> = {
+  ES: { pointValue: 50, tickSize: 0.25 },
+  MES: { pointValue: 5, tickSize: 0.25 },
+  NQ: { pointValue: 20, tickSize: 0.25 },
+  MNQ: { pointValue: 2, tickSize: 0.25 },
+  YM: { pointValue: 5, tickSize: 1 },
+  MYM: { pointValue: 0.5, tickSize: 1 },
+  RTY: { pointValue: 50, tickSize: 0.1 },
+  M2K: { pointValue: 5, tickSize: 0.1 },
+  CL: { pointValue: 1000, tickSize: 0.01 },
+  MCL: { pointValue: 100, tickSize: 0.01 },
+  GC: { pointValue: 100, tickSize: 0.1 },
+  MGC: { pointValue: 10, tickSize: 0.1 },
+  SI: { pointValue: 5000, tickSize: 0.005 },
+  NG: { pointValue: 10000, tickSize: 0.001 },
+  ZB: { pointValue: 1000, tickSize: 0.03125 },
+  ZN: { pointValue: 1000, tickSize: 0.015625 },
+  '6E': { pointValue: 125000, tickSize: 0.00005 },
+};
 
-export const FX_CODES = new Set([
+export const FX_CODES: ReadonlySet<string> = new Set([
   'USD',
   'EUR',
   'GBP',
@@ -45,7 +46,7 @@ export const FX_CODES = new Set([
   'MXN',
   'ZAR',
 ]);
-export const CRYPTO_BASES = [
+export const CRYPTO_BASES: readonly string[] = [
   'BTC',
   'ETH',
   'SOL',
@@ -57,7 +58,7 @@ export const CRYPTO_BASES = [
   'LINK',
   'DOT',
 ];
-export const CRYPTO_QUOTES = ['USD', 'USDT', 'USDC'];
+export const CRYPTO_QUOTES: readonly string[] = ['USD', 'USDT', 'USDC'];
 
 const OPTION_RE = /^([A-Z]{1,6})\s*(\d{6})([CP])(\d{8})$/;
 const FUTURES_RE = /^\/?([A-Z0-9]{1,4}?)([FGHJKMNQUVXZ])(\d{1,2})$/;

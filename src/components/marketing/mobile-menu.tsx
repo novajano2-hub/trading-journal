@@ -19,11 +19,26 @@ export function MobileMenu() {
     };
   }, [open]);
 
+  // Crossing into the desktop layout hides this menu: close it so the scroll lock can't stick.
+  useEffect(() => {
+    const md = matchMedia('(min-width: 768px)');
+    const onChange = (e: MediaQueryListEvent) => {
+      if (e.matches) setOpen(false);
+    };
+    md.addEventListener('change', onChange);
+    return () => md.removeEventListener('change', onChange);
+  }, []);
+
   const close = () => setOpen(false);
 
   return (
     <div
       className="md:hidden"
+      // Focus must not slide on under the sheet (WCAG 2.4.11): leaving it closes it.
+      onBlur={(e) => {
+        const next = e.relatedTarget as Node | null;
+        if (open && next && !e.currentTarget.contains(next)) close();
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Escape' && open) {
           close();
@@ -73,7 +88,7 @@ export function MobileMenu() {
               Log in
             </Link>
             <Link
-              href="/signup"
+              href="/#drop"
               onClick={close}
               className="flex min-h-12 items-center justify-center rounded bg-gold font-display text-2xl font-black tracking-[0.06em] text-navy uppercase no-underline"
             >

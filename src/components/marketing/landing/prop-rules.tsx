@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { DayStat } from '@/domain/metrics/days';
 import type { PropStatus, RuleState } from '@/domain/prop/evaluate';
 import { formatMoney, formatPct, formatPnl } from '@/lib/format';
+import { weekdayOf as weekday } from '@/lib/ticket-format';
 import { SAMPLE_PROP_RULES, SAMPLE_START } from '@/lib/landing/sample-view';
 import { RubberStamp } from '../rubber-stamp';
 import { AFTER_HEAD, SECTION, SectionHead } from './section-head';
@@ -11,12 +12,6 @@ const STATE: Record<RuleState, string> = {
   near: 'Near',
   breached: 'Breached',
 };
-
-const weekday = (date: string) =>
-  new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', {
-    weekday: 'long',
-    timeZone: 'UTC',
-  });
 
 function Rule({
   name,

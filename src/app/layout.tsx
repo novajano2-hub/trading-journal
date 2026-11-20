@@ -23,7 +23,7 @@ const stamp = DotGothic16({
 });
 
 export const metadata: Metadata = {
-  title: 'Keel',
+  title: { default: 'Keel', template: '%s · Keel' },
   description: 'Trading journal',
 };
 
