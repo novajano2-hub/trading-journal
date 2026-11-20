@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { cutOffText, stampCollisions } from './figures';
 
 for (const slug of [
   'journal',
@@ -19,40 +18,53 @@ for (const slug of [
       await expect(page.getByText('In development').first()).toBeVisible();
   });
 
-for (const slug of ['journal', 'strategies'])
-  test(`${slug} tickets print every figure in full`, async ({ page }) => {
+const SAMPLE_VISUALS: Record<string, RegExp> = {
+  journal: /Moved stop|NQ/,
+  analytics: /Sample data/,
+  strategies: /Stop stays where it was placed/,
+  'prop-firms': /Profit target/,
+  notebook: /Daily review/,
+};
+
+for (const [slug, text] of Object.entries(SAMPLE_VISUALS))
+  test(`${slug} hero carries its product component`, async ({ page }) => {
     await page.goto(`/features/${slug}`);
-    const tickets = page.getByTestId('ticket-sample');
-    await expect(tickets).toHaveCount(4);
-    // No text node ends in "…" or "...", and none is clipped by its cell.
-    expect(await cutOffText(tickets)).toEqual([]);
+    const visual = page.getByTestId('feature-visual');
+    await expect(visual).toBeVisible();
+    await expect(visual.getByText(text).first()).toBeAttached();
+    if (slug === 'analytics')
+      await expect(
+        visual.getByRole('img', { name: /Net P&L by hour/ }),
+      ).toBeVisible();
+    // The split hero: copy on the left, the component on the right (wide screens).
+    if ((page.viewportSize()?.width ?? 0) >= 1280) {
+      const h1 = (await page.getByRole('heading', { level: 1 }).boundingBox())!;
+      const v = (await visual.boundingBox())!;
+      expect(v.x).toBeGreaterThan(h1.x + h1.width - 1);
+    }
   });
 
-for (const slug of ['journal', 'strategies'])
-  test(`${slug} stamps land clear of every label and figure`, async ({
-    page,
-  }) => {
+for (const slug of ['backtesting', 'replay', 'mentors'])
+  test(`${slug} shows a plain placeholder, no fake data`, async ({ page }) => {
     await page.goto(`/features/${slug}`);
-    const tickets = page.getByTestId('ticket-sample');
-    await expect(tickets).toHaveCount(4);
-    let stamped = 0;
-    for (const ticket of await tickets.all()) {
-      const stamp = ticket.locator('.rubber-stamp');
-      if ((await stamp.count()) === 0) continue;
-      stamped++;
-      const s = (await stamp.boundingBox())!;
-      const pnl = (await ticket
-        .locator('div:has(> dt:text-is("Net P&L")) > dd')
-        .boundingBox())!;
-      const apart =
-        s.x + s.width <= pnl.x ||
-        pnl.x + pnl.width <= s.x ||
-        s.y + s.height <= pnl.y ||
-        pnl.y + pnl.height <= s.y;
-      expect(apart, `${await stamp.textContent()} clear of Net P&L`).toBe(true);
+    const visual = page.getByTestId('feature-visual');
+    await expect(visual).toContainText(/planned/i);
+    await expect(visual.locator('table, [role="img"]')).toHaveCount(0);
+    expect(await visual.innerText()).not.toMatch(/[$]\d|\d%/);
+  });
+
+for (const slug of ['journal', 'strategies', 'prop-firms'])
+  test(`${slug} points are a two-column definition list`, async ({ page }) => {
+    await page.goto(`/features/${slug}`);
+    const list = page.getByTestId('feature-points');
+    const terms = list.locator('dt');
+    expect(await terms.count()).toBeGreaterThanOrEqual(4);
+    if ((page.viewportSize()?.width ?? 0) >= 1280) {
+      const a = (await terms.nth(0).boundingBox())!;
+      const b = (await terms.nth(1).boundingBox())!;
+      expect(b.x).toBeGreaterThan(a.x + a.width - 1); // side by side
     }
-    expect(stamped).toBe(2); // RULE BROKEN and A+ SETUP
-    expect(await stampCollisions(tickets)).toEqual([]);
+    await expect(page.locator('.ticket-stock')).toHaveCount(0);
   });
 
 test('unknown feature 404s', async ({ page }) => {

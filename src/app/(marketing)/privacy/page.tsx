@@ -1,10 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import {
-  READ_P,
-  ReadPage,
-  ReadSection,
-} from '@/components/marketing/read-page';
+import { READ_P, ReadPage, ReadSection } from '@/components/site/read-page';
 
 export const metadata: Metadata = {
   title: 'Privacy',
@@ -41,7 +37,7 @@ export default function PrivacyPage() {
           Remove the file with &ldquo;Remove file&rdquo; on{' '}
           <Link
             href="/app/import"
-            className="underline decoration-2 underline-offset-4"
+            className="font-medium text-accent-ink underline"
           >
             /app/import
           </Link>

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowUp } from 'lucide-react';
+import { SectionHeading } from '@/components/site/landing/section-heading';
+import { START_HREF } from '@/components/site/nav-links';
 import { MODULES } from '@/content/modules';
 
 export const metadata: Metadata = {
@@ -8,56 +9,54 @@ export const metadata: Metadata = {
   description: 'Keel pricing has not been announced yet.',
 };
 
+const FRAME = 'mx-auto max-w-[1280px] px-5 sm:px-10';
+
 export default function PricingPage() {
   const included = MODULES.filter((m) => m.status === 'milestone-1');
   return (
-    <main className="overflow-x-clip px-4 pt-10 pb-24 md:px-14 md:pt-16 md:pb-36">
-      <h1 className="feature-h1 max-w-[13em] font-display font-black uppercase">
-        Pricing to be announced
-      </h1>
-      <p className="mt-6 max-w-[34em] text-lg leading-[1.45] font-medium md:mt-8 md:text-[21px]">
-        There is no plan or price to show yet, so none is shown. Drop a CSV now
-        to see your first fills filed as tickets.
-      </p>
+    <main>
+      <section className={`${FRAME} pt-16 pb-24`}>
+        <h1 className="max-w-[16ch] text-[clamp(36px,calc(2.6vw+16px),52px)] leading-[1.06] font-semibold tracking-[-0.04em] text-balance motion-safe:animate-rise">
+          Pricing to be announced
+        </h1>
+        <p
+          className="mt-5 max-w-[52ch] text-lg leading-[1.6] text-muted motion-safe:animate-rise"
+          style={{ animationDelay: '60ms' }}
+        >
+          There is no plan or price to show yet, so none is shown. Until the app
+          release, everything runs in your browser.
+        </p>
+        <Link
+          href={START_HREF}
+          className="mt-8 inline-flex h-11 items-center rounded-control bg-accent px-[18px] text-[15px] font-medium whitespace-nowrap text-accent-fg no-underline transition-colors hover:bg-accent-hover motion-safe:animate-rise"
+          style={{ animationDelay: '120ms' }}
+        >
+          Get started
+        </Link>
+      </section>
 
       <section
         aria-labelledby="included-title"
-        className="mt-16 grid gap-x-16 gap-y-8 md:mt-24 xl:grid-cols-[minmax(0,4fr)_minmax(0,8fr)]"
+        className="border-t border-line"
       >
-        <h2
-          id="included-title"
-          className="landing-h2 max-w-[8em] font-display font-black uppercase"
-        >
-          What is in the journal
-        </h2>
-        <ul className="ticket-stock m-0 list-none rounded-[3px] px-4 py-2 text-ink md:px-8">
-          {included.map((m) => (
-            <li
-              key={m.slug}
-              className="grid gap-x-8 gap-y-1 border-b border-rule py-5 last:border-b-0 md:grid-cols-[210px_minmax(0,1fr)]"
-            >
-              <span className="font-display text-[26px] leading-[0.95] font-black uppercase">
-                {m.name}
-              </span>
-              <span className="max-w-[36em] text-[17px] leading-[1.45] font-medium">
-                {m.oneLine}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div className={`${FRAME} py-24`}>
+          <SectionHeading id="included-title" title="What is in the journal">
+            Modules still in development are marked as such on their own pages.
+          </SectionHeading>
+          <ul className="m-0 mt-14 grid list-none gap-x-16 gap-y-10 p-0 md:grid-cols-2">
+            {included.map((m) => (
+              <li key={m.slug} className="border-t border-line pt-5">
+                <p className="text-[17px] font-semibold tracking-[-0.015em]">
+                  {m.name}
+                </p>
+                <p className="mt-2 max-w-[52ch] text-[15.5px] leading-[1.65] text-muted">
+                  {m.oneLine}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
       </section>
-
-      <p className="mt-6 max-w-[34em] text-[17px] leading-[1.5] font-medium">
-        Modules still in development are marked as such on their own pages.
-      </p>
-
-      <Link
-        href="/#drop"
-        className="close-go mt-12 inline-flex min-h-14 items-center gap-3 rounded px-6 py-3.5 font-display text-[26px] leading-none font-black tracking-[0.05em] whitespace-nowrap text-gold uppercase no-underline"
-      >
-        Build my journal
-        <ArrowUp aria-hidden="true" strokeWidth={2.25} className="size-6" />
-      </Link>
     </main>
   );
 }

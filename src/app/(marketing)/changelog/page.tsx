@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { ReadPage } from '@/components/marketing/read-page';
+import { ReadPage } from '@/components/site/read-page';
 import { CHANGELOG, CHANGELOG_AS_OF } from '@/content/changelog';
 
 export const metadata: Metadata = {
@@ -13,13 +13,13 @@ export default function ChangelogPage() {
       title="Changelog"
       lede={`What has shipped, newest first. Everything here is true as of ${CHANGELOG_AS_OF}.`}
     >
-      <ol className="m-0 mt-12 max-w-[68ch] list-none p-0 md:mt-16">
+      <ol className="m-0 mt-14 max-w-[68ch] list-none p-0">
         {CHANGELOG.map((e) => (
-          <li key={e.title} className="border-t-2 border-ink py-8">
-            <h2 className="font-display text-[30px] leading-none font-black uppercase md:text-[36px]">
+          <li key={e.title} className="border-t border-line py-8">
+            <h2 className="text-[22px] leading-[1.2] font-semibold tracking-[-0.025em]">
               {e.title}
             </h2>
-            <p className="mt-4 text-[17px] leading-[1.6] font-medium">
+            <p className="mt-3 text-[16.5px] leading-[1.7] text-muted">
               {e.body}
             </p>
           </li>

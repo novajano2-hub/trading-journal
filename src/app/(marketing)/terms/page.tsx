@@ -1,10 +1,6 @@
 import type { Metadata } from 'next';
-import {
-  READ_P,
-  ReadPage,
-  ReadSection,
-} from '@/components/marketing/read-page';
-import { RubberStamp } from '@/components/marketing/rubber-stamp';
+import { READ_P, ReadPage, ReadSection } from '@/components/site/read-page';
+import { Chip } from '@/components/ui/chip';
 
 export const metadata: Metadata = {
   title: 'Terms',
@@ -17,9 +13,9 @@ export default function TermsPage() {
       title="Terms"
       lede="This is a draft. It has not been reviewed by a lawyer and is not yet a binding agreement."
     >
-      <RubberStamp tone="sell" size="md" className="mt-8 -rotate-[3deg]">
+      <Chip tone="loss" className="mt-6 h-7 px-3 text-[13px]">
         Draft
-      </RubberStamp>
+      </Chip>
       <ReadSection id="what" title="What Keel is">
         <p className={READ_P}>
           Keel is a trading journal. It organises and measures trades you give
