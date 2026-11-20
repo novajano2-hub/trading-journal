@@ -1,9 +1,10 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
 import { getSampleView } from '@/lib/landing/sample-view';
-import { BreakdownChart } from './breakdown-chart';
+import { BreakdownChart, barHeight } from './breakdown-chart';
 import { EquityChart } from './equity-chart';
 import { KpiStrip } from './kpi-strip';
+import { visibleTickerValue } from './number-ticker';
 import { TradeDetailCard } from './trade-detail-card';
 import { TradeRows } from './trade-rows';
 
@@ -48,5 +49,30 @@ describe('product previews render engine values', () => {
     );
     expect(bars).toContain('+1,160');
     expect(bars).toContain('−$525.00');
+  });
+
+  test('ticker starts at zero unless motion is reduced', () => {
+    expect(visibleTickerValue(false, 0, 123600)).toBe(0);
+    expect(visibleTickerValue(null, 0, 123600)).toBe(0);
+    expect(visibleTickerValue(true, 0, 123600)).toBe(123600);
+    const html = renderToStaticMarkup(<KpiStrip summary={v.summary} />);
+    expect(html).toContain('<span aria-hidden="true">$0.00</span>');
+  });
+
+  test('bar slots persist by index and zero keeps a zero height', () => {
+    expect(barHeight(0, 100)).toBe(0);
+    expect(barHeight(1, 100000)).toBe(2);
+    expect(barHeight(-100, 100)).toBe(190);
+    const html = renderToStaticMarkup(
+      <BreakdownChart breakdowns={v.breakdowns} />,
+    );
+    // hour tab has 7 slots, 3 of which are zero but still rendered
+    expect(html.match(/<i class="block w-full/g)).toHaveLength(7);
+  });
+
+  test('chart is visible without JS', () => {
+    const eq = renderToStaticMarkup(<EquityChart series={[1, 2]} label="x" />);
+    expect(eq).toContain('<noscript>');
+    expect(eq).toContain('eq-draw');
   });
 });

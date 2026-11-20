@@ -19,7 +19,9 @@ const r = (n: number) => Math.round(n * 100) / 100;
 export function equityPath(
   series: readonly number[],
   box: PathBox,
-): { line: string; area: string; first: Point; last: Point } {
+): { line: string; area: string; first: Point | null; last: Point | null } {
+  if (series.length === 0)
+    return { line: '', area: '', first: null, last: null };
   const min = Math.min(...series);
   const max = Math.max(...series);
   const span = max - min;

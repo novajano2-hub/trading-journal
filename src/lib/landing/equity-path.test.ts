@@ -24,4 +24,14 @@ describe('equityPath', () => {
     });
     expect(line).toBe('M0 80 L680 80');
   });
+
+  test('an empty series yields empty paths', () => {
+    const box = { xMax: 680, top: 15, bottom: 145, floor: 160 };
+    expect(equityPath([], box)).toEqual({
+      line: '',
+      area: '',
+      first: null,
+      last: null,
+    });
+  });
 });

@@ -16,6 +16,18 @@ export function formatTicker(kind: TickerKind, value: number): string {
   return formatRatio(value);
 }
 
+/**
+ * What the visible counter shows. Under reduced motion it is the final value at once;
+ * otherwise it follows the count, which starts at zero so the final value never flashes first.
+ */
+export function visibleTickerValue(
+  reduced: boolean | null,
+  counted: number,
+  value: number,
+): number {
+  return reduced ? value : counted;
+}
+
 const DURATION_S = 0.9;
 
 export function NumberTicker({
@@ -30,7 +42,7 @@ export function NumberTicker({
   const reduced = useReducedMotion();
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true, amount: 0.6 });
-  const [shown, setShown] = useState(value);
+  const [shown, setShown] = useState(0);
   const final = formatTicker(kind, value);
   const tone =
     kind === 'money' && Math.round(value) !== 0
@@ -57,7 +69,9 @@ export function NumberTicker({
       style={{ minWidth: `${final.length}ch` }}
     >
       <span className="sr-only">{final}</span>
-      <span aria-hidden="true">{formatTicker(kind, shown)}</span>
+      <span aria-hidden="true">
+        {formatTicker(kind, visibleTickerValue(reduced, shown, value))}
+      </span>
     </span>
   );
 }

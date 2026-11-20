@@ -1,5 +1,9 @@
 import Papa from 'papaparse';
-import { guessColumns, normalizeSide, type PreviewField } from './guess-columns';
+import {
+  guessColumns,
+  normalizeSide,
+  type PreviewField,
+} from './guess-columns';
 
 export interface PreviewTicket {
   time?: string;
@@ -25,7 +29,10 @@ export class PreviewError extends Error {
 }
 
 export function previewFromText(csv: string, limit = 4): Preview {
-  const { data } = Papa.parse<string[]>(csv, { preview: limit + 1, skipEmptyLines: true });
+  const { data } = Papa.parse<string[]>(csv, {
+    preview: limit + 1,
+    skipEmptyLines: true,
+  });
   const [headerRow, ...rows] = data;
   if (!headerRow) throw new PreviewError('empty');
 

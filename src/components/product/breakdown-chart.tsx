@@ -15,6 +15,10 @@ const TABS: { value: BreakdownTab; label: string }[] = [
   { value: 'mistake', label: 'Mistake' },
 ];
 const BAR_AREA_PX = 190;
+/** Bar height in px: zero stays a zero-height slot so 0 to nonzero animates. */
+export function barHeight(net: number, max: number): number {
+  return net === 0 ? 0 : Math.max(2, (Math.abs(net) / max) * BAR_AREA_PX);
+}
 const tone = (n: number) =>
   n > 0 ? 'text-gain' : n < 0 ? 'text-loss' : 'text-faint';
 
@@ -49,31 +53,24 @@ export function BreakdownChart({
             className="grid h-[220px] items-end gap-2 border-b border-line font-mono sm:gap-[18px]"
             style={{ gridTemplateColumns: `repeat(${rows.length}, 1fr)` }}
           >
-            {rows.map((r) => (
+            {rows.map((r, i) => (
               <div
-                key={r.key}
+                key={i}
                 className="flex h-full flex-col items-center justify-end gap-2"
               >
                 <b className={`text-xs font-normal ${tone(r.net)}`}>
                   {formatPnlWhole(r.net)}
                 </b>
-                {r.net === 0 ? null : (
-                  <motion.i
-                    className={`block w-full max-w-14 rounded-t-md ${r.net > 0 ? 'bg-gain' : 'bg-loss'}`}
-                    initial={false}
-                    animate={{
-                      height: Math.max(
-                        2,
-                        (Math.abs(r.net) / max) * BAR_AREA_PX,
-                      ),
-                    }}
-                    transition={
-                      reduced
-                        ? { duration: 0 }
-                        : { duration: 0.24, ease: [...EASING_POINTS.out] }
-                    }
-                  />
-                )}
+                <motion.i
+                  className={`block w-full max-w-14 rounded-t-md ${r.net < 0 ? 'bg-loss' : 'bg-gain'}`}
+                  initial={false}
+                  animate={{ height: barHeight(r.net, max) }}
+                  transition={
+                    reduced
+                      ? { duration: 0 }
+                      : { duration: 0.24, ease: [...EASING_POINTS.out] }
+                  }
+                />
               </div>
             ))}
           </div>
@@ -81,8 +78,8 @@ export function BreakdownChart({
             className="mt-2 grid gap-2 text-center font-mono text-xs text-faint sm:gap-[18px]"
             style={{ gridTemplateColumns: `repeat(${rows.length}, 1fr)` }}
           >
-            {rows.map((r) => (
-              <span key={r.key} className="break-words">
+            {rows.map((r, i) => (
+              <span key={i} className="break-words">
                 {r.label}
               </span>
             ))}

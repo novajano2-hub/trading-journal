@@ -23,6 +23,12 @@ export function EquityChart({
   const grid = [20, 85, 150];
   return (
     <div className="px-3.5 pb-1.5">
+      {/* Without JS the draw never runs, so show the finished curve. */}
+      <noscript>
+        <style>
+          {'.eq-draw{opacity:1!important;stroke-dasharray:none!important}'}
+        </style>
+      </noscript>
       <svg
         viewBox="0 0 700 170"
         width="100%"
@@ -43,6 +49,7 @@ export function EquityChart({
         </g>
         <motion.path
           d={area}
+          className="eq-draw"
           fill={`url(#${gid})`}
           initial={reduced ? false : { opacity: 0 }}
           whileInView={{ opacity: 1 }}
@@ -51,6 +58,7 @@ export function EquityChart({
         />
         <motion.path
           d={line}
+          className="eq-draw"
           fill="none"
           stroke="var(--gain)"
           strokeWidth="2"
