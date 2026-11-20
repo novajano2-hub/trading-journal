@@ -216,7 +216,7 @@ test('definitions: four formulas in a description list', async ({ page }) => {
     'Breakeven',
   ]);
   await expect(section.locator('dd').first()).toContainText(
-    '(exit - entry) × qty × point value - fees',
+    '(exit - entry) × signed qty × point value - fees',
   );
 });
 
@@ -259,7 +259,7 @@ test('faq: Enter opens and closes, aria-expanded follows', async ({ page }) => {
   await expect(second).toHaveAttribute('aria-expanded', 'true');
   await expect(
     section.getByText(
-      'In this release, files are read in your browser and nothing is uploaded.',
+      'Nowhere yet. Import opens with the app release, and the privacy page says how your files are handled.',
     ),
   ).toBeVisible();
   await page.keyboard.press('Enter');
@@ -316,4 +316,14 @@ test('no em or en dash anywhere on the landing page', async ({ page }) => {
   expect(await page.evaluate(() => document.body.innerText)).not.toMatch(
     /[—–]/,
   );
+});
+
+test.describe('without JavaScript', () => {
+  test.use({ javaScriptEnabled: false });
+  test('every FAQ answer is readable', async ({ page }) => {
+    await page.goto('/');
+    await expect(
+      page.getByText('Pricing will be announced before accounts open.'),
+    ).toBeVisible();
+  });
 });

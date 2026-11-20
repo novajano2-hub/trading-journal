@@ -15,7 +15,7 @@ const QUESTIONS = [
     value: 'data',
     title: 'Where does my data go?',
     content: answer(
-      'In this release, files are read in your browser and nothing is uploaded.',
+      'Nowhere yet. Import opens with the app release, and the privacy page says how your files are handled.',
     ),
   },
   {

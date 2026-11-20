@@ -26,11 +26,14 @@ export function ColumnMapping({
   preview,
   fileName,
   note = 'Column mapping',
+  sample = false,
 }: {
   preview: Preview;
   fileName: string;
   /** The label at the right of the file bar. */
   note?: string;
+  /** Label the window as sample data. */
+  sample?: boolean;
 }) {
   const first = preview.tickets[0];
   const rows = KEEL_COLUMNS.flatMap(([field, keel]) => {
@@ -45,11 +48,14 @@ export function ColumnMapping({
         <FileCsv size={18} className="text-muted" aria-hidden="true" />
         <b className="text-sm font-medium">{fileName}</b>
         <span className="ml-auto text-xs text-faint">{note}</span>
+        {sample ? (
+          <span className="text-xs text-faint">Sample data</span>
+        ) : null}
       </div>
       <div className="overflow-x-auto">
         <table aria-label="Column mapping" className="w-full text-[13.5px]">
           <thead>
-            <tr className="bg-sunken text-left text-[12.5px] font-medium text-faint">
+            <tr className="bg-sunken text-left text-[12.5px] font-medium text-muted">
               <th scope="col" className="px-4 py-2.5 font-medium">
                 In your file
               </th>

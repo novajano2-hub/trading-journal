@@ -7,12 +7,13 @@ const items = [
   { value: 'b', title: 'Second?', content: 'Two.' },
 ];
 
-test('one section open by default, the rest closed and out of the tab order', () => {
+test('server markup keeps every answer open and reachable; the first is the one expanded', () => {
   const html = renderToStaticMarkup(
     <Accordion items={items} defaultValue="a" />,
   );
   expect(html.match(/aria-expanded="true"/g)).toHaveLength(1);
   expect(html.match(/aria-expanded="false"/g)).toHaveLength(1);
-  expect(html.match(/inert/g)).toHaveLength(1);
+  expect(html).not.toContain('inert');
+  expect(html).not.toContain('grid-rows-[0fr]');
   expect(html).toContain('role="region"');
 });

@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { formatPnlWhole } from '@/lib/format';
 import type { BreakdownRowView } from '@/lib/landing/sample-view';
 import { enter, glide } from '@/lib/motion';
+import { useHydrated } from '@/lib/use-hydrated';
 
 const BAR_AREA_PX = 190;
 /** Bar height in px: zero stays a zero-height slot so 0 to nonzero animates. */
@@ -16,15 +17,6 @@ const tone = (n: number) =>
 
 /** On first view the bars wait below the baseline, then grow in order. */
 type Stage = 'final' | 'hidden' | 'reveal';
-
-const noSubscribe = () => () => {};
-/** False while hydrating, so bars rendered on the server mount where they are. */
-const useHydrated = () =>
-  useSyncExternalStore(
-    noSubscribe,
-    () => true,
-    () => false,
-  );
 
 /**
  * Bars for one breakdown, on whichever basis the rows carry. Each slot holds
@@ -48,6 +40,7 @@ export function BreakdownChart({
   const ref = useRef<HTMLDivElement>(null);
   const [stage, setStage] = useState<Stage>('final');
   const hydrated = useHydrated();
+  const descId = useId();
   const max = Math.max(1, ...rows.map((r) => Math.abs(r.pnl)));
   const cols = {
     gridTemplateColumns: `repeat(${rows.length}, minmax(0, 1fr))`,
@@ -80,9 +73,18 @@ export function BreakdownChart({
 
   return (
     <div ref={ref}>
+      <dl id={descId} className="sr-only">
+        {rows.map((r, i) => (
+          <div key={i}>
+            <dt>{r.label}</dt>
+            <dd>{formatPnlWhole(r.pnl)}</dd>
+          </div>
+        ))}
+      </dl>
       <div
         role="img"
         aria-label={label}
+        aria-describedby={descId}
         className="grid h-[220px] items-end gap-1.5 border-b border-line font-mono sm:gap-[18px]"
         style={cols}
       >

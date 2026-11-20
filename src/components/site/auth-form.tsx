@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
 export const AUTH_CLOSED =
-  'Accounts open with the app release. Until then, everything runs in your browser.';
+  'Accounts open with the app release. Until then, sign-up is closed.';
 
 const INPUT =
   'block h-11 w-full rounded-control border border-line-2 bg-surface-1 px-3.5 text-[15px] text-text disabled:cursor-not-allowed disabled:opacity-50';

@@ -28,7 +28,7 @@ test('auth forms are honest', async ({ page }) => {
 });
 
 const CLOSED =
-  'Accounts open with the app release. Until then, everything runs in your browser.';
+  'Accounts open with the app release. Until then, sign-up is closed.';
 
 for (const [path, name] of [
   ['/login', 'Log in'],
@@ -145,5 +145,14 @@ test('privacy and brokers claim no file drop today', async ({ page }) => {
     expect(await page.locator('main').innerText(), path).not.toMatch(
       /\bdrop\b/i,
     );
+  }
+});
+
+test("today's pages claim no in-browser processing", async ({ page }) => {
+  for (const path of ['/', '/signup', '/pricing']) {
+    await page.goto(path);
+    const text = await page.locator('main').innerText();
+    expect(text, path).not.toMatch(/runs in your browser/i);
+    expect(text, path).not.toMatch(/read in your browser/i);
   }
 });

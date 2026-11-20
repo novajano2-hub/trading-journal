@@ -11,8 +11,8 @@ const DEFINITIONS: readonly { term: string; formula: ReactNode }[] = [
     term: 'Net P&L',
     formula: (
       <>
-        (exit <Op>-</Op> entry) <Op>×</Op> qty <Op>×</Op> point value <Op>-</Op>{' '}
-        fees
+        (exit <Op>-</Op> entry) <Op>×</Op> signed qty <Op>×</Op> point value{' '}
+        <Op>-</Op> fees
       </>
     ),
   },

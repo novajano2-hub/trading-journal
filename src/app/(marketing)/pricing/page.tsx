@@ -23,8 +23,8 @@ export default function PricingPage() {
           className="mt-5 max-w-[52ch] text-lg leading-[1.6] text-muted motion-safe:animate-rise"
           style={{ animationDelay: '60ms' }}
         >
-          There is no plan or price to show yet, so none is shown. Until the app
-          release, everything runs in your browser.
+          There is no plan or price to show yet, so none is shown. Pricing will
+          be announced before accounts open.
         </p>
         <Link
           href={START_HREF}

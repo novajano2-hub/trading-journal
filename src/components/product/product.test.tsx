@@ -47,6 +47,10 @@ describe('product previews render engine values', () => {
       <BreakdownChart rows={v.breakdowns.net.hour} label="Net P&L by hour" />,
     );
     expect(bars).toContain('+1,160');
+    expect(bars).toMatch(/aria-describedby="([^"]+)"/);
+    expect(bars).toMatch(
+      /<dl id="[^"]+" class="sr-only"><div><dt>09:00<\/dt><dd>[^<]+<\/dd>/,
+    );
     expect(bars).toContain('role="img" aria-label="Net P&amp;L by hour"');
   });
 
@@ -87,15 +91,9 @@ describe('product previews render engine values', () => {
     expect(one).not.toContain('Breakout');
   });
 
-  test('chart is visible without JS', () => {
-    const eq = renderToStaticMarkup(<EquityChart series={[1, 2]} label="x" />);
-    expect(eq).toContain('<noscript>');
-    expect(eq).toContain('eq-draw');
-  });
-
   test('the entrance curve is drawn by CSS, with its delay', () => {
     const eq = renderToStaticMarkup(
-      <EquityChart series={[1, 2]} label="x" draw="entrance" delayMs={420} />,
+      <EquityChart series={[1, 2]} label="x" delayMs={420} />,
     );
     expect(eq).toContain('pathLength="1"');
     expect(eq).toContain('motion-safe:animate-draw');

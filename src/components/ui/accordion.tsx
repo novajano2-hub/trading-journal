@@ -6,9 +6,10 @@
 // inert. Motion timing follows the HorizonX animated-accordion spec (240 ms
 // enter, 180 ms exit), animated through grid-template-rows; reduced motion
 // changes it in 0 ms.
-import { useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { Plus } from '@phosphor-icons/react/dist/ssr';
 import { enter, exit } from '@/lib/motion';
+import { useHydrated } from '@/lib/use-hydrated';
 
 export interface AccordionItem {
   value: string;
@@ -29,6 +30,14 @@ export function Accordion({
 }) {
   const base = useId();
   const [open, setOpen] = useState<string | undefined>(defaultValue);
+  // Without JS every panel stays open and readable; collapsing starts at
+  // hydration, and the transition arms a frame later so it does not play then.
+  const hydrated = useHydrated();
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setArmed(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
   const Heading = `h${headingLevel}` as const;
 
   return (
@@ -38,6 +47,7 @@ export function Accordion({
         const buttonId = `${base}-${item.value}-button`;
         const panelId = `${base}-${item.value}-panel`;
         const t = isOpen ? enter : exit;
+        const shown = isOpen || !hydrated;
         return (
           <div key={item.value} className="border-t border-line">
             <Heading className="m-0 text-[17px] font-medium">
@@ -65,8 +75,8 @@ export function Accordion({
               id={panelId}
               role="region"
               aria-labelledby={buttonId}
-              inert={!isOpen}
-              className={`grid transition-[grid-template-rows] motion-reduce:transition-none ${isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
+              inert={!shown}
+              className={`grid motion-reduce:transition-none ${armed ? 'transition-[grid-template-rows]' : ''} ${shown ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
               style={{
                 transitionDuration: `${t.duration * 1000}ms`,
                 transitionTimingFunction: curve(t.ease),
