@@ -1,0 +1,27 @@
+/* Trading Floor tokens: jacket gold ground, floor navy ink, ticket card stock. */
+:root {
+  --gold: #f2b705;
+  --navy: #151a2d;
+  --stock: #f4f6f8;
+  --buy: #2350c8;
+  --sell: #d2352a;
+  --stamp: #6b3fa0; /* timestamps only */
+
+  /* derived roles */
+  --ink: var(--navy);
+  --ground: var(--gold);
+  --surface: var(--stock);
+  --rule: #c9d1db;
+
+  /* focus ring flips on navy surfaces */
+  --focus: var(--navy);
+
+  --font-display:
+    var(--nf-display), 'Big Shoulders', 'Arial Narrow', sans-serif;
+  --font-text: var(--nf-text), 'Barlow', system-ui, sans-serif;
+  --font-stamp: var(--nf-stamp), 'DotGothic16', monospace;
+}
+
+[data-surface='navy'] {
+  --focus: var(--gold);
+}
