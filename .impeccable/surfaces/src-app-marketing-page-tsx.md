@@ -26,13 +26,13 @@ OWN-WORLD: Open-outcry pit ephemera.
 - States are rubber stamps: RULE BROKEN, A+ SETUP.
 - The trader badge is the account identity.
 
-STORY: Visitors see their own fills as tickets with their mistakes stamped on them. They come to believe Keel files and grades every trade for them, and they drop a CSV.
+STORY: Visitors see sample fills filed as tickets with their mistakes stamped on them, then see their own fills print as tickets the moment they drop a CSV. They come to believe Keel files and grades every trade for them. Stamps land on a visitor's own tickets only once they have rules in the app; on the landing drop their tickets print unstamped and UNFILED (the user-approved spec decision of 2026-11-20: a new visitor has no rules, so any stamp would be invented).
 
 FIRST VIEWPORT:
 - Gold field. Badge logo top-left, condensed uppercase nav.
 - Left ~55%: "FILE EVERY TRADE. FIND THE PATTERN." at ~118px, a two-line lede, then the navy ticket-slot file drop with "Build my journal".
 - Right ~45%: a fanned stack of four sample tickets. The top one is a winning ES buy with its time stamp; one beneath is stamped RULE BROKEN. The stack is labelled as sample.
-- Signature interaction: on drop, tickets print one by one into the stack and the stamps land.
+- Signature interaction: on drop, the visitor's first fills print one by one into the stack, unstamped and UNFILED, with times in the world's clock format (DD MMM HH:MM:SS); stamps stay on the labelled sample tickets.
 
 FORM: Trading Floor, position 1 of 7 on the grounded list (Impeccable's pick, chosen by the user). seed:605531cca91c96c2
 
