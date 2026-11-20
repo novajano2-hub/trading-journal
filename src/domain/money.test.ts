@@ -16,4 +16,7 @@ describe('money', () => {
     expect(roundHalfEven(200.67)).toBe(201);
     expect(roundHalfEven(-2.5)).toBe(-2);
   });
+  test('never returns negative zero', () => {
+    expect(Object.is(toCents(-0.00001), 0)).toBe(true);
+  });
 });
