@@ -1,12 +1,11 @@
 'use client';
 
-// Adapted from HorizonX animated-accordion, commercial licence. Same contract
-// as its Base UI build: a button inside each heading with aria-expanded and
-// aria-controls, a labelled region per panel, Enter/Space to toggle, one open
-// section at a time, closed content out of the tab order. Motion: the panel
-// height grows to its content in 240 ms ease-out and closes in 180 ms ease-in
-// (animated through grid-template-rows, so no measuring); reduced motion
-// changes it in 0 ms. Written without the Base UI dependency.
+// Original implementation of the WAI-ARIA accordion pattern: a button inside
+// each heading with aria-expanded and aria-controls, a labelled region per
+// panel, Enter/Space to toggle, one open section at a time, closed content
+// inert. Motion timing follows the HorizonX animated-accordion spec (240 ms
+// enter, 180 ms exit), animated through grid-template-rows; reduced motion
+// changes it in 0 ms.
 import { useId, useState, type ReactNode } from 'react';
 import { Plus } from '@phosphor-icons/react/dist/ssr';
 import { enter, exit } from '@/lib/motion';

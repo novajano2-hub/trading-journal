@@ -34,7 +34,8 @@ const clock = (iso: string) => shortTime(iso).split(' ').pop();
 /** "Hold yourself to your own plan.": rules, prop limits and the notebook, three cells. */
 export function PlanBento({ view }: { view: SampleView }) {
   const bySerial = new Map(view.trades.map((t) => [t.serial, t]));
-  const ruled = bySerial.get(RULES_SERIAL)!;
+  const ruled = bySerial.get(RULES_SERIAL);
+  if (!ruled) throw new Error(`Sample trade ${RULES_SERIAL} is missing`);
   const rules = view.checksFor(ruled).map((c) => ({ ...c, who: STRATEGY }));
   const { profit, drawdown, consistency } = view.prop;
 
@@ -92,7 +93,9 @@ export function PlanBento({ view }: { view: SampleView }) {
             </div>
             <div className={STAT}>
               <dt className="text-muted">Trailing drawdown</dt>
-              <dd className="font-mono font-medium text-gain">
+              <dd
+                className={`font-mono font-medium ${drawdown.state === 'clear' ? 'text-gain' : 'text-loss'}`}
+              >
                 {formatMoney(drawdown.remaining)} left
               </dd>
             </div>
