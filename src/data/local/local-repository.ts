@@ -1,7 +1,12 @@
 import type { Repository } from '../repository';
 import type { SampleWorkspace } from '../seed/generate';
 import { createLocalContext, defaultSample } from './context';
+import { localAccounts } from './accounts';
+import { localJournal } from './journal';
 import { localPrefs } from './prefs';
+import { localStrategies } from './strategies';
+import { localTags } from './tags';
+import { localTrades } from './trades';
 import { localWorkspaces } from './workspaces';
 
 export interface LocalRepositoryOptions {
@@ -24,5 +29,10 @@ export function createLocalRepository(
   return {
     workspaces: localWorkspaces(ctx, sample),
     prefs: localPrefs(ctx),
+    trades: localTrades(ctx),
+    accounts: localAccounts(ctx),
+    strategies: localStrategies(ctx),
+    tags: localTags(ctx),
+    journal: localJournal(ctx),
   };
 }
