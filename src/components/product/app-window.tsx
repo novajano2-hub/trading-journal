@@ -35,7 +35,7 @@ export function AppWindow({
             {(['Gross', 'Net'] as const).map((b) => (
               <span
                 key={b}
-                className={`rounded-[5px] px-2.5 py-1 ${b === basis ? 'bg-surface-1 text-text shadow-[0_1px_2px_rgba(15,18,24,0.08)]' : 'text-muted'}`}
+                className={`rounded-[5px] px-2.5 py-1 ${b === basis ? 'bg-surface-1 text-text shadow-[var(--shadow-chip)]' : 'text-muted'}`}
               >
                 {b}
               </span>

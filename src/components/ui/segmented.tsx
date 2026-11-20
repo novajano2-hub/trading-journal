@@ -26,7 +26,7 @@ export function Segmented<T extends string>({
       {options.map((o) => (
         <label
           key={o.value}
-          className="relative cursor-pointer rounded-[5px] px-2.5 py-1 text-[13px] text-muted transition-colors has-[:checked]:bg-surface-1 has-[:checked]:text-text has-[:checked]:shadow-[0_1px_2px_rgba(15,18,24,0.08)] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent"
+          className="relative cursor-pointer rounded-[5px] px-2.5 py-1 text-[13px] text-muted transition-colors has-[:checked]:bg-surface-1 has-[:checked]:text-text has-[:checked]:shadow-[var(--shadow-chip)] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent"
         >
           <input
             type="radio"

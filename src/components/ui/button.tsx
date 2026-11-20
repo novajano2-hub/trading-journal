@@ -25,7 +25,7 @@ type Props = Omit<ComponentProps<typeof motion.button>, 'ref' | 'children'> & {
   size?: ButtonSize;
 };
 
-/** 40px button (44 on touch), 10px radius, pressed state with a soft ripple. */
+/** 44px button (38px for `sm`), 10px radius, pressed state with a soft ripple. */
 export function Button({
   variant = 'primary',
   size = 'md',

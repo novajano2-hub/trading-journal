@@ -109,7 +109,7 @@ export function Tabs<T extends string>({
             data-testid="tab-fill"
             layout={!reduced}
             transition={{ layout: reduced ? { duration: 0 } : glide }}
-            className="absolute inset-y-0.5 bg-surface-1 shadow-[0_1px_2px_rgba(15,18,24,0.08)]"
+            className="absolute inset-y-0.5 bg-surface-1 shadow-[var(--shadow-chip)]"
             style={{ left: slot.left, width: slot.width, borderRadius: 5 }}
           />
         ) : null}
@@ -125,9 +125,9 @@ export function Tabs<T extends string>({
               aria-controls={panelId(id)}
               tabIndex={active ? 0 : -1}
               onClick={() => select(i, false)}
-              className={`relative rounded-[5px] px-2 py-1 text-[13px] font-medium whitespace-nowrap transition-colors duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] sm:px-2.5 ${
+              className={`relative rounded-[5px] px-2 py-1 text-[13px] font-medium whitespace-nowrap transition-colors duration-300 ease-[var(--ease-glide)] sm:px-2.5 ${
                 active
-                  ? `text-text ${slot ? '' : 'bg-surface-1 shadow-[0_1px_2px_rgba(15,18,24,0.08)]'}`
+                  ? `text-text ${slot ? '' : 'bg-surface-1 shadow-[var(--shadow-chip)]'}`
                   : 'text-muted hover:text-text'
               }`}
             >
