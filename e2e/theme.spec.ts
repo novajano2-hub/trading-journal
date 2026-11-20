@@ -44,6 +44,13 @@ test.describe('theme', () => {
     await toggle(page).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     expect(await primaryContrast(page)).toBeGreaterThanOrEqual(4.5);
+    const tokens = await page.evaluate(() => {
+      const s = getComputedStyle(document.documentElement);
+      return [s.getPropertyValue('--bg'), s.getPropertyValue('--accent')].map(
+        (v) => v.trim().toLowerCase(),
+      );
+    });
+    expect(tokens).toEqual(['#0e1014', '#3866e6']);
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await expect(page.locator('body')).not.toHaveCSS(

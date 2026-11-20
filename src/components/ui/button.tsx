@@ -6,21 +6,29 @@ import { motion, useReducedMotion } from 'motion/react';
 import { EASING_POINTS, press } from '@/lib/motion';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
+export type ButtonSize = 'md' | 'sm';
+
+const SIZE: Record<ButtonSize, string> = {
+  md: 'h-11',
+  sm: 'h-[38px]',
+};
 
 const VARIANT: Record<ButtonVariant, string> = {
   primary: 'bg-accent text-accent-fg hover:bg-accent-hover',
-  secondary: 'bg-surface-1 text-text border border-line-2 hover:bg-sunken',
+  secondary: 'bg-surface-1 text-text border border-line-2 hover:border-faint',
   ghost: 'bg-transparent text-text hover:bg-sunken',
 };
 
 type Props = Omit<ComponentProps<typeof motion.button>, 'ref' | 'children'> & {
   children?: ReactNode;
   variant?: ButtonVariant;
+  size?: ButtonSize;
 };
 
 /** 40px button (44 on touch), 10px radius, pressed state with a soft ripple. */
 export function Button({
   variant = 'primary',
+  size = 'md',
   className = '',
   type = 'button',
   disabled,
@@ -40,7 +48,7 @@ export function Button({
       {...props}
       type={type}
       disabled={disabled}
-      className={`relative inline-flex h-10 select-none items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-control px-4 text-[15px] font-medium transition-colors duration-120 disabled:opacity-50 pointer-coarse:h-11 ${VARIANT[variant]} ${className}`}
+      className={`relative inline-flex ${SIZE[size]} select-none items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-control px-[18px] text-[15px] font-medium transition-colors duration-120 disabled:opacity-50 ${VARIANT[variant]} ${className}`}
       animate={{ scale: pressed && !reduced ? press.scale : 1 }}
       transition={{
         duration: reduced ? 0 : pressed ? press.down : press.up,

@@ -3,10 +3,10 @@ import type { ReactNode } from 'react';
 export type ChipTone = 'neutral' | 'accent' | 'gain' | 'loss';
 
 const TONE: Record<ChipTone, string> = {
-  neutral: 'bg-sunken text-muted border-line',
-  accent: 'bg-accent-soft text-accent-ink border-transparent',
-  gain: 'bg-gain-soft text-gain border-transparent',
-  loss: 'bg-loss-soft text-loss border-transparent',
+  neutral: 'bg-sunken text-muted',
+  accent: 'bg-accent-soft text-accent-ink',
+  gain: 'bg-gain-soft text-gain',
+  loss: 'bg-loss-soft text-loss',
 };
 
 /** 6px-radius tag. Use `mono` for numbers or symbols. */
@@ -23,7 +23,7 @@ export function Chip({
 }) {
   return (
     <span
-      className={`inline-flex h-6 items-center gap-1 rounded-chip border px-2 text-xs font-medium ${mono ? 'font-mono' : ''} ${TONE[tone]} ${className}`}
+      className={`inline-flex h-[22px] items-center gap-[5px] rounded-chip px-2 text-xs ${mono ? 'font-mono' : ''} ${TONE[tone]} ${className}`}
     >
       {children}
     </span>
@@ -33,9 +33,11 @@ export function Chip({
 /** Trade side: Long reads gain, Short reads loss. */
 export function SideChip({ side }: { side: 'long' | 'short' }) {
   return (
-    <Chip tone={side === 'long' ? 'gain' : 'loss'}>
+    <span
+      className={`inline-flex h-5 items-center rounded-chip px-[7px] text-[11.5px] font-medium ${side === 'long' ? 'bg-gain-soft text-gain' : 'bg-loss-soft text-loss'}`}
+    >
       {side === 'long' ? 'Long' : 'Short'}
-    </Chip>
+    </span>
   );
 }
 

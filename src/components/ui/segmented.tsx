@@ -21,12 +21,12 @@ export function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className="inline-flex rounded-control border border-line bg-sunken p-0.5"
+      className="inline-flex rounded-[7px] bg-sunken p-0.5"
     >
       {options.map((o) => (
         <label
           key={o.value}
-          className="relative cursor-pointer rounded-[8px] px-3 py-1.5 text-sm font-medium text-muted transition-colors has-[:checked]:bg-surface-1 has-[:checked]:text-text has-[:checked]:shadow-[0_0_0_1px_var(--line-2)] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring"
+          className="relative cursor-pointer rounded-[5px] px-2.5 py-1 text-sm text-muted transition-colors has-[:checked]:bg-surface-1 has-[:checked]:text-text has-[:checked]:shadow-[0_1px_2px_rgba(15,18,24,0.08)] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent"
         >
           <input
             type="radio"

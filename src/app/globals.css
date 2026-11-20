@@ -37,7 +37,6 @@
   --color-gain-soft: var(--gain-soft);
   --color-loss: var(--loss);
   --color-loss-soft: var(--loss-soft);
-  --color-ring: var(--ring);
   --radius-chip: var(--r-chip);
   --radius-control: var(--r-control);
   --radius-card: var(--r-card);
@@ -62,14 +61,13 @@ body {
 }
 
 ::selection {
-  background: var(--accent-soft);
-  color: var(--accent-ink);
+  background: var(--accent);
+  color: #fff;
 }
 
 :focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-  border-radius: 4px;
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 a {
