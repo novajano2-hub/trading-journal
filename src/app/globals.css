@@ -373,3 +373,11 @@ a.rack-card:focus-visible {
     top: 50%;
   }
 }
+
+/* Feature pages: a page headline, a step under the landing's hero. */
+.feature-h1 {
+  font-size: clamp(2.75rem, 7vw + 0.5rem, 6rem);
+  line-height: 0.9;
+  letter-spacing: -0.005em;
+  text-wrap: balance;
+}
