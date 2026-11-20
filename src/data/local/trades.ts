@@ -1,4 +1,8 @@
-import { NotFoundError, type TradesRepo } from '../repository';
+import {
+  NotFoundError,
+  OpenImportedTradeError,
+  type TradesRepo,
+} from '../repository';
 import { applyTradePatch } from '../trade-patch';
 import type { LocalContext } from './context';
 import { rwTx } from './tx';
@@ -29,8 +33,13 @@ export function localTrades(ctx: LocalContext): TradesRepo {
 
     async remove(ws, ids) {
       const db = await ctx.db();
+      const keys = ids.map((id): [string, string] => [ws, id]);
       await rwTx(db, [db.trades, db.journal], async () => {
-        await db.trades.bulkDelete(ids.map((id) => [ws, id]));
+        // Later imports' fills would have nothing to close (Plan 5 adds a tombstone flow).
+        for (const t of await db.trades.bulkGet(keys))
+          if (t?.status === 'open' && t.importId !== undefined)
+            throw new OpenImportedTradeError(t.id, t.importId);
+        await db.trades.bulkDelete(keys);
         await pruneJournalLinks(db, ws, ids);
       });
     },

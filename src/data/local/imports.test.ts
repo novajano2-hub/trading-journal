@@ -8,6 +8,7 @@ import { fixtureSample } from '../__fixtures__/sample';
 import {
   ImportBlockedError,
   NotFoundError,
+  OpenImportedTradeError,
   StalePlanError,
 } from '../repository';
 import { KeelDb, META } from './db';
@@ -605,5 +606,51 @@ describe('imports.undo', () => {
     await expect(repo.imports.undo(M, a.id)).rejects.toThrow();
     expect(await repo.trades.list(M)).toEqual([open]);
     expect((await repo.imports.list(M))[0]!.status).toBe('active');
+  });
+});
+
+describe('trades.remove of an imported trade', () => {
+  test('an open imported trade is refused, so the next import still closes it; a closed one deletes', async () => {
+    const { repo, commit } = await setup();
+    const a = await commit(
+      H +
+        '2026-11-16 09:41:00,ESZ5,Buy,2,6010\n2026-11-16 09:45:00,ZCZ5,Buy,1,450\n2026-11-16 10:41:00,ZCZ5,Sell,1,451\n',
+      'impA',
+      { mapping: { overrides: { ZC } } },
+    );
+    const [es, zc] = await repo.trades.list(M);
+    expect([es!.status, zc!.status]).toEqual(['open', 'closed']);
+    const note = await repo.journal.save(M, {
+      kind: 'note',
+      title: 'Both',
+      body: null,
+      linkedTradeIds: [es!.id, zc!.id],
+    });
+    const before = await repo.trades.list(M);
+
+    // One open imported trade in the call refuses all of it.
+    const error = await repo.trades.remove(M, [zc!.id, es!.id]).catch((e) => e);
+    expect(error).toBeInstanceOf(OpenImportedTradeError);
+    expect(error).toMatchObject({ tradeId: es!.id, importId: a.id });
+    expect(await repo.trades.list(M)).toEqual(before);
+    expect((await repo.journal.get(M, note.id))!.linkedTradeIds).toEqual([
+      es!.id,
+      zc!.id,
+    ]);
+
+    await repo.trades.remove(M, [zc!.id]);
+    expect(await repo.trades.list(M)).toEqual([es]);
+
+    // The sell closes the long instead of opening a short.
+    await commit(CLOSE_ES, 'impB');
+    const [closed] = await repo.trades.list(M);
+    expect(closed).toMatchObject({
+      id: es!.id,
+      direction: 'long',
+      status: 'closed',
+    });
+    await repo.trades.remove(M, [closed!.id]);
+    expect(await repo.trades.list(M)).toEqual([]);
+    expect((await repo.journal.get(M, note.id))!.linkedTradeIds).toEqual([]);
   });
 });

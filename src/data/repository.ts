@@ -73,12 +73,33 @@ export interface PrefsRepo {
 // Workspace-scoped repositories: every call takes the workspace id.
 // update/remove of a missing id throw NotFoundError (except trades.remove).
 
+/**
+ * The trade is an open position that an import wrote. Deleting it would leave
+ * the next import's fills nothing to close, so they would open a phantom
+ * opposite position. Undo the import (`importId`) instead.
+ */
+export class OpenImportedTradeError extends Error {
+  override name = 'OpenImportedTradeError';
+  constructor(
+    readonly tradeId: string,
+    readonly importId: string,
+  ) {
+    super(
+      `Trade "${tradeId}" is an open position from import "${importId}"; undo the import instead`,
+    );
+  }
+}
+
 export interface TradesRepo {
   /** In serial order. */
   list(ws: string): Promise<Trade[]>;
   get(ws: string, id: string): Promise<Trade | undefined>;
   update(ws: string, id: string, patch: TradePatch): Promise<Trade>;
-  /** Also drops the ids from journal links. Missing ids are ignored. */
+  /**
+   * Also drops the ids from journal links. Missing ids are ignored. Throws
+   * OpenImportedTradeError, deleting nothing, when any of them is an open
+   * trade with an `importId`; closed trades and trades without one delete.
+   */
   remove(ws: string, ids: readonly string[]): Promise<void>;
 }
 
