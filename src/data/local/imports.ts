@@ -60,15 +60,17 @@ async function bumpImportRevision(db: KeelDb, ws: string): Promise<number> {
 /**
  * The latest active import that undoing `job` would break, if any: one that
  * rebuilt one of the job's trades, or a later one in the account with trades
- * in a symbol the job's trades or replaced trades are in. Restoring the job's
- * replaced trades beside those would leave two positions in one symbol,
- * which FIFO never builds. Call inside the undo's transaction.
+ * in the symbol of a trade the undo would restore. Restoring it beside those
+ * would leave two positions in one symbol, which FIFO never builds. Deleting
+ * the job's own trades breaks nothing: a later import's fills joined any of
+ * them still open (the first case) and never matched a closed one. Call
+ * inside the undo's transaction.
  */
 async function blockingImport(
   db: KeelDb,
   ws: string,
   job: ImportJobRecord,
-  built: readonly Trade[],
+  restored: readonly Trade[],
 ): Promise<string | undefined> {
   const others = (
     await db.imports
@@ -84,11 +86,9 @@ async function blockingImport(
   const later = new Set(
     others.filter((j) => j.revision > job.revision).map((j) => j.id),
   );
-  if (later.size > 0) {
+  if (later.size > 0 && restored.length > 0) {
     const touched = new Set(
-      [...built, ...job.replacedTrades].map((t) =>
-        canonicalSymbol(t.instrument.symbol),
-      ),
+      restored.map((t) => canonicalSymbol(t.instrument.symbol)),
     );
     await db.trades
       .where('[workspaceId+accountId]')
@@ -300,7 +300,14 @@ export function localImports(ctx: LocalContext): ImportRepo {
             .where('[workspaceId+importId]')
             .equals([ws, jobId])
             .toArray();
-          const blocker = await blockingImport(db, ws, job, built);
+          // A replaced trade comes back unless the job wrote a trade under its
+          // id that the user has since deleted: that deletion stands.
+          const wrote = new Set(job.tradeIds);
+          const remaining = new Set(built.map((t) => t.id));
+          const restored = job.replacedTrades.filter(
+            (t) => !wrote.has(t.id) || remaining.has(t.id),
+          );
+          const blocker = await blockingImport(db, ws, job, restored);
           if (blocker)
             return {
               ok: false,
@@ -309,13 +316,6 @@ export function localImports(ctx: LocalContext): ImportRepo {
             };
 
           await db.trades.bulkDelete(built.map((t) => [ws, t.id]));
-          // A replaced trade comes back unless the job wrote a trade under its
-          // id that the user has since deleted: that deletion stands.
-          const wrote = new Set(job.tradeIds);
-          const remaining = new Set(built.map((t) => t.id));
-          const restored = job.replacedTrades.filter(
-            (t) => !wrote.has(t.id) || remaining.has(t.id),
-          );
           // A restored trade keeps its id, so its journal links stay.
           const restoredIds = new Set(restored.map((t) => t.id));
           await pruneJournalLinks(

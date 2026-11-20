@@ -181,7 +181,7 @@ export class StalePlanError extends Error {
 
 export type UndoResult =
   | { ok: true }
-  /** A later active import in the account rebuilt one of this import's trades, or trades a symbol it touched; undo that one first. */
+  /** A later active import in the account rebuilt one of this import's trades, or trades the symbol of one undo would restore; undo that one first. */
   | { ok: false; reason: 'later-import-depends'; dependentJobId: string };
 
 export interface ImportRepo {
@@ -205,9 +205,9 @@ export interface ImportRepo {
    * Deletes the job's trades and restores the ones it replaced, except one
    * whose same-id replacement the user deleted, minus references to tags,
    * strategies, rules and notes deleted since. Refused while a later active
-   * import in the account rebuilt one of its trades or has trades in a symbol
-   * it touched. Throws NotFoundError for a missing job; an undone job is left
-   * as it is.
+   * import in the account rebuilt one of its trades or has trades in the
+   * symbol of a trade the undo would restore. Throws NotFoundError for a
+   * missing job; an undone job is left as it is.
    */
   undo(ws: string, jobId: string): Promise<UndoResult>;
 }

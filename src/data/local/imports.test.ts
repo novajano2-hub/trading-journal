@@ -589,6 +589,42 @@ describe('imports.undo', () => {
     expect(await repo.trades.get(M, x!.id)).toEqual(x);
   });
 
+  test('a later import in a symbol is no reason when the undo restores nothing there', async () => {
+    const { repo, commit } = await setup();
+    // J's closed trades replaced nothing; deleting them leaves L's fills as FIFO built them.
+    const j = await commit(
+      'Open Time,Close Time,Symbol,Side,Qty,Entry Price,Exit Price\n2026-11-16 09:30:00,2026-11-16 09:45:00,ESZ5,Long,1,6000,6004\n',
+      'impJ',
+    );
+    expect(j.mapping.kind).toBe('closed-trades');
+    const l = await commit(
+      H +
+        '2026-11-17 09:41:00,ESZ5,Buy,1,6010\n2026-11-17 09:50:00,ESZ5,Sell,1,6011\n',
+      'impL',
+    );
+    const kept = (await repo.trades.list(M)).filter((t) => t.importId === l.id);
+    expect(await repo.imports.undo(M, j.id)).toEqual({ ok: true });
+    expect(await repo.trades.list(M)).toEqual(kept);
+  });
+
+  test('a later import in a symbol is no reason when the replaced trade there stays deleted', async () => {
+    const { repo, commit } = await setup();
+    await commit(OPEN_ES, 'impA');
+    const b = await commit(CLOSE_ES, 'impB');
+    // The user deletes B's closed ES trade, so undoing B won't bring A's open one back.
+    const [closed] = await repo.trades.list(M);
+    await repo.trades.remove(M, [closed!.id]);
+    const c = await commit(
+      H +
+        '2026-11-18 09:41:00,ESZ5,Buy,1,6020\n2026-11-18 09:50:00,ESZ5,Sell,1,6021\n',
+      'impC',
+    );
+    const after = await repo.trades.list(M);
+    expect(after.map((t) => t.importId)).toEqual([c.id]);
+    expect(await repo.imports.undo(M, b.id)).toEqual({ ok: true });
+    expect(await repo.trades.list(M)).toEqual(after);
+  });
+
   test('an import that merged two open trades into one restores both on undo, and unlinks the one it removed', async () => {
     const { repo, commit, plan } = await setup();
     await commit(OPEN_ES, 'impA');
