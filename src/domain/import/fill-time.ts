@@ -123,6 +123,9 @@ export function fillTimeToUtc(
 
   const c = parseWallClock(s, opts.dateOrder);
   if (!c || !isValidTimeZone(opts.timeZone)) return null;
+  // A wall time in a DST gap, which never happened there, rolls forward by the
+  // gap (02:30 on a New York spring-forward day reads as 03:30 EDT). One in the
+  // fall-back hour, which happened twice, reads as the first (daylight) one.
   const tz = new TZDate(
     c.year,
     c.month - 1,

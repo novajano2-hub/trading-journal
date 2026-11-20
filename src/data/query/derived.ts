@@ -30,6 +30,13 @@ import {
   useTrades,
 } from './hooks';
 
+/**
+ * A value computed from several queries, with one status for all of them:
+ * - `error` as soon as any query has failed, even while others still load;
+ *   `error` is that failure. A failure always wins.
+ * - `pending` while no query has failed and any has no data yet.
+ * - `success` once every query has data. `data` is defined only then.
+ */
 export interface Derived<T> {
   status: 'pending' | 'error' | 'success';
   error: Error | null;
@@ -64,14 +71,18 @@ function sanitizeAgainst(
 }
 
 /**
- * The global filters, kept in the URL. Callers sit inside `<Suspense>` (Plan 4):
- * `useSearchParams` makes a prerendered route client-render up to the nearest boundary.
+ * The global filters, kept in the URL.
+ *
+ * Every component that calls this needs a `<Suspense>` boundary above it
+ * (Plan 4): `useSearchParams` makes a prerendered route client-render up to
+ * the nearest boundary.
  *
  * Once the workspace's accounts, strategies and tags have loaded, ids that don't exist
  * there (a shared link, another workspace, a deleted entity) are dropped, and the cleaned
  * query string is written back with `history.replaceState`. Next syncs native
  * `replaceState` calls into `useSearchParams`, and replacing keeps the bad link out of
- * the back stack.
+ * the back stack. Until those lists load, `filters` is the URL as written, so filter
+ * chips should read the cleaned set from `useTradeSet(filters).data.filters`.
  */
 export function useGlobalFilters(): {
   filters: GlobalFilters;
@@ -117,13 +128,28 @@ export function useGlobalFilters(): {
 }
 
 export interface TradeSet {
-  /** Sanitised against the workspace. */
+  /** The filters as applied: cleaned of ids the workspace doesn't have. Chips read these. */
   filters: GlobalFilters;
   trades: Trade[];
-  /** The selected accounts. */
+  /** The selected accounts: the active ones when no account is filtered. */
   accounts: Account[];
 }
 
+/**
+ * The active workspace's trades that pass `filters` (pass
+ * `useGlobalFilters().filters`; that hook's caller needs the `<Suspense>`
+ * boundary). Status follows `Derived`: trades, accounts, strategies, tags and
+ * prefs must all load, and a failure in any of them wins.
+ *
+ * - The filters are cleaned before they apply: ids that aren't in the
+ *   workspace are dropped, and `data.filters` is that cleaned set.
+ * - With no account filter only active accounts count; an archived account
+ *   counts only when it is selected.
+ * - A date range matches a trade's day: the local date of `closedAt`, or of
+ *   `openedAt` while it is open, in the prefs timezone (`today` too). For a
+ *   closed trade that is the day `dailyPnl` buckets it by, so filtered totals
+ *   equal the sum of the daily bars.
+ */
 export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
   const trades = useTrades();
   const accounts = useAccounts();
@@ -177,6 +203,12 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
   return { ...state, data: state.status === 'success' ? data : undefined };
 }
 
+/**
+ * Metrics for `useTradeSet(filters)`, one bundle per P&L currency, never
+ * mixed. The prefs' base currency comes first and is always present (empty
+ * when no trade is in it); other currencies follow in code order. Status,
+ * filters and the day rule are `useTradeSet`'s.
+ */
 export function useMetrics(filters: GlobalFilters): Derived<CurrencyMetrics[]> {
   const set = useTradeSet(filters);
   const prefs = usePrefs().data;
