@@ -7,9 +7,9 @@ import {
   shortTime,
   ticketTime,
   weekdayOf,
-} from './ticket-format';
+} from './time-format';
 
-describe('ticket-format', () => {
+describe('time-format', () => {
   test('serial and missing dash', () => {
     expect(serialNumber(6)).toBe('No. 000006');
     expect(MISSING).toBe('—');

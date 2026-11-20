@@ -14,7 +14,7 @@ export interface FeatureContent {
 export const FEATURES: Record<ModuleSlug, FeatureContent> = {
   journal: {
     slug: 'journal',
-    headline: 'Every fill, filed and reviewable.',
+    headline: 'Every fill becomes a trade you can review.',
     lede: 'Bring in an export and Keel builds your trades from the fills, works out the P&L, and keeps each trade ready to review.',
     points: [
       {
@@ -46,7 +46,7 @@ export const FEATURES: Record<ModuleSlug, FeatureContent> = {
   analytics: {
     slug: 'analytics',
     headline: 'Find the pattern in your own results.',
-    lede: 'Every figure is computed from your filed trades, and every metric is defined in the app beside the number.',
+    lede: 'Every figure is computed from your imported trades, and every metric is defined in the app beside the number.',
     points: [
       {
         title: 'Breakeven range',
@@ -181,7 +181,7 @@ export const FEATURES: Record<ModuleSlug, FeatureContent> = {
     points: [
       {
         title: 'One trade at a time',
-        body: 'You would open a filed trade and move through it a bar at a time.',
+        body: 'You would open a logged trade and move through it a bar at a time.',
       },
       {
         title: 'Your entry and exit marked',

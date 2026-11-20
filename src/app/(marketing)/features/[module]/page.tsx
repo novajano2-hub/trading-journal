@@ -104,7 +104,7 @@ export default async function FeaturePage({
           >
             {planned
               ? 'Plans, not features. Nothing here works yet.'
-              : 'Straight from how Keel files and measures your trades.'}
+              : 'Straight from how Keel logs and measures your trades.'}
           </SectionHeading>
           <dl
             data-testid="feature-points"

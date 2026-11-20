@@ -7,7 +7,7 @@ import { TradeRows } from '@/components/product/trade-rows';
 import { Chip } from '@/components/ui/chip';
 import { formatMoney, formatPct } from '@/lib/format';
 import type { SampleView } from '@/lib/landing/sample-view';
-import { shortTime } from '@/lib/ticket-format';
+import { shortTime } from '@/lib/time-format';
 import type { ModuleSlug } from '@/content/modules';
 
 /** The trade the sample shows moving its stop: rows open on it, rules grade it. */

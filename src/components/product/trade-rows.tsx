@@ -1,6 +1,6 @@
 import type { Tag, TagCategory, Trade } from '@/domain/types';
 import { formatPnl } from '@/lib/format';
-import { shortTime } from '@/lib/ticket-format';
+import { shortTime } from '@/lib/time-format';
 import { Chip, SideChip } from '@/components/ui/chip';
 
 /** Which tag a compact row shows first: the mistake, then the setup. */

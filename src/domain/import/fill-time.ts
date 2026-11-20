@@ -1,4 +1,4 @@
-import { formatClock } from '@/lib/ticket-format';
+import { formatClock } from '@/lib/time-format';
 
 const CLOCK = String.raw`(\d{1,2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:\s*([AaPp])\.?[Mm]\.?)?`;
 /** YYYY-MM-DD HH:MM[:SS], with a space or a T between date and time. */

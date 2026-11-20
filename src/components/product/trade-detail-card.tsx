@@ -2,7 +2,7 @@ import { CheckCircle, XCircle } from '@phosphor-icons/react/dist/ssr';
 import type { Trade } from '@/domain/types';
 import { formatMoney, formatPnl } from '@/lib/format';
 import { ticketPrice } from '@/lib/landing/sample-view';
-import { shortTime } from '@/lib/ticket-format';
+import { shortTime } from '@/lib/time-format';
 import { SideChip } from '@/components/ui/chip';
 
 export interface TradeCheck {

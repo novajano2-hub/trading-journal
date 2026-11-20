@@ -21,7 +21,7 @@ import type {
   TagCategory,
   Trade,
 } from '@/domain/types';
-import { onTradingDate } from '@/lib/ticket-format';
+import { onTradingDate } from '@/lib/time-format';
 
 export { SAMPLE_EXECUTIONS, SAMPLE_START };
 

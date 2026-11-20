@@ -20,7 +20,7 @@ export const MODULES: readonly ModuleInfo[] = [
   {
     slug: 'journal',
     name: 'Journal',
-    oneLine: 'Every fill filed as a trade you can review.',
+    oneLine: 'Every fill becomes a trade you can review.',
     status: 'milestone-1',
     hasPage: true,
   },

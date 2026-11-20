@@ -79,7 +79,7 @@ export default function ImportPage() {
 
         <div className="mt-8 rounded-card border border-line bg-surface-1 p-6 shadow-[var(--shadow)]">
           <h2 className="border-b border-line pb-3 text-[13px] font-medium text-muted">
-            Waiting to be filed
+            Waiting to be imported
           </h2>
           <div aria-live="polite">
             {waiting.kind === 'checking' ? (

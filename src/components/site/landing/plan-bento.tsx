@@ -3,7 +3,7 @@ import { RuleList } from '@/components/product/rule-list';
 import { Chip } from '@/components/ui/chip';
 import { formatMoney, formatPct } from '@/lib/format';
 import type { SampleView } from '@/lib/landing/sample-view';
-import { shortTime, weekdayOf } from '@/lib/ticket-format';
+import { shortTime, weekdayOf } from '@/lib/time-format';
 import { SectionHeading } from './section-heading';
 import { TickIn } from './tick-in';
 
