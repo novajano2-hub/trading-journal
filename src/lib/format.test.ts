@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { formatMoney, formatPnl } from './format';
+import { formatMoney, formatPct, formatPnl, formatRatio } from './format';
 
 describe('format', () => {
   test('formatPnl always signs gains and losses', () => {
@@ -10,5 +10,15 @@ describe('format', () => {
   });
   test('formatMoney is unsigned for balances', () => {
     expect(formatMoney(5000000)).toBe('$50,000.00');
+  });
+  test('formatPct takes a 0..1 ratio and a fixed number of decimals', () => {
+    expect(formatPct(0.5, 1)).toBe('50.0%');
+    expect(formatPct(0.412)).toBe('41%');
+    expect(formatPct(0.5421)).toBe('54%');
+    expect(formatPct(1)).toBe('100%');
+  });
+  test('formatRatio keeps two decimals', () => {
+    expect(formatRatio(3.1722)).toBe('3.17');
+    expect(formatRatio(2)).toBe('2.00');
   });
 });

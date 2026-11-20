@@ -1,8 +1,14 @@
+import { ClosingSection } from '@/components/marketing/landing/closing';
+import { LoopSection } from '@/components/marketing/landing/loop';
+import { PropRulesSection } from '@/components/marketing/landing/prop-rules';
+import { QuestionsSection } from '@/components/marketing/landing/questions';
+import { RackSection } from '@/components/marketing/landing/rack';
+import { SampleWeekSection } from '@/components/marketing/landing/sample-week';
 import { TicketSlotDrop } from '@/components/marketing/ticket-slot-drop';
 import { getSampleView } from '@/lib/landing/sample-view';
 
 export default function MarketingHome() {
-  const { heroTickets } = getSampleView();
+  const view = getSampleView();
   return (
     <main className="overflow-x-clip">
       <section
@@ -22,8 +28,14 @@ export default function MarketingHome() {
             setup, your mistakes and whether you kept your rules.
           </p>
         </div>
-        <TicketSlotDrop sample={heroTickets} />
+        <TicketSlotDrop sample={view.heroTickets} />
       </section>
+      <LoopSection trades={view.trades} />
+      <RackSection />
+      <SampleWeekSection view={view} />
+      <PropRulesSection prop={view.prop} days={view.days} />
+      <QuestionsSection />
+      <ClosingSection />
     </main>
   );
 }

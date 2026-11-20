@@ -6,6 +6,7 @@ const TONE = {
 const SIZE = {
   md: 'border-[3px] px-3 pt-[5px] pb-[3px] text-2xl -outline-offset-[7px] md:text-[30px]',
   sm: 'border-[2.5px] px-2.5 pt-1 pb-0.5 text-xl -outline-offset-[6px] md:text-2xl',
+  xs: 'border-2 px-2 pt-[3px] pb-px text-lg -outline-offset-[5px]',
 } as const;
 
 /**

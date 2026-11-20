@@ -64,7 +64,8 @@ function decimalsOf(tickSize: number): number {
   return i < 0 ? 0 : s.length - i - 1;
 }
 
-function ticketTime(iso: string): string {
+/** A fill time as printed on a ticket: 'DD MMM HH:MM:SS' in America/New_York. */
+export function ticketTime(iso: string): string {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat('en-US', {
       timeZone: TIME_ZONE,
@@ -81,6 +82,11 @@ function ticketTime(iso: string): string {
   return `${parts.day} ${parts.month} ${parts.hour}:${parts.minute}:${parts.second}`;
 }
 
+/** A price at the instrument's tick precision, e.g. 21100 → '21100.00' for NQ. */
+export function ticketPrice(t: Trade, price: number): string {
+  return price.toFixed(decimalsOf(t.instrument.tickSize));
+}
+
 function toTicket(t: Trade): TicketModel {
   const first = t.executions[0];
   const stamp = STAMPS[t.serial];
@@ -89,7 +95,7 @@ function toTicket(t: Trade): TicketModel {
     side: first?.side ?? (t.direction === 'long' ? 'buy' : 'sell'),
     symbol: t.instrument.symbol,
     qty: t.maxPosition,
-    price: t.avgEntry.toFixed(decimalsOf(t.instrument.tickSize)),
+    price: ticketPrice(t, t.avgEntry),
     time: ticketTime(t.openedAt),
     netPnl: formatPnl(t.net, t.pnlCurrency),
     ...(stamp ? { stamp } : {}),
