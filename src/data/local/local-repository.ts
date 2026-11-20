@@ -2,6 +2,7 @@ import type { Repository } from '../repository';
 import type { SampleWorkspace } from '../seed/generate';
 import { createLocalContext, defaultSample } from './context';
 import { localAccounts } from './accounts';
+import { localImports } from './imports';
 import { localJournal } from './journal';
 import { localPrefs } from './prefs';
 import { localStrategies } from './strategies';
@@ -34,5 +35,6 @@ export function createLocalRepository(
     strategies: localStrategies(ctx),
     tags: localTags(ctx),
     journal: localJournal(ctx),
+    imports: localImports(ctx),
   };
 }

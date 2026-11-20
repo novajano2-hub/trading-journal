@@ -1,6 +1,12 @@
+import type {
+  ImportBlock,
+  ImportContext,
+  ImportPlan,
+} from '@/domain/import/plan';
 import { isValidTimeZone } from '@/domain/time';
 import type {
   Account,
+  ImportJob,
   JournalEntry,
   Rule,
   Strategy,
@@ -136,6 +142,39 @@ export interface JournalRepo {
   remove(ws: string, id: string): Promise<void>;
 }
 
+/** The plan is blocked (`plan.blocked`), so there is nothing to commit. */
+export class ImportBlockedError extends Error {
+  override name = 'ImportBlockedError';
+  constructor(readonly reason: ImportBlock) {
+    super(`The import is blocked: ${reason}`);
+  }
+}
+
+export type UndoResult =
+  | { ok: true }
+  /** A later active import rebuilt one of this import's trades; undo that one first. */
+  | { ok: false; reason: 'later-import-depends'; dependentJobId: string };
+
+export interface ImportRepo {
+  /** Newest first, without the jobs' fingerprints and replaced trades. */
+  list(ws: string): Promise<ImportJob[]>;
+  /** What `planImport` needs for the account. Throws NotFoundError for a missing account. */
+  context(ws: string, accountId: string): Promise<ImportContext>;
+  /**
+   * Writes the plan's trades and its job, and remembers its point values.
+   * Throws ImportBlockedError for a blocked plan, and RangeError unless both
+   * `ws` and the plan are My workspace.
+   */
+  commit(ws: string, plan: ImportPlan): Promise<ImportJob>;
+  /**
+   * Deletes the job's trades and restores the ones it replaced, minus
+   * references to tags, strategies, rules and notes deleted since. Refused
+   * while a later active import holds one of its trades. Throws NotFoundError
+   * for a missing job; an undone job is left as it is.
+   */
+  undo(ws: string, jobId: string): Promise<UndoResult>;
+}
+
 export interface Repository {
   workspaces: WorkspacesRepo;
   prefs: PrefsRepo;
@@ -144,4 +183,5 @@ export interface Repository {
   strategies: StrategiesRepo;
   tags: TagsRepo;
   journal: JournalRepo;
+  imports: ImportRepo;
 }
