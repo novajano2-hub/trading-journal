@@ -21,22 +21,9 @@ import type {
   TagCategory,
   Trade,
 } from '@/domain/types';
-import { formatPnl } from '@/lib/format';
-import { onTradingDate, ticketTime } from '@/lib/ticket-format';
+import { onTradingDate } from '@/lib/ticket-format';
 
 export { SAMPLE_EXECUTIONS, SAMPLE_START };
-
-export interface TicketModel {
-  serial: number;
-  side: 'buy' | 'sell';
-  symbol: string;
-  qty: number;
-  price: string;
-  time: string; // 'DD MMM HH:MM:SS' (capitals) in America/New_York
-  netPnl: string;
-  r?: string;
-  stamp?: 'RULE BROKEN' | 'A+ SETUP';
-}
 
 export interface SampleView {
   trades: Trade[];
@@ -45,13 +32,10 @@ export interface SampleView {
   drawdown: Drawdown;
   equity: EquityPoint[];
   prop: PropStatus;
-  heroTickets: TicketModel[];
   tags: Tag[];
   tagNames: Record<string, string>;
   /** Engine breakdowns on each P&L basis, so gross is re-derived, never adjusted by hand. */
   breakdowns: Record<PnlBasis, Record<BreakdownTab, BreakdownRowView[]>>;
-  /** The sample strategy's rules. */
-  rules: Rule[];
   /** A trade's rule checks as text plus kept or broken, in rule order. */
   checksFor: (trade: Trade) => RuleCheckView[];
   /** The sample week as one range, e.g. '16-20 Nov 2026'. */
@@ -75,12 +59,7 @@ export interface BreakdownRowView {
 
 const TIME_ZONE = 'America/New_York';
 const NOW = '2026-11-20T21:00:00Z';
-const HERO_SERIALS = [8, 6, 5, 3];
 const BROKEN_RULE_SERIAL = 6;
-const STAMPS: Record<number, TicketModel['stamp']> = {
-  [BROKEN_RULE_SERIAL]: 'RULE BROKEN',
-  5: 'A+ SETUP',
-};
 
 const SETUP_BY_SERIAL: Record<number, string> = {
   1: 'Opening range break',
@@ -161,21 +140,6 @@ export function ticketPrice(t: Trade, price: number): string {
   return price.toFixed(decimalsOf(t.instrument.tickSize));
 }
 
-function toTicket(t: Trade): TicketModel {
-  const first = t.executions[0];
-  const stamp = STAMPS[t.serial];
-  return {
-    serial: t.serial,
-    side: first?.side ?? (t.direction === 'long' ? 'buy' : 'sell'),
-    symbol: t.instrument.symbol,
-    qty: t.maxPosition,
-    price: ticketPrice(t, t.avgEntry),
-    time: ticketTime(t.openedAt),
-    netPnl: formatPnl(t.net, t.pnlCurrency),
-    ...(stamp ? { stamp } : {}),
-  };
-}
-
 export function getSampleView(): SampleView {
   const tags = makeTags();
   const tagId = (name: string) => tags.find((t) => t.name === name)!.id;
@@ -234,7 +198,6 @@ export function getSampleView(): SampleView {
     };
   };
   const start: Cents = SAMPLE_START;
-  const bySerial = new Map(trades.map((t) => [t.serial, t]));
   const days = dailyPnl(trades, ctx);
   const ruleText = new Map(SAMPLE_RULES.map((r) => [r.id, r.text]));
   return {
@@ -253,7 +216,6 @@ export function getSampleView(): SampleView {
     tags,
     tagNames,
     breakdowns: { net: breakdownsOn('net'), gross: breakdownsOn('gross') },
-    rules: SAMPLE_RULES,
     checksFor: (t) =>
       t.ruleChecks.flatMap((c) => {
         const text = ruleText.get(c.ruleId);
@@ -261,9 +223,5 @@ export function getSampleView(): SampleView {
       }),
     weekLabel: rangeLabel(days[0]!.date, days[days.length - 1]!.date),
     breakeven: ctx.breakevenRange,
-    heroTickets: HERO_SERIALS.flatMap((n) => {
-      const t = bySerial.get(n);
-      return t ? [toTicket(t)] : [];
-    }),
   };
 }

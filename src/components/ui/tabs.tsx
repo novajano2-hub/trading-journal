@@ -90,6 +90,7 @@ export function Tabs<T extends string>({
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.altKey || e.ctrlKey || e.metaKey) return; // browser shortcuts stay theirs
     const i = nextTabIndex(e.key, index, options.length);
     if (i === null) return;
     e.preventDefault();

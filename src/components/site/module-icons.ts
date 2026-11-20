@@ -4,6 +4,7 @@ import {
   ClockCounterClockwise,
   Notebook,
   PlayCircle,
+  Sparkle,
   ShieldCheck,
   Strategy,
   UsersThree,
@@ -20,5 +21,5 @@ export const MODULE_ICONS: Record<ModuleInfo['slug'], Icon> = {
   backtesting: ClockCounterClockwise,
   replay: PlayCircle,
   mentors: UsersThree,
-  assistant: Notebook,
+  assistant: Sparkle,
 };

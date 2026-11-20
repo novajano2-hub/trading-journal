@@ -86,7 +86,7 @@ test('mobile sheet closes when focus tabs past its last link', async ({
   expect(stuck).toBe('');
 });
 
-test('mobile sheet closes and unlocks scrolling when the viewport reaches md', async ({
+test('mobile sheet closes and unlocks scrolling when the viewport reaches lg', async ({
   page,
 }) => {
   test.skip(!isMobile(), 'mobile only');
@@ -97,7 +97,7 @@ test('mobile sheet closes and unlocks scrolling when the viewport reaches md', a
     'hidden',
   );
   await page.setViewportSize({ width: 1024, height: 800 });
-  // At md the toggle is hidden, so address it without a role query.
+  // At lg the toggle is hidden, so address it without a role query.
   await expect(
     page.locator('button[aria-controls="mobile-sheet"]'),
   ).toHaveAttribute('aria-expanded', 'false');

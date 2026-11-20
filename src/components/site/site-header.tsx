@@ -9,7 +9,7 @@ const LINK =
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-50 border-b border-line bg-bg">
+    <header className="sticky top-0 z-50 border-b border-line bg-bg [--header-h:65px]">
       <div className="mx-auto flex h-16 max-w-[1280px] items-center gap-9 px-5 sm:px-10">
         <BrandMark />
         <nav

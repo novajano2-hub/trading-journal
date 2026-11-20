@@ -81,7 +81,7 @@ export function MobileMenu() {
               x: reduced ? 0 : '100%',
               transition: reduced ? { duration: 0 } : exit,
             }}
-            className="fixed inset-x-0 top-[65px] bottom-0 z-40 overflow-y-auto bg-bg px-5 py-6"
+            className="fixed inset-x-0 top-[var(--header-h)] bottom-0 z-40 overflow-y-auto bg-bg px-5 py-6"
           >
             <nav aria-label="Mobile" className="flex flex-col gap-1">
               <ProductMenu variant="inline" onNavigate={close} />

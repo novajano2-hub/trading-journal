@@ -64,7 +64,6 @@ for (const slug of ['journal', 'strategies', 'prop-firms'])
       const b = (await terms.nth(1).boundingBox())!;
       expect(b.x).toBeGreaterThan(a.x + a.width - 1); // side by side
     }
-    await expect(page.locator('.ticket-stock')).toHaveCount(0);
   });
 
 test('unknown feature 404s', async ({ page }) => {

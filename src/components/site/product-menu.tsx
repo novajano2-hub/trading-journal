@@ -128,7 +128,7 @@ export function ProductMenu({
         <CaretDown
           aria-hidden="true"
           size={popover ? 14 : 20}
-          className={`transition-transform duration-200 ease-out ${open ? 'rotate-180' : ''}`}
+          className={`transition-transform duration-(--dur-enter) ease-(--ease-enter) ${open ? 'rotate-180' : ''}`}
         />
       </button>
       {popover ? (

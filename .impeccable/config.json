@@ -13,15 +13,6 @@
         "reason": "Claude's call: the canon card is by definition the category standard played straight, which is Inter; scoped to this throwaway decision sketch only"
       },
       {
-        "rule": "border-accent-on-rounded",
-        "value": "*",
-        "files": [
-          "src/components/marketing/landing/loop.tsx"
-        ],
-        "createdAt": "2026-11-20T08:29:06.271Z",
-        "reason": "Claude's call: the flagged element (loop.tsx ~L234) is an aria-hidden U-shaped connector line of the trade-loop diagram drawn with border-x/b and a rounded bottom, not an accent-bordered card"
-      },
-      {
         "rule": "design-system-font",
         "value": "*",
         "files": [

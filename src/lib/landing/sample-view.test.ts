@@ -29,27 +29,6 @@ describe('landing sample', () => {
       consistency: { met: false },
     });
     expect(v.prop.consistency!.bestDayShare).toBeCloseTo(0.5421, 4);
-    expect(v.heroTickets[0]).toMatchObject({
-      serial: 8,
-      side: 'buy',
-      symbol: 'ESZ5',
-      netPnl: '+$370.00',
-    });
-    expect(v.heroTickets.find((t) => t.serial === 6)!.stamp).toBe(
-      'RULE BROKEN',
-    );
-  });
-
-  test('hero tickets', () => {
-    const v = getSampleView();
-    expect(v.heroTickets.map((t) => t.serial)).toEqual([8, 6, 5, 3]);
-    expect(v.heroTickets.find((t) => t.serial === 5)!.stamp).toBe('A+ SETUP');
-    expect(v.heroTickets[0]).toMatchObject({
-      time: '20 NOV 10:15:00',
-      price: '6050.50',
-      qty: 1,
-    });
-    expect(v.heroTickets[0]!.r).toBeUndefined();
   });
 
   test('trades carry engine tags for setup and mistake', () => {
@@ -72,7 +51,6 @@ describe('landing sample', () => {
     ]);
     const six = v.trades.find((t) => t.serial === 6)!;
     expect(six.tagIds.map(name)).toContain('Moved stop');
-    expect(v.heroTickets.find((t) => t.serial === 5)!.stamp).toBe('A+ SETUP');
   });
 
   test('breakdowns come from the engine', () => {
