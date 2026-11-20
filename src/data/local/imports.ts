@@ -109,10 +109,11 @@ async function blockingImport(
 }
 
 /**
- * The trades as they can be restored now: references to tags, strategies,
- * rules and notes deleted since the snapshot are dropped, as those deletions'
- * cascades did to the trades that replaced them. Call inside a transaction
- * that includes `db.tags`, `db.strategies` and `db.journal`.
+ * The trades as they can be written now: references to tags, strategies,
+ * rules and notes deleted since the snapshot (an undo's replaced trades, a
+ * plan's inherited journaling) are dropped, as those deletions' cascades did
+ * to the stored trades. Call inside a transaction that includes `db.tags`,
+ * `db.strategies` and `db.journal`.
  */
 async function withLiveReferences(
   db: KeelDb,
@@ -229,7 +230,15 @@ export function localImports(ctx: LocalContext): ImportRepo {
       const db = await ctx.db();
       await rwTx(
         db,
-        [db.accounts, db.trades, db.imports, db.journal, db.meta],
+        [
+          db.accounts,
+          db.trades,
+          db.imports,
+          db.journal,
+          db.tags,
+          db.strategies,
+          db.meta,
+        ],
         async () => {
           if (!(await db.accounts.get([ws, plan.accountId])))
             throw new StalePlanError('account-removed');
@@ -254,7 +263,10 @@ export function localImports(ctx: LocalContext): ImportRepo {
               .map((t) => t.id)
               .filter((id) => !written.has(id)),
           );
-          await db.trades.bulkPut(plan.trades);
+          // The plan carries journaling read with its context.
+          await db.trades.bulkPut(
+            await withLiveReferences(db, ws, plan.trades),
+          );
           await db.imports.put({
             ...job,
             fingerprints: plan.fingerprints,

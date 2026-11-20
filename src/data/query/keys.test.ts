@@ -5,10 +5,16 @@ import { invalidationsFor, keys } from './keys';
 test('the invalidation table', () => {
   expect(invalidationsFor('trades.update', 'sample')).toEqual([
     keys.trades('sample'),
+    keys.imports('sample'),
   ]);
   expect(invalidationsFor('tags.remove', 'mine')).toEqual([
     keys.tags('mine'),
     keys.trades('mine'),
+    keys.imports('mine'),
+  ]);
+  expect(invalidationsFor('tags.update', 'mine')).toEqual([keys.tags('mine')]);
+  expect(invalidationsFor('accounts.create', 'mine')).toEqual([
+    keys.accounts('mine'),
   ]);
   expect(invalidationsFor('imports.commit', 'mine')).toEqual([
     keys.imports('mine'),
@@ -17,6 +23,22 @@ test('the invalidation table', () => {
   expect(invalidationsFor('workspaces.resetSample', 'sample')).toEqual([
     keys.workspace('sample'),
   ]);
+});
+
+test('every write that changes what an import context holds makes it stale', () => {
+  // The context holds the account's currency and open trades with their journaling.
+  for (const write of [
+    'trades.update',
+    'trades.remove',
+    'tags.remove',
+    'strategies.update',
+    'strategies.remove',
+    'journal.remove',
+    'accounts.update',
+  ] as const)
+    expect(invalidationsFor(write, 'mine'), write).toContainEqual(
+      keys.imports('mine'),
+    );
 });
 
 test('a list key covers its details and nothing in another workspace or entity', async () => {

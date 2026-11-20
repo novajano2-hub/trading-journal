@@ -191,6 +191,8 @@ export interface ImportRepo {
   context(ws: string, accountId: string): Promise<ImportContext>;
   /**
    * Writes the plan's trades and its job, and remembers its point values.
+   * References to tags, strategies, rules and notes deleted since the
+   * context was read are dropped from the written trades.
    * Throws ImportBlockedError for a blocked plan, RangeError unless `ws`, the
    * plan and every row it writes or replaces are My workspace (rows also in
    * the plan's account), and StalePlanError, writing nothing,

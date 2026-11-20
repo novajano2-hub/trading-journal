@@ -56,16 +56,19 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
       return [keys.workspace('mine')];
     case 'prefs.update':
       return [keys.prefs()];
+    // Writes that change an account, its open trades or their journaling also
+    // make the import context stale (keys.imports covers it): the plan is remade.
     case 'trades.update':
-      return [keys.trades(ws)];
+      return [keys.trades(ws), keys.imports(ws)];
     case 'trades.remove':
     case 'journal.remove':
-      return [keys.trades(ws), keys.journal(ws)];
+      return [keys.trades(ws), keys.journal(ws), keys.imports(ws)];
     case 'imports.undo':
       return [keys.trades(ws), keys.journal(ws), keys.imports(ws)];
     case 'accounts.create':
-    case 'accounts.update':
       return [keys.accounts(ws)];
+    case 'accounts.update':
+      return [keys.accounts(ws), keys.imports(ws)];
     case 'accounts.remove':
       return [
         keys.accounts(ws),
@@ -77,12 +80,12 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
       return [keys.strategies(ws)];
     case 'strategies.update':
     case 'strategies.remove':
-      return [keys.strategies(ws), keys.trades(ws)];
+      return [keys.strategies(ws), keys.trades(ws), keys.imports(ws)];
     case 'tags.create':
     case 'tags.update':
       return [keys.tags(ws)];
     case 'tags.remove':
-      return [keys.tags(ws), keys.trades(ws)];
+      return [keys.tags(ws), keys.trades(ws), keys.imports(ws)];
     case 'journal.save':
       return [keys.journal(ws)];
     case 'imports.commit':

@@ -258,6 +258,30 @@ describe('imports.commit', () => {
     expect(await repo.imports.list('sample')).toEqual([]);
   });
 
+  test('a tag removed after the context was read is not written on the trade that inherits it', async () => {
+    const { repo, plan, commit } = await setup();
+    await commit(OPEN_ES, 'impA');
+    const [open] = await repo.trades.list(M);
+    const keep = await repo.tags.create(M, { name: 'Keep', category: 'setup' });
+    const drop = await repo.tags.create(M, {
+      name: 'Drop',
+      category: 'mistake',
+    });
+    await repo.trades.update(M, open!.id, { tagIds: [keep.id, drop.id] });
+    const p = await plan(CLOSE_ES, 'impB');
+    expect(p.trades[0]!.tagIds).toEqual([keep.id, drop.id]);
+
+    await repo.tags.remove(M, drop.id);
+    await repo.imports.commit(M, p);
+    expect(await repo.trades.list(M)).toEqual([
+      expect.objectContaining({
+        id: open!.id,
+        status: 'closed',
+        tagIds: [keep.id],
+      }),
+    ]);
+  });
+
   test('a commit that fails part way writes nothing', async () => {
     const { repo, plan, commit } = await setup();
     await commit(OPEN_ES, 'impA');
