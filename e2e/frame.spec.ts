@@ -29,11 +29,11 @@ test('header links and product menu by keyboard', async ({ page }) => {
   );
   await page.keyboard.press('ArrowDown');
   await expect(
-    header.locator('a[href="/product/journal"]:visible'),
+    header.locator('a[href="/features/journal"]:visible'),
   ).toBeFocused();
   await page.keyboard.press('ArrowDown');
   await expect(
-    header.locator('a[href="/product/analytics"]:visible'),
+    header.locator('a[href="/features/analytics"]:visible'),
   ).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(product).toHaveAttribute('aria-expanded', 'false');
@@ -77,4 +77,28 @@ test('no horizontal scroll', async ({ page }) => {
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+});
+
+test('product menu closes after following a link', async ({ page }) => {
+  await page.goto('/');
+  const header = page.getByRole('banner');
+  if (isMobile()) await header.getByRole('button', { name: 'Menu' }).click();
+  const product = header.getByRole('button', { name: 'Product' });
+  await product.click();
+  await header.locator('a[href="/features/journal"]:visible').click();
+  await expect(page).toHaveURL(/\/features\/journal$/);
+  if (isMobile()) await header.getByRole('button', { name: 'Menu' }).click();
+  await expect(product).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('product menu closes when focus tabs out of it', async ({ page }) => {
+  test.skip(isMobile(), 'popover is desktop only');
+  await page.goto('/');
+  const header = page.getByRole('banner');
+  const product = header.getByRole('button', { name: 'Product' });
+  await product.focus();
+  await page.keyboard.press('Enter');
+  await header.locator('a[href="/features/mentors"]:visible').focus();
+  await page.keyboard.press('Tab');
+  await expect(product).toHaveAttribute('aria-expanded', 'false');
 });

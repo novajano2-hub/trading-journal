@@ -5,7 +5,7 @@ export function BadgeLogo({ className = '' }: { className?: string }) {
     <Link
       href="/"
       aria-label="Keel home"
-      className={`relative flex h-16 w-[118px] flex-col items-center justify-center rounded-lg bg-stock text-navy no-underline shadow-[0_2px_0_rgba(21,26,45,0.25),0_8px_18px_-8px_rgba(21,26,45,0.5)] ${className}`}
+      className={`relative flex h-16 w-[118px] flex-col items-center justify-center rounded-lg bg-stock text-navy no-underline shadow-[0_2px_3px_rgba(21,26,45,0.3),0_8px_18px_-8px_rgba(21,26,45,0.5)] ${className}`}
     >
       <span
         aria-hidden="true"

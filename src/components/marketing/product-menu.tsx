@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { ChevronDown } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { MODULES } from '@/content/modules';
@@ -16,6 +17,12 @@ export function ProductMenu({
   onNavigate?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const [seenPath, setSeenPath] = useState(pathname);
+  if (seenPath !== pathname) {
+    setSeenPath(pathname);
+    setOpen(false);
+  }
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const panelId = useId();
@@ -63,6 +70,10 @@ export function ProductMenu({
     <div
       ref={root}
       onKeyDown={onKeyDown}
+      onBlur={(e) => {
+        if (open && !root.current?.contains(e.relatedTarget as Node | null))
+          setOpen(false);
+      }}
       className={popover ? 'relative' : 'w-full'}
     >
       <button
@@ -85,7 +96,7 @@ export function ProductMenu({
         hidden={!open}
         className={
           popover
-            ? 'absolute top-full left-0 z-30 mt-3 w-[340px] rounded-md bg-stock p-2 text-navy shadow-[0_2px_0_rgba(21,26,45,0.18),0_18px_30px_-14px_rgba(21,26,45,0.6)]'
+            ? 'absolute top-full left-0 z-30 mt-3 w-[340px] rounded-md bg-stock p-2 text-navy shadow-[0_2px_4px_rgba(21,26,45,0.18),0_18px_30px_-14px_rgba(21,26,45,0.6)]'
             : 'pb-3'
         }
       >
@@ -94,8 +105,11 @@ export function ProductMenu({
             <li key={m.slug}>
               <Link
                 data-item
-                href={`/product/${m.slug}`}
-                onClick={onNavigate}
+                href={`/features/${m.slug}`}
+                onClick={() => {
+                  setOpen(false);
+                  onNavigate?.();
+                }}
                 className={`block rounded px-3 py-2 no-underline ${popover ? 'text-navy hover:bg-gold' : 'text-stock hover:bg-white/10'}`}
               >
                 <span className="block font-display text-xl leading-tight font-bold tracking-[0.06em] uppercase">

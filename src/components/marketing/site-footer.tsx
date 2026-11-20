@@ -22,7 +22,7 @@ export function SiteFooter() {
           <ul className="m-0 grid list-none grid-cols-2 gap-x-6 p-0 md:max-w-md">
             {MODULES.filter((m) => m.hasPage).map((m) => (
               <li key={m.slug}>
-                <Link href={`/product/${m.slug}`} className={LINK}>
+                <Link href={`/features/${m.slug}`} className={LINK}>
                   {m.name}
                 </Link>
               </li>
