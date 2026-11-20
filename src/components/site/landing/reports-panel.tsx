@@ -27,7 +27,7 @@ const tone = (n: number) =>
 
 /**
  * The reports demo: tabs re-chart the engine's breakdowns, the basis switch
- * swaps in the gross derivation, and the side list ranks the same rows.
+ * swaps in the gross derivation, and the side list ranks a second dimension.
  */
 export function ReportsPanel({
   breakdowns,
@@ -43,8 +43,12 @@ export function ReportsPanel({
   // The side list fades in on a visitor's change, never on load.
   const [changed, setChanged] = useState(false);
   const rows = breakdowns[basis][tab];
+  // The side list shows a second dimension: setups, or mistakes on the Setup tab.
+  const sideDim = tab === 'setup' ? 'mistake' : 'setup';
   // Sort is stable, so equal figures keep the engine's order.
-  const ranked = [...rows].sort((a, b) => b.pnl - a.pnl);
+  const ranked = breakdowns[basis][sideDim]
+    .filter((r) => r.pnl !== 0)
+    .sort((a, b) => b.pnl - a.pnl);
   const name = `${basis === 'gross' ? 'Gross' : 'Net'} P&L by ${tab}`;
   const monoLabels = tab === 'hour';
 
@@ -89,10 +93,10 @@ export function ReportsPanel({
         </div>
         <div className="border-t border-line px-[22px] py-5 md:border-t-0 md:border-l">
           <h3 className="text-[13px] font-medium text-muted">
-            Ranked by {basis} P&amp;L
+            {basis === 'gross' ? 'Gross' : 'Net'} P&amp;L by {sideDim}
           </h3>
           <motion.ol
-            key={tab}
+            key={sideDim}
             className="mt-3.5 grid gap-3.5 text-sm"
             initial={changed && !reduced ? { opacity: 0, y: 4 } : false}
             animate={{ opacity: 1, y: 0 }}
@@ -105,7 +109,7 @@ export function ReportsPanel({
                 transition={glide}
                 className="flex justify-between gap-3"
               >
-                <span className={monoLabels ? 'font-mono' : ''}>{r.label}</span>
+                <span>{r.label}</span>
                 <span className={`font-mono whitespace-nowrap ${tone(r.pnl)}`}>
                   {formatPnl(r.pnl)}
                 </span>

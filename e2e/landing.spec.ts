@@ -84,9 +84,15 @@ test('reports: the tablist switches the breakdown by keyboard', async ({
   await expect(
     r.getByRole('img', { name: 'Net P&L by mistake' }),
   ).toBeVisible();
+  await expect(
+    r.getByRole('heading', { name: 'Net P&L by setup' }),
+  ).toBeVisible();
   expect(await ranked(page)).toEqual([
-    'Untagged +$1,511.00',
-    'Moved stop −$275.00',
+    'Opening range break +$776.00',
+    'Fade +$670.00',
+    'Pullback +$320.00',
+    'Range −$5.00',
+    'Breakout −$525.00',
   ]);
   await page.keyboard.press('ArrowRight');
   await expect(tab('Hour')).toBeFocused();
@@ -96,33 +102,43 @@ test('reports: the tablist switches the breakdown by keyboard', async ({
   await expect(tab('Hour')).toHaveAttribute('aria-selected', 'true');
 });
 
-test('reports: a ranked list by net, re-derived on gross', async ({ page }) => {
+test('reports: the side list ranks a second dimension, re-derived on gross', async ({
+  page,
+}) => {
   await page.goto('/');
   const r = reports(page);
   await expect(r.getByText('Sample data', { exact: true })).toHaveCount(1);
+  await expect(
+    r.getByRole('heading', { name: 'Net P&L by setup' }),
+  ).toBeVisible();
   expect(await ranked(page)).toEqual([
-    '09:00 +$1,160.00',
-    '10:00 +$120.00',
-    '12:00 $0.00',
-    '14:00 $0.00',
-    '15:00 $0.00',
-    '13:00 −$5.00',
-    '11:00 −$39.00',
+    'Opening range break +$776.00',
+    'Fade +$670.00',
+    'Pullback +$320.00',
+    'Range −$5.00',
+    'Breakout −$525.00',
   ]);
 
   await r.getByText('Gross', { exact: true }).click();
   await expect(r.getByRole('radio', { name: 'Gross' })).toBeChecked();
   await expect(r.getByRole('img', { name: 'Gross P&L by hour' })).toBeVisible();
-  await expect.poll(() => ranked(page)).toContain('09:00 +$1,180.00');
+  await expect(
+    r.getByRole('heading', { name: 'Gross P&L by setup' }),
+  ).toBeVisible();
+  await expect.poll(() => ranked(page)).toContain('Fade +$675.00');
 
   await r.getByRole('tab', { name: 'Setup' }).click();
+  await expect(
+    r.getByRole('heading', { name: 'Gross P&L by mistake' }),
+  ).toBeVisible();
   expect(await ranked(page)).toEqual([
-    'Opening range break +$787.50',
-    'Fade +$675.00',
-    'Pullback +$325.00',
-    'Range $0.00',
-    'Breakout −$515.00',
+    'Untagged +$1,542.50',
+    'Moved stop −$270.00',
   ]);
+  await r.getByRole('radio', { name: 'Net' }).click({ force: true });
+  await expect(
+    r.getByRole('heading', { name: 'Net P&L by mistake' }),
+  ).toBeVisible();
   expect(await cutOffText(r.getByRole('tabpanel'))).toEqual([]);
 });
 

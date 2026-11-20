@@ -2,11 +2,11 @@
 
 // Technique adapted from HorizonX Beacon Tabs, commercial licence: the active
 // fill slides and scales to the chosen tab (cubic-bezier(0.23,1,0.32,1), 320ms),
-// then a 6px accent marker lands under it 120ms later. Rebuilt here for
+// Rebuilt here for
 // auto-width text tabs, with one shared indicator instead of per-tab fills.
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { enter, glide } from '@/lib/motion';
+import { glide } from '@/lib/motion';
 
 export type TabOption<T extends string> = { value: T; label: string };
 
@@ -58,8 +58,6 @@ export function Tabs<T extends string>({
   const reduced = useReducedMotion();
   const listRef = useRef<HTMLDivElement>(null);
   const [slots, setSlots] = useState<Slot[] | null>(null);
-  // The marker only "lands" after the visitor picks a tab, never on load.
-  const [picked, setPicked] = useState(false);
   const index = Math.max(
     0,
     options.findIndex((o) => o.value === value),
@@ -81,7 +79,6 @@ export function Tabs<T extends string>({
 
   function select(i: number, focus: boolean) {
     const next = options[i]!;
-    setPicked(true);
     if (next.value !== value) onChange(next.value);
     if (focus)
       listRef.current
@@ -107,25 +104,14 @@ export function Tabs<T extends string>({
         className="relative flex w-max rounded-[7px] bg-sunken p-0.5"
       >
         {slot ? (
-          <>
-            <motion.span
-              aria-hidden="true"
-              data-testid="tab-fill"
-              layout={!reduced}
-              transition={{ layout: reduced ? { duration: 0 } : glide }}
-              className="absolute inset-y-0.5 bg-accent"
-              style={{ left: slot.left, width: slot.width, borderRadius: 5 }}
-            />
-            <motion.span
-              key={value}
-              aria-hidden="true"
-              className="absolute top-full mt-1 size-1.5 rounded-[2px] bg-accent"
-              style={{ left: slot.left + slot.width / 2 - 3 }}
-              initial={picked && !reduced ? { opacity: 0, y: -6 } : false}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ ...enter, delay: 0.12 }}
-            />
-          </>
+          <motion.span
+            aria-hidden="true"
+            data-testid="tab-fill"
+            layout={!reduced}
+            transition={{ layout: reduced ? { duration: 0 } : glide }}
+            className="absolute inset-y-0.5 bg-surface-1 shadow-[0_1px_2px_rgba(15,18,24,0.08)]"
+            style={{ left: slot.left, width: slot.width, borderRadius: 5 }}
+          />
         ) : null}
         {options.map((o, i) => {
           const active = i === index;
@@ -141,7 +127,7 @@ export function Tabs<T extends string>({
               onClick={() => select(i, false)}
               className={`relative rounded-[5px] px-2 py-1 text-[13px] font-medium whitespace-nowrap transition-colors duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] sm:px-2.5 ${
                 active
-                  ? `text-accent-fg ${slot ? '' : 'bg-accent'}`
+                  ? `text-text ${slot ? '' : 'bg-surface-1 shadow-[0_1px_2px_rgba(15,18,24,0.08)]'}`
                   : 'text-muted hover:text-text'
               }`}
             >
