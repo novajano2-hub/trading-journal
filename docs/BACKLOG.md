@@ -72,3 +72,17 @@ Origin key: **TZ** = TradeZella has it · **MTJ** = MyTradingJourney has it · *
 | 32 | Free trading calculators (position size, R:R, pip value) | TZ | SEO play, not core | — |
 | 33 | Comparison pages vs. other journals | TZ | Needs careful, factual claims | Legal review |
 | 34 | Real social proof (testimonials, counts, ratings) | — | None exists; must not be invented | Real users |
+
+## Engineering follow-ups (from Plan 1 reviews)
+
+| # | Item | Owner plan |
+|---|---|---|
+| E1 | Import validation: reject zero/negative quantities and unparseable times before the trade builder | Plan 2 |
+| E2 | Options that expire worthless need a synthetic closing fill at expiry, or their loss stays hidden as "open" | Plan 2 |
+| E3 | Partition trades by `pnlCurrency` (`partitionByCurrency`) before calling metrics; unconverted cross pairs subtract account-currency fees from quote-currency gross, so flag them in import | Plan 2 |
+| E4 | Unify metric signatures (options object vs. positional threshold/timezone) into one `MetricContext` before hooks bind to them | Plan 2 |
+| E5 | Clamp R-distribution tails (a tiny `initialRisk` creates thousands of bins) | Plan 5 (Reports) |
+| E6 | `canonicalSymbol` strips a leading `/` before resolving; confirm against real broker exports | Plan 2 |
+| E7 | Tooling: `.prettierignore` + format the repo once, `engines: node >=22`, pin Vite/Vitest (the native tsconfig paths option is experimental) | Plan 3 |
+| E8 | Review Next 16 scaffold defaults (`cacheComponents`, `partialPrefetching`), replace layout metadata and the boilerplate README | Plan 3 |
+| E9 | Thin test gaps: exact session boundaries, more negative half-even ties, ZB/ZN/6E/lowercase symbol parsing, `Math.max(...)` spread above ~100k trades | Any |
