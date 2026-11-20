@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { cutOffText } from './figures';
 
 test('sample week and prop numbers come from the engine', async ({ page }) => {
   await page.goto('/');
@@ -30,6 +31,35 @@ test('the loop follows sample ticket No. 000006 to the next trade', async ({
   const loop = page.getByRole('region', { name: /all the way round/i });
   for (const s of ['No. 000006', '−$275.00', 'RULE BROKEN', 'No. 000007'])
     await expect(loop).toContainText(s);
+});
+
+test('hero and loop tickets print every figure in full', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('ticket-sample')).toHaveCount(4);
+  expect(await cutOffText(page.getByTestId('ticket-sample'))).toEqual([]);
+  const loop = page.getByRole('region', { name: /all the way round/i });
+  expect(await cutOffText(loop.getByRole('listitem'))).toEqual([]);
+});
+
+test('the rack lifts on hover only when motion is welcome', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const rack = page.getByRole('region', { name: /every tool/i });
+  const card = rack.locator('a[href="/features/journal"]');
+  await card.hover();
+  await expect(card).toHaveCSS('translate', '0px -10px');
+
+  await page.mouse.move(0, 0);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await card.hover();
+  await expect(card).toHaveCSS('translate', 'none');
+  // Keyboard focus (focus-visible) holds still too.
+  await card.focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
+  await expect(card).toBeFocused();
+  await expect(card).toHaveCSS('translate', 'none');
 });
 
 test('the rack links live modules and leaves the assistant unlinked', async ({

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, FileText, Trash2 } from 'lucide-react';
+import { ArrowLeft, FileText, Trash2, TriangleAlert } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { BadgeLogo } from '@/components/marketing/badge-logo';
 import { clearPendingImport, loadPendingImport } from '@/lib/pending-import';
@@ -13,6 +13,9 @@ type Waiting =
 
 const ICON = { 'aria-hidden': true, strokeWidth: 1.75 } as const;
 
+const REMOVE_ERROR =
+  "Couldn't remove the file from this browser. Try again, or clear this site's data in your browser settings.";
+
 function kb(bytes: number): string {
   return (bytes / 1024).toLocaleString('en-US', {
     minimumFractionDigits: 1,
@@ -23,6 +26,7 @@ function kb(bytes: number): string {
 // Placeholder until column mapping lands with the import release.
 export default function ImportPage() {
   const [waiting, setWaiting] = useState<Waiting>({ kind: 'checking' });
+  const [removeError, setRemoveError] = useState(false);
   const noneRef = useRef<HTMLParagraphElement>(null);
   const removed = useRef(false);
 
@@ -48,7 +52,14 @@ export default function ImportPage() {
   }, [waiting]);
 
   async function remove() {
-    await clearPendingImport();
+    setRemoveError(false);
+    try {
+      await clearPendingImport();
+    } catch {
+      // The file is still in the browser: keep showing it, and say how to get out.
+      setRemoveError(true);
+      return;
+    }
     removed.current = true;
     setWaiting({ kind: 'none' });
   }
@@ -113,6 +124,20 @@ export default function ImportPage() {
             </>
           )}
         </div>
+
+        {/* Outside the polite region above, so the alert is announced once. */}
+        {removeError && waiting.kind === 'file' ? (
+          <p
+            role="alert"
+            className="mt-4 flex items-start gap-3 rounded bg-stock px-4 py-3 text-[15px] leading-snug font-semibold text-ink shadow-[0_1px_2px_rgba(21,26,45,0.2),0_10px_20px_-12px_rgba(21,26,45,0.5)]"
+          >
+            <TriangleAlert
+              {...ICON}
+              className="mt-px size-5 shrink-0 text-sell"
+            />
+            {REMOVE_ERROR}
+          </p>
+        ) : null}
       </div>
     </main>
   );

@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 import { MODULES, type ModuleInfo } from '@/content/modules';
+import type { SampleView } from '@/lib/landing/sample-view';
 import { RubberStamp } from '../rubber-stamp';
+import { RackMark } from './rack-marks';
 import { AFTER_HEAD, SECTION, SectionHead } from './section-head';
 
 /**
@@ -47,7 +49,7 @@ const POCKET: Record<ModuleInfo['slug'], { span: string; card: string }> = {
   },
 };
 
-function CardFace({ m }: { m: ModuleInfo }) {
+function CardFace({ m, view }: { m: ModuleInfo; view: SampleView }) {
   const live = m.status === 'milestone-1';
   return (
     <>
@@ -63,22 +65,28 @@ function CardFace({ m }: { m: ModuleInfo }) {
           In development
         </RubberStamp>
       )}
-      <span className="ruled mt-3 block flex-1 text-[15px] leading-[28px] font-medium md:text-base md:leading-[28px]">
+      <span className="ruled mt-3 block text-[15px] leading-[28px] font-medium md:text-base md:leading-[28px]">
         {m.oneLine}
       </span>
-      {m.hasPage ? (
-        <ArrowUpRight
-          aria-hidden="true"
-          strokeWidth={2}
-          className="absolute right-3.5 bottom-[38px] size-6 md:right-5"
-        />
-      ) : null}
+      {/* The card's one artifact, low on the card, beside the way in. */}
+      <span className="mt-auto flex items-end justify-between gap-2.5 pt-6">
+        <span className="flex min-w-0">
+          <RackMark slug={m.slug} view={view} />
+        </span>
+        {m.hasPage ? (
+          <ArrowUpRight
+            aria-hidden="true"
+            strokeWidth={1.75}
+            className="size-6 shrink-0"
+          />
+        ) : null}
+      </span>
     </>
   );
 }
 
 /** Every module as a card standing in a time-card rack, not a grid of equal tiles. */
-export function RackSection() {
+export function RackSection({ view }: { view: SampleView }) {
   return (
     <section aria-labelledby="rack-title" className={SECTION}>
       <SectionHead id="rack-title" title="Every tool, one rack.">
@@ -91,7 +99,7 @@ export function RackSection() {
       >
         {MODULES.map((m) => {
           const pocket = POCKET[m.slug];
-          const card = `rack-card ticket-stock relative flex w-full flex-col rounded-t-[3px] px-3.5 pt-4 pb-[68px] text-ink no-underline md:px-5 md:pt-5 ${pocket.card}`;
+          const card = `rack-card ticket-stock relative flex w-full flex-col rounded-t-[3px] px-3.5 pt-4 pb-[38px] text-ink no-underline md:px-5 md:pt-5 ${pocket.card}`;
           return (
             <li
               key={m.slug}
@@ -99,11 +107,11 @@ export function RackSection() {
             >
               {m.hasPage ? (
                 <Link href={`/features/${m.slug}`} className={card}>
-                  <CardFace m={m} />
+                  <CardFace m={m} view={view} />
                 </Link>
               ) : (
                 <div className={card}>
-                  <CardFace m={m} />
+                  <CardFace m={m} view={view} />
                 </div>
               )}
             </li>

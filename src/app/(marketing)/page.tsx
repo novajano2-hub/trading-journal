@@ -31,7 +31,7 @@ export default function MarketingHome() {
         <TicketSlotDrop sample={view.heroTickets} />
       </section>
       <LoopSection trades={view.trades} />
-      <RackSection />
+      <RackSection view={view} />
       <SampleWeekSection view={view} />
       <PropRulesSection prop={view.prop} days={view.days} />
       <QuestionsSection />

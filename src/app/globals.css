@@ -245,13 +245,25 @@ button.slot-go:disabled {
   pointer-events: none;
 }
 
-.rack-card {
-  transition: translate 240ms cubic-bezier(0.16, 1, 0.3, 1);
+/* Pulled up out of its pocket on hover, only for visitors who welcome motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .rack-card {
+    transition: translate 240ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  a.rack-card:hover,
+  a.rack-card:focus-visible {
+    translate: 0 -10px;
+  }
 }
 
-a.rack-card:hover,
-a.rack-card:focus-visible {
-  translate: 0 -10px;
+/* Held still, the card says it is a link the way every link here does. */
+@media (prefers-reduced-motion: reduce) {
+  a.rack-card:hover h3 {
+    text-decoration: underline;
+    text-decoration-thickness: 3px;
+    text-underline-offset: 0.12em;
+  }
 }
 
 /* Ruled card: each line of text sits on its own rule. */
@@ -262,6 +274,11 @@ a.rack-card:focus-visible {
     var(--rule) calc(1lh - 1px)
   );
   background-size: 100% 1lh;
+}
+
+/* A stamped mark on a rack card: ink that multiplies into the stock. */
+.rack-ink {
+  mix-blend-mode: multiply;
 }
 
 /* The recap sheet: filed, so it is punched; the shadow follows the holes. */

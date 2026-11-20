@@ -48,11 +48,14 @@ function Field({
   className?: string;
 }) {
   return (
-    <div className={`min-w-0 bg-stock px-2 pt-1 pb-0.5 ${className}`}>
+    <div
+      className={`min-w-0 bg-stock px-1.5 pt-1 pb-0.5 @min-[300px]:px-2 ${className}`}
+    >
       <dt className="text-[11px] leading-tight font-bold tracking-[0.16em] text-ink/70 uppercase">
         {label}
       </dt>
-      <dd className="truncate text-[17px] leading-snug font-semibold">
+      {/* Never cut off: a narrow ticket steps its figures down to 15px. */}
+      <dd className="text-[15px] leading-snug font-semibold wrap-anywhere @min-[240px]:text-[17px]">
         {value}
       </dd>
     </div>
@@ -76,12 +79,12 @@ function LoopTicket({
 }) {
   const filed = stage >= 2 && stage <= 4;
   return (
-    <div className="ticket-stock relative z-[1] flex h-[236px] flex-col rounded-[3px] px-3 pt-2.5 pb-2.5 text-ink">
+    <div className="ticket-stock relative z-[1] flex h-[236px] flex-col rounded-[3px] px-2.5 pt-2.5 pb-2.5 text-ink @min-[240px]:px-3">
       <p className="flex items-baseline justify-between border-b-[1.5px] border-ink pb-1.5 text-[11px] leading-none font-bold tracking-[0.18em]">
         <span className="uppercase">Order ticket</span>
         <span>{model.number}</span>
       </p>
-      <dl className="mt-2 grid grid-cols-[44px_1fr_1fr] gap-px border border-rule bg-rule">
+      <dl className="mt-2 grid grid-cols-[36px_1fr_1fr] gap-px border border-rule bg-rule @min-[240px]:grid-cols-[40px_1fr_1fr] @min-[300px]:grid-cols-[44px_1fr_1fr]">
         <div className="row-span-2 flex items-center justify-center bg-stock">
           <dt className="sr-only">Side</dt>
           <dd>
@@ -111,7 +114,7 @@ function LoopTicket({
         </p>
       ) : null}
       <p className="mt-auto flex items-baseline justify-between gap-3">
-        <span className="truncate font-stamp text-[14px] leading-none tracking-[0.06em] text-stamp uppercase">
+        <span className="min-w-0 font-stamp text-[14px] leading-none tracking-[0.06em] text-stamp uppercase wrap-anywhere">
           {model.time}
         </span>
         <span className="shrink-0 text-[11px] leading-none font-bold tracking-[0.2em] text-ink/70 uppercase">
@@ -198,7 +201,8 @@ export function LoopSection({ trades }: { trades: readonly Trade[] }) {
               <p className="mt-2 max-w-[26em] text-base leading-snug font-medium xl:min-h-[3lh] xl:text-[15px]">
                 {s.says}
               </p>
-              <div className="relative mt-4 max-w-[380px] xl:max-w-none">
+              {/* The ticket's width sets its type steps, at every breakpoint. */}
+              <div className="@container relative mt-4 max-w-[380px] xl:max-w-none">
                 <LoopTicket
                   model={s.model}
                   stage={s.stage}

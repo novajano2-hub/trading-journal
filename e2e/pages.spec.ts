@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { textContrast } from './figures';
 
 for (const path of [
   '/pricing',
@@ -26,6 +27,24 @@ test('auth forms are honest', async ({ page }) => {
     page.getByText(/Accounts open with the app release/),
   ).toBeVisible();
 });
+
+for (const [path, name] of [
+  ['/login', 'Log in'],
+  ['/signup', 'Create account'],
+] as const)
+  test(`${path} submit is closed in the world's own materials`, async ({
+    page,
+  }) => {
+    await page.goto(path);
+    const submit = page.getByRole('button', { name });
+    await expect(submit).toBeDisabled();
+    await expect(submit).toHaveAttribute('aria-disabled', 'true');
+    await expect(page.getByText('Opens with app release')).toBeVisible();
+    // Card stock under the label, never a faded grey fill.
+    await expect(submit).toHaveCSS('background-color', 'rgb(244, 246, 248)');
+    await expect(submit).toHaveCSS('opacity', '1');
+    expect(await textContrast(submit)).toBeGreaterThanOrEqual(4.5);
+  });
 
 test('pricing invents no price', async ({ page }) => {
   await page.goto('/pricing');

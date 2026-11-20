@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { formatFillTime } from '@/domain/import/fill-time';
 import type { PreviewTicket } from '@/domain/import/preview';
 import type { TicketModel } from '@/lib/landing/sample-view';
 import { RubberStamp } from './rubber-stamp';
@@ -45,7 +46,9 @@ function Field({
       <dt className="text-[11px] leading-tight font-bold tracking-[0.16em] text-ink/70 uppercase">
         {label}
       </dt>
-      <dd className="truncate text-[19px] leading-snug font-semibold md:text-[22px]">
+      {/* Figures are never cut off: they step down the ticket's type scale as
+          the ticket narrows, and only wrap if a visitor's value still won't fit. */}
+      <dd className="text-[17px] leading-snug font-semibold wrap-anywhere @min-[300px]:text-[19px] @min-[360px]:text-[22px]">
         {value}
       </dd>
     </div>
@@ -65,7 +68,11 @@ export function OrderTicket(props: OrderTicketProps) {
   const symbol = shown(sample?.symbol ?? yours?.symbol);
   const price = shown(sample?.price ?? yours?.price);
   const qty = shown(sample?.qty ?? yours?.qty);
-  const time = shown(sample?.time ?? yours?.time);
+  // The visitor's own clock, reprinted the way the sample tickets print time.
+  const time = shown(
+    sample?.time ??
+      (yours?.time === undefined ? undefined : formatFillTime(yours.time)),
+  );
   const number =
     props.variant === 'sample'
       ? `No. ${String(props.model.serial).padStart(6, '0')}`
@@ -78,14 +85,14 @@ export function OrderTicket(props: OrderTicketProps) {
       data-testid={`ticket-${props.variant}`}
       aria-label={`${sample ? 'Sample ticket' : 'Your ticket'}, ${number}`}
       style={style}
-      className={`ticket-stock relative flex h-[192px] w-full flex-col rounded-[3px] px-3.5 pt-3 pb-3 text-ink md:h-[236px] md:px-[18px] md:pt-4 md:pb-4 ${className}`}
+      className={`ticket-stock @container relative flex h-[192px] w-full flex-col rounded-[3px] px-3.5 pt-3 pb-3 text-ink md:h-[236px] md:px-[18px] md:pt-4 md:pb-4 ${className}`}
     >
       <header className="flex items-baseline justify-between border-b-[1.5px] border-ink pb-2 text-[11px] leading-none font-bold tracking-[0.2em]">
         <span className="uppercase">Order ticket</span>
         <span className={sample ? '' : 'uppercase'}>{number}</span>
       </header>
 
-      <dl className="mt-2 grid grid-cols-[52px_1fr_1fr] gap-px border border-rule bg-rule md:mt-2.5 md:grid-cols-[70px_1fr_1fr]">
+      <dl className="mt-2 grid grid-cols-[48px_1fr_1fr] gap-px border border-rule bg-rule md:mt-2.5 @min-[300px]:grid-cols-[52px_1fr_1fr] @min-[360px]:grid-cols-[70px_1fr_1fr]">
         <div className="row-span-2 flex items-center justify-center bg-stock">
           <dt className="sr-only">Side</dt>
           <dd>
@@ -105,7 +112,7 @@ export function OrderTicket(props: OrderTicketProps) {
       </dl>
 
       <p className="mt-auto flex items-baseline justify-between gap-3">
-        <span className="truncate font-stamp text-[15px] leading-none tracking-[0.06em] text-stamp uppercase md:text-[17px]">
+        <span className="min-w-0 font-stamp text-[15px] leading-none tracking-[0.06em] text-stamp uppercase wrap-anywhere @min-[360px]:text-[17px]">
           {time}
         </span>
         <span className="shrink-0 text-[11px] leading-none font-bold tracking-[0.2em] text-ink/70 uppercase">

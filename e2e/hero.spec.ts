@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { cutOffText } from './figures';
 
 const DROP = /drop your broker csv/i;
 
@@ -39,6 +40,84 @@ test("dropping a CSV prints the visitor's own tickets, then hands off", async ({
   await expect(page.getByText('No file waiting.')).toBeVisible();
   await page.reload();
   await expect(page.getByText('No file waiting.')).toBeVisible();
+});
+
+test("the visitor's fills print in the ticket clock, in full", async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByLabel(DROP).setInputFiles('e2e/fixtures/sample-fills.csv');
+  const yours = page.getByTestId('ticket-yours');
+  await expect(yours).toHaveCount(4);
+  // The file's '2026-11-16 09:41:00' as the sample tickets print time.
+  await expect(yours.first()).toContainText('16 NOV 09:41:00');
+  await expect(yours.nth(3)).toContainText('16 NOV 10:48:00');
+  await expect(page.getByTestId('ticket-stack')).not.toContainText('2026-');
+  expect(await cutOffText(yours)).toEqual([]);
+
+  // A US month-first time with AM/PM reads the same way.
+  await page
+    .getByLabel('Choose a different file')
+    .setInputFiles('e2e/fixtures/one-fill.csv');
+  await expect(yours).toHaveCount(1);
+  await expect(yours).toContainText('16 NOV 14:05:00');
+});
+
+test('the drop status agrees with the number of fills', async ({ page }) => {
+  await page.goto('/');
+  const status = page.getByRole('main').getByRole('status');
+  await page.getByLabel(DROP).setInputFiles('e2e/fixtures/sample-fills.csv');
+  await expect(
+    page.getByText(
+      'Its first 4 fills are printed as tickets. Check them, then map your columns.',
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(status).toHaveText(
+    'Read sample-fills.csv. Its first 4 fills are printed as tickets.',
+  );
+
+  await page
+    .getByLabel('Choose a different file')
+    .setInputFiles('e2e/fixtures/one-fill.csv');
+  await expect(
+    page.getByText(
+      'Its first fill is printed as a ticket. Check it, then map your columns.',
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(status).toHaveText(
+    'Read one-fill.csv. Its first fill is printed as a ticket.',
+  );
+});
+
+test('a file that cannot be removed stays, with a way out', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByLabel(DROP).setInputFiles('e2e/fixtures/sample-fills.csv');
+  await page.getByRole('button', { name: 'Map columns and continue' }).click();
+  await expect(page).toHaveURL(/\/app\/import$/);
+  await expect(page.getByText(/Received sample-fills\.csv/)).toBeVisible();
+
+  // Make the browser store refuse the delete, so clearPendingImport rejects.
+  await page.evaluate(() => {
+    IDBObjectStore.prototype.delete = () => {
+      throw new DOMException('Refused for the test', 'UnknownError');
+    };
+  });
+  await page.getByRole('button', { name: 'Remove file' }).click();
+  await expect(page.getByRole('main').getByRole('alert')).toHaveText(
+    "Couldn't remove the file from this browser. Try again, or clear this site's data in your browser settings.",
+  );
+  await expect(page.getByText(/Received sample-fills\.csv/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Remove file' })).toBeVisible();
+
+  // With the store working again, trying again removes it.
+  await page.reload();
+  await page.getByRole('button', { name: 'Remove file' }).click();
+  await expect(page.getByText('No file waiting.')).toBeVisible();
+  await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0);
 });
 
 test('unreadable file shows an error and keeps the sample', async ({

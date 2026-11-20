@@ -25,6 +25,12 @@ const hasValue = (t: PreviewTicket) =>
 const hasFiles = (e: DragEvent) =>
   Array.from(e.dataTransfer?.types ?? []).includes('Files');
 
+/** "Its first fill is printed as a ticket." / "Its first 4 fills are printed as tickets." */
+const printedLine = (n: number) =>
+  n === 1
+    ? 'Its first fill is printed as a ticket.'
+    : `Its first ${n} fills are printed as tickets.`;
+
 const ICON = { 'aria-hidden': true, strokeWidth: 1.75 } as const;
 
 /**
@@ -168,10 +174,9 @@ export function TicketSlotDrop({ sample }: { sample: TicketModel[] }) {
                   {printed.file.name}
                 </strong>
                 <span className="block text-[15px] leading-snug text-stock/75">
-                  {printed.tickets.length === 1
-                    ? 'Its first fill is printed as a ticket.'
-                    : `Its first ${printed.tickets.length} fills are printed as tickets.`}{' '}
-                  Check them, then map your columns.
+                  {printedLine(printed.tickets.length)}{' '}
+                  {printed.tickets.length === 1 ? 'Check it' : 'Check them'},
+                  then map your columns.
                 </span>
               </span>
             </div>
@@ -259,7 +264,7 @@ export function TicketSlotDrop({ sample }: { sample: TicketModel[] }) {
         </p>
         <p role="status" className="sr-only">
           {printed
-            ? `Printed ${printed.tickets.length} tickets from ${printed.file.name}.`
+            ? `Read ${printed.file.name}. ${printedLine(printed.tickets.length)}`
             : ''}
         </p>
       </div>
