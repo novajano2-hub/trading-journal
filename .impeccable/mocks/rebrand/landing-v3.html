@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keel: direction mock v3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Radius rule: buttons and inner panels 10px, cards and windows 16px, chips 6px. */
+:root{
+  --bg:#F6F7F9; --surface:#FFFFFF; --sunken:#EFF1F4; --line:#E3E6EB; --line-2:#D3D8DF;
+  --text:#0F1218; --muted:#4F5865; --faint:#687080;
+  --accent:#2550E0; --accent-hover:#1E44C4; --accent-soft:#EAF0FE; --accent-ink:#1B3FB8;
+  --gain:#087A54; --gain-soft:#E6F4EE; --loss:#C8283A; --loss-soft:#FBEBED;
+  --shadow:0 1px 2px rgba(15,18,24,.05),0 24px 48px -24px rgba(37,80,224,.18);
+}
+/* Light is the default brand mode; dark is an explicit toggle (data-theme="dark"). */
+:root[data-theme="dark"]{
+  --bg:#0E1014; --surface:#15181E; --sunken:#1B1F26; --line:#262B33; --line-2:#323843;
+  --text:#ECEEF2; --muted:#A3AAB6; --faint:#8E95A1;
+  --accent:#3866E6; --accent-hover:#2F5BD8; --accent-soft:#1A2440; --accent-ink:#9DB6FF;
+  --gain:#3FC08E; --gain-soft:#14281F; --loss:#F06A78; --loss-soft:#2E161A;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 24px 48px -24px rgba(0,0,0,.7);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--bg)}
+body{font-family:Geist,system-ui,sans-serif;color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+::selection{background:var(--accent);color:#fff}
+a{color:inherit;text-decoration:none}
+.mono{font-family:"Geist Mono",ui-monospace,monospace;font-feature-settings:"tnum" 1}
+.gain{color:var(--gain)} .loss{color:var(--loss)} .muted{color:var(--muted)} .faint{color:var(--faint)}
+.wrap{max-width:1280px;margin:0 auto;padding:0 40px}
+.btn{display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 18px;border-radius:10px;font-weight:500;font-size:15px;transition:background .2s,transform .1s;white-space:nowrap}
+.btn:active{transform:translateY(1px)}
+.btn-primary{background:var(--accent);color:#fff} .btn-primary:hover{background:var(--accent-hover)}
+.btn-quiet{color:var(--text);border:1px solid var(--line-2);background:var(--surface)} .btn-quiet:hover{border-color:var(--faint)}
+.btn:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+
+/* nav */
+.nav{height:68px;display:flex;align-items:center;gap:36px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:18px;letter-spacing:-.02em}
+.mark{width:26px;height:26px;border-radius:7px;background:var(--text);color:var(--bg);display:grid;place-items:center;font-size:14px;font-weight:600}
+.links{display:flex;gap:26px;font-size:14.5px;color:var(--muted)} .links a:hover{color:var(--text)}
+.nav .end{margin-left:auto;display:flex;align-items:center;gap:20px;font-size:14.5px}
+.nav .btn{height:38px;font-size:14px;padding:0 16px}
+
+/* hero */
+.hero{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:56px;align-items:center;padding:56px 0 88px}
+.hero h1{font-size:58px;line-height:1.04;letter-spacing:-.04em;font-weight:600;max-width:11ch}
+.hero p{margin-top:22px;font-size:18px;line-height:1.55;color:var(--muted);max-width:40ch}
+.ctas{margin-top:32px;display:flex;gap:10px}
+.compose{position:relative;margin-right:clamp(-120px,calc((1280px - 100vw) / 2),0px)}
+.win{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+.win-top{height:46px;display:flex;align-items:center;gap:8px;padding:0 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.sel{height:28px;display:inline-flex;align-items:center;gap:6px;padding:0 10px;border:1px solid var(--line);border-radius:6px;color:var(--text)}
+.sel i{color:var(--faint);font-size:13px}
+.seg{margin-left:auto;display:flex;background:var(--sunken);border-radius:7px;padding:2px}
+.seg span{padding:4px 10px;border-radius:5px;color:var(--muted)} .seg span.on{background:var(--surface);color:var(--text);box-shadow:0 1px 2px rgba(15,18,24,.08)}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);padding:16px 14px 6px;gap:8px}
+.kpi .l{font-size:12px;color:var(--muted)} .kpi .v{margin-top:4px;font-size:22px;letter-spacing:-.02em;font-weight:500}
+.chart{padding:0 14px 6px}
+.rows{border-top:1px solid var(--line);font-size:12.5px}
+.row{display:grid;grid-template-columns:96px 70px 64px 1fr 92px;align-items:center;padding:10px 14px;gap:8px}
+.row+.row{border-top:1px solid var(--line)}
+.side{display:inline-flex;height:20px;align-items:center;padding:0 7px;border-radius:6px;font-size:11.5px;font-weight:500}
+.side.long{background:var(--gain-soft);color:var(--gain)} .side.short{background:var(--loss-soft);color:var(--loss)}
+.tag{display:inline-flex;height:22px;align-items:center;gap:5px;padding:0 8px;border-radius:6px;background:var(--sunken);color:var(--muted);font-size:12px}
+.tag.warn{background:var(--loss-soft);color:var(--loss)}
+.float{position:absolute;left:-56px;bottom:-40px;width:300px;background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:16px}
+.float .hd{display:flex;justify-content:space-between;align-items:center;font-size:13px}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;margin:14px 0;font-size:12px}
+.kv span{display:block;color:var(--faint)} .kv b{font-weight:500;font-size:13.5px}
+.check{display:grid;gap:8px;border-top:1px solid var(--line);padding-top:12px;font-size:12.5px}
+.check div{display:flex;align-items:center;gap:8px}
+.check i{font-size:16px}
+
+/* sections */
+section{padding:112px 0}
+.h2{font-size:42px;line-height:1.08;letter-spacing:-.035em;font-weight:600;max-width:20ch}
+.sub{margin-top:16px;font-size:17px;line-height:1.6;color:var(--muted);max-width:56ch}
+
+.flow{margin-top:56px;display:grid;grid-template-columns:repeat(4,1fr);gap:40px}
+.flow h3{margin-top:14px;font-size:18px;font-weight:600;letter-spacing:-.015em}
+.flow p{margin-top:6px;font-size:14.5px;line-height:1.55;color:var(--muted)}
+.flow .ico{width:40px;height:40px;border-radius:10px;background:var(--accent-soft);color:var(--accent-ink);display:grid;place-items:center;font-size:20px}
+.frag{margin-top:18px;display:flex;flex-wrap:wrap;gap:6px}
+.map{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 8px;border:1px solid var(--line);border-radius:6px;font-size:12px;background:var(--surface)}
+.map i{color:var(--faint);font-size:12px}
+
+.panel{margin-top:48px;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.panel-top{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line);font-size:13px}
+.panel-body{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+.bars{padding:24px 24px 18px}
+.bars-grid{display:grid;grid-template-columns:repeat(7,1fr);align-items:end;gap:18px;height:220px;border-bottom:1px solid var(--line)}
+.bar{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:8px}
+.bar b{font-weight:400;font-size:12px}
+.bar i{display:block;width:100%;max-width:56px;border-radius:6px 6px 0 0}
+.axis{display:grid;grid-template-columns:repeat(7,1fr);gap:18px;margin-top:8px;font-size:12px;color:var(--faint);text-align:center}
+.by{border-left:1px solid var(--line);padding:20px 22px}
+.by .by-h{font-size:13px;font-weight:500;color:var(--muted)}
+.by ol{list-style:none;margin-top:14px;display:grid;gap:14px;font-size:14px}
+.by li{display:flex;justify-content:space-between;gap:12px}
+.by li span:first-child{color:var(--text)}
+
+.bento{margin-top:48px;display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+.cell{border-radius:16px;padding:28px;border:1px solid var(--line);background:var(--surface)}
+.cell h3{font-size:20px;font-weight:600;letter-spacing:-.02em} .cell p{margin-top:8px;font-size:14.5px;line-height:1.55;color:var(--muted);max-width:44ch}
+.c-rules{grid-column:span 7;background:var(--accent-soft);border-color:transparent}
+.c-prop{grid-column:span 5}
+.c-note{grid-column:span 12;background:var(--sunken);border-color:transparent;display:grid;grid-template-columns:minmax(0,4fr) minmax(0,7fr);gap:40px;align-items:center}
+.inner{margin-top:22px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px}
+.c-note .inner{margin-top:0}
+.rule{display:flex;align-items:center;gap:10px;padding:9px 0;font-size:14px}
+.rule+.rule{border-top:1px solid var(--line)}
+.rule i{font-size:18px}
+.rule .who{margin-left:auto;font-size:12px}
+.stat-line{display:flex;justify-content:space-between;align-items:baseline;padding:12px 0;font-size:14px}
+.stat-line+.stat-line{border-top:1px solid var(--line)}
+.stat-line b{font-weight:500}
+.pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:6px;font-size:12px;font-weight:500}
+.pill.no{background:var(--loss-soft);color:var(--loss)} .pill.ok{background:var(--gain-soft);color:var(--gain)} .pill.info{background:var(--accent-soft);color:var(--accent-ink)}
+.note-txt{font-size:15px;line-height:1.65}
+.note-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}
+
+.defs{margin-top:48px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:64px}
+.def{padding:22px 0;border-top:1px solid var(--line)}
+.def dt{font-size:14px;color:var(--muted)} .def dd{margin-top:8px;font-family:"Geist Mono",monospace;font-size:16px;line-height:1.5}
+.def dd em{font-style:normal;color:var(--accent-ink)}
+
+.split{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:56px;align-items:start}
+.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.tbl th{text-align:left;font-weight:500;color:var(--faint);font-size:12.5px;padding:10px 16px;background:var(--sunken)}
+.tbl td{padding:12px 16px;border-top:1px solid var(--line)}
+.tbl i{color:var(--faint)}
+.assets{margin-top:28px;display:flex;flex-wrap:wrap;gap:8px}
+.asset{display:inline-flex;gap:8px;align-items:center;height:34px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:13.5px}
+.asset span{color:var(--faint)}
+
+.faq{margin-top:40px;max-width:820px}
+.faq details{border-top:1px solid var(--line);padding:20px 0}
+.faq details:last-child{border-bottom:1px solid var(--line)}
+.faq summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:17px;font-weight:500}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary i{color:var(--faint);transition:transform .2s}
+.faq details[open] summary i{transform:rotate(45deg)}
+.faq p{margin-top:10px;font-size:15px;line-height:1.6;color:var(--muted);max-width:62ch}
+
+.close{border-top:1px solid var(--line);padding-block:96px}
+.close-in{display:flex;align-items:end;justify-content:space-between;gap:40px}
+.close h2{font-size:52px;line-height:1.04;letter-spacing:-.04em;font-weight:600;max-width:14ch}
+footer{border-top:1px solid var(--line);padding:48px 0 56px;font-size:14px;color:var(--muted)}
+.fcols{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:32px}
+.fcols h4{font-size:13px;font-weight:500;color:var(--text);margin-bottom:12px} .fcols a{display:block;padding:4px 0} .fcols a:hover{color:var(--text)}
+
+@media (max-width:900px){
+  .wrap{padding:0 20px} .links{display:none}
+  .hero,.split,.c-note{grid-template-columns:1fr} .compose{margin-right:0} .float{position:relative;left:0;bottom:0;margin-top:-24px;margin-left:16px;width:auto;max-width:300px}
+  .hero h1{font-size:40px} .flow{grid-template-columns:1fr 1fr} .panel-body{grid-template-columns:1fr} .by{border-left:0;border-top:1px solid var(--line)}
+  .bento{grid-template-columns:1fr} .c-rules,.c-prop,.c-note{grid-column:auto} .defs{grid-template-columns:1fr} .close-in{flex-direction:column;align-items:start} .close h2{font-size:38px} .fcols{grid-template-columns:1fr 1fr}
+  .row{grid-template-columns:80px 60px 1fr 80px} .row .hide-sm{display:none}
+  .kpis{grid-template-columns:1fr 1fr;row-gap:14px} .win-top{flex-wrap:wrap;height:auto;padding:8px 14px} .seg{margin-left:0}
+  .panel-top{flex-wrap:wrap} .panel-top .seg{max-width:100%;overflow-x:auto} .bars-grid,.axis{gap:8px}
+  .tbl th:nth-child(4),.tbl td:nth-child(4){display:none} .flow{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="nav">
+    <a class="brand" href="#"><span class="mark">K</span>Keel</a>
+    <nav class="links"><a href="#">Product</a><a href="#">Analytics</a><a href="#">Prop firms</a><a href="#">Pricing</a><a href="#">Changelog</a></nav>
+    <div class="end"><a href="#" class="muted">Log in</a><a href="#" class="btn btn-primary">Get started</a></div>
+  </header>
+
+  <main>
+  <div class="hero">
+    <div>
+      <h1>Find out what's working in your trading.</h1>
+      <p>Import your fills, see every stat to the cent, and grade each trade against your own rules.</p>
+      <div class="ctas"><a href="#" class="btn btn-primary">Get started</a><a href="#how" class="btn btn-quiet">See how it works</a></div>
+    </div>
+
+    <div class="compose" aria-label="Keel dashboard showing a sample week">
+      <div class="win">
+        <div class="win-top">
+          <span class="sel">Futures (live) <i class="ph ph-caret-down"></i></span>
+          <span class="sel mono">16-20 Nov 2026</span>
+          <span class="seg"><span>Gross</span><span class="on">Net</span></span>
+        </div>
+        <div class="kpis">
+          <div class="kpi"><div class="l">Net P&amp;L</div><div class="v mono gain">+$1,236.00</div></div>
+          <div class="kpi"><div class="l">Win rate</div><div class="v mono">50.0%</div></div>
+          <div class="kpi"><div class="l">Profit factor</div><div class="v mono">3.17</div></div>
+          <div class="kpi"><div class="l">Expectancy</div><div class="v mono gain">+$154.50</div></div>
+        </div>
+        <div class="chart">
+          <svg viewBox="0 0 700 170" width="100%" height="170" role="img" aria-label="Equity curve, sample week, from $50,000.00 to $51,236.00">
+            <defs><linearGradient id="fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#087A54" stop-opacity=".16"/><stop offset="1" stop-color="#087A54" stop-opacity="0"/></linearGradient></defs>
+            <g stroke="var(--line)"><line x1="0" x2="700" y1="20" y2="20"/><line x1="0" x2="700" y1="85" y2="85"/><line x1="0" x2="700" y1="150" y2="150"/></g>
+            <path d="M0 145 L85 98 L170 124 L255 90 L340 94 L425 25 L510 53 L595 54 L680 15 L680 160 L0 160Z" fill="url(#fill)"/>
+            <path d="M0 145 L85 98 L170 124 L255 90 L340 94 L425 25 L510 53 L595 54 L680 15" fill="none" stroke="var(--gain)" stroke-width="2" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="rows mono">
+          <div class="row"><span class="faint">20 Nov 10:15</span><span>ESZ5</span><span><span class="side long">Long</span></span><span class="hide-sm"><span class="tag" style="font-family:Geist">ORB</span></span><span class="gain" style="text-align:right">+$370.00</span></div>
+          <div class="row"><span class="faint">19 Nov 09:50</span><span>NQZ5</span><span><span class="side long">Long</span></span><span class="hide-sm"><span class="tag warn" style="font-family:Geist">Moved stop</span></span><span class="loss" style="text-align:right">−$275.00</span></div>
+          <div class="row"><span class="faint">18 Nov 09:45</span><span>ESZ5</span><span><span class="side short">Short</span></span><span class="hide-sm"><span class="tag" style="font-family:Geist">Fade</span></span><span class="gain" style="text-align:right">+$670.00</span></div>
+        </div>
+      </div>
+
+      <div class="float">
+        <div class="hd"><b style="font-weight:600">NQZ5 <span class="side long" style="margin-left:6px">Long</span></b><span class="mono faint" style="font-size:12px">19 Nov 09:50</span></div>
+        <div class="kv mono"><div><span>Entry</span><b>21,100.00</b></div><div><span>Exit</span><b>21,086.50</b></div><div><span>Net P&amp;L</span><b class="loss">−$275.00</b></div><div><span>Fees</span><b>$5.00</b></div></div>
+        <div class="check">
+          <div><i class="ph-fill ph-check-circle gain"></i>Entered on the range break</div>
+          <div><i class="ph-fill ph-x-circle loss"></i>Stop stays where it was placed</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </main>
+</div>
+
+<section id="how" style="background:var(--surface);border-block:1px solid var(--line)"><div class="wrap">
+  <h2 class="h2">Keel does the logging. You do the review.</h2>
+  <div class="flow">
+    <div><span class="ico"><i class="ph ph-upload-simple"></i></span><h3>Import</h3><p>Drop your broker's CSV export. Fills become trades, fees included.</p>
+      <div class="frag"><span class="map">Date/Time <i class="ph ph-arrow-right"></i> time</span><span class="map">B/S <i class="ph ph-arrow-right"></i> side</span></div></div>
+    <div><span class="ico"><i class="ph ph-tag"></i></span><h3>Journal</h3><p>Tag the setup, the mistake and how you felt, right on the trade.</p>
+      <div class="frag"><span class="tag">Fade</span><span class="tag warn">Moved stop</span><span class="tag">Impatient</span></div></div>
+    <div><span class="ico"><i class="ph ph-list-checks"></i></span><h3>Review</h3><p>Every rule of your strategy marked kept or broken.</p>
+      <div class="frag"><span class="pill ok"><i class="ph ph-check"></i>3 kept</span><span class="pill no"><i class="ph ph-x"></i>1 broken</span></div></div>
+    <div><span class="ico"><i class="ph ph-chart-bar"></i></span><h3>Improve</h3><p>Reports show which hours, setups and habits pay.</p>
+      <div class="frag"><span class="map">Best hour 09:00 <b class="mono gain" style="font-weight:500">+$1,160.00</b></span></div></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2 class="h2">See where the money comes from.</h2>
+  <p class="sub">Break results down by hour, session, setup, symbol or mistake, on gross or net, with a breakeven range you set.</p>
+  <div class="panel">
+    <div class="panel-top">
+      <span class="seg" style="margin-left:0"><span class="on">Hour</span><span>Session</span><span>Setup</span><span>Symbol</span><span>Mistake</span></span>
+      <span class="sel" style="margin-left:auto">Breakeven <span class="mono">$0.00 to $0.00</span></span>
+      <span class="faint" style="font-size:12px">Sample data</span>
+    </div>
+    <div class="panel-body">
+      <div class="bars">
+        <div class="bars-grid mono">
+          <div class="bar"><b class="gain">+1,160</b><i style="height:100%;background:var(--gain)"></i></div>
+          <div class="bar"><b class="gain">+120</b><i style="height:11%;background:var(--gain)"></i></div>
+          <div class="bar"><b class="loss">−39</b><i style="height:4%;background:var(--loss)"></i></div>
+          <div class="bar"><b class="faint">0</b></div>
+          <div class="bar"><b class="loss">−5</b><i style="height:2%;background:var(--loss)"></i></div>
+          <div class="bar"><b class="faint">0</b></div>
+          <div class="bar"><b class="faint">0</b></div>
+        </div>
+        <div class="axis mono"><span>09:00</span><span>10:00</span><span>11:00</span><span>12:00</span><span>13:00</span><span>14:00</span><span>15:00</span></div>
+      </div>
+      <div class="by">
+        <h3 class="by-h">Net P&amp;L by setup</h3>
+        <ol class="mono">
+          <li><span style="font-family:Geist">Opening range break</span><span class="gain">+$776.00</span></li>
+          <li><span style="font-family:Geist">Fade</span><span class="gain">+$670.00</span></li>
+          <li><span style="font-family:Geist">Pullback</span><span class="gain">+$320.00</span></li>
+          <li><span style="font-family:Geist">Range</span><span class="loss">−$5.00</span></li>
+          <li><span style="font-family:Geist">Breakout</span><span class="loss">−$525.00</span></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<section style="padding-top:0"><div class="wrap">
+  <h2 class="h2">Hold yourself to your own plan.</h2>
+  <div class="bento">
+    <div class="cell c-rules">
+      <h3>Rules, graded on every trade</h3>
+      <p>Write a strategy once. Each trade is checked against it, and the misses add up where you can see them.</p>
+      <div class="inner">
+        <div class="rule"><i class="ph-fill ph-check-circle gain"></i>Enter after the first 5-minute bar<span class="who faint mono">ORB</span></div>
+        <div class="rule"><i class="ph-fill ph-check-circle gain"></i>Risk no more than 1R per trade<span class="who faint mono">ORB</span></div>
+        <div class="rule"><i class="ph-fill ph-x-circle loss"></i>Stop stays where it was placed<span class="who faint mono">ORB</span></div>
+        <div class="rule"><i class="ph-fill ph-check-circle gain"></i>No new trade after two losses<span class="who faint mono">ORB</span></div>
+      </div>
+    </div>
+    <div class="cell c-prop">
+      <h3>Prop rules after every trade</h3>
+      <p>Static, end-of-day or trailing drawdown, daily loss and consistency, as your firm wrote them.</p>
+      <div class="inner">
+        <div class="stat-line"><span class="muted">Profit target</span><b class="mono">41% of $3,000.00</b></div>
+        <div class="stat-line"><span class="muted">Trailing drawdown</span><b class="mono gain">$2,000.00 left</b></div>
+        <div class="stat-line"><span class="muted">Best day share</span><span><b class="mono">54%</b> <span class="pill no" style="margin-left:6px">Over 50% limit</span></span></div>
+      </div>
+    </div>
+    <div class="cell c-note">
+      <div><h3>A notebook beside the trades</h3><p>Plan before the open, review after the close. Each entry links to the trades it covers.</p></div>
+      <div class="inner">
+        <div class="faint mono" style="font-size:12px">Daily review, Thu 19 Nov</div>
+        <p class="note-txt" style="margin-top:8px">Took the NQ breakout early and moved the stop when it came back. Second trade went nowhere. Tomorrow: the stop stays put, and I size down after a loss.</p>
+        <div class="note-meta"><span class="tag mono">NQZ5 09:50</span><span class="tag mono">ESZ5 13:00</span><span class="tag warn">Moved stop</span></div>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<section style="padding-top:0"><div class="wrap">
+  <h2 class="h2">Every number has a definition.</h2>
+  <p class="sub">Fees are in every figure, and each metric's formula is written down, so you can check the math yourself.</p>
+  <dl class="defs">
+    <div class="def"><dt>Net P&amp;L</dt><dd>(exit <em>-</em> entry) <em>×</em> qty <em>×</em> point value <em>-</em> fees</dd></div>
+    <div class="def"><dt>Expectancy</dt><dd>win% <em>×</em> avg win <em>-</em> loss% <em>×</em> avg loss</dd></div>
+    <div class="def"><dt>Realized R</dt><dd>net P&amp;L <em>÷</em> initial risk</dd></div>
+    <div class="def"><dt>Breakeven</dt><dd>from <em>≤</em> net <em>≤</em> to, in dollars or % of ROI</dd></div>
+  </dl>
+</div></section>
+
+<section style="background:var(--surface);border-block:1px solid var(--line)"><div class="wrap split">
+  <div>
+    <h2 class="h2">Bring the export your broker already gives you.</h2>
+    <p class="sub">Map the columns once. Keel matches fills into trades, first in first out, across five markets.</p>
+    <div class="assets">
+      <span class="asset"><b class="mono" style="font-weight:500">ES</b><span>Futures</span></span>
+      <span class="asset"><b class="mono" style="font-weight:500">AAPL</b><span>Stocks</span></span>
+      <span class="asset"><b class="mono" style="font-weight:500">SPY 600C</b><span>Options</span></span>
+      <span class="asset"><b class="mono" style="font-weight:500">EUR/USD</b><span>Forex</span></span>
+      <span class="asset"><b class="mono" style="font-weight:500">BTC-USD</b><span>Crypto</span></span>
+    </div>
+  </div>
+  <div class="panel" style="margin-top:0">
+    <div class="panel-top"><i class="ph ph-file-csv" style="font-size:18px"></i><b style="font-weight:500">fills-november.csv</b><span class="faint" style="margin-left:auto;font-size:12px">Column mapping</span></div>
+    <table class="tbl">
+      <thead><tr><th>In your file</th><th></th><th>In Keel</th><th>First row</th></tr></thead>
+      <tbody>
+        <tr><td>Date/Time</td><td><i class="ph ph-arrow-right"></i></td><td>Time</td><td class="mono faint">2026-11-16 09:41:00</td></tr>
+        <tr><td>Symbol</td><td><i class="ph ph-arrow-right"></i></td><td>Symbol</td><td class="mono faint">ESZ5</td></tr>
+        <tr><td>Buy/Sell</td><td><i class="ph ph-arrow-right"></i></td><td>Side</td><td class="mono faint">BOT</td></tr>
+        <tr><td>Quantity</td><td><i class="ph ph-arrow-right"></i></td><td>Quantity</td><td class="mono faint">2</td></tr>
+        <tr><td>Price</td><td><i class="ph ph-arrow-right"></i></td><td>Price</td><td class="mono faint">6010.00</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2 class="h2">Questions</h2>
+  <div class="faq">
+    <details open><summary>Which brokers work?<i class="ph ph-plus"></i></summary><p>Any export with time, symbol, side, quantity and price columns. Direct broker sync is on the roadmap.</p></details>
+    <details><summary>Where does my data go?<i class="ph ph-plus"></i></summary><p>In this release, files are read in your browser and nothing is uploaded.</p></details>
+    <details><summary>What does it cost?<i class="ph ph-plus"></i></summary><p>Pricing will be announced before accounts open.</p></details>
+    <details><summary>Does it handle prop firm accounts?<i class="ph ph-plus"></i></summary><p>Yes. Enter the rules from your evaluation and Keel tracks them after every trade.</p></details>
+  </div>
+</div></section>
+
+<div class="wrap close"><div class="close-in">
+  <h2>Start with last week's trades.</h2>
+  <a href="#" class="btn btn-primary" style="height:50px;padding:0 24px;font-size:16px">Get started</a>
+</div></div>
+
+<footer><div class="wrap fcols">
+  <div><a class="brand" href="#"><span class="mark">K</span>Keel</a><p style="margin-top:14px;max-width:32ch">A trading journal for the whole review loop.</p><p style="margin-top:20px">© 2026 Keel</p></div>
+  <div><h4>Product</h4><a href="#">Journal</a><a href="#">Analytics</a><a href="#">Strategies</a><a href="#">Prop firms</a></div>
+  <div><h4>Resources</h4><a href="#">Brokers</a><a href="#">Changelog</a><a href="#">Pricing</a></div>
+  <div><h4>Legal</h4><a href="#">Terms</a><a href="#">Privacy</a></div>
+</div></footer>
+</body>
+</html>
