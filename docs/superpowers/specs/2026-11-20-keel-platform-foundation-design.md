@@ -25,7 +25,7 @@ Data comes through a data layer that a real backend replaces in milestone 2, wit
 - Every module from both products has its place in the navigation and a real page.
 - Six modules work fully on sample data: Dashboard, Trades (log and detail), Calendar, Reports, Strategies, Notebook.
 - Five modules are honest structure-only pages, since they need backends or market data first: Backtesting, Replay, Prop firms, Mentor & Spaces, AI assistant.
-- A marketing site that sells the product in its committed visual world (Trading Floor). Its primary action is a working file drop that leads into the import flow.
+- A marketing site that sells the product in the approved light pro-trading look. Its primary action is "Get started". It hosts no tools: import lives in the app at `/app/import`.
 - A CSV import flow that works on the user's own file in the browser, so a visitor's own trades can appear in the app.
 - Correct, tested trading metrics. Numbers are the product.
 
@@ -236,28 +236,20 @@ Pages talk only to TanStack Query hooks over the interfaces. In milestone 2 a se
 
 ## 9. Visual direction
 
-**Landing and marketing:** the committed **Trading Floor** world. Its direction contract is at `.impeccable/surfaces/src-app-marketing-page-tsx.md`:
-- jacket-gold ground, navy ink, ticket card stock
-- B/S letters in circles, rubber-stamp states, trader-badge identity
-- Big Shoulders Display, Barlow, and a dot-matrix face for timestamps
+**Replaced on 2026-11-20 (user directive).** The first committed world, "Trading Floor" (gold ground, paper tickets, rubber stamps), was built and then rejected by the user: "it lacks that trading feel... the tickets idea i dont like it at all". Its sketches stay in `.impeccable/mocks/decision/` as history only.
 
-**App screens:** the same world, used with restraint for long working sessions. This is the planned translation; each app surface still gets its own Impeccable structure round inside the world before it's built.
-- Ticket-stock and navy surfaces.
-- Gold reserved for the primary action and the active state.
-- Trades render as ticket rows, and the trade detail as a full ticket.
-- Tags and mistakes render as stamps.
-- Timestamps use the dot-matrix face.
-- Dense, keyboard-first tables.
+**The committed look:** light, precise and pro-trading, in the company of Kraken Pro, Coinbase Advanced, Gemini ActiveTrader and Public, with Mobbin and HorizonX as the craft references. `DESIGN.md` documents the shipped system:
+- cool neutral ground, white surfaces, one cobalt accent
+- gain and loss colours that always travel with a sign
+- Geist for text, Geist Mono for every number
+- radius rule 6 / 10 / 16
+- motion with purpose: number ticker, line draw, sliding tabs
 
-**Landing file drop (my call, honest version of the signature interaction).**
-1. A dropped file is parsed in the browser.
-2. Columns are auto-guessed.
-3. The first few rows "print" into the ticket stack as unstamped tickets showing only raw facts: side, symbol, quantity, price, time. Stamps appear only on the labelled sample tickets, because a new visitor has no rules yet.
-4. "Map columns and continue" hands the parsed file to `/app/import` through IndexedDB.
+**Landing and marketing:** the approved mock is `.impeccable/mocks/rebrand/landing-v3.html`, and the direction contract is `.impeccable/surfaces/src-app-marketing-page-tsx.md`. The landing sells; it does not host tools. The CSV file drop that the Trading Floor landing carried was removed at the user's request ("it is a landing page...why is there upload field").
 
-The "or choose your broker" control records the broker's name, used to name the account, and opens short "how to export from this broker" help. It does not imply a preset.
-
-**Approved composition.** No image generation is available, so the build is code-led. The chosen sketch `.impeccable/mocks/decision/model-pick.html` is the composition the landing build matches and the finish review checks against.
+**App screens:** the same system in Operate mode, built for long working sessions.
+- The user picks the app shell and Dashboard layout from the options in `.impeccable/mocks/decision-app/` (see §12).
+- Every other app screen follows that layout. Each screen still gets its own Impeccable structure round and finish review.
 
 **Pricing page.** It shows the tier structure as "Pricing to be announced", without module gating or prices, until the user decides (backlog #3).
 
@@ -299,7 +291,7 @@ The "or choose your broker" control records the broker's name, used to name the 
 - Working name; real name later.
 - Positioning: "everything", with best practice left to me.
 - Next.js.
-- Visual direction: Trading Floor.
+- Visual direction: the light pro-trading look (Kraken Pro, Coinbase Advanced, Gemini ActiveTrader, Public), replacing Trading Floor on 2026-11-20 (§9).
 - Design sign-off:
   - The user approves the layout of the **app shell and the Dashboard**, chosen from options on the Impeccable decision page, before they are built.
   - The remaining app screens are built in that pattern, each with its own Impeccable layout step and finish review.
