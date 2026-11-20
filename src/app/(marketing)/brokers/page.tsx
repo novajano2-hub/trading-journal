@@ -51,7 +51,7 @@ export default function BrokersPage() {
   return (
     <ReadPage
       title="Brokers and file formats"
-      lede="Keel reads a CSV export from your broker, or a text file in the same layout. Any export that carries the columns below can be previewed. Excel files: export as CSV for now."
+      lede="The columns below are what Keel will read from a CSV export from your broker, or a text file in the same layout. File import arrives with the app. Excel files: export as CSV for now."
     >
       <nav aria-label="On this page" className="mt-8">
         <ul className="m-0 flex list-none flex-wrap gap-x-6 gap-y-1 p-0 text-[15px]">
@@ -90,8 +90,8 @@ export default function BrokersPage() {
             account statements.
           </li>
           <li className="pt-2 pl-1">
-            Bring the file to Keel. It is read in your browser, and nothing is
-            uploaded. The{' '}
+            Import opens with the app release. Files are read in your browser
+            and nothing is uploaded. The{' '}
             <Link href="/privacy" className={LINK}>
               privacy page
             </Link>{' '}
@@ -106,7 +106,11 @@ export default function BrokersPage() {
           makes for a sample export.
         </p>
         <div className="mt-2 max-w-[760px]">
-          <ColumnMapping preview={preview} fileName="fills-november.csv" />
+          <ColumnMapping
+            preview={preview}
+            fileName="fills-november.csv"
+            note="Sample data"
+          />
         </div>
         <dl className="m-0 mt-4 max-w-[68ch]">
           {REQUIRED.map(([name, note]) => (

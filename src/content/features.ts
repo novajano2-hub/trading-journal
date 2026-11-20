@@ -5,7 +5,6 @@ export interface FeatureContent {
   headline: string;
   lede: string;
   points: { title: string; body: string }[];
-  demo: 'tickets' | 'week' | 'prop' | 'none';
 }
 
 /**
@@ -15,9 +14,8 @@ export interface FeatureContent {
 export const FEATURES: Record<ModuleSlug, FeatureContent> = {
   journal: {
     slug: 'journal',
-    headline: 'Every fill, filed as a ticket.',
+    headline: 'Every fill, filed and reviewable.',
     lede: 'Bring in an export and Keel builds your trades from the fills, works out the P&L, and keeps each trade ready to review.',
-    demo: 'tickets',
     points: [
       {
         title: 'Fills become trades',
@@ -49,7 +47,6 @@ export const FEATURES: Record<ModuleSlug, FeatureContent> = {
     slug: 'analytics',
     headline: 'Find the pattern in your own results.',
     lede: 'Every figure is computed from your filed trades, and every metric is defined in the app beside the number.',
-    demo: 'week',
     points: [
       {
         title: 'Breakeven range',
@@ -81,7 +78,6 @@ export const FEATURES: Record<ModuleSlug, FeatureContent> = {
     slug: 'strategies',
     headline: 'Write your rules once. Grade every trade.',
     lede: 'A strategy is your rules in your words. Each trade gets checked against them, and the misses add up where you can see them.',
-    demo: 'tickets',
     points: [
       {
         title: 'Rules in four groups',
@@ -113,7 +109,6 @@ export const FEATURES: Record<ModuleSlug, FeatureContent> = {
     slug: 'notebook',
     headline: 'Notes beside the trades they describe.',
     lede: 'A journal of the day, kept next to the fills. Write the plan before the open and the review after the close.',
-    demo: 'none',
     points: [
       {
         title: 'Three templates',
@@ -137,7 +132,6 @@ export const FEATURES: Record<ModuleSlug, FeatureContent> = {
     slug: 'prop-firms',
     headline: 'Your challenge rules, checked after every trade.',
     lede: 'Enter the rules your firm gave you for an account. Keel measures that account’s trades against them and says how much room is left.',
-    demo: 'prop',
     points: [
       {
         title: 'Your rules, per account',
@@ -165,7 +159,6 @@ export const FEATURES: Record<ModuleSlug, FeatureContent> = {
     slug: 'backtesting',
     headline: 'Test a setup before it costs you money.',
     lede: 'Backtesting is being built. The page in the app is a placeholder that shows where it will sit.',
-    demo: 'none',
     points: [
       {
         title: 'A session per idea',
@@ -185,7 +178,6 @@ export const FEATURES: Record<ModuleSlug, FeatureContent> = {
     slug: 'replay',
     headline: 'Step back through a trade, bar by bar.',
     lede: 'Replay is being built. The page in the app is a placeholder that shows where it will sit.',
-    demo: 'none',
     points: [
       {
         title: 'One trade at a time',
@@ -205,7 +197,6 @@ export const FEATURES: Record<ModuleSlug, FeatureContent> = {
     slug: 'mentors',
     headline: 'Share a journal with a mentor, or a room.',
     lede: 'Mentor and Spaces are being built. The page in the app is a placeholder that shows where they will sit.',
-    demo: 'none',
     points: [
       {
         title: 'Share with a mentor',

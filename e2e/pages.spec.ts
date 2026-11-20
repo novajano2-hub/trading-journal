@@ -140,3 +140,12 @@ test('no route overflows at any width', async ({ page }) => {
     }
   }
 });
+
+test('privacy and brokers claim no file drop today', async ({ page }) => {
+  for (const path of ['/privacy', '/brokers']) {
+    await page.goto(path);
+    expect(await page.locator('main').innerText(), path).not.toMatch(
+      /\bdrop\b/i,
+    );
+  }
+});

@@ -9,8 +9,12 @@ export const CHANGELOG_AS_OF = '2026-11-20';
 /** Every entry is a statement that is true as of CHANGELOG_AS_OF. */
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    title: 'Redesigned site',
+    body: 'A light look built around live product views. The CSV drop moves into the app’s import, which arrives with the app.',
+  },
+  {
     title: 'This public site',
-    body: 'The Keel site: the landing page with a drop slot that reads your own CSV into tickets, a page for each module, and pages for pricing, brokers, this changelog, and the terms and privacy drafts.',
+    body: 'The Keel site: the landing page, a page for each module, and pages for pricing, brokers, this changelog, and the terms and privacy drafts.',
   },
   {
     title: 'Written-down metric definitions',
@@ -18,6 +22,6 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   },
   {
     title: 'The trading engine',
-    body: 'Keel builds trades from raw fills, works out P&L and the standard performance metrics, and checks results against prop-firm rules such as daily loss and drawdown limits. The engine runs when the site is built; files you drop do not reach it yet.',
+    body: 'Keel builds trades from raw fills, works out P&L and the standard performance metrics, and checks results against prop-firm rules such as daily loss and drawdown limits. The engine runs when the site is built; no file you add reaches it yet.',
   },
 ];

@@ -4,7 +4,7 @@ import { READ_P, ReadPage, ReadSection } from '@/components/site/read-page';
 
 export const metadata: Metadata = {
   title: 'Privacy',
-  description: 'What happens to the files you drop on Keel in this release.',
+  description: 'What happens to files you bring to Keel in this release.',
 };
 
 export default function PrivacyPage() {
@@ -15,15 +15,13 @@ export default function PrivacyPage() {
     >
       <ReadSection id="files" title="Your files stay on this device">
         <p className={READ_P}>
-          When you drop a CSV or text file on Keel, your browser reads it to
-          preview its first rows. Nothing is uploaded.
+          File import opens with the app release. When it does, your browser
+          reads the file on this device and nothing is uploaded.
         </p>
         <p className={READ_P}>
-          If you choose &ldquo;Map columns and continue&rdquo;, the file itself,
-          every column of it, is kept in IndexedDB, a database inside your
-          browser, on this device. It stays there until you remove it on the
-          import page or clear this site&apos;s data. No trades are built from
-          it yet. Only CSV or text files are accepted.
+          A file saved earlier in this browser stays in IndexedDB on this device
+          until you remove it on the import page or clear this site&apos;s data.
+          Only CSV or text files are accepted.
         </p>
       </ReadSection>
       <ReadSection id="accounts" title="Accounts">

@@ -77,62 +77,61 @@ export default function ImportPage() {
           Import
         </h1>
 
-        <div
-          aria-live="polite"
-          className="mt-8 rounded-card border border-line bg-surface-1 p-6 shadow-[var(--shadow)]"
-        >
+        <div className="mt-8 rounded-card border border-line bg-surface-1 p-6 shadow-[var(--shadow)]">
           <h2 className="border-b border-line pb-3 text-[13px] font-medium text-muted">
             Waiting to be filed
           </h2>
-          {waiting.kind === 'checking' ? (
-            <p className="mt-4 text-[16px] text-muted">
-              Checking this browser for your file…
-            </p>
-          ) : waiting.kind === 'file' ? (
-            <>
-              <p className="mt-4 flex items-start gap-3 text-[16px] leading-snug">
-                <FileText
-                  {...ICON}
-                  size={24}
-                  className="mt-px shrink-0 text-muted"
-                />
-                <span>
-                  Received{' '}
-                  <strong className="font-semibold">{waiting.name}</strong> (
-                  <span className="font-mono">{kb(waiting.size)} KB</span>),
-                  stored only in this browser.
-                </span>
+          <div aria-live="polite">
+            {waiting.kind === 'checking' ? (
+              <p className="mt-4 text-[16px] text-muted">
+                Checking this browser for your file…
               </p>
-              <p className="mt-2 pl-9 text-[14.5px] leading-snug text-muted">
-                Column mapping opens with the import release.
-              </p>
-              <button
-                type="button"
-                onClick={remove}
-                className="mt-5 ml-9 inline-flex h-11 cursor-pointer items-center gap-2 rounded-control border border-line-2 bg-surface-1 px-[18px] text-[15px] font-medium transition-colors hover:border-faint"
-              >
-                <Trash {...ICON} size={18} />
-                Remove file
-              </button>
-            </>
-          ) : (
-            <>
-              <p
-                ref={noneRef}
-                tabIndex={-1}
-                className="mt-4 text-[16px] focus-visible:outline-offset-4"
-              >
-                No file waiting.
-              </p>
-              <Link
-                href="/"
-                className="mt-3 inline-flex min-h-11 items-center gap-2 text-[15px] font-medium text-accent-ink"
-              >
-                <ArrowLeft {...ICON} size={16} />
-                Back to the home page
-              </Link>
-            </>
-          )}
+            ) : waiting.kind === 'file' ? (
+              <>
+                <p className="mt-4 flex items-start gap-3 text-[16px] leading-snug">
+                  <FileText
+                    {...ICON}
+                    size={24}
+                    className="mt-px shrink-0 text-muted"
+                  />
+                  <span>
+                    Received{' '}
+                    <strong className="font-semibold">{waiting.name}</strong> (
+                    <span className="font-mono">{kb(waiting.size)} KB</span>),
+                    stored only in this browser.
+                  </span>
+                </p>
+                <p className="mt-2 pl-9 text-[14.5px] leading-snug text-muted">
+                  Column mapping opens with the import release.
+                </p>
+                <button
+                  type="button"
+                  onClick={remove}
+                  className="mt-5 ml-9 inline-flex h-11 cursor-pointer items-center gap-2 rounded-control border border-line-2 bg-surface-1 px-[18px] text-[15px] font-medium transition-colors hover:border-faint"
+                >
+                  <Trash {...ICON} size={18} />
+                  Remove file
+                </button>
+              </>
+            ) : (
+              <>
+                <p
+                  ref={noneRef}
+                  tabIndex={-1}
+                  className="mt-4 text-[16px] focus-visible:outline-offset-4"
+                >
+                  No file waiting.
+                </p>
+                <Link
+                  href="/"
+                  className="mt-3 inline-flex min-h-11 items-center gap-2 text-[15px] font-medium text-accent-ink"
+                >
+                  <ArrowLeft {...ICON} size={16} />
+                  Back to the home page
+                </Link>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Outside the polite region above, so the alert is announced once. */}

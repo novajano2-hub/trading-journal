@@ -25,9 +25,12 @@ function cell(ticket: PreviewTicket | undefined, field: PreviewField): string {
 export function ColumnMapping({
   preview,
   fileName,
+  note = 'Column mapping',
 }: {
   preview: Preview;
   fileName: string;
+  /** The label at the right of the file bar. */
+  note?: string;
 }) {
   const first = preview.tickets[0];
   const rows = KEEL_COLUMNS.flatMap(([field, keel]) => {
@@ -41,7 +44,7 @@ export function ColumnMapping({
       <div className="flex items-center gap-2.5 border-b border-line px-[18px] py-3.5">
         <FileCsv size={18} className="text-muted" aria-hidden="true" />
         <b className="text-sm font-medium">{fileName}</b>
-        <span className="ml-auto text-xs text-faint">Column mapping</span>
+        <span className="ml-auto text-xs text-faint">{note}</span>
       </div>
       <div className="overflow-x-auto">
         <table aria-label="Column mapping" className="w-full text-[13.5px]">
