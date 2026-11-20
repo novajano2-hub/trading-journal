@@ -53,8 +53,8 @@ export default function BrokersPage() {
       title="Brokers and file formats"
       lede={
         <>
-          Keel reads a CSV or Excel export from your broker. It does not matter
-          which broker, as long as the file carries the columns below.
+          Keel reads a CSV or Excel export from your broker. Any export that
+          carries the columns below can be read.
         </>
       }
     >
@@ -156,10 +156,7 @@ export default function BrokersPage() {
 
       <ReadSection id="sync" title="Broker sync">
         <p className={READ_P}>Direct broker sync is on the roadmap.</p>
-        <p className={READ_P}>
-          Until then, a file export is the way in, and it works with any broker
-          that lets you download your fills.
-        </p>
+        <p className={READ_P}>Until then, a file export is the way in.</p>
       </ReadSection>
     </ReadPage>
   );
