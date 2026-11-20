@@ -192,6 +192,31 @@ Point values and currency:
 
 `/brokers` states exactly this: generic import works with any export that has these columns. It names no brokers as "supported" until a preset is tested (backlog #11).
 
+**Platform alignment (2026-11-20, user directive: "make them like those two platforms").** Where TradeZella's help centre documents a calculation, Keel matches it, and this replaces the matching "my calls" above. MyTradingJourney publishes none of these definitions.
+
+| Behaviour | Keel now |
+|---|---|
+| Breakeven | A From/To range in **$ or % of Net ROI**, asymmetric allowed (default 0..0). It applies to trades **and days**: days inside the range are flat/"blue" |
+| Expectancy | Win% × Avg Win − Loss% × Avg Loss |
+| Gross / net | A switch: gross excludes fees and commissions. Every P&L metric follows it, except prop-firm rules, which always use net |
+| R | **Planned R** (needs both target and stop) and **Realized R** (needs stop / initial risk), reported separately |
+| Time reports | Time of day in 5/15/30/60-minute buckets, by **entry or exit** time |
+| Prop setup | Static / EOD / Trailing drawdown, daily loss in $ or % (the UI converts % to $ against the starting balance), an optional best-day consistency rule, and Active/Breached status |
+| Timezone | The user's display timezone drives day and time bucketing; imports choose their own source timezone (Plan 2) |
+
+Still Keel's own, because neither platform documents them:
+- Breakevens are excluded from win %.
+- Profit factor shows "—" with no losses.
+- Drawdown is on closed trades, as a % of peak.
+- FIFO trade grouping.
+- Breakevens don't affect streaks.
+- Session hours.
+- The trailing lock at the starting balance.
+- Daily loss breaches at the intraday dip.
+- The prop "near" warning.
+
+Sources: help.tradezella.com articles on dashboard widgets, reports overview, breakeven range, trade expectancy, the Day & Time report, global settings, and PropFirm Sync setup.
+
 ## 8. Data layer
 
 `src/data` defines repository interfaces (`TradesRepo`, `StrategiesRepo`, `JournalRepo`, `AccountsRepo`, `ImportRepo`). Milestone 1 ships one implementation, **LocalRepository**:
