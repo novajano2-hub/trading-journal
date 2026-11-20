@@ -1,241 +1,356 @@
 ---
 name: Keel
-description: A trading journal that files every trade as a ticket, in the world of open-outcry pit ephemera.
+description: A light, precise, pro-trading journal. One cobalt accent, Geist type, Geist Mono for every number.
 colors:
-  jacket-gold: "#f2b705"
-  floor-navy: "#151a2d"
-  ticket-stock: "#f4f6f8"
-  buy-blue: "#2350c8"
-  sell-red: "#d2352a"
-  time-clock-purple: "#6b3fa0"
-  card-rule: "#c9d1db"
+  bg: "#f6f7f9"
+  surface: "#ffffff"
+  sunken: "#eff1f4"
+  line: "#e3e6eb"
+  line-strong: "#d3d8df"
+  text: "#0f1218"
+  muted: "#4f5865"
+  faint: "#687080"
+  cobalt: "#2550e0"
+  cobalt-hover: "#1e44c4"
+  cobalt-soft: "#eaf0fe"
+  cobalt-ink: "#1b3fb8"
+  on-cobalt: "#ffffff"
+  gain: "#087a54"
+  gain-soft: "#e6f4ee"
+  loss: "#c8283a"
+  loss-soft: "#fbebed"
+  dark-bg: "#0e1014"
+  dark-surface: "#15181e"
+  dark-sunken: "#1b1f26"
+  dark-line: "#262b33"
+  dark-line-strong: "#323843"
+  dark-text: "#eceef2"
+  dark-muted: "#a3aab6"
+  dark-faint: "#8e95a1"
+  dark-cobalt: "#3866e6"
+  dark-cobalt-hover: "#2f5bd8"
+  dark-cobalt-soft: "#1a2440"
+  dark-cobalt-ink: "#9db6ff"
+  dark-gain: "#3fc08e"
+  dark-gain-soft: "#14281f"
+  dark-loss: "#f06a78"
+  dark-loss-soft: "#2e161a"
 typography:
   display-hero:
-    fontFamily: "Big Shoulders, Arial Narrow, sans-serif"
-    fontSize: "7.375rem"
-    fontWeight: 900
-  display-section:
-    fontFamily: "Big Shoulders, Arial Narrow, sans-serif"
-    fontSize: "4.5rem"
-    fontWeight: 900
-    lineHeight: 0.9
-    letterSpacing: "-0.005em"
-  display-nav:
-    fontFamily: "Big Shoulders, Arial Narrow, sans-serif"
-    fontSize: "21px"
-    fontWeight: 700
-    letterSpacing: "0.06em"
-  body:
-    fontFamily: "Barlow, system-ui, sans-serif"
-    fontSize: "17px"
-    fontWeight: 500
-    lineHeight: 1.6
-  lede:
-    fontFamily: "Barlow, system-ui, sans-serif"
-    fontSize: "21px"
-    fontWeight: 500
-    lineHeight: 1.45
-  label:
-    fontFamily: "Barlow, system-ui, sans-serif"
-    fontSize: "11px"
-    fontWeight: 700
-    letterSpacing: "0.2em"
-  clock:
-    fontFamily: "DotGothic16, monospace"
-    fontSize: "17px"
+    fontFamily: "Geist, system-ui, sans-serif"
+    fontSize: "clamp(40px, calc(3.125vw + 18px), 58px)"
+    fontWeight: 600
+    lineHeight: 1.04
+    letterSpacing: "-0.04em"
+  display-page:
+    fontFamily: "Geist, system-ui, sans-serif"
+    fontSize: "clamp(36px, calc(2.6vw + 16px), 52px)"
+    fontWeight: 600
+    lineHeight: 1.06
+    letterSpacing: "-0.04em"
+  headline:
+    fontFamily: "Geist, system-ui, sans-serif"
+    fontSize: "42px"
+    fontWeight: 600
+    lineHeight: 1.08
+    letterSpacing: "-0.035em"
+  headline-sub:
+    fontFamily: "Geist, system-ui, sans-serif"
+    fontSize: "26px"
+    fontWeight: 600
+    lineHeight: 1.15
+    letterSpacing: "-0.03em"
+  title:
+    fontFamily: "Geist, system-ui, sans-serif"
+    fontSize: "22px"
+    fontWeight: 600
+    lineHeight: 1.2
+    letterSpacing: "-0.025em"
+  lead:
+    fontFamily: "Geist, system-ui, sans-serif"
+    fontSize: "18px"
     fontWeight: 400
-    letterSpacing: "0.06em"
+    lineHeight: 1.55
+  body-reading:
+    fontFamily: "Geist, system-ui, sans-serif"
+    fontSize: "16.5px"
+    fontWeight: 400
+    lineHeight: 1.7
+  body:
+    fontFamily: "Geist, system-ui, sans-serif"
+    fontSize: "15.5px"
+    fontWeight: 400
+    lineHeight: 1.65
+  ui:
+    fontFamily: "Geist, system-ui, sans-serif"
+    fontSize: "15px"
+    fontWeight: 500
+  ui-small:
+    fontFamily: "Geist, system-ui, sans-serif"
+    fontSize: "13px"
+    fontWeight: 500
+  label:
+    fontFamily: "Geist, system-ui, sans-serif"
+    fontSize: "12px"
+    fontWeight: 400
+  ui-14:
+    fontFamily: "Geist, system-ui, sans-serif"
+    fontSize: "14px"
+    fontWeight: 400
+  axis:
+    fontFamily: "Geist Mono, ui-monospace, monospace"
+    fontSize: "11px"
+    fontWeight: 400
+    fontFeature: "tnum"
+  figure-kpi:
+    fontFamily: "Geist Mono, ui-monospace, monospace"
+    fontSize: "22px"
+    fontWeight: 500
+    letterSpacing: "-0.02em"
+    fontFeature: "tnum"
+  figure-row:
+    fontFamily: "Geist Mono, ui-monospace, monospace"
+    fontSize: "12.5px"
+    fontWeight: 400
+    fontFeature: "tnum"
 rounded:
-  focus: "2px"
-  ticket: "3px"
-  button: "4px"
-  mouth: "5px"
-  slot: "6px"
-  badge: "8px"
-  mark: "9999px"
+  chip: "6px"
+  control: "10px"
+  card: "16px"
 spacing:
-  gutter-mobile: "16px"
-  gutter-desktop: "56px"
-  header-height: "88px"
-  hero-gap: "48px"
-  field-pad: "12px"
-  card-pad: "24px"
+  page-gutter-mobile: "20px"
+  page-gutter: "40px"
+  container: "1280px"
+  header: "64px"
+  row-x: "14px"
 components:
-  button-header-primary:
-    backgroundColor: "{colors.floor-navy}"
-    textColor: "{colors.jacket-gold}"
-    typography: "{typography.display-nav}"
-    rounded: "{rounded.button}"
-    padding: "12px 22px"
-  button-slot-go:
-    backgroundColor: "{colors.jacket-gold}"
-    textColor: "{colors.floor-navy}"
-    rounded: "{rounded.button}"
-    padding: "12px 20px"
-    height: "48px"
-  button-closed:
-    backgroundColor: "{colors.ticket-stock}"
-    textColor: "{colors.floor-navy}"
-    rounded: "{rounded.button}"
-    padding: "12px 24px"
-    height: "56px"
-  ticket:
-    backgroundColor: "{colors.ticket-stock}"
-    textColor: "{colors.floor-navy}"
-    rounded: "{rounded.ticket}"
-    padding: "16px 18px"
-    height: "236px"
-  ticket-slot:
-    backgroundColor: "{colors.floor-navy}"
-    textColor: "{colors.ticket-stock}"
-    rounded: "{rounded.slot}"
-    padding: "22px 24px"
-  input-field:
-    backgroundColor: "{colors.ticket-stock}"
-    textColor: "{colors.floor-navy}"
-    rounded: "{rounded.ticket}"
-    padding: "0 12px"
-    height: "48px"
-  badge-logo:
-    backgroundColor: "{colors.ticket-stock}"
-    textColor: "{colors.floor-navy}"
-    rounded: "{rounded.badge}"
-    size: "118px"
-    height: "64px"
-  footer:
-    backgroundColor: "{colors.floor-navy}"
-    textColor: "{colors.ticket-stock}"
-    padding: "48px 56px"
+  button-primary:
+    backgroundColor: "{colors.cobalt}"
+    textColor: "{colors.on-cobalt}"
+    rounded: "{rounded.control}"
+    height: "44px"
+    padding: "0 18px"
+  button-primary-hover:
+    backgroundColor: "{colors.cobalt-hover}"
+  button-secondary:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.control}"
+    height: "44px"
+    padding: "0 18px"
+  button-ghost:
+    textColor: "{colors.text}"
+    rounded: "{rounded.control}"
+    height: "44px"
+  button-ghost-hover:
+    backgroundColor: "{colors.sunken}"
+  chip-neutral:
+    backgroundColor: "{colors.sunken}"
+    textColor: "{colors.muted}"
+    rounded: "{rounded.chip}"
+    height: "22px"
+    padding: "0 8px"
+  chip-accent:
+    backgroundColor: "{colors.cobalt-soft}"
+    textColor: "{colors.cobalt-ink}"
+    rounded: "{rounded.chip}"
+    height: "22px"
+  chip-gain:
+    backgroundColor: "{colors.gain-soft}"
+    textColor: "{colors.gain}"
+    rounded: "{rounded.chip}"
+    height: "22px"
+  chip-loss:
+    backgroundColor: "{colors.loss-soft}"
+    textColor: "{colors.loss}"
+    rounded: "{rounded.chip}"
+    height: "22px"
+  card:
+    backgroundColor: "{colors.surface}"
+    rounded: "{rounded.card}"
+  segmented:
+    backgroundColor: "{colors.sunken}"
+    textColor: "{colors.muted}"
+    padding: "2px"
+  segmented-active:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
 ---
 
 # Design System: Keel
 
 ## Overview
 
-**Creative North Star: "The Trading Floor"**
+**Creative North Star: "Precise and Plain"** names a register, not a metaphor world. Keel looks like a modern pro trading product: light, exact, quiet. The surface is pale cool grey with white panels, hairline borders, one cobalt accent, and green and red reserved for money. Every figure is set in Geist Mono and lines up in columns. The product itself is the illustration: a real-looking app window with labelled sample data carries the marketing pages.
 
-Keel is open-outcry pit ephemera: a jacket-gold field, floor-navy ink, and ticket card stock that trades are filed on. Every trade is a ticket that gets filed, stamped and reviewed, and the interface is built from the objects of that ritual: order tickets with ruled field grids, rubber stamps, a navy ticket slot, a trader badge, a punched recap sheet, a rack of cards standing in pockets.
+Light is the default regardless of OS. Dark is an explicit toggle (`data-theme="dark"` on `<html>`, saved as `keel-theme`, applied before first paint). It is the same system with the same roles, not a second design.
 
-The marketing site is loud and flat. Gold floods the page ground, navy carries every word, and condensed uppercase display type does the shouting. Surfaces are physical paper and metal, so depth is a contact shadow under a card, never a glow. Motion is rare and mechanical: a ticket printing into the stack, a card lifting out of its pocket.
+Rejected, and recorded so they are not rebuilt: metaphor worlds (the earlier trading-floor tickets and stamps), dark mesh hero clichés, editorial serif display type, and anything that reads as AI-generated.
 
 **Key Characteristics:**
-- Gold ground, navy ink, stock surfaces; the three never trade roles on the marketing site.
-- Condensed black uppercase display face against a plain humanist text face.
-- Buy and sell are always a circled letter, never colour alone; losses print hatched, gains solid.
-- States are stamps (RULE BROKEN, A+ SETUP) and dashed rules for anything not yet open.
-- Timestamps are set in a dot-matrix face, in purple, and nowhere else.
+- Cool off-white page, white panels, hairline borders; depth from border first, shadow only on the product shot.
+- One accent: cobalt. Gain green and loss red mean money and nothing else.
+- Geist for words, Geist Mono with tabular figures for every number.
+- Tight negative tracking on large headings, generous leading on body.
+- Motion is short and decelerating; it announces arrival and selection, then stops.
 
 ## Colors
 
-A three-colour field (gold, navy, stock) with two directional inks and one clock ink; everything else is a tint of navy.
+A cool neutral field, a single cobalt voice, and a green/red pair that carries trading sign. Tokens live in `src/styles/theme.css` as CSS variables and are exposed to Tailwind as `bg`, `surface-1`, `sunken`, `line`, `line-2`, `text`, `muted`, `faint`, `accent*`, `gain*`, `loss*`. Frontmatter names above are the descriptive aliases (`surface` = `--surface-1`, `line-strong` = `--line-2`, `cobalt` = `--accent`).
 
 ### Primary
-- **Jacket Gold** (#f2b705): the marketing page ground and scrollbar track, the ticket slot's "go" button, the fed slot mouth, and the focus ring and selection on navy surfaces.
-
-### Secondary
-- **Buy Blue** (#2350c8): buy side only, always inside the circled B.
-- **Sell Red** (#d2352a): sell side inside the circled S, and the RULE BROKEN stamp.
-
-### Tertiary
-- **Time-Clock Purple** (#6b3fa0): timestamps only, always in the dot-matrix face.
+- **Cobalt** (#2550e0 light, #3866e6 dark): primary buttons, selection and caret, focus ring, links on hover. Nothing else is accent-coloured.
+- **Cobalt Hover** (#1e44c4 light, #2f5bd8 dark): primary button hover.
+- **Cobalt Soft** (#eaf0fe light, #1a2440 dark): accent chip fill.
+- **Cobalt Ink** (#1b3fb8 light, #9db6ff dark): text on cobalt-soft, accordion title hover.
+- **On Cobalt** (#ffffff): text on cobalt fills and selected text.
 
 ### Neutral
-- **Floor Navy** (#151a2d): all text and borders on gold and stock, the slot, footer and primary header button; shadows are navy at low alpha.
-- **Ticket Stock** (#f4f6f8): ticket, form card, badge and note surfaces; text on navy.
-- **Card Rule** (#c9d1db): field grid lines and the ruled lines on cards.
+- **Page** (#f6f7f9 / #0e1014): page background, scrollbar track.
+- **Surface** (#ffffff / #15181e): cards, app window, secondary buttons, active segment.
+- **Sunken** (#eff1f4 / #1b1f26): segmented and tab tracks, neutral chips, ghost hover.
+- **Line** (#e3e6eb / #262b33): hairline borders and row dividers.
+- **Line Strong** (#d3d8df / #323843): control borders, scrollbar thumb.
+- **Text** (#0f1218 / #eceef2): headings and primary copy.
+- **Muted** (#4f5865 / #a3aab6): body copy, labels, inactive tabs.
+- **Faint** (#687080 / #8e95a1): timestamps, captions, chevrons, empty values.
+
+### Signal
+- **Gain** (#087a54 / #3fc08e) on **Gain Soft** (#e6f4ee / #14281f): positive P&L, long side, kept rules, equity line.
+- **Loss** (#c8283a / #f06a78) on **Loss Soft** (#fbebed / #2e161a): negative P&L, short side, mistake tags, broken rules.
 
 ### Named Rules
-**The Circled Letter Rule.** Buy blue and sell red never appear alone. They sit in a circled B or S, or in a stamp, so the meaning survives without colour.
-**The Clock Ink Rule.** Purple is for timestamps and nothing else.
-**The Ground Rule.** Gold is the ground, navy is the ink. A gold element on gold, or a navy body on navy without the flipped focus ring, is wrong.
-
-### Cross-surface rule (app screens, planned; not yet built)
-The app screens will reuse this world with restraint for long working sessions: ticket-stock and navy surfaces; gold reserved for the primary action and the active state; trades as ticket rows; tags and mistakes as stamps; timestamps in the dot-matrix face; dense, keyboard-first tables. This is the direction contract for a later build, not something the current code contains.
+**The One Accent Rule.** Cobalt is the only brand colour. Never add a second hue for emphasis, category or decoration.
+**The Sign Rule.** Green and red appear only where a number is positive or negative, or a rule is kept or broken. Zero is uncoloured. Never use them for status, branding or ornament.
+**The Never Colour Alone Rule.** Sign and state also carry text or an icon (a leading sign in the figure, "Kept" / "Broken" for screen readers, Long / Short labels).
 
 ## Typography
 
-**Display Font:** Big Shoulders (optical size pinned to 72; Arial Narrow, sans-serif fallback)
-**Body Font:** Barlow (400-700; system-ui fallback)
-**Label/Mono Font:** DotGothic16, a dot-matrix face (monospace fallback)
+**Text Font:** Geist (via `next/font/google`, `--font-geist-sans`, fallback system-ui, sans-serif)
+**Number Font:** Geist Mono (`--font-geist-mono`, fallback ui-monospace, monospace). Used for every figure: P&L, percentages, ratios, times, symbols, ranges. `tabular-nums` is applied to `.font-mono` and `.tnum` so columns align.
 
-**Character:** A pit-board condensed face for shouting and badges, a calm grotesque for reading, and a dot-matrix clock face for the time printed on a ticket. Tabular numerals are on for the whole body.
+**Character:** Neutral grotesque for words, a matched mono for data. Weight does the hierarchy (400, 500, 600) with heavy negative tracking on display sizes. No uppercase labels, no letter-spaced small caps.
 
 ### Hierarchy
-- **Display hero** (900, min(20.5vw, 7.375rem) on phones, up to 118px on desktop, uppercase): the landing headline.
-- **Display section** (900, clamp(2.75rem, 5vw + 0.75rem, 4.5rem), 0.9): landing H2s. The closing line runs clamp(3.25rem, 8vw + 0.5rem, 6rem) at 0.88; feature page H1s clamp(2.75rem, 7vw + 0.5rem, 6rem) at 0.9.
-- **Nav and buttons** (700-900, 21-26px, 0.05-0.06em tracking, uppercase): navigation, buttons, stamps.
-- **Lede** (500, 18px phone, 21px from md, 1.45): under headlines, capped near 34em.
-- **Body** (500, 17px, 1.6): reading text, capped at 68ch.
-- **Label** (700, 11px, 0.16-0.2em, uppercase): ticket field names and the Filed/Unfiled flag.
-- **Clock** (DotGothic16 400, 15-17px, 0.06em, uppercase, purple): ticket timestamps in the format DD MMM HH:MM:SS.
+The ramp as shipped. Half-pixel sizes are deliberate steps between 15 and 17, not accidents; use only values in this table.
+
+| Role | Size | Weight | Leading | Tracking | Use |
+|---|---|---|---|---|---|
+| Hero display | clamp(40px, 3.125vw + 18px, 58px) | 600 | 1.04 | -0.04em | Landing hero |
+| Page display | clamp(36px, 2.6vw + 16px, 52px) | 600 | 1.06 | -0.04em | Page and auth h1 |
+| Closing display | clamp(38px, 5vw, 52px) | 600 | 1.04 | -0.04em | Closing section |
+| Section heading | clamp(2rem, 1.6rem + 1.6vw, 2.625rem) | 600 | 1.08 | -0.035em | Landing section heading |
+| Headline | 42px | 600 | 1.08 | -0.035em | Reports and how-it-works headings |
+| Sub-headline | 26px | 600 | 1.15 | -0.03em | Module and legal section h2 |
+| Title | 22px | 600 | 1.2 | -0.025em | Changelog entries; KPI figure (500) |
+| Card title | 20px (`text-xl`), 18px (`text-lg`), 18px brand | 600 | default | -0.02em | Bento titles, brand mark |
+| Lead | 18px | 400 | 1.55 to 1.6 | 0 | Subhead under display |
+| Reading body | 16.5px | 400 | 1.7 | 0 | Legal and changelog prose (68ch) |
+| Body 16 | 16px | 400 | snug to default | 0 | Import page copy |
+| Body | 15.5px | 400 | 1.65 | 0 | Feature and pricing descriptions |
+| UI | 15px | 500 | 1.6 in accordion | 0 | Buttons, accordion body |
+| Nav | 14.5px | 500 | default | 0 | Header and menu links |
+| UI 14 | 14px (`text-sm`) | 400 | default | 0 | Rule list rows; brand tile glyph |
+| Detail | 13.5px | 500 | default | 0 | Trade detail values, column mapping, import chips |
+| Control | 13px | 500 | default | 0 | Segmented and tab labels |
+| App bar | 12.5px | 400 | default | 0 | App window bar; trade rows (mono) |
+| Label | 12px (`text-xs`) | 400 | default | 0 | KPI labels, chips, captions |
+| Side chip | 11.5px | 500 | default | 0 | Long/Short chip |
+| Axis | 11px (12px from sm) | 400 | 1rem | 0 | Chart labels |
+| KPI figure | 22px, scales to clamp(15px, 3.6cqi, 22px) in a wide strip | 500 | default | -0.02em | Mono, via NumberTicker |
+
+Also in use: 24px (`text-2xl`) for mobile menu links, 16px (`text-base`) default body.
 
 ### Named Rules
-**The Shout Rule.** Display type is Big Shoulders 900 uppercase, tight leading (0.88-0.9), and used for headlines, buttons, badges and stamps only. Never for running text.
+**The Mono Numbers Rule.** Every number a trader reads is Geist Mono with tabular figures. Never set a figure in the text face.
+**The Measure Rule.** Display headings cap at 11 to 20ch, ledes at 40 to 60ch, reading prose at 68ch.
 
 ## Layout
 
-Page gutters are 16px on phones and 56px from md. The header is a fixed 88px row. The landing's first viewport is a grid that stacks on phones (intro, drop, note, stack) and from 80rem sits as a 640px text column beside a 620px ticket stack with a 48px gap. Reading pages cap text at 68ch and ledes at 34em. Sections breathe with large vertical padding (up to 144px under reading pages). Cards and tickets are laid out as ruled grids: 1px rule gaps over a rule-coloured background. The day strip changes orientation at 40rem: rows on phones, columns from sm. Tickets scale their figure type with container width.
+A single 1280px container (`max-w-[1280px]`) centred, with 20px gutters on phones and 40px from `sm`. The header is 64px. The landing hero is a two-column grid at `lg` (5fr text, 7fr product shot) with a floating trade card overlapping the window's lower left; on phones it stacks and the card sits in flow. Sections breathe with large vertical padding (hero 56px top, 88px bottom); inside product panels density is high: rows are 10px vertical, 14px horizontal padding, 8px gaps.
+
+The KPI strip is container-query driven (`@container`): two by two when narrow, one row of four from `@md`, so figures scale with the strip, not the viewport. Trade rows collapse tag columns below `sm`. Touch targets are 44px: buttons are 44px high (38px for `sm`), the theme toggle goes from 40px to 44px on coarse pointers.
 
 ## Elevation & Depth
 
-Depth is paper and metal, not light. Surfaces are flat colour with a two-part navy shadow: a tight contact shadow plus a soft, negatively spread lift. Inset shadows make recesses (the slot mouth, punched day cells). A stamped element multiplies into the stock beneath it. Cards that are filed get punched holes, with the shadow following them.
+Flat and bordered. Panels separate from the page by a 1px line and a white-on-grey tonal step. Shadow appears only on the product shot and on the active segment.
 
 ### Shadow Vocabulary
-- **Ticket stock** (`0 1px 1.5px rgb(21 26 45 / 0.2), 0 16px 26px -14px rgb(21 26 45 / 0.55)`): tickets and form cards.
-- **Slot** (`0 2px 3px rgb(21 26 45 / 0.25), 0 14px 30px -18px rgb(21 26 45 / 0.9)`): the navy reader and the closing button.
-- **Badge** (`0 2px 3px rgb(21 26 45 / 0.3), 0 12px 22px -10px rgb(21 26 45 / 0.55)`): trader badge.
-- **Recess** (`inset 0 2px 3px rgb(0 0 0 / 0.6)`): slot mouth and punched cells.
+- **Product shot** (`--shadow`: `0 1px 2px rgba(15,18,24,0.05), 0 24px 48px -24px rgba(37,80,224,0.18)` light; `0 1px 2px rgba(0,0,0,0.4), 0 24px 48px -24px rgba(0,0,0,0.7)` dark): the app window and hero cards. A faint cobalt cast in light, plain black in dark.
+- **Active chip** (`0 1px 2px rgba(15,18,24,0.08)`): the white fill of the selected segment or tab.
 
 ### Named Rules
-**The Contact Shadow Rule.** Every raised thing gets a tight contact shadow plus a soft negative-spread lift, both in navy. No blur-only glows, no hard offset shadows.
+**The Border First Rule.** Depth comes from hairlines and tonal steps. A soft diffuse shadow is allowed on the product shot; hard offset shadows never.
 
 ## Shapes
 
-Small, firm corners, like die-cut card: 3px on tickets, stamps and fields; 4px on buttons; 6px on the slot; 8px on the badge; circles only for the buy/sell mark. Borders are 2px navy for fields and stamps (stamps add a 1.5px inner outline for a double rule), 1.5px navy under ticket headers, and 1px card-rule between ticket fields. Anything not yet available has a dashed rule. Focus rings are 3px solid, offset 3px, navy (gold on navy surfaces).
+Three radii, by role: **chips 6px**, **buttons, inputs and inner panels 10px**, **cards and the app window 16px**. Circles only for the button press ripple and the status pill dot. Borders are always 1px `line` (or `line-strong` on controls). Focus is a 2px cobalt outline with 3px offset on every focusable element.
+
+Segmented and tab tracks use 7px outer and 5px inner radius, and the brand tile uses 7px: these sit between the rule's steps; treat them as the one documented exception for nested tracks and do not extend it.
 
 ## Components
 
 ### Buttons
-- **Shape:** 4px corners, condensed uppercase labels.
-- **Primary in header:** navy fill, gold text, 12px 22px padding.
-- **Slot go:** gold fill, navy text, 48px tall; lightens 22% toward white on hover; disabled mixes gold 30% toward navy.
-- **Closing go:** navy fill, lightens 14% on hover.
-- **Closed:** stock fill, 2px dashed navy border, stamped with when it opens.
+- **Shape:** 10px radius, 44px high (38px `sm`), 18px horizontal padding, 15px/500 label, 8px icon gap.
+- **Primary:** cobalt fill, white text; hover cobalt-hover.
+- **Secondary:** surface fill, text colour, 1px line-strong border; hover darkens border to faint.
+- **Ghost:** transparent; hover sunken.
+- **Press:** scales to 0.97 (down 180ms, up 120ms, out easing) and a 160px ripple at the pointer fades from 16% to 0 over 220ms. Disabled at 50% opacity. Reduced motion removes both.
 
-### Order ticket
-A 220px (236px from md) card on stock: header with ORDER TICKET and a serial, a ruled grid of Side, Symbol, Price, Qty and Net P&L, an optional stamp band, and a purple dot-matrix clock beside a Filed or Unfiled flag. Sample tickets carry P&L and stamps; a visitor's own tickets are unstamped and Unfiled.
+### Chips
+- **Style:** 22px high, 6px radius, 8px padding, 12px text. Tones: neutral (sunken/muted), accent (cobalt-soft/cobalt-ink), gain, loss. `mono` for numbers and symbols.
+- **Side chip:** 20px high, 11.5px/500; Long reads gain, Short reads loss.
+- **Status pill:** a chip with a 6px leading dot. The dot is a status marker, the only dot allowed.
 
-### Rubber stamp
-Condensed black caps in a double rule, slightly rotated (about -2deg), 0.9 opacity, multiplied into the stock, with a noise mask so the ink misses in places. Sell tone is red; neutral tone is navy. Three sizes (xs, sm, md).
+### Segmented control and Tabs
+Both share one look: a sunken track (2px padding, 7px radius) holding 13px labels; the active item is a white (surface) chip with 5px radius, text colour and the active-chip shadow. Segmented is a radio group (state flips, no travel). Tabs are a roving-focus tablist whose single white fill slides and resizes to the chosen tab over 320ms on the glide curve. Arrow keys wrap, Home and End jump, selection follows focus.
 
-### Side mark
-A circled B (buy blue) or S (sell red), Big Shoulders 900. Unknown side is a dashed circle with a dash.
+### App window (the product shot)
+The product pages' hero illustration. 16px radius, 1px line, surface fill, product-shot shadow. A top bar (min 46px) holds an account select, a mono date range, optional meta at the right (the "Sample data" label goes here), and a Gross/Net segmented basis switch. Content below is real components fed by the typed sample dataset: KPI strip, equity chart, trade rows.
 
-### Ticket slot (file drop)
-A navy reader with a recessed mouth that fills gold when a file is dragged over or fed. Dashed 3px navy outline while dragging.
+### KPI strip
+Four figures (Net P&L, Win rate, Profit factor, Expectancy): 12px muted label over a 22px mono figure counted up by NumberTicker. A missing value reads "None yet" in faint mono.
 
-### Inputs / Fields
-Stock fill, 2px navy border, 3px corners, 48px minimum height, 17px medium text, bold labels above.
+### Trade rows
+Mono 12.5px list on hairline dividers: faint time, symbol, side chip, up to a few tags (mistakes first, loss tone), right-aligned signed net P&L. Grid `96px 70px 64px 1fr 92px` from `sm`; tags hide on phones.
 
-### Navigation
-Header: badge logo left, condensed uppercase 21px navy links, Log in plus a navy Get started button right. Phones collapse to a menu. Footer: navy block with stock text in a four-column grid.
+### P&L sign colouring
+Positive is gain, negative is loss, zero stays text colour. Applies to ticker figures, row nets and chart bars. Rule rows use CheckCircle and XCircle (fill) in gain and loss.
 
-### Trader badge
-A stock-coloured plate (118x64, 8px corners) with a punched clip slot and a condensed KEL wordmark over KEEL; it is the home link and the account identity.
+### Equity chart
+2px gain-colour line, rounded joins, a gain gradient fill (16% to 0), three `line` gridlines, drawn in an SVG that scales uniformly.
+
+### Accordion
+One open at a time. Heading button 17px/500, 56px minimum, Phosphor Plus rotating 45deg when open. Panel animates `grid-template-rows` 0fr to 1fr; body 15px muted at 1.6 leading.
+
+### Icons
+Phosphor (`@phosphor-icons/react`), 18px typically, 13px for small carets, `aria-hidden`, regular weight except fill for CheckCircle and XCircle. No glyph or emoji icons.
+
+### Motion
+Tokens in `src/lib/motion.ts`, mirrored as CSS variables. Several patterns are adapted from HorizonX (commercial licence): button press, number ticker, Beacon Tabs glide, animated accordion timing.
+- **Enter** 240ms `cubic-bezier(0.2, 0.8, 0.2, 1)`; **Exit** 160ms `cubic-bezier(0.4, 0, 1, 1)`; **Glide** 320ms `cubic-bezier(0.23, 1, 0.32, 1)`; **Press** 0.97 scale, 180ms down, 120ms up.
+- **Hero entrance** (CSS, plays from first paint): `rise` 8px over 240ms; `rise-window` 12px over 400ms; `slide-in` from -16px over 320ms (opaque by 40%); line `draw` and area `fade` 900ms.
+- **Number ticker** counts 0 to value in 900ms once in view; screen readers get only the final string.
+- **TickIn rows** reveal with 110ms stagger, 8px rise, once on first view.
+- **Reduced motion:** all animation and transition durations collapse to 0.01ms; ticker shows the final value; tabs, button and draws skip movement; smooth in-page scroll is off. Without JS everything shows in its final state.
 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** put gold on the page ground and navy on all ink; keep gold as a button fill only where the surface is navy.
-- **Do** pair every buy or sell colour with its circled letter.
-- **Do** set every timestamp in the dot-matrix face, purple, in DD MMM HH:MM:SS.
-- **Do** show state as a stamp, a hatched loss bar, or a dashed rule.
-- **Do** use the two-part navy contact shadow on raised cards.
-- **Do** respect reduced motion: the print and pull-from-pocket motions are off, and links underline instead.
+- **Do** use cobalt (#2550e0) as the single accent and only for primary action, selection, focus and accent chips.
+- **Do** set every number in Geist Mono with tabular figures, and colour only signed P&L green or red.
+- **Do** use the three radii: 6 chips, 10 buttons and inner panels, 16 cards.
+- **Do** show the product as a real app window built from live components, and label it "Sample data. Not a real account." wherever invented figures appear.
+- **Do** write copy with commas, periods and colons. Use hyphens only inside words.
+- **Do** use Phosphor icons at 18px, with Motion durations and curves from `src/lib/motion.ts`.
+- **Do** keep light as the default and design dark as the same roles on the dark tokens.
 
 ### Don't:
-- **Don't** put a centred headline over a dark dashboard screenshot; this world refuses that category default.
-- **Don't** invent stamps on a visitor's own data: with no rules in the app, tickets print unstamped and Unfiled.
-- **Don't** use purple for anything but timestamps.
-- **Don't** use blur-only glows or hard offset shadows.
-- **Don't** set running text in the display face.
+- **Don't** add eyebrows, kickers or small-caps labels above headings.
+- **Don't** use em or en dashes in copy.
+- **Don't** add decorative dots, orbs, gradients or mesh backgrounds. The status pill dot is a status, not decoration.
+- **Don't** present sample data unlabelled, or invent real-sounding user names and figures.
+- **Don't** build metaphor worlds (floors, tickets, stamps, ledgers, cockpits) or editorial serif display type.
+- **Don't** add a second accent colour or use green and red for anything but sign and state.
+- **Don't** use hard offset shadows, glassmorphism or side-stripe borders.
+- **Don't** introduce font sizes outside the ramp above.

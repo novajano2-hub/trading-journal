@@ -40,18 +40,6 @@
         ],
         "createdAt": "2026-11-20T11:02:40.024Z",
         "reason": "Claude's call: archived decision-page sketch of a direction (two unchosen), not shipping code; its fonts belong to that sketch's world and predate DESIGN.md"
-      },
-      {
-        "rule": "design-system-font",
-        "value": "geist",
-        "createdAt": "2026-11-20T12:13:50.017Z",
-        "reason": "Claude's call, temporary: Geist/Geist Mono are the user-approved v3 type; DESIGN.md still documents the rejected world and is rewritten in Plan 3b Task 8, which removes this ignore"
-      },
-      {
-        "rule": "design-system-font",
-        "value": "geist mono",
-        "createdAt": "2026-11-20T12:13:50.046Z",
-        "reason": "Claude's call, temporary: Geist/Geist Mono are the user-approved v3 type; DESIGN.md still documents the rejected world and is rewritten in Plan 3b Task 8, which removes this ignore"
       }
     ]
   }

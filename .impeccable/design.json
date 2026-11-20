@@ -4,120 +4,311 @@
   "title": "Design System: Keel",
   "extensions": {
     "colorMeta": {
-      "jacket-gold": {"role": "primary", "displayName": "Jacket Gold", "canonical": "#f2b705", "tonalRamp": ["#3a2c00","#6b5000","#9c7600","#cc9c03","#f2b705","#f7ca46","#fadf8a","#fdf1cc"]},
-      "floor-navy": {"role": "neutral", "displayName": "Floor Navy", "canonical": "#151a2d", "tonalRamp": ["#05060b","#0d1020","#151a2d","#2a3150","#434b72","#6c7599","#a3aac3","#d8dbe7"]},
-      "ticket-stock": {"role": "neutral", "displayName": "Ticket Stock", "canonical": "#f4f6f8", "tonalRamp": ["#3b4048","#5f6670","#858d98","#aeb6c2","#c9d1db","#dde2e9","#ecf0f3","#f4f6f8"]},
-      "buy-blue": {"role": "secondary", "displayName": "Buy Blue", "canonical": "#2350c8", "tonalRamp": ["#0a1b4a","#102a74","#17399f","#2350c8","#4a73dc","#7897e8","#a9bff1","#dbe5fa"]},
-      "sell-red": {"role": "secondary", "displayName": "Sell Red", "canonical": "#d2352a", "tonalRamp": ["#4a0f0b","#771a14","#a52720","#d2352a","#e0645b","#ea8e87","#f3b9b5","#fae0de"]},
-      "time-clock-purple": {"role": "tertiary", "displayName": "Time-Clock Purple", "canonical": "#6b3fa0", "tonalRamp": ["#1f1030","#35205a","#4d2f7c","#6b3fa0","#8a63b9","#aa8ccf","#cbb7e3","#e9dff4"]},
-      "card-rule": {"role": "neutral", "displayName": "Card Rule", "canonical": "#c9d1db", "tonalRamp": ["#3b4048","#5f6670","#858d98","#aeb6c2","#c9d1db","#dde2e9","#ecf0f3","#f4f6f8"]}
+      "cobalt": {
+        "role": "primary",
+        "displayName": "Cobalt",
+        "canonical": "#2550e0",
+        "tonalRamp": [
+          "#9db6ff",
+          "#3866e6",
+          "#2550e0",
+          "#1e44c4",
+          "#1b3fb8",
+          "#eaf0fe",
+          "#1a2440"
+        ]
+      },
+      "bg": {
+        "role": "neutral",
+        "displayName": "Cool Page",
+        "canonical": "#f6f7f9",
+        "tonalRamp": [
+          "#ffffff",
+          "#f6f7f9",
+          "#eff1f4",
+          "#e3e6eb",
+          "#d3d8df",
+          "#0e1014"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#0f1218",
+        "tonalRamp": [
+          "#0f1218",
+          "#4f5865",
+          "#687080",
+          "#a3aab6",
+          "#eceef2"
+        ]
+      },
+      "gain": {
+        "role": "signal",
+        "displayName": "Gain Green",
+        "canonical": "#087a54",
+        "tonalRamp": [
+          "#3fc08e",
+          "#087a54",
+          "#e6f4ee",
+          "#14281f"
+        ]
+      },
+      "loss": {
+        "role": "signal",
+        "displayName": "Loss Red",
+        "canonical": "#c8283a",
+        "tonalRamp": [
+          "#f06a78",
+          "#c8283a",
+          "#fbebed",
+          "#2e161a"
+        ]
+      }
     },
     "typographyMeta": {
-      "display-hero": {"displayName": "Display hero", "purpose": "Landing headline, up to 118px, uppercase."},
-      "display-section": {"displayName": "Display section", "purpose": "Section and feature headlines."},
-      "display-nav": {"displayName": "Nav and buttons", "purpose": "Navigation, buttons, stamps, badges."},
-      "body": {"displayName": "Body", "purpose": "Reading text, 68ch max."},
-      "lede": {"displayName": "Lede", "purpose": "Intro text under headlines."},
-      "label": {"displayName": "Label", "purpose": "Ticket field names and flags."},
-      "clock": {"displayName": "Clock", "purpose": "Timestamps only, purple."}
+      "display-hero": {
+        "displayName": "Hero display",
+        "purpose": "Landing hero headline only."
+      },
+      "display-page": {
+        "displayName": "Page display",
+        "purpose": "Page and auth h1."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Descriptions at 15.5px / 1.65."
+      },
+      "figure-kpi": {
+        "displayName": "KPI figure",
+        "purpose": "Geist Mono tabular figure for headline numbers."
+      },
+      "figure-row": {
+        "displayName": "Row figure",
+        "purpose": "Geist Mono 12.5px for trade rows."
+      }
     },
+    "fontSizesPx": [
+      11,
+      11.5,
+      12,
+      12.5,
+      13,
+      13.5,
+      14,
+      14.5,
+      15,
+      15.5,
+      16,
+      16.5,
+      17,
+      18,
+      20,
+      22,
+      24,
+      26,
+      42
+    ],
     "shadows": [
-      {"name": "ticket-stock", "value": "0 1px 1.5px rgb(21 26 45 / 0.2), 0 16px 26px -14px rgb(21 26 45 / 0.55)", "purpose": "Tickets and form cards."},
-      {"name": "slot", "value": "0 2px 3px rgb(21 26 45 / 0.25), 0 14px 30px -18px rgb(21 26 45 / 0.9)", "purpose": "Navy reader and closing button."},
-      {"name": "badge", "value": "0 2px 3px rgb(21 26 45 / 0.3), 0 12px 22px -10px rgb(21 26 45 / 0.55)", "purpose": "Trader badge."},
-      {"name": "recess", "value": "inset 0 2px 3px rgb(0 0 0 / 0.6)", "purpose": "Slot mouth and punched cells."}
+      {
+        "name": "product-shot",
+        "value": "0 1px 2px rgba(15,18,24,0.05), 0 24px 48px -24px rgba(37,80,224,0.18)",
+        "purpose": "App window and hero cards, light. Dark: 0 1px 2px rgba(0,0,0,0.4), 0 24px 48px -24px rgba(0,0,0,0.7)."
+      },
+      {
+        "name": "active-chip",
+        "value": "0 1px 2px rgba(15,18,24,0.08)",
+        "purpose": "White fill of the selected segment or tab."
+      }
     ],
     "motion": [
-      {"name": "ease-out-expo-ish", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Ticket print (720ms, 120ms stagger), rack card lift (240ms), slot mouth fill (200ms)."},
-      {"name": "hover-fade", "value": "150ms ease-out", "purpose": "Button background changes."}
+      {
+        "name": "enter",
+        "value": "240ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "purpose": "Elements arriving, decelerating."
+      },
+      {
+        "name": "exit",
+        "value": "160ms cubic-bezier(0.4, 0, 1, 1)",
+        "purpose": "Elements leaving, accelerating."
+      },
+      {
+        "name": "glide",
+        "value": "320ms cubic-bezier(0.23, 1, 0.32, 1)",
+        "purpose": "Selection moving between options (tab indicator). Adapted from HorizonX Beacon Tabs."
+      },
+      {
+        "name": "press",
+        "value": "scale 0.97, 180ms down, 120ms up",
+        "purpose": "Button press, plus a 220ms ripple. Adapted from HorizonX animated-button-press."
+      },
+      {
+        "name": "number-ticker",
+        "value": "900ms, enter curve, once in view",
+        "purpose": "KPI count-up. Adapted from HorizonX animated-number-ticker."
+      },
+      {
+        "name": "line-draw",
+        "value": "900ms, enter curve",
+        "purpose": "Equity line pathLength draw, area fades in."
+      },
+      {
+        "name": "accordion",
+        "value": "240ms open, 160ms close (grid-template-rows)",
+        "purpose": "Follows the HorizonX animated-accordion spec."
+      },
+      {
+        "name": "hero-entrance",
+        "value": "rise 240ms / rise-window 400ms / slide-in 320ms",
+        "purpose": "CSS entrance from first paint, motion-safe only."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "durations 0.01ms",
+        "purpose": "All animation and transition collapse; ticker shows final value."
+      }
     ],
     "breakpoints": [
-      {"name": "sm", "value": "40rem"},
-      {"name": "md", "value": "48rem"},
-      {"name": "xl", "value": "80rem"}
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "container-md",
+        "value": "28rem (KPI strip, container query)"
+      }
     ]
   },
   "components": [
     {
-      "name": "Slot Go Button", "kind": "button", "refersTo": "button-slot-go",
-      "description": "Gold action on the navy ticket slot.",
-      "html": "<button class=\"ds-slot-go\">BUILD MY JOURNAL</button>",
-      "css": ".ds-slot-go{background:var(--gold,#f2b705);color:var(--navy,#151a2d);min-height:48px;padding:12px 20px;border:0;border-radius:4px;font-family:var(--font-display,'Big Shoulders',sans-serif);font-size:22px;font-weight:900;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;transition:background-color 150ms ease-out}.ds-slot-go:hover{background:color-mix(in oklab,#f2b705,white 22%)}.ds-slot-go:focus-visible{outline:3px solid #151a2d;outline-offset:3px}"
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Cobalt call to action, 44px, 10px radius.",
+      "html": "<button class=\"ds-btn-primary\">Start journaling</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px;border:0;border-radius:var(--r-control);font:500 15px var(--font-geist-sans),system-ui,sans-serif;cursor:pointer;transition:background-color 120ms;background:var(--accent);color:var(--accent-fg);}.ds-btn-primary:hover{background:var(--accent-hover);}.ds-btn-primary:active{transform:scale(.97);}.ds-btn-primary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}"
     },
     {
-      "name": "Header Button", "kind": "button", "refersTo": "button-header-primary",
-      "description": "Navy Get started button in the header.",
-      "html": "<a class=\"ds-nav-btn\" href=\"#\">GET STARTED</a>",
-      "css": ".ds-nav-btn{display:inline-block;background:#151a2d;color:#f2b705;padding:12px 22px;border-radius:4px;font-family:var(--font-display,'Big Shoulders',sans-serif);font-size:21px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;text-decoration:none}.ds-nav-btn:focus-visible{outline:3px solid #151a2d;outline-offset:3px}"
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Surface button with a strong hairline.",
+      "html": "<button class=\"ds-btn-secondary\">See pricing</button>",
+      "css": ".ds-btn-secondary{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px;border:0;border-radius:var(--r-control);font:500 15px var(--font-geist-sans),system-ui,sans-serif;cursor:pointer;transition:background-color 120ms;background:var(--surface-1);color:var(--text);border:1px solid var(--line-2);}.ds-btn-secondary:hover{border-color:var(--faint);}.ds-btn-secondary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}"
     },
     {
-      "name": "Text Field", "kind": "input", "refersTo": "input-field",
-      "description": "Stock field with a 2px navy border.",
-      "html": "<input class=\"ds-input\" type=\"email\" placeholder=\"Email\">",
-      "css": ".ds-input{min-height:48px;width:240px;padding:0 12px;background:#f4f6f8;color:#151a2d;border:2px solid #151a2d;border-radius:3px;font:500 17px var(--font-text,'Barlow',sans-serif)}.ds-input:focus-visible{outline:3px solid #151a2d;outline-offset:3px}"
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Quiet action, sunken on hover.",
+      "html": "<button class=\"ds-btn-ghost\">Log in</button>",
+      "css": ".ds-btn-ghost{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px;border:0;border-radius:var(--r-control);font:500 15px var(--font-geist-sans),system-ui,sans-serif;cursor:pointer;transition:background-color 120ms;background:transparent;color:var(--text);}.ds-btn-ghost:hover{background:var(--sunken);}.ds-btn-ghost:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}"
     },
     {
-      "name": "Nav Link", "kind": "nav", "refersTo": "display-nav",
-      "description": "Condensed uppercase navy link on the gold ground.",
-      "html": "<nav class=\"ds-nav\"><a href=\"#\">Features</a><a href=\"#\">Log in</a></nav>",
-      "css": ".ds-nav{display:flex;gap:32px;background:#f2b705;padding:20px}.ds-nav a{font-family:var(--font-display,'Big Shoulders',sans-serif);font-size:21px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#151a2d;text-decoration:none}.ds-nav a:hover{text-decoration:underline;text-underline-offset:.2em}.ds-nav a:focus-visible{outline:3px solid #151a2d;outline-offset:3px}"
+      "name": "Chips",
+      "kind": "chip",
+      "refersTo": "chip-neutral",
+      "description": "6px tags in neutral, accent, gain and loss, plus the Long/Short side chip.",
+      "html": "<span class=\"ds-chip\">Breakout</span> <span class=\"ds-chip ds-chip-loss\">Early exit</span> <span class=\"ds-side\">Long</span>",
+      "css": ".ds-chip{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:var(--r-chip);background:var(--sunken);color:var(--muted);font:400 12px var(--font-geist-sans),system-ui,sans-serif;}.ds-chip-loss{background:var(--loss-soft);color:var(--loss);}.ds-side{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:var(--r-chip);background:var(--gain-soft);color:var(--gain);font:500 11.5px var(--font-geist-sans),system-ui,sans-serif;}"
     },
     {
-      "name": "Rubber Stamp", "kind": "chip", "refersTo": "ticket",
-      "description": "Double-ruled condensed caps, multiplied into the stock.",
-      "html": "<span class=\"ds-stamp\">RULE BROKEN</span>",
-      "css": ".ds-stamp{display:inline-block;color:#d2352a;border:2.5px solid currentColor;outline:1.5px solid currentColor;outline-offset:-6px;border-radius:3px;padding:4px 10px 2px;font-family:var(--font-display,'Big Shoulders',sans-serif);font-size:20px;font-weight:900;letter-spacing:.08em;line-height:1;text-transform:uppercase;transform:rotate(-2deg);opacity:.9;mix-blend-mode:multiply}"
+      "name": "Segmented Control",
+      "kind": "custom",
+      "refersTo": "segmented",
+      "description": "Sunken track with a white active chip. Tabs share the same look and slide the fill.",
+      "html": "<div class=\"ds-seg\"><span class=\"ds-seg-on\">Net</span><span>Gross</span></div>",
+      "css": ".ds-seg{display:inline-flex;padding:2px;border-radius:7px;background:var(--sunken);font:500 13px var(--font-geist-sans),system-ui,sans-serif;color:var(--muted);}.ds-seg span{padding:4px 10px;border-radius:5px;cursor:pointer;}.ds-seg span:hover{color:var(--text);}.ds-seg .ds-seg-on{background:var(--surface-1);color:var(--text);box-shadow:0 1px 2px rgba(15,18,24,.08);}"
     },
     {
-      "name": "Side Mark", "kind": "chip", "refersTo": "ticket",
-      "description": "Circled B for buy.",
-      "html": "<span class=\"ds-side\">B</span>",
-      "css": ".ds-side{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:2.5px solid #2350c8;border-radius:9999px;color:#2350c8;font-family:var(--font-display,'Big Shoulders',sans-serif);font-size:26px;font-weight:900;line-height:1}"
+      "name": "KPI Strip",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Label over a mono figure; sign colours the figure.",
+      "html": "<dl class=\"ds-kpi\"><div><dt>Net P&amp;L</dt><dd class=\"ds-gain\">+$1,240.50</dd></div><div><dt>Win rate</dt><dd>58.3%</dd></div><div><dt>Profit factor</dt><dd>1.84</dd></div></dl>",
+      "css": ".ds-kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0;padding:16px 14px;background:var(--surface-1);border:1px solid var(--line);border-radius:var(--r-card);}.ds-kpi dt{font:400 12px var(--font-geist-sans),system-ui,sans-serif;color:var(--muted);}.ds-kpi dd{margin:4px 0 0;font:500 22px var(--font-geist-mono),ui-monospace,monospace;letter-spacing:-.02em;font-variant-numeric:tabular-nums;}.ds-gain{color:var(--gain);}"
     },
     {
-      "name": "Order Ticket", "kind": "card", "refersTo": "ticket",
-      "description": "Card-stock ticket with a ruled field grid and a dot-matrix clock.",
-      "html": "<article class=\"ds-ticket\"><header><span>ORDER TICKET</span><span>No. 000417</span></header><dl><div><dt>SYMBOL</dt><dd>ES</dd></div><div><dt>PRICE</dt><dd>5,421.25</dd></div></dl><p><span class=\"ds-clock\">14 MAR 09:31:07</span><span class=\"ds-flag\">FILED</span></p></article>",
-      "css": ".ds-ticket{width:320px;background:#f4f6f8;color:#151a2d;border-radius:3px;padding:14px 16px;box-shadow:0 1px 1.5px rgb(21 26 45/.2),0 16px 26px -14px rgb(21 26 45/.55);font-family:var(--font-text,'Barlow',sans-serif)}.ds-ticket header{display:flex;justify-content:space-between;border-bottom:1.5px solid #151a2d;padding-bottom:8px;font-size:11px;font-weight:700;letter-spacing:.2em}.ds-ticket dl{display:grid;grid-template-columns:1fr 1fr;gap:1px;margin:10px 0;background:#c9d1db;border:1px solid #c9d1db}.ds-ticket dl div{background:#f4f6f8;padding:6px 8px}.ds-ticket dt{font-size:11px;font-weight:700;letter-spacing:.16em;opacity:.7}.ds-ticket dd{margin:0;font-size:22px;font-weight:600}.ds-ticket p{display:flex;justify-content:space-between;align-items:baseline;margin:0}.ds-clock{font-family:var(--font-stamp,'DotGothic16',monospace);font-size:17px;letter-spacing:.06em;color:#6b3fa0}.ds-flag{font-size:11px;font-weight:700;letter-spacing:.2em;opacity:.7}"
+      "name": "Trade Row",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Mono row: time, symbol, side, signed net.",
+      "html": "<div class=\"ds-row\"><span class=\"ds-faint\">09:41</span><span>ES</span><span class=\"ds-side\">Long</span><span class=\"ds-gain\">+$312.00</span></div>",
+      "css": ".ds-row{display:grid;grid-template-columns:96px 70px 64px 1fr;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--line);background:var(--surface-1);font:400 12.5px var(--font-geist-mono),ui-monospace,monospace;font-variant-numeric:tabular-nums;color:var(--text);}.ds-row>:last-child{text-align:right;}.ds-faint{color:var(--faint);}.ds-gain{color:var(--gain);}.ds-side{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:6px;background:var(--gain-soft);color:var(--gain);font:500 11.5px var(--font-geist-sans),system-ui,sans-serif;}"
     },
     {
-      "name": "Ticket Slot", "kind": "custom", "refersTo": "ticket-slot",
-      "description": "Navy file reader with a recessed mouth.",
-      "html": "<div class=\"ds-slot\"><span class=\"ds-mouth\"></span><p>Drop your broker CSV</p></div>",
-      "css": ".ds-slot{width:320px;background:#151a2d;color:#f4f6f8;border-radius:6px;padding:22px 24px;box-shadow:0 2px 3px rgb(21 26 45/.25),0 14px 30px -18px rgb(21 26 45/.9)}.ds-mouth{display:block;height:10px;border-radius:5px;background:color-mix(in oklab,#151a2d,black 55%);box-shadow:inset 0 2px 3px rgb(0 0 0/.6)}.ds-slot:hover .ds-mouth{background:#f2b705}.ds-slot p{margin:18px 0 0;font:600 20px var(--font-text,'Barlow',sans-serif)}"
+      "name": "App Window",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The product shot: 16px card, bar with account, range and basis, then content.",
+      "html": "<div class=\"ds-win\"><div class=\"ds-bar\"><span class=\"ds-sel\">Main account</span><span class=\"ds-sel ds-mono\">Last 30 days</span><span class=\"ds-meta\">Sample data</span></div><div class=\"ds-body\">Content</div></div>",
+      "css": ".ds-win{overflow:hidden;border:1px solid var(--line);border-radius:var(--r-card);background:var(--surface-1);box-shadow:var(--shadow);}.ds-bar{display:flex;align-items:center;gap:8px;min-height:46px;padding:0 14px;border-bottom:1px solid var(--line);font:400 12.5px var(--font-geist-sans),system-ui,sans-serif;color:var(--text);}.ds-sel{display:inline-flex;align-items:center;height:28px;padding:0 10px;border:1px solid var(--line);border-radius:var(--r-chip);}.ds-mono{font-family:var(--font-geist-mono),ui-monospace,monospace;}.ds-meta{margin-left:auto;color:var(--faint);}.ds-body{padding:16px 14px;color:var(--muted);}"
     }
   ],
   "narrative": {
-    "northStar": "The Trading Floor",
-    "overview": "Keel is open-outcry pit ephemera: a jacket-gold field, floor-navy ink, and ticket card stock that trades are filed on. Every trade is a ticket that gets filed, stamped and reviewed, and the interface is built from the objects of that ritual: order tickets with ruled field grids, rubber stamps, a navy ticket slot, a trader badge, a punched recap sheet, a rack of cards standing in pockets.\n\nThe marketing site is loud and flat. Gold floods the page ground, navy carries every word, and condensed uppercase display type does the shouting. Surfaces are physical paper and metal, so depth is a contact shadow under a card, never a glow. Motion is rare and mechanical: a ticket printing into the stack, a card lifting out of its pocket.",
+    "northStar": "Precise and Plain",
+    "overview": "**Creative North Star: \"Precise and Plain\"** names a register, not a metaphor world. Keel looks like a modern pro trading product: light, exact, quiet. The surface is pale cool grey with white panels, hairline borders, one cobalt accent, and green and red reserved for money. Every figure is set in Geist Mono and lines up in columns. The product itself is the illustration: a real-looking app window with labelled sample data carries the marketing pages.\n\nLight is the default regardless of OS. Dark is an explicit toggle (`data-theme=\"dark\"` on `<html>`, saved as `keel-theme`, applied before first paint). It is the same system with the same roles, not a second design.\n\nRejected, and recorded so they are not rebuilt: metaphor worlds (the earlier trading-floor tickets and stamps), dark mesh hero clich\u00e9s, editorial serif display type, and anything that reads as AI-generated.",
     "keyCharacteristics": [
-      "Gold ground, navy ink, stock surfaces; the three never trade roles on the marketing site.",
-      "Condensed black uppercase display face against a plain humanist text face.",
-      "Buy and sell are always a circled letter, never colour alone; losses print hatched, gains solid.",
-      "States are stamps (RULE BROKEN, A+ SETUP) and dashed rules for anything not yet open.",
-      "Timestamps are set in a dot-matrix face, in purple, and nowhere else."
+      "Cool off-white page, white panels, hairline borders; depth from border first, shadow only on the product shot.",
+      "One accent: cobalt. Gain green and loss red mean money and nothing else.",
+      "Geist for words, Geist Mono with tabular figures for every number.",
+      "Tight negative tracking on large headings, generous leading on body.",
+      "Motion is short and decelerating; it announces arrival and selection, then stops."
     ],
     "rules": [
-      {"name": "The Circled Letter Rule", "body": "Buy blue and sell red never appear alone. They sit in a circled B or S, or in a stamp, so the meaning survives without colour.", "section": "colors"},
-      {"name": "The Clock Ink Rule", "body": "Purple is for timestamps and nothing else.", "section": "colors"},
-      {"name": "The Ground Rule", "body": "Gold is the ground, navy is the ink. A gold element on gold, or a navy body on navy without the flipped focus ring, is wrong.", "section": "colors"},
-      {"name": "The Shout Rule", "body": "Display type is Big Shoulders 900 uppercase, tight leading (0.88-0.9), and used for headlines, buttons, badges and stamps only. Never for running text.", "section": "typography"},
-      {"name": "The Contact Shadow Rule", "body": "Every raised thing gets a tight contact shadow plus a soft negative-spread lift, both in navy. No blur-only glows, no hard offset shadows.", "section": "elevation"}
+      {
+        "name": "The One Accent Rule",
+        "body": "Cobalt is the only brand colour. Never add a second hue for emphasis, category or decoration.",
+        "section": "colors"
+      },
+      {
+        "name": "The Sign Rule",
+        "body": "Green and red appear only where a number is positive or negative, or a rule is kept or broken. Zero is uncoloured. Never use them for status, branding or ornament.",
+        "section": "colors"
+      },
+      {
+        "name": "The Never Colour Alone Rule",
+        "body": "Sign and state also carry text or an icon (a leading sign in the figure, \"Kept\" / \"Broken\" for screen readers, Long / Short labels).",
+        "section": "colors"
+      },
+      {
+        "name": "The Mono Numbers Rule",
+        "body": "Every number a trader reads is Geist Mono with tabular figures. Never set a figure in the text face.",
+        "section": "typography"
+      },
+      {
+        "name": "The Measure Rule",
+        "body": "Display headings cap at 11 to 20ch, ledes at 40 to 60ch, reading prose at 68ch.",
+        "section": "typography"
+      },
+      {
+        "name": "The Border First Rule",
+        "body": "Depth comes from hairlines and tonal steps. A soft diffuse shadow is allowed on the product shot; hard offset shadows never.",
+        "section": "elevation"
+      }
     ],
     "dos": [
-      "Do put gold on the page ground and navy on all ink; keep gold as a button fill only where the surface is navy.",
-      "Do pair every buy or sell colour with its circled letter.",
-      "Do set every timestamp in the dot-matrix face, purple, in DD MMM HH:MM:SS.",
-      "Do show state as a stamp, a hatched loss bar, or a dashed rule.",
-      "Do use the two-part navy contact shadow on raised cards.",
-      "Do respect reduced motion: the print and pull-from-pocket motions are off, and links underline instead."
+      "**Do** use cobalt (#2550e0) as the single accent and only for primary action, selection, focus and accent chips.",
+      "**Do** set every number in Geist Mono with tabular figures, and colour only signed P&L green or red.",
+      "**Do** use the three radii: 6 chips, 10 buttons and inner panels, 16 cards.",
+      "**Do** show the product as a real app window built from live components, and label it \"Sample data. Not a real account.\" wherever invented figures appear.",
+      "**Do** write copy with commas, periods and colons. Use hyphens only inside words.",
+      "**Do** use Phosphor icons at 18px, with Motion durations and curves from `src/lib/motion.ts`.",
+      "**Do** keep light as the default and design dark as the same roles on the dark tokens."
     ],
     "donts": [
-      "Don't put a centred headline over a dark dashboard screenshot; this world refuses that category default.",
-      "Don't invent stamps on a visitor's own data: with no rules in the app, tickets print unstamped and Unfiled.",
-      "Don't use purple for anything but timestamps.",
-      "Don't use blur-only glows or hard offset shadows.",
-      "Don't set running text in the display face."
+      "**Don't** add eyebrows, kickers or small-caps labels above headings.",
+      "**Don't** use em or en dashes in copy.",
+      "**Don't** add decorative dots, orbs, gradients or mesh backgrounds. The status pill dot is a status, not decoration.",
+      "**Don't** present sample data unlabelled, or invent real-sounding user names and figures.",
+      "**Don't** build metaphor worlds (floors, tickets, stamps, ledgers, cockpits) or editorial serif display type.",
+      "**Don't** add a second accent colour or use green and red for anything but sign and state.",
+      "**Don't** use hard offset shadows, glassmorphism or side-stripe borders.",
+      "**Don't** introduce font sizes outside the ramp above."
     ]
   }
 }
