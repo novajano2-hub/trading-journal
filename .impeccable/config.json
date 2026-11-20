@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "files": [
+          ".impeccable/mocks/decision/canon.html"
+        ],
+        "createdAt": "2026-11-20T05:05:26.585Z",
+        "reason": "Claude's call: the canon card is by definition the category standard played straight, which is Inter; scoped to this throwaway decision sketch only"
+      }
+    ]
+  }
+}

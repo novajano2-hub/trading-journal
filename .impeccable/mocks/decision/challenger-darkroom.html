@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>Keel — Darkroom</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Courier+Prime:wght@400;700&family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root { --amber:#C98410; --amber-d:#C8830F; --umber:#1E1407; --silver:#A7A298; --enamel:#E6E0D2; --wet:#6E5525; }
+* { box-sizing:border-box; margin:0; padding:0; }
+html,body { width:1440px; height:900px; overflow:hidden; }
+body { background:radial-gradient(120% 90% at 40% 35%, #D08C14 0%, var(--amber) 45%, var(--amber-d) 100%); color:var(--umber); font-family:Archivo, sans-serif; font-variant-numeric:tabular-nums; position:relative; }
+::selection { background:var(--umber); color:var(--amber); }
+header { position:absolute; top:0; left:0; right:0; height:84px; display:flex; align-items:center; padding:0 56px; gap:44px; border-bottom:1px solid rgba(30,20,7,.35); }
+.mark { font-family:'Permanent Marker'; font-size:30px; }
+nav { display:flex; gap:32px; font-family:'Courier Prime'; font-weight:700; font-size:16px; letter-spacing:.08em; text-transform:uppercase; }
+nav a, .login { color:var(--umber); text-decoration:none; }
+.right { margin-left:auto; display:flex; align-items:center; gap:26px; font-family:'Courier Prime'; font-weight:700; font-size:16px; letter-spacing:.08em; text-transform:uppercase; }
+.btn { background:var(--umber); color:var(--amber); padding:11px 18px; border-radius:3px; }
+h1 { position:absolute; left:56px; top:140px; font-family:'Permanent Marker'; font-size:112px; line-height:.95; font-weight:400; }
+.lede { position:absolute; left:60px; top:384px; width:540px; font-size:20px; line-height:1.5; font-weight:500; }
+.tray-form { position:absolute; left:56px; top:520px; width:600px; border:2px solid var(--enamel); border-radius:14px; padding:20px 22px; background:rgba(30,20,7,.12); }
+.tray-form .line { display:flex; align-items:center; gap:16px; }
+.tray-form strong { display:block; font-size:19px; font-weight:700; }
+.tray-form small { font-size:14px; }
+.go { margin-left:auto; background:var(--umber); color:var(--amber); font-weight:700; font-size:16px; padding:13px 18px; border-radius:4px; white-space:nowrap; }
+.note { position:absolute; left:60px; top:640px; font-family:'Courier Prime'; font-size:14px; }
+.tray { position:absolute; left:740px; top:132px; width:640px; height:400px; background:var(--enamel); border-radius:22px; padding:22px; box-shadow:0 22px 40px -22px rgba(30,20,7,.8); }
+.bath { width:100%; height:100%; border-radius:12px; background:linear-gradient(180deg,#7A6431,#5E4A20); padding:34px 44px; position:relative; }
+.print { width:100%; height:100%; padding:18px; background:#D9D4C7; position:relative; transform:rotate(-1.5deg); box-shadow:0 4px 10px rgba(0,0,0,.35); overflow:hidden; }
+.print svg { position:absolute; inset:18px; width:calc(100% - 36px); height:calc(100% - 36px); }
+.print::after { content:""; position:absolute; inset:0; background:linear-gradient(90deg, transparent 0%, transparent 52%, rgba(217,212,199,.85) 82%, #D9D4C7 100%); }
+.grease { position:absolute; font-family:'Permanent Marker'; color:#9C1E0E; font-size:24px; }
+.g1 { left:120px; top:52px; transform:rotate(-6deg); }
+.strip { position:absolute; left:740px; top:568px; width:640px; height:120px; display:grid; grid-template-columns:repeat(5,1fr); border:2px solid var(--umber); }
+.step { padding:12px 14px; border-right:1px solid rgba(230,224,210,.35); color:var(--enamel); display:flex; flex-direction:column; justify-content:space-between; }
+.step:last-child { border-right:0; }
+.step b { font-family:'Courier Prime'; font-size:13px; letter-spacing:.12em; }
+.step span { font-size:22px; font-weight:700; }
+.e1 { background:#6A5A3E; } .e2 { background:#574830; } .e3 { background:#443722; outline:3px solid var(--enamel); outline-offset:-6px; } .e4 { background:#2F2415; } .e5 { background:#1C140A; }
+.strip-cap { position:absolute; left:740px; top:700px; font-family:'Courier Prime'; font-size:14px; }
+.stations { position:absolute; left:56px; right:56px; bottom:46px; display:flex; align-items:center; gap:18px; font-family:'Courier Prime'; font-weight:700; font-size:17px; letter-spacing:.1em; text-transform:uppercase; border-top:1px solid rgba(30,20,7,.35); padding-top:22px; }
+.stations .on { position:relative; }
+.stations .on::after { content:""; position:absolute; left:-14px; right:-14px; top:-10px; bottom:-10px; border:2.5px solid #B5281C; border-radius:50%; transform:rotate(-3deg); }
+</style></head>
+<body>
+<header>
+  <span class="mark">Keel</span>
+  <nav><a href="#">Product</a><a href="#">Pricing</a><a href="#">Brokers</a><a href="#">Changelog</a></nav>
+  <div class="right"><a class="login" href="#">Log in</a><span class="btn">Get started</span></div>
+</header>
+<h1>Develop<br>your edge.</h1>
+<p class="lede">Every trade goes through the same stations: logged, reviewed against your rules, tested. Keep going until the picture is sharp.</p>
+<form class="tray-form" onsubmit="return false">
+  <div class="line">
+    <svg width="38" height="44" viewBox="0 0 38 44" fill="none" stroke="#1E1407" stroke-width="1.6"><path d="M3 1h22l10 10v32H3z"/><path d="M25 1v10h10"/><path d="M10 22h18M10 28h18M10 34h12"/></svg>
+    <span><strong>Drop a broker CSV to start</strong><small>Fills and fees become trades in seconds.</small></span>
+    <span class="go">Build my journal</span>
+  </div>
+</form>
+<p class="note">Direct broker sync is on the roadmap.</p>
+<div class="tray">
+  <div class="bath">
+    <div class="print">
+      <svg viewBox="0 0 520 300" preserveAspectRatio="none" aria-label="Equity curve, developing">
+        <path d="M0 250 L40 238 L80 246 L120 214 L160 222 L200 190 L240 198 L280 160 L320 172 L360 128 L400 140 L440 96 L480 104 L520 62" fill="none" stroke="#2A2620" stroke-width="3"/>
+        <path d="M0 250 L40 238 L80 246 L120 214 L160 222 L200 190 L240 198 L280 160 L320 172 L360 128 L400 140 L440 96 L480 104 L520 62 L520 300 L0 300Z" fill="#2A2620" opacity=".14"/>
+        <path d="M0 270 H520" stroke="#2A2620" stroke-width="1" stroke-dasharray="4 6" opacity=".6"/>
+      </svg>
+      <span class="grease g1">cut losers at 1R</span>
+    </div>
+  </div>
+</div>
+<div class="strip" aria-label="Test strip: same setup at five stop sizes">
+  <div class="step e1"><b>0.5R</b><span>+$1,240</span></div>
+  <div class="step e2"><b>1R</b><span>+$2,860</span></div>
+  <div class="step e3"><b>1.5R</b><span>+$3,410</span></div>
+  <div class="step e4"><b>2R</b><span>+$2,120</span></div>
+  <div class="step e5"><b>3R</b><span>−$380</span></div>
+</div>
+<p class="strip-cap">Test strip: one setup backtested at five stop sizes. Sample data.</p>
+<div class="stations">
+  <span>Trade</span><svg width="34" height="12" viewBox="0 0 34 12" fill="none" stroke="#1E1407" stroke-width="1.6"><path d="M0 6h32m-5-5l5 5-5 5"/></svg>
+  <span>Log</span><svg width="34" height="12" viewBox="0 0 34 12" fill="none" stroke="#1E1407" stroke-width="1.6"><path d="M0 6h32m-5-5l5 5-5 5"/></svg>
+  <span class="on">Review</span><svg width="34" height="12" viewBox="0 0 34 12" fill="none" stroke="#1E1407" stroke-width="1.6"><path d="M0 6h32m-5-5l5 5-5 5"/></svg>
+  <span>Test</span><svg width="34" height="12" viewBox="0 0 34 12" fill="none" stroke="#1E1407" stroke-width="1.6"><path d="M0 6h32m-5-5l5 5-5 5"/></svg>
+  <span>Trade again</span>
+</div>
+</body></html>

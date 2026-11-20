@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>Keel — Category standard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#0B0D12; --panel:#12151C; --line:#222733; --text:#F5F7FA; --dim:#9AA3B2; --blue:#3A62DE; --up:#22C55E; --down:#EF4444; }
+* { box-sizing:border-box; margin:0; padding:0; }
+html,body { width:1440px; height:900px; overflow:hidden; }
+body { background:var(--bg); color:var(--text); font-family:Inter, sans-serif; font-variant-numeric:tabular-nums; }
+header { height:72px; display:flex; align-items:center; padding:0 64px; gap:44px; border-bottom:1px solid var(--line); }
+.mark { display:flex; align-items:center; gap:10px; font-weight:700; font-size:19px; }
+nav { display:flex; gap:30px; font-size:15px; color:var(--dim); }
+.right { margin-left:auto; display:flex; gap:22px; align-items:center; font-size:15px; }
+.btn { background:var(--blue); color:#fff; padding:10px 16px; border-radius:8px; font-weight:600; }
+.hero { text-align:center; padding-top:84px; }
+h1 { font-size:64px; font-weight:650; letter-spacing:-.035em; line-height:1.04; }
+.lede { margin:22px auto 0; max-width:620px; font-size:19px; line-height:1.55; color:var(--dim); }
+.ctas { margin-top:32px; display:flex; justify-content:center; gap:14px; font-size:16px; font-weight:600; }
+.ctas span { padding:13px 20px; border-radius:9px; }
+.p { background:var(--blue); }
+.g { border:1px solid var(--line); color:var(--text); }
+.shot { margin:56px auto 0; width:1160px; height:520px; background:var(--panel); border:1px solid var(--line); border-radius:14px; box-shadow:0 30px 60px -30px rgba(0,0,0,.8); display:grid; grid-template-columns:200px 1fr; overflow:hidden; }
+.side { border-right:1px solid var(--line); padding:18px 14px; display:flex; flex-direction:column; gap:6px; font-size:13px; color:var(--dim); }
+.side .on { background:#1A1F2A; color:var(--text); border-radius:6px; }
+.side span { padding:8px 10px; }
+.main { padding:20px 22px; display:grid; grid-template-columns:1.4fr 1fr; grid-template-rows:auto 1fr; gap:16px; }
+.kpis { grid-column:1 / -1; display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+.kpi { border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+.kpi small { font-size:12px; color:var(--dim); display:block; }
+.kpi b { font-size:22px; font-weight:650; }
+.panel { border:1px solid var(--line); border-radius:10px; padding:14px; }
+.panel h2 { font-size:13px; font-weight:600; color:var(--dim); margin-bottom:10px; }
+.cal { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
+.cal i { height:30px; border-radius:5px; background:#171B24; }
+.cal .u { background:rgba(34,197,94,.28); } .cal .d { background:rgba(239,68,68,.26); }
+</style></head>
+<body>
+<header>
+  <div class="mark"><svg width="22" height="22" viewBox="0 0 22 22"><rect width="22" height="22" rx="6" fill="#4F7DFF"/><path d="M6 15l4-5 3 3 3-6" stroke="#fff" stroke-width="2" fill="none"/></svg>Keel</div>
+  <nav><span>Product</span><span>Pricing</span><span>Brokers</span><span>Changelog</span></nav>
+  <div class="right"><span>Log in</span><span class="btn">Get started</span></div>
+</header>
+<section class="hero">
+  <h1>See exactly why you win<br>and why you lose.</h1>
+  <p class="lede">Import your trades, tag your setups and mistakes, and get the reports that show where your edge really is.</p>
+  <div class="ctas"><span class="p">Start journaling</span><span class="g">See a sample dashboard</span></div>
+</section>
+<div class="shot">
+  <div class="side"><span class="on">Dashboard</span><span>Trades</span><span>Calendar</span><span>Reports</span><span>Strategies</span><span>Notebook</span><span>Backtesting</span><span>Replay</span></div>
+  <div class="main">
+    <div class="kpis">
+      <div class="kpi"><small>Net P&amp;L</small><b style="color:var(--up)">+$4,218.50</b></div>
+      <div class="kpi"><small>Win rate</small><b>61.8%</b></div>
+      <div class="kpi"><small>Profit factor</small><b>1.92</b></div>
+      <div class="kpi"><small>Avg win / loss</small><b>1.41</b></div>
+    </div>
+    <div class="panel"><h2>Equity curve</h2>
+      <svg viewBox="0 0 520 200" width="100%" height="200"><path d="M0 180 L40 170 L80 176 L120 150 L160 156 L200 130 L240 136 L280 108 L320 116 L360 84 L400 92 L440 60 L480 66 L520 38 L520 200 L0 200Z" fill="rgba(79,125,255,.14)"/><path d="M0 180 L40 170 L80 176 L120 150 L160 156 L200 130 L240 136 L280 108 L320 116 L360 84 L400 92 L440 60 L480 66 L520 38" fill="none" stroke="#4F7DFF" stroke-width="2.2"/></svg>
+    </div>
+    <div class="panel"><h2>October</h2>
+      <div class="cal"><i></i><i class="u"></i><i class="d"></i><i class="u"></i><i class="u"></i><i></i><i></i><i class="u"></i><i class="u"></i><i class="d"></i><i class="u"></i><i class="d"></i><i></i><i></i><i class="u"></i><i class="d"></i><i class="u"></i><i class="u"></i><i class="u"></i><i></i><i></i><i class="d"></i><i class="u"></i><i class="u"></i><i class="d"></i><i class="u"></i><i></i><i></i></div>
+    </div>
+  </div>
+</div>
+</body></html>
