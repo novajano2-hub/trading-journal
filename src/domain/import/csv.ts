@@ -20,7 +20,10 @@ export interface ParsedCsv {
  * later messages can point at the visitor's own row. `limit` caps the data
  * rows collected and stops parsing early.
  */
-export function parseCsv(text: string, opts: { limit?: number } = {}): ParsedCsv {
+export function parseCsv(
+  text: string,
+  opts: { limit?: number } = {},
+): ParsedCsv {
   const { limit } = opts;
   let headers: string[] = [];
   let delimiter = ',';
