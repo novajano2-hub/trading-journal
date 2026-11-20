@@ -77,27 +77,35 @@ Origin key: **TZ** = TradeZella has it · **MTJ** = MyTradingJourney has it · *
 
 | # | Item | Owner plan |
 |---|---|---|
-| E1 | Import validation: reject zero/negative quantities and unparseable times before the trade builder | Plan 2 |
-| E2 | Options that expire worthless need a synthetic closing fill at expiry, or their loss stays hidden as "open" | Plan 2 |
-| E3 | Partition trades by `pnlCurrency` (`partitionByCurrency`) before calling metrics; unconverted cross pairs subtract account-currency fees from quote-currency gross, so flag them in import | Plan 2 |
+| E1 | ~~Import validation: reject zero/negative quantities and unparseable times before the trade builder~~. Done in Plan 2 | Done |
+| E2 | ~~Options that expire worthless need a synthetic closing fill at expiry, or their loss stays hidden as "open"~~. Done in Plan 2 | Done |
+| E3 | ~~Partition trades by `pnlCurrency` (`partitionByCurrency`) before calling metrics; unconverted cross pairs subtract account-currency fees from quote-currency gross, so flag them in import~~. Done in Plan 2 | Done |
 | E4 | ~~Unify metric signatures into one `MetricContext`~~. Done in the TradeZella alignment (40fa14c) | Done |
 | E5 | Clamp R-distribution tails (a tiny `initialRisk` creates thousands of bins) | Plan 5 (Reports) |
-| E6 | `canonicalSymbol` strips a leading `/` before resolving; confirm against real broker exports | Plan 2 |
+| E6 | `canonicalSymbol` strips a leading `/`, and Plan 2 pins slash, case and space variants as one position. Confirm against real broker exports, including exchange suffixes (`/ESZ5:XCME`) and MetaTrader broker suffixes (`EURUSD.m`) | With #11 (sample exports) |
 | E7 | ~~Tooling: .prettierignore, format, engines, pins~~. Done in Plan 3 | Done |
 | E8 | ~~Next scaffold defaults, metadata, README~~. Done in Plan 3 | Done |
 | E9 | Thin test gaps: exact session boundaries, more negative half-even ties, ZB/ZN/6E/lowercase symbol parsing, `Math.max(...)` spread above ~100k trades | Any |
 | E10 | Manual **merge / split** of trades after import (TradeZella has it) | Plan 5 (Trades) |
-| E11 | Import picks its own **source timezone** (TradeZella has it), separate from the display timezone | Plan 2 |
+| E11 | ~~Import picks its own **source timezone** (TradeZella has it), separate from the display timezone~~. Done in Plan 2 | Done |
 | E12 | Prop setup accepts daily loss as **% or $** (UI converts % against the starting balance) | Plan 5 (Prop firms) |
 | E13 | Verify the undocumented behaviours (breakeven in win %, profit factor with no losses, drawdown basis, fill grouping) against a real TradeZella test import, and align if they differ | When an account is available |
-| E14 | `PreviewRow.rowIndex` so import preview rows number by real file row | Plan 2 |
+| E14 | ~~`PreviewRow.rowIndex` so import preview rows number by real file row~~. Done in Plan 2 | Done |
 | E15 | **Don't publish the marketing site** until the app plans land: feature pages describe milestone-1 modules in the present tense | Release |
 | E16 | ~~Trading Floor ceiling items (tickets, pit ornament, time-clock imprint)~~. Dropped with the rejected world in Plan 3b | Dropped |
 | E17 | ~~Mechanical stamps on dropped tickets~~. Dropped with the rejected world in Plan 3b | Dropped |
-| E18 | Rename the leftover ticket identifiers (`ticketPrice`, `Preview.tickets`) to row/fill names; none reach visible copy | Plan 2 |
+| E18 | ~~Rename the leftover ticket identifiers (`ticketPrice`, `Preview.tickets`) to row/fill names; none reach visible copy~~. Done in Plan 2 | Done |
 | E19 | Number ticker: if JS loads but hydration fails, KPIs show $0.00; also starts about 300ms after hydration | Plan 4 |
 | E20 | `RuleList` carries landing-only tick hooks; split the landing animation from the app component | Plan 5 (Strategies) |
 | E21 | Test and type tidy: kv tuple looseness, `grouped()` Number re-parse, no motion-behaviour tests | Any |
 | E22 | Derive the "Trailing drawdown" label from `drawdownType` instead of hand-typing it | Plan 5 (Prop firms) |
 | E23 | "Get started" goes to /signup, which says accounts open with the release; point it at the real sign-up flow when auth lands | Plan 4 |
 | E24 | Optional design ceiling from the Plan 3b finish review: a hover/focus value readout on breakdown bars, and a row hover highlight on product trade rows | Plan 4 |
+| E25 | Excel (.xlsx) import. Spec §7 says CSV/Excel, but the §5 stack has no spreadsheet parser; users save as CSV meanwhile | Plan 5 decision |
+| E26 | Options that expire after their last import stay open until the next import into that account settles them; settle at app start or in a server job | Milestone 2 (#1) |
+| E27 | Import maps one fees and one commission column; swap/financing and extra fee columns aren't summed | With #11 |
+| E28 | The spec's Playwright import-to-trade-log test (upload a CSV in the UI, see the trades in the log) | Plan 5 |
+| E29 | A broker's own expiration row imported after Keel settled the option synthetically opens a phantom short that is settled again (gross 0, inflates counts). Pairs with E26 | With E26 |
+| E30 | Settings UI should show "Browser default (zone)" until the user picks a timezone; day buckets follow the browser zone when travelling | Plan 5 (Settings) |
+| E31 | Edits or deletes made to a trade between import context and commit (a tag added in another tab, a trade deleted by hand) are overwritten or resurrected by the commit's `bulkPut`; detect via a per-trade revision | Milestone 2 (#1) |
+| E32 | Two open trades in one symbol: raise a `TradeFlag` and a user-facing notice when an overlapping export flips a trade's direction on merge (deferred from Task 6) | Plan 5 (Import UI) |
