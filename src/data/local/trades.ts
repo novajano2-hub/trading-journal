@@ -21,7 +21,7 @@ export function localTrades(ctx: LocalContext): TradesRepo {
       return rwTx(db, [db.trades], async () => {
         const trade = await db.trades.get([ws, id]);
         if (!trade) throw new NotFoundError('trade', id);
-        const next = applyTradePatch(trade, patch);
+        const next = { ...applyTradePatch(trade, patch), id, workspaceId: ws };
         await db.trades.put(next);
         return next;
       });

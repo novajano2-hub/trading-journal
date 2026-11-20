@@ -2,7 +2,7 @@ import type { Rule } from '@/domain/types';
 import { NotFoundError, type StrategiesRepo } from '../repository';
 import type { LocalContext } from './context';
 import { rwTx } from './tx';
-import { mergePatch } from './merge';
+import { mergePatch } from '../merge';
 
 export function localStrategies(ctx: LocalContext): StrategiesRepo {
   const withIds = (rules: readonly (Omit<Rule, 'id'> & { id?: string })[]) =>
@@ -40,7 +40,11 @@ export function localStrategies(ctx: LocalContext): StrategiesRepo {
         const strategy = await db.strategies.get([ws, id]);
         if (!strategy) throw new NotFoundError('strategy', id);
         const { rules, ...rest } = patch;
-        const next = mergePatch(strategy, rest);
+        const next = {
+          ...mergePatch(strategy, rest),
+          id,
+          workspaceId: ws,
+        };
         if (rules) {
           next.rules = withIds(rules);
           const kept = new Set(next.rules.map((r) => r.id));

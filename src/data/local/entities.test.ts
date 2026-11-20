@@ -352,3 +352,57 @@ test('a failed cascade rolls everything back', async () => {
   expect(await repo.accounts.list(S)).toHaveLength(2);
   expect(await repo.trades.list(S)).toHaveLength(3);
 });
+
+test('undefined on a required field leaves it unchanged; on propRules it clears', async () => {
+  const { repo } = setup();
+  const acc = await repo.accounts.update(S, 'acc-a', {
+    propRules: {
+      firm: 'F',
+      phase: 'evaluation',
+      profitTarget: 1,
+      dailyLossLimit: 1,
+      maxDrawdown: 1,
+      drawdownType: 'static',
+      minTradingDays: 1,
+    },
+  });
+  expect(acc.propRules).toBeDefined();
+  const kept = await repo.accounts.update(S, 'acc-a', { name: undefined });
+  expect(kept.name).toBe('Futures main');
+  const cleared = await repo.accounts.update(S, 'acc-a', {
+    propRules: undefined,
+  });
+  expect('propRules' in cleared).toBe(false);
+  expect((await repo.accounts.list(S)).map((a) => a.name)).toContain(
+    'Futures main',
+  );
+  const strat = await repo.strategies.update(S, 'str-1', {
+    name: undefined,
+    checklist: undefined,
+  });
+  expect(strat.name).toBe('Opening range breakout');
+  expect(strat.checklist).toEqual(['Check the economic calendar']);
+  const tag = await repo.tags.update(S, 'tag-fomo', {
+    name: undefined,
+    category: undefined,
+  });
+  expect(tag).toMatchObject({ name: 'FOMO', category: 'mistake' });
+});
+
+test('a patch carrying a foreign id or workspaceId still updates the original row', async () => {
+  const { repo } = setup();
+  const sneaky = { workspaceId: M, id: 'other', name: 'Renamed' };
+  const acc = await repo.accounts.update(S, 'acc-a', sneaky);
+  expect(acc).toMatchObject({ id: 'acc-a', workspaceId: S, name: 'Renamed' });
+  const tag = await repo.tags.update(S, 'tag-fomo', sneaky);
+  expect(tag).toMatchObject({ id: 'tag-fomo', workspaceId: S });
+  const strat = await repo.strategies.update(S, 'str-1', sneaky);
+  expect(strat).toMatchObject({ id: 'str-1', workspaceId: S });
+  const trade = await repo.trades.update(S, 'f-1', {
+    ...sneaky,
+    rating: 1,
+  } as object);
+  expect(trade).toMatchObject({ id: 'f-1', workspaceId: S, rating: 1 });
+  expect(await repo.accounts.list(M)).toEqual([]);
+  expect(await repo.trades.list(M)).toEqual([]);
+});

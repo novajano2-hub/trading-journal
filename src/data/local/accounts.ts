@@ -2,7 +2,7 @@ import { NotFoundError, type AccountsRepo } from '../repository';
 import type { LocalContext } from './context';
 import { rwTx } from './tx';
 import { pruneJournalLinks } from './journal';
-import { mergePatch } from './merge';
+import { mergePatch } from '../merge';
 
 export function localAccounts(ctx: LocalContext): AccountsRepo {
   return {
@@ -24,7 +24,11 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
       return rwTx(db, [db.accounts], async () => {
         const account = await db.accounts.get([ws, id]);
         if (!account) throw new NotFoundError('account', id);
-        const next = mergePatch(account, patch);
+        const next = {
+          ...mergePatch(account, patch, ['propRules']),
+          id,
+          workspaceId: ws,
+        };
         await db.accounts.put(next);
         return next;
       });

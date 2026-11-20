@@ -7,7 +7,7 @@ import {
 import type { LocalContext } from './context';
 import { rwTx } from './tx';
 import type { KeelDb } from './db';
-import { mergePatch } from './merge';
+import { mergePatch } from '../merge';
 
 /** Throws when another tag in the workspace and category has the name, ignoring case. */
 async function assertUnique(db: KeelDb, tag: Tag): Promise<void> {
@@ -56,7 +56,7 @@ export function localTags(ctx: LocalContext): TagsRepo {
       return rwTx(db, [db.tags], async () => {
         const tag = await db.tags.get([ws, id]);
         if (!tag) throw new NotFoundError('tag', id);
-        const next = mergePatch(tag, patch);
+        const next: Tag = { ...mergePatch(tag, patch), id, workspaceId: ws };
         next.name = next.name.trim();
         await assertUnique(db, next);
         await db.tags.put(next);
