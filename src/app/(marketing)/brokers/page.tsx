@@ -90,8 +90,8 @@ export default function BrokersPage() {
             account statements.
           </li>
           <li className="pt-2 pl-1">
-            Import opens with the app release. Files are read in your browser
-            and nothing is uploaded. The{' '}
+            Import opens with the app release. When it does, files are read in
+            your browser and nothing is uploaded. The{' '}
             <Link href="/privacy" className={LINK}>
               privacy page
             </Link>{' '}
