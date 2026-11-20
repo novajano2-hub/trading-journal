@@ -5,8 +5,12 @@ import { parseCsv } from '@/domain/import/csv';
 import { guessMapping, type MappingOptions } from '@/domain/import/mapping';
 import { planImport } from '@/domain/import/plan';
 import { fixtureSample } from '../__fixtures__/sample';
-import { ImportBlockedError, NotFoundError } from '../repository';
-import { KeelDb } from './db';
+import {
+  ImportBlockedError,
+  NotFoundError,
+  StalePlanError,
+} from '../repository';
+import { KeelDb, META } from './db';
 import { createLocalRepository } from './local-repository';
 
 const M = 'mine';
@@ -78,6 +82,7 @@ describe('imports.context', () => {
       openTrades: [],
       fingerprints: [],
       overrides: {},
+      importRevision: 0,
     });
     await expect(repo.imports.context(M, 'nope')).rejects.toBeInstanceOf(
       NotFoundError,
@@ -219,6 +224,57 @@ describe('imports.commit', () => {
     await expect(repo.imports.commit(M, broken)).rejects.toThrow();
     expect(await repo.trades.list(M)).toEqual(open);
     expect((await repo.imports.list(M)).map((j) => j.id)).toEqual(['impA']);
+  });
+});
+
+describe('imports.commit refuses a stale plan', () => {
+  test('when its account was removed after the context was read', async () => {
+    const { repo, db, acc, plan } = await setup();
+    const p = await plan(CORN, 'impA', { mapping: { overrides: { ZC } } });
+    await repo.accounts.remove(M, acc.id);
+    const error = await repo.imports.commit(M, p).catch((e) => e);
+    expect(error).toBeInstanceOf(StalePlanError);
+    expect(error).toMatchObject({ reason: 'account-removed' });
+    expect(await repo.trades.list(M)).toEqual([]);
+    expect(await repo.imports.list(M)).toEqual([]);
+    expect(await db.meta.get(META.overrides(M))).toBeUndefined();
+  });
+
+  test('when an import was committed or undone in the workspace since', async () => {
+    const { repo, account, plan } = await setup();
+    const other = await account('Other');
+    // Two plans from the same history: the first commit makes the second stale.
+    const first = await plan(OPEN_ES, 'impA');
+    const second = await plan(CORN, 'impB', {
+      accountId: other.id,
+      mapping: { overrides: { ZC } },
+    });
+    const a = await repo.imports.commit(M, first);
+    const stale = await repo.imports.commit(M, second).catch((e) => e);
+    expect(stale).toBeInstanceOf(StalePlanError);
+    expect(stale).toMatchObject({ reason: 'imports-changed' });
+    expect(await repo.trades.list(M)).toEqual(first.trades);
+    expect((await repo.imports.list(M)).map((j) => j.id)).toEqual([a.id]);
+    expect((await repo.imports.context(M, other.id)).overrides).toEqual({});
+
+    // An undo moves the history on as well.
+    const third = await plan(CLOSE_ES, 'impC');
+    expect(third.replacedTrades).toEqual(first.trades);
+    await repo.imports.undo(M, a.id);
+    await expect(repo.imports.commit(M, third)).rejects.toMatchObject({
+      reason: 'imports-changed',
+    });
+    expect(await repo.trades.list(M)).toEqual([]);
+
+    // Planned again from the current history, it commits.
+    await repo.imports.commit(
+      M,
+      await plan(CORN, 'impB', {
+        accountId: other.id,
+        mapping: { overrides: { ZC } },
+      }),
+    );
+    expect(await repo.trades.list(M)).toHaveLength(1);
   });
 });
 
@@ -367,30 +423,32 @@ describe('imports.undo', () => {
     const landing = await commit(sampleFillsCsv(), 'impL');
     const [first] = await repo.trades.list(M);
     await repo.trades.remove(M, [first!.id]);
-
-    // The open ES position, closed by B; the user then deletes the closed trade.
-    const a = await commit(OPEN_ES.replace('ESZ5', 'ESH6'), 'impA');
-    const opened = (await repo.trades.list(M)).find((t) => t.importId === a.id);
-    const b = await commit(CLOSE_ES.replace('ESZ5', 'ESH6'), 'impB');
-    await repo.trades.remove(M, [opened!.id]);
-    expect(
-      (await repo.trades.list(M)).filter((t) => t.importId === b.id),
-    ).toEqual([]);
-
     expect(await repo.imports.undo(M, landing.id)).toEqual({ ok: true });
-    expect(
-      (await repo.trades.list(M)).filter((t) => t.importId === landing.id),
-    ).toEqual([]);
-    // Undoing B puts back what B replaced: the open trade as A left it.
+    expect(await repo.trades.list(M)).toEqual([]);
+    expect((await repo.imports.list(M))[0]!.status).toBe('undone');
+  });
+
+  test('undo restores a replaced trade only while its replacement exists', async () => {
+    const { repo, commit } = await setup();
+    const a = await commit(
+      H +
+        '2026-11-16 09:41:00,ESZ5,Buy,2,6010\n2026-11-16 09:45:00,NQZ5,Buy,1,21000\n',
+      'impA',
+    );
+    const [es, nq] = await repo.trades.list(M);
+    const b = await commit(
+      H +
+        '2026-11-17 10:00:00,ESZ5,Sell,2,6015\n2026-11-17 10:05:00,NQZ5,Sell,1,21010\n',
+      'impB',
+    );
+    // The user deletes B's ES trade; B's NQ trade stays.
+    await repo.trades.remove(M, [es!.id]);
+
     expect(await repo.imports.undo(M, b.id)).toEqual({ ok: true });
-    expect(await repo.trades.list(M)).toEqual([opened]);
+    // The deletion stands; NQ is open again as A left it.
+    expect(await repo.trades.list(M)).toEqual([nq]);
     expect(await repo.imports.undo(M, a.id)).toEqual({ ok: true });
     expect(await repo.trades.list(M)).toEqual([]);
-    expect((await repo.imports.list(M)).map((j) => j.status)).toEqual([
-      'undone',
-      'undone',
-      'undone',
-    ]);
   });
 
   test('undo twice is idempotent, and the undone rows stop counting as imported', async () => {

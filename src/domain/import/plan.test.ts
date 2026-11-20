@@ -15,6 +15,7 @@ const ctx = (o: Partial<ImportContext> = {}): ImportContext => ({
   openTrades: [],
   fingerprints: [],
   overrides: {},
+  importRevision: 0,
   ...o,
 });
 const plan = (
@@ -61,6 +62,9 @@ describe('planImport', () => {
       createdAt: '2026-11-21T00:00:00.000Z',
       mapping: { kind: 'fills' },
     }));
+
+  test('the plan carries the revision of the context it was made from', () =>
+    expect(plan(csv, ctx({ importRevision: 3 })).importRevision).toBe(3));
 
   test('serials continue the workspace', () =>
     expect(plan(csv, ctx({ nextSerial: 41 })).trades[0]!.serial).toBe(41));

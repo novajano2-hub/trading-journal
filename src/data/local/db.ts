@@ -23,6 +23,8 @@ export const META = {
   /** Value: `SeedMeta`. */
   seed: 'seed:sample',
   overrides: (ws: string) => `overrides:${ws}`,
+  /** Value: a number, bumped by every import commit and undo in the workspace. */
+  importRevision: (ws: string) => `import-revision:${ws}`,
 } as const;
 
 export interface SeedMeta {

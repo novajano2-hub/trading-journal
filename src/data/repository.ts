@@ -150,6 +150,14 @@ export class ImportBlockedError extends Error {
   }
 }
 
+/** The plan was made from a context that no longer holds, so committing it could write wrong trades. */
+export class StalePlanError extends Error {
+  override name = 'StalePlanError';
+  constructor(readonly reason: 'account-removed' | 'imports-changed') {
+    super(`The import plan is stale: ${reason}`);
+  }
+}
+
 export type UndoResult =
   | { ok: true }
   /** A later active import rebuilt one of this import's trades; undo that one first. */
@@ -162,8 +170,10 @@ export interface ImportRepo {
   context(ws: string, accountId: string): Promise<ImportContext>;
   /**
    * Writes the plan's trades and its job, and remembers its point values.
-   * Throws ImportBlockedError for a blocked plan, and RangeError unless both
-   * `ws` and the plan are My workspace.
+   * Throws ImportBlockedError for a blocked plan, RangeError unless both
+   * `ws` and the plan are My workspace, and StalePlanError, writing nothing,
+   * when the account is gone or an import was committed or undone in the
+   * workspace since the plan's context was read.
    */
   commit(ws: string, plan: ImportPlan): Promise<ImportJob>;
   /**

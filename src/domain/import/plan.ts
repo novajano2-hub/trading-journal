@@ -31,6 +31,8 @@ export interface ImportContext {
   fingerprints: string[];
   /** Point values remembered from earlier imports. */
   overrides: InstrumentOverrides;
+  /** The workspace's import history revision when read; the plan carries it so a commit can refuse a stale plan. */
+  importRevision: number;
 }
 
 export type TradeFlag =
@@ -60,6 +62,8 @@ export interface ImportPlan {
   unresolvedKeys: string[];
   flags: TradeFlag[];
   blocked: ImportBlock | null;
+  /** `ImportContext.importRevision` of the context it was planned from. */
+  importRevision: number;
 }
 
 /** A file P&L within one cent of Keel's gross or net agrees with it. */
@@ -373,5 +377,6 @@ export function planImport(
     fingerprints: built.fingerprints,
     unresolvedKeys,
     blocked,
+    importRevision: ctx.importRevision,
   };
 }

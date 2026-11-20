@@ -3,6 +3,7 @@ import type { ImportJob, Trade } from '@/domain/types';
 import {
   ImportBlockedError,
   NotFoundError,
+  StalePlanError,
   type ImportRepo,
   type UndoResult,
 } from '../repository';
@@ -25,6 +26,19 @@ async function storedOverrides(
 ): Promise<InstrumentOverrides> {
   const value = (await db.meta.get(META.overrides(ws)))?.value;
   return (value as InstrumentOverrides | undefined) ?? {};
+}
+
+async function importRevision(db: KeelDb, ws: string): Promise<number> {
+  const value = (await db.meta.get(META.importRevision(ws)))?.value;
+  return (value as number | undefined) ?? 0;
+}
+
+/** Call inside the rw transaction of the commit or undo. */
+async function bumpImportRevision(db: KeelDb, ws: string): Promise<void> {
+  await db.meta.put({
+    key: META.importRevision(ws),
+    value: (await importRevision(db, ws)) + 1,
+  });
 }
 
 /**
@@ -119,6 +133,7 @@ export function localImports(ctx: LocalContext): ImportRepo {
             openTrades: openTrades.sort((a, b) => a.serial - b.serial),
             fingerprints: jobs.flatMap((j) => j.fingerprints),
             overrides: await storedOverrides(db, ws),
+            importRevision: await importRevision(db, ws),
           };
         },
       );
@@ -148,18 +163,31 @@ export function localImports(ctx: LocalContext): ImportRepo {
         replacedTrades: plan.replacedTrades,
       };
       const db = await ctx.db();
-      await rwTx(db, [db.trades, db.imports, db.meta], async () => {
-        await db.trades.bulkDelete(plan.replacedTrades.map((t) => [ws, t.id]));
-        await db.trades.bulkPut(plan.trades);
-        await db.imports.put(record);
-        await db.meta.put({
-          key: META.overrides(ws),
-          value: {
-            ...(await storedOverrides(db, ws)),
-            ...plan.mapping.overrides,
-          },
-        });
-      });
+      await rwTx(
+        db,
+        [db.accounts, db.trades, db.imports, db.meta],
+        async () => {
+          if (!(await db.accounts.get([ws, plan.accountId])))
+            throw new StalePlanError('account-removed');
+          // A commit or undo since then moved the open trades, fingerprints
+          // and serials the plan was made from.
+          if ((await importRevision(db, ws)) !== plan.importRevision)
+            throw new StalePlanError('imports-changed');
+          await bumpImportRevision(db, ws);
+          await db.trades.bulkDelete(
+            plan.replacedTrades.map((t) => [ws, t.id]),
+          );
+          await db.trades.bulkPut(plan.trades);
+          await db.imports.put(record);
+          await db.meta.put({
+            key: META.overrides(ws),
+            value: {
+              ...(await storedOverrides(db, ws)),
+              ...plan.mapping.overrides,
+            },
+          });
+        },
+      );
       return withoutSnapshots(record);
     },
 
@@ -167,7 +195,7 @@ export function localImports(ctx: LocalContext): ImportRepo {
       const db = await ctx.db();
       return rwTx(
         db,
-        [db.imports, db.trades, db.journal, db.tags, db.strategies],
+        [db.imports, db.trades, db.journal, db.tags, db.strategies, db.meta],
         async (): Promise<UndoResult> => {
           const job = await db.imports.get([ws, jobId]);
           if (!job) throw new NotFoundError('import', jobId);
@@ -190,26 +218,33 @@ export function localImports(ctx: LocalContext): ImportRepo {
             };
 
           // Trades the user has deleted since the import are simply not found.
-          const built = await db.trades
-            .where('[workspaceId+importId]')
-            .equals([ws, jobId])
-            .primaryKeys();
-          await db.trades.bulkDelete(built);
+          const built = (
+            await db.trades
+              .where('[workspaceId+importId]')
+              .equals([ws, jobId])
+              .primaryKeys()
+          ).map(([, id]) => id);
+          await db.trades.bulkDelete(built.map((id) => [ws, id]));
+          // A replacement keeps the replaced trade's id. One the user deleted
+          // stays deleted, so its replaced trade is not brought back.
+          const remaining = new Set(built);
+          const restored = job.replacedTrades.filter((t) =>
+            remaining.has(t.id),
+          );
           // A restored trade keeps its id, so its journal links stay.
-          const restored = new Set(job.replacedTrades.map((t) => t.id));
+          const restoredIds = new Set(restored.map((t) => t.id));
           await pruneJournalLinks(
             db,
             ws,
-            built.map(([, id]) => id).filter((id) => !restored.has(id)),
+            built.filter((id) => !restoredIds.has(id)),
           );
-          await db.trades.bulkPut(
-            await withLiveReferences(db, ws, job.replacedTrades),
-          );
+          await db.trades.bulkPut(await withLiveReferences(db, ws, restored));
           await db.imports.put({
             ...job,
             status: 'undone',
             undoneAt: ctx.now().toISOString(),
           });
+          await bumpImportRevision(db, ws);
           return { ok: true };
         },
       );
