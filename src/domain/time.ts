@@ -15,5 +15,10 @@ export interface LocalParts {
 
 export function localParts(iso: string, timeZone: string): LocalParts {
   const d = new TZDate(Date.parse(iso), timeZone);
-  return { date: format(d, 'yyyy-MM-dd'), weekday: d.getDay(), hour: d.getHours(), minute: d.getMinutes() };
+  return {
+    date: format(d, 'yyyy-MM-dd'),
+    weekday: d.getDay(),
+    hour: d.getHours(),
+    minute: d.getMinutes(),
+  };
 }

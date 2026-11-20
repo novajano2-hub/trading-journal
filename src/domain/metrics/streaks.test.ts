@@ -19,6 +19,11 @@ describe('streaks', () => {
   test('empty and threshold', () => {
     expect(tradeStreaks([], ctx).current).toEqual({ kind: null, length: 0 });
     const t = [50, -50].map((net, i) => makeTrade({ net, serial: i + 1 }));
-    expect(tradeStreaks(t, { ...ctx, breakevenRange: { unit: 'amount', from: -50, to: 50 } })).toEqual({ maxWin: 0, maxLoss: 0, current: { kind: null, length: 0 } });
+    expect(
+      tradeStreaks(t, {
+        ...ctx,
+        breakevenRange: { unit: 'amount', from: -50, to: 50 },
+      }),
+    ).toEqual({ maxWin: 0, maxLoss: 0, current: { kind: null, length: 0 } });
   });
 });

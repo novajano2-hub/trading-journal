@@ -40,7 +40,11 @@ export function canonicalSymbol(symbol: string): string {
   return symbol.trim().toUpperCase().replace(/^\/+/, '');
 }
 
-function splitCost(total: number, openQty: number, qty: number): [closing: number, opening: number] {
+function splitCost(
+  total: number,
+  openQty: number,
+  qty: number,
+): [closing: number, opening: number] {
   const opening = roundHalfEven((total * openQty) / qty);
   return [total - opening, opening];
 }
@@ -60,7 +64,11 @@ function finalize(
 
   const pnlCurrency = pnlCurrencyFor(inst, acctCcy);
   // No exits means no realised P&L, so the rate is never needed then.
-  const gross = toCents(avgExit === undefined ? d.pnl : quoteToPnl(d.pnl, inst, pnlCurrency, avgExit));
+  const gross = toCents(
+    avgExit === undefined
+      ? d.pnl
+      : quoteToPnl(d.pnl, inst, pnlCurrency, avgExit),
+  );
   const fees = d.executions.reduce((s, e) => s + e.fees + e.commission, 0);
 
   const trade: Trade = {
@@ -83,11 +91,17 @@ function finalize(
     ruleChecks: [],
   };
   if (avgExit !== undefined) trade.avgExit = avgExit;
-  if (status === 'closed' && d.closedAt !== undefined) trade.closedAt = d.closedAt;
+  if (status === 'closed' && d.closedAt !== undefined)
+    trade.closedAt = d.closedAt;
   return trade;
 }
 
-function buildGroup(fills: Execution[], inst: Instrument, accountId: string, opts: BuildOptions): Trade[] {
+function buildGroup(
+  fills: Execution[],
+  inst: Instrument,
+  accountId: string,
+  opts: BuildOptions,
+): Trade[] {
   const trades: Trade[] = [];
   let position = 0; // signed
   let draft: Draft | null = null;
@@ -136,8 +150,20 @@ function buildGroup(fills: Execution[], inst: Instrument, accountId: string, opt
     if (openQty > QTY_EPS) {
       const [cf, of] = splitCost(f.fees, openQty, f.qty);
       const [cc, oc] = splitCost(f.commission, openQty, f.qty);
-      closing = { ...f, id: `${f.id}:a`, qty: closeQty, fees: cf, commission: cc };
-      opening = { ...f, id: `${f.id}:b`, qty: openQty, fees: of, commission: oc };
+      closing = {
+        ...f,
+        id: `${f.id}:a`,
+        qty: closeQty,
+        fees: cf,
+        commission: cc,
+      };
+      opening = {
+        ...f,
+        id: `${f.id}:b`,
+        qty: openQty,
+        fees: of,
+        commission: oc,
+      };
     }
     d.executions.push(closing);
 
@@ -162,11 +188,15 @@ function buildGroup(fills: Execution[], inst: Instrument, accountId: string, opt
     }
   }
 
-  if (draft !== null) trades.push(finalize(draft, inst, accountId, 'open', opts));
+  if (draft !== null)
+    trades.push(finalize(draft, inst, accountId, 'open', opts));
   return trades;
 }
 
-export function buildTrades(executions: readonly Execution[], opts: BuildOptions): BuildResult {
+export function buildTrades(
+  executions: readonly Execution[],
+  opts: BuildOptions,
+): BuildResult {
   const groups = new Map<string, Execution[]>();
   for (const e of executions) {
     const key = `${e.accountId}\u0000${canonicalSymbol(e.symbol)}`;
@@ -188,7 +218,9 @@ export function buildTrades(executions: readonly Execution[], opts: BuildOptions
       continue;
     }
     // Array.prototype.sort is stable: equal times keep input order.
-    const sorted = [...group].sort((a, b) => Date.parse(a.time) - Date.parse(b.time));
+    const sorted = [...group].sort(
+      (a, b) => Date.parse(a.time) - Date.parse(b.time),
+    );
     all.push(...buildGroup(sorted, inst, accountId, opts));
   }
 

@@ -11,5 +11,8 @@ export function isClosed(t: Trade): t is ClosedTrade {
 export function closedInOrder(trades: readonly Trade[]): ClosedTrade[] {
   return trades
     .filter(isClosed)
-    .sort((a, b) => Date.parse(a.closedAt) - Date.parse(b.closedAt) || a.serial - b.serial);
+    .sort(
+      (a, b) =>
+        Date.parse(a.closedAt) - Date.parse(b.closedAt) || a.serial - b.serial,
+    );
 }

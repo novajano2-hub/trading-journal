@@ -5,7 +5,15 @@ import type { MetricContext, PnlBasis } from './context';
 import { rOf, summarize, type Summary } from './summary';
 
 export type BreakdownKey =
-  'weekday' | 'hour' | 'time-of-day' | 'session' | 'duration' | 'side' | 'symbol' | 'strategy' | 'tag';
+  | 'weekday'
+  | 'hour'
+  | 'time-of-day'
+  | 'session'
+  | 'duration'
+  | 'side'
+  | 'symbol'
+  | 'strategy'
+  | 'tag';
 export interface BreakdownOptions {
   strategyNames?: Record<string, string>;
   tagNames?: Record<string, string>;
@@ -14,24 +22,52 @@ export interface BreakdownOptions {
   /** Time-of-day bucket width in minutes. Default 30. */
   bucketMinutes?: 5 | 15 | 30 | 60;
 }
-export interface BreakdownRow { key: string; label: string; summary: Summary }
-export interface RBin { from: number; to: number; count: number }
+export interface BreakdownRow {
+  key: string;
+  label: string;
+  summary: Summary;
+}
+export interface RBin {
+  from: number;
+  to: number;
+  count: number;
+}
 
 type Bucket = readonly [key: string, label: string];
 
 const NONE = '__none__';
 const WEEKDAYS: Bucket[] = [
-  ['mon', 'Mon'], ['tue', 'Tue'], ['wed', 'Wed'], ['thu', 'Thu'], ['fri', 'Fri'], ['sat', 'Sat'], ['sun', 'Sun'],
+  ['mon', 'Mon'],
+  ['tue', 'Tue'],
+  ['wed', 'Wed'],
+  ['thu', 'Thu'],
+  ['fri', 'Fri'],
+  ['sat', 'Sat'],
+  ['sun', 'Sun'],
 ];
-const HOURS: Bucket[] = Array.from({ length: 24 }, (_, h) => [String(h), `${String(h).padStart(2, '0')}:00`]);
+const HOURS: Bucket[] = Array.from({ length: 24 }, (_, h) => [
+  String(h),
+  `${String(h).padStart(2, '0')}:00`,
+]);
 const SESSIONS: Bucket[] = [
-  ['asia', 'Asia'], ['london', 'London'], ['new-york', 'New York'], ['after-hours', 'After hours'],
+  ['asia', 'Asia'],
+  ['london', 'London'],
+  ['new-york', 'New York'],
+  ['after-hours', 'After hours'],
 ];
 const DURATIONS: Bucket[] = [
-  ['lt-1m', '<1m'], ['1-5m', '1–5m'], ['5-15m', '5–15m'], ['15-60m', '15–60m'],
-  ['1-4h', '1–4h'], ['4h-1d', '4h–1d'], ['gt-1d', '>1d'],
+  ['lt-1m', '<1m'],
+  ['1-5m', '1–5m'],
+  ['5-15m', '5–15m'],
+  ['15-60m', '15–60m'],
+  ['1-4h', '1–4h'],
+  ['4h-1d', '4h–1d'],
+  ['gt-1d', '>1d'],
 ];
-const SIDES: Bucket[] = [['long', 'Long'], ['short', 'Short']];
+const SIDES: Bucket[] = [
+  ['long', 'Long'],
+  ['short', 'Short'],
+];
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -60,7 +96,10 @@ const hhmm = (mins: number) =>
 
 /** Buckets covering the whole local day in order; key and label are the bucket start 'HH:MM'. */
 function timeBuckets(width: number): Bucket[] {
-  return Array.from({ length: 1440 / width }, (_, i) => [hhmm(i * width), hhmm(i * width)]);
+  return Array.from({ length: 1440 / width }, (_, i) => [
+    hhmm(i * width),
+    hhmm(i * width),
+  ]);
 }
 
 function timeKey(p: { hour: number; minute: number }, width: number): string {
@@ -120,24 +159,45 @@ export function breakdown(
   ctx: MetricContext & BreakdownOptions,
 ): BreakdownRow[] {
   const closed = trades.filter(isClosed);
-  const instant = (t: ClosedTrade) => (ctx.timeBasis === 'exit' ? t.closedAt : t.openedAt);
+  const instant = (t: ClosedTrade) =>
+    ctx.timeBasis === 'exit' ? t.closedAt : t.openedAt;
   const local = (t: ClosedTrade) => localParts(instant(t), ctx.timeZone);
   const width = ctx.bucketMinutes ?? 30;
   switch (by) {
     case 'weekday':
-      return fixed(closed, WEEKDAYS, (t) => WEEKDAY_KEYS[local(t).weekday]!, ctx);
+      return fixed(
+        closed,
+        WEEKDAYS,
+        (t) => WEEKDAY_KEYS[local(t).weekday]!,
+        ctx,
+      );
     case 'hour':
       return fixed(closed, HOURS, (t) => String(local(t).hour), ctx);
     case 'time-of-day':
-      return fixed(closed, timeBuckets(width), (t) => timeKey(local(t), width), ctx);
+      return fixed(
+        closed,
+        timeBuckets(width),
+        (t) => timeKey(local(t), width),
+        ctx,
+      );
     case 'session':
       return fixed(closed, SESSIONS, (t) => sessionKey(instant(t)), ctx);
     case 'duration':
-      return fixed(closed, DURATIONS, (t) => durationKey(Date.parse(t.closedAt) - Date.parse(t.openedAt)), ctx);
+      return fixed(
+        closed,
+        DURATIONS,
+        (t) => durationKey(Date.parse(t.closedAt) - Date.parse(t.openedAt)),
+        ctx,
+      );
     case 'side':
       return fixed(closed, SIDES, (t) => t.direction, ctx);
     case 'symbol':
-      return dynamic(closed, (t) => [t.instrument.root], (k) => k, ctx);
+      return dynamic(
+        closed,
+        (t) => [t.instrument.root],
+        (k) => k,
+        ctx,
+      );
     case 'strategy':
       return dynamic(
         closed,
@@ -156,7 +216,11 @@ export function breakdown(
 }
 
 /** Histogram of R multiples over closed trades; contiguous [from, to) bins including empty ones. */
-export function rDistribution(trades: readonly Trade[], binWidth = 0.5, basis: PnlBasis = 'net'): RBin[] {
+export function rDistribution(
+  trades: readonly Trade[],
+  binWidth = 0.5,
+  basis: PnlBasis = 'net',
+): RBin[] {
   const idx = trades
     .filter(isClosed)
     .map((t) => rOf(t, basis))
@@ -166,7 +230,8 @@ export function rDistribution(trades: readonly Trade[], binWidth = 0.5, basis: P
   const lo = Math.min(...idx);
   const hi = Math.max(...idx);
   const bins: RBin[] = [];
-  for (let i = lo; i <= hi; i++) bins.push({ from: i * binWidth, to: i * binWidth + binWidth, count: 0 });
+  for (let i = lo; i <= hi; i++)
+    bins.push({ from: i * binWidth, to: i * binWidth + binWidth, count: 0 });
   for (const i of idx) bins[i - lo]!.count += 1;
   return bins;
 }

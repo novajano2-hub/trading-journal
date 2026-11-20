@@ -5,7 +5,11 @@ import type { BreakevenRange, Cents } from './types';
  * Amount ranges compare `value`; percent ranges compare `roi` (value / cost basis).
  * A percent range without a usable `roi` (cost basis 0) falls back to amount 0..0.
  */
-export function outcomeOf(value: Cents, range: BreakevenRange, roi?: number): 'win' | 'loss' | 'breakeven' {
+export function outcomeOf(
+  value: Cents,
+  range: BreakevenRange,
+  roi?: number,
+): 'win' | 'loss' | 'breakeven' {
   let v: number = value;
   let from = 0;
   let to = 0;

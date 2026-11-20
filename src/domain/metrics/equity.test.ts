@@ -8,7 +8,11 @@ const ctx = defaultMetricContext('America/New_York');
 describe('equity', () => {
   test('equity and max drawdown', () => {
     const t = [100000, -300000, 50000, -100000, 400000].map((net, i) =>
-      makeTrade({ net, serial: i + 1, closedAt: `2026-03-0${i + 2}T15:00:00Z` }),
+      makeTrade({
+        net,
+        serial: i + 1,
+        closedAt: `2026-03-0${i + 2}T15:00:00Z`,
+      }),
     );
     expect(equityCurve(t, 5000000, ctx).map((p) => p.equity)).toEqual([
       5100000, 4800000, 4850000, 4750000, 5150000,
@@ -16,12 +20,22 @@ describe('equity', () => {
     const dd = maxDrawdown(t, 5000000, ctx);
     expect(dd.amount).toBe(350000);
     expect(dd.pct).toBeCloseTo(0.0686, 4);
-    expect([dd.peakAt, dd.troughAt]).toEqual(['2026-03-02T15:00:00Z', '2026-03-05T15:00:00Z']);
+    expect([dd.peakAt, dd.troughAt]).toEqual([
+      '2026-03-02T15:00:00Z',
+      '2026-03-05T15:00:00Z',
+    ]);
     expect(maxDrawdown([], 5000000, ctx)).toMatchObject({ amount: 0, pct: 0 });
     expect(
-      maxDrawdown([makeTrade({ net: 1000 }), makeTrade({ net: -500, serial: 2 })], 0, ctx).pct,
+      maxDrawdown(
+        [makeTrade({ net: 1000 }), makeTrade({ net: -500, serial: 2 })],
+        0,
+        ctx,
+      ).pct,
     ).toBeCloseTo(0.5, 4);
-    expect(maxDrawdown([makeTrade({ net: -500 })], 0, ctx)).toMatchObject({ amount: 500, pct: null });
+    expect(maxDrawdown([makeTrade({ net: -500 })], 0, ctx)).toMatchObject({
+      amount: 500,
+      pct: null,
+    });
   });
 
   test('ignores open trades; orders by closedAt then serial', () => {

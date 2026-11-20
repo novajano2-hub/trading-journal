@@ -2,7 +2,10 @@ import type { AssetClass, Instrument } from './types';
 
 export interface ResolveOptions {
   forexQtyUnit?: 'lots' | 'units'; // default 'lots'
-  overrides?: Record<string, { pointValue: number; tickSize: number; assetClass?: AssetClass }>; // keyed by root
+  overrides?: Record<
+    string,
+    { pointValue: number; tickSize: number; assetClass?: AssetClass }
+  >; // keyed by root
 }
 
 const FUTURES: Record<string, { pointValue: number; tickSize: number }> = {
@@ -25,17 +28,49 @@ const FUTURES: Record<string, { pointValue: number; tickSize: number }> = {
   '6E': { pointValue: 125000, tickSize: 0.00005 },
 };
 
-const FX_CODES = new Set(['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK', 'SGD', 'HKD', 'MXN', 'ZAR']);
-const CRYPTO_BASES = ['BTC', 'ETH', 'SOL', 'XRP', 'ADA', 'DOGE', 'LTC', 'AVAX', 'LINK', 'DOT'];
+const FX_CODES = new Set([
+  'USD',
+  'EUR',
+  'GBP',
+  'JPY',
+  'CHF',
+  'CAD',
+  'AUD',
+  'NZD',
+  'SEK',
+  'NOK',
+  'SGD',
+  'HKD',
+  'MXN',
+  'ZAR',
+]);
+const CRYPTO_BASES = [
+  'BTC',
+  'ETH',
+  'SOL',
+  'XRP',
+  'ADA',
+  'DOGE',
+  'LTC',
+  'AVAX',
+  'LINK',
+  'DOT',
+];
 const CRYPTO_QUOTES = ['USD', 'USDT', 'USDC'];
 
 const OPTION_RE = /^([A-Z]{1,6})\s*(\d{6})([CP])(\d{8})$/;
 const FUTURES_RE = /^\/?([A-Z0-9]{1,4}?)([FGHJKMNQUVXZ])(\d{1,2})$/;
 const FOREX_RE = /^([A-Z]{3})\/?([A-Z]{3})$/;
-const CRYPTO_RE = new RegExp(`^(${CRYPTO_BASES.join('|')})[-/]?(${CRYPTO_QUOTES.join('|')})$`);
+const CRYPTO_RE = new RegExp(
+  `^(${CRYPTO_BASES.join('|')})[-/]?(${CRYPTO_QUOTES.join('|')})$`,
+);
 const STOCK_RE = /^[A-Z]{1,5}(\.[A-Z])?$/;
 
-function resolveFuture(symbol: string, s: string, opts: ResolveOptions): Instrument | null {
+function resolveFuture(
+  symbol: string,
+  s: string,
+  opts: ResolveOptions,
+): Instrument | null {
   const m = FUTURES_RE.exec(s);
   if (!m) return null;
   // Lazy root match can pick a shorter root than intended; try every split.
@@ -62,7 +97,10 @@ function resolveFuture(symbol: string, s: string, opts: ResolveOptions): Instrum
   return null;
 }
 
-export function resolveInstrument(symbol: string, opts: ResolveOptions = {}): Instrument | null {
+export function resolveInstrument(
+  symbol: string,
+  opts: ResolveOptions = {},
+): Instrument | null {
   const trimmed = symbol.trim();
   const s = trimmed.toUpperCase();
   if (!s) return null;
@@ -88,7 +126,12 @@ export function resolveInstrument(symbol: string, opts: ResolveOptions = {}): In
 
   const fx = FOREX_RE.exec(s);
   const [, fxBase = '', fxQuote = ''] = fx ?? [];
-  if (fx && FX_CODES.has(fxBase) && FX_CODES.has(fxQuote) && fxBase !== fxQuote) {
+  if (
+    fx &&
+    FX_CODES.has(fxBase) &&
+    FX_CODES.has(fxQuote) &&
+    fxBase !== fxQuote
+  ) {
     return {
       symbol: trimmed,
       root: fxBase + fxQuote,
@@ -115,7 +158,14 @@ export function resolveInstrument(symbol: string, opts: ResolveOptions = {}): In
   }
 
   if (STOCK_RE.test(s)) {
-    return { symbol: trimmed, root: s, assetClass: 'stock', pointValue: 1, tickSize: 0.01, quoteCurrency: 'USD' };
+    return {
+      symbol: trimmed,
+      root: s,
+      assetClass: 'stock',
+      pointValue: 1,
+      tickSize: 0.01,
+      quoteCurrency: 'USD',
+    };
   }
   return null;
 }

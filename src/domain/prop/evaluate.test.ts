@@ -16,11 +16,19 @@ function S(o: Opts = {}) {
   const day1 = o.day1 ?? [150000, -50000];
   const times1 = ['2026-03-02T15:00:00Z', '2026-03-02T16:00:00Z'];
   const trades: Trade[] = [];
-  day1.forEach((net, i) => trades.push(makeTrade({ net, serial: i + 1, closedAt: times1[i] })));
+  day1.forEach((net, i) =>
+    trades.push(makeTrade({ net, serial: i + 1, closedAt: times1[i] })),
+  );
   const day2 = o.day2 ?? -90000;
-  if (day2 !== 0) trades.push(makeTrade({ net: day2, serial: 10, closedAt: '2026-03-03T15:00:00Z' }));
+  if (day2 !== 0)
+    trades.push(
+      makeTrade({ net: day2, serial: 10, closedAt: '2026-03-03T15:00:00Z' }),
+    );
   const day3 = o.day3 ?? 40000;
-  if (day3 !== 0) trades.push(makeTrade({ net: day3, serial: 20, closedAt: '2026-03-04T15:00:00Z' }));
+  if (day3 !== 0)
+    trades.push(
+      makeTrade({ net: day3, serial: 20, closedAt: '2026-03-04T15:00:00Z' }),
+    );
   return {
     startingBalance: 5000000,
     rules: {
@@ -65,31 +73,45 @@ describe('evaluateProp', () => {
   });
 
   test('daily loss near and breached', () => {
-    expect(evaluateProp(S({ day2: -95000, now: '2026-03-03T20:00:00Z' })).dailyLoss).toMatchObject({
+    expect(
+      evaluateProp(S({ day2: -95000, now: '2026-03-03T20:00:00Z' })).dailyLoss,
+    ).toMatchObject({
       todayNet: -95000,
       remaining: 5000,
       state: 'near',
     });
     const b = evaluateProp(S({ day2: -120000 }));
-    expect(b.dailyLoss).toMatchObject({ state: 'breached', breachedOn: '2026-03-03' });
+    expect(b.dailyLoss).toMatchObject({
+      state: 'breached',
+      breachedOn: '2026-03-03',
+    });
     expect(b.overall).toBe('breached');
   });
 
   test('trailing breach is permanent even after recovery', () => {
-    const s = evaluateProp(S({ drawdownType: 'trailing', day2: -210000, day3: 300000 }));
-    expect(s.drawdown).toMatchObject({ state: 'breached', breachedAt: '2026-03-03T15:00:00Z' });
+    const s = evaluateProp(
+      S({ drawdownType: 'trailing', day2: -210000, day3: 300000 }),
+    );
+    expect(s.drawdown).toMatchObject({
+      state: 'breached',
+      breachedAt: '2026-03-03T15:00:00Z',
+    });
     expect(s.overall).toBe('breached');
   });
 
   test('trailing floor locks at the starting balance', () => {
     expect(
-      evaluateProp(S({ drawdownType: 'trailing', day1: [300000], day2: 0, day3: 0 })).drawdown.floor,
+      evaluateProp(
+        S({ drawdownType: 'trailing', day1: [300000], day2: 0, day3: 0 }),
+      ).drawdown.floor,
     ).toBe(5000000);
   });
 
   test('target reached', () => {
     expect(
-      evaluateProp(S({ day1: [150000], day2: 100000, day3: 100000, consistencyPct: 0.5 })).overall,
+      evaluateProp(
+        S({ day1: [150000], day2: 100000, day3: 100000, consistencyPct: 0.5 }),
+      ).overall,
     ).toBe('target-reached');
   });
 
@@ -102,19 +124,38 @@ describe('evaluateProp', () => {
   });
 
   test('eod-trailing breach is permanent', () => {
-    const s = evaluateProp(S({ drawdownType: 'eod-trailing', day1: [300000], day2: -310000, day3: 400000 }));
-    expect(s.drawdown).toMatchObject({ state: 'breached', breachedAt: '2026-03-03T15:00:00Z' });
+    const s = evaluateProp(
+      S({
+        drawdownType: 'eod-trailing',
+        day1: [300000],
+        day2: -310000,
+        day3: 400000,
+      }),
+    );
+    expect(s.drawdown).toMatchObject({
+      state: 'breached',
+      breachedAt: '2026-03-03T15:00:00Z',
+    });
     expect(s.overall).toBe('breached');
   });
 
   test('drawdown near state', () => {
-    const s = evaluateProp(S({ drawdownType: 'static', day1: [-100000], day2: -60000, day3: 0 }));
-    expect(s.drawdown).toMatchObject({ floor: 4800000, remaining: 40000, state: 'near' });
+    const s = evaluateProp(
+      S({ drawdownType: 'static', day1: [-100000], day2: -60000, day3: 0 }),
+    );
+    expect(s.drawdown).toMatchObject({
+      floor: 4800000,
+      remaining: 40000,
+      state: 'near',
+    });
   });
 
   test('daily loss breaches at the intraday dip even if the day recovers', () => {
     const s = evaluateProp(S({ day1: [-120000, 80000], day2: 0, day3: 0 }));
-    expect(s.dailyLoss).toMatchObject({ state: 'breached', breachedOn: '2026-03-02' });
+    expect(s.dailyLoss).toMatchObject({
+      state: 'breached',
+      breachedOn: '2026-03-02',
+    });
     expect(s.overall).toBe('breached');
   });
 

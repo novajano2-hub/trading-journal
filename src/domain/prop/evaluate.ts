@@ -19,13 +19,27 @@ export interface PropStatus {
     breachedOn?: string;
     worstDay: { date: string; net: Cents } | null;
   };
-  drawdown: { type: DrawdownType; floor: Cents; remaining: Cents; state: RuleState; breachedAt?: string };
+  drawdown: {
+    type: DrawdownType;
+    floor: Cents;
+    remaining: Cents;
+    state: RuleState;
+    breachedAt?: string;
+  };
   tradingDays: { count: number; min: number; met: boolean };
-  consistency: { bestDayShare: number | null; limitPct: number; met: boolean } | null;
+  consistency: {
+    bestDayShare: number | null;
+    limitPct: number;
+    met: boolean;
+  } | null;
   overall: 'in-progress' | 'breached' | 'target-reached';
 }
 
-function ruleState(breached: boolean, remaining: Cents, limit: Cents): RuleState {
+function ruleState(
+  breached: boolean,
+  remaining: Cents,
+  limit: Cents,
+): RuleState {
   if (breached) return 'breached';
   return remaining <= NEAR_FRACTION * limit ? 'near' : 'clear';
 }
@@ -63,25 +77,38 @@ export function evaluateProp(input: {
   for (const t of closedInOrder(trades)) {
     const day = localDate(t.closedAt, timeZone);
     if (day !== currentDay) dayRunning = 0;
-    if (rules.drawdownType === 'eod-trailing' && currentDay !== undefined && day !== currentDay) {
+    if (
+      rules.drawdownType === 'eod-trailing' &&
+      currentDay !== undefined &&
+      day !== currentDay
+    ) {
       peak = Math.max(peak, equity); // equity is still the previous day's close
     }
     currentDay = day;
     equity += t.net;
     dayRunning += t.net;
     // Daily loss breaches the first time the running day net touches the limit.
-    if (breachedOn === undefined && dayRunning <= -rules.dailyLossLimit) breachedOn = day;
-    if (breachedAt === undefined && equity <= floorFor(peak)) breachedAt = t.closedAt;
+    if (breachedOn === undefined && dayRunning <= -rules.dailyLossLimit)
+      breachedOn = day;
+    if (breachedAt === undefined && equity <= floorFor(peak))
+      breachedAt = t.closedAt;
     if (rules.drawdownType === 'trailing') peak = Math.max(peak, equity);
   }
   // eod-trailing: the last trading day's close counts once that day has ended.
   const today = localDate(now, timeZone);
-  if (rules.drawdownType === 'eod-trailing' && currentDay !== undefined && today > currentDay) {
+  if (
+    rules.drawdownType === 'eod-trailing' &&
+    currentDay !== undefined &&
+    today > currentDay
+  ) {
     peak = Math.max(peak, equity);
   }
   const floor = floorFor(peak);
 
-  const days = dailyPnl(trades, defaultMetricContext(timeZone)) /* firm rules count fees: net, range 0..0 */;
+  const days = dailyPnl(
+    trades,
+    defaultMetricContext(timeZone),
+  ); /* firm rules count fees: net, range 0..0 */
   const todayNet = days.find((d) => d.date === today)?.net ?? 0;
   const worst = days.reduce<{ date: string; net: Cents } | null>(
     (w, d) => (w === null || d.net < w.net ? { date: d.date, net: d.net } : w),
@@ -110,7 +137,9 @@ export function evaluateProp(input: {
   const overall: PropStatus['overall'] =
     dailyBreached || ddBreached
       ? 'breached'
-      : profitCurrent >= rules.profitTarget && daysMet && (consistency === null || consistency.met)
+      : profitCurrent >= rules.profitTarget &&
+          daysMet &&
+          (consistency === null || consistency.met)
         ? 'target-reached'
         : 'in-progress';
 
@@ -136,7 +165,11 @@ export function evaluateProp(input: {
       state: ruleState(ddBreached, ddRemaining, rules.maxDrawdown),
       ...(breachedAt !== undefined && { breachedAt }),
     },
-    tradingDays: { count: tradingDayCount, min: rules.minTradingDays, met: daysMet },
+    tradingDays: {
+      count: tradingDayCount,
+      min: rules.minTradingDays,
+      met: daysMet,
+    },
     consistency,
     overall,
   };

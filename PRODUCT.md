@@ -11,6 +11,7 @@ Responsive web: the marketing site and the app both work on phones. Native mobil
 ## Stack
 
 Next.js (the user's choice). Supporting choices were delegated, so these are my calls:
+
 - TypeScript, Tailwind CSS and Radix primitives, styled in-house
 - TradingView Lightweight Charts (Apache-2.0) for price and replay charts
 - a permissively licensed library for analytics charts
@@ -20,6 +21,7 @@ For reference, TradeZella's app is a Vite + React single-page app hosted on Hero
 ## Users
 
 Retail traders of stocks, options, futures, forex and crypto, at every stage:
+
 - losing money and looking for why
 - developing and trying to become consistent
 - profitable and protecting their edge
@@ -31,6 +33,7 @@ The job: find out what is and isn't working in their trading, then change their 
 ## Product Purpose
 
 One platform that does the jobs of TradeZella and MyTradingJourney together:
+
 - trades journaled automatically from broker sync or file import
 - analysed in depth
 - measured against the trader's own strategies and rules
@@ -43,6 +46,7 @@ Success: traders stop paying for several tools, and their review habit sticks be
 ## Positioning
 
 Delegated to me; this is my call from category practice. Everything in one place, organised as one improvement loop: **trade → journal → review against your rules → test the fix → trade again**. Neither source product covers the whole loop:
+
 - TradeZella has no trade copier and gates replay and AI behind higher tiers.
 - MyTradingJourney has no playbooks, rule tracking or psychology tooling.
 

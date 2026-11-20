@@ -2,11 +2,24 @@ import { closedInOrder } from '../trade-status';
 import type { Cents, Trade } from '../types';
 import { pnlOf, type MetricContext } from './context';
 
-export interface EquityPoint { time: string; equity: Cents; tradeId: string }
-export interface Drawdown { amount: Cents; pct: number | null; peakAt?: string; troughAt?: string }
+export interface EquityPoint {
+  time: string;
+  equity: Cents;
+  tradeId: string;
+}
+export interface Drawdown {
+  amount: Cents;
+  pct: number | null;
+  peakAt?: string;
+  troughAt?: string;
+}
 
 /** Closed-trade equity on ctx.pnlBasis; the input must be a single-currency set. */
-export function equityCurve(trades: readonly Trade[], startingBalance: Cents, ctx: MetricContext): EquityPoint[] {
+export function equityCurve(
+  trades: readonly Trade[],
+  startingBalance: Cents,
+  ctx: MetricContext,
+): EquityPoint[] {
   let equity = startingBalance;
   return closedInOrder(trades).map((t) => {
     equity += pnlOf(t, ctx.pnlBasis);
@@ -14,7 +27,11 @@ export function equityCurve(trades: readonly Trade[], startingBalance: Cents, ct
   });
 }
 
-export function maxDrawdown(trades: readonly Trade[], startingBalance: Cents, ctx: MetricContext): Drawdown {
+export function maxDrawdown(
+  trades: readonly Trade[],
+  startingBalance: Cents,
+  ctx: MetricContext,
+): Drawdown {
   let peak = startingBalance;
   let peakAt: string | undefined;
   let amount = 0;

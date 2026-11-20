@@ -11,9 +11,21 @@ describe('trade-status', () => {
     expect(isClosed(noClose)).toBe(false);
   });
   test('closedInOrder sorts by closedAt then serial', () => {
-    const a = makeTrade({ net: 1, serial: 2, closedAt: '2026-03-02T15:00:00Z' });
-    const b = makeTrade({ net: 1, serial: 1, closedAt: '2026-03-02T15:00:00Z' });
-    const c = makeTrade({ net: 1, serial: 3, closedAt: '2026-03-02T14:00:00Z' });
+    const a = makeTrade({
+      net: 1,
+      serial: 2,
+      closedAt: '2026-03-02T15:00:00Z',
+    });
+    const b = makeTrade({
+      net: 1,
+      serial: 1,
+      closedAt: '2026-03-02T15:00:00Z',
+    });
+    const c = makeTrade({
+      net: 1,
+      serial: 3,
+      closedAt: '2026-03-02T14:00:00Z',
+    });
     expect(closedInOrder([a, b, c])).toEqual([c, b, a]);
   });
 });

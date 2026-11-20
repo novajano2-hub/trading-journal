@@ -7,23 +7,38 @@ import { costBasis, pnlOf, type MetricContext, type PnlBasis } from './context';
 
 /** `netPnl`/`grossPnl` are always the true net and gross totals; `basis` says which one every other figure uses. */
 export interface Summary {
-  closedCount: number; openCount: number; wins: number; losses: number; breakevens: number;
-  netPnl: Cents; grossPnl: Cents; fees: Cents;
+  closedCount: number;
+  openCount: number;
+  wins: number;
+  losses: number;
+  breakevens: number;
+  netPnl: Cents;
+  grossPnl: Cents;
+  fees: Cents;
   /** Which P&L every classification, sum and ratio below is computed on. */
   basis: PnlBasis;
-  winRate: number | null; profitFactor: number | null;
-  avgWin: Cents | null; avgLoss: Cents | null; winLossRatio: number | null;
+  winRate: number | null;
+  profitFactor: number | null;
+  avgWin: Cents | null;
+  avgLoss: Cents | null;
+  winLossRatio: number | null;
   expectancy: Cents | null;
-  avgRealizedR: number | null; realizedRTradeCount: number; noRiskCount: number;
-  avgPlannedR: number | null; plannedRTradeCount: number;
-  largestWin: Cents | null; largestLoss: Cents | null; ruleAdherence: number | null;
+  avgRealizedR: number | null;
+  realizedRTradeCount: number;
+  noRiskCount: number;
+  avgPlannedR: number | null;
+  plannedRTradeCount: number;
+  largestWin: Cents | null;
+  largestLoss: Cents | null;
+  ruleAdherence: number | null;
   /** Sorted distinct pnlCurrency values of the closed trades; more than one means the set is mixed. */
   currencies: string[];
 }
 
 /** Realized R: P&L on the basis / initialRisk, only when initialRisk > 0. */
 export function rOf(trade: Trade, basis: PnlBasis): number | undefined {
-  if (trade.initialRisk === undefined || !(trade.initialRisk > 0)) return undefined;
+  if (trade.initialRisk === undefined || !(trade.initialRisk > 0))
+    return undefined;
   return pnlOf(trade, basis) / trade.initialRisk;
 }
 
@@ -40,8 +55,13 @@ export function plannedR(trade: Trade): number | undefined {
  * converted to the trade's P&L currency at the entry price.
  */
 export function riskFromStop(trade: Trade, stop: number): Cents {
-  const quote = Math.abs(trade.avgEntry - stop) * trade.maxPosition * trade.instrument.pointValue;
-  return toCents(quoteToPnl(quote, trade.instrument, trade.pnlCurrency, trade.avgEntry));
+  const quote =
+    Math.abs(trade.avgEntry - stop) *
+    trade.maxPosition *
+    trade.instrument.pointValue;
+  return toCents(
+    quoteToPnl(quote, trade.instrument, trade.pnlCurrency, trade.avgEntry),
+  );
 }
 
 const sum = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0);
@@ -51,15 +71,29 @@ const ratio = (n: number, d: number): number | null => (d === 0 ? null : n / d);
  * Aggregate closed trades. The input must be a single-currency set (the data layer
  * partitions by pnlCurrency first); `currencies` lets the UI warn when it is not.
  */
-export function summarize(trades: readonly Trade[], ctx: MetricContext): Summary {
+export function summarize(
+  trades: readonly Trade[],
+  ctx: MetricContext,
+): Summary {
   const closed = trades.filter(isClosed);
   const classified = closed.map((t) => {
     const value = pnlOf(t, ctx.pnlBasis);
     const basis = costBasis(t);
-    return { value, outcome: outcomeOf(value, ctx.breakevenRange, basis > 0 ? value / basis : undefined) };
+    return {
+      value,
+      outcome: outcomeOf(
+        value,
+        ctx.breakevenRange,
+        basis > 0 ? value / basis : undefined,
+      ),
+    };
   });
-  const winNets = classified.filter((c) => c.outcome === 'win').map((c) => c.value);
-  const lossNets = classified.filter((c) => c.outcome === 'loss').map((c) => c.value);
+  const winNets = classified
+    .filter((c) => c.outcome === 'win')
+    .map((c) => c.value);
+  const lossNets = classified
+    .filter((c) => c.outcome === 'loss')
+    .map((c) => c.value);
   const wins = winNets.length;
   const losses = lossNets.length;
 
@@ -68,14 +102,23 @@ export function summarize(trades: readonly Trade[], ctx: MetricContext): Summary
   const avgWinRaw = ratio(winSum, wins);
   const avgLossRaw = ratio(lossSum, losses);
 
-  const rs = closed.map((t) => rOf(t, ctx.pnlBasis)).filter((r): r is number => r !== undefined);
-  const planned = closed.map(plannedR).filter((r): r is number => r !== undefined);
-  const checks = closed.flatMap((t) => t.ruleChecks).filter((c) => c.followed !== null);
+  const rs = closed
+    .map((t) => rOf(t, ctx.pnlBasis))
+    .filter((r): r is number => r !== undefined);
+  const planned = closed
+    .map(plannedR)
+    .filter((r): r is number => r !== undefined);
+  const checks = closed
+    .flatMap((t) => t.ruleChecks)
+    .filter((c) => c.followed !== null);
   const followed = checks.filter((c) => c.followed === true).length;
   const decisive = wins + losses;
   // Win% x Avg Win + Loss% x Avg Loss (avg loss is negative), over decisive trades, unrounded.
   const expectancy =
-    decisive === 0 ? null : (wins / decisive) * (avgWinRaw ?? 0) + (losses / decisive) * (avgLossRaw ?? 0);
+    decisive === 0
+      ? null
+      : (wins / decisive) * (avgWinRaw ?? 0) +
+        (losses / decisive) * (avgLossRaw ?? 0);
 
   return {
     closedCount: closed.length,
@@ -92,7 +135,9 @@ export function summarize(trades: readonly Trade[], ctx: MetricContext): Summary
     avgWin: avgWinRaw === null ? null : roundHalfEven(avgWinRaw),
     avgLoss: avgLossRaw === null ? null : roundHalfEven(avgLossRaw),
     winLossRatio:
-      avgWinRaw === null || avgLossRaw === null || avgLossRaw === 0 ? null : avgWinRaw / Math.abs(avgLossRaw),
+      avgWinRaw === null || avgLossRaw === null || avgLossRaw === 0
+        ? null
+        : avgWinRaw / Math.abs(avgLossRaw),
     expectancy: expectancy === null ? null : roundHalfEven(expectancy),
     avgRealizedR: ratio(sum(rs), rs.length),
     realizedRTradeCount: rs.length,

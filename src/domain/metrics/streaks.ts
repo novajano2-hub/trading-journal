@@ -10,7 +10,9 @@ export interface StreakResult {
 }
 
 /** Folds decisive outcomes (undefined = neutral: skipped, neither extends nor breaks). */
-export function streaksOf(outcomes: readonly ('win' | 'loss' | undefined)[]): StreakResult {
+export function streaksOf(
+  outcomes: readonly ('win' | 'loss' | undefined)[],
+): StreakResult {
   let maxWin = 0;
   let maxLoss = 0;
   let kind: 'win' | 'loss' | null = null;
@@ -22,15 +24,26 @@ export function streaksOf(outcomes: readonly ('win' | 'loss' | undefined)[]): St
     if (o === 'win') maxWin = Math.max(maxWin, length);
     else maxLoss = Math.max(maxLoss, length);
   }
-  return { maxWin, maxLoss, current: { kind, length: kind === null ? 0 : length } };
+  return {
+    maxWin,
+    maxLoss,
+    current: { kind, length: kind === null ? 0 : length },
+  };
 }
 
-export function tradeStreaks(trades: readonly Trade[], ctx: MetricContext): StreakResult {
+export function tradeStreaks(
+  trades: readonly Trade[],
+  ctx: MetricContext,
+): StreakResult {
   return streaksOf(
     closedInOrder(trades).map((t) => {
       const value = pnlOf(t, ctx.pnlBasis);
       const basis = costBasis(t);
-      const o = outcomeOf(value, ctx.breakevenRange, basis > 0 ? value / basis : undefined);
+      const o = outcomeOf(
+        value,
+        ctx.breakevenRange,
+        basis > 0 ? value / basis : undefined,
+      );
       return o === 'breakeven' ? undefined : o;
     }),
   );
