@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { CheckCircle, XCircle } from '@phosphor-icons/react/dist/ssr';
 
 export interface RuleRow {
@@ -8,12 +9,24 @@ export interface RuleRow {
 }
 
 /** Strategy rules graded kept or broken. State is carried by icon, color and text. */
-export function RuleList({ rules }: { rules: readonly RuleRow[] }) {
+export function RuleList({
+  rules,
+  label,
+}: {
+  rules: readonly RuleRow[];
+  /** Names the list for assistive tech. */
+  label?: string;
+}) {
   return (
-    <ul className="rounded-control border border-line bg-surface-1 px-4 py-1">
-      {rules.map((r) => (
+    <ul
+      aria-label={label}
+      className="rounded-control border border-line bg-surface-1 px-4 py-1"
+    >
+      {rules.map((r, i) => (
         <li
           key={r.text}
+          data-tick-row=""
+          style={{ '--i': i } as CSSProperties}
           className="flex items-center gap-2.5 border-t border-line py-[9px] text-sm first:border-t-0"
         >
           {r.ok ? (

@@ -481,3 +481,18 @@ button.slot-go:disabled {
   letter-spacing: -0.005em;
   text-wrap: balance;
 }
+
+/*
+ * Rows that tick in once when their section is first seen (TickIn). Rows are
+ * plain and visible until script arms the wrapper, so no-JS and reduced
+ * motion show the final state.
+ */
+[data-tick-row] {
+  transition:
+    opacity var(--dur-enter) var(--ease-enter) calc(var(--i, 0) * 110ms),
+    translate var(--dur-enter) var(--ease-enter) calc(var(--i, 0) * 110ms);
+}
+[data-tick-armed]:not([data-tick-in]) [data-tick-row] {
+  opacity: 0;
+  translate: 0 8px;
+}

@@ -144,6 +144,139 @@ test('reports: the active fill follows the selected tab', async ({ page }) => {
   }
 });
 
+const plan = (page: Page) =>
+  page.getByRole('region', { name: 'Hold yourself to your own plan.' });
+const faq = (page: Page) => page.getByRole('region', { name: 'Questions' });
+
+test('plan bento: exactly three cells, with the sample numbers', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const section = plan(page);
+  await expect(section.getByRole('heading', { level: 3 })).toHaveText([
+    'Rules, graded on every trade',
+    'Prop rules after every trade',
+    'A notebook beside the trades',
+  ]);
+  await expect(section.getByTestId('bento-cell')).toHaveCount(3);
+  // Trade 6's checks: three kept, the stop broken.
+  const rules = section.getByRole('list', { name: 'Rules for trade 6' });
+  await expect(rules.getByRole('listitem')).toHaveCount(4);
+  await expect(rules).toContainText('Broken: Stop stays where it was placed');
+  // Plain numbers from the prop engine, no bars.
+  await expect(section).toContainText('41% of $3,000.00');
+  await expect(section).toContainText('$2,000.00 left');
+  await expect(section).toContainText('54%');
+  await expect(section.getByText('Over 50% limit')).toBeVisible();
+  await expect(section.getByRole('progressbar')).toHaveCount(0);
+  await expect(
+    section.getByRole('list', { name: 'Linked trades' }),
+  ).toContainText('Moved stop');
+});
+
+test('plan bento: the rule rows tick in once, in order', async ({ page }) => {
+  await page.goto('/');
+  const rows = plan(page)
+    .getByRole('list', { name: 'Rules for trade 6' })
+    .getByRole('listitem');
+  await rows.first().scrollIntoViewIfNeeded();
+  await expect(rows.first()).toBeVisible();
+  await expect
+    .poll(() =>
+      rows.evaluateAll((els) => els.map((e) => getComputedStyle(e).opacity)),
+    )
+    .toEqual(['1', '1', '1', '1']);
+});
+
+test('definitions: four formulas in a description list', async ({ page }) => {
+  await page.goto('/');
+  const section = page.getByRole('region', {
+    name: 'Every number has a definition.',
+  });
+  await expect(section.locator('dt')).toHaveText([
+    'Net P&L',
+    'Expectancy',
+    'Realized R',
+    'Breakeven',
+  ]);
+  await expect(section.locator('dd').first()).toContainText(
+    '(exit - entry) × qty × point value - fees',
+  );
+});
+
+test('import: a mapping table built from the sample CSV, five asset pills', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const section = page.getByRole('region', {
+    name: 'Bring the export your broker already gives you.',
+  });
+  const table = section.getByRole('table', { name: 'Column mapping' });
+  await expect(table.getByRole('row')).toHaveCount(6);
+  await expect(table.getByRole('row').nth(1)).toContainText('Date/Time');
+  await expect(table.getByRole('row').nth(1)).toContainText(
+    '2026-11-16 09:41:00',
+  );
+  await expect(table.getByRole('row').nth(3)).toContainText('Buy/Sell');
+  await expect(table.getByRole('row').nth(3)).toContainText('Side');
+  await expect(
+    section.getByRole('list', { name: 'Asset classes' }).getByRole('listitem'),
+  ).toHaveCount(5);
+  for (const label of ['Futures', 'Stocks', 'Options', 'Forex', 'Crypto'])
+    await expect(section.getByText(label, { exact: true })).toBeVisible();
+});
+
+test('faq: Enter opens and closes, aria-expanded follows', async ({ page }) => {
+  await page.goto('/');
+  const section = faq(page);
+  const q = (name: string) => section.getByRole('button', { name });
+  await expect(section.getByRole('button')).toHaveText([
+    'Which brokers work?',
+    'Where does my data go?',
+    'What does it cost?',
+    'Does it handle prop firm accounts?',
+  ]);
+  const second = q('Where does my data go?');
+  await expect(second).toHaveAttribute('aria-expanded', 'false');
+  await second.focus();
+  await page.keyboard.press('Enter');
+  await expect(second).toHaveAttribute('aria-expanded', 'true');
+  await expect(
+    section.getByText(
+      'In this release, files are read in your browser and nothing is uploaded.',
+    ),
+  ).toBeVisible();
+  await page.keyboard.press('Enter');
+  await expect(second).toHaveAttribute('aria-expanded', 'false');
+  await page.keyboard.press('Space');
+  await expect(second).toHaveAttribute('aria-expanded', 'true');
+
+  const answers: [string, string][] = [
+    [
+      'Which brokers work?',
+      'Any export with time, symbol, side, quantity and price columns. Direct broker sync is on the roadmap.',
+    ],
+    ['What does it cost?', 'Pricing will be announced before accounts open.'],
+    [
+      'Does it handle prop firm accounts?',
+      'Yes. Enter the rules from your evaluation and Keel tracks them after every trade.',
+    ],
+  ];
+  for (const [name, answer] of answers) {
+    await q(name).click();
+    await expect(section.getByText(answer)).toBeVisible();
+  }
+});
+
+test('closing row and a page free of "In development"', async ({ page }) => {
+  await page.goto('/');
+  const close = page.getByRole('region', {
+    name: "Start with last week's trades.",
+  });
+  await expect(close.getByRole('link', { name: 'Get started' })).toBeVisible();
+  await expect(page.getByRole('main')).not.toContainText('In development');
+});
+
 for (const width of [390, 768, 1024, 1280, 1440, 1680]) {
   test(`no horizontal overflow at ${width}, longest labels showing`, async ({
     page,
@@ -153,6 +286,7 @@ for (const width of [390, 768, 1024, 1280, 1440, 1680]) {
     const r = reports(page);
     await r.getByRole('tab', { name: 'Setup' }).click();
     await r.getByRole('tab', { name: 'Setup' }).scrollIntoViewIfNeeded();
+    await faq(page).getByRole('button').first().scrollIntoViewIfNeeded();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
