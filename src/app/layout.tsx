@@ -1,38 +1,28 @@
 import type { Metadata } from 'next';
-import { Barlow, Big_Shoulders, DotGothic16 } from 'next/font/google';
+import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 
-// Variable, with the optical-size axis, so globals.css can pin the Display cut
-// (Google's static weights default to opsz 14, the wider Text cut).
-const display = Big_Shoulders({
-  variable: '--nf-display',
-  subsets: ['latin'],
-  axes: ['opsz'],
-});
-
-const text = Barlow({
-  variable: '--nf-text',
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-});
-
-const stamp = DotGothic16({
-  variable: '--nf-stamp',
-  subsets: ['latin'],
-  weight: '400',
-});
+const sans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
+const mono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: { default: 'Keel', template: '%s · Keel' },
   description: 'Trading journal',
 };
 
+// Runs before first paint so a saved dark choice never flashes light.
+const themeInit = `try{if(localStorage.getItem('keel-theme')==='dark')document.documentElement.dataset.theme='dark'}catch(e){}`;
+
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
     <html
       lang="en"
-      className={`${display.variable} ${text.variable} ${stamp.variable} h-full antialiased`}
+      className={`${sans.variable} ${mono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

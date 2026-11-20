@@ -1,0 +1,52 @@
+/*
+ * Keel light pro-trading tokens. Light is the default regardless of OS;
+ * dark is an explicit [data-theme='dark'] on <html>.
+ * Radius rule: chips 6, buttons/inputs/inner panels 10, cards 16.
+ */
+:root {
+  color-scheme: light;
+  --bg: #f6f7f9;
+  --surface-1: #ffffff;
+  --sunken: #eff1f4;
+  --line: #e3e6eb;
+  --line-2: #d3d8df;
+  --text: #0f1218;
+  --muted: #4f5865;
+  --faint: #687080;
+  --accent: #2550e0;
+  --accent-hover: #1e44c4;
+  --accent-soft: #eaf0fe;
+  --accent-ink: #1b3fb8;
+  --accent-fg: #ffffff;
+  --gain: #087a54;
+  --gain-soft: #e6f4ee;
+  --loss: #c8283a;
+  --loss-soft: #fbebed;
+  --ring: #2550e0;
+
+  --r-chip: 6px;
+  --r-control: 10px;
+  --r-card: 16px;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0c0e12;
+  --surface-1: #14171d;
+  --sunken: #101319;
+  --line: #232832;
+  --line-2: #313846;
+  --text: #eceef2;
+  --muted: #a3abb8;
+  --faint: #8b93a1;
+  --accent: #3866e6;
+  --accent-hover: #2f5bd8;
+  --accent-soft: #172447;
+  --accent-ink: #9db6f5;
+  --accent-fg: #ffffff;
+  --gain: #3ecf9a;
+  --gain-soft: #0f2a21;
+  --loss: #f0707e;
+  --loss-soft: #2f1519;
+  --ring: #7a9cf2;
+}

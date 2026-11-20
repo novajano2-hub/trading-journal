@@ -51,7 +51,7 @@ export function Field({
       {/* Figures are never cut off: they step down the ticket's type scale as
           the ticket narrows, and only wrap if a visitor's value still won't fit. */}
       <dd
-        className={`leading-snug font-semibold wrap-anywhere ${compact ? 'text-[15px] @min-[240px]:text-[17px]' : 'text-[17px] @min-[300px]:text-[19px] @min-[360px]:text-[22px]'}`}
+        className={`leading-snug font-semibold tracking-tight wrap-anywhere ${compact ? 'text-[15px] @min-[240px]:text-[17px]' : 'text-[17px] @min-[300px]:text-[19px] @min-[360px]:text-[22px]'}`}
       >
         {value}
       </dd>

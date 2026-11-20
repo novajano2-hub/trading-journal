@@ -16,10 +16,10 @@
   /* focus ring flips on navy surfaces */
   --focus: var(--navy);
 
-  --font-display:
-    var(--nf-display), 'Big Shoulders', 'Arial Narrow', sans-serif;
-  --font-text: var(--nf-text), 'Barlow', system-ui, sans-serif;
-  --font-stamp: var(--nf-stamp), 'DotGothic16', monospace;
+  /* Trading Floor fonts are gone; the old names alias Geist until Task 7. */
+  --font-display: var(--font-geist-sans), system-ui, sans-serif;
+  --font-text: var(--font-geist-sans), system-ui, sans-serif;
+  --font-stamp: var(--font-geist-sans), system-ui, sans-serif;
 }
 
 [data-surface='navy'] {
