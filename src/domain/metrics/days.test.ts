@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { makeTrade } from '../__fixtures__/trades';
+import { outcomeOf } from '../outcome';
 import { dailyPnl, dayStreaks, daySummary } from './days';
 
 describe('days', () => {
@@ -29,5 +30,12 @@ describe('days', () => {
     expect(dayStreaks([d('1', 1), d('2', 0), d('3', 1), d('4', -1)])).toEqual({
       maxWin: 2, maxLoss: 1, current: { kind: 'loss', length: 1 },
     });
+  });
+
+  test('outcomeOf classifies against the breakeven threshold', () => {
+    expect(outcomeOf(101, 100)).toBe('win');
+    expect(outcomeOf(100, 100)).toBe('breakeven');
+    expect(outcomeOf(-100, 100)).toBe('breakeven');
+    expect(outcomeOf(-101, 100)).toBe('loss');
   });
 });

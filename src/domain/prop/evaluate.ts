@@ -1,7 +1,6 @@
-import { TZDate } from '@date-fns/tz';
-import { format } from 'date-fns';
 import { dailyPnl } from '../metrics/days';
-import { closedInOrder } from '../metrics/equity';
+import { localDate } from '../time';
+import { closedInOrder, isClosed } from '../trade-status';
 import type { Cents, DrawdownType, PropRuleSet, Trade } from '../types';
 
 export type RuleState = 'clear' | 'near' | 'breached';
@@ -25,16 +24,15 @@ export interface PropStatus {
   overall: 'in-progress' | 'breached' | 'target-reached';
 }
 
-function localDate(iso: string, timeZone: string): string {
-  return format(new TZDate(Date.parse(iso), timeZone), 'yyyy-MM-dd');
-}
-
 function ruleState(breached: boolean, remaining: Cents, limit: Cents): RuleState {
   if (breached) return 'breached';
   return remaining <= NEAR_FRACTION * limit ? 'near' : 'clear';
 }
 
-/** Closed-trade equity basis; intraday unrealised P&L needs market data (backlog #14). */
+/**
+ * Closed-trade equity basis; intraday unrealised P&L needs market data (backlog #14).
+ * The input trades must be a single-currency set (the data layer partitions by pnlCurrency first).
+ */
 export function evaluateProp(input: {
   startingBalance: Cents;
   rules: PropRuleSet;
@@ -45,7 +43,7 @@ export function evaluateProp(input: {
   const { startingBalance: start, rules, timeZone, now } = input;
   const nowMs = Date.parse(now);
   const trades = input.trades.filter(
-    (t) => t.closedAt !== undefined && Date.parse(t.closedAt) <= nowMs,
+    (t) => isClosed(t) && Date.parse(t.closedAt) <= nowMs,
   );
 
   // Floor in force before a trade, from the peak *before* that trade.
@@ -58,24 +56,32 @@ export function evaluateProp(input: {
   let peak = start; // trailing: peak of equity; eod-trailing: peak of prior days' end-of-day equity
   let currentDay: string | undefined;
   let breachedAt: string | undefined;
+  let breachedOn: string | undefined;
+  let dayRunning = 0; // closed-trade net so far on currentDay
 
   for (const t of closedInOrder(trades)) {
     const day = localDate(t.closedAt, timeZone);
+    if (day !== currentDay) dayRunning = 0;
     if (rules.drawdownType === 'eod-trailing' && currentDay !== undefined && day !== currentDay) {
       peak = Math.max(peak, equity); // equity is still the previous day's close
     }
     currentDay = day;
     equity += t.net;
+    dayRunning += t.net;
+    // Daily loss breaches the first time the running day net touches the limit.
+    if (breachedOn === undefined && dayRunning <= -rules.dailyLossLimit) breachedOn = day;
     if (breachedAt === undefined && equity <= floorFor(peak)) breachedAt = t.closedAt;
     if (rules.drawdownType === 'trailing') peak = Math.max(peak, equity);
   }
-  // Floor in force after the last trade (eod-trailing peak only moves at day rollover).
+  // eod-trailing: the last trading day's close counts once that day has ended.
+  const today = localDate(now, timeZone);
+  if (rules.drawdownType === 'eod-trailing' && currentDay !== undefined && today > currentDay) {
+    peak = Math.max(peak, equity);
+  }
   const floor = floorFor(peak);
 
   const days = dailyPnl(trades, timeZone, 0);
-  const today = localDate(now, timeZone);
   const todayNet = days.find((d) => d.date === today)?.net ?? 0;
-  const breachedOn = days.find((d) => d.net <= -rules.dailyLossLimit)?.date;
   const worst = days.reduce<{ date: string; net: Cents } | null>(
     (w, d) => (w === null || d.net < w.net ? { date: d.date, net: d.net } : w),
     null,

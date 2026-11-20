@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { makeTrade } from '../__fixtures__/trades';
+import { resolveInstrument } from '../instruments';
 import { riskFromStop, summarize } from './summary';
 
 const nets = [10000, -5000, 0, 2500, -2500, 7500].map((net) => makeTrade({ net }));
@@ -45,5 +46,34 @@ describe('summarize', () => {
   test('rule adherence ignores unanswered checks', () => {
     const t = makeTrade({ net: 0, ruleChecks: [true, true, false, null].map((f, i) => ({ ruleId: `r${i}`, followed: f })) });
     expect(summarize([t], { breakevenThreshold: 0 }).ruleAdherence).toBeCloseTo(0.6667, 4);
+  });
+
+  test('riskFromStop converts quote-currency risk into the trade pnl currency', () => {
+    const usdjpy = makeTrade({
+      net: 0,
+      instrument: resolveInstrument('USDJPY')!,
+      avgEntry: 154.21,
+      maxPosition: 1,
+      pnlCurrency: 'USD',
+    });
+    expect(riskFromStop(usdjpy, 154.0)).toBe(13618);
+  });
+
+  test('currencies lists the sorted distinct pnl currencies of closed trades', () => {
+    const mixed = [
+      makeTrade({ net: 100, pnlCurrency: 'USD' }),
+      makeTrade({ net: 100, pnlCurrency: 'EUR' }),
+      makeTrade({ net: 100, pnlCurrency: 'USD' }),
+      makeTrade({ net: 100, pnlCurrency: 'JPY', status: 'open' }),
+    ];
+    expect(summarize(mixed, { breakevenThreshold: 0 }).currencies).toEqual(['EUR', 'USD']);
+    expect(summarize([], { breakevenThreshold: 0 }).currencies).toEqual([]);
+  });
+
+  test('a closed trade without closedAt is not counted as closed', () => {
+    const odd = makeTrade({ net: 500, closedAt: undefined });
+    delete (odd as { closedAt?: string }).closedAt;
+    const s = summarize([odd], { breakevenThreshold: 0 });
+    expect(s).toMatchObject({ closedCount: 0, openCount: 1, netPnl: 0 });
   });
 });

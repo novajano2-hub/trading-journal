@@ -1,3 +1,4 @@
+import { pnlCurrencyFor, quoteToPnl } from './currency';
 import { roundHalfEven, toCents } from './money';
 import type { Direction, Execution, Instrument, Trade } from './types';
 
@@ -34,6 +35,11 @@ interface Draft {
   closedAt?: string;
 }
 
+/** Trimmed, uppercase, no leading '/'. */
+export function canonicalSymbol(symbol: string): string {
+  return symbol.trim().toUpperCase().replace(/^\/+/, '');
+}
+
 function splitCost(total: number, openQty: number, qty: number): [closing: number, opening: number] {
   const opening = roundHalfEven((total * openQty) / qty);
   return [total - opening, opening];
@@ -52,19 +58,13 @@ function finalize(
   const avgExit = d.exitQty > 0 ? d.exitNotional / d.exitQty : undefined;
   const acctCcy = opts.accountCurrency(accountId);
 
-  let pnl = d.pnl;
-  let pnlCurrency = inst.quoteCurrency;
-  if (inst.quoteCurrency !== acctCcy) {
-    if (inst.baseCurrency === acctCcy && avgExit !== undefined) {
-      pnl = pnl / avgExit;
-      pnlCurrency = acctCcy;
-    }
-  }
-  const gross = toCents(pnl);
+  const pnlCurrency = pnlCurrencyFor(inst, acctCcy);
+  // No exits means no realised P&L, so the rate is never needed then.
+  const gross = toCents(avgExit === undefined ? d.pnl : quoteToPnl(d.pnl, inst, pnlCurrency, avgExit));
   const fees = d.executions.reduce((s, e) => s + e.fees + e.commission, 0);
 
   const trade: Trade = {
-    id: `${accountId}:${inst.symbol}:${first.id}`,
+    id: `${accountId}:${canonicalSymbol(inst.symbol)}:${first.id}`,
     serial: 0,
     workspaceId: opts.workspaceId,
     accountId,
@@ -169,7 +169,7 @@ function buildGroup(fills: Execution[], inst: Instrument, accountId: string, opt
 export function buildTrades(executions: readonly Execution[], opts: BuildOptions): BuildResult {
   const groups = new Map<string, Execution[]>();
   for (const e of executions) {
-    const key = `${e.accountId}\u0000${e.symbol}`;
+    const key = `${e.accountId}\u0000${canonicalSymbol(e.symbol)}`;
     const g = groups.get(key);
     if (g) g.push(e);
     else groups.set(key, [e]);
@@ -180,7 +180,8 @@ export function buildTrades(executions: readonly Execution[], opts: BuildOptions
   for (const group of groups.values()) {
     const head = group[0];
     if (!head) continue;
-    const { accountId, symbol } = head;
+    const accountId = head.accountId;
+    const symbol = canonicalSymbol(head.symbol);
     const inst = opts.resolve(symbol);
     if (!inst) {
       if (!unresolved.includes(symbol)) unresolved.push(symbol);

@@ -1,12 +1,12 @@
-import { TZDate } from '@date-fns/tz';
-import { format } from 'date-fns';
+import { outcomeOf } from '../outcome';
+import { localDate } from '../time';
+import { closedInOrder } from '../trade-status';
 import type { Cents, Trade } from '../types';
-import { closedInOrder } from './equity';
 import { streaksOf, type StreakResult } from './streaks';
 
 export interface DayStat { date: string; net: Cents; tradeCount: number; wins: number; losses: number }
 
-/** Closed trades bucketed by local (timeZone) close date, ascending. */
+/** Closed trades bucketed by local (timeZone) close date, ascending. Input must be a single-currency set. */
 export function dailyPnl(
   trades: readonly Trade[],
   timeZone: string,
@@ -14,13 +14,14 @@ export function dailyPnl(
 ): DayStat[] {
   const byDate = new Map<string, DayStat>();
   for (const t of closedInOrder(trades)) {
-    const date = format(new TZDate(Date.parse(t.closedAt), timeZone), 'yyyy-MM-dd');
+    const date = localDate(t.closedAt, timeZone);
     let d = byDate.get(date);
     if (!d) byDate.set(date, (d = { date, net: 0, tradeCount: 0, wins: 0, losses: 0 }));
     d.net += t.net;
     d.tradeCount += 1;
-    if (t.net > breakevenThreshold) d.wins += 1;
-    else if (t.net < -breakevenThreshold) d.losses += 1;
+    const o = outcomeOf(t.net, breakevenThreshold);
+    if (o === 'win') d.wins += 1;
+    else if (o === 'loss') d.losses += 1;
   }
   return [...byDate.values()].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 }

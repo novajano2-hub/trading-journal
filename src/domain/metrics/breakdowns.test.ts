@@ -84,4 +84,12 @@ describe('breakdowns', () => {
     ]);
     expect(rDistribution([makeTrade({ net: 100 })])).toEqual([]);
   });
+
+  test('status open with a closedAt is excluded from breakdowns and rDistribution', () => {
+    const ghost = at('2026-03-09T13:45:00Z', { status: 'open', initialRisk: 1000 });
+    const noClose = at('2026-03-09T13:45:00Z', { initialRisk: 1000 });
+    delete (noClose as { closedAt?: string }).closedAt;
+    expect(breakdown([ghost, noClose], 'side', ctx).every((r) => r.summary.closedCount === 0)).toBe(true);
+    expect(rDistribution([ghost, noClose])).toEqual([]);
+  });
 });

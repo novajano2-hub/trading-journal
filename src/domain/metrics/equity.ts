@@ -1,17 +1,10 @@
+import { closedInOrder } from '../trade-status';
 import type { Cents, Trade } from '../types';
 
 export interface EquityPoint { time: string; equity: Cents; tradeId: string }
 export interface Drawdown { amount: Cents; pct: number | null; peakAt?: string; troughAt?: string }
 
-type ClosedTrade = Trade & { closedAt: string };
-
-/** Closed trades only, ordered by closedAt (instant) then serial. */
-export function closedInOrder(trades: readonly Trade[]): ClosedTrade[] {
-  return trades
-    .filter((t): t is ClosedTrade => t.status === 'closed' && t.closedAt !== undefined)
-    .sort((a, b) => Date.parse(a.closedAt) - Date.parse(b.closedAt) || a.serial - b.serial);
-}
-
+/** Closed-trade equity; the input must be a single-currency set. */
 export function equityCurve(trades: readonly Trade[], startingBalance: Cents): EquityPoint[] {
   let equity = startingBalance;
   return closedInOrder(trades).map((t) => {

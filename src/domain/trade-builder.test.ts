@@ -94,4 +94,22 @@ describe('buildTrades', () => {
     expect(r.trades.map((t) => [t.accountId, t.serial])).toEqual([['a1', 10], ['a2', 11]]);
     expect(r.unresolvedSymbols).toEqual(['XYZZ5']);
   });
+
+  test('symbols are canonicalised: trimmed, uppercased, no leading slash', () => {
+    const fills = [
+      { ...fill('e1', 'buy', 1, 4500, T1), symbol: 'ESZ5' },
+      { ...fill('e2', 'sell', 1, 4501, T2), symbol: ' /esz5 ' },
+    ];
+    const r = buildTrades(fills, {
+      workspaceId: 'w', startSerial: 1, resolve: (s) => resolveInstrument(s), accountCurrency: () => 'USD',
+    });
+    expect(r.trades).toHaveLength(1);
+    expect(at(r.trades, 0).status).toBe('closed');
+    expect(at(r.trades, 0).id).toBe('a1:ESZ5:e1');
+  });
+
+  test('an open USD-base forex trade gets pnlCurrency from instrument and account', () => {
+    const r = build([fill('e1', 'buy', 1, 154.21, T1)], 'USDJPY');
+    expect(at(r.trades, 0)).toMatchObject({ status: 'open', pnlCurrency: 'USD' });
+  });
 });

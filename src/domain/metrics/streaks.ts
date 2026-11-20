@@ -1,5 +1,6 @@
+import { outcomeOf } from '../outcome';
+import { closedInOrder } from '../trade-status';
 import type { Cents, Trade } from '../types';
-import { closedInOrder } from './equity';
 
 export interface StreakResult {
   maxWin: number;
@@ -25,8 +26,9 @@ export function streaksOf(outcomes: readonly ('win' | 'loss' | undefined)[]): St
 
 export function tradeStreaks(trades: readonly Trade[], breakevenThreshold: Cents): StreakResult {
   return streaksOf(
-    closedInOrder(trades).map((t) =>
-      t.net > breakevenThreshold ? 'win' : t.net < -breakevenThreshold ? 'loss' : undefined,
-    ),
+    closedInOrder(trades).map((t) => {
+      const o = outcomeOf(t.net, breakevenThreshold);
+      return o === 'breakeven' ? undefined : o;
+    }),
   );
 }

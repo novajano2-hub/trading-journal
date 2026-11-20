@@ -3,7 +3,7 @@ import type { Cents, Trade } from '../types';
 
 let counter = 0;
 
-/** Test-only: a fully valid closed ES long; gross = net, fees 0. Overrides win. */
+/** Test-only: a fully valid closed ES long; gross = net + fees (fees 0 by default). Overrides win. */
 export function makeTrade(p: Partial<Trade> & { net: Cents }): Trade {
   counter += 1;
   const base: Trade = {
@@ -21,7 +21,7 @@ export function makeTrade(p: Partial<Trade> & { net: Cents }): Trade {
     avgExit: 4500,
     maxPosition: 1,
     pnlCurrency: 'USD',
-    gross: p.net,
+    gross: p.net + (p.fees ?? 0),
     fees: 0,
     tagIds: [],
     ruleChecks: [],

@@ -1,4 +1,5 @@
-import { TZDate } from '@date-fns/tz';
+import { localParts } from '../time';
+import { isClosed, type ClosedTrade } from '../trade-status';
 import type { Cents, Trade } from '../types';
 import { rOf, summarize, type Summary } from './summary';
 
@@ -42,8 +43,8 @@ function durationKey(ms: number): string {
 }
 
 function sessionKey(openedAt: string): string {
-  const d = new TZDate(Date.parse(openedAt), 'America/New_York');
-  const mins = d.getHours() * 60 + d.getMinutes();
+  const p = localParts(openedAt, 'America/New_York');
+  const mins = p.hour * 60 + p.minute;
   if (mins >= 18 * 60 || mins < 3 * 60) return 'asia';
   if (mins < 9 * 60 + 30) return 'london';
   if (mins < 16 * 60) return 'new-york';
@@ -53,12 +54,12 @@ function sessionKey(openedAt: string): string {
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
 function fixed(
-  closed: Trade[],
+  closed: ClosedTrade[],
   buckets: Bucket[],
-  keyOf: (t: Trade) => string,
+  keyOf: (t: ClosedTrade) => string,
   ctx: BreakdownContext,
 ): BreakdownRow[] {
-  const groups = new Map<string, Trade[]>(buckets.map(([k]) => [k, []]));
+  const groups = new Map<string, ClosedTrade[]>(buckets.map(([k]) => [k, []]));
   for (const t of closed) groups.get(keyOf(t))!.push(t);
   return buckets.map(([key, label]) => ({
     key,
@@ -68,12 +69,12 @@ function fixed(
 }
 
 function dynamic(
-  closed: Trade[],
-  keysOf: (t: Trade) => string[],
+  closed: ClosedTrade[],
+  keysOf: (t: ClosedTrade) => string[],
   labelOf: (key: string) => string,
   ctx: BreakdownContext,
 ): BreakdownRow[] {
-  const groups = new Map<string, Trade[]>();
+  const groups = new Map<string, ClosedTrade[]>();
   for (const t of closed) {
     for (const k of keysOf(t)) {
       const g = groups.get(k);
@@ -95,17 +96,17 @@ function dynamic(
 }
 
 export function breakdown(trades: readonly Trade[], by: BreakdownKey, ctx: BreakdownContext): BreakdownRow[] {
-  const closed = trades.filter((t) => t.closedAt !== undefined);
-  const local = (t: Trade) => new TZDate(Date.parse(t.openedAt), ctx.timeZone);
+  const closed = trades.filter(isClosed);
+  const local = (t: ClosedTrade) => localParts(t.openedAt, ctx.timeZone);
   switch (by) {
     case 'weekday':
-      return fixed(closed, WEEKDAYS, (t) => WEEKDAY_KEYS[local(t).getDay()]!, ctx);
+      return fixed(closed, WEEKDAYS, (t) => WEEKDAY_KEYS[local(t).weekday]!, ctx);
     case 'hour':
-      return fixed(closed, HOURS, (t) => String(local(t).getHours()), ctx);
+      return fixed(closed, HOURS, (t) => String(local(t).hour), ctx);
     case 'session':
       return fixed(closed, SESSIONS, (t) => sessionKey(t.openedAt), ctx);
     case 'duration':
-      return fixed(closed, DURATIONS, (t) => durationKey(Date.parse(t.closedAt!) - Date.parse(t.openedAt)), ctx);
+      return fixed(closed, DURATIONS, (t) => durationKey(Date.parse(t.closedAt) - Date.parse(t.openedAt)), ctx);
     case 'side':
       return fixed(closed, SIDES, (t) => t.direction, ctx);
     case 'symbol':
@@ -130,7 +131,7 @@ export function breakdown(trades: readonly Trade[], by: BreakdownKey, ctx: Break
 /** Histogram of R multiples over closed trades; contiguous [from, to) bins including empty ones. */
 export function rDistribution(trades: readonly Trade[], binWidth = 0.5): RBin[] {
   const idx = trades
-    .filter((t) => t.closedAt !== undefined)
+    .filter(isClosed)
     .map(rOf)
     .filter((r): r is number => r !== undefined)
     .map((r) => Math.floor(r / binWidth + 1e-9));

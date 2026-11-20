@@ -1,4 +1,7 @@
+import { quoteToPnl } from '../currency';
 import { roundHalfEven, toCents } from '../money';
+import { outcomeOf } from '../outcome';
+import { isClosed } from '../trade-status';
 import type { Cents, Trade } from '../types';
 
 export interface Summary {
@@ -8,6 +11,8 @@ export interface Summary {
   avgWin: Cents | null; avgLoss: Cents | null; winLossRatio: number | null;
   expectancy: Cents | null; expectancyR: number | null; rTradeCount: number; noRiskCount: number;
   largestWin: Cents | null; largestLoss: Cents | null; ruleAdherence: number | null;
+  /** Sorted distinct pnlCurrency values of the closed trades; more than one means the set is mixed. */
+  currencies: string[];
 }
 
 /** R multiple: net / initialRisk, only when initialRisk > 0. */
@@ -16,20 +21,28 @@ export function rOf(trade: Trade): number | undefined {
   return trade.net / trade.initialRisk;
 }
 
-/** Risk in cents implied by a stop price: |avgEntry - stop| x maxPosition x pointValue. */
+/**
+ * Risk in cents implied by a stop price: |avgEntry - stop| x maxPosition x pointValue,
+ * converted to the trade's P&L currency at the entry price.
+ */
 export function riskFromStop(trade: Trade, stop: number): Cents {
-  return toCents(Math.abs(trade.avgEntry - stop) * trade.maxPosition * trade.instrument.pointValue);
+  const quote = Math.abs(trade.avgEntry - stop) * trade.maxPosition * trade.instrument.pointValue;
+  return toCents(quoteToPnl(quote, trade.instrument, trade.pnlCurrency, trade.avgEntry));
 }
 
 const sum = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0);
 const ratio = (n: number, d: number): number | null => (d === 0 ? null : n / d);
 
+/**
+ * Aggregate closed trades. The input must be a single-currency set (the data layer
+ * partitions by pnlCurrency first); `currencies` lets the UI warn when it is not.
+ */
 export function summarize(trades: readonly Trade[], opts: { breakevenThreshold: Cents }): Summary {
   const th = opts.breakevenThreshold;
-  const closed = trades.filter((t) => t.status === 'closed');
+  const closed = trades.filter(isClosed);
   const nets = closed.map((t) => t.net);
-  const winNets = nets.filter((n) => n > th);
-  const lossNets = nets.filter((n) => n < -th);
+  const winNets = nets.filter((n) => outcomeOf(n, th) === 'win');
+  const lossNets = nets.filter((n) => outcomeOf(n, th) === 'loss');
   const wins = winNets.length;
   const losses = lossNets.length;
 
@@ -66,5 +79,6 @@ export function summarize(trades: readonly Trade[], opts: { breakevenThreshold: 
     largestWin: wins === 0 ? null : Math.max(...winNets),
     largestLoss: losses === 0 ? null : Math.min(...lossNets),
     ruleAdherence: ratio(followed, checks.length),
+    currencies: [...new Set(closed.map((t) => t.pnlCurrency))].sort(),
   };
 }

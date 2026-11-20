@@ -93,6 +93,31 @@ describe('evaluateProp', () => {
     ).toBe('target-reached');
   });
 
+  test('eod-trailing floor catches up once the trading day has ended', () => {
+    const s = evaluateProp({
+      ...S({ drawdownType: 'eod-trailing', day1: [300000], day2: 0, day3: 0 }),
+      now: '2026-03-03T15:00:00Z',
+    });
+    expect(s.drawdown).toMatchObject({ floor: 5000000, remaining: 300000 });
+  });
+
+  test('eod-trailing breach is permanent', () => {
+    const s = evaluateProp(S({ drawdownType: 'eod-trailing', day1: [300000], day2: -310000, day3: 400000 }));
+    expect(s.drawdown).toMatchObject({ state: 'breached', breachedAt: '2026-03-03T15:00:00Z' });
+    expect(s.overall).toBe('breached');
+  });
+
+  test('drawdown near state', () => {
+    const s = evaluateProp(S({ drawdownType: 'static', day1: [-100000], day2: -60000, day3: 0 }));
+    expect(s.drawdown).toMatchObject({ floor: 4800000, remaining: 40000, state: 'near' });
+  });
+
+  test('daily loss breaches at the intraday dip even if the day recovers', () => {
+    const s = evaluateProp(S({ day1: [-120000, 80000], day2: 0, day3: 0 }));
+    expect(s.dailyLoss).toMatchObject({ state: 'breached', breachedOn: '2026-03-02' });
+    expect(s.overall).toBe('breached');
+  });
+
   test('ignores trades after now; no days gives null worstDay', () => {
     const s = evaluateProp({ ...S(), now: '2026-03-01T00:00:00Z' });
     expect(s.equity).toBe(5000000);
