@@ -40,6 +40,8 @@ const importJob = (
   createdAt: '2026-11-20T00:00:00.000Z',
   fingerprints: [],
   replacedTrades: [],
+  tradeIds: [],
+  revision: 1,
 });
 
 test('lists come back in their documented order', async () => {

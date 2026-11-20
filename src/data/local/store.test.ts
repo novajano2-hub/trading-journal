@@ -282,6 +282,8 @@ function mineRows() {
     createdAt: '2026-11-20T15:00:00.000Z',
     fingerprints: [],
     replacedTrades: [],
+    tradeIds: [],
+    revision: 1,
   };
   return { account, trade, strategy, tag, note, job };
 }

@@ -160,27 +160,30 @@ export class StalePlanError extends Error {
 
 export type UndoResult =
   | { ok: true }
-  /** A later active import rebuilt one of this import's trades; undo that one first. */
+  /** A later active import in the account rebuilt one of this import's trades, or trades a symbol it touched; undo that one first. */
   | { ok: false; reason: 'later-import-depends'; dependentJobId: string };
 
 export interface ImportRepo {
-  /** Newest first, without the jobs' fingerprints and replaced trades. */
+  /** Newest first (`createdAt`, then `id`), without what dedupe and undo work from. */
   list(ws: string): Promise<ImportJob[]>;
   /** What `planImport` needs for the account. Throws NotFoundError for a missing account. */
   context(ws: string, accountId: string): Promise<ImportContext>;
   /**
    * Writes the plan's trades and its job, and remembers its point values.
-   * Throws ImportBlockedError for a blocked plan, RangeError unless both
-   * `ws` and the plan are My workspace, and StalePlanError, writing nothing,
+   * Throws ImportBlockedError for a blocked plan, RangeError unless `ws`, the
+   * plan and every row it writes or replaces are My workspace (rows also in
+   * the plan's account), and StalePlanError, writing nothing,
    * when the account is gone or an import was committed or undone in the
    * workspace since the plan's context was read.
    */
   commit(ws: string, plan: ImportPlan): Promise<ImportJob>;
   /**
-   * Deletes the job's trades and restores the ones it replaced, minus
-   * references to tags, strategies, rules and notes deleted since. Refused
-   * while a later active import holds one of its trades. Throws NotFoundError
-   * for a missing job; an undone job is left as it is.
+   * Deletes the job's trades and restores the ones it replaced, except one
+   * whose same-id replacement the user deleted, minus references to tags,
+   * strategies, rules and notes deleted since. Refused while a later active
+   * import in the account rebuilt one of its trades or has trades in a symbol
+   * it touched. Throws NotFoundError for a missing job; an undone job is left
+   * as it is.
    */
   undo(ws: string, jobId: string): Promise<UndoResult>;
 }

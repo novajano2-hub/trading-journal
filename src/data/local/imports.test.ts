@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { sampleFillsCsv } from '@/content/landing-sample-csv';
 import { parseCsv } from '@/domain/import/csv';
 import { guessMapping, type MappingOptions } from '@/domain/import/mapping';
-import { planImport } from '@/domain/import/plan';
+import { planImport, type ImportContext } from '@/domain/import/plan';
 import { fixtureSample } from '../__fixtures__/sample';
 import {
   ImportBlockedError,
@@ -48,9 +48,15 @@ async function setup() {
   const plan = async (
     text: string,
     importId: string,
-    o: { accountId?: string; mapping?: Partial<MappingOptions> } = {},
+    o: {
+      accountId?: string;
+      mapping?: Partial<MappingOptions>;
+      /** Plans from an altered context, to reach a state the repository no longer builds. */
+      alter?: (c: ImportContext) => ImportContext;
+    } = {},
   ) => {
-    const ctx = await repo.imports.context(M, o.accountId ?? acc.id);
+    const read = await repo.imports.context(M, o.accountId ?? acc.id);
+    const ctx = o.alter ? o.alter(read) : read;
     const parsed = parseCsv(text);
     return planImport(
       parsed,
@@ -161,6 +167,18 @@ describe('imports.commit', () => {
     expect(await repo.trades.list(M)).toHaveLength(9);
   });
 
+  test('jobs created at the same time list by id', async () => {
+    const { repo, plan } = await setup();
+    const b = await plan(OPEN_ES, 'impB');
+    await repo.imports.commit(M, b);
+    const a = await plan(CORN, 'impA', { mapping: { overrides: { ZC } } });
+    await repo.imports.commit(M, { ...a, createdAt: b.createdAt });
+    expect((await repo.imports.list(M)).map((j) => j.id)).toEqual([
+      'impA',
+      'impB',
+    ]);
+  });
+
   test('point values entered for an import are remembered for the next one, in this workspace only', async () => {
     const { repo, acc, plan, commit } = await setup();
     await commit(CORN, 'impA', { mapping: { overrides: { ZC } } });
@@ -197,6 +215,19 @@ describe('imports.commit', () => {
     await expect(
       repo.imports.commit(M, { ...p, workspaceId: 'sample' }),
     ).rejects.toBeInstanceOf(RangeError);
+    // Every row it writes or replaces must be the plan's workspace and account.
+    const t = p.trades[0]!;
+    for (const row of [
+      { ...t, workspaceId: 'sample' },
+      { ...t, accountId: 'acc-a' },
+    ]) {
+      await expect(
+        repo.imports.commit(M, { ...p, trades: [row] }),
+      ).rejects.toBeInstanceOf(RangeError);
+      await expect(
+        repo.imports.commit(M, { ...p, replacedTrades: [row] }),
+      ).rejects.toBeInstanceOf(RangeError);
+    }
 
     const blocked = await plan(H + 'x,ESZ5,Buy,0,1\n', 'impB');
     expect(blocked.blocked).toBe('no-rows');
@@ -449,6 +480,76 @@ describe('imports.undo', () => {
     expect(await repo.trades.list(M)).toEqual([nq]);
     expect(await repo.imports.undo(M, a.id)).toEqual({ ok: true });
     expect(await repo.trades.list(M)).toEqual([]);
+  });
+
+  test('undo is refused while a later import in the account trades a symbol it touched', async () => {
+    const { repo, account, commit } = await setup();
+    // An earlier ES round trip in the account is no reason either.
+    await commit(
+      H +
+        '2026-11-13 09:41:00,ESZ5,Buy,1,6000\n2026-11-13 09:50:00,ESZ5,Sell,1,6001\n',
+      'impP',
+    );
+    await commit(OPEN_ES, 'impA');
+    const x = (await repo.trades.list(M)).find((t) => t.importId === 'impA');
+    const b = await commit(CLOSE_ES, 'impB');
+    const c = await commit(H + '2026-11-18 09:41:00,ESZ5,Buy,1,6020\n', 'impC');
+    // The same symbol in another account, and another symbol in this one, are no reason.
+    const other = await account('Other');
+    await commit(H + '2026-11-19 09:41:00,ESZ5,Buy,1,6030\n', 'impE', {
+      accountId: other.id,
+    });
+    await commit(CORN.replaceAll('2026-11-16', '2026-11-19'), 'impF', {
+      mapping: { overrides: { ZC } },
+    });
+    const before = await repo.trades.list(M);
+
+    // Restoring A's open trade beside C's would leave two ES positions.
+    expect(await repo.imports.undo(M, b.id)).toEqual({
+      ok: false,
+      reason: 'later-import-depends',
+      dependentJobId: c.id,
+    });
+    expect(await repo.trades.list(M)).toEqual(before);
+
+    expect(await repo.imports.undo(M, c.id)).toEqual({ ok: true });
+    expect(await repo.imports.undo(M, b.id)).toEqual({ ok: true });
+    expect(
+      (await repo.trades.list(M))
+        .filter((t) => t.accountId !== other.id)
+        .map((t) => t.importId),
+    ).toEqual(['impP', 'impA', 'impF']);
+    expect(await repo.trades.get(M, x!.id)).toEqual(x);
+  });
+
+  test('an import that merged two open trades into one restores both on undo, and unlinks the one it removed', async () => {
+    const { repo, commit, plan } = await setup();
+    await commit(OPEN_ES, 'impA');
+    // A second open ES trade beside A's, as an older undo could leave behind.
+    await commit(H + '2026-11-18 09:41:00,ESZ5,Buy,1,6020\n', 'impC', {
+      alter: (c) => ({ ...c, openTrades: [] }),
+    });
+    const [x, y] = await repo.trades.list(M);
+    const tag = await repo.tags.create(M, { name: 'T', category: 'setup' });
+    await repo.trades.update(M, y!.id, { tagIds: [tag.id] });
+    const note = await repo.journal.save(M, {
+      kind: 'note',
+      title: 'Y',
+      body: null,
+      linkedTradeIds: [y!.id],
+    });
+    const before = await repo.trades.list(M);
+    expect(before.map((t) => t.status)).toEqual(['open', 'open']);
+
+    const d = await plan(H + '2026-11-19 10:00:00,ESZ5,Sell,3,6030\n', 'impD');
+    expect(d.replacedTrades.map((t) => t.id)).toEqual([x!.id, y!.id]);
+    expect(d.trades.map((t) => t.id)).toEqual([x!.id]);
+    await repo.imports.commit(M, d);
+    // Y is gone, so the note no longer links it.
+    expect((await repo.journal.get(M, note.id))!.linkedTradeIds).toEqual([]);
+
+    expect(await repo.imports.undo(M, d.importId)).toEqual({ ok: true });
+    expect(await repo.trades.list(M)).toEqual(before);
   });
 
   test('undo twice is idempotent, and the undone rows stop counting as imported', async () => {

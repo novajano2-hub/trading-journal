@@ -1,4 +1,6 @@
 import type { InstrumentOverrides } from '@/domain/import/mapping';
+import type { ImportPlan } from '@/domain/import/plan';
+import { canonicalSymbol } from '@/domain/trade-builder';
 import type { ImportJob, Trade } from '@/domain/types';
 import {
   ImportBlockedError,
@@ -13,11 +15,26 @@ import { META, type ImportJobRecord, type KeelDb } from './db';
 import { pruneJournalLinks } from './journal';
 import { rwTx } from './tx';
 
-/** The job as the history shows it, without the snapshots undo works from. */
+/** The job as the history shows it, without what dedupe and undo work from. */
 function withoutSnapshots(record: ImportJobRecord): ImportJob {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- dropped on purpose
-  const { fingerprints, replacedTrades, ...job } = record;
+  const { fingerprints, replacedTrades, tradeIds, revision, ...job } = record;
   return job;
+}
+
+/** Throws RangeError unless the plan and every row it writes or replaces are in My workspace and its account. */
+function assertLandsInMyWorkspace(ws: string, plan: ImportPlan): void {
+  if (ws !== USER_WORKSPACE.id || plan.workspaceId !== ws)
+    throw new RangeError(
+      `Imports land only in ${USER_WORKSPACE.id}, got ${ws} for a plan in ${plan.workspaceId}`,
+    );
+  const stray = [...plan.trades, ...plan.replacedTrades].find(
+    (t) => t.workspaceId !== ws || t.accountId !== plan.accountId,
+  );
+  if (stray)
+    throw new RangeError(
+      `Trade ${stray.id} is in ${stray.workspaceId}/${stray.accountId}, not the plan's ${ws}/${plan.accountId}`,
+    );
 }
 
 async function storedOverrides(
@@ -33,12 +50,62 @@ async function importRevision(db: KeelDb, ws: string): Promise<number> {
   return (value as number | undefined) ?? 0;
 }
 
-/** Call inside the rw transaction of the commit or undo. */
-async function bumpImportRevision(db: KeelDb, ws: string): Promise<void> {
-  await db.meta.put({
-    key: META.importRevision(ws),
-    value: (await importRevision(db, ws)) + 1,
-  });
+/** Returns the new revision. Call inside the rw transaction of the commit or undo. */
+async function bumpImportRevision(db: KeelDb, ws: string): Promise<number> {
+  const next = (await importRevision(db, ws)) + 1;
+  await db.meta.put({ key: META.importRevision(ws), value: next });
+  return next;
+}
+
+/**
+ * The latest active import that undoing `job` would break, if any: one that
+ * rebuilt one of the job's trades, or a later one in the account with trades
+ * in a symbol the job's trades or replaced trades are in. Restoring the job's
+ * replaced trades beside those would leave two positions in one symbol,
+ * which FIFO never builds. Call inside the undo's transaction.
+ */
+async function blockingImport(
+  db: KeelDb,
+  ws: string,
+  job: ImportJobRecord,
+  built: readonly Trade[],
+): Promise<string | undefined> {
+  const others = (
+    await db.imports
+      .where('[workspaceId+accountId]')
+      .equals([ws, job.accountId])
+      .toArray()
+  ).filter((j) => j.status === 'active' && j.id !== job.id);
+  const blocking = new Set(
+    others
+      .filter((j) => j.replacedTrades.some((t) => t.importId === job.id))
+      .map((j) => j.id),
+  );
+  const later = new Set(
+    others.filter((j) => j.revision > job.revision).map((j) => j.id),
+  );
+  if (later.size > 0) {
+    const touched = new Set(
+      [...built, ...job.replacedTrades].map((t) =>
+        canonicalSymbol(t.instrument.symbol),
+      ),
+    );
+    await db.trades
+      .where('[workspaceId+accountId]')
+      .equals([ws, job.accountId])
+      .filter(
+        (t) =>
+          t.importId !== undefined &&
+          later.has(t.importId) &&
+          touched.has(canonicalSymbol(t.instrument.symbol)),
+      )
+      .each((t) => {
+        blocking.add(t.importId!);
+      });
+  }
+  return others
+    .filter((j) => blocking.has(j.id))
+    .sort((a, b) => b.revision - a.revision)[0]?.id;
 }
 
 /**
@@ -86,15 +153,15 @@ async function withLiveReferences(
   });
 }
 
+const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
 export function localImports(ctx: LocalContext): ImportRepo {
   return {
     async list(ws) {
       const db = await ctx.db();
       const rows = await db.imports.where('workspaceId').equals(ws).toArray();
       return rows
-        .sort((a, b) =>
-          a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0,
-        )
+        .sort((a, b) => cmp(b.createdAt, a.createdAt) || cmp(a.id, b.id))
         .map(withoutSnapshots);
     },
 
@@ -143,11 +210,8 @@ export function localImports(ctx: LocalContext): ImportRepo {
 
     async commit(ws, plan) {
       if (plan.blocked) throw new ImportBlockedError(plan.blocked);
-      if (ws !== USER_WORKSPACE.id || plan.workspaceId !== ws)
-        throw new RangeError(
-          `Imports land only in ${USER_WORKSPACE.id}, got ${ws} for a plan in ${plan.workspaceId}`,
-        );
-      const record: ImportJobRecord = {
+      assertLandsInMyWorkspace(ws, plan);
+      const job: ImportJob = {
         id: plan.importId,
         workspaceId: ws,
         accountId: plan.accountId,
@@ -159,13 +223,12 @@ export function localImports(ctx: LocalContext): ImportRepo {
         duplicateCount: plan.duplicateRows.length,
         status: 'active',
         createdAt: plan.createdAt,
-        fingerprints: plan.fingerprints,
-        replacedTrades: plan.replacedTrades,
       };
+      const tradeIds = plan.trades.map((t) => t.id);
       const db = await ctx.db();
       await rwTx(
         db,
-        [db.accounts, db.trades, db.imports, db.meta],
+        [db.accounts, db.trades, db.imports, db.journal, db.meta],
         async () => {
           if (!(await db.accounts.get([ws, plan.accountId])))
             throw new StalePlanError('account-removed');
@@ -173,12 +236,27 @@ export function localImports(ctx: LocalContext): ImportRepo {
           // and serials the plan was made from.
           if ((await importRevision(db, ws)) !== plan.importRevision)
             throw new StalePlanError('imports-changed');
-          await bumpImportRevision(db, ws);
+          const revision = await bumpImportRevision(db, ws);
           await db.trades.bulkDelete(
             plan.replacedTrades.map((t) => [ws, t.id]),
           );
+          // A replaced trade that no written trade continues under its id is gone.
+          const written = new Set(tradeIds);
+          await pruneJournalLinks(
+            db,
+            ws,
+            plan.replacedTrades
+              .map((t) => t.id)
+              .filter((id) => !written.has(id)),
+          );
           await db.trades.bulkPut(plan.trades);
-          await db.imports.put(record);
+          await db.imports.put({
+            ...job,
+            fingerprints: plan.fingerprints,
+            replacedTrades: plan.replacedTrades,
+            tradeIds,
+            revision,
+          });
           await db.meta.put({
             key: META.overrides(ws),
             value: {
@@ -188,7 +266,7 @@ export function localImports(ctx: LocalContext): ImportRepo {
           });
         },
       );
-      return withoutSnapshots(record);
+      return job;
     },
 
     async undo(ws, jobId) {
@@ -200,43 +278,33 @@ export function localImports(ctx: LocalContext): ImportRepo {
           const job = await db.imports.get([ws, jobId]);
           if (!job) throw new NotFoundError('import', jobId);
           if (job.status === 'undone') return { ok: true };
-          const dependent = await db.imports
-            .where('workspaceId')
-            .equals(ws)
-            .filter(
-              (j) =>
-                j.id !== jobId &&
-                j.status === 'active' &&
-                j.replacedTrades.some((t) => t.importId === jobId),
-            )
-            .first();
-          if (dependent)
+          // Trades the user has deleted since the import are simply not found.
+          const built = await db.trades
+            .where('[workspaceId+importId]')
+            .equals([ws, jobId])
+            .toArray();
+          const blocker = await blockingImport(db, ws, job, built);
+          if (blocker)
             return {
               ok: false,
               reason: 'later-import-depends',
-              dependentJobId: dependent.id,
+              dependentJobId: blocker,
             };
 
-          // Trades the user has deleted since the import are simply not found.
-          const built = (
-            await db.trades
-              .where('[workspaceId+importId]')
-              .equals([ws, jobId])
-              .primaryKeys()
-          ).map(([, id]) => id);
-          await db.trades.bulkDelete(built.map((id) => [ws, id]));
-          // A replacement keeps the replaced trade's id. One the user deleted
-          // stays deleted, so its replaced trade is not brought back.
-          const remaining = new Set(built);
-          const restored = job.replacedTrades.filter((t) =>
-            remaining.has(t.id),
+          await db.trades.bulkDelete(built.map((t) => [ws, t.id]));
+          // A replaced trade comes back unless the job wrote a trade under its
+          // id that the user has since deleted: that deletion stands.
+          const wrote = new Set(job.tradeIds);
+          const remaining = new Set(built.map((t) => t.id));
+          const restored = job.replacedTrades.filter(
+            (t) => !wrote.has(t.id) || remaining.has(t.id),
           );
           // A restored trade keeps its id, so its journal links stay.
           const restoredIds = new Set(restored.map((t) => t.id));
           await pruneJournalLinks(
             db,
             ws,
-            built.filter((id) => !restoredIds.has(id)),
+            [...remaining].filter((id) => !restoredIds.has(id)),
           );
           await db.trades.bulkPut(await withLiveReferences(db, ws, restored));
           await db.imports.put({

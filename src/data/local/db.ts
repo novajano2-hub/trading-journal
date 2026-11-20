@@ -36,6 +36,10 @@ export interface SeedMeta {
 export interface ImportJobRecord extends ImportJob {
   fingerprints: string[];
   replacedTrades: Trade[];
+  /** Ids of the trades the commit wrote. */
+  tradeIds: string[];
+  /** The workspace's import revision this commit made; orders the commits. */
+  revision: number;
 }
 
 /** Every table whose rows belong to a workspace, keyed `[workspaceId+id]`. */
