@@ -1,176 +1,171 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { cutOffText } from './figures';
 
-const DROP = /drop your broker csv/i;
+const H1 = "Find out what's working in your trading.";
+const FINAL = ['+$1,236.00', '50.0%', '3.17', '+$154.50'];
 
-test('hero shows the contract copy and labelled sample tickets', async ({
-  page,
-}) => {
+const hero = (page: Page) => page.getByRole('region', { name: H1 });
+
+/**
+ * The figure a sighted visitor sees in each KPI cell. Screen readers get a
+ * separate copy of the final value, so only visible, aria-hidden text counts.
+ */
+function shownKpis(page: Page): Promise<string[]> {
+  return page
+    .getByTestId('kpi-strip')
+    .locator('dd')
+    .evaluateAll((dds) =>
+      dds.map((dd) =>
+        [...dd.querySelectorAll('[aria-hidden="true"]')]
+          .filter((el) => el.checkVisibility())
+          .map((el) => el.textContent)
+          .join(''),
+      ),
+    );
+}
+
+const equityLine = (page: Page) =>
+  hero(page)
+    .getByRole('img', { name: /equity/i })
+    .locator('path[fill="none"]');
+
+/** Animations still running anywhere in the hero (CSS or Web Animations). */
+const running = (page: Page) =>
+  hero(page).evaluate((el) => el.getAnimations({ subtree: true }).length);
+
+test('hero carries the contract copy and its two actions', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
-    /FILE EVERY TRADE\.\s*FIND THE PATTERN\./,
-  );
-  await expect(page.getByText('SAMPLE TICKETS')).toBeVisible();
-  await expect(
-    page.getByTestId('ticket-stack').getByText('RULE BROKEN'),
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(H1);
+  const h = hero(page);
+  const start = h.getByRole('link', { name: 'Get started' });
+  const how = h.getByRole('link', { name: 'See how it works' });
+  await expect(start).toBeVisible();
+  await expect(how).toBeVisible();
+  await expect(start).toHaveAttribute('href', '/#how');
+  await expect(how).toHaveAttribute('href', '#how');
+  // The product composition is labelled as sample data, once.
+  await expect(h.getByText('Sample data', { exact: true })).toHaveCount(1);
+  await how.click();
+  await expect(page.locator('#how')).toBeInViewport();
 });
 
-test("dropping a CSV prints the visitor's own tickets, then hands off", async ({
-  page,
-}) => {
+test('the landing page has no file input', async ({ page }) => {
   await page.goto('/');
-  await page.getByLabel(DROP).setInputFiles('e2e/fixtures/sample-fills.csv');
-  await expect(page.getByTestId('ticket-yours')).toHaveCount(4);
-  await expect(page.getByTestId('ticket-yours').first()).toContainText('ESZ5');
-  await expect(
-    page.getByTestId('ticket-stack').getByText('RULE BROKEN'),
-  ).toHaveCount(0);
+  await expect(page.locator('input[type=file]')).toHaveCount(0);
+});
+
+test('the KPI tickers settle on the engine figures', async ({ page }) => {
+  await page.goto('/');
+  // The entrance is declared when motion is welcome…
+  const h1 = page.getByRole('heading', { level: 1 });
   expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
-  await page.getByRole('button', { name: 'Map columns and continue' }).click();
-  await expect(page).toHaveURL(/\/app\/import$/);
-  await expect(page.getByText(/Received sample-fills\.csv/)).toBeVisible();
-  await page.reload();
-  await expect(page.getByText(/Received sample-fills\.csv/)).toBeVisible(); // Review Focus 5
-  await page.getByRole('button', { name: 'Remove file' }).click();
-  await expect(page.getByText('No file waiting.')).toBeVisible();
-  await page.reload();
-  await expect(page.getByText('No file waiting.')).toBeVisible();
-});
-
-test("the visitor's fills print in the ticket clock, in full", async ({
-  page,
-}) => {
-  await page.goto('/');
-  await page.getByLabel(DROP).setInputFiles('e2e/fixtures/sample-fills.csv');
-  const yours = page.getByTestId('ticket-yours');
-  await expect(yours).toHaveCount(4);
-  // The file's '2026-11-16 09:41:00' as the sample tickets print time.
-  await expect(yours.first()).toContainText('16 NOV 09:41:00');
-  await expect(yours.nth(3)).toContainText('16 NOV 10:48:00');
-  await expect(page.getByTestId('ticket-stack')).not.toContainText('2026-');
-  expect(await cutOffText(yours)).toEqual([]);
-
-  // A US month-first time with AM/PM reads the same way.
-  await page
-    .getByLabel('Choose a different file')
-    .setInputFiles('e2e/fixtures/one-fill.csv');
-  await expect(yours).toHaveCount(1);
-  await expect(yours).toContainText('16 NOV 14:05:00');
-});
-
-test('the drop status agrees with the number of fills', async ({ page }) => {
-  await page.goto('/');
-  const status = page.getByRole('main').getByRole('status');
-  await page.getByLabel(DROP).setInputFiles('e2e/fixtures/sample-fills.csv');
-  await expect(
-    page.getByText(
-      'Its first 4 fills are printed as tickets. Check them, then map your columns.',
-      { exact: true },
-    ),
-  ).toBeVisible();
-  await expect(status).toHaveText(
-    'Read sample-fills.csv. Its first 4 fills are printed as tickets.',
-  );
-
-  await page
-    .getByLabel('Choose a different file')
-    .setInputFiles('e2e/fixtures/one-fill.csv');
-  await expect(
-    page.getByText(
-      'Its first fill is printed as a ticket. Check it, then map your columns.',
-      { exact: true },
-    ),
-  ).toBeVisible();
-  await expect(status).toHaveText(
-    'Read one-fill.csv. Its first fill is printed as a ticket.',
+    await h1.evaluate((el) => getComputedStyle(el).animationName),
+  ).not.toBe('none');
+  // …and every figure lands on the exact engine value.
+  await expect.poll(() => shownKpis(page)).toEqual(FINAL);
+  await expect
+    .poll(() =>
+      equityLine(page).evaluate((el) => getComputedStyle(el).strokeDashoffset),
+    )
+    .toBe('0px');
+  await expect.poll(() => running(page)).toBe(0);
+  // Screen readers get each final value once, never a counting number.
+  await expect(page.getByTestId('kpi-strip').locator('.sr-only')).toHaveText(
+    FINAL,
   );
 });
 
-test('a file that cannot be removed stays, with a way out', async ({
-  page,
-}) => {
-  await page.goto('/');
-  await page.getByLabel(DROP).setInputFiles('e2e/fixtures/sample-fills.csv');
-  await page.getByRole('button', { name: 'Map columns and continue' }).click();
-  await expect(page).toHaveURL(/\/app\/import$/);
-  await expect(page.getByText(/Received sample-fills\.csv/)).toBeVisible();
+test.describe('reduced motion', () => {
+  test.use({ reducedMotion: 'reduce' });
 
-  // Make the browser store refuse the delete, so clearPendingImport rejects.
-  await page.evaluate(() => {
-    IDBObjectStore.prototype.delete = () => {
-      throw new DOMException('Refused for the test', 'UnknownError');
-    };
+  test('the hero is in its final state at once', async ({ page }) => {
+    await page.goto('/');
+    // Read once, without retrying: nothing may count, draw or slide.
+    expect(await shownKpis(page)).toEqual(FINAL);
+    expect(
+      await equityLine(page).evaluate(
+        (el) => getComputedStyle(el).strokeDashoffset,
+      ),
+    ).toBe('0px');
+    expect(await running(page)).toBe(0);
+    expect(
+      await page
+        .getByRole('heading', { level: 1 })
+        .evaluate((el) => getComputedStyle(el).animationName),
+    ).toBe('none');
   });
-  await page.getByRole('button', { name: 'Remove file' }).click();
-  await expect(page.getByRole('main').getByRole('alert')).toHaveText(
-    "Couldn't remove the file from this browser. Try again, or clear this site's data in your browser settings.",
-  );
-  await expect(page.getByText(/Received sample-fills\.csv/)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Remove file' })).toBeVisible();
-
-  // With the store working again, trying again removes it.
-  await page.reload();
-  await page.getByRole('button', { name: 'Remove file' }).click();
-  await expect(page.getByText('No file waiting.')).toBeVisible();
-  await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0);
 });
 
-test('unreadable file shows an error and keeps the sample', async ({
+test('the trade card shows one rule kept and one broken, in full', async ({
   page,
 }) => {
   await page.goto('/');
-  await page.getByLabel(DROP).setInputFiles('e2e/fixtures/not-trades.csv');
-  // Next's route announcer is also role=alert, so scope to the page content.
-  await expect(page.getByRole('main').getByRole('alert')).toHaveText(
-    /couldn't read that file/,
-  );
-  await expect(page.getByText('SAMPLE TICKETS')).toBeVisible();
+  const card = page.getByTestId('hero-trade');
+  await expect(card).toContainText('NQZ5');
+  await expect(card).toContainText('−$275.00');
+  await expect(card.getByRole('listitem')).toHaveText([
+    'Kept: Entered on the range break',
+    'Broken: Stop stays where it was placed',
+  ]);
+  expect(await cutOffText(card)).toEqual([]);
 });
 
-test('a header-only CSV is an error, not blank tickets', async ({ page }) => {
+test('the hero fits the first viewport at 1280×800 and the headline holds three lines at 1440', async ({
+  page,
+}) => {
+  test.skip(test.info().project.name === 'mobile', 'desktop sizes');
+  await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/');
-  await page.getByLabel(DROP).setInputFiles('e2e/fixtures/header-only.csv');
-  await expect(page.getByRole('main').getByRole('alert')).toHaveText(
-    "We couldn't find any trades in that file.",
-  );
-  await expect(page.getByTestId('ticket-yours')).toHaveCount(0);
-  await expect(page.getByText('SAMPLE TICKETS')).toBeVisible();
-});
-
-test('the drop slot is reachable by keyboard', async ({ page }) => {
-  await page.goto('/');
-  const input = page.getByLabel(DROP);
-  let reached = false;
-  for (let i = 0; i < 20 && !reached; i++) {
-    await page.keyboard.press('Tab');
-    reached = await input.evaluate((el) => el === document.activeElement);
-  }
-  expect(reached).toBe(true);
-  // The ring is drawn on the slot, since the input itself is visually hidden.
-  const slot = page.locator('label', { has: input });
-  await expect(slot).toHaveCSS('outline-style', 'solid');
-  // Once the tickets print, focus moves on to the next action.
-  await input.setInputFiles('e2e/fixtures/sample-fills.csv');
+  const h = hero(page);
+  await expect(h.getByRole('link', { name: 'Get started' })).toBeInViewport({
+    ratio: 1,
+  });
   await expect(
-    page.getByRole('button', { name: 'Map columns and continue' }),
-  ).toBeFocused();
+    h.getByRole('link', { name: 'See how it works' }),
+  ).toBeInViewport({ ratio: 1 });
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const lines = await page
+    .getByRole('heading', { level: 1 })
+    .evaluate(
+      (el) =>
+        el.getBoundingClientRect().height /
+        parseFloat(getComputedStyle(el).lineHeight),
+    );
+  expect(Math.round(lines)).toBeLessThanOrEqual(3);
 });
 
-test('reduced motion prints the tickets without animation', async ({
-  page,
-}) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/');
-  await page.getByLabel(DROP).setInputFiles('e2e/fixtures/sample-fills.csv');
-  const tickets = page.getByTestId('ticket-yours');
-  await expect(tickets).toHaveCount(4);
-  for (const name of await tickets.evaluateAll((els) =>
-    els.map((el) => getComputedStyle(el).animationName),
-  ))
-    expect(name).toBe('none');
-});
+for (const width of [1024, 1152, 1280]) {
+  test(`the KPI figures show in full at ${width}`, async ({ page }) => {
+    test.skip(test.info().project.name === 'mobile', 'desktop sizes');
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto('/');
+    await expect.poll(() => shownKpis(page)).toEqual(FINAL);
+    const problems = await page
+      .getByTestId('kpi-strip')
+      .evaluate(async (dl) => {
+        await document.fonts.ready;
+        // The window clips its content, so a figure must sit inside it too.
+        let clip: Element | null = dl.parentElement;
+        while (clip && getComputedStyle(clip).overflow !== 'hidden')
+          clip = clip.parentElement;
+        const box = clip!.getBoundingClientRect();
+        const out: string[] = [];
+        for (const cell of [...dl.children]) {
+          const fig = [
+            ...cell.querySelectorAll('dd [aria-hidden="true"]'),
+          ].find((el) => el.checkVisibility())!;
+          const range = document.createRange();
+          range.selectNodeContents(fig);
+          const ink = range.getBoundingClientRect();
+          const c = cell.getBoundingClientRect();
+          if (ink.left < c.left - 0.5 || ink.right > c.right + 0.5)
+            out.push(`${fig.textContent} spills past its cell`);
+          if (ink.left < box.left || ink.right > box.right)
+            out.push(`${fig.textContent} is clipped by the window`);
+        }
+        return out;
+      });
+    expect(problems).toEqual([]);
+  });
+}

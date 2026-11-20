@@ -2,7 +2,7 @@ import { SAMPLE_EXECUTIONS, SAMPLE_START } from '@/content/landing-sample';
 import { resolveInstrument } from '@/domain/instruments';
 import { breakdown, type BreakdownKey } from '@/domain/metrics/breakdowns';
 import { dailyPnl, type DayStat } from '@/domain/metrics/days';
-import { defaultMetricContext } from '@/domain/metrics/context';
+import { defaultMetricContext, type PnlBasis } from '@/domain/metrics/context';
 import {
   equityCurve,
   maxDrawdown,
@@ -13,14 +13,16 @@ import { summarize, type Summary } from '@/domain/metrics/summary';
 import { evaluateProp, type PropStatus } from '@/domain/prop/evaluate';
 import { buildTrades } from '@/domain/trade-builder';
 import type {
+  BreakevenRange,
   Cents,
   PropRuleSet,
+  Rule,
   Tag,
   TagCategory,
   Trade,
 } from '@/domain/types';
 import { formatPnl } from '@/lib/format';
-import { ticketTime } from '@/lib/ticket-format';
+import { onTradingDate, ticketTime } from '@/lib/ticket-format';
 
 export { SAMPLE_EXECUTIONS, SAMPLE_START };
 
@@ -46,15 +48,29 @@ export interface SampleView {
   heroTickets: TicketModel[];
   tags: Tag[];
   tagNames: Record<string, string>;
-  breakdowns: Record<BreakdownTab, BreakdownRowView[]>;
+  /** Engine breakdowns on each P&L basis, so gross is re-derived, never adjusted by hand. */
+  breakdowns: Record<PnlBasis, Record<BreakdownTab, BreakdownRowView[]>>;
+  /** The sample strategy's rules. */
+  rules: Rule[];
+  /** A trade's rule checks as text plus kept or broken, in rule order. */
+  checksFor: (trade: Trade) => RuleCheckView[];
+  /** The sample week as one range, e.g. '16-20 Nov 2026'. */
+  weekLabel: string;
+  /** The breakeven range every figure above is classified with. */
+  breakeven: BreakevenRange;
+}
+
+export interface RuleCheckView {
+  text: string;
+  ok: boolean;
 }
 
 export type BreakdownTab = 'hour' | 'session' | 'setup' | 'symbol' | 'mistake';
 export interface BreakdownRowView {
   key: string;
   label: string;
-  /** Net P&L in cents. */
-  net: Cents;
+  /** P&L in cents on the breakdown's basis (gross or net). */
+  pnl: Cents;
 }
 
 const TIME_ZONE = 'America/New_York';
@@ -77,6 +93,13 @@ const SETUP_BY_SERIAL: Record<number, string> = {
   8: 'Opening range break',
 };
 const MISTAKE_BY_SERIAL: Record<number, string> = { 6: 'Moved stop' };
+const EMOTION_BY_SERIAL: Record<number, string> = { 6: 'Impatient' };
+
+const TAGS_BY_CATEGORY: [TagCategory, Record<number, string>][] = [
+  ['setup', SETUP_BY_SERIAL],
+  ['mistake', MISTAKE_BY_SERIAL],
+  ['emotion', EMOTION_BY_SERIAL],
+];
 
 function makeTags(): Tag[] {
   const tag = (name: string, category: TagCategory): Tag => ({
@@ -85,13 +108,33 @@ function makeTags(): Tag[] {
     name,
     category,
   });
-  return [...new Set(Object.values(SETUP_BY_SERIAL))]
-    .map((n) => tag(n, 'setup'))
-    .concat(
-      [...new Set(Object.values(MISTAKE_BY_SERIAL))].map((n) =>
-        tag(n, 'mistake'),
-      ),
-    );
+  return TAGS_BY_CATEGORY.flatMap(([category, bySerial]) =>
+    [...new Set(Object.values(bySerial))].map((n) => tag(n, category)),
+  );
+}
+
+export const SAMPLE_RULES: Rule[] = [
+  { id: 'r-entry', text: 'Entered on the range break', group: 'entry' },
+  { id: 'r-risk', text: 'Risk no more than 1R per trade', group: 'risk' },
+  { id: 'r-stop', text: 'Stop stays where it was placed', group: 'management' },
+  { id: 'r-two-losses', text: 'No new trade after two losses', group: 'risk' },
+];
+/** Trade 6 is graded against every rule; it moved its stop. */
+const BROKEN_RULE_ID = 'r-stop';
+
+/** '16-20 Nov 2026' within a month, '30 Nov-4 Dec 2026' across months. */
+function rangeLabel(first: string, last: string): string {
+  const day = (d: string) => onTradingDate(d, { day: 'numeric' });
+  const month = (d: string) => onTradingDate(d, { month: 'short' });
+  const year = (d: string) => onTradingDate(d, { year: 'numeric' });
+  if (first === last) return `${day(first)} ${month(first)} ${year(first)}`;
+  const start =
+    month(first) === month(last) && year(first) === year(last)
+      ? day(first)
+      : year(first) === year(last)
+        ? `${day(first)} ${month(first)}`
+        : `${day(first)} ${month(first)} ${year(first)}`;
+  return `${start}-${day(last)} ${month(last)} ${year(last)}`;
 }
 
 const HOURS_SHOWN = [9, 10, 11, 12, 13, 14, 15];
@@ -143,25 +186,33 @@ export function getSampleView(): SampleView {
     accountCurrency: () => 'USD',
   }).trades;
   const trades = built.map((t) => {
-    const setup = SETUP_BY_SERIAL[t.serial];
-    const mistake = MISTAKE_BY_SERIAL[t.serial];
     const tagged: Trade = {
       ...t,
-      tagIds: [
-        ...(setup ? [tagId(setup)] : []),
-        ...(mistake ? [tagId(mistake)] : []),
-      ],
+      tagIds: TAGS_BY_CATEGORY.flatMap(([, bySerial]) => {
+        const name = bySerial[t.serial];
+        return name ? [tagId(name)] : [];
+      }),
     };
     return t.serial === BROKEN_RULE_SERIAL
-      ? { ...tagged, ruleChecks: [{ ruleId: 'r-stop', followed: false }] }
+      ? {
+          ...tagged,
+          ruleChecks: SAMPLE_RULES.map((r) => ({
+            ruleId: r.id,
+            followed: r.id !== BROKEN_RULE_ID,
+          })),
+        }
       : tagged;
   });
   const ctx = defaultMetricContext(TIME_ZONE);
   const tagNames = Object.fromEntries(tags.map((t) => [t.id, t.name]));
+  const basisPnl = (s: Summary) =>
+    s.basis === 'gross' ? s.grossPnl : s.netPnl;
   const view = (rows: ReturnType<typeof breakdown>): BreakdownRowView[] =>
-    rows.map((r) => ({ key: r.key, label: r.label, net: r.summary.netPnl }));
-  const by = (key: BreakdownKey, ts: Trade[] = trades) =>
-    view(breakdown(ts, key, { ...ctx, tagNames }));
+    rows.map((r) => ({
+      key: r.key,
+      label: r.label,
+      pnl: basisPnl(r.summary),
+    }));
   const onlyCategory = (category: TagCategory) =>
     trades.map((t) => ({
       ...t,
@@ -169,12 +220,27 @@ export function getSampleView(): SampleView {
         (id) => tags.find((x) => x.id === id)?.category === category,
       ),
     }));
+  const breakdownsOn = (
+    pnlBasis: PnlBasis,
+  ): Record<BreakdownTab, BreakdownRowView[]> => {
+    const by = (key: BreakdownKey, ts: Trade[] = trades) =>
+      view(breakdown(ts, key, { ...ctx, pnlBasis, tagNames }));
+    return {
+      hour: by('hour').filter((r) => HOURS_SHOWN.includes(Number(r.key))),
+      session: by('session'),
+      setup: by('tag', onlyCategory('setup')),
+      symbol: by('symbol'),
+      mistake: by('tag', onlyCategory('mistake')),
+    };
+  };
   const start: Cents = SAMPLE_START;
   const bySerial = new Map(trades.map((t) => [t.serial, t]));
+  const days = dailyPnl(trades, ctx);
+  const ruleText = new Map(SAMPLE_RULES.map((r) => [r.id, r.text]));
   return {
     trades,
     summary: summarize(trades, ctx),
-    days: dailyPnl(trades, ctx),
+    days,
     drawdown: maxDrawdown(trades, start, ctx),
     equity: equityCurve(trades, start, ctx),
     prop: evaluateProp({
@@ -186,13 +252,15 @@ export function getSampleView(): SampleView {
     }),
     tags,
     tagNames,
-    breakdowns: {
-      hour: by('hour').filter((r) => HOURS_SHOWN.includes(Number(r.key))),
-      session: by('session'),
-      setup: by('tag', onlyCategory('setup')),
-      symbol: by('symbol'),
-      mistake: by('tag', onlyCategory('mistake')),
-    },
+    breakdowns: { net: breakdownsOn('net'), gross: breakdownsOn('gross') },
+    rules: SAMPLE_RULES,
+    checksFor: (t) =>
+      t.ruleChecks.flatMap((c) => {
+        const text = ruleText.get(c.ruleId);
+        return text && c.followed !== null ? [{ text, ok: c.followed }] : [];
+      }),
+    weekLabel: rangeLabel(days[0]!.date, days[days.length - 1]!.date),
+    breakeven: ctx.breakevenRange,
     heroTickets: HERO_SERIALS.flatMap((n) => {
       const t = bySerial.get(n);
       return t ? [toTicket(t)] : [];

@@ -76,9 +76,9 @@ describe('landing sample', () => {
   });
 
   test('breakdowns come from the engine', () => {
-    const b = getSampleView().breakdowns;
-    const net = (rows: { label: string; net: number }[]) =>
-      Object.fromEntries(rows.map((r) => [r.label, r.net]));
+    const b = getSampleView().breakdowns.net;
+    const pnl = (rows: { label: string; pnl: number }[]) =>
+      Object.fromEntries(rows.map((r) => [r.label, r.pnl]));
     expect(b.hour.map((r) => r.label)).toEqual([
       '09:00',
       '10:00',
@@ -88,7 +88,7 @@ describe('landing sample', () => {
       '14:00',
       '15:00',
     ]);
-    expect(net(b.hour)).toEqual({
+    expect(pnl(b.hour)).toEqual({
       '09:00': 116000,
       '10:00': 12000,
       '11:00': -3900,
@@ -97,20 +97,74 @@ describe('landing sample', () => {
       '14:00': 0,
       '15:00': 0,
     });
-    expect(b.setup.map((r) => [r.label, r.net])).toEqual([
+    expect(b.setup.map((r) => [r.label, r.pnl])).toEqual([
       ['Opening range break', 77600],
       ['Fade', 67000],
       ['Pullback', 32000],
       ['Range', -500],
       ['Breakout', -52500],
     ]);
-    expect(b.setup.reduce((a, r) => a + r.net, 0)).toBe(123600);
-    expect(b.mistake.map((r) => [r.label, r.net])).toEqual([
+    expect(b.setup.reduce((a, r) => a + r.pnl, 0)).toBe(123600);
+    expect(b.mistake.map((r) => [r.label, r.pnl])).toEqual([
       ['Moved stop', -27500],
       ['Untagged', 151100],
     ]);
-    expect(b.session.find((r) => r.key === 'new-york')!.net).toBe(123600);
-    expect(b.symbol.reduce((a, r) => a + r.net, 0)).toBe(123600);
+    expect(b.session.find((r) => r.key === 'new-york')!.pnl).toBe(123600);
+    expect(b.symbol.reduce((a, r) => a + r.pnl, 0)).toBe(123600);
+  });
+
+  test('gross breakdowns are re-derived by the engine on the gross basis', () => {
+    const v = getSampleView();
+    const g = v.breakdowns.gross;
+    expect(g.hour.map((r) => [r.label, r.pnl])).toEqual([
+      ['09:00', 118000],
+      ['10:00', 13000],
+      ['11:00', -3750],
+      ['12:00', 0],
+      ['13:00', 0],
+      ['14:00', 0],
+      ['15:00', 0],
+    ]);
+    expect(g.setup.map((r) => [r.label, r.pnl])).toEqual([
+      ['Opening range break', 78750],
+      ['Fade', 67500],
+      ['Pullback', 32500],
+      ['Range', 0],
+      ['Breakout', -51500],
+    ]);
+    expect(g.mistake.map((r) => [r.label, r.pnl])).toEqual([
+      ['Moved stop', -27000],
+      ['Untagged', 154250],
+    ]);
+    for (const tab of ['hour', 'session', 'setup', 'symbol'] as const)
+      expect(g[tab].reduce((a, r) => a + r.pnl, 0)).toBe(v.summary.grossPnl);
+  });
+
+  test('trade 6 carries a setup, a mistake and an emotion, and its rule checks', () => {
+    const v = getSampleView();
+    const six = v.trades.find((t) => t.serial === 6)!;
+    expect(six.tagIds.map((id) => v.tagNames[id])).toEqual([
+      'Breakout',
+      'Moved stop',
+      'Impatient',
+    ]);
+    expect(v.checksFor(six)).toEqual([
+      { text: 'Entered on the range break', ok: true },
+      { text: 'Risk no more than 1R per trade', ok: true },
+      { text: 'Stop stays where it was placed', ok: false },
+      { text: 'No new trade after two losses', ok: true },
+    ]);
+    // Setup and mistake breakdowns ignore the emotion tag.
+    expect(v.breakdowns.net.mistake.map((r) => r.label)).toEqual([
+      'Moved stop',
+      'Untagged',
+    ]);
+  });
+
+  test('the week reads as one date range, with its breakeven range', () => {
+    const v = getSampleView();
+    expect(v.weekLabel).toBe('16-20 Nov 2026');
+    expect(v.breakeven).toEqual({ unit: 'amount', from: 0, to: 0 });
   });
 
   test('ticker text equals the formatted net P&L', () => {

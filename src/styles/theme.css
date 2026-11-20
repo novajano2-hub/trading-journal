@@ -28,6 +28,13 @@
   --r-chip: 6px;
   --r-control: 10px;
   --r-card: 16px;
+
+  /* Motion tokens, mirrored from src/lib/motion.ts for CSS-only motion. */
+  --ease-enter: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --ease-glide: cubic-bezier(0.23, 1, 0.32, 1);
+  --dur-enter: 240ms;
+  --dur-exit: 160ms;
 }
 
 :root[data-theme='dark'] {

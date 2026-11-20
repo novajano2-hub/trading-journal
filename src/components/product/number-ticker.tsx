@@ -16,27 +16,27 @@ export function formatTicker(kind: TickerKind, value: number): string {
   return formatRatio(value);
 }
 
-/**
- * What the visible counter shows. Under reduced motion it is the final value at once;
- * otherwise it follows the count, which starts at zero so the final value never flashes first.
- */
-export function visibleTickerValue(
-  reduced: boolean | null,
-  counted: number,
-  value: number,
-): number {
-  return reduced ? value : counted;
-}
-
 const DURATION_S = 0.9;
+
+/**
+ * Without JS the count never runs, and under reduced motion it must not: CSS
+ * then shows the final copy instead of the counter (see `motion-reduce:`).
+ * The counter itself always starts at zero, so the server and the first
+ * client render agree whatever the visitor's motion setting.
+ */
+const NO_SCRIPT_CSS =
+  '.ticker-count{display:none!important}.ticker-final{display:inline!important}';
 
 export function NumberTicker({
   value,
   kind,
+  delay = 0,
   className = '',
 }: {
   value: number;
   kind: TickerKind;
+  /** Seconds to wait once in view, to sit in a larger entrance. */
+  delay?: number;
   className?: string;
 }) {
   const reduced = useReducedMotion();
@@ -54,13 +54,14 @@ export function NumberTicker({
   useEffect(() => {
     if (reduced || !inView) return;
     const controls = animate(0, value, {
+      delay,
       duration: DURATION_S,
       ease: [...EASING_POINTS.out],
       onUpdate: setShown,
       onComplete: () => setShown(value),
     });
     return () => controls.stop();
-  }, [inView, reduced, value]);
+  }, [delay, inView, reduced, value]);
 
   return (
     <span
@@ -68,9 +69,18 @@ export function NumberTicker({
       className={`inline-block font-mono tabular-nums ${tone} ${className}`}
       style={{ minWidth: `${final.length}ch` }}
     >
+      <noscript>
+        <style>{NO_SCRIPT_CSS}</style>
+      </noscript>
       <span className="sr-only">{final}</span>
-      <span aria-hidden="true">
-        {formatTicker(kind, visibleTickerValue(reduced, shown, value))}
+      <span aria-hidden="true" className="ticker-count motion-reduce:hidden">
+        {formatTicker(kind, shown)}
+      </span>
+      <span
+        aria-hidden="true"
+        className="ticker-final hidden motion-reduce:inline"
+      >
+        {final}
       </span>
     </span>
   );

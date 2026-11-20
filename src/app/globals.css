@@ -42,6 +42,66 @@
   --radius-card: var(--r-card);
 }
 
+/*
+ * The landing hero's entrance: one orchestrated moment, in CSS so it plays
+ * from first paint without waiting for JS. Use with `motion-safe:` so reduced
+ * motion declares no animation at all. Fill is `backwards` only: once played,
+ * nothing holds the element.
+ */
+@theme {
+  --animate-rise: rise var(--dur-enter) var(--ease-enter) backwards;
+  --animate-rise-window: rise-window 400ms var(--ease-enter) backwards;
+  --animate-slide-in: slide-in 320ms var(--ease-enter) backwards;
+  --animate-draw: draw 900ms var(--ease-enter) backwards;
+  --animate-fade: fade 900ms var(--ease-enter) backwards;
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+  @keyframes rise-window {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+  }
+  /* Opaque early, so the rows beneath never show through while it moves. */
+  @keyframes slide-in {
+    from {
+      opacity: 0;
+      transform: translateX(-16px);
+    }
+    40% {
+      opacity: 1;
+    }
+  }
+  /* For a path with pathLength="1". The dash exists only while drawing. */
+  @keyframes draw {
+    from {
+      stroke-dasharray: 1;
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dasharray: 1;
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+  }
+}
+
+/* In-page links glide to their section; route changes still jump. */
+@media (prefers-reduced-motion: no-preference) {
+  html:has([data-smooth-scroll]) {
+    scroll-behavior: smooth;
+  }
+}
+
 html {
   background: var(--bg);
   scrollbar-color: var(--line-2) var(--bg);

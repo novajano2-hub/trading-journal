@@ -4,7 +4,6 @@ import { getSampleView } from '@/lib/landing/sample-view';
 import { BreakdownChart, barHeight } from './breakdown-chart';
 import { EquityChart } from './equity-chart';
 import { KpiStrip } from './kpi-strip';
-import { visibleTickerValue } from './number-ticker';
 import { TradeDetailCard } from './trade-detail-card';
 import { TradeRows } from './trade-rows';
 
@@ -45,18 +44,19 @@ describe('product previews render engine values', () => {
     );
     expect(eq).toContain('<path');
     const bars = renderToStaticMarkup(
-      <BreakdownChart breakdowns={v.breakdowns} />,
+      <BreakdownChart rows={v.breakdowns.net.hour} label="Net P&L by hour" />,
     );
     expect(bars).toContain('+1,160');
-    expect(bars).toContain('−$525.00');
+    expect(bars).toContain('role="img" aria-label="Net P&amp;L by hour"');
   });
 
-  test('ticker starts at zero unless motion is reduced', () => {
-    expect(visibleTickerValue(false, 0, 123600)).toBe(0);
-    expect(visibleTickerValue(null, 0, 123600)).toBe(0);
-    expect(visibleTickerValue(true, 0, 123600)).toBe(123600);
+  test('ticker counts from zero, with the final copy beside it for CSS', () => {
     const html = renderToStaticMarkup(<KpiStrip summary={v.summary} />);
-    expect(html).toContain('<span aria-hidden="true">$0.00</span>');
+    // The counter starts at zero; CSS shows the final copy instead when
+    // motion is reduced or JS never runs.
+    expect(html).toMatch(/class="ticker-count[^"]*">\$0\.00</);
+    expect(html).toMatch(/class="ticker-final[^"]*">\+\$1,236\.00</);
+    expect(html).toContain('<noscript>');
   });
 
   test('bar slots persist by index and zero keeps a zero height', () => {
@@ -64,15 +64,41 @@ describe('product previews render engine values', () => {
     expect(barHeight(1, 100000)).toBe(2);
     expect(barHeight(-100, 100)).toBe(190);
     const html = renderToStaticMarkup(
-      <BreakdownChart breakdowns={v.breakdowns} />,
+      <BreakdownChart rows={v.breakdowns.net.hour} label="x" />,
     );
     // hour tab has 7 slots, 3 of which are zero but still rendered
     expect(html.match(/<i class="block w-full/g)).toHaveLength(7);
+    // Rendered finished: the tallest bar shows in full, a zero bar not at all.
+    expect(html).toContain('style="transform:none"');
+    expect(html).toContain('transform:translateY(190px)');
+  });
+
+  test('rows can show just the most telling tag, mistakes first', () => {
+    const six = v.trades.find((t) => t.serial === 6)!;
+    const all = renderToStaticMarkup(
+      <TradeRows trades={[six]} tags={v.tags} />,
+    );
+    expect(all).toContain('Breakout');
+    expect(all).toContain('Impatient');
+    const one = renderToStaticMarkup(
+      <TradeRows trades={[six]} tags={v.tags} maxTags={1} />,
+    );
+    expect(one).toContain('Moved stop');
+    expect(one).not.toContain('Breakout');
   });
 
   test('chart is visible without JS', () => {
     const eq = renderToStaticMarkup(<EquityChart series={[1, 2]} label="x" />);
     expect(eq).toContain('<noscript>');
     expect(eq).toContain('eq-draw');
+  });
+
+  test('the entrance curve is drawn by CSS, with its delay', () => {
+    const eq = renderToStaticMarkup(
+      <EquityChart series={[1, 2]} label="x" draw="entrance" delayMs={420} />,
+    );
+    expect(eq).toContain('pathLength="1"');
+    expect(eq).toContain('motion-safe:animate-draw');
+    expect(eq).toContain('animation-delay:420ms');
   });
 });

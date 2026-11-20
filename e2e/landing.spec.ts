@@ -1,144 +1,169 @@
-import { expect, test } from '@playwright/test';
-import { cutOffText, inPlainView, stampCollisions } from './figures';
+import { expect, test, type Page } from '@playwright/test';
+import { cutOffText } from './figures';
 
-test('sample week and prop numbers come from the engine', async ({ page }) => {
-  await page.goto('/');
-  const week = page.getByRole('region', { name: /sample week/i });
-  for (const s of ['+$1,236.00', '50.0%', '3.17', '+$154.50', '$280.00'])
-    await expect(week).toContainText(s);
-  const prop = page.getByRole('region', { name: /prop rules/i });
-  for (const s of ['$49,236.00', '$2,000.00', '54%', 'Not met'])
-    await expect(prop).toContainText(s);
-  await expect(page.getByText('In development')).toHaveCount(4);
-});
+const how = (page: Page) =>
+  page.getByRole('region', {
+    name: 'Keel does the logging. You do the review.',
+  });
+const reports = (page: Page) =>
+  page.getByRole('region', { name: 'See where the money comes from.' });
 
-test('the equity curve has a name and the five day nets as its text', async ({
+/** The ranked side list, one "label value" string per row. */
+const ranked = (page: Page) =>
+  reports(page)
+    .getByRole('tabpanel')
+    .getByRole('listitem')
+    .evaluateAll((lis) =>
+      lis.map((li) =>
+        [...li.children].map((c) => c.textContent?.trim()).join(' '),
+      ),
+    );
+
+test('how it works: four steps, each with a real fragment', async ({
   page,
 }) => {
   await page.goto('/');
-  const week = page.getByRole('region', { name: /sample week/i });
-  const curve = week.getByRole('img', { name: /equity/i });
-  await expect(curve).toBeVisible();
-  await expect(curve).toHaveAccessibleDescription(
-    /\+\$195\.00.*\+\$281\.00.*\+\$670\.00.*−\$280\.00.*\+\$370\.00/,
+  const section = how(page);
+  await expect(section).toHaveAttribute('id', 'how');
+  await expect(section.getByRole('heading', { level: 3 })).toHaveText([
+    'Import',
+    'Journal',
+    'Review',
+    'Improve',
+  ]);
+  // guessColumns maps the broker's headers onto Keel's columns.
+  const mapping = section.getByRole('list', { name: 'Column mapping' });
+  await expect(mapping.getByRole('listitem')).toHaveText([
+    'Date/Time to Time',
+    'Buy/Sell to Side',
+  ]);
+  // Trade 6's own tags, its rule checks, and the best hour from the engine.
+  await expect(section.getByRole('list', { name: 'Tags' })).toContainText(
+    'Moved stop',
   );
+  await expect(section).toContainText('3 kept');
+  await expect(section).toContainText('1 broken');
+  await expect(section).toContainText('Best hour 09:00');
+  await expect(section).toContainText('+$1,160.00');
+  expect(await cutOffText(section)).toEqual([]);
 });
 
-test('the loop follows sample ticket No. 000006 to the next trade', async ({
+test('reports: the tablist switches the breakdown by keyboard', async ({
   page,
 }) => {
   await page.goto('/');
-  const loop = page.getByRole('region', { name: /all the way round/i });
-  for (const s of ['No. 000006', '−$275.00', 'RULE BROKEN', 'No. 000007'])
-    await expect(loop).toContainText(s);
-});
+  const r = reports(page);
+  const list = r.getByRole('tablist', { name: 'Break down by' });
+  await expect(list.getByRole('tab')).toHaveText([
+    'Hour',
+    'Session',
+    'Setup',
+    'Symbol',
+    'Mistake',
+  ]);
+  const tab = (name: string) => list.getByRole('tab', { name });
+  await expect(tab('Hour')).toHaveAttribute('aria-selected', 'true');
+  await expect(r.getByRole('img', { name: 'Net P&L by hour' })).toBeVisible();
 
-test('hero and loop tickets print every figure in full', async ({ page }) => {
-  await page.goto('/');
-  await expect(page.getByTestId('ticket-sample')).toHaveCount(4);
-  expect(await cutOffText(page.getByTestId('ticket-sample'))).toEqual([]);
-  const loop = page.getByRole('region', { name: /all the way round/i });
-  expect(await cutOffText(loop.getByRole('listitem'))).toEqual([]);
-});
-
-test('hero stamps sit clear of figures, and RULE BROKEN shows in the stack', async ({
-  page,
-}) => {
-  await page.goto('/');
-  const tickets = page.getByTestId('ticket-sample');
-  expect(await stampCollisions(tickets)).toEqual([]);
-  const broken = page
-    .getByTestId('ticket-stack')
-    .locator('.rubber-stamp', { hasText: 'RULE BROKEN' });
-  expect(await inPlainView(broken)).toBe(true);
-});
-
-test('each rack mark fills a real band, down to its card foot', async ({
-  page,
-}) => {
-  await page.goto('/');
-  const rack = page.getByRole('region', { name: /every tool/i });
-  const marks = rack.locator('li svg:not(.lucide)');
-  await expect(marks).toHaveCount(9);
-  const bands = await marks.evaluateAll((svgs) =>
-    svgs.map((svg) => {
-      const card = svg.closest('.rack-card')!;
-      const box = card.getBoundingClientRect();
-      const foot =
-        box.bottom - parseFloat(getComputedStyle(card).paddingBottom);
-      const band = svg.parentElement!.getBoundingClientRect();
-      const ink = [
-        ...svg.querySelectorAll('path, rect, circle, polyline, text'),
-      ]
-        .map((el) => el.getBoundingClientRect())
-        .map(({ left, right, top, bottom }) => ({ left, right, top, bottom }))
-        .reduce((u, r) => ({
-          left: Math.min(u.left, r.left),
-          right: Math.max(u.right, r.right),
-          top: Math.min(u.top, r.top),
-          bottom: Math.max(u.bottom, r.bottom),
-        }));
-      return {
-        height: band.height,
-        toFoot: Math.abs(foot - band.bottom),
-        fill: Math.max(
-          (ink.right - ink.left) / band.width,
-          (ink.bottom - ink.top) / band.height,
-        ),
-      };
-    }),
+  await tab('Hour').focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(tab('Session')).toHaveAttribute('aria-selected', 'true');
+  await expect(tab('Session')).toBeFocused();
+  await expect(tab('Hour')).toHaveAttribute('aria-selected', 'false');
+  await expect(tab('Hour')).toHaveAttribute('tabindex', '-1');
+  await expect(
+    r.getByRole('img', { name: 'Net P&L by session' }),
+  ).toBeVisible();
+  await expect(r.getByRole('tabpanel')).toHaveAttribute(
+    'aria-labelledby',
+    (await tab('Session').getAttribute('id'))!,
   );
-  for (const b of bands) {
-    // A band of real height that runs down to the lip, not an icon strip…
-    expect(b.height).toBeGreaterThanOrEqual(60);
-    expect(b.toFoot).toBeLessThan(1);
-    // …and a drawing scaled to it in at least one direction.
-    expect(b.fill).toBeGreaterThan(0.75);
+
+  await page.keyboard.press('End');
+  await expect(tab('Mistake')).toBeFocused();
+  await expect(
+    r.getByRole('img', { name: 'Net P&L by mistake' }),
+  ).toBeVisible();
+  expect(await ranked(page)).toEqual([
+    'Untagged +$1,511.00',
+    'Moved stop −$275.00',
+  ]);
+  await page.keyboard.press('ArrowRight');
+  await expect(tab('Hour')).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
+  await expect(tab('Mistake')).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(tab('Hour')).toHaveAttribute('aria-selected', 'true');
+});
+
+test('reports: a ranked list by net, re-derived on gross', async ({ page }) => {
+  await page.goto('/');
+  const r = reports(page);
+  await expect(r.getByText('Sample data', { exact: true })).toHaveCount(1);
+  expect(await ranked(page)).toEqual([
+    '09:00 +$1,160.00',
+    '10:00 +$120.00',
+    '12:00 $0.00',
+    '14:00 $0.00',
+    '15:00 $0.00',
+    '13:00 −$5.00',
+    '11:00 −$39.00',
+  ]);
+
+  await r.getByText('Gross', { exact: true }).click();
+  await expect(r.getByRole('radio', { name: 'Gross' })).toBeChecked();
+  await expect(r.getByRole('img', { name: 'Gross P&L by hour' })).toBeVisible();
+  await expect.poll(() => ranked(page)).toContain('09:00 +$1,180.00');
+
+  await r.getByRole('tab', { name: 'Setup' }).click();
+  expect(await ranked(page)).toEqual([
+    'Opening range break +$787.50',
+    'Fade +$675.00',
+    'Pullback +$325.00',
+    'Range $0.00',
+    'Breakout −$515.00',
+  ]);
+  expect(await cutOffText(r.getByRole('tabpanel'))).toEqual([]);
+});
+
+test('reports: the active fill follows the selected tab', async ({ page }) => {
+  await page.goto('/');
+  const r = reports(page);
+  const list = r.getByRole('tablist', { name: 'Break down by' });
+  await list.scrollIntoViewIfNeeded();
+  const fill = list.getByTestId('tab-fill');
+  for (const name of ['Symbol', 'Hour']) {
+    await list.getByRole('tab', { name }).click();
+    const tab = await list.getByRole('tab', { name }).boundingBox();
+    await expect
+      .poll(async () => {
+        const f = await fill.boundingBox();
+        return Math.abs(f!.x - tab!.x) + Math.abs(f!.width - tab!.width);
+      })
+      .toBeLessThan(1);
   }
 });
 
-test('the rack lifts on hover only when motion is welcome', async ({
-  page,
-}) => {
-  await page.goto('/');
-  const rack = page.getByRole('region', { name: /every tool/i });
-  const card = rack.locator('a[href="/features/journal"]');
-  await card.hover();
-  await expect(card).toHaveCSS('translate', '0px -10px');
+for (const width of [390, 768, 1024, 1280, 1440, 1680]) {
+  test(`no horizontal overflow at ${width}, longest labels showing`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/');
+    const r = reports(page);
+    await r.getByRole('tab', { name: 'Setup' }).click();
+    await r.getByRole('tab', { name: 'Setup' }).scrollIntoViewIfNeeded();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  });
+}
 
-  await page.mouse.move(0, 0);
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await card.hover();
-  await expect(card).toHaveCSS('translate', 'none');
-  // Keyboard focus (focus-visible) holds still too.
-  await card.focus();
-  await page.keyboard.press('Tab');
-  await page.keyboard.press('Shift+Tab');
-  await expect(card).toBeFocused();
-  await expect(card).toHaveCSS('translate', 'none');
-});
-
-test('the rack links live modules and leaves the assistant unlinked', async ({
-  page,
-}) => {
+test('no em or en dash anywhere on the landing page', async ({ page }) => {
   await page.goto('/');
-  const rack = page.getByRole('region', { name: /every tool/i });
-  for (const slug of [
-    'journal',
-    'analytics',
-    'strategies',
-    'notebook',
-    'prop-firms',
-  ])
-    await expect(rack.locator(`a[href="/features/${slug}"]`)).toHaveCount(1);
-  await expect(rack.getByRole('link', { name: /AI assistant/ })).toHaveCount(0);
-  await expect(rack).toContainText('AI assistant');
-});
-
-test('the closing call to action goes back to the drop', async ({ page }) => {
-  await page.goto('/');
-  const cta = page.getByRole('link', { name: 'Build my journal' });
-  await expect(cta).toHaveAttribute('href', '#drop');
-  await cta.click();
-  await expect(page.locator('#drop')).toBeInViewport();
+  expect(await page.evaluate(() => document.body.innerText)).not.toMatch(
+    /[—–]/,
+  );
 });
