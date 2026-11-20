@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ImportMapping } from '@/domain/import/mapping';
 import type { ParsedCsv } from '@/domain/import/csv';
 import { planImport, type ImportPlan } from '@/domain/import/plan';
@@ -201,27 +201,53 @@ export interface ImportInput {
   fileName: string;
 }
 
-/** The plan for a file. Its id and timestamp are fixed per `input` object, so re-renders keep one plan identity. */
+/** Who a plan is: its id and time, and the input and import revision they were made for. */
+interface PlanIdentity {
+  input: ImportInput | null;
+  revision: number | undefined;
+  importId: string;
+  now: string;
+}
+
+function newPlanIdentity(
+  input: ImportInput | null,
+  revision: number | undefined,
+): PlanIdentity {
+  return {
+    input,
+    revision,
+    importId: crypto.randomUUID(),
+    now: new Date().toISOString(),
+  };
+}
+
+/**
+ * The plan for a file. Its id and time hold while the `input` object and the
+ * workspace's import revision stay the same, so re-renders and refetches keep
+ * one plan identity. A new input, or an import committed or undone since,
+ * makes a new plan with a new id: a commit never reuses an id in the history.
+ * Keep `input` one object while the file and mapping are unchanged (state or a
+ * memo): a new object on every render would re-plan without end.
+ */
 export function useImportPlan(input: ImportInput | null): Derived<ImportPlan> {
   const context = useImportContext(input?.accountId);
-  const meta = useMemo(
-    () => ({
-      importId: crypto.randomUUID(),
-      now: new Date().toISOString(),
-    }),
-    // A new input is a new plan, so it gets a new id.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [input],
+  const revision = context.data?.importRevision;
+  const [identity, setIdentity] = useState(() =>
+    newPlanIdentity(input, revision),
   );
+  // Adjusting state while rendering: React re-renders at once with the new identity.
+  const current = identity.input === input && identity.revision === revision;
+  if (!current) setIdentity(newPlanIdentity(input, revision));
   const data = useMemo(
     () =>
-      input && context.data
+      current && input && context.data
         ? planImport(input.parsed, input.mapping, context.data, {
-            ...meta,
+            importId: identity.importId,
+            now: identity.now,
             fileName: input.fileName,
           })
         : undefined,
-    [input, context.data, meta],
+    [current, input, context.data, identity],
   );
   return {
     status: context.status,

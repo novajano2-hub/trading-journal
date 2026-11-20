@@ -4,7 +4,14 @@ import { cleanup, renderHook, waitFor, act } from '@testing-library/react';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { readFileSync } from 'node:fs';
 import type { ReactNode } from 'react';
-import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import {
+  afterEach,
+  beforeEach,
+  expect,
+  onTestFinished,
+  test,
+  vi,
+} from 'vitest';
 import { parseCsv } from '@/domain/import/csv';
 import { guessMapping } from '@/domain/import/mapping';
 import { EMPTY_FILTERS } from '../filters';
@@ -19,6 +26,7 @@ import {
   useTradeSet,
   type ImportInput,
 } from './derived';
+import { useCommitImport, useUndoImport } from './hooks';
 import { DataProvider } from './provider';
 
 vi.mock('next/navigation', () => ({
@@ -176,4 +184,67 @@ test('useImportPlan plans the landing file and keeps its id per input', async ()
   expect(result.current.data!.importId).toBe(id);
   rerender({ i: null });
   expect(result.current.status).toBe('pending');
+});
+
+const EARLY = '2026-11-21T10:00:00.000Z';
+const LATE = '2026-11-21T10:05:00.000Z';
+
+test('useImportPlan gives the same input a fresh id and time after every commit and undo, so no commit overwrites another', async () => {
+  const { repository, Wrapper } = setup();
+  const account = await repository.accounts.create(USER_WORKSPACE.id, {
+    name: 'Mine',
+    broker: 'x',
+    type: 'live',
+    currency: 'USD',
+    startingBalance: 0,
+    status: 'active',
+  });
+  const parsed = parseCsv(
+    'Date/Time,Symbol,Buy/Sell,Quantity,Price\n2026-11-16 09:41:00,ESZ5,Buy,1,6010\n2026-11-16 09:50:00,ESZ5,Sell,1,6011\n',
+  );
+  const input: ImportInput = {
+    parsed,
+    mapping: guessMapping(parsed, { sourceTimeZone: 'America/New_York' }),
+    accountId: account.id,
+    fileName: 'es.csv',
+  };
+  const { result } = renderHook(
+    () => ({
+      plan: useImportPlan(input),
+      commit: useCommitImport(),
+      undo: useUndoImport(),
+    }),
+    { wrapper: Wrapper },
+  );
+  const planned = async (not: readonly string[]) => {
+    await waitFor(() => {
+      expect(result.current.plan.status).toBe('success');
+      expect(not).not.toContain(result.current.plan.data!.importId);
+    });
+    return result.current.plan.data!;
+  };
+
+  // Only the clock is faked; timers stay real for waitFor and IndexedDB.
+  vi.useFakeTimers({ toFake: ['Date'], now: Date.parse(EARLY) });
+  onTestFinished(() => void vi.useRealTimers());
+  const x = await planned([]);
+  await act(() => result.current.commit.mutateAsync(x));
+  // The file is all imported now, under a new id.
+  const y = await planned([x.importId]);
+  expect(y.blocked).toBe('nothing-new');
+  vi.setSystemTime(Date.parse(LATE));
+  await act(() => result.current.undo.mutateAsync(x.importId));
+  const z = await planned([x.importId, y.importId]);
+  expect(z.blocked).toBeNull();
+  expect([x.createdAt, z.createdAt]).toEqual([EARLY, LATE]);
+  await act(() => result.current.commit.mutateAsync(z));
+  expect(
+    (await repository.imports.list(USER_WORKSPACE.id)).map((j) => [
+      j.id,
+      j.status,
+    ]),
+  ).toEqual([
+    [z.importId, 'active'],
+    [x.importId, 'undone'],
+  ]);
 });

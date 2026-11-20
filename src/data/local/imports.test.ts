@@ -168,12 +168,28 @@ describe('imports.commit', () => {
     expect(await repo.trades.list(M)).toHaveLength(9);
   });
 
-  test('jobs created at the same time list by id', async () => {
+  test('the list follows commit order, not the time a plan was made', async () => {
     const { repo, plan } = await setup();
-    const b = await plan(OPEN_ES, 'impB');
-    await repo.imports.commit(M, b);
-    const a = await plan(CORN, 'impA', { mapping: { overrides: { ZC } } });
-    await repo.imports.commit(M, { ...a, createdAt: b.createdAt });
+    // A plan made stale and planned again can carry an older time than one committed before it.
+    await repo.imports.commit(M, {
+      ...(await plan(OPEN_ES, 'impA')),
+      createdAt: '2026-11-21T09:00:00.000Z',
+    });
+    await repo.imports.commit(M, {
+      ...(await plan(CORN, 'impB', { mapping: { overrides: { ZC } } })),
+      createdAt: '2026-11-21T08:00:00.000Z',
+    });
+    expect((await repo.imports.list(M)).map((j) => j.id)).toEqual([
+      'impB',
+      'impA',
+    ]);
+  });
+
+  test('jobs with the same revision list by id', async () => {
+    const { repo, db, commit } = await setup();
+    await commit(OPEN_ES, 'impB');
+    await commit(CORN, 'impA', { mapping: { overrides: { ZC } } });
+    await db.imports.update([M, 'impA'], { revision: 1 });
     expect((await repo.imports.list(M)).map((j) => j.id)).toEqual([
       'impA',
       'impB',
@@ -307,6 +323,32 @@ describe('imports.commit refuses a stale plan', () => {
       }),
     );
     expect(await repo.trades.list(M)).toHaveLength(1);
+  });
+});
+
+describe('imports.commit refuses a reused import id', () => {
+  test('commit X, undo X, then X planned again: the commit is refused and the undone record stays', async () => {
+    const { repo, plan } = await setup();
+    const x = await repo.imports.commit(M, await plan(OPEN_ES, 'impX'));
+    await repo.imports.undo(M, x.id);
+    const history = await repo.imports.list(M);
+    expect(history).toMatchObject([{ id: x.id, status: 'undone' }]);
+
+    // Planned from the current history, so only the id is stale.
+    const again = await plan(OPEN_ES, 'impX');
+    expect(again.blocked).toBeNull();
+    const error = await repo.imports.commit(M, again).catch((e) => e);
+    expect(error).toBeInstanceOf(StalePlanError);
+    expect(error).toMatchObject({ reason: 'imports-changed' });
+    expect(await repo.imports.list(M)).toEqual(history);
+    expect(await repo.trades.list(M)).toEqual([]);
+
+    // Under a fresh id it lands beside the undone record.
+    await repo.imports.commit(M, await plan(OPEN_ES, 'impY'));
+    expect((await repo.imports.list(M)).map((j) => [j.id, j.status])).toEqual([
+      ['impY', 'active'],
+      ['impX', 'undone'],
+    ]);
   });
 });
 

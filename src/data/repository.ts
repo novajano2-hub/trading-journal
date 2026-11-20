@@ -185,7 +185,7 @@ export type UndoResult =
   | { ok: false; reason: 'later-import-depends'; dependentJobId: string };
 
 export interface ImportRepo {
-  /** Newest first (`createdAt`, then `id`), without what dedupe and undo work from. */
+  /** Newest commit first (then by `id`), without what dedupe and undo work from. */
   list(ws: string): Promise<ImportJob[]>;
   /** What `planImport` needs for the account. Throws NotFoundError for a missing account. */
   context(ws: string, accountId: string): Promise<ImportContext>;
@@ -194,8 +194,9 @@ export interface ImportRepo {
    * Throws ImportBlockedError for a blocked plan, RangeError unless `ws`, the
    * plan and every row it writes or replaces are My workspace (rows also in
    * the plan's account), and StalePlanError, writing nothing,
-   * when the account is gone or an import was committed or undone in the
-   * workspace since the plan's context was read.
+   * when the account is gone, an import was committed or undone in the
+   * workspace since the plan's context was read, or a job with the plan's
+   * `importId` already exists (also an undone one).
    */
   commit(ws: string, plan: ImportPlan): Promise<ImportJob>;
   /**

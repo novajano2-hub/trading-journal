@@ -160,8 +160,9 @@ export function localImports(ctx: LocalContext): ImportRepo {
     async list(ws) {
       const db = await ctx.db();
       const rows = await db.imports.where('workspaceId').equals(ws).toArray();
+      // By commit order: `createdAt` is when the plan was made.
       return rows
-        .sort((a, b) => cmp(b.createdAt, a.createdAt) || cmp(a.id, b.id))
+        .sort((a, b) => b.revision - a.revision || cmp(a.id, b.id))
         .map(withoutSnapshots);
     },
 
@@ -235,6 +236,10 @@ export function localImports(ctx: LocalContext): ImportRepo {
           // A commit or undo since then moved the open trades, fingerprints
           // and serials the plan was made from.
           if ((await importRevision(db, ws)) !== plan.importRevision)
+            throw new StalePlanError('imports-changed');
+          // An id already in the history, even an undone one, would
+          // overwrite that record.
+          if (await db.imports.get([ws, plan.importId]))
             throw new StalePlanError('imports-changed');
           const revision = await bumpImportRevision(db, ws);
           await db.trades.bulkDelete(
