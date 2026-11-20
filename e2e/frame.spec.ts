@@ -104,7 +104,7 @@ test('mobile sheet closes and unlocks scrolling when the viewport reaches md', a
   expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
 });
 
-test('Get started leads to the drop slot, not a dead-end signup', async ({
+test('Get started leads to the how-it-works section, not a dead-end signup', async ({
   page,
 }) => {
   await page.goto('/pricing');
@@ -112,7 +112,7 @@ test('Get started leads to the drop slot, not a dead-end signup', async ({
   if (isMobile()) await header.getByRole('button', { name: 'Menu' }).click();
   await expect(
     header.getByRole('link', { name: 'Get started' }),
-  ).toHaveAttribute('href', '/#drop');
+  ).toHaveAttribute('href', '/#how');
 });
 
 test('footer carries the legal and module links', async ({ page }) => {
@@ -120,16 +120,64 @@ test('footer carries the legal and module links', async ({ page }) => {
   const footer = page.getByRole('contentinfo');
   for (const name of ['Terms', 'Privacy', 'Pricing', 'Journal'])
     await expect(footer.getByRole('link', { name })).toBeVisible();
+  await expect(
+    footer.getByRole('button', { name: /Switch to (dark|light) theme/ }),
+  ).toBeVisible();
   await expect(footer).toContainText('© 2026 Keel');
 });
 
-test('no horizontal scroll', async ({ page }) => {
+for (const width of [390, 768, 1024, 1280, 1440, 1680]) {
+  test(`no horizontal scroll at ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/');
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  });
+}
+
+test('header is 64-68px and the desktop nav sits on one line', async ({
+  page,
+}) => {
+  test.skip(isMobile(), 'desktop only');
+  for (const width of [1024, 1280, 1680]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/');
+    const header = page.getByRole('banner');
+    const box = await header.boundingBox();
+    expect(box!.height).toBeGreaterThanOrEqual(64);
+    expect(box!.height).toBeLessThanOrEqual(68);
+    const tops = await header
+      .locator('nav[aria-label="Primary"] > *, nav[aria-label="Primary"] a')
+      .evaluateAll((els) =>
+        els.map((e) => Math.round(e.getBoundingClientRect().top)),
+      );
+    expect(new Set(tops).size).toBeLessThanOrEqual(2);
+    const wrapped = await header
+      .getByRole('link', { name: 'Get started' })
+      .evaluate((e) => e.getBoundingClientRect().height <= 44);
+    expect(wrapped).toBe(true);
+  }
+});
+
+test('product menu shows two columns with the in-development chip', async ({
+  page,
+}) => {
+  test.skip(isMobile(), 'popover is desktop only');
   await page.goto('/');
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
+  const header = page.getByRole('banner');
+  await header.getByRole('button', { name: 'Product' }).click();
+  const panel = header.locator('[data-product-panel]');
+  await expect(panel).toBeVisible();
+  const lefts = await panel
+    .locator('a[data-item]')
+    .evaluateAll((els) => [
+      ...new Set(els.map((e) => Math.round(e.getBoundingClientRect().left))),
+    ]);
+  expect(lefts).toHaveLength(2);
+  await expect(panel.getByText('In development').first()).toBeVisible();
 });
 
 test('product menu closes after following a link', async ({ page }) => {

@@ -1,5 +1,5 @@
-import { SiteFooter } from '@/components/marketing/site-footer';
-import { SiteHeader } from '@/components/marketing/site-header';
+import { SiteFooter } from '@/components/site/site-footer';
+import { SiteHeader } from '@/components/site/site-header';
 
 export default function MarketingLayout({
   children,
