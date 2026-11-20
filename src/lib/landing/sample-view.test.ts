@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { formatPnl } from '@/lib/format';
 import { getSampleView } from './sample-view';
 
 describe('landing sample', () => {
@@ -49,5 +50,70 @@ describe('landing sample', () => {
       qty: 1,
     });
     expect(v.heroTickets[0]!.r).toBeUndefined();
+  });
+
+  test('trades carry engine tags for setup and mistake', () => {
+    const v = getSampleView();
+    const name = (id: string) => v.tagNames[id];
+    const setups = v.trades.map((t) =>
+      t.tagIds
+        .map(name)
+        .filter((n) => v.tags.find((x) => x.name === n)?.category === 'setup'),
+    );
+    expect(setups.flat()).toEqual([
+      'Opening range break',
+      'Breakout',
+      'Pullback',
+      'Opening range break',
+      'Fade',
+      'Breakout',
+      'Range',
+      'Opening range break',
+    ]);
+    const six = v.trades.find((t) => t.serial === 6)!;
+    expect(six.tagIds.map(name)).toContain('Moved stop');
+    expect(v.heroTickets.find((t) => t.serial === 5)!.stamp).toBe('A+ SETUP');
+  });
+
+  test('breakdowns come from the engine', () => {
+    const b = getSampleView().breakdowns;
+    const net = (rows: { label: string; net: number }[]) =>
+      Object.fromEntries(rows.map((r) => [r.label, r.net]));
+    expect(b.hour.map((r) => r.label)).toEqual([
+      '09:00',
+      '10:00',
+      '11:00',
+      '12:00',
+      '13:00',
+      '14:00',
+      '15:00',
+    ]);
+    expect(net(b.hour)).toEqual({
+      '09:00': 116000,
+      '10:00': 12000,
+      '11:00': -3900,
+      '12:00': 0,
+      '13:00': -500,
+      '14:00': 0,
+      '15:00': 0,
+    });
+    expect(b.setup.map((r) => [r.label, r.net])).toEqual([
+      ['Opening range break', 77600],
+      ['Fade', 67000],
+      ['Pullback', 32000],
+      ['Range', -500],
+      ['Breakout', -52500],
+    ]);
+    expect(b.setup.reduce((a, r) => a + r.net, 0)).toBe(123600);
+    expect(b.mistake.map((r) => [r.label, r.net])).toEqual([
+      ['Moved stop', -27500],
+      ['Untagged', 151100],
+    ]);
+    expect(b.session.find((r) => r.key === 'new-york')!.net).toBe(123600);
+    expect(b.symbol.reduce((a, r) => a + r.net, 0)).toBe(123600);
+  });
+
+  test('ticker text equals the formatted net P&L', () => {
+    expect(formatPnl(getSampleView().summary.netPnl)).toBe('+$1,236.00');
   });
 });

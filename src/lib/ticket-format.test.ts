@@ -4,6 +4,7 @@ import {
   MISSING,
   formatClock,
   serialNumber,
+  shortTime,
   ticketTime,
   weekdayOf,
 } from './ticket-format';
@@ -25,5 +26,10 @@ describe('ticket-format', () => {
   test('weekday reads at noon UTC so it never shifts', () => {
     expect(weekdayOf('2026-11-20')).toBe('Friday');
     expect(weekdayOf('2026-11-16', 'short')).toBe('Mon');
+  });
+
+  test('shortTime prints the compact row clock', () => {
+    expect(shortTime('2026-11-20T15:15:00Z')).toBe('20 Nov 10:15');
+    expect(shortTime('2026-11-19T14:50:00Z')).toBe('19 Nov 09:50');
   });
 });

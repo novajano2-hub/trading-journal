@@ -68,3 +68,20 @@ export function onTradingDate(
 
 export const weekdayOf = (date: string, style: 'short' | 'long' = 'long') =>
   onTradingDate(date, { weekday: style }, 'en-US');
+
+/** The compact row clock, '20 Nov 10:15', in the given timezone. */
+export function shortTime(iso: string, timeZone = 'America/New_York'): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(new Date(iso))
+      .map((p) => [p.type, p.value]),
+  );
+  return `${parts.day} ${parts.month} ${parts.hour}:${parts.minute}`;
+}

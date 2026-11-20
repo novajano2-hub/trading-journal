@@ -32,3 +32,13 @@ export function formatPct(ratio: number, digits = 0): string {
 export function formatRatio(value: number, digits = 2): string {
   return value.toFixed(digits);
 }
+
+/** Signed whole dollars for chart labels, e.g. +1,160 or −39. Zero is bare. */
+export function formatPnlWhole(cents: Cents): string {
+  const body = new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: 0,
+  }).format(Math.round(Math.abs(cents) / 100));
+  if (cents > 0) return `+${body}`;
+  if (cents < 0) return `−${body}`;
+  return body;
+}

@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'vitest';
-import { formatMoney, formatPct, formatPnl, formatRatio } from './format';
+import {
+  formatMoney,
+  formatPct,
+  formatPnl,
+  formatPnlWhole,
+  formatRatio,
+} from './format';
 
 describe('format', () => {
   test('formatPnl always signs gains and losses', () => {
@@ -20,5 +26,12 @@ describe('format', () => {
   test('formatRatio keeps two decimals', () => {
     expect(formatRatio(3.1722)).toBe('3.17');
     expect(formatRatio(2)).toBe('2.00');
+  });
+
+  test('formatPnlWhole signs whole dollars', () => {
+    expect(formatPnlWhole(116000)).toBe('+1,160');
+    expect(formatPnlWhole(-3900)).toBe('−39');
+    expect(formatPnlWhole(-500)).toBe('−5');
+    expect(formatPnlWhole(0)).toBe('0');
   });
 });
