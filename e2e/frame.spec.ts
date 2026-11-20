@@ -104,15 +104,13 @@ test('mobile sheet closes and unlocks scrolling when the viewport reaches lg', a
   expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
 });
 
-test('Get started leads to the how-it-works section, not a dead-end signup', async ({
-  page,
-}) => {
+test('Get started leads to sign-up', async ({ page }) => {
   await page.goto('/pricing');
   const header = page.getByRole('banner');
   if (isMobile()) await header.getByRole('button', { name: 'Menu' }).click();
   await expect(
     header.getByRole('link', { name: 'Get started' }),
-  ).toHaveAttribute('href', '/#how');
+  ).toHaveAttribute('href', '/signup');
 });
 
 test('footer carries the legal and module links', async ({ page }) => {

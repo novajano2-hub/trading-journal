@@ -6,4 +6,4 @@ export const PRIMARY_LINKS = [
 
 /** Account entry points until sign-up exists. */
 export const LOGIN_HREF = '/login';
-export const START_HREF = '/#how';
+export const START_HREF = '/signup';

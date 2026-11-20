@@ -41,7 +41,7 @@ test('hero carries the contract copy and its two actions', async ({ page }) => {
   const how = h.getByRole('link', { name: 'See how it works' });
   await expect(start).toBeVisible();
   await expect(how).toBeVisible();
-  await expect(start).toHaveAttribute('href', '/#how');
+  await expect(start).toHaveAttribute('href', '/signup');
   await expect(how).toHaveAttribute('href', '#how');
   // The product composition is labelled as sample data, once.
   await expect(h.getByText('Sample data', { exact: true })).toHaveCount(1);
