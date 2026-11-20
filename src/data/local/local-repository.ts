@@ -1,0 +1,28 @@
+import type { Repository } from '../repository';
+import type { SampleWorkspace } from '../seed/generate';
+import { createLocalContext, defaultSample } from './context';
+import { localPrefs } from './prefs';
+import { localWorkspaces } from './workspaces';
+
+export interface LocalRepositoryOptions {
+  indexedDB?: IDBFactory;
+  IDBKeyRange?: typeof IDBKeyRange;
+  now?: () => Date;
+  newId?: () => string;
+  /** Default: the real generator with `SAMPLE_SEED`, ending the last weekday before `now`. */
+  sample?: (now: Date) => Promise<SampleWorkspace>;
+  /** Default 5000. */
+  openTimeoutMs?: number;
+}
+
+/** The IndexedDB repository. Side-effect free: nothing touches storage until the first method call. */
+export function createLocalRepository(
+  opts: LocalRepositoryOptions = {},
+): Repository {
+  const sample = opts.sample ?? defaultSample;
+  const ctx = createLocalContext({ ...opts, sample });
+  return {
+    workspaces: localWorkspaces(ctx, sample),
+    prefs: localPrefs(ctx),
+  };
+}
