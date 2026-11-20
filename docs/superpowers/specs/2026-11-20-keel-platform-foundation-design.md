@@ -70,7 +70,7 @@ The user chose Next.js and left the rest to me, so A is my call. Competitors, fo
 | Concern | Choice | Why |
 |---|---|---|
 | Framework | Next.js App Router, React, TypeScript strict (**user**) | One codebase for marketing and app |
-| Package manager | pnpm | Fast, strict dependency resolution |
+| Package manager | npm | Ships with Node, no extra install (pnpm was planned but is not installed on this machine) |
 | Styling | Tailwind CSS v4 with design tokens as CSS variables | Tokens come from the committed world. Utilities stay fast |
 | Primitives | Radix UI primitives, styled in-house | Accessible behaviour without a stock look |
 | Fonts | Self-hosted with `next/font`: Big Shoulders Display, Barlow, DotGothic16 | From the direction contract |

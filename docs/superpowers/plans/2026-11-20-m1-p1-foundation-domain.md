@@ -13,7 +13,7 @@ All of it is test-first, and every later plan depends on it.
 
 **Architecture:** One Next.js App Router app (spec §4, approach A). This plan adds only `src/domain` and `src/lib`, as pure TypeScript with no React, browser APIs or I/O, so the data layer, marketing site and app can all build on it. Money is integer cents. Times are UTC ISO strings, bucketed in the user's timezone.
 
-**Tech Stack:** Next.js (App Router), TypeScript strict, pnpm, Vitest, date-fns v4 + @date-fns/tz, ESLint, Prettier.
+**Tech Stack:** Next.js (App Router), TypeScript strict, npm, Vitest, date-fns v4 + @date-fns/tz, ESLint, Prettier.
 
 **Spec:** `docs/superpowers/specs/2026-11-20-keel-platform-foundation-design.md` (approved). Product truth: `PRODUCT.md`. Deferred work: `docs/BACKLOG.md`.
 
@@ -29,7 +29,7 @@ All of it is test-first, and every later plan depends on it.
 
 ## Global Constraints
 
-- Node.js 22 LTS or newer; pnpm; Next.js App Router; TypeScript `strict: true` and `noUncheckedIndexedAccess: true`.
+- Node.js 22 LTS or newer; npm; Next.js App Router; TypeScript `strict: true` and `noUncheckedIndexedAccess: true`.
 - `src/domain/**` is pure: no imports from `react`, `next`, browser globals or network/file I/O.
 - Money is stored as integer minor units (`Cents`). It is rounded **half-even**, once, at the trade level. Values within 1e-6 of an integer or a .5 tie count as that integer or tie.
 - Times are stored as UTC ISO 8601 strings. Day, weekday and hour bucketing uses the user's IANA timezone via `@date-fns/tz`. Sessions always use `America/New_York`.
@@ -37,7 +37,7 @@ All of it is test-first, and every later plan depends on it.
 - Breakeven: |net| ≤ `breakevenThreshold` (default `0`). It is excluded from win rate, average win, average loss and win/loss counts. It adds nothing to profit factor and neither extends nor breaks a streak.
 - Metrics count only `status === 'closed'` trades.
 - No licensed libraries: no Highcharts, no TradingView Charting Library.
-- Test files are type-checked by `pnpm typecheck`. Under `noUncheckedIndexedAccess`, tests use non-null assertions on indexed access (`trades[0]!`). The snippets below omit them for brevity.
+- Test files are type-checked by `npm run typecheck`. Under `noUncheckedIndexedAccess`, tests use non-null assertions on indexed access (`trades[0]!`). The snippets below omit them for brevity.
 
 ## Review Focus
 
@@ -57,7 +57,7 @@ All of it is test-first, and every later plan depends on it.
 - Modify: `.gitignore`
 
 **Interfaces:**
-- Produces: scripts `pnpm dev | build | lint | typecheck | test | test:watch | format`. The import alias `@/*` maps to `src/*` in both Next and Vitest.
+- Produces: npm scripts `dev | build | lint | typecheck | test | test:watch | format`. The import alias `@/*` maps to `src/*` in both Next and Vitest.
 
 - [ ] **Step 1: Initialise git and commit the existing docs on `main`**
 
@@ -70,9 +70,9 @@ git switch -c m1-foundation
 
 - [ ] **Step 2: Scaffold Next.js in a temporary directory and copy it in.** The repo root isn't empty, so create-next-app would refuse it.
 
-Run: `pnpm dlx create-next-app@latest <tmpdir>/keel-scaffold --ts --tailwind --eslint --app --src-dir --import-alias "@/*" --use-pnpm --yes`
-Then copy everything except `.git` and `node_modules` into the repo root, and run `pnpm install`.
-Expected: `pnpm dev` serves the default page on :3000.
+Run: `npx create-next-app@latest <tmpdir>/keel-scaffold --ts --tailwind --eslint --app --src-dir --import-alias "@/*" --use-npm --yes`
+Then copy everything except `.git` and `node_modules` into the repo root, and run `npm install`.
+Expected: `npm run dev` serves the default page on :3000.
 
 - [ ] **Step 3: Tighten TypeScript and add tooling.**
   - Set `"noUncheckedIndexedAccess": true` in `tsconfig.json`.
@@ -85,7 +85,7 @@ Expected: `pnpm dev` serves the default page on :3000.
 
 - [ ] **Step 5: Verify the toolchain**
 
-Run: `pnpm lint && pnpm typecheck && pnpm test && pnpm build`
+Run: `npm run lint && npm run typecheck && npm test && npm run build`
 Expected: all exit 0; Vitest reports 1 passed.
 
 - [ ] **Step 6: Commit**
@@ -201,7 +201,7 @@ test('formatMoney is unsigned for balances', () => {
 
 - [ ] **Step 3: Run the tests and confirm they fail**
 
-Run: `pnpm test src/domain/money.test.ts src/lib/format.test.ts`
+Run: `npm test -- src/domain/money.test.ts src/lib/format.test.ts`
 Expected: FAIL. `toCents`, `roundHalfEven`, `formatPnl` and `formatMoney` are not defined.
 
 - [ ] **Step 4: Implement them.**
@@ -209,7 +209,7 @@ Expected: FAIL. `toCents`, `roundHalfEven`, `formatPnl` and `formatMoney` are no
   - `toCents(a) = roundHalfEven(a * 100)`.
   - `formatPnl` and `formatMoney` use `Intl.NumberFormat('en-US', { style: 'currency', currency })` on `cents / 100` with the absolute value. `formatPnl` prefixes `+` or `−` (U+2212) by sign.
 
-- [ ] **Step 5: Run `pnpm test && pnpm typecheck`.** Expected: PASS.
+- [ ] **Step 5: Run `npm test && npm run typecheck`.** Expected: PASS.
 
 - [ ] **Step 6: Commit** with `git commit -m "feat(domain): core types, half-even cents, signed P&L formatting"`.
 
@@ -295,7 +295,7 @@ test('unknown futures root needs an override', () => {
 });
 ```
 
-- [ ] **Step 2: Run `pnpm test src/domain/instruments.test.ts`.** Expected: FAIL (not defined).
+- [ ] **Step 2: Run `npm test -- src/domain/instruments.test.ts`.** Expected: FAIL (not defined).
 - [ ] **Step 3: Implement `resolveInstrument`** in `src/domain/instruments.ts`, using the registry and rules above. Try the patterns in order: option, futures, forex, crypto, stock.
 - [ ] **Step 4: Run the tests.** Expected: PASS.
 - [ ] **Step 5: Commit** with `git commit -m "feat(domain): instrument registry and symbol resolution"`.
@@ -401,7 +401,7 @@ test('accounts never mix, serials follow openedAt, unknown symbols are reported'
 });
 ```
 
-- [ ] **Step 2: Run `pnpm test src/domain/trade-builder.test.ts`.** Expected: FAIL (`buildTrades` not defined).
+- [ ] **Step 2: Run `npm test -- src/domain/trade-builder.test.ts`.** Expected: FAIL (`buildTrades` not defined).
 - [ ] **Step 3: Implement `buildTrades`** in `src/domain/trade-builder.ts` per the rules above. Keep a FIFO lot queue of `{ qty, price }` per group, and accumulate quote-currency P&L as a float until the single `toCents`.
 - [ ] **Step 4: Run the tests.** Expected: PASS.
 - [ ] **Step 5: Commit** with `git commit -m "feat(domain): FIFO trade builder with reversals, cost split, FX conversion"`.
@@ -481,7 +481,7 @@ test('rule adherence ignores unanswered checks', () => {
 });
 ```
 
-- [ ] **Step 2: Run `pnpm test src/domain/metrics/summary.test.ts`.** Expected: FAIL.
+- [ ] **Step 2: Run `npm test -- src/domain/metrics/summary.test.ts`.** Expected: FAIL.
 - [ ] **Step 3: Implement** `makeTrade` (defaults: ES `Instrument` from `resolveInstrument('ESZ5')`, `status: 'closed'`, `openedAt: '2026-03-02T15:00:00Z'`, `closedAt: '2026-03-02T15:05:00Z'`, `pnlCurrency: 'USD'`), plus `summarize`, `rOf` and `riskFromStop`.
 - [ ] **Step 4: Run the tests.** Expected: PASS.
 - [ ] **Step 5: Commit** with `git commit -m "feat(domain): summary metrics, R, rule adherence"`.
@@ -549,7 +549,7 @@ test('daily P&L buckets by local close date across DST', () => {   // Review Foc
 });
 ```
 
-- [ ] **Step 2: Run `pnpm test src/domain/metrics`.** Expected: the new tests FAIL.
+- [ ] **Step 2: Run `npm test -- src/domain/metrics`.** Expected: the new tests FAIL.
 - [ ] **Step 3: Implement** the three modules. Local dates use `TZDate` from `@date-fns/tz` with `format(…, 'yyyy-MM-dd')`.
 - [ ] **Step 4: Run the tests.** Expected: PASS.
 - [ ] **Step 5: Commit** with `git commit -m "feat(domain): equity, drawdown, streaks, timezone-correct daily P&L"`.
@@ -633,7 +633,7 @@ test('R distribution has contiguous bins', () => {
 });
 ```
 
-- [ ] **Step 2: Run `pnpm test src/domain/metrics/breakdowns.test.ts`.** Expected: FAIL.
+- [ ] **Step 2: Run `npm test -- src/domain/metrics/breakdowns.test.ts`.** Expected: FAIL.
 - [ ] **Step 3: Implement `breakdown` and `rDistribution`.** Group the trades, then call `summarize` per group.
 - [ ] **Step 4: Run the tests.** Expected: PASS.
 - [ ] **Step 5: Commit** with `git commit -m "feat(domain): breakdowns by time, session, duration, side, symbol, strategy, tag; R distribution"`.
@@ -718,16 +718,16 @@ test('target reached', () => {
 
 `S(overrides)` is a local test helper. It builds the scenario above with `makeTrade` and `closedAt` times as listed, and accepts overrides for `drawdownType`, `consistencyPct`, `now`, `day1` (an array of nets), `day2` and `day3` (single nets; a 0 net means no trade that day).
 
-- [ ] **Step 2: Run `pnpm test src/domain/prop/evaluate.test.ts`.** Expected: FAIL.
+- [ ] **Step 2: Run `npm test -- src/domain/prop/evaluate.test.ts`.** Expected: FAIL.
 - [ ] **Step 3: Implement `evaluateProp`**, reusing `equityCurve` and `dailyPnl`.
-- [ ] **Step 4: Run the full suite.** Run `pnpm lint && pnpm typecheck && pnpm test`. Expected: all PASS.
+- [ ] **Step 4: Run the full suite.** Run `npm run lint && npm run typecheck && npm test`. Expected: all PASS.
 - [ ] **Step 5: Commit** with `git commit -m "feat(domain): prop-firm rule evaluation with permanent breaches"`.
 
 ---
 
 ## Done when
 
-- `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all pass on branch `m1-foundation`.
+- `npm run lint && npm run typecheck && npm test && npm run build` all pass on branch `m1-foundation`.
 - `src/domain` has no imports from `react`, `next` or browser APIs. Check with `grep -rE "from '(react|next)" src/domain`, which should print nothing.
 - Plans 2 and 3 can start: Plan 2 consumes every Interfaces block above, and Plan 3 needs only Task 1.
 - Not in this plan, deliberately: the spec's "<50 ms for 1,200 trades" performance check. It lands in Plan 2, where the seeded sample generator provides a realistic 1,200-trade set.
