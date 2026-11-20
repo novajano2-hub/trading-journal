@@ -1,3 +1,5 @@
+import type { ImportMapping } from './import/mapping';
+
 export type Cents = number; // integer minor units of the P&L currency
 export type AssetClass =
   'stock' | 'option' | 'future' | 'forex' | 'crypto' | 'cfd';
@@ -61,6 +63,8 @@ export interface Trade {
   rating?: 1 | 2 | 3 | 4 | 5;
   ruleChecks: RuleCheck[];
   noteId?: string;
+  /** The import that last built this trade. */
+  importId?: string;
 }
 export type DrawdownType = 'static' | 'trailing' | 'eod-trailing';
 export interface PropRuleSet {
@@ -120,6 +124,20 @@ export interface JournalEntry {
   linkedTradeIds: string[];
   folder?: string;
   updatedAt: string;
+}
+export interface ImportJob {
+  id: string;
+  workspaceId: string;
+  accountId: string;
+  fileName: string;
+  mapping: ImportMapping;
+  rowCount: number;
+  tradeCount: number;
+  skippedCount: number;
+  duplicateCount: number;
+  status: 'active' | 'undone';
+  createdAt: string;
+  undoneAt?: string;
 }
 export interface Workspace {
   id: string;
