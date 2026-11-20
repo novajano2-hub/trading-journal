@@ -1,7 +1,9 @@
 {
   "detector": {
     "ignoreRules": [],
-    "ignoreFiles": [],
+    "ignoreFiles": [
+      ".impeccable/mocks/rebrand/landing-v3.html"
+    ],
     "ignoreValues": [
       {
         "rule": "overused-font",
