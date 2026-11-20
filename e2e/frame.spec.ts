@@ -48,7 +48,11 @@ test('product menu closes on outside click', async ({ page }) => {
   await product.click();
   await expect(product).toHaveAttribute('aria-expanded', 'true');
   if (isMobile()) await page.mouse.click(380, 830);
-  else await page.getByRole('heading', { level: 1 }).click();
+  // The open popover covers the headline's centre; click its corner instead.
+  else
+    await page
+      .getByRole('heading', { level: 1 })
+      .click({ position: { x: 8, y: 8 } });
   await expect(product).toHaveAttribute('aria-expanded', 'false');
 });
 

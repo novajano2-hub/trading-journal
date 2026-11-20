@@ -2,10 +2,12 @@ import type { Metadata } from 'next';
 import { Barlow, Big_Shoulders, DotGothic16 } from 'next/font/google';
 import './globals.css';
 
+// Variable, with the optical-size axis, so globals.css can pin the Display cut
+// (Google's static weights default to opsz 14, the wider Text cut).
 const display = Big_Shoulders({
   variable: '--nf-display',
   subsets: ['latin'],
-  weight: ['700', '900'],
+  axes: ['opsz'],
 });
 
 const text = Barlow({
