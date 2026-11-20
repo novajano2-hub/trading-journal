@@ -61,14 +61,13 @@ export function usePrefs(): UseQueryResult<UserPrefs> {
 function useWorkspaceQuery<T>(
   key: (ws: string) => readonly unknown[],
   read: (repo: Repository, ws: string) => Promise<T>,
-  extra: { enabled?: boolean } = {},
 ): UseQueryResult<T> {
   const repo = useRepository();
   const ws = useActiveWorkspace().data?.id;
   return useQuery({
     queryKey: key(ws ?? ''),
     queryFn: () => read(repo, ws!),
-    enabled: ws !== undefined && (extra.enabled ?? true),
+    enabled: ws !== undefined,
   });
 }
 
@@ -355,9 +354,13 @@ export function useCommitImport(): UseMutationResult<
   return useMutation<ImportJob, Error, ImportPlan>({
     mutationFn: async (plan) => {
       const job = await repo.imports.commit(USER_WORKSPACE.id, plan);
-      await repo.workspaces.setActive(USER_WORKSPACE.id);
-      await invalidate('imports.commit', USER_WORKSPACE.id);
-      await invalidate('workspaces.setActive', USER_WORKSPACE.id);
+      // The commit has landed: refresh the caches even if switching fails.
+      try {
+        await repo.workspaces.setActive(USER_WORKSPACE.id);
+      } finally {
+        await invalidate('imports.commit', USER_WORKSPACE.id);
+        await invalidate('workspaces.setActive', USER_WORKSPACE.id);
+      }
       return job;
     },
   });
