@@ -2,3 +2,4 @@
 .impeccable/config.local.json
 .impeccable/review/
 .DS_Store
+.impeccable/hook.cache.json
