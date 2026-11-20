@@ -15,7 +15,7 @@ import {
 export const metadata: Metadata = {
   title: 'Brokers and file formats',
   description:
-    'How to export your trades from any broker and the symbol formats Keel recognises.',
+    'How to export your trades from your broker and the symbol formats Keel recognises.',
 };
 
 const REQUIRED = [
