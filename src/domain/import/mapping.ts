@@ -254,6 +254,43 @@ function guessFills(headers: readonly string[], norm: string[]) {
   return { ...rest, ...columns };
 }
 
+/** Which decimal mark a numeric cell proves, if it proves one. */
+function decimalEvidence(raw: string): DecimalMark | null {
+  const s = raw.replace(/[^0-9.,]/g, '');
+  const dot = s.lastIndexOf('.');
+  const comma = s.lastIndexOf(',');
+  if (dot >= 0 && comma >= 0) return dot > comma ? '.' : ',';
+  const mark = dot >= 0 ? '.' : comma >= 0 ? ',' : null;
+  if (mark === null) return null;
+  const parts = s.split(mark);
+  // Repeated marks with groups of three are thousands separators, not decimals.
+  if (parts.length > 2) return null;
+  return parts[1]!.length === 3 ? null : mark;
+}
+
+/**
+ * Read the decimal mark off the numeric columns; when the data cannot decide
+ * (no evidence, or both marks), fall back on the delimiter: ';' files are
+ * usually European.
+ */
+function guessDecimal(
+  parsed: ParsedCsv,
+  columns: readonly (number | undefined)[],
+): DecimalMark {
+  let dot = false;
+  let comma = false;
+  for (const row of parsed.rows.slice(0, 50)) {
+    for (const c of columns) {
+      if (c === undefined) continue;
+      const mark = decimalEvidence(row.cells[c] ?? '');
+      if (mark === '.') dot = true;
+      else if (mark === ',') comma = true;
+    }
+  }
+  if (dot !== comma) return dot ? '.' : ',';
+  return parsed.delimiter === ';' ? ',' : '.';
+}
+
 export function guessMapping(
   parsed: ParsedCsv,
   defaults: { sourceTimeZone: string; overrides?: InstrumentOverrides },
@@ -267,7 +304,10 @@ export function guessMapping(
     indexesOf(norm, 'price').length >= 2 ||
     indexesOf(norm, 'time').length >= 2;
 
-  const options = (timeColumn: number | undefined) => ({
+  const options = (
+    timeColumn: number | undefined,
+    numericColumns: readonly (number | undefined)[],
+  ) => ({
     sourceTimeZone: defaults.sourceTimeZone,
     dateOrder:
       timeColumn === undefined
@@ -275,20 +315,35 @@ export function guessMapping(
         : guessDateOrder(
             parsed.rows.slice(0, 50).map((r) => r.cells[timeColumn] ?? ''),
           ),
-    decimal: parsed.delimiter === ';' ? (',' as const) : ('.' as const),
+    decimal: guessDecimal(parsed, numericColumns),
     forexQtyUnit: 'lots' as const,
     overrides: defaults.overrides ?? {},
   });
 
   if (closed) {
     const columns = guessClosedTrades(headers, norm);
-    return { kind: 'closed-trades', columns, ...options(columns.openTime) };
+    return {
+      kind: 'closed-trades',
+      columns,
+      ...options(columns.openTime, [
+        columns.entryPrice,
+        columns.exitPrice,
+        columns.qty,
+        columns.fees,
+        columns.commission,
+      ]),
+    };
   }
   const columns = guessFills(headers, norm);
   return {
     kind: 'fills',
     columns,
-    ...options(columns.date ?? columns.time),
+    ...options(columns.date ?? columns.time, [
+      columns.price,
+      columns.qty,
+      columns.fees,
+      columns.commission,
+    ]),
   };
 }
 

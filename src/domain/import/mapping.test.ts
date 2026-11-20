@@ -104,3 +104,42 @@ test('named close columns make a closed-trade file', () => {
   });
   expect(missingFields(m)).toEqual([]);
 });
+
+test('a semicolon file with dot decimals is read as dot decimals', () => {
+  expect(
+    g(
+      'Time;Symbol;Side;Qty;Price\n2026-11-16 09:41;EURUSD;Buy;1.052;1.08452\n',
+    ),
+  ).toMatchObject({ decimal: '.' });
+});
+
+test('a semicolon file with comma decimals is read as comma decimals', () => {
+  expect(
+    g('Time;Symbol;Side;Qty;Price\n2026-11-16 09:41;ESZ5;Buy;2;6010,25\n'),
+  ).toMatchObject({ decimal: ',' });
+});
+
+test('a comma file with quoted European numbers is read as comma decimals', () => {
+  expect(
+    g('Time,Symbol,Side,Qty,Price\n2026-11-16 09:41,ESZ5,Buy,2,"1.234,56"\n'),
+  ).toMatchObject({ decimal: ',' });
+});
+
+test('ambiguous numbers keep the delimiter rule', () => {
+  const head = 'Time;Symbol;Side;Qty;Price\n';
+  expect(g(`${head}2026-11-16 09:41;ESZ5;Buy;2;1.234\n`)).toMatchObject({
+    decimal: ',',
+  });
+  expect(g(`${head}2026-11-16 09:41;ESZ5;Buy;2;6010\n`)).toMatchObject({
+    decimal: ',',
+  });
+  expect(
+    g('Time,Symbol,Side,Qty,Price\n2026-11-16 09:41,ESZ5,Buy,2,1.234\n'),
+  ).toMatchObject({ decimal: '.' });
+});
+
+test('mixed evidence keeps the delimiter rule', () => {
+  expect(
+    g('Time;Symbol;Side;Qty;Price\n2026-11-16 09:41;ESZ5;Buy;1.5;6010,25\n'),
+  ).toMatchObject({ decimal: ',' });
+});
