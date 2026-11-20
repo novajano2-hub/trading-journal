@@ -124,7 +124,7 @@ export const FEATURES: Record<ModuleSlug, FeatureContent> = {
       },
       {
         title: 'Folders',
-        body: 'File entries where you will look for them.',
+        body: 'Keep entries where you will look for them.',
       },
     ],
   },

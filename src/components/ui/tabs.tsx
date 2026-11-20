@@ -1,9 +1,9 @@
 'use client';
 
 // Technique adapted from HorizonX Beacon Tabs, commercial licence: the active
-// fill slides and scales to the chosen tab (cubic-bezier(0.23,1,0.32,1), 320ms),
-// Rebuilt here for
-// auto-width text tabs, with one shared indicator instead of per-tab fills.
+// fill slides and scales to the chosen tab (cubic-bezier(0.23,1,0.32,1), 320ms).
+// Rebuilt here for auto-width text tabs, with one shared indicator instead of
+// per-tab fills.
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { glide } from '@/lib/motion';
