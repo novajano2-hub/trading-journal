@@ -1,3 +1,4 @@
+import { defaultMetricContext } from '../metrics/context';
 import { dailyPnl } from '../metrics/days';
 import { localDate } from '../time';
 import { closedInOrder, isClosed } from '../trade-status';
@@ -80,7 +81,7 @@ export function evaluateProp(input: {
   }
   const floor = floorFor(peak);
 
-  const days = dailyPnl(trades, timeZone, 0);
+  const days = dailyPnl(trades, defaultMetricContext(timeZone)) /* firm rules count fees: net, range 0..0 */;
   const todayNet = days.find((d) => d.date === today)?.net ?? 0;
   const worst = days.reduce<{ date: string; net: Cents } | null>(
     (w, d) => (w === null || d.net < w.net ? { date: d.date, net: d.net } : w),

@@ -1,14 +1,18 @@
 import { localParts } from '../time';
 import { isClosed, type ClosedTrade } from '../trade-status';
-import type { Cents, Trade } from '../types';
+import type { Trade } from '../types';
+import type { MetricContext } from './context';
 import { rOf, summarize, type Summary } from './summary';
 
-export type BreakdownKey = 'weekday' | 'hour' | 'session' | 'duration' | 'side' | 'symbol' | 'strategy' | 'tag';
-export interface BreakdownContext {
-  timeZone: string;
-  breakevenThreshold: Cents;
+export type BreakdownKey =
+  'weekday' | 'hour' | 'time-of-day' | 'session' | 'duration' | 'side' | 'symbol' | 'strategy' | 'tag';
+export interface BreakdownOptions {
   strategyNames?: Record<string, string>;
   tagNames?: Record<string, string>;
+  /** Which instant the time reports (weekday, hour, time-of-day, session) bucket by. Default 'entry'. */
+  timeBasis?: 'entry' | 'exit';
+  /** Time-of-day bucket width in minutes. Default 30. */
+  bucketMinutes?: 5 | 15 | 30 | 60;
 }
 export interface BreakdownRow { key: string; label: string; summary: Summary }
 export interface RBin { from: number; to: number; count: number }
@@ -51,20 +55,33 @@ function sessionKey(openedAt: string): string {
   return 'after-hours';
 }
 
+const hhmm = (mins: number) =>
+  `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
+
+/** Buckets covering the whole local day in order; key and label are the bucket start 'HH:MM'. */
+function timeBuckets(width: number): Bucket[] {
+  return Array.from({ length: 1440 / width }, (_, i) => [hhmm(i * width), hhmm(i * width)]);
+}
+
+function timeKey(p: { hour: number; minute: number }, width: number): string {
+  const mins = p.hour * 60 + p.minute;
+  return hhmm(mins - (mins % width));
+}
+
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
 function fixed(
   closed: ClosedTrade[],
   buckets: Bucket[],
   keyOf: (t: ClosedTrade) => string,
-  ctx: BreakdownContext,
+  ctx: MetricContext,
 ): BreakdownRow[] {
   const groups = new Map<string, ClosedTrade[]>(buckets.map(([k]) => [k, []]));
   for (const t of closed) groups.get(keyOf(t))!.push(t);
   return buckets.map(([key, label]) => ({
     key,
     label,
-    summary: summarize(groups.get(key)!, { breakevenThreshold: ctx.breakevenThreshold }),
+    summary: summarize(groups.get(key)!, ctx),
   }));
 }
 
@@ -72,7 +89,7 @@ function dynamic(
   closed: ClosedTrade[],
   keysOf: (t: ClosedTrade) => string[],
   labelOf: (key: string) => string,
-  ctx: BreakdownContext,
+  ctx: MetricContext,
 ): BreakdownRow[] {
   const groups = new Map<string, ClosedTrade[]>();
   for (const t of closed) {
@@ -85,7 +102,7 @@ function dynamic(
   const rows = [...groups].map(([key, ts]) => ({
     key,
     label: labelOf(key),
-    summary: summarize(ts, { breakevenThreshold: ctx.breakevenThreshold }),
+    summary: summarize(ts, ctx),
   }));
   // Array.prototype.sort is stable, so ties keep first-appearance order.
   return rows.sort((a, b) => {
@@ -95,16 +112,24 @@ function dynamic(
   });
 }
 
-export function breakdown(trades: readonly Trade[], by: BreakdownKey, ctx: BreakdownContext): BreakdownRow[] {
+export function breakdown(
+  trades: readonly Trade[],
+  by: BreakdownKey,
+  ctx: MetricContext & BreakdownOptions,
+): BreakdownRow[] {
   const closed = trades.filter(isClosed);
-  const local = (t: ClosedTrade) => localParts(t.openedAt, ctx.timeZone);
+  const instant = (t: ClosedTrade) => (ctx.timeBasis === 'exit' ? t.closedAt : t.openedAt);
+  const local = (t: ClosedTrade) => localParts(instant(t), ctx.timeZone);
+  const width = ctx.bucketMinutes ?? 30;
   switch (by) {
     case 'weekday':
       return fixed(closed, WEEKDAYS, (t) => WEEKDAY_KEYS[local(t).weekday]!, ctx);
     case 'hour':
       return fixed(closed, HOURS, (t) => String(local(t).hour), ctx);
+    case 'time-of-day':
+      return fixed(closed, timeBuckets(width), (t) => timeKey(local(t), width), ctx);
     case 'session':
-      return fixed(closed, SESSIONS, (t) => sessionKey(t.openedAt), ctx);
+      return fixed(closed, SESSIONS, (t) => sessionKey(instant(t)), ctx);
     case 'duration':
       return fixed(closed, DURATIONS, (t) => durationKey(Date.parse(t.closedAt) - Date.parse(t.openedAt)), ctx);
     case 'side':
@@ -132,7 +157,7 @@ export function breakdown(trades: readonly Trade[], by: BreakdownKey, ctx: Break
 export function rDistribution(trades: readonly Trade[], binWidth = 0.5): RBin[] {
   const idx = trades
     .filter(isClosed)
-    .map(rOf)
+    .map((t) => rOf(t))
     .filter((r): r is number => r !== undefined)
     .map((r) => Math.floor(r / binWidth + 1e-9));
   if (idx.length === 0) return [];

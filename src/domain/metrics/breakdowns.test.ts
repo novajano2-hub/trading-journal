@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import { makeTrade } from '../__fixtures__/trades';
 import { resolveInstrument } from '../instruments';
+import { defaultMetricContext } from './context';
 import { breakdown, rDistribution } from './breakdowns';
 
-const ctx = { timeZone: 'America/New_York', breakevenThreshold: 0 };
+const ctx = defaultMetricContext('America/New_York');
 const at = (openedAt: string, extra = {}) => makeTrade({ net: 1000, openedAt, closedAt: openedAt, ...extra });
 
 describe('breakdowns', () => {
@@ -69,6 +70,33 @@ describe('breakdowns', () => {
       makeTrade({ net: 1, instrument: resolveInstrument('ESH6')! }),
     ];
     expect(breakdown(es, 'symbol', ctx).map((r) => r.key)).toEqual(['ES']);
+  });
+
+  test('time-of-day buckets by entry or exit time', () => {
+    const t = [makeTrade({ net: 1, openedAt: '2026-03-09T13:47:00Z', closedAt: '2026-03-09T14:20:00Z' })];
+    const key = (o: object) => breakdown(t, 'time-of-day', { ...ctx, ...o }).find((r) => r.summary.closedCount)!.key;
+    expect(key({ bucketMinutes: 15 })).toBe('09:45');
+    expect(key({ bucketMinutes: 15, timeBasis: 'exit' })).toBe('10:15');
+    expect(key({})).toBe('09:30');
+    expect(key({ bucketMinutes: 60 })).toBe('09:00');
+    expect(key({ bucketMinutes: 5 })).toBe('09:45');
+    const rows = breakdown(t, 'time-of-day', { ...ctx, bucketMinutes: 30 });
+    expect(rows).toHaveLength(48);
+    expect(rows[0]).toMatchObject({ key: '00:00', label: '00:00' });
+    expect(rows[47]!.key).toBe('23:30');
+    expect(breakdown(t, 'time-of-day', { ...ctx, bucketMinutes: 5 })).toHaveLength(288);
+  });
+
+  test('timeBasis exit applies to hour, weekday and session', () => {
+    const t = [makeTrade({ net: 1, openedAt: '2026-03-09T13:47:00Z', closedAt: '2026-03-09T14:20:00Z' })];
+    const exit = { ...ctx, timeBasis: 'exit' as const };
+    expect(breakdown(t, 'hour', exit).find((r) => r.summary.closedCount)!.key).toBe('10');
+    expect(breakdown(t, 'hour', ctx).find((r) => r.summary.closedCount)!.key).toBe('9');
+    const overnight = [makeTrade({ net: 1, openedAt: '2026-03-09T13:47:00Z', closedAt: '2026-03-10T13:47:00Z' })];
+    expect(breakdown(overnight, 'weekday', exit).find((r) => r.summary.closedCount)!.key).toBe('tue');
+    const lateExit = [makeTrade({ net: 1, openedAt: '2026-03-09T13:47:00Z', closedAt: '2026-03-09T20:30:00Z' })];
+    expect(breakdown(lateExit, 'session', exit).find((r) => r.summary.closedCount)!.key).toBe('after-hours');
+    expect(breakdown(lateExit, 'session', ctx).find((r) => r.summary.closedCount)!.key).toBe('new-york');
   });
 
   test('R distribution has contiguous bins', () => {

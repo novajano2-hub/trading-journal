@@ -1,3 +1,5 @@
+import type { BreakevenRange, PnlBasis } from './metrics/context';
+
 export type Cents = number; // integer minor units of the P&L currency
 export type AssetClass =
   'stock' | 'option' | 'future' | 'forex' | 'crypto' | 'cfd';
@@ -129,5 +131,6 @@ export interface Workspace {
 export interface UserPrefs {
   timeZone: string;
   baseCurrency: string;
-  breakevenThreshold: Cents;
+  breakevenRange: BreakevenRange;
+  pnlBasis: PnlBasis;
 }

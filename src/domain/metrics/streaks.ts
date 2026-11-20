@@ -1,6 +1,7 @@
 import { outcomeOf } from '../outcome';
 import { closedInOrder } from '../trade-status';
-import type { Cents, Trade } from '../types';
+import type { Trade } from '../types';
+import { costBasis, pnlOf, type MetricContext } from './context';
 
 export interface StreakResult {
   maxWin: number;
@@ -24,10 +25,12 @@ export function streaksOf(outcomes: readonly ('win' | 'loss' | undefined)[]): St
   return { maxWin, maxLoss, current: { kind, length: kind === null ? 0 : length } };
 }
 
-export function tradeStreaks(trades: readonly Trade[], breakevenThreshold: Cents): StreakResult {
+export function tradeStreaks(trades: readonly Trade[], ctx: MetricContext): StreakResult {
   return streaksOf(
     closedInOrder(trades).map((t) => {
-      const o = outcomeOf(t.net, breakevenThreshold);
+      const value = pnlOf(t, ctx.pnlBasis);
+      const basis = costBasis(t);
+      const o = outcomeOf(value, ctx.breakevenRange, basis > 0 ? value / basis : undefined);
       return o === 'breakeven' ? undefined : o;
     }),
   );
