@@ -1,8 +1,10 @@
 'use client';
 
 import { Suspense, type ReactNode } from 'react';
+import { MagnifyingGlass } from '@phosphor-icons/react/dist/ssr';
 import { EMPTY_FILTERS } from '@/data/filters';
 import { AccountSwitcher } from './account-switcher';
+import { AppSearch } from './app-search';
 import { BasisSwitch } from './basis-switch';
 import { FilterBar, FilterBarView } from './filter-bar';
 import { MobileNav } from './mobile-nav';
@@ -20,6 +22,18 @@ const FILTERS_FALLBACK = (
     disabled
   />
 );
+
+/** The search before the URL is read: its resting 36px icon, inert, holding the bar's place. */
+function SearchFallback(): React.JSX.Element {
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-flex size-9 flex-none items-center justify-center rounded-control border border-line bg-sunken text-muted pointer-coarse:size-11"
+    >
+      <MagnifyingGlass size={18} />
+    </span>
+  );
+}
 
 /** Every /app page: the sidebar (a drawer below `lg`), the top bar, then the page. */
 export function AppShell({
@@ -42,6 +56,11 @@ export function AppShell({
           filters={
             <Suspense fallback={FILTERS_FALLBACK}>
               <FilterBar />
+            </Suspense>
+          }
+          search={
+            <Suspense fallback={<SearchFallback />}>
+              <AppSearch />
             </Suspense>
           }
           basis={<BasisSwitch />}
