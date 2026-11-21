@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import {
   ArrowLeft,
   FileText,
@@ -8,7 +7,7 @@ import {
   Warning,
 } from '@phosphor-icons/react/dist/ssr';
 import { useEffect, useRef, useState } from 'react';
-import { BrandMark } from '@/components/site/brand-mark';
+import { DashboardLink } from '@/components/app/dashboard-link';
 import { clearPendingImport, loadPendingImport } from '@/lib/pending-import';
 
 type Waiting =
@@ -70,14 +69,10 @@ export default function ImportPage() {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-[1280px] flex-1 flex-col px-5 pt-6 pb-16 sm:px-10">
-      <BrandMark />
-      <div className="mt-14 max-w-[640px] md:mt-20">
-        <h1 className="text-[clamp(36px,calc(2.6vw+16px),52px)] leading-[1.06] font-semibold tracking-[-0.04em] motion-safe:animate-rise">
-          Import
-        </h1>
-
-        <div className="mt-8 rounded-card border border-line bg-surface-1 p-6 shadow-[var(--shadow)]">
+    // The app shell's top bar carries the page title.
+    <div className="w-full px-5 pt-6 pb-16">
+      <div className="max-w-[640px]">
+        <div className="rounded-card border border-line bg-surface-1 p-6">
           <h2 className="border-b border-line pb-3 text-[13px] font-medium text-muted">
             Waiting to be imported
           </h2>
@@ -122,13 +117,11 @@ export default function ImportPage() {
                 >
                   No file waiting.
                 </p>
-                <Link
-                  href="/"
-                  className="mt-3 inline-flex min-h-11 items-center gap-2 text-[15px] font-medium text-accent-ink"
-                >
+                {/* Styled as the placeholders' way back. */}
+                <DashboardLink className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-control text-[15px] font-medium text-accent-ink no-underline hover:underline">
                   <ArrowLeft {...ICON} size={16} />
-                  Back to the home page
-                </Link>
+                  Back to the Dashboard
+                </DashboardLink>
               </>
             )}
           </div>
@@ -145,6 +138,6 @@ export default function ImportPage() {
           </p>
         ) : null}
       </div>
-    </main>
+    </div>
   );
 }

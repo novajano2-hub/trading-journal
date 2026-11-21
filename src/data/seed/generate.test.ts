@@ -4,6 +4,7 @@ import { defaultMetricContext } from '@/domain/metrics/context';
 import { dailyPnl } from '@/domain/metrics/days';
 import { summarize } from '@/domain/metrics/summary';
 import { evaluateProp } from '@/domain/prop/evaluate';
+import { closedInOrder } from '@/domain/trade-status';
 import { toCents } from '@/domain/money';
 import { localDate, localParts } from '@/domain/time';
 import type { Trade } from '@/domain/types';
@@ -115,6 +116,29 @@ describe('sample workspace generator', () => {
         (4 * acct.startingBalance) / 100,
       );
     }
+  });
+
+  test('the five latest closed trades carry a strategy, kept and broken rules', () => {
+    const latest = closedInOrder(s.trades).slice(-5);
+    expect(latest).toHaveLength(5);
+    let kept = 0;
+    let broken = 0;
+    let ungraded = 0;
+    for (const c of latest) {
+      const t = s.trades.find((x) => x.id === c.id)!;
+      const graded = t.ruleChecks.filter((r) => r.followed !== null);
+      if (t.strategyId === undefined || graded.length === 0) ungraded += 1;
+      else if (graded.some((r) => r.followed === false)) {
+        broken += 1;
+        const mistakes = new Set(
+          s.tags.filter((x) => x.category === 'mistake').map((x) => x.id),
+        );
+        expect(t.tagIds.some((id) => mistakes.has(id))).toBe(true);
+      } else kept += 1;
+    }
+    expect(broken).toBeGreaterThanOrEqual(1);
+    expect(kept).toBeGreaterThanOrEqual(2);
+    expect(ungraded).toBeLessThanOrEqual(1);
   });
 
   test('end date is validated; a weekend rolls back to Friday', () => {

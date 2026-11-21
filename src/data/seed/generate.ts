@@ -3,6 +3,7 @@ import { resolveInstrument } from '@/domain/instruments';
 import { riskFromStop } from '@/domain/metrics/summary';
 import { localDate } from '@/domain/time';
 import { buildTrades } from '@/domain/trade-builder';
+import { closedInOrder } from '@/domain/trade-status';
 import type {
   Account,
   AssetClass,
@@ -290,6 +291,7 @@ export function generateSampleWorkspace(opts: {
   const { strategies, tags } = buildStrategiesAndTags();
   for (const t of trades)
     decorate(rng, t, firstFillPlan.get(t.executions[0]!.id)!, strategies, tags);
+  pinLatestTrades(trades, strategies, tags);
   const journal = writeJournal(rng, trades, days, lastDay);
 
   return {
@@ -471,6 +473,48 @@ function buildStrategiesAndTags(): { strategies: Strategy[]; tags: Tag[] } {
     category: t.category,
   }));
   return { strategies, tags };
+}
+
+/**
+ * The dashboard's recent-trades table shows the five latest closed trades, so
+ * they carry a fixed mix: three with every rule kept, two with a broken rule and
+ * a mistake tag, none ungraded. No random draws, so the rest of the sample is
+ * unchanged.
+ */
+const LATEST_MIX: readonly { broken: boolean; mistake: string }[] = [
+  { broken: false, mistake: '' },
+  { broken: true, mistake: 'Moved stop' },
+  { broken: false, mistake: '' },
+  { broken: true, mistake: 'FOMO entry' },
+  { broken: false, mistake: '' },
+];
+
+function pinLatestTrades(
+  trades: readonly Trade[],
+  strategies: readonly Strategy[],
+  tags: readonly Tag[],
+): void {
+  const latest = closedInOrder(trades).slice(-LATEST_MIX.length).reverse();
+  latest.forEach((closed, i) => {
+    const t = trades.find((x) => x.id === closed.id)!;
+    const mix = LATEST_MIX[i]!;
+    const eligible = strategies.filter((s) =>
+      s.assetClasses.includes(t.instrument.assetClass),
+    );
+    const st = eligible[i % eligible.length]!;
+    t.strategyId = st.id;
+    const brokenRule = i % st.rules.length;
+    t.ruleChecks = st.rules.map((r, j) => ({
+      ruleId: r.id,
+      followed: !(mix.broken && j === brokenRule),
+    }));
+    const mistakeTags = new Set(
+      tags.filter((x) => x.category === 'mistake').map((x) => x.id),
+    );
+    const kept = t.tagIds.filter((id) => !mistakeTags.has(id));
+    const mistake = tags.find((x) => x.name === mix.mistake);
+    t.tagIds = mistake ? [...kept, mistake.id] : kept;
+  });
 }
 
 function decorate(

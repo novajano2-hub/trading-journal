@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { makeTrade } from '@/domain/__fixtures__/trades';
-import { applyTradePatch } from './trade-patch';
+import { applyTradePatch, withRuleCheck } from './trade-patch';
 
 const t = makeTrade({
   net: 0,
@@ -55,4 +55,26 @@ test('a key present with undefined removes the field', () => {
   const rated = applyTradePatch(t, { rating: 3, noteId: 'n' });
   const r = applyTradePatch(rated, { rating: undefined, noteId: undefined });
   expect('rating' in r || 'noteId' in r).toBe(false);
+});
+
+test('withRuleCheck sets one rule and leaves the others; a new rule is appended', () => {
+  const graded = makeTrade({
+    net: 0,
+    ruleChecks: [
+      { ruleId: 'r1', followed: false },
+      { ruleId: 'r2', followed: null },
+    ],
+  });
+  expect(withRuleCheck(graded, 'r1', true)).toEqual({
+    ruleChecks: [
+      { ruleId: 'r1', followed: true },
+      { ruleId: 'r2', followed: null },
+    ],
+  });
+  expect(withRuleCheck(graded, 'r3', false).ruleChecks).toEqual([
+    { ruleId: 'r1', followed: false },
+    { ruleId: 'r2', followed: null },
+    { ruleId: 'r3', followed: false },
+  ]);
+  expect(graded.ruleChecks[0]!.followed).toBe(false);
 });

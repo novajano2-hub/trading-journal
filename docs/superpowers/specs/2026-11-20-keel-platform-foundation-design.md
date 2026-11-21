@@ -198,7 +198,7 @@ Point values and currency:
 |---|---|
 | Breakeven | A From/To range in **$ or % of Net ROI**, asymmetric allowed (default 0..0). It applies to trades **and days**: days inside the range are flat/"blue" |
 | Expectancy | Win% × Avg Win − Loss% × Avg Loss |
-| Gross / net | A switch: gross excludes fees and commissions. Every P&L metric follows it, except prop-firm rules, which always use net |
+| Gross / net | A switch: gross excludes fees and commissions. Every P&L metric follows it, except prop-firm rules and the trader's own goals (weekly net goal, daily loss limit), which always use net, as TradeZella's "Net Max Loss /Day" does |
 | R | **Planned R** (needs both target and stop) and **Realized R** (needs stop / initial risk), reported separately |
 | Time reports | Time of day in 5/15/30/60-minute buckets, by **entry or exit** time |
 | Prop setup | Static / EOD / Trailing drawdown, daily loss in $ or % (the UI converts % to $ against the starting balance), an optional best-day consistency rule, and Active/Breached status |

@@ -66,7 +66,14 @@ export interface WorkspacesRepo {
 
 export interface PrefsRepo {
   get(): Promise<UserPrefs>;
-  /** Throws RangeError for an unknown time zone or a breakeven range with from > to. */
+  /**
+   * Shallow-merges `patch` over the stored prefs; a key set to undefined is left
+   * unchanged. `goals` merges per workspace inside the write: each workspace the
+   * patch names replaces that workspace's goals whole, and the others are kept,
+   * so `{ goals: { [id]: {} } }` clears one workspace (see `withGoals`).
+   * Throws RangeError for an unknown time zone, a breakeven range with
+   * from > to, or a goals entry that isn't an object of positive whole cents.
+   */
   update(patch: Partial<UserPrefs>): Promise<UserPrefs>;
 }
 
