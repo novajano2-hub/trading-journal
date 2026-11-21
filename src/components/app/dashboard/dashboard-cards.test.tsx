@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import {
+  act,
   cleanup,
   fireEvent,
   screen,
@@ -307,6 +308,42 @@ test('a goals save that fails keeps the form with a plain error', async () => {
   ).toBeTruthy();
 });
 
+test('Escape and Cancel wait for a save in flight, so its failure still shows', async () => {
+  let fail: ((e: Error) => void) | undefined;
+  await renderDashboard({
+    patch: (repo) => ({
+      prefs: {
+        ...repo.prefs,
+        update: () =>
+          new Promise((_, reject) => {
+            fail = reject;
+          }),
+      },
+    }),
+  });
+  const goals = await goalsCard();
+  fireEvent.click(within(goals).getByRole('button', { name: 'Edit goals' }));
+  const weekly = within(goals).getByRole('textbox', {
+    name: 'Weekly net goal',
+  });
+  fireEvent.change(weekly, { target: { value: '200' } });
+  fireEvent.click(within(goals).getByRole('button', { name: 'Save' }));
+  fireEvent.keyDown(weekly, { key: 'Escape' });
+  expect(weekly.isConnected).toBe(true);
+  const cancel = within(goals).getByRole('button', {
+    name: 'Cancel',
+  }) as HTMLButtonElement;
+  expect(cancel.disabled).toBe(true);
+  await waitFor(() => expect(fail).toBeDefined());
+  fireEvent.keyDown(weekly, { key: 'Escape' }); // and again, now the write has started
+  expect(weekly.isConnected).toBe(true);
+  await act(async () => fail!(new Error('disk full')));
+  expect((await within(goals).findByRole('alert')).textContent).toBe(
+    "Couldn't save your goals. Try again.",
+  );
+  expect(cancel.disabled).toBe(false);
+});
+
 test('goals in another currency say they use the base currency', async () => {
   await renderDashboard({
     edit: (s) => {
@@ -439,6 +476,10 @@ test('a trade that broke two rules and carries two mistakes', async () => {
   // The full list rides in the title, and whole in the text a screen reader gets.
   const rules = within(row).getByTitle(`${r1}, ${r2}`);
   expect(rules.textContent).toContain(`Broke: ${r1}`);
+  // The rule wraps to two lines rather than cutting to a stub (touch and keyboard can't reach the title).
+  const text = within(rules).getByText(`Broke: ${r1}`);
+  expect(text.className).toContain('line-clamp-2');
+  expect(text.className).not.toContain('truncate');
   expect(rules.textContent).toContain('and 1 more');
   expect(row.textContent).toContain(`Broke: ${r1} and ${r2}`);
   // The first mistake as a chip, then +1 that names the rest.

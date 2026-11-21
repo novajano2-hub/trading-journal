@@ -40,21 +40,23 @@ function RulesCell({ rules }: { rules: TradeRulesSummary }): React.JSX.Element {
     first === undefined
       ? `Broke ${brokenCount} ${brokenCount === 1 ? 'rule' : 'rules'}`
       : `Broke: ${listOf(rules.broken)}`;
-  // One line from xl. Narrower, "and n more" drops under the rule, so the rule text keeps the cell's width.
+  // The rule wraps to two lines rather than cutting to a stub: touch and
+  // keyboard can't reach the title. Below xl "and n more" takes its own line,
+  // so the rule keeps the cell's width; from xl it sits beside the first line.
   return (
     <span
       title={rules.broken.join(', ') || undefined}
-      className="flex min-w-0 flex-wrap items-center text-loss xl:flex-nowrap"
+      className="flex min-w-0 flex-wrap items-start text-loss xl:flex-nowrap"
     >
       <XCircle
         size={14}
         weight="fill"
         aria-hidden="true"
-        className="mr-1.5 flex-none"
+        className="mt-[3px] mr-1.5 flex-none"
       />
       <span
         aria-hidden="true"
-        className="min-w-0 flex-1 truncate xl:flex-initial"
+        className="line-clamp-2 min-w-0 flex-1 xl:flex-initial"
       >
         {first === undefined ? spoken : `Broke: ${first}`}
       </span>
@@ -164,7 +166,7 @@ export function RecentTrades({
             <th
               scope="col"
               // 90rem, not 1440px: Tailwind orders min-[...] against xl (80rem) only in the same unit.
-              className={`${TH} ${GAP} sm:w-40 lg:w-[200px] xl:w-[240px] min-[90rem]:w-[280px]`}
+              className={`${TH} ${GAP} sm:w-40 md:w-[184px] lg:w-[200px] xl:w-[280px] min-[90rem]:w-[300px]`}
             >
               Rules
             </th>
@@ -200,7 +202,7 @@ export function RecentTrades({
                 >
                   {formatPnl(pnl, t.pnlCurrency)}
                 </td>
-                <td className={GAP}>
+                <td className={`${GAP} py-1.5`}>
                   <RulesCell rules={row.rules} />
                 </td>
               </tr>

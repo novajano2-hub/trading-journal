@@ -78,7 +78,8 @@ function GoalField({
 
 /**
  * The goals as a form, in place of the Goals card's rows. Nothing is written
- * until both amounts parse. Escape cancels, as Cancel does.
+ * until both amounts parse. Escape cancels, as Cancel does, except while a
+ * save is in flight.
  */
 export function GoalsForm({
   set,
@@ -138,7 +139,8 @@ export function GoalsForm({
         if (e.key !== 'Escape' || e.nativeEvent.isComposing) return;
         e.preventDefault();
         e.stopPropagation();
-        onClose();
+        // A save in flight keeps the form, so its failure still has somewhere to show.
+        if (!saving) onClose();
       }}
       className="@container flex flex-col"
     >
@@ -190,6 +192,7 @@ export function GoalsForm({
         <Button
           variant="secondary"
           size="sm"
+          disabled={saving}
           onClick={onClose}
           className="pointer-coarse:h-11"
         >
