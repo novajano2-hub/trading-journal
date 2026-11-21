@@ -62,13 +62,14 @@ test('sidebar by keyboard keeps the filters (desktop)', async ({
   await ready(page);
   await page.getByRole('link', { name: 'Dashboard' }).focus();
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('link', { name: 'Trades', exact: true })).toBeFocused();
+  await expect(
+    page.getByRole('link', { name: 'Trades', exact: true }),
+  ).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/app\/trades\?range=last-week$/);
-  await expect(page.getByRole('link', { name: 'Trades', exact: true })).toHaveAttribute(
-    'aria-current',
-    'page',
-  );
+  await expect(
+    page.getByRole('link', { name: 'Trades', exact: true }),
+  ).toHaveAttribute('aria-current', 'page');
 });
 
 test('mobile drawer opens, closes on Escape, and returns focus (mobile)', async ({
