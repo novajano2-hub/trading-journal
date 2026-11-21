@@ -95,12 +95,12 @@ Origin key: **TZ** = TradeZella has it · **MTJ** = MyTradingJourney has it · *
 | E16 | ~~Trading Floor ceiling items (tickets, pit ornament, time-clock imprint)~~. Dropped with the rejected world in Plan 3b | Dropped |
 | E17 | ~~Mechanical stamps on dropped tickets~~. Dropped with the rejected world in Plan 3b | Dropped |
 | E18 | ~~Rename the leftover ticket identifiers (`ticketPrice`, `Preview.tickets`) to row/fill names; none reach visible copy~~. Done in Plan 2 | Done |
-| E19 | Number ticker: if JS loads but hydration fails, KPIs show $0.00; also starts about 300ms after hydration | Plan 4 |
+| E19 | App tickers mount after data, so a failed hydration cannot leave $0.00 there; the landing hero case remains | Release polish |
 | E20 | `RuleList` carries landing-only tick hooks; split the landing animation from the app component | Plan 5 (Strategies) |
 | E21 | Test and type tidy: kv tuple looseness, `grouped()` Number re-parse, no motion-behaviour tests | Any |
 | E22 | Derive the "Trailing drawdown" label from `drawdownType` instead of hand-typing it | Plan 5 (Prop firms) |
-| E23 | "Get started" goes to /signup, which says accounts open with the release; point it at the real sign-up flow when auth lands | Plan 4 |
-| E24 | Optional design ceiling from the Plan 3b finish review: a hover/focus value readout on breakdown bars, and a row hover highlight on product trade rows | Plan 4 |
+| E23 | /login and /signup now offer "Open the sample workspace"; point "Get started" at the real sign-up flow when auth lands | #2 |
+| E24 | Dashboard rule and mistake rows have hover fills; a hover/focus value readout on breakdown bars and product trade-row hovers remain | Plan 5 (Reports) |
 | E25 | Excel (.xlsx) import. Spec §7 says CSV/Excel, but the §5 stack has no spreadsheet parser; users save as CSV meanwhile | Plan 5 decision |
 | E26 | Options that expire after their last import stay open until the next import into that account settles them; settle at app start or in a server job | Milestone 2 (#1) |
 | E27 | Import maps one fees and one commission column; swap/financing and extra fee columns aren't summed | With #11 |
@@ -122,3 +122,12 @@ Origin key: **TZ** = TradeZella has it · **MTJ** = MyTradingJourney has it · *
 | E43 | Re-importing a file with a corrected timezone or decimal mark duplicates its trades, because row fingerprints use parsed values. Suggest undoing the earlier import first; after undoing an earlier overlapping import, rows a later import skipped as its duplicates belong to no trade until that later file is re-imported; the undo flow should say so | Plan 5 (Import UI) |
 | E44 | Large and non-UTF-8 files: `file.text()` decodes UTF-8 only, so Windows-1252 cells are reported as row issues; `planImport` runs synchronously in render for files up to 20 MB, so move it to a worker | Plan 5 (Import UI) |
 | E45 | **Fix before the Plan 5 import UI:** `useImportPlan` (`src/data/query/derived.ts`) returns `status: 'success'` with `data: undefined` on the render pass where it resets its plan identity (context load, after each commit/undo, input change), breaking the `Derived` contract; an inline `input` object also loops. Fix: compare inputs by their four fields, plan from the stored identity input, and report `'pending'` until the identity is current; add a per-pass contract test and an inline-input test (recipe and probes in the Plan 2 final re-review) | Plan 5 (Import) |
+| E46 | Tag a trade from the drill-down ("tag what is missing" in the dashboard contract story); needs the tag picker the Trades page builds | Plan 5 (Trades) |
+| E47 | Drill-down and recent-trade rows link to `/app/trades/[id]` once trade detail exists | Plan 5 (Trades) |
+| E48 | Search over trade text (notes, ids) and journal entries; today search covers modules, symbols, strategies and tags | Plan 5 (Trades, Notebook) |
+| E49 | Dashboard shows one currency at a time with a switch; a combined view waits on FX | #8 |
+| E50 | More goal types: monthly, trade count, TradeZella-style routine rules (trading hours, stop on every trade, start-my-day) | Plan 5 decision |
+| E51 | Customisable dashboard widgets (TradeZella has them); the contract fixes one layout for milestone 1 | Milestone 2 decision |
+| E52 | Focus Not Obscured (WCAG 2.4.11): the sticky desktop bar and the pinned mobile row can cover a focused element when tabbing backwards; needs scroll-padding without breaking the chip scroller | Plan 5 polish |
+| E53 | A closing filter popover stays interactive through its 160ms exit (Escape then fast Tab lands in its fields) | Plan 5 polish |
+| E54 | `useGlobalFilters` writes the pathname it rendered with, and any late `replaceState` during a pending Next navigation discards that navigation (reproduced 0-10ms after a workspace switch); write against `window.location.pathname` and avoid late writes while a navigation is pending | Plan 5 |
