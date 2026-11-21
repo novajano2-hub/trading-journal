@@ -56,7 +56,7 @@ export function TaskCheckbox({
         <span
           className={`absolute inset-0 rounded-[5px] bg-gain ${
             checked ? 'scale-100 opacity-100' : 'scale-0 opacity-0'
-          } transition-[transform,opacity] duration-[240ms] ease-[cubic-bezier(0.68,-0.275,0.265,1.275)] motion-reduce:transition-none`}
+          } transition-[transform,opacity] duration-[240ms] ease-[var(--ease-glide)] motion-reduce:transition-none`}
         />
         <svg viewBox="0 0 18 18" className="relative size-[18px]" fill="none">
           <path
