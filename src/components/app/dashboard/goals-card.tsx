@@ -1,12 +1,10 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
-import { Check, Warning } from '@phosphor-icons/react/dist/ssr';
-import { Button } from '@/components/ui/button';
+import { useEffect, useId, useRef, useState } from 'react';
+import { Check } from '@phosphor-icons/react/dist/ssr';
 import { Chip } from '@/components/ui/chip';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { DashboardModel } from '@/data/dashboard';
-import { parseGoalAmount } from '@/data/goals';
 import type {
   DailyLossProgress,
   WeeklyGoalProgress,
@@ -14,6 +12,7 @@ import type {
 import type { Cents, Goals } from '@/domain/types';
 import { formatMoney, formatPnl } from '@/lib/format';
 import { onTradingDate } from '@/lib/time-format';
+import { GoalsForm } from './goals-form';
 import { signTone } from './plan-card';
 
 /** Figures never break, so a minus sign can't end up on the line before its amount. */
@@ -121,15 +120,18 @@ function WeeklyRow({
 function DailyLossRow({
   daily,
   currency,
+  period,
 }: {
   daily: DailyLossProgress;
   currency: string;
+  /** The range the days come from, e.g. "all time", so it never reads as the goal week. */
+  period: string;
 }): React.JSX.Element {
   const { keptDays: kept, tradingDays: days, brokenDays } = daily;
   const latest = brokenDays[brokenDays.length - 1];
   let sentence: React.ReactNode;
   if (days === 0) sentence = 'No trading days in this range.';
-  else if (!latest) sentence = 'Kept every day.';
+  else if (!latest) sentence = `Kept every day, ${period}.`;
   else {
     const at = (
       <>
@@ -141,7 +143,7 @@ function DailyLossRow({
     );
     sentence = (
       <>
-        Kept <Num>{kept}</Num> of <Num>{days}</Num> {dayNoun(days)}.{' '}
+        Kept <Num>{kept}</Num> of <Num>{days}</Num> {dayNoun(days)}, {period}.{' '}
         {brokenDays.length === 1 ? (
           <>Broken {at}.</>
         ) : (
@@ -171,177 +173,6 @@ function DailyLossRow({
   );
 }
 
-/** A stored amount as the field shows it: '1,500', or '1,500.50' with cents. */
-function amountText(cents: Cents | undefined): string {
-  if (cents === undefined) return '';
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
-    maximumFractionDigits: 2,
-  }).format(cents / 100);
-}
-
-function GoalField({
-  label,
-  value,
-  error,
-  hintId,
-  inputRef,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  error: string | undefined;
-  hintId: string;
-  inputRef: React.RefObject<HTMLInputElement | null>;
-  onChange(value: string): void;
-}): React.JSX.Element {
-  const id = useId();
-  const errorId = `${id}-error`;
-  return (
-    <div className="min-w-0">
-      <label
-        htmlFor={id}
-        className="mb-1.5 block text-[13px] font-medium text-text"
-      >
-        {label}
-      </label>
-      <input
-        ref={inputRef}
-        id={id}
-        type="text"
-        inputMode="decimal"
-        autoComplete="off"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? `${hintId} ${errorId}` : hintId}
-        className="block h-[38px] w-full rounded-control border border-line-2 bg-surface-1 px-3 font-mono text-[13px] text-text tabular-nums placeholder:text-faint aria-invalid:border-muted pointer-coarse:h-11"
-      />
-      {error ? (
-        // An input problem, not a loss: neutral, never loss red.
-        <p
-          id={errorId}
-          className="mt-1.5 flex items-start gap-1.5 text-xs leading-4 text-text"
-        >
-          <Warning
-            size={14}
-            aria-hidden="true"
-            className="mt-px flex-none text-muted"
-          />
-          {error}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-/** The goals as a form, in place of the rows. Nothing is written until both amounts parse. */
-function GoalsForm({
-  set,
-  currency,
-  onSave,
-  onClose,
-}: {
-  set: Goals;
-  currency: string;
-  onSave(next: Goals): Promise<void>;
-  onClose(): void;
-}): React.JSX.Element {
-  const hintId = useId();
-  const [weekly, setWeekly] = useState(() => amountText(set.weeklyNet));
-  const [daily, setDaily] = useState(() => amountText(set.dailyLossLimit));
-  const [errors, setErrors] = useState<{ weekly?: string; daily?: string }>({});
-  const [saving, setSaving] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const weeklyRef = useRef<HTMLInputElement>(null);
-  const dailyRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    weeklyRef.current?.focus();
-  }, []);
-
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    if (saving) return;
-    const w = parseGoalAmount(weekly);
-    const d = parseGoalAmount(daily);
-    setErrors({
-      weekly: w.ok ? undefined : w.message,
-      daily: d.ok ? undefined : d.message,
-    });
-    if (!w.ok || !d.ok) {
-      (w.ok ? dailyRef : weeklyRef).current?.focus();
-      return;
-    }
-    setSaving(true);
-    setFailed(false);
-    onSave({ weeklyNet: w.cents, dailyLossLimit: d.cents }).then(
-      onClose,
-      () => {
-        setSaving(false);
-        setFailed(true);
-      },
-    );
-  };
-
-  return (
-    <form noValidate onSubmit={submit} className="@container flex flex-col">
-      <p id={hintId} className="text-xs leading-4 text-faint">
-        Amounts in {currency}, net of fees. Leave one empty to clear it.
-      </p>
-      <div className="mt-3 grid gap-3 @[20rem]:grid-cols-2">
-        <GoalField
-          label="Weekly net goal"
-          value={weekly}
-          error={errors.weekly}
-          hintId={hintId}
-          inputRef={weeklyRef}
-          onChange={setWeekly}
-        />
-        <GoalField
-          label="Daily loss limit"
-          value={daily}
-          error={errors.daily}
-          hintId={hintId}
-          inputRef={dailyRef}
-          onChange={setDaily}
-        />
-      </div>
-      {failed ? (
-        <p
-          role="alert"
-          className="mt-3 flex items-center gap-2 rounded-control bg-sunken px-3 py-2 text-[13px] text-text"
-        >
-          <Warning
-            size={16}
-            aria-hidden="true"
-            className="flex-none text-muted"
-          />
-          Couldn&apos;t save your goals. Try again.
-        </p>
-      ) : null}
-      <div className="mt-4 flex gap-2">
-        <Button
-          type="submit"
-          size="sm"
-          disabled={saving}
-          className="pointer-coarse:h-11"
-        >
-          Save
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={onClose}
-          className="pointer-coarse:h-11"
-        >
-          Cancel
-        </Button>
-      </div>
-    </form>
-  );
-}
-
 /**
  * Row 2's Goals card: this week's net against the weekly goal and the days
  * that kept the daily loss limit, both always on net P&L and only in the
@@ -352,6 +183,7 @@ export function GoalsCard({
   set,
   currency,
   weekLabel,
+  rangeLabel,
   onSave,
 }: {
   goals: DashboardModel['goals'];
@@ -361,6 +193,8 @@ export function GoalsCard({
   currency: string;
   /** Where the weekly net sits, e.g. "this week, 16-20 Nov". */
   weekLabel: string;
+  /** The dashboard's range, e.g. "all time": the daily loss limit's period. */
+  rangeLabel: string;
   onSave(next: Goals): Promise<void>;
 }): React.JSX.Element {
   const headingId = useId();
@@ -412,7 +246,11 @@ export function GoalsCard({
         )}
         <div className="border-t border-line pt-3">
           {goals.dailyLoss ? (
-            <DailyLossRow daily={goals.dailyLoss} currency={currency} />
+            <DailyLossRow
+              daily={goals.dailyLoss}
+              currency={currency}
+              period={rangeLabel}
+            />
           ) : (
             <p className="text-[13px] text-muted">No daily loss limit set.</p>
           )}

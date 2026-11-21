@@ -286,6 +286,7 @@ export function DashboardView(): React.JSX.Element {
           set={view.goals}
           currency={prefs?.baseCurrency ?? m.currency}
           weekLabel={view.weekLabel}
+          rangeLabel={caption}
           onSave={async (next) => {
             const ws = workspace.data;
             if (!ws) throw new Error('No active workspace');

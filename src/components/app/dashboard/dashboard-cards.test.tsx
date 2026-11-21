@@ -90,7 +90,7 @@ test('goals: reached this week; one day broke the loss limit', async () => {
   expect(goals.textContent).toContain('$300.00');
   expect(goals.textContent).toContain('1 of 2 days');
   expect(goals.textContent).toContain(
-    'Kept 1 of 2 days. Broken Thu 19 Nov at −$400.00.',
+    'Kept 1 of 2 days, all time. Broken Thu 19 Nov at −$400.00.',
   );
   expect(
     within(goals).getByRole('button', { name: 'Edit goals' }),
@@ -106,7 +106,7 @@ test('goals: a week in progress, and a limit kept every day', async () => {
   expect(within(goals).queryByText('Reached')).toBeNull();
   expect(goals.textContent).toContain('+$200.00 this week, 16-20 Nov');
   expect(goals.textContent).toContain('2 of 2 days');
-  expect(goals.textContent).toContain('Kept every day.');
+  expect(goals.textContent).toContain('Kept every day, all time.');
 });
 
 test('percent of goal rounds down exactly: $145 of $500 is 29%, not 28%', async () => {
@@ -132,7 +132,7 @@ test('goals: several broken days name the latest and the count', async () => {
   });
   const goals = await goalsCard();
   expect(goals.textContent).toContain(
-    'Kept 0 of 2 days. Broken, latest Thu 19 Nov at −$400.00, 2 days in all.',
+    'Kept 0 of 2 days, all time. Broken, latest Thu 19 Nov at −$400.00, 2 days in all.',
   );
   // A losing week reads 0% of its goal: an honest figure, not an empty one.
   expect(goals.textContent).toContain('0% of goal');
@@ -150,6 +150,8 @@ test("a range that ended before this week reads 'that week'", async () => {
   });
   const goals = await goalsCard();
   expect(goals.textContent).toContain('+$600.00 that week, 9-15 Nov');
+  // The daily row names its own period: the range, as the other cards' captions do.
+  expect(goals.textContent).toContain('Kept every day, 9-15 Nov.');
 });
 
 test('unset goals say so, and the button reads Set goals', async () => {
@@ -198,6 +200,22 @@ test('editing goals saves per workspace; bad input writes nothing', async () => 
     message.closest('[id]')!.id,
   );
   expect(document.activeElement).toBe(weekly);
+  // The message sits in a polite live region, and a second Save re-adds it so it is announced again.
+  expect(message.closest('[aria-live="polite"]')).toBeTruthy();
+  fireEvent.click(within(goals).getByRole('button', { name: 'Save' }));
+  const again = within(goals).getByText(
+    'Enter an amount above zero, or leave it empty.',
+  );
+  expect(again).not.toBe(message);
+  expect(message.isConnected).toBe(false);
+
+  // Too large never reaches the repository: a field error, not "Try again".
+  fireEvent.change(weekly, { target: { value: '99999999999999' } });
+  fireEvent.click(within(goals).getByRole('button', { name: 'Save' }));
+  expect(
+    within(goals).getByText('Enter an amount up to $10,000,000.'),
+  ).toBeTruthy();
+  expect(within(goals).queryByRole('alert')).toBeNull();
   expect((await repo.prefs.get()).goals).toEqual({
     sample: { weeklyNet: 10000, dailyLossLimit: 30000 },
     mine: { dailyLossLimit: 20000 },
@@ -223,6 +241,26 @@ test('editing goals saves per workspace; bad input writes nothing', async () => 
   expect(document.activeElement).toBe(
     within(goals).getByRole('button', { name: 'Edit goals' }),
   );
+});
+
+test('Escape in the form cancels it, like Cancel', async () => {
+  const { repo } = await renderDashboard();
+  const goals = await goalsCard();
+  fireEvent.click(within(goals).getByRole('button', { name: 'Edit goals' }));
+  const weekly = within(goals).getByRole('textbox', {
+    name: 'Weekly net goal',
+  });
+  fireEvent.change(weekly, { target: { value: '9,999' } });
+  fireEvent.keyDown(weekly, { key: 'Escape' });
+  expect(within(goals).queryByRole('textbox')).toBeNull();
+  expect(goals.textContent).toContain('$100.00');
+  expect(document.activeElement).toBe(
+    within(goals).getByRole('button', { name: 'Edit goals' }),
+  );
+  expect((await repo.prefs.get()).goals!.sample).toEqual({
+    weeklyNet: 10000,
+    dailyLossLimit: 30000,
+  });
 });
 
 test('cancel leaves the goals as they were', async () => {

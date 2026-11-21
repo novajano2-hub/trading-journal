@@ -40,11 +40,11 @@ function RulesCell({ rules }: { rules: TradeRulesSummary }): React.JSX.Element {
     first === undefined
       ? `Broke ${brokenCount} ${brokenCount === 1 ? 'rule' : 'rules'}`
       : `Broke: ${listOf(rules.broken)}`;
-  // One line from sm; on phones "and n more" drops under the rule, beside the two-line symbol cell.
+  // One line from xl. Narrower, "and n more" drops under the rule, so the rule text keeps the cell's width.
   return (
     <span
       title={rules.broken.join(', ') || undefined}
-      className="flex min-w-0 flex-wrap items-center text-loss sm:flex-nowrap"
+      className="flex min-w-0 flex-wrap items-center text-loss xl:flex-nowrap"
     >
       <XCircle
         size={14}
@@ -54,14 +54,14 @@ function RulesCell({ rules }: { rules: TradeRulesSummary }): React.JSX.Element {
       />
       <span
         aria-hidden="true"
-        className="min-w-0 flex-1 truncate sm:flex-initial"
+        className="min-w-0 flex-1 truncate xl:flex-initial"
       >
         {first === undefined ? spoken : `Broke: ${first}`}
       </span>
       {rest.length > 0 ? (
         <span
           aria-hidden="true"
-          className="basis-full pl-5 whitespace-nowrap sm:basis-auto sm:pl-1"
+          className="basis-full pl-5 whitespace-nowrap xl:basis-auto xl:pl-1"
         >
           and {rest.length} more
         </span>
@@ -103,8 +103,9 @@ function StrategyCell({ row }: { row: RecentTrade }): React.JSX.Element {
 
 /**
  * Row 3: the newest closed trades in the filters, each with how it went
- * against its strategy's rules. Below `md` the time folds under the symbol;
- * below `sm` Side and Strategy hide.
+ * against its strategy's rules. Below `xl` a broken row's "and n more" sits
+ * under the rule; below `md` the time folds under the symbol; below `sm` Side
+ * and Strategy hide.
  */
 export function RecentTrades({
   recent,
@@ -162,7 +163,8 @@ export function RecentTrades({
             </th>
             <th
               scope="col"
-              className={`${TH} ${GAP} sm:w-40 lg:w-[200px] xl:w-[240px] min-[1440px]:w-[280px]`}
+              // 90rem, not 1440px: Tailwind orders min-[...] against xl (80rem) only in the same unit.
+              className={`${TH} ${GAP} sm:w-40 lg:w-[200px] xl:w-[240px] min-[90rem]:w-[280px]`}
             >
               Rules
             </th>

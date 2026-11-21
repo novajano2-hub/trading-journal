@@ -47,6 +47,39 @@ test('goal amounts parse to cents', () => {
   });
 });
 
+test.each([
+  ['10,000,000', 1_000_000_000],
+  ['$ 1,500', 150000],
+  ['1500.50', 150050],
+  ['345,678.90', 34567890],
+  ['0.01', 1],
+])('goal amount %j is accepted as %i cents', (raw, cents) => {
+  expect(parseGoalAmount(raw)).toEqual({ ok: true, cents });
+});
+
+test.each([
+  // A comma not followed by three digits is ambiguous (12,34 could mean 12.34).
+  ['12,34', 'Use commas only for thousands, like 1,500.'],
+  ['1,5000', 'Use commas only for thousands, like 1,500.'],
+  [',500', 'Use commas only for thousands, like 1,500.'],
+  // More than two decimals would round quietly; one decimal is a half-typed cents.
+  ['1.234', 'Use two decimals for cents, like 1,500.50.'],
+  ['1.5', 'Use two decimals for cents, like 1,500.50.'],
+  // Clearing a goal means leaving the field empty, not a bare sign.
+  ['$', 'Enter an amount, or leave it empty to clear the goal.'],
+  ['-', 'Enter an amount, or leave it empty to clear the goal.'],
+  ['-$5', 'Enter an amount above zero, or leave it empty.'],
+  ['$-5', 'Enter an amount above zero, or leave it empty.'],
+  ['0.00', 'Enter an amount above zero, or leave it empty.'],
+  ['99999999999999', 'Enter an amount up to $10,000,000.'],
+  ['10,000,000.01', 'Enter an amount up to $10,000,000.'],
+  ['1 500', 'Enter an amount, like 1,500.'],
+  ['1.', 'Enter an amount, like 1,500.'],
+  ['1e3', 'Enter an amount, like 1,500.'],
+])('goal amount %j is a field error: %s', (raw, message) => {
+  expect(parseGoalAmount(raw)).toEqual({ ok: false, message });
+});
+
 test(
   'sample goals are kept on some days and weeks and missed on others',
   { timeout: 30_000 },
