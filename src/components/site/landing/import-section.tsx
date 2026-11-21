@@ -10,7 +10,7 @@ export function ImportSection() {
   return (
     <section
       aria-labelledby="import-title"
-      className="border-y border-line bg-surface-1 py-28"
+      className="border-y border-line bg-bg py-28"
     >
       <div className="mx-auto grid max-w-[1280px] items-start gap-12 px-5 sm:px-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-14">
         <div>

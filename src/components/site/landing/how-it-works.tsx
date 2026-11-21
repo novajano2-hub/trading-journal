@@ -87,7 +87,7 @@ export function HowItWorks({ view }: { view: SampleView }) {
     <section
       id="how"
       aria-labelledby="how-title"
-      className="scroll-mt-16 border-y border-line bg-surface-1 py-28"
+      className="scroll-mt-16 border-y border-line bg-bg py-28"
     >
       <div className="mx-auto max-w-[1280px] px-5 sm:px-10">
         <SectionHeading

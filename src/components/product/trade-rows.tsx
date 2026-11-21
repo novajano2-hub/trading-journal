@@ -19,11 +19,17 @@ export function TradeRows({
   trades,
   tags,
   maxTags,
+  inset,
 }: {
   trades: readonly Trade[];
   tags: readonly Tag[];
   /** Show only the most telling tags per row, mistakes first. */
   maxTags?: number;
+  /**
+   * Keep clear of a card floating over the left edge at lg and up: the list
+   * starts past it, and between lg and xl the time column steps aside.
+   */
+  inset?: boolean;
 }) {
   const byId = new Map(tags.map((t) => [t.id, t]));
   const shown = (t: Trade) =>
@@ -37,20 +43,26 @@ export function TradeRows({
       )
       .slice(0, maxTags);
   return (
-    <ul className="mx-4 text-[13px] tnum">
+    <ul
+      className={`mr-4 text-[13px] tnum ${inset ? 'ml-4 lg:ml-[272px] xl:ml-[244px]' : 'ml-4'}`}
+    >
       {trades.map((t) => (
         <li
           key={t.id}
-          className="grid grid-cols-[92px_52px_1fr_auto] items-center gap-2 border-t border-line py-2.5 whitespace-nowrap first:border-t-0 sm:grid-cols-[96px_64px_60px_1fr_92px]"
+          className={`grid grid-cols-[92px_52px_1fr_auto] items-center gap-2 border-t border-line py-2.5 whitespace-nowrap first:border-t-0 sm:grid-cols-[96px_64px_60px_1fr_92px] ${inset ? 'lg:max-xl:grid-cols-[minmax(0,1fr)_92px] xl:grid-cols-[64px_60px_minmax(0,1fr)_92px]' : ''}`}
         >
-          <span className="text-muted">{shortTime(t.openedAt)}</span>
-          <span className="font-semibold tracking-[0.01em]">
+          <span className={`text-muted ${inset ? 'lg:hidden' : ''}`}>
+            {shortTime(t.openedAt)}
+          </span>
+          <span
+            className={`font-semibold tracking-[0.01em] ${inset ? 'lg:max-xl:hidden' : ''}`}
+          >
             {t.instrument.symbol}
           </span>
-          <span>
+          <span className={inset ? 'lg:max-xl:hidden' : ''}>
             <SideChip side={t.direction} />
           </span>
-          <span className="flex flex-wrap gap-1 max-sm:hidden">
+          <span className="flex min-w-0 flex-wrap gap-1 max-sm:hidden">
             {shown(t).map((tag) => (
               <Chip
                 key={tag.id}

@@ -55,7 +55,10 @@ function Field({
 function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   const login = mode === 'login';
   return (
-    <form className="mt-9 flex max-w-[400px] flex-col gap-3" noValidate>
+    <form
+      className="mt-9 flex max-w-[448px] flex-col gap-3 rounded-card bg-surface-1 p-6 shadow-[var(--shadow-card)] sm:p-8"
+      noValidate
+    >
       <p id="auth-note" className="text-sm leading-[1.55] text-muted">
         {AUTH_CLOSED}
       </p>

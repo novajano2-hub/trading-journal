@@ -110,11 +110,11 @@ export default function BrokersPage() {
             note="Sample data"
           />
         </div>
-        <dl className="m-0 mt-4 max-w-[68ch]">
+        <dl className="m-0 mt-4 max-w-[68ch] overflow-hidden rounded-card bg-surface-1 px-5 shadow-[var(--shadow-card)] sm:px-6">
           {REQUIRED.map(([name, note]) => (
             <div
               key={name}
-              className="grid gap-x-8 border-t border-line-2 py-3 sm:grid-cols-[9rem_minmax(0,1fr)]"
+              className="grid gap-x-8 border-t border-line py-3 first:border-t-0 sm:grid-cols-[9rem_minmax(0,1fr)]"
             >
               <dt className="text-[15px] font-semibold">{name}</dt>
               <dd className="m-0 text-[15.5px] leading-[1.6] text-muted">

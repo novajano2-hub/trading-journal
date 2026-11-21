@@ -46,11 +46,14 @@ export default function PricingPage() {
           <SectionHeading id="included-title" title="What is in the journal">
             Modules still in development are marked as such on their own pages.
           </SectionHeading>
-          <ul className="m-0 mt-14 grid list-none gap-x-16 gap-y-10 p-0 md:grid-cols-2">
+          <ul className="m-0 mt-14 grid list-none gap-0 overflow-hidden rounded-card bg-surface-1 p-0 shadow-[var(--shadow-card)] md:grid-cols-2">
             {included.map((m) => (
-              <li key={m.slug} className="border-t border-line-2 pt-5">
+              <li
+                key={m.slug}
+                className="border-t border-line p-6 sm:p-8 md:nth-[-n+2]:border-t-0 md:odd:last:col-span-2"
+              >
                 <p className="flex items-center gap-2.5 text-[17px] font-semibold tracking-[-0.015em]">
-                  <IconTile icon={MODULE_ICONS[m.slug]} tone="accent" bare />
+                  <IconTile icon={MODULE_ICONS[m.slug]} tone="accent" />
                   {m.name}
                 </p>
                 <p className="mt-2 max-w-[52ch] text-[15.5px] leading-[1.65] text-muted">
