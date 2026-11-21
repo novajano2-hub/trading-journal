@@ -47,5 +47,55 @@ await dark.evaluate(() => document.documentElement.setAttribute('data-theme', 'd
 await settle(dark);
 await dark.screenshot({ path: '.impeccable/review/desktop-dark.png', fullPage: true });
 
+// The app dashboard: loaded state, both themes and sizes, then two desktop interactions.
+await mkdir('.impeccable/review/app', { recursive: true });
+const appReady = async (page) => {
+  await page.waitForSelector('[data-testid="dashboard-ready"]', { timeout: 30_000 });
+  await settle(page);
+};
+const appPage = async (width, height, theme) => {
+  const ctx = await browser.newContext({ viewport: { width, height }, colorScheme: 'light', reducedMotion: 'reduce' });
+  const page = await ctx.newPage();
+  if (theme === 'dark') {
+    await page.addInitScript(() => {
+      try { localStorage.setItem('keel-theme', 'dark'); } catch {}
+    });
+  }
+  await page.goto(base + '/app/dashboard', { waitUntil: 'networkidle' });
+  if (theme === 'dark') await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+  await appReady(page);
+  return [ctx, page];
+};
+let appShots = 0;
+for (const [name, width, height] of sizes) {
+  for (const theme of ['light', 'dark']) {
+    const [ctx, page] = await appPage(width, height, theme);
+    await page.screenshot({ path: `.impeccable/review/app/${name}-${theme}-dashboard.png`, fullPage: true });
+    await page.screenshot({ path: `.impeccable/review/app/${name}-${theme}-dashboard-first-viewport.png` });
+    appShots += 2;
+    await ctx.close();
+  }
+}
+{
+  const [ctx, page] = await appPage(1440, 900, 'light');
+  await page.getByRole('table', { name: 'Rules' }).getByRole('button', { name: /Show the trades\.$/ }).first().click();
+  await page.getByRole('dialog').waitFor();
+  await settle(page);
+  await page.screenshot({ path: '.impeccable/review/app/desktop-light-drilldown.png' });
+  await ctx.close();
+  appShots += 1;
+}
+{
+  const [ctx, page] = await appPage(1440, 900, 'light');
+  await page.getByRole('button', { name: /Sample workspace/ }).click();
+  await page.getByRole('menuitemradio', { name: 'My workspace' }).click();
+  await page.keyboard.press('Escape');
+  await page.getByRole('heading', { name: 'No trades in My workspace yet.' }).waitFor();
+  await settle(page);
+  await page.screenshot({ path: '.impeccable/review/app/desktop-light-empty.png' });
+  await ctx.close();
+  appShots += 1;
+}
+
 await browser.close();
-console.log('captured', routes.length * sizes.length + sizes.length + 1, 'screens');
+console.log('captured', routes.length * sizes.length + sizes.length + 1 + appShots, 'screens');
