@@ -5,8 +5,8 @@ import { XCircle } from '@phosphor-icons/react/dist/ssr';
 import { Chip, SideChip } from '@/components/ui/chip';
 import type { RecentTrade, TradeRulesSummary } from '@/data/dashboard';
 import { pnlOf } from '@/domain/metrics/context';
-import type { PnlBasis } from '@/domain/types';
-import { formatPnl } from '@/lib/format';
+import type { PnlBasis, Trade } from '@/domain/types';
+import { formatInstrument, formatPnl, keepHyphens } from '@/lib/format';
 import { shortTime } from '@/lib/time-format';
 import { signTone } from './plan-card';
 
@@ -21,7 +21,12 @@ function listOf(items: readonly string[]): string {
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
 
-/** The Rules cell: kept, broken (the first rule, then how many more) or not graded. */
+/**
+ * The Rules cell: kept, broken (the first rule, then a "+n" chip for the
+ * rest) or not graded. A broken rule reads on one line from `xl`, cut short
+ * with its whole text in the title; below `xl` it wraps to two lines rather
+ * than cutting to a stub (touch and keyboard can't reach the title).
+ */
 function RulesCell({ rules }: { rules: TradeRulesSummary }): React.JSX.Element {
   if (rules.kind === 'ungraded')
     return <span className="text-faint">Not graded</span>;
@@ -40,35 +45,65 @@ function RulesCell({ rules }: { rules: TradeRulesSummary }): React.JSX.Element {
     first === undefined
       ? `Broke ${brokenCount} ${brokenCount === 1 ? 'rule' : 'rules'}`
       : `Broke: ${listOf(rules.broken)}`;
-  // The rule wraps to two lines rather than cutting to a stub: touch and
-  // keyboard can't reach the title. Below xl "and n more" takes its own line,
-  // so the rule keeps the cell's width; from xl it sits beside the first line.
+  // From xl one line: icon, rule, then the chip right after it. Below xl the
+  // rule keeps the cell's width and the chip sits under its first word.
   return (
     <span
       title={rules.broken.join(', ') || undefined}
-      className="flex min-w-0 flex-wrap items-start text-loss xl:flex-nowrap"
+      className="grid min-w-0 grid-cols-[14px_minmax(0,1fr)] items-start gap-x-1.5 text-loss xl:flex xl:items-center"
     >
       <XCircle
         size={14}
         weight="fill"
         aria-hidden="true"
-        className="mt-[3px] mr-1.5 flex-none"
+        className="mt-[3px] xl:mt-0 xl:flex-none"
       />
-      <span
-        aria-hidden="true"
-        className="line-clamp-2 min-w-0 flex-1 xl:flex-initial"
-      >
-        {first === undefined ? spoken : `Broke: ${first}`}
+      <span aria-hidden="true" className="line-clamp-2 min-w-0 xl:truncate">
+        {first === undefined ? spoken : `Broke: ${keepHyphens(first)}`}
       </span>
       {rest.length > 0 ? (
         <span
           aria-hidden="true"
-          className="basis-full pl-5 whitespace-nowrap xl:basis-auto xl:pl-1"
+          className="col-start-2 mt-1 inline-flex h-5 items-center justify-self-start rounded-chip bg-loss-soft px-1.5 font-mono text-[11.5px] tabular-nums xl:mt-0 xl:flex-none"
         >
-          and {rest.length} more
+          +{rest.length}
         </span>
       ) : null}
       <span className="sr-only">{spoken}</span>
+    </span>
+  );
+}
+
+/**
+ * The instrument in words, "TSLA 370 Put" with its expiry faint beside it, or
+ * "ES Dec 26". The title keeps the symbol as traded. Where a table folds the
+ * trade's time under the symbol, `detailClassName` hides the expiry, so the
+ * two dates never stack.
+ */
+export function InstrumentName({
+  trade,
+  className = '',
+  detailClassName = '',
+}: {
+  trade: Trade;
+  className?: string;
+  detailClassName?: string;
+}): React.JSX.Element {
+  const { name, detail } = formatInstrument(trade.instrument, trade.openedAt);
+  return (
+    <span
+      title={trade.instrument.symbol}
+      className={`flex min-w-0 flex-wrap items-baseline gap-x-1.5 ${className}`}
+    >
+      <span className="whitespace-nowrap">{name}</span>
+      {detail !== undefined ? (
+        <span
+          className={`min-w-0 truncate text-xs text-faint ${detailClassName}`}
+        >
+          <span className="sr-only">expires </span>
+          {detail}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -105,9 +140,9 @@ function StrategyCell({ row }: { row: RecentTrade }): React.JSX.Element {
 
 /**
  * Row 3: the newest closed trades in the filters, each with how it went
- * against its strategy's rules. Below `xl` a broken row's "and n more" sits
- * under the rule; below `md` the time folds under the symbol; below `sm` Side
- * and Strategy hide.
+ * against its strategy's rules. Rules takes the width the fixed columns
+ * leave, at least 280px from `xl`, where every row is one 32px line. Below
+ * `md` the time folds under the symbol; below `sm` Side and Strategy hide.
  */
 export function RecentTrades({
   recent,
@@ -142,19 +177,22 @@ export function RecentTrades({
       >
         <thead>
           <tr>
-            <th scope="col" className={`${TH} w-[104px] max-md:hidden`}>
+            <th scope="col" className={`${TH} w-24 max-md:hidden xl:w-[104px]`}>
               Time
             </th>
             <th
               scope="col"
-              className={`${TH} w-[100px] md:w-[88px] md:pl-4 xl:w-[168px]`}
+              className={`${TH} w-[100px] md:w-32 md:pl-4 xl:w-[176px]`}
             >
               Symbol
             </th>
             <th scope="col" className={`${TH} ${GAP} w-[72px] max-sm:hidden`}>
               Side
             </th>
-            <th scope="col" className={`${TH} ${GAP} max-sm:hidden`}>
+            <th
+              scope="col"
+              className={`${TH} ${GAP} w-32 max-sm:hidden lg:w-36 xl:w-[180px]`}
+            >
               Strategy
             </th>
             <th
@@ -163,11 +201,7 @@ export function RecentTrades({
             >
               {basis === 'gross' ? 'Gross P&L' : 'Net P&L'}
             </th>
-            <th
-              scope="col"
-              // 90rem, not 1440px: Tailwind orders min-[...] against xl (80rem) only in the same unit.
-              className={`${TH} ${GAP} sm:w-40 md:w-[184px] lg:w-[200px] xl:w-[280px] min-[90rem]:w-[300px]`}
-            >
+            <th scope="col" className={`${TH} ${GAP}`}>
               Rules
             </th>
           </tr>
@@ -182,11 +216,12 @@ export function RecentTrades({
                 <td className={`${MONO} whitespace-nowrap max-md:hidden`}>
                   {time}
                 </td>
-                <td className={`${MONO} py-1.5 md:py-0 md:pl-4`}>
-                  {/* A long option symbol truncates; the title carries it whole. */}
-                  <span title={t.instrument.symbol} className="block truncate">
-                    {t.instrument.symbol}
-                  </span>
+                <td className={`${MONO} py-1.5 md:pl-4 xl:py-0`}>
+                  <InstrumentName
+                    trade={t}
+                    className="xl:flex-nowrap"
+                    detailClassName="max-md:hidden"
+                  />
                   <span className="block whitespace-nowrap text-faint md:hidden">
                     {time}
                   </span>

@@ -11,11 +11,13 @@ import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { METRIC_IDS } from '@/content/metric-definitions';
+import { resolveInstrument } from '@/domain/instruments';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import type { Repository } from '@/data/repository';
 import type { SampleWorkspace } from '@/data/seed/generate';
 import type { UserPrefs } from '@/domain/types';
+import { keepHyphens } from '@/lib/format';
 import { dashboardFixture } from '../__fixtures__/dashboard-sample';
 import { renderApp } from '../__fixtures__/render-app';
 import { DashboardView } from './dashboard-view';
@@ -475,17 +477,36 @@ test('a trade that broke two rules and carries two mistakes', async () => {
   const row = within(table).getAllByRole('row')[1]!;
   // The full list rides in the title, and whole in the text a screen reader gets.
   const rules = within(row).getByTitle(`${r1}, ${r2}`);
-  expect(rules.textContent).toContain(`Broke: ${r1}`);
-  // The rule wraps to two lines rather than cutting to a stub (touch and keyboard can't reach the title).
-  const text = within(rules).getByText(`Broke: ${r1}`);
+  // Below xl the rule wraps to two lines rather than cutting to a stub; from xl it reads on one line.
+  const text = within(rules).getByText(`Broke: ${keepHyphens(r1)}`);
   expect(text.className).toContain('line-clamp-2');
-  expect(text.className).not.toContain('truncate');
-  expect(rules.textContent).toContain('and 1 more');
+  expect(text.className).toContain('xl:truncate');
+  expect(text.className).not.toMatch(/(^|\s)truncate/);
+  // The rest is a small loss chip right after the rule, not stranded at the cell's edge.
+  const count = text.nextElementSibling!;
+  expect(count.textContent).toBe('+1');
+  expect(count.className).toContain('bg-loss-soft');
+  expect(rules.textContent).not.toContain('more');
   expect(row.textContent).toContain(`Broke: ${r1} and ${r2}`);
   // The first mistake as a chip, then +1 that names the rest.
   expect(row.textContent).toContain(fomo);
   const more = within(row).getByTitle('Oversized');
   expect(more.textContent).toContain('+1');
+});
+
+test('recent trades name the instrument, keeping the symbol in the title', async () => {
+  await renderDashboard({
+    edit: (s) => {
+      const f1 = s.trades.find((t) => t.id === 'f-1')!;
+      f1.instrument = resolveInstrument('TSLA261120P00370000')!;
+    },
+  });
+  const table = await screen.findByRole('table', { name: 'Recent trades' });
+  const [option, future] = within(table).getAllByRole('row').slice(1);
+  const name = within(option!).getByTitle('TSLA261120P00370000');
+  expect(name.textContent).toBe('TSLA 370 Putexpires 20 Nov');
+  expect(option!.textContent).not.toContain('TSLA261120P00370000');
+  expect(within(future!).getByTitle('ESZ5').textContent).toBe('ES Dec 25');
 });
 
 test('ungraded imports still show performance and trades (Review Focus 1)', async () => {
@@ -510,10 +531,15 @@ test('ungraded imports still show performance and trades (Review Focus 1)', asyn
 
 test('every metric carries its definition', async () => {
   await renderDashboard();
-  const ids = [
-    ...(await screen.findByTestId('dashboard-ready')).querySelectorAll(
-      '[data-metric-tip]',
-    ),
-  ].map((e) => (e as HTMLElement).dataset.metricTip);
+  const tips = (root: Element) =>
+    [...root.querySelectorAll('[data-metric-tip]')].map(
+      (e) => (e as HTMLElement).dataset.metricTip,
+    );
+  const ids = tips(await screen.findByTestId('dashboard-ready'));
+  // A rule's drill-down carries the last: its Kept column.
+  fireEvent.click(
+    screen.getByRole('button', { name: new RegExp(`^${r1}\\.`) }),
+  );
+  ids.push(...tips(await screen.findByRole('dialog')));
   expect(new Set(ids)).toEqual(new Set(METRIC_IDS));
 });

@@ -13,6 +13,7 @@ import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import { StorageUnavailableError, type Repository } from '@/data/repository';
 import type { SampleWorkspace } from '@/data/seed/generate';
+import { keepHyphens } from '@/lib/format';
 import { dashboardFixture } from '../__fixtures__/dashboard-sample';
 import { renderApp } from '../__fixtures__/render-app';
 import { DashboardView } from './dashboard-view';
@@ -34,6 +35,8 @@ const rule = (id: string) =>
   fx.strategies[0]!.rules.find((r) => r.id === id)!.text;
 const r1 = rule('r-1');
 const r2 = rule('r-2');
+/** r-1 as it shows: "15-minute" can't break at its hyphen. */
+const r1Shown = keepHyphens(r1);
 const fomo = fx.tags.find((t) => t.id === 'tag-fomo')!.name;
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** Rule and mistake buttons' aria-labels start "{text}." */
@@ -106,7 +109,9 @@ test('your plan: adherence, cost once per trade, rules by cost with the costlies
   const rows = within(within(plan).getByRole('table', { name: 'Rules' }))
     .getAllByRole('row')
     .slice(1);
-  expect(rows[0]!.textContent).toContain(r1);
+  // On screen the rule can't break at its hyphen; its label keeps the plain text.
+  expect(r1Shown).not.toBe(r1);
+  expect(rows[0]!.textContent).toContain(r1Shown);
   expect(rows[0]!.textContent).toContain('Costliest');
   expect(rows[1]!.textContent).toContain(r2);
   expect(rows[1]!.textContent).toContain('none');
@@ -191,7 +196,7 @@ test('a rule opens its trades; Escape closes; focus returns (signature move)', a
   const open = await screen.findByRole('button', { name: opener(r1) });
   open.focus();
   fireEvent.click(open);
-  const dialog = await screen.findByRole('dialog', { name: r1 });
+  const dialog = await screen.findByRole('dialog', { name: r1Shown });
   expect(within(dialog).getAllByRole('row')).toHaveLength(2);
   expect(dialog.textContent).toContain(
     'Broken on 1 trade, all time. Cost when broken −$400.00. Trades that kept it: +$600.00.',
@@ -205,19 +210,25 @@ test('clicking anywhere on a rule row opens it', async () => {
   renderApp(<DashboardView />, { sample: graded });
   const open = await screen.findByRole('button', { name: opener(r1) });
   fireEvent.click(open.closest('tr')!.lastElementChild!);
-  expect(await screen.findByRole('dialog', { name: r1 })).toBeTruthy();
+  expect(await screen.findByRole('dialog', { name: r1Shown })).toBeTruthy();
 });
 
 test('regrading in the drill-down saves the check, keeps the row, and updates the plan', async () => {
   const { repo } = renderApp(<DashboardView />, { sample: graded });
   fireEvent.click(await screen.findByRole('button', { name: opener(r1) }));
-  const dialog = await screen.findByRole('dialog', { name: r1 });
+  const dialog = await screen.findByRole('dialog', { name: r1Shown });
   const kept = within(dialog).getByRole('checkbox', {
     name: new RegExp(`^Kept ${esc(r1)} on ESZ5 `),
   }) as HTMLInputElement;
   expect(kept.checked).toBe(false);
+  // Drawn as a broken mark, not an empty box, and said as much.
+  const mark = kept.closest('label')!;
+  expect(mark.textContent).toBe('Broken');
+  expect(mark.querySelector('.text-loss:not(.opacity-0)')).toBeTruthy();
   fireEvent.click(kept);
   expect(kept.checked).toBe(true); // at once, before the save lands
+  expect(mark.textContent).toBe('Kept');
+  expect(mark.querySelector('.text-gain:not(.opacity-0)')).toBeTruthy();
   await waitFor(async () =>
     expect(
       (await repo.trades.get('sample', 'f-1'))!.ruleChecks.find(
@@ -250,7 +261,7 @@ test('a regrade that fails to save reverts with an inline error', async () => {
   }));
   renderApp(<DashboardView />, { repository });
   fireEvent.click(await screen.findByRole('button', { name: opener(r1) }));
-  const dialog = await screen.findByRole('dialog', { name: r1 });
+  const dialog = await screen.findByRole('dialog', { name: r1Shown });
   const kept = within(dialog).getByRole('checkbox', {
     name: new RegExp(`^Kept ${esc(r1)}`),
   }) as HTMLInputElement;
@@ -276,14 +287,46 @@ test('a mistake opens its trades', async () => {
   const dialog = await screen.findByRole('dialog', { name: fomo });
   const rows = within(dialog).getAllByRole('row').slice(1);
   expect(rows).toHaveLength(1);
-  expect(rows[0]!.textContent).toContain('ESZ5');
+  // The future reads as root and contract month; the title keeps the symbol.
+  expect(rows[0]!.textContent).toContain('ES Dec 25');
+  expect(within(rows[0]!).getByTitle('ESZ5')).toBeTruthy();
   expect(rows[0]!.textContent).toContain('−$400.00');
+  // Every row carries the opened mistake, so only the others show.
+  expect(
+    within(dialog)
+      .getAllByRole('columnheader')
+      .map((h) => h.textContent),
+  ).toContain('Other mistakes');
+  expect(rows[0]!.textContent).not.toContain(fomo);
+  expect(rows[0]!.textContent).toContain('None');
   expect(dialog.textContent).toContain('1 trade, all time, −$400.00 net.');
   // A mistake's trades are not regraded here.
   expect(within(dialog).queryByRole('checkbox')).toBeNull();
   fireEvent.keyDown(dialog, { key: 'Escape' });
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   expect(document.activeElement).toBe(open);
+});
+
+test("a mistake's rows list only the trade's other mistakes", async () => {
+  renderApp(<DashboardView />, {
+    sample: sampleWith((s) => {
+      s.tags.push({
+        id: 'tag-size',
+        workspaceId: 'sample',
+        name: 'Oversized',
+        category: 'mistake',
+      });
+      s.trades.find((t) => t.id === 'f-1')!.tagIds = ['tag-fomo', 'tag-size'];
+    }),
+  });
+  const mistakes = await screen.findByRole('region', {
+    name: 'Mistakes, by cost',
+  });
+  fireEvent.click(within(mistakes).getByRole('button', { name: opener(fomo) }));
+  const dialog = await screen.findByRole('dialog', { name: fomo });
+  const row = within(dialog).getAllByRole('row')[1]!;
+  expect(row.textContent).toContain('Oversized');
+  expect(row.textContent).not.toContain(fomo);
 });
 
 test('a filter that matches nothing offers Clear filters (Review Focus 2)', async () => {
@@ -294,6 +337,7 @@ test('a filter that matches nothing offers Clear filters (Review Focus 2)', asyn
   expect(
     await screen.findByText('No trades match these filters.'),
   ).toBeTruthy();
+  expect(screen.queryByRole('figure')).toBeNull(); // the preview is for an empty workspace
   fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
   await waitFor(() => expect(window.location.search).toBe(''));
   const plan = await screen.findByRole('region', {
@@ -315,6 +359,11 @@ test('an empty workspace offers Import and the sample (Review Focus 2)', async (
     await screen.findByText('No trades in My workspace yet.'),
   ).toBeTruthy();
   expect(screen.queryByText('No trades match these filters.')).toBeNull();
+  // A ghosted, labelled "Your plan": rule rows, no numbers.
+  const preview = screen.getByRole('figure', {
+    name: 'Your rules and what breaking them costs will show here.',
+  });
+  expect(preview.textContent).not.toMatch(/\d/);
   expect(
     screen.getByRole('link', { name: 'Import' }).getAttribute('href'),
   ).toBe('/app/import');

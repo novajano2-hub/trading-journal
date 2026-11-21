@@ -1,20 +1,21 @@
 'use client';
 
 import { useMemo, useState, type RefObject } from 'react';
-import { Warning } from '@phosphor-icons/react/dist/ssr';
+import { CheckCircle, Warning, XCircle } from '@phosphor-icons/react/dist/ssr';
 import { Chip, SideChip } from '@/components/ui/chip';
+import { MetricTip } from '@/components/ui/metric-tip';
 import { MorphDialog } from '@/components/ui/morph-dialog';
-import { TaskCheckbox } from '@/components/ui/task-checkbox';
 import type { DashboardModel } from '@/data/dashboard';
 import { useUpdateTrade } from '@/data/query/hooks';
 import { withRuleCheck } from '@/data/trade-patch';
 import { pnlOf } from '@/domain/metrics/context';
 import type { Cents, Strategy, Tag, Trade } from '@/domain/types';
-import { formatPnl } from '@/lib/format';
+import { formatPnl, keepHyphens } from '@/lib/format';
 import { shortTime } from '@/lib/time-format';
 import type { DrillTarget } from './dashboard-view';
 import { tradeNoun } from './mistakes-card';
 import { signTone } from './plan-card';
+import { InstrumentName } from './recent-trades';
 
 function Money({ cents, currency }: { cents: Cents; currency: string }) {
   return (
@@ -33,8 +34,10 @@ function Count({ n }: { n: number }) {
 }
 
 /**
- * A rule's "Kept" box on one trade. It flips at once; the saved value takes
- * over once it catches up, and a failed save reverts and reports.
+ * A rule's kept or broken mark on one trade, a native checkbox drawn as a
+ * gain CheckCircle (kept) or a loss XCircle (broken); Space or a click
+ * regrades it. It flips at once; the saved value takes over once it catches
+ * up, and a failed save reverts and reports.
  */
 function KeptBox({
   trade,
@@ -57,31 +60,55 @@ function KeptBox({
     landed: boolean;
   } | null>(null);
   if (optimistic?.landed && optimistic.value === saved) setOptimistic(null);
+  const kept = optimistic?.value ?? saved;
+  const mark =
+    'absolute inset-0 transition-[opacity,scale] duration-[240ms] ease-[var(--ease-glide)] motion-reduce:transition-none';
 
   return (
-    <TaskCheckbox
-      aria-label={label}
-      checked={optimistic?.value ?? saved}
-      onCheckedChange={(value) => {
-        setOptimistic({ value, landed: false });
-        onSaving();
-        update
-          .mutateAsync({
-            id: trade.id,
-            patch: withRuleCheck(trade, ruleId, value),
-          })
-          .then(
-            () =>
-              setOptimistic((o) =>
-                o?.value === value ? { value, landed: true } : o,
-              ),
-            () => {
-              setOptimistic(null);
-              onFailed();
-            },
-          );
-      }}
-    />
+    <label className="group relative inline-flex cursor-pointer items-center justify-center pointer-coarse:min-h-11 pointer-coarse:min-w-11">
+      <input
+        type="checkbox"
+        checked={kept}
+        aria-label={label}
+        onChange={(event) => {
+          const value = event.currentTarget.checked;
+          setOptimistic({ value, landed: false });
+          onSaving();
+          update
+            .mutateAsync({
+              id: trade.id,
+              patch: withRuleCheck(trade, ruleId, value),
+            })
+            .then(
+              () =>
+                setOptimistic((o) =>
+                  o?.value === value ? { value, landed: true } : o,
+                ),
+              () => {
+                setOptimistic(null);
+                onFailed();
+              },
+            );
+        }}
+        className="peer sr-only"
+      />
+      <span
+        aria-hidden="true"
+        className="relative size-6 rounded-full outline-offset-1 transition-colors duration-120 group-hover:bg-sunken peer-focus-visible:outline-2 peer-focus-visible:outline-accent"
+      >
+        <XCircle
+          size={20}
+          weight="fill"
+          className={`${mark} m-0.5 text-loss ${kept ? 'scale-75 opacity-0' : ''}`}
+        />
+        <CheckCircle
+          size={20}
+          weight="fill"
+          className={`${mark} m-0.5 text-gain ${kept ? '' : 'scale-75 opacity-0'}`}
+        />
+      </span>
+      <span className="sr-only">{kept ? 'Kept' : 'Broken'}</span>
+    </label>
   );
 }
 
@@ -134,7 +161,7 @@ function TradesTable({
             <tr>
               {rule ? (
                 <th scope="col" className={`${TH} w-11`}>
-                  Kept
+                  <MetricTip id="trade-rule-kept" basis={model.basis} />
                 </th>
               ) : null}
               <th scope="col" className={`${TH} max-sm:hidden`}>
@@ -153,15 +180,18 @@ function TradesTable({
                 {basisLabel}
               </th>
               <th scope="col" className={`${TH} max-sm:hidden`}>
-                Mistakes
+                {rule ? 'Mistakes' : 'Other mistakes'}
               </th>
             </tr>
           </thead>
           <tbody>
             {rows.map((t) => {
               const time = shortTime(t.closedAt ?? t.openedAt, timeZone);
-              const mistakes = t.tagIds.flatMap(
-                (id) => mistakeName.get(id) ?? [],
+              // A mistake's own trades all carry it: show only their others.
+              const mistakes = t.tagIds.flatMap((id) =>
+                target.kind === 'mistake' && id === target.tagId
+                  ? []
+                  : (mistakeName.get(id) ?? []),
               );
               const strategy =
                 t.strategyId !== undefined
@@ -190,13 +220,12 @@ function TradesTable({
                   <td
                     className={`${TD} ${symbolPad} py-1.5 font-mono text-[12.5px] text-text`}
                   >
-                    {/* A long option symbol truncates on phones; the title and the Kept box's label carry it whole. */}
-                    <span
-                      title={t.instrument.symbol}
-                      className="block whitespace-nowrap max-sm:max-w-[7rem] max-sm:truncate"
-                    >
-                      {t.instrument.symbol}
-                    </span>
+                    {/* The title and the Kept box's label keep the symbol as traded; below sm the time takes the expiry's place. */}
+                    <InstrumentName
+                      trade={t}
+                      className="sm:flex-nowrap"
+                      detailClassName="max-sm:hidden"
+                    />
                     <span className="block whitespace-nowrap text-faint tabular-nums sm:hidden">
                       {time}
                     </span>
@@ -320,7 +349,8 @@ export function Drilldown({
       onOpenChange={onOpenChange}
       origin={origin}
       returnFocus={returnFocus}
-      title={title}
+      // A rule's title keeps "1-hour" whole on a narrow screen.
+      title={target.kind === 'rule' ? keepHyphens(title) : title}
       description={description}
     >
       <TradesTable

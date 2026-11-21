@@ -1,12 +1,15 @@
 import { describe, expect, test } from 'vitest';
+import { resolveInstrument } from '@/domain/instruments';
 import {
   adherenceDigits,
   formatAdherence,
+  formatInstrument,
   formatMoney,
   formatPct,
   formatPnl,
   formatPnlWhole,
   formatRatio,
+  keepHyphens,
 } from './format';
 
 describe('format', () => {
@@ -54,5 +57,82 @@ describe('format', () => {
     expect(formatPnlWhole(-3900)).toBe('−39');
     expect(formatPnlWhole(-500)).toBe('−5');
     expect(formatPnlWhole(0)).toBe('0');
+  });
+
+  describe('formatInstrument', () => {
+    const at = '2026-11-20T15:00:00Z';
+    const of = (symbol: string, tradedAt = at) =>
+      formatInstrument(resolveInstrument(symbol)!, tradedAt);
+
+    test('an option reads underlying, strike and right, with the expiry beside it', () => {
+      expect(of('TSLA261120P00370000')).toEqual({
+        name: 'TSLA 370 Put',
+        detail: '20 Nov',
+      });
+      expect(of('TSLA261120C00385000')).toEqual({
+        name: 'TSLA 385 Call',
+        detail: '20 Nov',
+      });
+    });
+    test('a fractional strike keeps its decimals; a single-digit day has no padding', () => {
+      expect(of('AAPL261106P00277500')).toEqual({
+        name: 'AAPL 277.5 Put',
+        detail: '6 Nov',
+      });
+    });
+    test("an expiry in another year than the trade's says the year", () => {
+      expect(of('SPY270115C00600000')).toEqual({
+        name: 'SPY 600 Call',
+        detail: '15 Jan 27',
+      });
+    });
+    test('a future reads root and contract month, matching the Symbol filter by root', () => {
+      expect(of('ESZ6')).toEqual({ name: 'ES Dec 26' });
+      expect(of('MNQH7')).toEqual({ name: 'MNQ Mar 27' });
+      expect(of('/CLF27')).toEqual({ name: 'CL Jan 27' });
+      expect(of('6EM6')).toEqual({ name: '6E Jun 26' });
+    });
+    test("a one-digit contract year is the nearest year to the trade's", () => {
+      expect(of('ESZ5')).toEqual({ name: 'ES Dec 25' });
+      expect(of('ESH0', '2029-12-30T15:00:00Z')).toEqual({
+        name: 'ES Mar 30',
+      });
+      expect(of('GCG0', '2026-11-20T15:00:00Z')).toEqual({
+        name: 'GC Feb 30',
+      });
+    });
+    test('stocks, forex and crypto keep their symbol', () => {
+      expect(of('AAPL')).toEqual({ name: 'AAPL' });
+      expect(of('BRK.B')).toEqual({ name: 'BRK.B' });
+      expect(of('EURUSD')).toEqual({ name: 'EURUSD' });
+      expect(of('EUR/USD')).toEqual({ name: 'EUR/USD' });
+      expect(of('BTCUSD')).toEqual({ name: 'BTCUSD' });
+      expect(of('ETH-USDT')).toEqual({ name: 'ETH-USDT' });
+    });
+    test('an instrument missing the fields to decode keeps its symbol', () => {
+      const noStrike = { ...resolveInstrument('TSLA261120P00370000')! };
+      delete noStrike.strike;
+      expect(formatInstrument(noStrike, at)).toEqual({
+        name: 'TSLA261120P00370000',
+      });
+      const future = resolveInstrument('ESZ6')!;
+      expect(formatInstrument({ ...future, symbol: 'ES' }, at)).toEqual({
+        name: 'ES',
+      });
+    });
+  });
+
+  test('keepHyphens joins hyphenated words so a line never breaks inside them', () => {
+    expect(keepHyphens('Trend is intact on the 1-hour chart')).toBe(
+      'Trend is intact on the 1\u2011hour chart',
+    );
+    expect(keepHyphens('Pullback holds the 20-period average')).toBe(
+      'Pullback holds the 20\u2011period average',
+    );
+    expect(keepHyphens('Exit at the mid-point')).toBe(
+      'Exit at the mid\u2011point',
+    );
+    // A hyphen with a space on either side is not inside a word.
+    expect(keepHyphens('Risk - reward')).toBe('Risk - reward');
   });
 });

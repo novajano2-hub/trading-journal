@@ -1,11 +1,10 @@
 // No 'use client': the page prerenders the skeleton as its Suspense fallback.
 import Link from 'next/link';
-import type { ReactNode } from 'react';
-import type { Icon } from '@phosphor-icons/react';
+import { useId, type ReactNode } from 'react';
 import {
   ClockCounterClockwise,
   FunnelSimple,
-  Tray,
+  ListChecks,
   Warning,
 } from '@phosphor-icons/react/dist/ssr';
 import { Button } from '@/components/ui/button';
@@ -70,15 +69,15 @@ export function DashboardSkeleton(): React.JSX.Element {
   );
 }
 
-/** One state of the page: a tile, what happened, what to do next. */
+/** One state of the page: a tile (or a preview), what happened, what to do next. */
 function StateBlock({
-  icon,
+  visual,
   title,
   body,
   actions,
   role,
 }: {
-  icon: Icon;
+  visual: ReactNode;
   title: string;
   body?: ReactNode;
   actions?: ReactNode;
@@ -89,7 +88,7 @@ function StateBlock({
       role={role}
       className="mx-auto flex w-full max-w-[520px] flex-col items-center px-5 py-20 text-center sm:py-28"
     >
-      <IconTile icon={icon} />
+      {visual}
       <h2 className="mt-5 text-[16px] leading-snug font-medium text-balance text-text">
         {title}
       </h2>
@@ -104,6 +103,53 @@ function StateBlock({
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** Rule text widths for the preview's rows. */
+const GHOST_RULES = ['w-3/4', 'w-1/2', 'w-2/3'];
+
+/**
+ * "Your plan" before there is anything to grade: rule rows with empty tracks
+ * and no numbers, labelled with what will fill them.
+ */
+function PlanPreview(): React.JSX.Element {
+  const captionId = useId();
+  const columns = 'grid grid-cols-[minmax(0,1fr)_28%_56px] items-center gap-4';
+  return (
+    <figure
+      aria-labelledby={captionId}
+      className="mb-3 w-full rounded-card border border-line bg-surface-1 px-5 pt-4 pb-2 text-left"
+    >
+      <figcaption
+        id={captionId}
+        className="flex items-center gap-3 text-[13px] leading-snug text-muted"
+      >
+        <IconTile icon={ListChecks} tone="accent" />
+        Your rules and what breaking them costs will show here.
+      </figcaption>
+      {/* The last row fades: the list goes on. */}
+      <div
+        aria-hidden="true"
+        className="mt-4 [mask-image:linear-gradient(to_bottom,black_55%,transparent)]"
+      >
+        <div className={`${columns} pb-2 text-xs leading-4 text-faint`}>
+          <span>Rule</span>
+          <span>Adherence</span>
+          <span className="text-right">Cost</span>
+        </div>
+        {GHOST_RULES.map((width) => (
+          <div
+            key={width}
+            className={`${columns} h-[38px] border-t border-line`}
+          >
+            <Bar className={`h-2.5 ${width}`} />
+            <span className="block h-1 rounded-full bg-line" />
+            <Bar className="ml-auto h-2.5 w-12" />
+          </div>
+        ))}
+      </div>
+    </figure>
   );
 }
 
@@ -126,7 +172,7 @@ export function DashboardEmpty({
     case 'no-trades':
       return (
         <StateBlock
-          icon={Tray}
+          visual={<PlanPreview />}
           title="No trades in My workspace yet."
           body="Import a CSV from your broker, or open the sample workspace to look around."
           actions={
@@ -144,7 +190,7 @@ export function DashboardEmpty({
     case 'no-matches':
       return (
         <StateBlock
-          icon={FunnelSimple}
+          visual={<IconTile icon={FunnelSimple} />}
           title="No trades match these filters."
           actions={<Button onClick={onClearFilters}>Clear filters</Button>}
         />
@@ -152,7 +198,7 @@ export function DashboardEmpty({
     case 'no-closed':
       return (
         <StateBlock
-          icon={ClockCounterClockwise}
+          visual={<IconTile icon={ClockCounterClockwise} />}
           title="No closed trades yet."
           body="Open positions count here once they close."
         />
@@ -175,7 +221,7 @@ export function DashboardError({
   return (
     <StateBlock
       role="alert"
-      icon={Warning}
+      visual={<IconTile icon={Warning} />}
       title={
         storage
           ? "Keel can't open storage in this browser, so your workspace can't load."

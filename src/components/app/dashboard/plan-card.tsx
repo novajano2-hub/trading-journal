@@ -9,7 +9,7 @@ import { MetricTip } from '@/components/ui/metric-tip';
 import { RULES_SHOWN, type DashboardModel } from '@/data/dashboard';
 import type { RuleScore } from '@/domain/metrics/rules';
 import type { Cents, PnlBasis } from '@/domain/types';
-import { formatAdherence, formatPnl } from '@/lib/format';
+import { formatAdherence, formatPnl, keepHyphens } from '@/lib/format';
 
 /** Gain or loss text for signed money; zero stays uncoloured. */
 export function signTone(cents: Cents): string {
@@ -84,7 +84,7 @@ function RuleRow({
   const broken = rule.broken > 0;
   const text = (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      <span className="line-clamp-2">{rule.text}</span>
+      <span className="line-clamp-2">{keepHyphens(rule.text)}</span>
       {costliest ? <Chip tone="loss">Costliest</Chip> : null}
     </span>
   );
@@ -286,7 +286,13 @@ export function PlanCard({
                 scope="col"
                 className={`${TH} ${PAD.cost} ${WIDTH.cost} text-right`}
               >
-                <MetricTip id="rule-cost-broken" basis={basis} />
+                {/* Below sm the full label wraps to two dotted lines; its definition keeps the long form. */}
+                <MetricTip id="rule-cost-broken" basis={basis}>
+                  {/* One run of text: as separate flex items the space would drop. */}
+                  <span>
+                    Cost<span className="max-sm:hidden"> when broken</span>
+                  </span>
+                </MetricTip>
               </th>
             </tr>
           </thead>

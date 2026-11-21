@@ -5,6 +5,7 @@ export const METRIC_IDS = [
   'broken-rules-cost',
   'rule-kept',
   'rule-cost-broken',
+  'trade-rule-kept',
   'mistake-cost',
   'weekly-goal',
   'daily-loss-limit',
@@ -38,6 +39,10 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Cost when broken',
     definition:
       'Total {basis} P&L of closed trades that broke this rule. A trade that broke several rules counts in each, so rows can add up to more than the total.',
+  },
+  'trade-rule-kept': {
+    label: 'Kept',
+    definition: 'Whether this trade kept the rule. Click a mark to regrade it.',
   },
   'mistake-cost': {
     label: 'Cost',
