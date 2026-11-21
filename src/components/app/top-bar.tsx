@@ -39,8 +39,8 @@ const FIT: Record<'bar' | 'title' | 'breaker', Record<ChipsFit, string>> = {
   },
 };
 
-/** The bar's gap (gap-x-2.5), and the title's margin beside the chips (mr-3). */
-const GAP = 10;
+/** The bar's gap (gap-x-2), and the title's margin beside the chips (mr-3). */
+const GAP = 8;
 const TITLE_MARGIN = 12;
 
 /**
@@ -139,7 +139,7 @@ export function TopBar({
     <header
       ref={bar}
       data-chips={filters ? fit : undefined}
-      className={`z-30 bg-bg px-5 max-sm:pt-14 sm:sticky sm:top-0 sm:flex sm:items-center sm:gap-x-2.5 ${FIT.bar[fit]}`}
+      className={`z-30 bg-bg px-5 max-sm:pt-14 sm:sticky sm:top-0 sm:flex sm:items-center sm:gap-x-2 ${FIT.bar[fit]}`}
     >
       {/* Below sm this row is pinned to the top; from sm its items join the bar's. */}
       <div className="flex h-14 items-center gap-2 max-sm:fixed max-sm:inset-x-0 max-sm:top-0 max-sm:z-30 max-sm:border-b max-sm:border-line max-sm:bg-bg max-sm:px-5 sm:contents">
@@ -178,7 +178,7 @@ export function TopBar({
           {search}
         </div>
         {label || basis ? (
-          <div ref={controls} className="flex flex-none items-center gap-2.5">
+          <div ref={controls} className="flex flex-none items-center gap-2">
             {label}
             <div className="flex">{basis}</div>
           </div>

@@ -75,12 +75,12 @@ The claim we can make truthfully is the complete loop under one subscription.
 
 - Working name: **Keel**. It's a placeholder; the real name comes later.
 - **Visual direction (user-pinned, 2026-11-20).** A light, precise, pro-trading look built from the user's references: Kraken Pro, Coinbase Advanced, Gemini ActiveTrader and Public, plus Mobbin and HorizonX references.
-  - The approved mock is `.impeccable/mocks/rebrand/landing-v3.html`.
+  - The approved mock was `.impeccable/mocks/rebrand/landing-v3.html` (its layout still stands; its look was replaced by the app direction below).
   - Light is the default mode; dark is an explicit toggle.
 - **App direction (user-picked, 2026-11-21): "Daylight premium".** The user rejected the Plan 4 app look as "too plain and grey… looks like AI slop" and chose comp C of three hi-fi comps: `.impeccable/mocks/rebrand-app/c-daylight-premium.html`.
   - Keel Ultramarine #2B35AF, the one hue the money palette never uses, carries the brand; the "Your plan" hero is the app's only coloured surface.
   - Periwinkle-tinted canvas, white cards with brand-tinted shadows, Instrument Sans with tabular figures, colour-coded icon tiles (marigold mistakes, cyan goals, ultramarine performance).
-  - Scoped to `/app`. The marketing site keeps the landing-v3 system until the user decides otherwise.
+  - The whole product follows it: on 2026-11-21 the user asked that the landing "adapt to the new changes", so the marketing site moved to the same tokens, face and product-shot treatment, replacing the landing-v3 Geist and cobalt system.
 - **Rejected:** metaphor worlds (the earlier "Trading Floor" tickets and stamps), dark-mesh hero clichés, editorial serif display type, and anything that reads as AI-generated. The user's words: "no AI slop".
 - **Quality bars:** the design-taste-frontend and Impeccable skills. HorizonX coded components may be used directly under their commercial licence.
 - No look or copy is taken from TradeZella or MyTradingJourney.

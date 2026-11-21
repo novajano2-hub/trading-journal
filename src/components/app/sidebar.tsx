@@ -170,7 +170,7 @@ export function Sidebar({
     // On the canvas, no rule beside it. The right padding holds a focus ring
     // and the active pill's shadow inside the scroller; the page's own 20px
     // gutter makes up the rest of the space before the cards.
-    <div className="sticky top-0 hidden h-dvh w-[228px] flex-none flex-col overflow-y-auto pt-5 pr-1.5 pb-[18px] pl-[18px] lg:flex">
+    <div className="sticky top-0 hidden h-dvh w-[220px] flex-none flex-col overflow-y-auto pt-5 pr-1.5 pb-[18px] pl-[18px] lg:flex">
       {/* The wordmark goes to the Dashboard, filters kept. */}
       <WithDashboardHref>
         {(href) => (

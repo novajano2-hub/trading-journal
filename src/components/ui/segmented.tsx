@@ -54,13 +54,11 @@ export function Segmented<T extends string>({
             }}
             className="sr-only"
           />
-          <span className="grid justify-items-center">
-            <span
-              aria-hidden="true"
-              className="invisible col-start-1 row-start-1 font-semibold"
-            >
-              {o.label}
-            </span>
+          {/* The bold twin is generated content: no second text node for search or tests, and hidden from assistive tech. */}
+          <span
+            data-label={o.label}
+            className="grid justify-items-center after:invisible after:col-start-1 after:row-start-1 after:font-semibold after:content-[attr(data-label)]"
+          >
             <span className="col-start-1 row-start-1">{o.label}</span>
           </span>
         </label>
