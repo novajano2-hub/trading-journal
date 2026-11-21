@@ -116,6 +116,8 @@ test('no route overflows at any width', async ({ page }) => {
     '/terms',
     '/privacy',
     '/app/import',
+    '/app/trades',
+    '/app/backtesting',
     ...[
       'journal',
       'analytics',

@@ -1,0 +1,165 @@
+import { expect, test, type Page } from '@playwright/test';
+
+test.beforeEach(async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-11-20T15:00:00Z'));
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+});
+
+async function ready(page: Page) {
+  await expect(page.getByTestId('dashboard-ready')).toBeVisible({
+    timeout: 20_000,
+  });
+}
+
+test('filters change the numbers and the URL', async ({ page }) => {
+  await page.goto('/app/dashboard');
+  await ready(page);
+  const pnl = page.getByTestId('kpi-pnl');
+  const all = await pnl.innerText();
+  await page.getByRole('button', { name: 'Side', exact: true }).click();
+  await page.getByRole('radio', { name: 'Short' }).check();
+  await expect(page).toHaveURL(/[?&]side=short(&|$)/);
+  await expect.poll(() => pnl.innerText()).not.toBe(all);
+  const short = await pnl.innerText();
+  await page.reload();
+  await ready(page);
+  await expect.poll(() => pnl.innerText()).toBe(short);
+  await page.getByRole('button', { name: 'All time', exact: true }).click();
+  await page.getByRole('radio', { name: 'Last week' }).check();
+  await expect(page).toHaveURL(/range=last-week/);
+  await expect(
+    page.getByRole('heading', { name: 'Your plan, 9-15 Nov' }),
+  ).toBeVisible();
+});
+
+test('the account switcher writes the account filter (desktop)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop');
+  await page.goto('/app/dashboard');
+  await ready(page);
+  await page.getByRole('button', { name: /Sample workspace/ }).click();
+  await page
+    .getByRole('menuitemcheckbox', { name: 'Futures live', exact: true })
+    .click();
+  await expect(page).toHaveURL(/[?&]account=sample-futures(&|$)/);
+  await page.keyboard.press('Escape');
+  await expect(
+    page.getByRole('button', { name: /Sample workspace/ }),
+  ).toContainText('Futures live');
+});
+
+test('a rule opens its trades on Enter and closes on Escape with focus restored', async ({
+  page,
+}) => {
+  // Real animations: the component tests turn them off, so focus return is pinned here.
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/app/dashboard');
+  await ready(page);
+  const first = page
+    .getByRole('table', { name: 'Rules' })
+    .getByRole('button', { name: /Show the trades\.$/ })
+    .first();
+  // The page behind an open dialog is hidden from the accessibility tree: read the name first.
+  const name = (await first.getAttribute('aria-label'))!;
+  const [, kept, total] = /Kept (\d+) of (\d+)/.exec(name)!.map(Number) as [
+    unknown,
+    number,
+    number,
+  ];
+  await first.focus();
+  await page.keyboard.press('Enter');
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  const rows = dialog.getByRole('table', { name: 'Trades' }).getByRole('row');
+  // A header row, then one row per broken check.
+  await expect(rows).toHaveCount(total - kept + 1);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(first).toBeFocused();
+});
+
+test('Gross/Net relabels P&L', async ({ page }) => {
+  await page.goto('/app/dashboard');
+  await ready(page);
+  const pnl = page.getByTestId('kpi-pnl');
+  await expect(pnl).toContainText('Net P&L');
+  await page
+    .getByRole('radiogroup', { name: 'P&L basis' })
+    .locator('label', { hasText: 'Gross' })
+    .click();
+  await expect(pnl).toContainText('Gross P&L');
+  await page
+    .getByRole('radiogroup', { name: 'P&L basis' })
+    .locator('label', { hasText: 'Net' })
+    .click();
+  await expect(pnl).toContainText('Net P&L');
+});
+
+test('goals edit in place and keep the saved amount', async ({ page }) => {
+  await page.goto('/app/dashboard');
+  await ready(page);
+  const goals = page.getByRole('region', { name: 'Goals' });
+  await goals.getByRole('button', { name: 'Edit goals' }).click();
+  const weekly = goals.getByLabel('Weekly net goal');
+  await expect(weekly).toBeFocused();
+  await weekly.fill('750');
+  await goals.getByRole('button', { name: 'Save' }).click();
+  await expect(goals.getByRole('button', { name: 'Edit goals' })).toBeVisible();
+  await expect(goals).toContainText('$750.00');
+  await page.reload();
+  await ready(page);
+  await expect(page.getByRole('region', { name: 'Goals' })).toContainText(
+    '$750.00',
+  );
+});
+
+test('a filter that matches nothing and an empty workspace each show their own way out', async ({
+  page,
+}, info) => {
+  await page.goto('/app/dashboard?symbol=ZZZ');
+  // The empty state has the only "Clear filters" that is not in the top bar.
+  const empty = page
+    .getByRole('heading', { name: 'No trades match these filters.' })
+    .locator('..');
+  await expect(empty).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('button', { name: 'Clear filters' })).toHaveCount(
+    2,
+  );
+  await empty.getByRole('button', { name: 'Clear filters' }).click();
+  await expect(page).not.toHaveURL(/symbol=/);
+  await ready(page);
+
+  // An empty workspace is a different state, with Import and the sample as its ways out.
+  test.skip(info.project.name !== 'desktop');
+  await page.getByRole('button', { name: /Sample workspace/ }).click();
+  await page.getByRole('menuitemradio', { name: 'My workspace' }).click();
+  await page.keyboard.press('Escape');
+  const none = page
+    .getByRole('heading', { name: 'No trades in My workspace yet.' })
+    .locator('..');
+  await expect(none).toBeVisible();
+  await expect(none.getByRole('link', { name: 'Import' })).toHaveAttribute(
+    'href',
+    '/app/import',
+  );
+  await none.getByRole('button', { name: 'Open the sample workspace' }).click();
+  await ready(page);
+});
+
+test('no overflow at any width once loaded (desktop)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop');
+  for (const width of [390, 768, 1024, 1280, 1440, 1680]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/app/dashboard');
+    await ready(page);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth - innerWidth,
+      ),
+      `dashboard at ${width}`,
+    ).toBeLessThanOrEqual(0);
+  }
+});
