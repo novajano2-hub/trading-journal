@@ -51,3 +51,19 @@ export function applyTradePatch(trade: Trade, patch: TradePatch): Trade {
   result.tagIds = [...new Set(result.tagIds)];
   return result;
 }
+
+/** The patch that marks one rule kept or broken on `trade`; its other checks are untouched, and a rule with no check yet is appended. */
+export function withRuleCheck(
+  trade: Trade,
+  ruleId: string,
+  followed: boolean,
+): TradePatch {
+  const has = trade.ruleChecks.some((c) => c.ruleId === ruleId);
+  return {
+    ruleChecks: has
+      ? trade.ruleChecks.map((c) =>
+          c.ruleId === ruleId ? { ruleId, followed } : c,
+        )
+      : [...trade.ruleChecks, { ruleId, followed }],
+  };
+}
