@@ -4,7 +4,7 @@ import type { Cents, Goals, UserPrefs, Workspace } from '@/domain/types';
 
 /** What the sample workspace shows until the user edits its goals. */
 export const SAMPLE_GOALS: Required<Goals> = {
-  weeklyNet: 10000,
+  weeklyNet: 50000,
   dailyLossLimit: 60000,
 };
 

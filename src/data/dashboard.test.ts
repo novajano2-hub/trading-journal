@@ -198,13 +198,14 @@ test('a trade’s rules column', () => {
   expect(tradeRulesSummary(t([]), text).kind).toBe('ungraded');
 });
 
-test('the sample at its default view: weekly goal reached, loss limit kept this week', () => {
+test('the sample at its default view: weekly goal in progress, loss limit kept this week', () => {
   const ctx = defaultMetricContext(NY),
     d = buildDashboard(usd(ctx), { ...env(ctx), goals: SAMPLE_GOALS });
   const week = d.goals.weekly!;
   expect(week.window).toEqual({ from: '2026-11-16', to: '2026-11-20' });
-  expect(week.reached).toBe(true);
-  expect(week.net).toBeGreaterThanOrEqual(SAMPLE_GOALS.weeklyNet);
+  expect(week.reached).toBe(false);
+  expect(week.net).toBe(12919);
+  expect(week.fraction).toBeCloseTo(0.258, 3);
   const loss = d.goals.dailyLoss!;
   expect(loss.limit).toBe(SAMPLE_GOALS.dailyLossLimit);
   expect(
