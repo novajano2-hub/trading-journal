@@ -35,11 +35,16 @@ export function formatPct(ratio: number, digits = 0): string {
  * 0.1% and 99.9%.
  */
 export function formatAdherence(ratio: number): string {
-  const whole = formatPct(ratio, 0);
-  const atEdge = whole === formatPct(0, 0) || whole === formatPct(1, 0);
-  if (ratio <= 0 || ratio >= 1 || !atEdge) return whole;
+  if (adherenceDigits(ratio) === 0) return formatPct(ratio, 0);
   const tenths = Math.min(999, Math.max(1, Math.round(ratio * 1000)));
   return formatPct(tenths / 1000, 1);
+}
+
+/** The decimals `formatAdherence` shows: 1 where a whole percentage would read 0% or 100% short of it, else 0. */
+export function adherenceDigits(ratio: number): 0 | 1 {
+  if (ratio <= 0 || ratio >= 1) return 0;
+  const whole = formatPct(ratio, 0);
+  return whole === formatPct(0, 0) || whole === formatPct(1, 0) ? 1 : 0;
 }
 
 /** A plain ratio such as profit factor, to two decimals. */

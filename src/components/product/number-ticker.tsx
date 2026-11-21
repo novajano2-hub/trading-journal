@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { animate, useInView, useReducedMotion } from 'motion/react';
 import { EASING_POINTS } from '@/lib/motion';
 import {
+  adherenceDigits,
   formatAdherence,
   formatPct,
   formatPnl,
@@ -25,6 +26,29 @@ export function formatTicker(
   if (kind === 'pct') return formatPct(value, opts.digits ?? 1);
   if (kind === 'adherence') return formatAdherence(value);
   return formatRatio(value);
+}
+
+/**
+ * The counting copy's formatter for one run toward `value`. Each frame keeps
+ * the final string's format, so the count never switches mid-run: an
+ * adherence run takes its decimals from the final value once, and a
+ * one-decimal run stays between 0.1% and 99.9%, as its final figure does.
+ */
+export function tickerFrame(
+  kind: TickerKind,
+  value: number,
+  opts: { digits?: number; currency?: string } = {},
+): (shown: number) => string {
+  if (kind !== 'adherence') return (shown) => formatTicker(kind, shown, opts);
+  const final = formatAdherence(value);
+  const digits = adherenceDigits(value);
+  return (shown) =>
+    shown === value
+      ? final
+      : formatPct(
+          digits === 1 ? Math.min(0.999, Math.max(0.001, shown)) : shown,
+          digits,
+        );
 }
 
 const DURATION_S = 0.9;
@@ -64,6 +88,7 @@ export function NumberTicker({
   const shownRef = useRef(0);
   const fmt = { digits, currency };
   const final = formatTicker(kind, value, fmt);
+  const frame = tickerFrame(kind, value, fmt);
   const tone =
     kind === 'money' && Math.round(value) !== 0
       ? value > 0
@@ -100,7 +125,7 @@ export function NumberTicker({
       </noscript>
       <span className="sr-only">{final}</span>
       <span aria-hidden="true" className="ticker-count motion-reduce:hidden">
-        {formatTicker(kind, shown, fmt)}
+        {frame(shown)}
       </span>
       <span
         aria-hidden="true"

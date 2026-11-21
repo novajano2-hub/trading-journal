@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+  adherenceDigits,
   formatAdherence,
   formatMoney,
   formatPct,
@@ -34,6 +35,14 @@ describe('format', () => {
     expect(formatAdherence(0.0004)).toBe('0.1%');
     expect(formatAdherence(0.994)).toBe('99%');
     expect(formatAdherence(0.006)).toBe('1%');
+  });
+  test('adherenceDigits is 1 only where a whole percentage would claim an edge', () => {
+    expect([1, 0, 0.874, 0.994, 0.006].map(adherenceDigits)).toEqual([
+      0, 0, 0, 0, 0,
+    ]);
+    expect([199 / 200, 0.9996, 1 / 300, 0.0004].map(adherenceDigits)).toEqual([
+      1, 1, 1, 1,
+    ]);
   });
   test('formatRatio keeps two decimals', () => {
     expect(formatRatio(3.1722)).toBe('3.17');
