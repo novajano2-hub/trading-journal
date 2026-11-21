@@ -23,3 +23,13 @@ test('a click toggles the definition for touch', async () => {
   fireEvent.click(trigger);
   await waitFor(() => expect(screen.queryByRole('tooltip')).toBeNull());
 });
+
+test('with a mouse, hover opens the tip and a click does not flip it back open', async () => {
+  render(<MetricTip id="win-rate" basis="net" />);
+  const trigger = screen.getByRole('button', { name: 'Win rate' });
+  fireEvent.pointerMove(trigger, { pointerType: 'mouse' });
+  expect(await screen.findByRole('tooltip')).toBeTruthy();
+  fireEvent.pointerDown(trigger, { pointerType: 'mouse' });
+  fireEvent.click(trigger);
+  await waitFor(() => expect(screen.queryByRole('tooltip')).toBeNull());
+});
