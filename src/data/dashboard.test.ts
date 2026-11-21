@@ -1,0 +1,197 @@
+import { beforeAll, expect, test } from 'vitest';
+import { makeTrade } from '@/domain/__fixtures__/trades';
+import {
+  defaultMetricContext,
+  type MetricContext,
+} from '@/domain/metrics/context';
+import type { RuleCheck } from '@/domain/types';
+import {
+  buildDashboard,
+  pickPartition,
+  RECENT_TRADE_COUNT,
+  tradeRulesSummary,
+  type DashboardEnv,
+} from './dashboard';
+import { metricsByCurrency, type CurrencyMetrics } from './metrics';
+import {
+  generateSampleWorkspace,
+  SAMPLE_SEED,
+  type SampleWorkspace,
+} from './seed/generate';
+
+const NY = 'America/New_York';
+let s: SampleWorkspace;
+beforeAll(() => {
+  s = generateSampleWorkspace({ seed: SAMPLE_SEED, endDate: '2026-11-19' });
+}, 30_000);
+const usd = (ctx: MetricContext) =>
+  metricsByCurrency(s.trades, {
+    accounts: s.accounts,
+    ctx,
+    baseCurrency: 'USD',
+  })[0]!;
+const env = (ctx: MetricContext): DashboardEnv => ({
+  strategies: s.strategies,
+  tags: s.tags,
+  goals: { weeklyNet: 150000, dailyLossLimit: 50000 },
+  baseCurrency: 'USD',
+  ctx,
+  range: {},
+  today: '2026-11-20',
+});
+
+test('the dashboard is the engine, sorted by cost', () => {
+  const ctx = defaultMetricContext(NY),
+    m = usd(ctx),
+    d = buildDashboard(m, env(ctx));
+  expect(d.plan.adherence).toBe(m.summary.ruleAdherence);
+  const broken = d.plan.rules.filter((r) => r.broken > 0);
+  expect(broken.map((r) => r.brokenPnl)).toEqual(
+    broken.map((r) => r.brokenPnl).sort((a, b) => a - b),
+  );
+  expect(d.plan.rules.slice(broken.length).every((r) => r.broken === 0)).toBe(
+    true,
+  );
+  expect(d.recent).toHaveLength(RECENT_TRADE_COUNT);
+  expect(d.recent.every((r) => r.trade.status === 'closed')).toBe(true);
+  expect(d.recent[0]!.trade.closedAt! >= d.recent[1]!.trade.closedAt!).toBe(
+    true,
+  );
+  expect(d.performance.equity[0]).toBe(17_500_000);
+  expect(d.performance.equity).toHaveLength(m.summary.closedCount + 1);
+  expect(d.goals.unavailable).toBeNull();
+  expect(d.goals.weekly!.window).toEqual({
+    from: '2026-11-16',
+    to: '2026-11-20',
+  });
+  expect(d.goals.dailyLoss!.limit).toBe(50000);
+  expect(d.tradesById.size).toBe(m.trades.length);
+  expect(d.closedCount).toBe(m.summary.closedCount);
+});
+
+test('goals need the base currency, and are absent when unset', () => {
+  const ctx = defaultMetricContext(NY),
+    m = usd(ctx);
+  const other = buildDashboard(m, { ...env(ctx), baseCurrency: 'GBP' });
+  expect(other.goals.weekly).toBeNull();
+  expect(other.goals.dailyLoss).toBeNull();
+  expect(other.goals.unavailable).toMatch(/base currency/);
+  const unset = buildDashboard(m, { ...env(ctx), goals: {} });
+  expect(unset.goals).toEqual({
+    weekly: null,
+    dailyLoss: null,
+    unavailable: null,
+  });
+  const past = buildDashboard(m, {
+    ...env(ctx),
+    range: { from: '2026-11-25' },
+  });
+  expect(past.goals.weekly).toBeNull();
+});
+
+test('Gross/Net moves costs and performance, never goals (Review Focus 3)', () => {
+  const net = defaultMetricContext(NY),
+    gross = { ...net, pnlBasis: 'gross' as const };
+  const a = buildDashboard(usd(net), env(net)),
+    b = buildDashboard(usd(gross), env(gross));
+  expect(b.basis).toBe('gross');
+  expect(b.performance.pnl).toBe(usd(gross).summary.grossPnl);
+  expect(a.performance.pnl).toBe(usd(net).summary.netPnl);
+  expect(b.performance.pnl).toBeGreaterThan(a.performance.pnl);
+  expect(b.plan.cost.pnl).toBeGreaterThan(a.plan.cost.pnl);
+  expect(b.mistakes.reduce((n, x) => n + x.pnl, 0)).toBeGreaterThan(
+    a.mistakes.reduce((n, x) => n + x.pnl, 0),
+  );
+  expect(b.performance.equity.at(-1)).toBeGreaterThan(
+    a.performance.equity.at(-1)!,
+  );
+  expect(b.goals).toEqual(a.goals);
+});
+
+test('goals use net even when the dashboard is on gross', () => {
+  const t = (id: string, net: number, gross: number, closedAt: string) =>
+    makeTrade({ id, net, gross, closedAt });
+  const trades = [
+    t('a', -48000, -40000, '2026-11-17T15:00:00Z'),
+    t('b', 20000, 30000, '2026-11-18T15:00:00Z'),
+  ];
+  const mk = (pnlBasis: 'net' | 'gross') => {
+    const ctx = { ...defaultMetricContext(NY), pnlBasis };
+    const [m] = metricsByCurrency(trades, {
+      accounts: [],
+      ctx,
+      baseCurrency: 'USD',
+    });
+    return buildDashboard(m!, {
+      ...env(ctx),
+      goals: { weeklyNet: 100000, dailyLossLimit: 45000 },
+    });
+  };
+  const net = mk('net'),
+    gross = mk('gross');
+  expect(gross.goals.weekly!.net).toBe(-28000);
+  expect(gross.goals.dailyLoss!.brokenDays).toHaveLength(1);
+  expect(gross.goals).toEqual(net.goals);
+});
+
+test('dashboard metrics for the sample compute in under 50 ms (spec §10)', () => {
+  const ctx = defaultMetricContext(NY);
+  const run = () => buildDashboard(usd(ctx), env(ctx));
+  run();
+  const ms = Array.from({ length: 5 }, () => {
+    const t = performance.now();
+    run();
+    return performance.now() - t;
+  }).sort((x, y) => x - y);
+  expect(ms[2]!).toBeLessThan(50);
+});
+
+test('one currency at a time', () => {
+  const part = (currency: string, n: number) =>
+    ({ currency, summary: { closedCount: n } }) as CurrencyMetrics;
+  expect(
+    pickPartition([part('USD', 0), part('GBP', 3)], undefined, 'USD').currency,
+  ).toBe('GBP');
+  expect(
+    pickPartition([part('USD', 5), part('GBP', 3)], 'GBP', 'USD').currency,
+  ).toBe('GBP');
+  expect(
+    pickPartition([part('USD', 5), part('GBP', 3)], 'JPY', 'USD').currency,
+  ).toBe('USD');
+  expect(pickPartition([part('USD', 0)], undefined, 'USD').currency).toBe(
+    'USD',
+  );
+});
+
+test('a trade’s rules column', () => {
+  const text = new Map([
+    ['r1', 'Stop stays where it was placed'],
+    ['r2', 'Max 6 trades a day'],
+  ]);
+  const t = (checks: RuleCheck[]) => makeTrade({ net: 0, ruleChecks: checks });
+  expect(
+    tradeRulesSummary(
+      t([
+        { ruleId: 'r1', followed: true },
+        { ruleId: 'r2', followed: true },
+        { ruleId: 'r3', followed: null },
+      ]),
+      text,
+    ),
+  ).toEqual({ kind: 'kept', kept: 2, checked: 2, broken: [] });
+  expect(
+    tradeRulesSummary(
+      t([
+        { ruleId: 'r1', followed: false },
+        { ruleId: 'r2', followed: true },
+      ]),
+      text,
+    ),
+  ).toEqual({
+    kind: 'broke',
+    kept: 1,
+    checked: 2,
+    broken: ['Stop stays where it was placed'],
+  });
+  expect(tradeRulesSummary(t([]), text).kind).toBe('ungraded');
+});
