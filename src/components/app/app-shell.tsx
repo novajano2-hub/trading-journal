@@ -23,12 +23,12 @@ const FILTERS_FALLBACK = (
   />
 );
 
-/** The search before the URL is read: its resting 36px icon, inert, holding the bar's place. */
+/** The search before the URL is read: its resting icon (36px, 40px on a phone), inert, holding the bar's place. */
 function SearchFallback(): React.JSX.Element {
   return (
     <span
       aria-hidden="true"
-      className="inline-flex size-9 flex-none items-center justify-center rounded-control border border-line bg-sunken text-muted pointer-coarse:size-11"
+      className="inline-flex size-9 flex-none items-center justify-center rounded-control border border-line bg-sunken text-muted pointer-coarse:size-11 max-sm:size-10 max-sm:pointer-coarse:size-11"
     >
       <MagnifyingGlass size={18} />
     </span>

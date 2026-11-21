@@ -15,30 +15,22 @@ import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { pageTitle } from './nav';
 
 /**
- * Where the chips sit from `sm` up: beside the title, or on a row of their
- * own. `unknown` is the prerendered guess, until the bar is measured: beside
- * the title from `xl`, where chips at rest fit.
+ * Where the chips sit from `sm` up: beside the title, or with the controls on
+ * a row under it. `unknown` is the prerendered guess, until the bar is
+ * measured: beside the title from `xl`, where chips at rest fit.
  */
 type ChipsFit = 'unknown' | 'inline' | 'wrapped';
 
-const FIT: Record<
-  'bar' | 'title' | 'chips' | 'breaker',
-  Record<ChipsFit, string>
-> = {
+const FIT: Record<'bar' | 'title' | 'breaker', Record<ChipsFit, string>> = {
   bar: {
-    unknown: 'sm:flex-wrap xl:flex-nowrap',
+    unknown: 'sm:flex-wrap sm:pb-3 xl:flex-nowrap xl:pb-0',
     inline: 'sm:flex-nowrap',
-    wrapped: 'sm:flex-wrap',
+    wrapped: 'sm:flex-wrap sm:pb-3',
   },
   title: {
-    unknown: 'sm:flex-1 xl:mr-2 xl:flex-none',
+    unknown: 'sm:h-12 xl:mr-2 xl:h-14 xl:flex-none',
     inline: 'sm:mr-2 sm:flex-none',
-    wrapped: 'sm:flex-1',
-  },
-  chips: {
-    unknown: 'sm:order-7 sm:pb-3 xl:order-1 xl:pb-0',
-    inline: 'sm:order-1',
-    wrapped: 'sm:order-7 sm:pb-3',
+    wrapped: 'sm:h-12',
   },
   breaker: {
     unknown: 'sm:block xl:hidden',
@@ -104,14 +96,16 @@ function useChipsFit({
 }
 
 /**
- * The bar over every app page: the page title, the filter chips, then
- * search, the sample label, Gross/Net, Import and the theme.
+ * The bar over every app page. Its source order is its reading order at every
+ * width, so Tab follows what the eye does: the menu (below `lg`), the page
+ * title, the filter chips, then search, the sample label, Gross/Net, Import
+ * and the theme. Nothing is reordered by CSS.
  * - From `sm` up it is one sticky bar, 56px while the chips fit beside the
- *   title. Where they don't, measured, they take a row of their own, and
- *   where even that row is too short they scroll sideways.
- * - Below `lg` the drawer trigger (`menu`) leads the bar.
- * - Below `sm` the first row (menu, title, search, Import, theme) holds still
- *   at the top; the sample label, Gross/Net and the chips scroll away under it.
+ *   title. Where they don't, measured, the title keeps the first row and the
+ *   chips lead a second one, the controls after them; where even that row is
+ *   too short the chips scroll sideways.
+ * - Below `sm` the first row (menu and title) holds still at the top; the
+ *   chips, then search and the controls, scroll away under it.
  */
 export function TopBar({
   menu,
@@ -150,50 +144,51 @@ export function TopBar({
             {pageTitle(pathname)}
           </span>
         </h1>
-        <div
-          ref={tail}
-          className="flex flex-none items-center sm:order-2 sm:ml-auto"
-        >
-          {search}
-        </div>
-        {/* Import's own page needs no link to itself. */}
-        {pathname === '/app/import' ? null : (
-          <Link
-            href="/app/import"
-            aria-label="Import"
-            className={`${buttonClasses('primary', 'sm')} flex-none pointer-coarse:h-11 max-sm:w-[38px] max-sm:px-0 max-sm:pointer-coarse:w-11 sm:order-4`}
-          >
-            <UploadSimple size={18} aria-hidden="true" className="sm:hidden" />
-            <span className="max-sm:hidden">Import</span>
-          </Link>
-        )}
-        <ThemeToggle className="flex-none sm:order-5" />
       </div>
-      {label || basis ? (
-        <div
-          ref={controls}
-          className="flex items-center gap-2 max-sm:pt-2.5 max-sm:pb-2 sm:order-3 sm:flex-none"
-        >
-          {label}
-          <div className="flex max-sm:ml-auto">{basis}</div>
-        </div>
-      ) : null}
       {filters ? (
         <>
-          {/* A line break before chips on their own row. */}
+          {/* Ends the title's row when the chips lead the next. */}
           <div
             aria-hidden="true"
-            className={`hidden basis-full sm:order-6 ${FIT.breaker[fit]}`}
+            className={`hidden basis-full ${FIT.breaker[fit]}`}
           />
-          {/* The chips scroll inside their own group; this only places it. */}
+          {/* As wide as the chips need, up to the room left; they scroll inside their own group. */}
           <div
             ref={chips}
-            className={`flex min-w-0 flex-initial items-center max-sm:pb-3 ${FIT.chips[fit]}`}
+            className="flex max-w-max min-w-0 grow basis-0 items-center max-sm:pt-3"
           >
             {filters}
           </div>
         </>
       ) : null}
+      {/* Below sm the last row; from sm its items join the bar's, at its end. */}
+      <div className="flex items-center gap-2 max-sm:pt-2.5 max-sm:pb-3 sm:contents">
+        {/* Search starts the controls: at the bar's end from sm, the row's start below. */}
+        <div
+          ref={tail}
+          className="flex flex-none items-center max-sm:mr-auto sm:ml-auto"
+        >
+          {search}
+        </div>
+        {label || basis ? (
+          <div ref={controls} className="flex flex-none items-center gap-2">
+            {label}
+            <div className="flex">{basis}</div>
+          </div>
+        ) : null}
+        {/* Import's own page needs no link to itself. */}
+        {pathname === '/app/import' ? null : (
+          <Link
+            href="/app/import"
+            aria-label="Import"
+            className={`${buttonClasses('primary', 'sm')} flex-none pointer-coarse:h-11 max-sm:w-[38px] max-sm:px-0 max-sm:pointer-coarse:w-11`}
+          >
+            <UploadSimple size={18} aria-hidden="true" className="sm:hidden" />
+            <span className="max-sm:hidden">Import</span>
+          </Link>
+        )}
+        <ThemeToggle className="flex-none" />
+      </div>
     </header>
   );
 }

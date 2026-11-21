@@ -80,3 +80,51 @@ test('below sm the chips always have their own row, under the pinned first row',
     screen.getByRole('heading', { level: 1 }).parentElement!.className,
   ).toContain('max-sm:fixed');
 });
+
+test('the source reads as the bar does: menu, title, chips, search, label, Gross/Net, Import, theme; none reordered by CSS', () => {
+  layOut({ titleWidth: 115, chipsWidth: 100 });
+  render(
+    <TopBar
+      menu={<button data-testid="menu">Menu</button>}
+      filters={<div data-testid="chips" />}
+      search={<button data-testid="search">Search</button>}
+      label={<span data-testid="label" />}
+      basis={<div data-testid="basis" />}
+    />,
+  );
+  const bar = screen.getByRole('banner');
+  const order = [
+    ...bar.querySelectorAll('[data-testid], h1, a, button:not([data-testid])'),
+  ].map((el) =>
+    el instanceof HTMLElement && el.dataset.testid
+      ? el.dataset.testid
+      : el.tagName === 'H1'
+        ? 'title'
+        : (el.getAttribute('aria-label') ?? el.textContent),
+  );
+  expect(order).toEqual([
+    'menu',
+    'title',
+    'chips',
+    'search',
+    'label',
+    'basis',
+    'Import',
+    'Switch to dark theme',
+  ]);
+  expect(bar.innerHTML).not.toMatch(/\border-/);
+});
+
+test('below sm the pinned row holds only the menu and the title', () => {
+  render(
+    <TopBar
+      menu={<button data-testid="menu">Menu</button>}
+      filters={<div data-testid="chips" />}
+      search={<button data-testid="search">Search</button>}
+    />,
+  );
+  const pinned = screen.getByRole('heading', { level: 1 }).parentElement!;
+  expect(pinned.className).toContain('max-sm:fixed');
+  expect(pinned.children).toHaveLength(2);
+  expect(pinned.firstElementChild).toBe(screen.getByTestId('menu'));
+});

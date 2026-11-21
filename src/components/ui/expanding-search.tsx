@@ -15,12 +15,13 @@ export interface SearchOption {
 }
 
 /**
- * Wide enough for the longest option, and never past the bar's left edge: on a
- * phone it stops short of the screen's, and from `sm` to `md` (where the
- * field sits furthest left) it is capped so its ring keeps a gutter.
+ * Wide enough for the longest option, and never past the bar's edges. On a
+ * phone the field starts its row and grows right across all of it, inside
+ * the gutters; from `sm` it ends the bar and grows left, capped from `sm` to
+ * `md` (where it sits furthest left) so its ring keeps a gutter.
  */
 const EXPANDED =
-  'data-[open=true]:w-[min(280px,calc(100vw-8.5rem))] sm:max-md:data-[open=true]:w-[248px]';
+  'data-[open=true]:w-[280px] max-sm:data-[open=true]:w-[calc(100vw-2.5rem)] sm:max-md:data-[open=true]:w-[248px]';
 
 /**
  * The search field and its results. At rest only the magnifier shows; it
@@ -85,16 +86,17 @@ export function ExpandingSearch({
   }
 
   return (
-    <div className="relative h-9 w-9 flex-none pointer-coarse:h-11 pointer-coarse:w-11">
+    // 36px at rest; 40px on a phone, level with the controls it opens over.
+    <div className="relative h-9 w-9 flex-none pointer-coarse:h-11 pointer-coarse:w-11 max-sm:h-10 max-sm:w-10 max-sm:pointer-coarse:h-11 max-sm:pointer-coarse:w-11">
       <div
         data-open={focused}
-        className={`absolute top-0 right-0 z-10 w-full transition-[width] duration-[var(--dur-glide)] ease-[var(--ease-glide)] motion-reduce:transition-none ${EXPANDED}`}
+        className={`absolute top-0 left-0 z-10 w-full sm:right-0 sm:left-auto transition-[width] duration-[var(--dur-glide)] ease-[var(--ease-glide)] motion-reduce:transition-none ${EXPANDED}`}
       >
-        <div className="relative h-9 overflow-hidden rounded-control border border-line bg-sunken transition-colors hover:border-line-2 focus-within:outline-2 focus-within:outline-offset-3 focus-within:outline-accent pointer-coarse:h-11">
+        <div className="relative h-9 overflow-hidden rounded-control border border-line bg-sunken transition-colors hover:border-line-2 focus-within:outline-2 focus-within:outline-offset-3 focus-within:outline-accent pointer-coarse:h-11 max-sm:h-10 max-sm:pointer-coarse:h-11">
           <MagnifyingGlass
             size={18}
             aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 left-[8px] -translate-y-1/2 text-muted pointer-coarse:left-[12px]"
+            className="pointer-events-none absolute top-1/2 left-[8px] -translate-y-1/2 text-muted pointer-coarse:left-[12px] max-sm:left-[10px] max-sm:pointer-coarse:left-[12px]"
           />
           <input
             ref={inputRef}
