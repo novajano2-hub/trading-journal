@@ -15,16 +15,20 @@ export function goalsFor(prefs: UserPrefs, workspace: Workspace): Goals {
   );
 }
 
-/** The `PrefsRepo.update` patch for one workspace's goals; keeps the other workspaces' goals from `prefs`. */
+/**
+ * The `PrefsRepo.update` patch for one workspace's goals. It names only that
+ * workspace; the repository merges per workspace inside its transaction, so
+ * stale cached prefs can't overwrite the others. `{}` clears the workspace.
+ */
 export function withGoals(
-  prefs: UserPrefs,
+  _prefs: UserPrefs,
   workspaceId: string,
   goals: Goals,
 ): Pick<UserPrefs, 'goals'> {
   const clean = Object.fromEntries(
     Object.entries(goals).filter(([, v]) => v !== undefined),
   ) as Goals;
-  return { goals: { ...prefs.goals, [workspaceId]: clean } };
+  return { goals: { [workspaceId]: clean } };
 }
 
 export type GoalAmount =

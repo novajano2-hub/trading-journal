@@ -18,10 +18,12 @@ export function localPrefs(ctx: LocalContext): PrefsRepo {
       const db = await ctx.db();
       let stored: Partial<UserPrefs> = {};
       await db.transaction('rw', db.meta, async () => {
-        stored = {
-          ...asPartial((await db.meta.get(META.prefs))?.value),
-          ...changes,
-        };
+        const current = asPartial((await db.meta.get(META.prefs))?.value);
+        stored = { ...current, ...changes };
+        // Goals merge per workspace, so a stale caller can't clobber other workspaces' goals.
+        if (changes.goals)
+          stored.goals = { ...current.goals, ...changes.goals };
+        validate({ goals: stored.goals });
         await db.meta.put({ key: META.prefs, value: stored });
       });
       return withDefaults(stored);
@@ -38,12 +40,15 @@ function validate(p: Partial<UserPrefs>): void {
     throw new RangeError(
       `Breakeven range must run low to high, got ${range.from} to ${range.to}`,
     );
-  for (const [id, g] of Object.entries(p.goals ?? {}))
+  for (const [id, g] of Object.entries(p.goals ?? {})) {
+    if (typeof g !== 'object' || g === null)
+      throw new RangeError(`Goals for workspace "${id}" must be an object`);
     for (const [field, cents] of Object.entries(g))
       if (cents !== undefined && !(Number.isSafeInteger(cents) && cents > 0))
         throw new RangeError(
           `Goal ${field} for workspace "${id}" must be a positive whole number of cents, got ${cents}`,
         );
+  }
 }
 
 const asPartial = (value: unknown): Partial<UserPrefs> =>

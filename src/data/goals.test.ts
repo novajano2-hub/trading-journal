@@ -20,7 +20,7 @@ test('sample goals until edited; none for My workspace', () => {
   expect(goalsFor(edited, USER_WORKSPACE)).toEqual({});
 });
 
-test('withGoals keeps other workspaces and drops undefined fields', () => {
+test('withGoals names only the edited workspace and drops undefined fields', () => {
   const prefs = {
     ...defaultPrefs(),
     goals: { mine: { weeklyNet: 150000, dailyLossLimit: 20000 } },
@@ -29,14 +29,8 @@ test('withGoals keeps other workspaces and drops undefined fields', () => {
     weeklyNet: 100000,
     dailyLossLimit: undefined,
   });
-  expect(patch).toEqual({
-    goals: {
-      mine: { weeklyNet: 150000, dailyLossLimit: 20000 },
-      sample: { weeklyNet: 100000 },
-    },
-  });
+  expect(patch).toEqual({ goals: { sample: { weeklyNet: 100000 } } });
   expect(Object.keys(patch.goals?.sample ?? {})).toEqual(['weeklyNet']);
-  expect(Object.keys(patch)).toEqual(['goals']);
 });
 
 test('goal amounts parse to cents', () => {
