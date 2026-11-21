@@ -1,4 +1,5 @@
 import { beforeAll, expect, test } from 'vitest';
+import { SAMPLE_GOALS } from './goals';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import {
   defaultMetricContext,
@@ -161,6 +162,7 @@ test('one currency at a time', () => {
   expect(pickPartition([part('USD', 0)], undefined, 'USD').currency).toBe(
     'USD',
   );
+  expect(() => pickPartition([], undefined, 'USD')).toThrow(RangeError);
 });
 
 test('a trade’s rules column', () => {
@@ -194,4 +196,59 @@ test('a trade’s rules column', () => {
     broken: ['Stop stays where it was placed'],
   });
   expect(tradeRulesSummary(t([]), text).kind).toBe('ungraded');
+});
+
+test('the sample at its default view: weekly goal reached, loss limit kept this week', () => {
+  const ctx = defaultMetricContext(NY),
+    d = buildDashboard(usd(ctx), { ...env(ctx), goals: SAMPLE_GOALS });
+  const week = d.goals.weekly!;
+  expect(week.window).toEqual({ from: '2026-11-16', to: '2026-11-20' });
+  expect(week.reached).toBe(true);
+  expect(week.net).toBeGreaterThanOrEqual(SAMPLE_GOALS.weeklyNet);
+  const loss = d.goals.dailyLoss!;
+  expect(loss.limit).toBe(SAMPLE_GOALS.dailyLossLimit);
+  expect(
+    loss.brokenDays.filter(
+      (x) => x.date >= week.window.from && x.date <= week.window.to,
+    ),
+  ).toEqual([]);
+});
+
+test('imported trades with no strategy and no rule checks (Review Focus 1)', () => {
+  const ctx = defaultMetricContext(NY);
+  const trades = [
+    makeTrade({
+      id: 'a',
+      net: 12000,
+      gross: 12500,
+      closedAt: '2026-11-18T15:00:00Z',
+    }),
+    makeTrade({
+      id: 'b',
+      net: -4000,
+      gross: -3500,
+      closedAt: '2026-11-19T15:00:00Z',
+    }),
+  ];
+  const [m] = metricsByCurrency(trades, {
+    accounts: s.accounts,
+    ctx,
+    baseCurrency: 'USD',
+  });
+  const d = buildDashboard(m!, { ...env(ctx), strategies: [], tags: [] });
+  expect(d.plan.adherence).toBeNull();
+  expect(d.plan.checks).toBe(0);
+  expect(d.plan.rules).toEqual([]);
+  expect(d.plan.cost).toEqual({ pnl: 0, tradeCount: 0 });
+  expect(d.mistakes).toEqual([]);
+  expect(
+    d.recent.every(
+      (r) => r.rules.kind === 'ungraded' && r.strategyName === null,
+    ),
+  ).toBe(true);
+  const p = d.performance;
+  for (const n of [p.pnl, ...p.equity]) expect(Number.isFinite(n)).toBe(true);
+  for (const n of [p.winRate, p.profitFactor, p.expectancy])
+    if (n !== null) expect(Number.isFinite(n)).toBe(true);
+  expect(p.equity).toHaveLength(3);
 });

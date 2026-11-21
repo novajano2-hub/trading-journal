@@ -140,9 +140,10 @@ export function buildDashboard(
       unavailable: `Goals use your base currency (${env.baseCurrency}).`,
     };
   } else {
-    // m.days is already net when the switch is on net; only gross needs a second pass.
+    // m.days is already net when m was built on net; only gross needs a second pass.
+    // env.ctx must be the ctx that m was built with.
     const days =
-      env.ctx.pnlBasis === 'net'
+      summary.basis === 'net'
         ? m.days
         : dailyPnl(m.trades, { ...env.ctx, pnlBasis: 'net' });
     const window = goalWeek(env.range, env.today);
@@ -197,7 +198,7 @@ export function buildDashboard(
   };
 }
 
-/** One currency at a time: the chosen one if it exists, else the base currency if it has closed trades, else the first that has. */
+/** One currency at a time: the chosen one if it exists, else the base currency if it has closed trades, else the first that has. `metricsByCurrency` always yields the base partition, so an empty list is a caller bug and throws. */
 export function pickPartition(
   ms: readonly CurrencyMetrics[],
   chosen: string | undefined,
@@ -206,11 +207,12 @@ export function pickPartition(
   const named = (c: string | undefined) =>
     c === undefined ? undefined : ms.find((m) => m.currency === c);
   const has = (m: CurrencyMetrics) => m.summary.closedCount > 0;
-  return (
+  const pick =
     named(chosen) ??
     ms.find((m) => m.currency === base && has(m)) ??
     ms.find(has) ??
     named(base) ??
-    ms[0]!
-  );
+    ms[0];
+  if (!pick) throw new RangeError('pickPartition needs at least one partition');
+  return pick;
 }
