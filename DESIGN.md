@@ -427,7 +427,7 @@ The app restyles the shipped primitives for density and adds the pieces below. A
 
 #### Icon tiles and nav rows
 
-`IconTile`: 32px square, 6px radius, one 18px duotone glyph, decorative (`aria-hidden`). Duotone's second layer is the glyph's `[opacity]` path, which the tile recolours. Tones: `accent` (cobalt-soft fill, cobalt-ink glyph), `neutral` (sunken, muted), `faint` (sunken, faint, second layer 0), `gain` (gain-soft, gain), `loss` (loss-soft, loss). `bare` drops the fill. Used for the sidebar, the account switcher, state blocks and the plan preview.
+`IconTile`: 32px square, 6px radius, one 18px duotone glyph, decorative (`aria-hidden`). Duotone's second layer is the glyph's `[opacity]` path, which the tile recolours. Tones: `accent` (cobalt-soft fill, cobalt-ink glyph), `neutral` (sunken, muted), `faint` (sunken, faint, second layer 0). `bare` drops the fill. Used for the sidebar, the account switcher, state blocks and the plan preview.
 
 Sidebar rows are 40px (44px coarse), 6px radius on the row, 13.5px label, 10px gap, 4px padding. Three looks:
 

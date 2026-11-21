@@ -5,6 +5,7 @@ import {
   type GlobalFilters,
 } from '@/data/filters';
 import type { Account, Strategy, Tag } from '@/domain/types';
+import { plural } from '@/lib/format';
 
 /** The top bar's chips other than the date. Accounts live in the sidebar switcher. */
 export type ChipDimension = 'symbol' | 'side' | 'strategy' | 'tag';
@@ -24,10 +25,6 @@ export function toggleId(list: readonly string[], id: string): string[] {
   return [...ids].sort();
 }
 
-function plural(n: number, one: string, many: string): string {
-  return `${n} ${n === 1 ? one : many}`;
-}
-
 /** One name for a single id; a count for two or more. */
 function named(
   ids: readonly string[],
@@ -36,7 +33,7 @@ function named(
   many: string,
 ): string {
   const only = ids.length === 1 ? names.get(ids[0]!) : undefined;
-  return only ?? plural(ids.length, one, many);
+  return only ?? `${ids.length} ${plural(ids.length, one, many)}`;
 }
 
 /** A chip's text: its dimension's name while unset, else what it holds. */
@@ -55,7 +52,7 @@ export function chipLabel(
         text:
           f.symbols.length <= 2
             ? f.symbols.join(', ')
-            : plural(f.symbols.length, 'symbol', 'symbols'),
+            : `${f.symbols.length} ${plural(f.symbols.length, 'symbol')}`,
         active: true,
       };
     case 'side':

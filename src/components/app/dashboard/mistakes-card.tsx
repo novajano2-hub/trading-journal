@@ -5,18 +5,8 @@ import { Chip } from '@/components/ui/chip';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { MistakeCost } from '@/domain/metrics/mistakes';
 import type { PnlBasis } from '@/domain/types';
-import { formatPnl } from '@/lib/format';
-import { signTone } from './plan-card';
-
-/** "trade" for one, "trades" otherwise. */
-export function tradeNoun(n: number): string {
-  return n === 1 ? 'trade' : 'trades';
-}
-
-/** "1 trade", "2 trades". */
-export function tradeCount(n: number): string {
-  return `${n} ${tradeNoun(n)}`;
-}
+import { formatPnl, plural } from '@/lib/format';
+import { signTone } from './shared';
 
 /** Mistake, trades and cost: the header and every row share these columns. */
 const COLUMNS = 'grid grid-cols-[minmax(0,1fr)_4.5rem_6rem] items-center gap-2';
@@ -76,12 +66,13 @@ export function MistakesCard({
           <ul ref={listRef} tabIndex={-1} className="outline-none">
             {mistakes.map((m) => {
               const amount = formatPnl(m.pnl, currency);
+              const trades = `${m.tradeCount} ${plural(m.tradeCount, 'trade')}`;
               return (
                 // The divider stops at the content edge; the button's hover fill reaches 8px past it.
                 <li key={m.tagId} className="border-t border-line">
                   <button
                     type="button"
-                    aria-label={`${m.name}. ${tradeCount(m.tradeCount)}, ${amount}. Show the trades.`}
+                    aria-label={`${m.name}. ${trades}, ${amount}. Show the trades.`}
                     onClick={(e) => onOpenMistake(m.tagId, e.currentTarget)}
                     className={`${COLUMNS} -mx-2 h-10 w-[calc(100%+16px)] px-2 text-left transition-colors duration-120 outline-offset-[-2px] hover:bg-sunken focus-visible:bg-sunken focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11`}
                   >
@@ -91,7 +82,7 @@ export function MistakesCard({
                       </Chip>
                     </span>
                     <span className="text-right font-mono text-[12.5px] text-muted tabular-nums">
-                      {tradeCount(m.tradeCount)}
+                      {trades}
                     </span>
                     <span
                       className={`text-right font-mono text-[12.5px] tabular-nums ${signTone(m.pnl)}`}

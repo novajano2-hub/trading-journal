@@ -1,6 +1,6 @@
 import type { Icon } from '@phosphor-icons/react';
 
-export type TileTone = 'accent' | 'neutral' | 'faint' | 'gain' | 'loss';
+export type TileTone = 'accent' | 'neutral' | 'faint';
 
 /**
  * Duotone's second layer is the glyph's `[opacity]` path: this tints it
@@ -14,16 +14,12 @@ const GLYPH: Record<TileTone, string> = {
   neutral: `text-muted ${COBALT_FILL}`,
   // Outline only: a module that isn't live has nothing to fill.
   faint: 'text-faint [&_[opacity]]:opacity-0',
-  gain: 'text-gain',
-  loss: 'text-loss',
 };
 
 const FILL: Record<TileTone, string> = {
   accent: 'bg-accent-soft',
   neutral: 'bg-sunken',
   faint: 'bg-sunken',
-  gain: 'bg-gain-soft',
-  loss: 'bg-loss-soft',
 };
 
 /**

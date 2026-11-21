@@ -8,13 +8,9 @@ import { IconTile } from '@/components/ui/icon-tile';
 import { MetricTip } from '@/components/ui/metric-tip';
 import { RULES_SHOWN, type DashboardModel } from '@/data/dashboard';
 import type { RuleScore } from '@/domain/metrics/rules';
-import type { Cents, PnlBasis } from '@/domain/types';
+import type { PnlBasis } from '@/domain/types';
 import { formatAdherence, formatPnl, keepHyphens } from '@/lib/format';
-
-/** Gain or loss text for signed money; zero stays uncoloured. */
-export function signTone(cents: Cents): string {
-  return cents < 0 ? 'text-loss' : cents > 0 ? 'text-gain' : '';
-}
+import { signTone } from './shared';
 
 function Track({
   value,

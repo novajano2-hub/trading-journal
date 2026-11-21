@@ -10,6 +10,7 @@ import {
   formatPnlWhole,
   formatRatio,
   keepHyphens,
+  plural,
 } from './format';
 
 describe('format', () => {
@@ -134,5 +135,13 @@ describe('format', () => {
     );
     // A hyphen with a space on either side is not inside a word.
     expect(keepHyphens('Risk - reward')).toBe('Risk - reward');
+  });
+
+  test('plural names one of a thing, or many', () => {
+    expect(plural(1, 'trade')).toBe('trade');
+    expect(plural(0, 'trade')).toBe('trades');
+    expect(plural(2, 'day')).toBe('days');
+    expect(plural(1, 'strategy', 'strategies')).toBe('strategy');
+    expect(plural(3, 'strategy', 'strategies')).toBe('strategies');
   });
 });

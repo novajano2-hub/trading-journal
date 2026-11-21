@@ -10,12 +10,10 @@ import { useUpdateTrade } from '@/data/query/hooks';
 import { withRuleCheck } from '@/data/trade-patch';
 import { pnlOf } from '@/domain/metrics/context';
 import type { Cents, Strategy, Tag, Trade } from '@/domain/types';
-import { formatPnl, keepHyphens } from '@/lib/format';
+import { formatPnl, keepHyphens, plural } from '@/lib/format';
 import { shortTime } from '@/lib/time-format';
 import type { DrillTarget } from './dashboard-view';
-import { tradeNoun } from './mistakes-card';
-import { signTone } from './plan-card';
-import { InstrumentName } from './recent-trades';
+import { InstrumentName, signTone } from './shared';
 
 function Money({ cents, currency }: { cents: Cents; currency: string }) {
   return (
@@ -28,7 +26,7 @@ function Money({ cents, currency }: { cents: Cents; currency: string }) {
 function Count({ n }: { n: number }) {
   return (
     <>
-      <span className="font-mono tabular-nums">{n}</span> {tradeNoun(n)}
+      <span className="font-mono tabular-nums">{n}</span> {plural(n, 'trade')}
     </>
   );
 }

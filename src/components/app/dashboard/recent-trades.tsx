@@ -5,10 +5,10 @@ import { XCircle } from '@phosphor-icons/react/dist/ssr';
 import { Chip, SideChip } from '@/components/ui/chip';
 import type { RecentTrade, TradeRulesSummary } from '@/data/dashboard';
 import { pnlOf } from '@/domain/metrics/context';
-import type { PnlBasis, Trade } from '@/domain/types';
-import { formatInstrument, formatPnl, keepHyphens } from '@/lib/format';
+import type { PnlBasis } from '@/domain/types';
+import { formatPnl, keepHyphens, plural } from '@/lib/format';
 import { shortTime } from '@/lib/time-format';
-import { signTone } from './plan-card';
+import { InstrumentName, signTone } from './shared';
 
 const MONO = 'font-mono text-[12.5px] tabular-nums';
 const TH = 'h-5 pb-1.5 align-bottom text-left text-xs font-normal text-faint';
@@ -43,7 +43,7 @@ function RulesCell({ rules }: { rules: TradeRulesSummary }): React.JSX.Element {
   // Rule texts can be missing when a check points at a deleted rule.
   const spoken =
     first === undefined
-      ? `Broke ${brokenCount} ${brokenCount === 1 ? 'rule' : 'rules'}`
+      ? `Broke ${brokenCount} ${plural(brokenCount, 'rule')}`
       : `Broke: ${listOf(rules.broken)}`;
   // From xl one line: icon, rule, then the chip right after it. Below xl the
   // rule keeps the cell's width and the chip sits under its first word.
@@ -70,40 +70,6 @@ function RulesCell({ rules }: { rules: TradeRulesSummary }): React.JSX.Element {
         </span>
       ) : null}
       <span className="sr-only">{spoken}</span>
-    </span>
-  );
-}
-
-/**
- * The instrument in words, "TSLA 370 Put" with its expiry faint beside it, or
- * "ES Dec 26". The title keeps the symbol as traded. Where a table folds the
- * trade's time under the symbol, `detailClassName` hides the expiry, so the
- * two dates never stack.
- */
-export function InstrumentName({
-  trade,
-  className = '',
-  detailClassName = '',
-}: {
-  trade: Trade;
-  className?: string;
-  detailClassName?: string;
-}): React.JSX.Element {
-  const { name, detail } = formatInstrument(trade.instrument, trade.openedAt);
-  return (
-    <span
-      title={trade.instrument.symbol}
-      className={`flex min-w-0 flex-wrap items-baseline gap-x-1.5 ${className}`}
-    >
-      <span className="whitespace-nowrap">{name}</span>
-      {detail !== undefined ? (
-        <span
-          className={`min-w-0 truncate text-xs text-faint ${detailClassName}`}
-        >
-          <span className="sr-only">expires </span>
-          {detail}
-        </span>
-      ) : null}
     </span>
   );
 }

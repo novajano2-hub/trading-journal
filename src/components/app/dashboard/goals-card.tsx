@@ -10,10 +10,10 @@ import type {
   WeeklyGoalProgress,
 } from '@/domain/metrics/goals';
 import type { Cents, Goals } from '@/domain/types';
-import { formatMoney, formatPnl } from '@/lib/format';
+import { formatMoney, formatPnl, plural } from '@/lib/format';
 import { onTradingDate } from '@/lib/time-format';
 import { GoalsForm } from './goals-form';
-import { signTone } from './plan-card';
+import { signTone } from './shared';
 
 /** Figures never break, so a minus sign can't end up on the line before its amount. */
 const MONO = 'font-mono text-[12.5px] whitespace-nowrap tabular-nums';
@@ -22,9 +22,6 @@ const MONO = 'font-mono text-[12.5px] whitespace-nowrap tabular-nums';
 function Num({ children }: { children: React.ReactNode }) {
   return <span className="font-mono tabular-nums">{children}</span>;
 }
-
-/** "day" for one, "days" otherwise. */
-const dayNoun = (n: number) => (n === 1 ? 'day' : 'days');
 
 /** 'Thu 19 Nov' for a local trading date. */
 const dayLabel = (date: string) =>
@@ -143,7 +140,8 @@ function DailyLossRow({
     );
     sentence = (
       <>
-        Kept <Num>{kept}</Num> of <Num>{days}</Num> {dayNoun(days)}, {period}.{' '}
+        Kept <Num>{kept}</Num> of <Num>{days}</Num> {plural(days, 'day')},{' '}
+        {period}.{' '}
         {brokenDays.length === 1 ? (
           <>Broken {at}.</>
         ) : (
@@ -164,7 +162,7 @@ function DailyLossRow({
           currency={currency}
         />
         <span className={`flex-none text-faint ${MONO}`}>
-          {kept} of {days} {dayNoun(days)}
+          {kept} of {days} {plural(days, 'day')}
         </span>
       </div>
       <GoalTrack value={days > 0 ? kept / days : 0} tone="accent" />

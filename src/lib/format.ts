@@ -156,3 +156,8 @@ function twoDigitYear(digits: string, tradeYear: number): string {
 export function keepHyphens(text: string): string {
   return text.replace(/(?<=[\p{L}\p{N}])-(?=[\p{L}\p{N}])/gu, '\u2011');
 }
+
+/** The noun for `n` of a thing: `one` for exactly one, else `many` ("trade", "trades"). */
+export function plural(n: number, one: string, many = `${one}s`): string {
+  return n === 1 ? one : many;
+}
