@@ -1,9 +1,9 @@
-import Link from 'next/link';
 import { ArrowLeft } from '@phosphor-icons/react/dist/ssr';
 import { IconTile } from '@/components/ui/icon-tile';
+import { DashboardLink } from './dashboard-link';
 import { navItem, type AppModuleId } from './nav';
 
-/** A module's page until it is built: what it will do, and the way back. No figures. */
+/** A module's page until it is built: what it will do, and the way back, filters kept. No figures. */
 export function ModulePlaceholder({
   module,
 }: {
@@ -25,13 +25,10 @@ export function ModulePlaceholder({
           {item.reason}
         </p>
       ) : null}
-      <Link
-        href="/app/dashboard"
-        className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-control px-2 text-[15px] font-medium text-accent-ink no-underline hover:underline"
-      >
+      <DashboardLink className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-control px-2 text-[15px] font-medium text-accent-ink no-underline hover:underline">
         <ArrowLeft aria-hidden="true" size={16} />
         Back to the Dashboard
-      </Link>
+      </DashboardLink>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { Suspense, useId, type ReactNode } from 'react';
 import { BrandMark } from '@/components/site/brand-mark';
 import { IconTile } from '@/components/ui/icon-tile';
+import { WithDashboardHref } from './dashboard-link';
 import { APP_NAV, activeItem, navHref, type NavItem } from './nav';
 
 const NO_PARAMS = new URLSearchParams();
@@ -170,10 +171,15 @@ export function Sidebar({
 }): React.JSX.Element {
   return (
     <div className="sticky top-0 hidden h-dvh w-[220px] flex-none flex-col overflow-y-auto border-r border-line bg-surface-1 px-3 py-4 lg:flex">
-      <BrandMark
-        href="/app/dashboard"
-        className="mb-3 h-10 self-start rounded-control px-2 pointer-coarse:h-11"
-      />
+      {/* The wordmark goes to the Dashboard, filters kept. */}
+      <WithDashboardHref>
+        {(href) => (
+          <BrandMark
+            href={href}
+            className="mb-3 h-10 self-start rounded-control px-2 pointer-coarse:h-11"
+          />
+        )}
+      </WithDashboardHref>
       <SwitcherSlot switcher={switcher} />
       <CurrentSidebarNav />
     </div>

@@ -1,10 +1,19 @@
 // @vitest-environment happy-dom
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
+import { commitNavigation } from './__fixtures__/navigation';
 import { ModulePlaceholder } from './module-placeholder';
-import { SidebarNav } from './sidebar';
+import { Sidebar, SidebarNav } from './sidebar';
+
+vi.mock('next/navigation', () => import('./__fixtures__/navigation'));
 
 afterEach(cleanup);
+
+/** On a page whose URL carries filters and a param of its own. */
+function at(url: string): void {
+  window.history.replaceState(null, '', url);
+  commitNavigation();
+}
 
 test('the active module is marked and filter-scoped links keep the filters', () => {
   render(
@@ -57,4 +66,22 @@ test('a placeholder says the module is not built, with no figures', () => {
   expect(text).toContain("Trades isn't built yet.");
   expect(text).not.toContain('$');
   expect(text).not.toMatch(/\d/);
+});
+
+test('the wordmark goes to the Dashboard with the filters', () => {
+  at('/app/trades?side=short&by=pnl');
+  render(<Sidebar />);
+  expect(screen.getByRole('link', { name: 'Keel' }).getAttribute('href')).toBe(
+    '/app/dashboard?side=short',
+  );
+});
+
+test("a placeholder's way back keeps the filters", () => {
+  at('/app/calendar?range=last-week&symbol=ES');
+  render(<ModulePlaceholder module="calendar" />);
+  expect(
+    screen
+      .getByRole('link', { name: 'Back to the Dashboard' })
+      .getAttribute('href'),
+  ).toBe('/app/dashboard?range=last-week&symbol=ES');
 });

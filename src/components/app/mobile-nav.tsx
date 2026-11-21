@@ -8,6 +8,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { BrandMark } from '@/components/site/brand-mark';
 import { useActiveWorkspace } from '@/data/query/hooks';
 import { enter, exit } from '@/lib/motion';
+import { WithDashboardHref } from './dashboard-link';
 import { CurrentSidebarNav, SwitcherSlot } from './sidebar';
 
 const ICON_BUTTON =
@@ -83,13 +84,17 @@ export function MobileNav({
                 exit={{ ...slide.gone, transition: exit }}
               >
                 <Dialog.Title className="sr-only">Navigation</Dialog.Title>
-                {/* Both controls here leave the sheet: the wordmark goes to the Dashboard. */}
+                {/* Both controls here leave the sheet: the wordmark goes to the Dashboard, filters kept. */}
                 <div className="mb-2 flex items-center justify-between">
-                  <BrandMark
-                    href="/app/dashboard"
-                    onClick={close}
-                    className="h-11 rounded-control px-2"
-                  />
+                  <WithDashboardHref>
+                    {(href) => (
+                      <BrandMark
+                        href={href}
+                        onClick={close}
+                        className="h-11 rounded-control px-2"
+                      />
+                    )}
+                  </WithDashboardHref>
                   <Dialog.Close
                     aria-label="Close navigation"
                     className={`${ICON_BUTTON} -mr-1`}

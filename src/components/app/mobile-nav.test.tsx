@@ -48,3 +48,12 @@ test('the drawer stays open while the workspace first loads', async () => {
   await within(sheet).findByRole('button', { name: /Sample workspace/ });
   expect(screen.getByRole('dialog', { name: 'Navigation' })).toBe(sheet);
 });
+
+test("the drawer's wordmark goes to the Dashboard with the filters", async () => {
+  renderApp(<MobileNav />, { url: '/app/reports?side=long&by=day' });
+  fireEvent.click(screen.getByRole('button', { name: 'Open navigation' }));
+  const sheet = await screen.findByRole('dialog', { name: 'Navigation' });
+  expect(
+    within(sheet).getByRole('link', { name: 'Keel' }).getAttribute('href'),
+  ).toBe('/app/dashboard?side=long');
+});
