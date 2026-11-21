@@ -1,11 +1,11 @@
 'use client';
 
 // Technique adapted from HorizonX Task Checkbox, commercial licence: the check
-// that draws itself, the fill that grows with a small overshoot (240ms,
-// cubic-bezier(.68,-.275,.265,1.275)) and the ripple, here a soft disc that
-// grows and fades, on checking. Rebuilt
-// as a native checkbox inside its label in Keel tokens; the strike-through,
-// gradient fill, drop shadow and foreign palette are dropped.
+// that draws itself, the fill that grows (240ms, kept) and the ripple, here a
+// soft disc that grows and fades, on checking. The fill eases on Keel's glide
+// curve: the original's overshoot is dropped. Rebuilt as a native checkbox
+// inside its label in Keel tokens; the strike-through, gradient fill, drop
+// shadow and foreign palette are dropped.
 import { useState, type ReactNode } from 'react';
 
 /**

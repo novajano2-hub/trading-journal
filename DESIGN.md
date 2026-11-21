@@ -465,7 +465,7 @@ In a rule's drill-down the first column is **Kept**: a native checkbox visually 
 
 #### Task checkbox (HorizonX)
 
-Built and tested, not yet used. Reserved for Plan 5 review checklists. A visually hidden native checkbox in its label; an 18px box, 6px radius, `line-strong` border that fills gain with a drawn check and a 240ms overshoot; a soft gain ripple on false-to-true only. 44px target on coarse pointers.
+Built and tested, not yet used. Reserved for Plan 5 review checklists. A visually hidden native checkbox in its label; an 18px box, 6px radius, `line-strong` border that fills gain over 240ms on the glide curve (no overshoot) with a drawn check; a soft gain disc that grows and fades on false-to-true only. 44px target on coarse pointers.
 
 #### Dashboard cards
 
@@ -496,7 +496,7 @@ Commercial licence; each is rebuilt in Keel tokens, never copied wholesale.
 - **Signal Tooltip** (MetricTip): kept the reveal (rise 6px, scale up from 0.92). Dropped the button cluster, tones and signal mark. The trigger is the metric's own label.
 - **Morph Dialog** (drill-down): kept the shared-element morph from opener to panel and back. Dropped the looks, images, eyebrow, blur and spring. Rebuilt as a FLIP on Radix Dialog.
 - **Expanding Search** (top bar search): kept the field that grows as it takes focus. Dropped the gradient, drop shadow and hover width. Added the ARIA combobox and listbox.
-- **Task Checkbox** (reserved): kept the self-drawing check, the overshooting fill and the ripple. Dropped the strike-through, gradient fill, drop shadow and foreign palette.
+- **Task Checkbox** (reserved): kept the self-drawing check, the growing fill and the ripple (a soft disc). Dropped the fill's overshoot (it eases on the glide curve), the strike-through, gradient fill, drop shadow and foreign palette.
 - **Number ticker, button press, Beacon Tabs glide, animated accordion:** as listed under Motion.
 
 ### Motion

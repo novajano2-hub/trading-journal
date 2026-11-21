@@ -46,7 +46,7 @@
   /* App popovers and menus drop from their trigger; they leave as the tooltip does. */
   --animate-pop-in: pop-in var(--dur-enter) var(--ease-enter) backwards;
 
-  /* Task checkbox ripple (HorizonX Task Checkbox technique): a ring that grows and fades. */
+  /* Task checkbox ripple (HorizonX Task Checkbox technique): a soft disc that grows and fades. */
   --animate-check-ripple: check-ripple 360ms ease-out;
 
   @keyframes check-ripple {
