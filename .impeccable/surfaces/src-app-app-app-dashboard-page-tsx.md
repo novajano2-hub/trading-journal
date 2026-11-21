@@ -24,21 +24,25 @@ related_targets: ["src/app/(app)/layout.tsx"]
 
 **Chosen layout:** "Plan vs actual". The user picked it on 2026-11-20 from six sketches at `.impeccable/mocks/decision-app/`. The approved sketch is `rules-scorecard.html` (render: `6-plan-vs-actual.png`). The user also asked for "cool and banger icons and other UI elements from horizon or other references".
 
+**Look (2026-11-21):** the user rejected the shipped Plan 4 look ("too plain and grey… looks like AI slop") and picked comp C, "Daylight premium", from three hi-fi comps at `.impeccable/mocks/rebrand-app/` (render `c-daylight-premium.png`). It keeps this layout and replaces OWN-WORLD below. The build brief is `build-brief.md` there.
+
 **Unresolved:** none blocking. The mobile collapse of the sidebar and the rules table is the builder's call within this contract.
 
 ## Direction contract
 
 THESIS: The trader's own plan is the yardstick. The Dashboard opens on how well they kept their rules and what breaking them cost in dollars, with performance second. It refuses the category default of a P&L hero and a wall of KPI tiles.
 
-OWN-WORLD: The shipped light pro-trading system in DESIGN.md:
-- cool neutral ground, white cards
-- one cobalt accent
+OWN-WORLD: "Daylight premium" (comp C), scoped to /app through `[data-surface='app']` in theme.css:
+- periwinkle-tinted canvas #ECEEF8, white cards with brand-tinted soft shadows
+- Keel Ultramarine #2B35AF as the one accent; the "Your plan" hero is the only coloured surface
+- data hues with fixed jobs: marigold for mistakes, cyan for goal progress, gain and loss only for signed money and kept or broken
 - gain and loss always signed
-- Geist, with Geist Mono for every number
-- radius rule 6/10/16
+- Instrument Sans for everything, tabular figures for numbers; the hero numeral is condensed (`font-stretch` 88%)
+- radius rule 6/10/16 for chips, controls and cards; icon tiles 8px
+- dark mode is a designed deep-navy set, the hero stays ultramarine
 
 Additions for the app:
-- **Icons:** Phosphor icons in the duotone weight, set in 32px tinted tiles (accent-soft, or gain-soft/loss-soft where state applies). One family, no mixing.
+- **Icons:** Phosphor icons in the duotone weight, set in 28px tinted tiles coloured by the card's job (accent, warn, info, gain, loss; a translucent white tile on the hero). One family, no mixing.
 - **HorizonX components, restyled to tokens:**
   - Signal Tooltip for metric definitions
   - Morph Dialog for rule drill-down
@@ -51,7 +55,7 @@ STORY: The trader opens Keel after the close and sees at once that they kept 91%
 
 FIRST VIEWPORT:
 - **Left sidebar, 220px:** wordmark, account switcher, labelled modules with duotone icons, a quieter "Not live yet" group, and Settings.
-- **Top bar, 56px:** title, the URL-driven filter chips, an expanding search, Gross/Net, and Import.
+- **Top bar, 68px:** title, the URL-driven filter chips, an expanding search, Gross/Net, and Import.
 - **Row 1, "Your plan":**
   - The adherence percentage, ticking up, plus the cost of broken rules.
   - A rules table sorted by cost: kept count, adherence track, percentage, and cost when broken. The costliest rule is flagged.
