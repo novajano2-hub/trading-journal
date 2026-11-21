@@ -9,9 +9,10 @@ import {
 } from '@/components/product/number-ticker';
 import { Sparkline } from '@/components/product/sparkline';
 import { MetricTip } from '@/components/ui/metric-tip';
-import type { MetricId } from '@/content/metric-definitions';
+import { metricDefinition, type MetricId } from '@/content/metric-definitions';
 import type { DashboardModel } from '@/data/dashboard';
 import type { MetricContext } from '@/domain/metrics/context';
+import type { DayStat } from '@/domain/metrics/days';
 import { summarize } from '@/domain/metrics/summary';
 import { closedInOrder } from '@/domain/trade-status';
 import type { Cents, PnlBasis, Trade } from '@/domain/types';
@@ -22,15 +23,18 @@ import { CARD, CARD_PAD, CardHeader } from './shared';
 const balance = (cents: Cents, currency: string) =>
   cents < 0 ? formatPnl(cents, currency) : formatMoney(cents, currency);
 
-/** How each KPI moved through the range. */
+/** How each KPI moved through the range, each point over a trailing window. */
 export interface KpiTrends {
+  /** Closed trades behind each point; 0 when there is no trend. */
+  window: number;
   winRate: number[];
   profitFactor: number[];
   expectancy: number[];
 }
 
-/** Trends for a range with no closed trades. */
+/** No trend: the range holds no more closed trades than one window. */
 export const NO_TRENDS: KpiTrends = {
+  window: 0,
   winRate: [],
   profitFactor: [],
   expectancy: [],
@@ -39,29 +43,66 @@ export const NO_TRENDS: KpiTrends = {
 /** Points in a KPI's trend line, at most. */
 const TREND_POINTS = 24;
 
+/** A trend point's window: 20 closed trades, or an eighth of the range when that is more. */
+export const trendWindow = (closed: number): number =>
+  Math.max(20, Math.ceil(closed / 8));
+
 /**
- * Each KPI as it stood after evenly spaced closed trades, oldest first, so
- * every trend line ends on the figure beside it. A KPI with no value yet at
- * a point (no losses for profit factor) skips that point.
+ * Each KPI over the last `trendWindow` closed trades, at up to 24 evenly
+ * spaced trades from the first full window to the last trade, oldest first.
+ * A window is not the whole range, so a line need not end on the figure
+ * beside it. A range with no more closed trades than one window has no
+ * line to draw, so no trend. A KPI with no value in a window (no losses for
+ * profit factor) skips that point.
  */
 export function kpiTrends(
   trades: readonly Trade[],
   ctx: MetricContext,
 ): KpiTrends {
   const closed = closedInOrder(trades);
-  const trends: KpiTrends = { winRate: [], profitFactor: [], expectancy: [] };
-  const points = Math.min(TREND_POINTS, closed.length);
-  if (points < 2) return trends;
-  for (let i = 1; i <= points; i++) {
-    const s = summarize(
-      closed.slice(0, Math.round((i * closed.length) / points)),
-      ctx,
-    );
+  const size = trendWindow(closed.length);
+  // How far the last window's end lies past the first's.
+  const span = closed.length - size;
+  if (span < 1) return NO_TRENDS;
+  const points = Math.min(TREND_POINTS, span + 1);
+  const trends: KpiTrends = {
+    window: size,
+    winRate: [],
+    profitFactor: [],
+    expectancy: [],
+  };
+  for (let i = 0; i < points; i++) {
+    const end = size + Math.round((i * span) / (points - 1));
+    const s = summarize(closed.slice(end - size, end), ctx);
     if (s.winRate !== null) trends.winRate.push(s.winRate);
     if (s.profitFactor !== null) trends.profitFactor.push(s.profitFactor);
     if (s.expectancy !== null) trends.expectancy.push(s.expectancy);
   }
   return trends;
+}
+
+/** The equity line's points, and whether each is a trading day's close. */
+export interface EquityLine {
+  points: Cents[];
+  daily: boolean;
+}
+
+/**
+ * The equity line: the starting balance, then the balance at each trading
+ * day's close, so a long range reads as a line rather than one point per
+ * trade. `days` must be the same trades on the same basis as `equity`, so
+ * the last close is the last balance to the cent. A range of one trading day
+ * keeps a point per closed trade, so its line still has a shape.
+ */
+export function equityLine(
+  equity: readonly Cents[],
+  days: readonly DayStat[],
+): EquityLine {
+  if (days.length < 2) return { points: [...equity], daily: false };
+  let balance = equity[0] ?? 0;
+  const points = [balance];
+  for (const d of days) points.push((balance += d.net));
+  return { points, daily: true };
 }
 
 /**
@@ -79,6 +120,7 @@ function Kpi({
   basis,
   currency,
   trend,
+  windowSize,
 }: {
   id: MetricId;
   value: number | null;
@@ -86,11 +128,16 @@ function Kpi({
   basis: PnlBasis;
   currency: string;
   trend: readonly number[];
+  /** Closed trades behind each trend point. */
+  windowSize: number;
 }): React.JSX.Element {
-  const text =
-    value === null
-      ? 'None yet'
-      : formatTicker(kind, value, { digits: 1, currency });
+  const fmt = (v: number) => formatTicker(kind, v, { digits: 1, currency });
+  const text = value === null ? 'None yet' : fmt(value);
+  const hasTrend = trend.length >= 2;
+  // Says what the line is: a rolling window, not the range's figure beside it.
+  const trendLabel = hasTrend
+    ? `Rolling ${windowSize}-trade ${metricDefinition(id, basis).label.toLowerCase()}, from ${fmt(trend[0]!)} to ${fmt(trend[trend.length - 1]!)}`
+    : undefined;
   return (
     <div
       data-kpi={id}
@@ -100,7 +147,9 @@ function Kpi({
       <div className="text-xs leading-4 text-faint pointer-coarse:-my-3.5">
         <MetricTip id={id} basis={basis} />
       </div>
-      <div className="mt-0.5 flex items-end gap-2 [--trend:60px] @max-[7rem]:[--trend:0px]">
+      <div
+        className={`mt-0.5 flex items-end gap-2 ${hasTrend ? '[--trend:60px] @max-[7rem]:[--trend:0px]' : '[--trend:0px]'}`}
+      >
         <div
           className="min-w-0 flex-1 leading-[1.25] font-semibold tracking-[-0.03em] whitespace-nowrap"
           style={{ fontSize: figureSize(text.length) }}
@@ -116,11 +165,14 @@ function Kpi({
             />
           )}
         </div>
-        <Sparkline
-          variant="line"
-          series={trend}
-          className="mr-1 mb-1 h-6 w-12 flex-none @max-[7rem]:hidden"
-        />
+        {hasTrend ? (
+          <Sparkline
+            variant="line"
+            series={trend}
+            label={trendLabel}
+            className="mr-1 mb-1 h-6 w-12 flex-none @max-[7rem]:hidden"
+          />
+        ) : null}
       </div>
     </div>
   );
@@ -128,16 +180,19 @@ function Kpi({
 
 /**
  * Row 2's Performance card: the P&L on the Gross/Net basis over the equity
- * line from the starting balance through each closed trade, then win rate,
- * profit factor and expectancy, each with how it moved through the range.
+ * line from the starting balance through each trading day's close, then win
+ * rate, profit factor and expectancy, each with its rolling trend.
  */
 export function PerformanceCard({
   performance,
+  line,
   trends,
   basis,
   currency,
 }: {
   performance: DashboardModel['performance'];
+  /** From `equityLine`: what the line draws. The figures come from `performance.equity`. */
+  line: EquityLine;
   trends: KpiTrends;
   basis: PnlBasis;
   currency: string;
@@ -162,6 +217,11 @@ export function PerformanceCard({
             <MetricTip
               id="equity"
               basis={basis}
+              note={
+                line.daily
+                  ? "The line marks the balance at each trading day's close."
+                  : undefined
+              }
               className="pointer-coarse:-my-3.5"
             />{' '}
             {/* The line's own label already says this to a screen reader. */}
@@ -196,7 +256,7 @@ export function PerformanceCard({
         </span>
       </div>
       <Sparkline
-        series={equity}
+        series={line.points}
         label={`Equity, from ${start} to ${end}`}
         className="mt-1.5 mb-2.5"
       />
@@ -208,6 +268,7 @@ export function PerformanceCard({
           basis={basis}
           currency={currency}
           trend={trends.winRate}
+          windowSize={trends.window}
         />
         <Kpi
           id="profit-factor"
@@ -216,6 +277,7 @@ export function PerformanceCard({
           basis={basis}
           currency={currency}
           trend={trends.profitFactor}
+          windowSize={trends.window}
         />
         <Kpi
           id="expectancy"
@@ -224,6 +286,7 @@ export function PerformanceCard({
           basis={basis}
           currency={currency}
           trend={trends.expectancy}
+          windowSize={trends.window}
         />
       </div>
     </section>

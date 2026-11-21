@@ -26,9 +26,13 @@ import {
 const ITEM =
   'relative flex min-h-9 cursor-pointer items-center rounded-[8px] py-1.5 pr-2 pl-8 text-[13.5px] text-text select-none data-highlighted:bg-sunken data-disabled:cursor-default data-disabled:opacity-50 pointer-coarse:min-h-11';
 const LABEL = 'px-2 pt-2 pb-1 text-[12px] font-medium text-faint';
-/** A white card on the canvas, its edge a hairline that firms on hover and while open. */
+/**
+ * A white card on the canvas, its edge a hairline that firms on hover and
+ * while open. Its gaps and the caret's are tight so "Sample workspace" fits
+ * whole in the 220px sidebar.
+ */
 const BOX =
-  'flex h-[52px] w-full items-center gap-2.5 rounded-[12px] border border-line bg-surface-1 py-2 pl-2 text-left shadow-[var(--shadow-chip)] transition-[border-color] duration-200 ease-(--ease-glide) hover:border-line-2';
+  'flex h-[52px] w-full items-center gap-2 rounded-[12px] border border-line bg-surface-1 py-2 pl-2 text-left shadow-[var(--shadow-chip)] transition-[border-color] duration-200 ease-(--ease-glide) hover:border-line-2';
 
 function Indicator(): React.JSX.Element {
   return (
@@ -130,7 +134,7 @@ export function AccountSwitcher(): React.JSX.Element {
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
-        className={`${BOX} pr-2.5 data-[state=open]:border-line-2`}
+        className={`${BOX} pr-2 data-[state=open]:border-line-2`}
       >
         <IconTile icon={Wallet} tone="accent" />
         <span className="flex min-w-0 flex-1 flex-col">
@@ -141,10 +145,11 @@ export function AccountSwitcher(): React.JSX.Element {
             {summary}
           </span>
         </span>
+        {/* The glyph has air of its own inside its box: 4px is enough beside the words. */}
         <CaretUpDown
-          size={15}
+          size={14}
           aria-hidden="true"
-          className="flex-none text-faint"
+          className="-ml-1 flex-none text-faint"
         />
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>

@@ -31,7 +31,12 @@ import { hasActiveFilters, switchWorkspaceFilters } from '../filter-model';
 import { Drilldown } from './drilldown';
 import { GoalsCard } from './goals-card';
 import { MistakesCard } from './mistakes-card';
-import { kpiTrends, NO_TRENDS, PerformanceCard } from './performance-card';
+import {
+  equityLine,
+  kpiTrends,
+  NO_TRENDS,
+  PerformanceCard,
+} from './performance-card';
 import { PlanCard } from './plan-card';
 import { RecentTrades } from './recent-trades';
 import { DashboardEmpty, DashboardError, DashboardSkeleton } from './states';
@@ -140,6 +145,7 @@ export function DashboardView(): React.JSX.Element {
         weekLabel: '',
         days: [] as DayStat[],
         trends: NO_TRENDS,
+        line: undefined,
       };
     const chosen = withClosed.some((m) => m.currency === currency)
       ? currency
@@ -162,12 +168,23 @@ export function DashboardView(): React.JSX.Element {
         ? partition.days
         : dailyPnl(partition.trades, { ...ctx, pnlBasis: 'net' });
     const trends = kpiTrends(partition.trades, ctx);
+    // The partition's days are on the basis its equity is, so the last close is the last balance.
+    const line = equityLine(model.performance.equity, partition.days);
     // "this week" while the goal week is today's; a range that ended earlier reads "that week".
     const week = model.goals.weekly?.window;
     const weekLabel = week
       ? `${week.from >= goalWeek({}, today)!.from ? 'this' : 'that'} week, ${rangeCaption(week, today)}`
       : '';
-    return { withClosed, caption, goals, model, weekLabel, days, trends };
+    return {
+      withClosed,
+      caption,
+      goals,
+      model,
+      weekLabel,
+      days,
+      trends,
+      line,
+    };
   }, [
     metrics.data,
     shownFilters,
@@ -317,6 +334,7 @@ export function DashboardView(): React.JSX.Element {
         <div className="min-w-0 md:max-xl:col-span-2">
           <PerformanceCard
             performance={m.performance}
+            line={view.line}
             trends={view.trends}
             basis={m.basis}
             currency={m.currency}

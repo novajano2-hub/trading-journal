@@ -10,7 +10,8 @@ const H = 80;
  * hairline at the starting value and a ringed dot on the last point. The
  * line draws in once and the rest fades in after it; under reduced motion
  * everything is simply there. `variant="line"` is the small KPI trend: the
- * line alone, 2 points or more, decorative unless it is given a label.
+ * line alone, 2 points or more, decorative unless it is given a label, which
+ * it also shows as its hover title.
  */
 export function Sparkline({
   series,
@@ -43,6 +44,8 @@ export function Sparkline({
         preserveAspectRatio="none"
         className={`block overflow-visible ${className}`}
       >
+        {/* A labelled trend also says what it is on hover. */}
+        {label ? <title>{label}</title> : null}
         <path
           d={line}
           fill="none"

@@ -234,9 +234,9 @@ function AdherenceNumeral({ value }: { value: number }): React.JSX.Element {
   );
 }
 
-/** A definition's label on the ultramarine card: white underline and focus ring. */
+/** A definition's label on the ultramarine card: its underline (on hover and focus) and focus ring in white. */
 const ON_ACCENT_TIP =
-  'decoration-white/40! hover:decoration-white/85! focus-visible:outline-white!';
+  'hover:decoration-white/85! focus-visible:decoration-white/85! focus-visible:outline-white!';
 
 /**
  * Row 1, "Your plan": the ultramarine hero (how many rule checks were kept,

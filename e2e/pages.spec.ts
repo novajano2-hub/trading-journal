@@ -102,11 +102,15 @@ test('/app/import is restyled, same behaviour', async ({ page }) => {
   await expect(
     page.getByRole('link', { name: 'Back to the Dashboard' }),
   ).toHaveAttribute('href', '/app/dashboard?side=short');
-  // A flat bordered card, as the app's are.
-  await expect(page.locator('main .rounded-card')).toHaveCSS(
+  // A card as the Dashboard's are: a hairline border and the card shadow.
+  await expect(page.locator('main .rounded-card')).not.toHaveCSS(
     'box-shadow',
     'none',
   );
+  // With no file, the way on is the broker export guide.
+  await expect(
+    page.getByRole('link', { name: 'How to export your CSV' }),
+  ).toHaveAttribute('href', '/brokers#export');
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

@@ -38,8 +38,11 @@ import { useShownFilters } from './use-shown-filters';
 
 const NO_OPTIONS: FilterOptions = { symbols: [], strategies: [], tags: [] };
 
-/** How far the edge fade reaches into a row that scrolls. */
-const FADE = '32px';
+/**
+ * How far each edge fade reaches into a row that scrolls. The end's is the
+ * longer, so a chip cut there reads as going on, not as clipped.
+ */
+const FADE = { start: '32px', end: '56px' };
 
 /** Whether the scroller has more past its start and its end. */
 function useScrollEdges(
@@ -76,8 +79,8 @@ function useScrollEdges(
 
 function fadeMask({ start, end }: { start: boolean; end: boolean }) {
   if (!start && !end) return undefined;
-  const from = start ? `transparent, black ${FADE}` : 'black';
-  const to = end ? `black calc(100% - ${FADE}), transparent` : 'black';
+  const from = start ? `transparent, black ${FADE.start}` : 'black';
+  const to = end ? `black calc(100% - ${FADE.end}), transparent` : 'black';
   return `linear-gradient(to right, ${from}, ${to})`;
 }
 
@@ -85,8 +88,9 @@ function fadeMask({ start, end }: { start: boolean; end: boolean }) {
  * The top bar's filter chips: date, symbol, side, strategy and tags, then
  * "Clear filters" while any filter is set. The chips scroll sideways when the
  * bar is too narrow, fading at an edge with more past it; "Clear filters"
- * stays put after them. Every choice calls `onChange` with the whole next
- * filter set. In a workspace with no trades at all the chips stay in the tab
+ * stays put after them. On a phone, with nothing after them, the row runs to
+ * the screen's edge and fades out there, as a row that scrolls does. Every
+ * choice calls `onChange` with the whole next filter set. In a workspace with no trades at all the chips stay in the tab
  * order but open nothing; a filter that matches nothing leaves them live.
  */
 export function FilterBarView({
@@ -127,6 +131,7 @@ export function FilterBarView({
   const side = chipLabel('side', f, names);
   const strategy = chipLabel('strategy', f, names);
   const tag = chipLabel('tag', f, names);
+  const cleared = !hasActiveFilters(f);
 
   return (
     <div
@@ -134,11 +139,16 @@ export function FilterBarView({
       aria-label="Filters"
       className="flex min-w-0 items-center gap-2"
     >
-      {/* Padded past a focus ring's 2px and 3px offset, and pulled back by as much, so rings show whole. */}
+      {/*
+        Padded past a focus ring's 2px and 3px offset, and pulled back by as
+        much, so rings show whole. On a phone with no "Clear filters" it also
+        reaches through the bar's 20px gutter to the screen's edge, padded by
+        as much, so the last chip still stops at the gutter.
+      */}
       <div
         ref={scroller}
         style={{ maskImage: fadeMask(edges) }}
-        className="-m-1.5 min-w-0 scroll-px-8 overflow-x-auto p-1.5"
+        className={`-m-1.5 min-w-0 scroll-pl-8 scroll-pr-14 overflow-x-auto p-1.5 ${cleared ? 'max-sm:-mr-5 max-sm:pr-5' : ''}`}
       >
         <div
           ref={row}
@@ -244,7 +254,7 @@ export function FilterBarView({
           No trades to filter yet.
         </span>
       ) : null}
-      {hasActiveFilters(f) ? (
+      {cleared ? null : (
         <button
           type="button"
           disabled={disabled}
@@ -257,7 +267,7 @@ export function FilterBarView({
         >
           Clear filters
         </button>
-      ) : null}
+      )}
     </div>
   );
 }

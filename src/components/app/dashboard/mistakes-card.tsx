@@ -45,7 +45,7 @@ export function MistakesCard({
         // "cost" opens its definition, as every metric's label does.
         title={
           <>
-            Mistakes, by{' '}
+            Mistakes by{' '}
             <MetricTip
               id="mistake-cost"
               basis={basis}
