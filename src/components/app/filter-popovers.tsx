@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, type ReactNode } from 'react';
-import { buttonClasses } from '@/components/ui/button-styles';
+import { RAISED } from '@/components/ui/button-styles';
 import { DATE_PRESETS, type DatePreset, type DateRange } from '@/data/filters';
 import type { Strategy, Tag, TagCategory } from '@/domain/types';
 import { PRESET_LABELS } from '@/lib/range-label';
@@ -79,31 +79,33 @@ export function DateBody({
         className="mt-1.5 border-t border-line px-2 pt-1 pb-1.5"
       >
         <fieldset>
-          <legend className="pt-2 pb-2 text-xs text-faint">Custom</legend>
+          <legend className="pt-2 pb-2 text-[12px] font-medium text-faint">
+            Custom
+          </legend>
           <div className="grid grid-cols-2 gap-2">
-            <label className="flex min-w-0 flex-col gap-1 text-xs text-muted">
+            <label className="flex min-w-0 flex-col gap-1 text-[12px] text-muted">
               From
               <input
                 type="date"
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
-                className={`${FIELD} font-mono text-[12.5px]`}
+                className={`${FIELD} font-mono text-[13px]`}
               />
             </label>
-            <label className="flex min-w-0 flex-col gap-1 text-xs text-muted">
+            <label className="flex min-w-0 flex-col gap-1 text-[12px] text-muted">
               To
               <input
                 type="date"
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
-                className={`${FIELD} font-mono text-[12.5px]`}
+                className={`${FIELD} font-mono text-[13px]`}
               />
             </label>
           </div>
         </fieldset>
         <button
           type="submit"
-          className={`${buttonClasses('primary', 'sm')} mt-2.5 w-full text-[13px] pointer-coarse:h-11`}
+          className={`mt-2.5 inline-flex h-9 w-full items-center justify-center rounded-control text-[13.5px] font-semibold select-none ${RAISED} pointer-coarse:h-11`}
         >
           Apply
         </button>
@@ -141,7 +143,7 @@ export function SymbolBody({
           placeholder="Filter symbols"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className={`${FIELD} mb-1.5 px-2.5 text-sm placeholder:text-faint`}
+          className={`${FIELD} mb-1.5 px-2.5 text-[13.5px] placeholder:text-faint`}
         />
       ) : null}
       {shown.length === 0 ? (

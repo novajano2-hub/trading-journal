@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { CTA_MD, CTA_PRIMARY } from '@/components/site/cta';
 import { SectionHeading } from '@/components/site/landing/section-heading';
+import { MODULE_ICONS } from '@/components/site/module-icons';
 import { START_HREF } from '@/components/site/nav-links';
+import { IconTile } from '@/components/ui/icon-tile';
 import { MODULES } from '@/content/modules';
 
 export const metadata: Metadata = {
@@ -16,7 +19,7 @@ export default function PricingPage() {
   return (
     <main>
       <section className={`${FRAME} pt-16 pb-24`}>
-        <h1 className="max-w-[16ch] text-[clamp(36px,calc(2.6vw+16px),52px)] leading-[1.06] font-semibold tracking-[-0.04em] text-balance motion-safe:animate-rise">
+        <h1 className="max-w-[16ch] text-[clamp(36px,calc(2.6vw+16px),52px)] leading-[1.06] font-semibold tracking-[-0.032em] text-balance motion-safe:animate-rise">
           Pricing to be announced
         </h1>
         <p
@@ -28,7 +31,7 @@ export default function PricingPage() {
         </p>
         <Link
           href={START_HREF}
-          className="mt-8 inline-flex h-11 items-center rounded-control bg-accent px-[18px] text-[15px] font-medium whitespace-nowrap text-accent-fg no-underline transition-colors hover:bg-accent-hover motion-safe:animate-rise"
+          className={`mt-8 ${CTA_PRIMARY} ${CTA_MD} motion-safe:animate-rise`}
           style={{ animationDelay: '120ms' }}
         >
           Get started
@@ -37,16 +40,20 @@ export default function PricingPage() {
 
       <section
         aria-labelledby="included-title"
-        className="border-t border-line"
+        className="border-t border-line-2"
       >
         <div className={`${FRAME} py-24`}>
           <SectionHeading id="included-title" title="What is in the journal">
             Modules still in development are marked as such on their own pages.
           </SectionHeading>
-          <ul className="m-0 mt-14 grid list-none gap-x-16 gap-y-10 p-0 md:grid-cols-2">
+          <ul className="m-0 mt-14 grid list-none gap-0 overflow-hidden rounded-card bg-surface-1 p-0 shadow-[var(--shadow-card)] md:grid-cols-2">
             {included.map((m) => (
-              <li key={m.slug} className="border-t border-line pt-5">
-                <p className="text-[17px] font-semibold tracking-[-0.015em]">
+              <li
+                key={m.slug}
+                className="border-t border-line p-6 sm:p-8 md:nth-[-n+2]:border-t-0 md:odd:last:col-span-2"
+              >
+                <p className="flex items-center gap-2.5 text-[17px] font-semibold tracking-[-0.015em]">
+                  <IconTile icon={MODULE_ICONS[m.slug]} tone="accent" />
                   {m.name}
                 </p>
                 <p className="mt-2 max-w-[52ch] text-[15.5px] leading-[1.65] text-muted">

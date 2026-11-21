@@ -40,6 +40,7 @@ export function MorphDialog({
   returnFocus,
   title,
   description,
+  icon,
   children,
 }: {
   open: boolean;
@@ -48,6 +49,8 @@ export function MorphDialog({
   returnFocus: RefObject<HTMLElement | null>;
   title: string;
   description?: ReactNode;
+  /** A decorative tile beside the title, as the card it grew from has. */
+  icon?: ReactNode;
   children: ReactNode;
 }): React.JSX.Element | null {
   const reduced = useReducedMotion();
@@ -166,17 +169,18 @@ export function MorphDialog({
             event.preventDefault();
             returnFocus.current?.focus();
           }}
-          className="fixed inset-0 z-50 m-auto flex h-fit max-h-[80dvh] w-[calc(100%-32px)] max-w-[720px] flex-col overflow-hidden rounded-card border border-line bg-surface-1 shadow-[var(--shadow)] outline-none"
+          className="fixed inset-0 z-50 m-auto flex h-fit max-h-[80dvh] w-[calc(100%-32px)] max-w-[760px] flex-col overflow-hidden rounded-card border border-line bg-surface-1 shadow-[var(--shadow)] outline-none"
         >
           <div ref={body} className="flex max-h-[80dvh] min-h-0 flex-col">
-            <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
-              <div className="min-w-0">
-                <Dialog.Title className="text-[18px] font-semibold leading-snug text-text">
+            <div className="flex items-start gap-3 border-b border-line px-5 pt-[18px] pb-4">
+              {icon ? <div className="flex-none pt-px">{icon}</div> : null}
+              <div className="min-w-0 flex-1">
+                <Dialog.Title className="text-[17px] leading-snug font-semibold tracking-[-0.015em] text-pretty text-text">
                   {title}
                 </Dialog.Title>
                 {description ? (
                   <Dialog.Description asChild>
-                    <div className="mt-1 text-[13px] text-muted">
+                    <div className="mt-1 text-[13px] leading-[1.5] text-muted">
                       {description}
                     </div>
                   </Dialog.Description>
@@ -184,12 +188,14 @@ export function MorphDialog({
               </div>
               <Dialog.Close
                 aria-label="Close"
-                className="-m-1.5 inline-flex size-11 flex-none items-center justify-center rounded-control text-muted transition-colors hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+                className="-m-1.5 inline-flex size-11 flex-none items-center justify-center rounded-control text-muted transition-colors duration-200 ease-[var(--ease-glide)] hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
               >
-                <X size={20} aria-hidden="true" />
+                <X size={18} aria-hidden="true" />
               </Dialog.Close>
             </div>
-            <div className="min-h-0 overflow-y-auto px-5 py-4">{children}</div>
+            <div className="min-h-0 overflow-y-auto px-5 pt-2 pb-4">
+              {children}
+            </div>
           </div>
         </Dialog.Content>
       </Dialog.Portal>

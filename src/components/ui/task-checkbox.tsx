@@ -51,10 +51,10 @@ export function TaskCheckbox({
       />
       <span
         aria-hidden="true"
-        className="relative grid size-[18px] flex-none place-items-center rounded-[6px] border border-line-2 bg-surface-1 transition-colors duration-[240ms] group-hover:border-faint peer-checked:border-gain peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent motion-reduce:transition-none"
+        className="relative grid size-[18px] flex-none place-items-center rounded-[6px] border border-line-2 bg-surface-1 shadow-[var(--shadow-chip)] transition-colors duration-[240ms] ease-[var(--ease-glide)] group-hover:border-accent/50 peer-checked:border-[var(--gain-fill,var(--gain))] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent motion-reduce:transition-none"
       >
         <span
-          className={`absolute inset-0 rounded-[5px] bg-gain ${
+          className={`absolute -inset-px rounded-[6px] bg-[var(--gain-fill,var(--gain))] ${
             checked ? 'scale-100 opacity-100' : 'scale-0 opacity-0'
           } transition-[transform,opacity] duration-[240ms] ease-[var(--ease-glide)] motion-reduce:transition-none`}
         />
@@ -67,7 +67,7 @@ export function TaskCheckbox({
             strokeWidth={2}
             strokeLinecap="round"
             strokeLinejoin="round"
-            className={`stroke-surface-1 transition-[stroke-dashoffset] duration-[240ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] motion-reduce:transition-none ${
+            className={`stroke-white transition-[stroke-dashoffset] duration-[240ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] motion-reduce:transition-none ${
               checked ? 'delay-[80ms]' : ''
             }`}
           />
@@ -75,7 +75,7 @@ export function TaskCheckbox({
         {ripple ? (
           <span
             data-ripple
-            className="pointer-events-none absolute left-1/2 top-1/2 size-[25px] rounded-full bg-gain/40 motion-safe:animate-check-ripple motion-reduce:hidden"
+            className="pointer-events-none absolute left-1/2 top-1/2 size-[25px] rounded-full bg-[var(--gain-fill,var(--gain))]/35 motion-safe:animate-check-ripple motion-reduce:hidden"
           />
         ) : null}
       </span>

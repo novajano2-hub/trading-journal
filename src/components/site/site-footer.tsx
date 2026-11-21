@@ -12,7 +12,7 @@ const RESOURCES = [PRIMARY_LINKS[1], PRIMARY_LINKS[2], PRIMARY_LINKS[0]];
 
 export function SiteFooter() {
   return (
-    <footer className="mt-auto border-t border-line pt-12 pb-14 text-sm text-muted">
+    <footer className="mt-auto border-t border-line-2 pt-12 pb-14 text-sm text-muted">
       <div className="mx-auto grid max-w-[1280px] grid-cols-2 gap-8 px-5 sm:px-10 lg:grid-cols-[2fr_1fr_1fr_1fr]">
         <div className="col-span-2 lg:col-span-1">
           <BrandMark />

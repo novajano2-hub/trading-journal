@@ -85,7 +85,7 @@ export function BreakdownChart({
         role="img"
         aria-label={label}
         aria-describedby={descId}
-        className="grid h-[220px] items-end gap-1.5 border-b border-line font-mono sm:gap-[18px]"
+        className="grid h-[220px] items-end gap-1.5 border-b border-line-2 tnum sm:gap-[18px]"
         style={cols}
       >
         {rows.map((r, i) => {
@@ -113,12 +113,12 @@ export function BreakdownChart({
                 }}
               >
                 <b
-                  className={`text-[11px] leading-4 font-normal whitespace-nowrap sm:text-xs ${tone(r.pnl)}`}
+                  className={`text-[11px] leading-4 font-medium whitespace-nowrap sm:text-xs ${tone(r.pnl)}`}
                 >
                   {formatPnlWhole(r.pnl)}
                 </b>
                 <i
-                  className={`block w-full max-w-14 rounded-t-md transition-colors duration-300 ${r.pnl < 0 ? 'bg-loss' : 'bg-gain'}`}
+                  className={`block w-full max-w-14 rounded-t-[6px] transition-colors duration-300 ${r.pnl < 0 ? 'bg-loss-fill' : 'bg-gain-fill'}`}
                   style={{ height: BAR_AREA_PX }}
                 />
               </motion.div>
@@ -128,7 +128,7 @@ export function BreakdownChart({
       </div>
       <div
         aria-hidden="true"
-        className={`mt-2 grid gap-1.5 text-center text-[11px] leading-4 text-faint sm:gap-[18px] sm:text-xs ${monoLabels ? 'font-mono' : ''}`}
+        className={`mt-2 grid gap-1.5 text-center text-[11px] leading-4 text-faint sm:gap-[18px] sm:text-xs ${monoLabels ? 'tnum' : ''}`}
         style={cols}
       >
         {rows.map((r, i) => (

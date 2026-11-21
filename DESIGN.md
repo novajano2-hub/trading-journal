@@ -1,138 +1,154 @@
 ---
 name: Keel
-description: A light, precise, pro-trading journal. One cobalt accent, Geist type, Geist Mono for every number.
+description: A daylight, premium trading journal. Keel Ultramarine on a periwinkle canvas, white cards with brand-tinted shadows, Instrument Sans with tabular figures for every word and number.
 colors:
-  bg: '#f6f7f9'
+  bg: '#eceef8'
   surface: '#ffffff'
-  sunken: '#eff1f4'
-  line: '#e3e6eb'
-  line-strong: '#d3d8df'
-  text: '#0f1218'
-  muted: '#4f5865'
-  faint: '#687080'
-  cobalt: '#2550e0'
-  cobalt-hover: '#1e44c4'
-  cobalt-soft: '#eaf0fe'
-  cobalt-ink: '#1b3fb8'
-  on-cobalt: '#ffffff'
-  gain: '#087a54'
-  gain-soft: '#e6f4ee'
-  loss: '#c8283a'
-  loss-soft: '#fbebed'
-  dark-bg: '#0e1014'
-  dark-surface: '#15181e'
-  dark-sunken: '#1b1f26'
-  dark-line: '#262b33'
-  dark-line-strong: '#323843'
-  dark-text: '#eceef2'
-  dark-muted: '#a3aab6'
-  dark-faint: '#8e95a1'
-  dark-cobalt: '#3866e6'
-  dark-cobalt-hover: '#2f5bd8'
-  dark-cobalt-soft: '#1a2440'
-  dark-cobalt-ink: '#9db6ff'
+  sunken: '#f0f1f8'
+  line: '#e7e9f3'
+  line-strong: '#d5d8ea'
+  text: '#121633'
+  muted: '#4b5175'
+  faint: '#636889'
+  ultramarine: '#2b35af'
+  ultramarine-hover: '#1f278c'
+  ultramarine-soft: '#eeeffc'
+  ultramarine-ink: '#2b35af'
+  ultramarine-deep: '#1f278c'
+  ultramarine-tint: '#dcdff8'
+  on-ultramarine: '#ffffff'
+  on-ultramarine-muted: '#c9ccf5'
+  on-ultramarine-loss: '#ffb3b8'
+  gain: '#0a7a52'
+  gain-fill: '#19a672'
+  gain-soft: '#ddf3e8'
+  loss: '#c22e3a'
+  loss-fill: '#e5484d'
+  loss-soft: '#fceced'
+  warn: '#9a5700'
+  warn-fill: '#e9a21a'
+  warn-soft: '#fcf1dc'
+  info: '#0a6f94'
+  info-fill: '#1693be'
+  info-soft: '#e0f1f8'
+  dark-bg: '#0c0e1c'
+  dark-surface: '#151831'
+  dark-sunken: '#1b1f3b'
+  dark-line: '#262a4a'
+  dark-line-strong: '#323760'
+  dark-text: '#eceefb'
+  dark-muted: '#aeb2d2'
+  dark-faint: '#9095bb'
+  dark-ultramarine: '#4c57dc'
+  dark-ultramarine-hover: '#5c66e6'
+  dark-ultramarine-soft: '#22285a'
+  dark-ultramarine-ink: '#aeb4ff'
+  dark-ultramarine-tint: '#2c336e'
   dark-gain: '#3fc08e'
-  dark-gain-soft: '#14281f'
+  dark-gain-fill: '#2fb27f'
+  dark-gain-soft: '#10291f'
   dark-loss: '#f06a78'
-  dark-loss-soft: '#2e161a'
-  veil: 'rgba(15, 18, 24, 0.32)'
-  dark-veil: 'rgba(0, 0, 0, 0.6)'
+  dark-loss-soft: '#2e1620'
+  dark-warn: '#f0b44a'
+  dark-warn-soft: '#2d2210'
+  dark-info: '#4db8e0'
+  dark-info-soft: '#0e2533'
+  veil: 'rgba(18, 22, 51, 0.36)'
+  dark-veil: 'rgba(4, 5, 14, 0.66)'
 typography:
   display-hero:
-    fontFamily: 'Geist, system-ui, sans-serif'
+    fontFamily: 'Instrument Sans, system-ui, sans-serif'
     fontSize: 'clamp(40px, calc(3.125vw + 18px), 58px)'
     fontWeight: 600
     lineHeight: 1.04
-    letterSpacing: '-0.04em'
+    letterSpacing: '-0.032em'
   display-page:
-    fontFamily: 'Geist, system-ui, sans-serif'
+    fontFamily: 'Instrument Sans, system-ui, sans-serif'
     fontSize: 'clamp(36px, calc(2.6vw + 16px), 52px)'
     fontWeight: 600
     lineHeight: 1.06
-    letterSpacing: '-0.04em'
-  headline:
-    fontFamily: 'Geist, system-ui, sans-serif'
-    fontSize: '42px'
+    letterSpacing: '-0.032em'
+  section-heading:
+    fontFamily: 'Instrument Sans, system-ui, sans-serif'
+    fontSize: 'clamp(2rem, 1.6rem + 1.6vw, 2.625rem)'
     fontWeight: 600
     lineHeight: 1.08
-    letterSpacing: '-0.035em'
+    letterSpacing: '-0.028em'
   headline-sub:
-    fontFamily: 'Geist, system-ui, sans-serif'
+    fontFamily: 'Instrument Sans, system-ui, sans-serif'
     fontSize: '26px'
     fontWeight: 600
     lineHeight: 1.15
     letterSpacing: '-0.03em'
-  title:
-    fontFamily: 'Geist, system-ui, sans-serif'
-    fontSize: '22px'
-    fontWeight: 600
-    lineHeight: 1.2
-    letterSpacing: '-0.025em'
   lead:
-    fontFamily: 'Geist, system-ui, sans-serif'
-    fontSize: '18px'
+    fontFamily: 'Instrument Sans, system-ui, sans-serif'
+    fontSize: '17px'
     fontWeight: 400
-    lineHeight: 1.55
+    lineHeight: 1.6
   body-reading:
-    fontFamily: 'Geist, system-ui, sans-serif'
+    fontFamily: 'Instrument Sans, system-ui, sans-serif'
     fontSize: '16.5px'
     fontWeight: 400
     lineHeight: 1.7
   body:
-    fontFamily: 'Geist, system-ui, sans-serif'
+    fontFamily: 'Instrument Sans, system-ui, sans-serif'
     fontSize: '15.5px'
     fontWeight: 400
     lineHeight: 1.65
   ui:
-    fontFamily: 'Geist, system-ui, sans-serif'
+    fontFamily: 'Instrument Sans, system-ui, sans-serif'
     fontSize: '15px'
     fontWeight: 500
   ui-small:
-    fontFamily: 'Geist, system-ui, sans-serif'
-    fontSize: '13px'
+    fontFamily: 'Instrument Sans, system-ui, sans-serif'
+    fontSize: '13.5px'
     fontWeight: 500
   label:
-    fontFamily: 'Geist, system-ui, sans-serif'
+    fontFamily: 'Instrument Sans, system-ui, sans-serif'
     fontSize: '12px'
     fontWeight: 400
-  ui-14:
-    fontFamily: 'Geist, system-ui, sans-serif'
-    fontSize: '14px'
-    fontWeight: 400
   axis:
-    fontFamily: 'Geist Mono, ui-monospace, monospace'
+    fontFamily: 'Instrument Sans, system-ui, sans-serif'
     fontSize: '11px'
     fontWeight: 400
     fontFeature: 'tnum'
   figure-kpi:
-    fontFamily: 'Geist Mono, ui-monospace, monospace'
+    fontFamily: 'Instrument Sans, system-ui, sans-serif'
     fontSize: '22px'
-    fontWeight: 500
-    letterSpacing: '-0.02em'
+    fontWeight: 600
+    letterSpacing: '-0.03em'
     fontFeature: 'tnum'
   figure-row:
-    fontFamily: 'Geist Mono, ui-monospace, monospace'
-    fontSize: '12.5px'
-    fontWeight: 400
+    fontFamily: 'Instrument Sans, system-ui, sans-serif'
+    fontSize: '13px'
+    fontWeight: 550
     fontFeature: 'tnum'
   figure-hero:
-    fontFamily: 'Geist Mono, ui-monospace, monospace'
-    fontSize: '40px'
-    fontWeight: 500
-    lineHeight: 1.1
-    letterSpacing: '-0.02em'
+    fontFamily: 'Instrument Sans, system-ui, sans-serif'
+    fontSize: '104px'
+    fontWeight: 600
+    lineHeight: 0.82
+    letterSpacing: '-0.05em'
+    fontFeature: 'tnum'
+  figure-pnl:
+    fontFamily: 'Instrument Sans, system-ui, sans-serif'
+    fontSize: '31px'
+    fontWeight: 600
+    lineHeight: 1.15
+    letterSpacing: '-0.04em'
     fontFeature: 'tnum'
   card-title:
-    fontFamily: 'Geist, system-ui, sans-serif'
-    fontSize: '14px'
+    fontFamily: 'Instrument Sans, system-ui, sans-serif'
+    fontSize: '15px'
     fontWeight: 600
     lineHeight: 1.375
+    letterSpacing: '-0.015em'
   app-title:
-    fontFamily: 'Geist, system-ui, sans-serif'
-    fontSize: '22px'
-    fontWeight: 600
+    fontFamily: 'Instrument Sans, system-ui, sans-serif'
+    fontSize: '24px'
+    fontWeight: 650
     lineHeight: 1.2
-    letterSpacing: '-0.02em'
+    letterSpacing: '-0.035em'
 rounded:
   chip: '6px'
   control: '10px'
@@ -142,19 +158,18 @@ spacing:
   page-gutter: '40px'
   container: '1280px'
   header: '64px'
-  row-x: '14px'
   app-sidebar: '220px'
   app-top-bar: '56px'
-  app-card-padding: '20px 16px'
+  app-card-padding: '18px 20px 16px'
 components:
   button-primary:
-    backgroundColor: '{colors.cobalt}'
-    textColor: '{colors.on-cobalt}'
+    backgroundColor: '{colors.ultramarine}'
+    textColor: '{colors.on-ultramarine}'
     rounded: '{rounded.control}'
     height: '44px'
     padding: '0 18px'
   button-primary-hover:
-    backgroundColor: '{colors.cobalt-hover}'
+    backgroundColor: '{colors.ultramarine-hover}'
   button-secondary:
     backgroundColor: '{colors.surface}'
     textColor: '{colors.text}'
@@ -170,280 +185,345 @@ components:
   chip-neutral:
     backgroundColor: '{colors.sunken}'
     textColor: '{colors.muted}'
-    rounded: '{rounded.chip}'
+    rounded: '999px'
     height: '22px'
     padding: '0 8px'
   chip-accent:
-    backgroundColor: '{colors.cobalt-soft}'
-    textColor: '{colors.cobalt-ink}'
-    rounded: '{rounded.chip}'
+    backgroundColor: '{colors.ultramarine-soft}'
+    textColor: '{colors.ultramarine-ink}'
+    rounded: '999px'
     height: '22px'
   chip-gain:
     backgroundColor: '{colors.gain-soft}'
     textColor: '{colors.gain}'
-    rounded: '{rounded.chip}'
+    rounded: '999px'
     height: '22px'
   chip-loss:
     backgroundColor: '{colors.loss-soft}'
     textColor: '{colors.loss}'
-    rounded: '{rounded.chip}'
+    rounded: '999px'
     height: '22px'
+  chip-warn:
+    backgroundColor: '{colors.warn-soft}'
+    textColor: '{colors.warn}'
+    rounded: '999px'
+    height: '22px'
+  chip-info:
+    backgroundColor: '{colors.info-soft}'
+    textColor: '{colors.info}'
+    rounded: '999px'
+    height: '22px'
+  side-chip:
+    backgroundColor: '{colors.sunken}'
+    textColor: '{colors.muted}'
+    rounded: '7px'
+    height: '22px'
+    padding: '0 9px'
   card:
     backgroundColor: '{colors.surface}'
     rounded: '{rounded.card}'
+  hero-surface:
+    backgroundColor: '{colors.ultramarine}'
+    textColor: '{colors.on-ultramarine}'
+    rounded: '{rounded.card}'
   segmented:
-    backgroundColor: '{colors.sunken}'
+    backgroundColor: '{colors.ultramarine-soft}'
     textColor: '{colors.muted}'
-    padding: '2px'
+    rounded: '11px'
+    padding: '3px'
   segmented-active:
     backgroundColor: '{colors.surface}'
     textColor: '{colors.text}'
+    rounded: '8px'
   icon-tile:
     backgroundColor: '{colors.sunken}'
-    textColor: '{colors.muted}'
-    rounded: '{rounded.chip}'
-    size: '32px'
+    textColor: '{colors.text}'
+    rounded: '8px'
+    size: '28px'
   icon-tile-accent:
-    backgroundColor: '{colors.cobalt-soft}'
-    textColor: '{colors.cobalt-ink}'
+    backgroundColor: '{colors.ultramarine-soft}'
+    textColor: '{colors.ultramarine-ink}'
+  icon-tile-warn:
+    backgroundColor: '{colors.warn-soft}'
+    textColor: '{colors.warn}'
+  icon-tile-info:
+    backgroundColor: '{colors.info-soft}'
+    textColor: '{colors.info}'
   filter-chip:
     backgroundColor: '{colors.surface}'
     textColor: '{colors.muted}'
-    rounded: '{rounded.chip}'
-    height: '30px'
-    padding: '0 9px'
-  filter-chip-active:
-    backgroundColor: '{colors.cobalt-soft}'
-    textColor: '{colors.cobalt-ink}'
+    rounded: '{rounded.control}'
+    height: '32px'
+    padding: '0 10px 0 12px'
   filter-chip-unavailable:
     textColor: '{colors.faint}'
   kpi-tile:
-    backgroundColor: '{colors.sunken}'
     rounded: '{rounded.control}'
-    padding: '8px 12px'
+    padding: '10px 14px 0'
   morph-dialog:
     backgroundColor: '{colors.surface}'
     rounded: '{rounded.card}'
-    width: '720px'
+    width: '760px'
 ---
 
 # Design System: Keel
 
 ## Overview
 
-**Creative North Star: "Precise and Plain"** names a register, not a metaphor world. Keel looks like a modern pro trading product: light, exact, quiet. The surface is pale cool grey with white panels, hairline borders, one cobalt accent, and green and red reserved for money. Every figure is set in Geist Mono and lines up in columns. The product itself is the illustration: a real-looking app window with labelled sample data carries the marketing pages.
+**Creative North Star: "Daylight Premium"** names a register, not a metaphor world. Keel looks like a premium product used in daylight: a periwinkle canvas, white cards that lift on brand-tinted shadows, one deep brand hue (Keel Ultramarine), and one family, Instrument Sans, whose tabular figures set every number. The trader's plan is the one coloured surface: an ultramarine "Your plan" hero. The product itself is the illustration: real-looking app windows made of the app's own cards, with labelled sample data, carry the marketing pages.
 
-Light is the default regardless of OS. Dark is an explicit toggle (`data-theme="dark"` on `<html>`, saved as `keel-theme`, applied before first paint). It is the same system with the same roles, not a second design.
+The whole product wears one world. The app (`/app/*`) and the marketing site share the same tokens, face, cards and product-shot components; the approved comp is `.impeccable/mocks/rebrand-app/c-daylight-premium.html`. The `:root` tokens and the app-scoped (`:has([data-surface='app'])`) tokens in `src/styles/theme.css` hold the same values, so a Radix portal or page background follows the app while one is mounted.
 
-Rejected, and recorded so they are not rebuilt: metaphor worlds (the earlier trading-floor tickets and stamps), dark mesh hero clichés, editorial serif display type, and anything that reads as AI-generated.
+Light is the default regardless of OS. Dark is an explicit toggle (`data-theme="dark"` on `<html>`, saved as `keel-theme`, applied before first paint). It is a designed deep navy, not an inversion: its own surfaces, lifted accent, brighter data hues and neutral shadows, with the hero surface staying ultramarine.
+
+Rejected, and recorded so they are not rebuilt: metaphor worlds (the earlier trading-floor tickets and stamps), dark mesh hero clichés, editorial serif display type, the earlier flat grey-and-cobalt Geist look (replaced by this system; do not bring it back), and anything that reads as AI-generated.
 
 **Key Characteristics:**
 
-- Cool off-white page, white panels, hairline borders; depth from border first, shadow only on the product shot.
-- One accent: cobalt. Gain green and loss red mean money and nothing else.
-- Geist for words, Geist Mono with tabular figures for every number.
-- Tight negative tracking on large headings, generous leading on body.
+- Periwinkle canvas, white cards, brand-tinted shadows; depth comes from the card shadow and a hairline.
+- One brand hue: Keel Ultramarine. Data hues have fixed jobs: marigold for mistakes, cyan for goal progress, green and red for signed money and kept or broken.
+- Instrument Sans for everything, with tabular figures wherever a number is read.
+- Tight negative tracking on large type, generous leading on body.
 - Motion is short and decelerating; it announces arrival and selection, then stops.
-- The app (`/app`) is the same system at working density: labelled sidebar, 56px top bar, "Plan vs actual" Dashboard. Its direction is the trader's own plan as the yardstick: adherence and the cost of broken rules lead, performance follows.
+- The app (`/app`) is the same system at working density: a labelled sidebar on the canvas, a top bar, a "Plan vs actual" Dashboard led by the ultramarine "Your plan" hero. Its direction is the trader's own plan as the yardstick: adherence and the cost of broken rules lead, performance follows.
 
 ## Colors
 
-A cool neutral field, a single cobalt voice, and a green/red pair that carries trading sign. Tokens live in `src/styles/theme.css` as CSS variables and are exposed to Tailwind as `bg`, `surface-1`, `sunken`, `line`, `line-2`, `text`, `muted`, `faint`, `accent*`, `gain*`, `loss*`. Frontmatter names above are the descriptive aliases (`surface` = `--surface-1`, `line-strong` = `--line-2`, `cobalt` = `--accent`).
+A periwinkle-tinted neutral field, one ultramarine voice, three data hues with fixed jobs, and a green/red pair for money. Tokens live in `src/styles/theme.css` as CSS variables and are exposed to Tailwind in `src/app/globals.css` as `bg`, `surface-1`, `sunken`, `line`, `line-2`, `text`, `muted`, `faint`, `accent*`, `gain*`, `loss*`, `warn*`, `info*`, `on-accent-*`, `veil`. Frontmatter names above are the descriptive aliases (`surface` = `--surface-1`, `line-strong` = `--line-2`, `ultramarine` = `--accent`, `ultramarine-tint` = `--accent-tint`).
 
 ### Primary
 
-- **Cobalt** (#2550e0 light, #3866e6 dark): primary buttons, selection and caret, focus ring, links on hover. Nothing else is accent-coloured.
-- **Cobalt Hover** (#1e44c4 light, #2f5bd8 dark): primary button hover.
-- **Cobalt Soft** (#eaf0fe light, #1a2440 dark): accent chip fill.
-- **Cobalt Ink** (#1b3fb8 light, #9db6ff dark): text on cobalt-soft, accordion title hover.
-- **On Cobalt** (#ffffff): text on cobalt fills and selected text.
-- **Cobalt in the app** also fills: the active nav tile and active filter chip (cobalt-soft with cobalt-ink), the 4px rule adherence tracks and goal tracks, the equity sparkline, and the duotone layer of inactive nav glyphs (see Icon tiles).
+- **Keel Ultramarine** (#2b35af light, #4c57dc dark; `--accent`): the primary button, selection and caret, focus ring, adherence bars, the equity line, the brand tile and the hero surface. The brand's hue, which the money palette never uses.
+- **Ultramarine Hover** (#1f278c light, #5c66e6 dark): primary button hover.
+- **Ultramarine Soft** (#eeeffc light, #22285a dark): accent chip and accent tile fill, adherence rail, the segmented track's tint, hover wash on text actions.
+- **Ultramarine Ink** (#2b35af light, #aeb4ff dark): text and glyphs on ultramarine-soft, links in cards, the current nav glyph.
+- **Ultramarine Deep** (#1f278c both): the dark end of brand gradients.
+- **Ultramarine Tint** (#dcdff8 light, #2c336e dark): text selection.
+- **On Ultramarine** (#ffffff), **On Ultramarine Muted** (#c9ccf5) and **On Ultramarine Loss** (#ffb3b8): white, secondary text and the loss figure on the hero surface. The same in both themes, because the hero is.
 
 ### Neutral
 
-- **Page** (#f6f7f9 / #0e1014): page background, scrollbar track.
-- **Surface** (#ffffff / #15181e): cards, app window, secondary buttons, active segment.
-- **Sunken** (#eff1f4 / #1b1f26): segmented and tab tracks, neutral chips, ghost hover.
-- **Line** (#e3e6eb / #262b33): hairline borders and row dividers.
-- **Line Strong** (#d3d8df / #323843): control borders, scrollbar thumb.
-- **Text** (#0f1218 / #eceef2): headings and primary copy.
-- **Muted** (#4f5865 / #a3aab6): body copy, labels, inactive tabs.
-- **Faint** (#687080 / #8e95a1): timestamps, captions, chevrons, empty values, table headers, the "Not live yet" group.
-- **Veil** (rgba(15,18,24,0.32) light, rgba(0,0,0,0.6) dark; `--veil`, Tailwind `bg-veil`): the scrim behind the mobile drawer and the Morph dialog. Nothing else.
+- **Canvas** (#eceef8 / #0c0e1c): the page, the sidebar and the top bar, scrollbar track.
+- **Surface** (#ffffff / #151831): cards, the app window's controls, secondary buttons, popovers, the chosen segment.
+- **Sunken** (#f0f1f8 / #1b1f3b): neutral chips and tiles, ghost hover, the search key hint.
+- **Line** (#e7e9f3 / #262a4a): hairline borders and row dividers, the goal track rail.
+- **Line Strong** (#d5d8ea / #323760): control borders, scrollbar thumb, the dark chosen-segment fill.
+- **Text** (#121633 / #eceefb): headings and primary copy.
+- **Muted** (#4b5175 / #aeb2d2): body copy, labels, inactive nav and tabs.
+- **Faint** (#636889 / #9095bb): timestamps, captions, table headers, empty values, the "Not live yet" group.
+- **Veil** (rgba(18,22,51,0.36) light, rgba(4,5,14,0.66) dark; `bg-veil`): the scrim behind the mobile drawer and the Morph dialog. Nothing else.
 
-### Signal
+### Data hues
 
-- **Gain** (#087a54 / #3fc08e) on **Gain Soft** (#e6f4ee / #14281f): positive P&L, long side, kept rules, equity line.
-- **Loss** (#c8283a / #f06a78) on **Loss Soft** (#fbebed / #2e161a): negative P&L, short side, mistake tags, broken rules.
+Each has a text token, a `-fill` for bars and marks, and a `-soft` for chip and tile fills.
+
+- **Gain** (#0a7a52 / #3fc08e, fill #19a672 / #2fb27f, soft #ddf3e8 / #10291f): positive P&L, kept rules, a reached goal.
+- **Loss** (#c22e3a / #f06a78, fill #e5484d, soft #fceced / #2e1620): negative P&L, broken rules and the days that broke the daily loss limit.
+- **Marigold, warn** (#9a5700 / #f0b44a, fill #e9a21a, soft #fcf1dc / #2d2210): mistakes: mistake chips, the Mistakes tile, the "Costliest" chip.
+- **Cyan, info** (#0a6f94 / #4db8e0, fill #1693be, soft #e0f1f8 / #0e2533): goal progress: the weekly goal track and its percentage, the Goals tile.
 
 ### Named Rules
 
-**The One Accent Rule.** Cobalt is the only brand colour. Never add a second hue for emphasis, category or decoration.
-**The Sign Rule.** Green and red appear only where a number is positive or negative, or a rule is kept or broken. Zero is uncoloured. Never use them for status, branding or ornament.
-**The Neutral Error Rule.** Failures to load or save (storage unavailable, dashboard could not load, "Couldn't save") are neutral: sunken or faint, with a Warning or ArrowClockwise glyph in muted ink. Loss red is money and broken rules, never an error state.
-**The Never Colour Alone Rule.** Sign and state also carry text or an icon (a leading sign in the figure, "Kept" / "Broken" for screen readers, Long / Short labels). Long and Short chips use gain and loss soft fills; this is sanctioned because the word always travels with the colour.
+**The One Brand Hue Rule.** Ultramarine is the only brand colour. Never use it for money, and never add another hue for brand, emphasis or decoration.
+**The Fixed Jobs Rule.** Marigold means a mistake, cyan means goal progress, green and red mean signed money or kept and broken. A hue never takes a second job. Zero is uncoloured.
+**The Neutral Error Rule.** Failures to load or save (storage unavailable, dashboard could not load, "Couldn't save") are neutral: sunken or faint, with a Warning or ArrowClockwise glyph in muted ink. Loss red is money and broken rules, never an error state, and marigold is mistakes, never a warning state.
+**The Never Colour Alone Rule.** Sign and state also carry text or an icon (a leading sign in the figure, "Kept" and "Broken" for screen readers and the hero's Kept and Broken labels, "Broke:" in a trade's rules cell). Long and Short are neutral words, never a result colour.
 
 ## Typography
 
-**Text Font:** Geist (via `next/font/google`, `--font-geist-sans`, fallback system-ui, sans-serif)
-**Number Font:** Geist Mono (`--font-geist-mono`, fallback ui-monospace, monospace). Used for every figure: P&L, percentages, ratios, times, symbols, ranges. `tabular-nums` is applied to `.font-mono` and `.tnum` so columns align.
+**Face:** Instrument Sans (via `next/font/google`, `--font-keel`, `wdth` axis loaded, fallback system-ui, sans-serif). `font-sans` and `font-mono` both resolve to it, so `.font-mono` keeps its job (tabular figures, the number's role) in the same face. `tabular-nums` is applied to `.font-mono`, `.tnum` and every figure so columns align. The hero numeral also condenses to `font-stretch: 88%`.
 
-**Character:** Neutral grotesque for words, a matched mono for data. Weight does the hierarchy (400, 500, 600) with heavy negative tracking on display sizes. No uppercase labels, no letter-spaced small caps.
+**Character:** One humanist grotesque for words and data. Weight does the hierarchy (400, 500, 550, 600, 650) with negative tracking on display and figure sizes. No uppercase labels, no letter-spaced small caps.
 
 ### Hierarchy
 
 The ramp as shipped. Half-pixel sizes are deliberate steps between 15 and 17, not accidents; use only values in this table.
 
-| Role            | Size                                                      | Weight | Leading          | Tracking | Use                                               |
-| --------------- | --------------------------------------------------------- | ------ | ---------------- | -------- | ------------------------------------------------- |
-| Hero display    | clamp(40px, 3.125vw + 18px, 58px)                         | 600    | 1.04             | -0.04em  | Landing hero                                      |
-| Page display    | clamp(36px, 2.6vw + 16px, 52px)                           | 600    | 1.06             | -0.04em  | Page and auth h1                                  |
-| Closing display | clamp(38px, 5vw, 52px)                                    | 600    | 1.04             | -0.04em  | Closing section                                   |
-| Section heading | clamp(2rem, 1.6rem + 1.6vw, 2.625rem)                     | 600    | 1.08             | -0.035em | Landing section heading                           |
-| Headline        | 42px                                                      | 600    | 1.08             | -0.035em | Reports and how-it-works headings                 |
-| Sub-headline    | 26px                                                      | 600    | 1.15             | -0.03em  | Module and legal section h2                       |
-| Title           | 22px                                                      | 600    | 1.2              | -0.025em | Changelog entries; KPI figure (500)               |
-| Card title      | 20px (`text-xl`), 18px (`text-lg`), 18px brand            | 600    | default          | -0.02em  | Bento titles, brand mark                          |
-| App card title  | 14px                                                      | 600    | 1.375 (snug)     | 0        | Every Dashboard card heading                      |
-| App title       | 22px                                                      | 600    | 1.2              | -0.02em  | Top bar page title                                |
-| Hero figure     | 40px Geist Mono                                           | 500    | 1.1              | -0.02em  | The adherence percentage in "Your plan" (ticker)  |
-| Dialog title    | 18px                                                      | 600    | snug             | 0        | Morph dialog title                                |
-| State title     | 16px                                                      | 500    | snug             | 0        | Empty, error and placeholder titles               |
-| Accordion       | 17px                                                      | 500    | default          | 0        | Accordion headings                                |
-| Lead            | 18px                                                      | 400    | 1.55 to 1.6      | 0        | Subhead under display                             |
-| Reading body    | 16.5px                                                    | 400    | 1.7              | 0        | Legal and changelog prose (68ch)                  |
-| Body 16         | 16px                                                      | 400    | snug to default  | 0        | Import page copy                                  |
-| Body            | 15.5px                                                    | 400    | 1.65             | 0        | Feature and pricing descriptions                  |
-| UI              | 15px                                                      | 500    | 1.6 in accordion | 0        | Buttons, accordion body                           |
-| Nav             | 14.5px                                                    | 500    | default          | 0        | Header and menu links, import page detail         |
-| Sidebar row     | 13.5px                                                    | 400 (500 current) | default | 0     | Sidebar module labels                             |
-| UI 14           | 14px (`text-sm`)                                          | 400    | default          | 0        | Rule list rows; brand tile glyph                  |
-| Detail          | 13.5px                                                    | 500    | default          | 0        | Trade detail values, column mapping, import chips |
-| Control         | 13px                                                      | 500    | default          | 0        | Segmented and tab labels                          |
-| App bar         | 12.5px                                                    | 400    | default          | 0        | App window bar; trade rows (mono)                 |
-| Label           | 12px (`text-xs`)                                          | 400    | default          | 0        | KPI labels, chips, captions                       |
-| Side chip       | 11.5px                                                    | 500    | default          | 0        | Long/Short chip                                   |
-| Axis            | 11px (12px from sm)                                       | 400    | 1rem             | 0        | Chart labels                                      |
-| KPI figure      | 22px, scales to clamp(15px, 3.6cqi, 22px) in a wide strip | 500    | default          | -0.02em  | Mono, via NumberTicker                            |
+| Role            | Size                                                  | Weight | Leading         | Tracking | Use                                                       |
+| --------------- | ----------------------------------------------------- | ------ | --------------- | -------- | --------------------------------------------------------- |
+| Hero display    | clamp(40px, 3.125vw + 18px, 58px)                     | 600    | 1.04            | -0.032em | Landing hero                                              |
+| Page display    | clamp(36px, 2.6vw + 16px, 52px)                       | 600    | 1.06            | -0.032em | Page and auth h1                                          |
+| Closing display | clamp(38px, 5vw, 52px)                                | 600    | 1.04            | -0.032em | Closing section                                           |
+| Section heading | clamp(2rem, 1.6rem + 1.6vw, 2.625rem)                 | 600    | 1.08            | -0.028em | Landing section heading                                   |
+| Sub-headline    | 26px                                                  | 600    | 1.15            | -0.03em  | Legal and read-page section h2                            |
+| Hero numeral    | 88px, 104px from sm                                   | 600    | 0.82            | -0.05em  | Adherence percentage on the Your plan hero (stretch 88%)  |
+| P&L figure      | 31px                                                  | 600    | 1.15            | -0.04em  | Performance card net P&L                                  |
+| App title       | 24px (20px on phones)                                 | 650    | 1.2             | -0.035em | Top bar page title                                        |
+| Cost figure     | 21px                                                  | 600    | default         | -0.02em  | Cost band on the hero                                     |
+| Goal figure     | 22px                                                  | 600    | 1.25            | -0.03em  | Weekly net on the Goals card                              |
+| KPI figure      | 22px marketing; 20px app, shrinking to fit            | 600    | 1.25            | -0.03em  | Marketing KPI strip; app rolling KPIs via NumberTicker    |
+| Card title      | 15px                                                  | 600    | 1.375 (snug)    | -0.015em | Every dashboard and product card heading                  |
+| Brand           | 19px                                                  | 650    | default         | -0.03em  | Brand mark                                                |
+| Dialog title    | 17px                                                  | 600    | snug            | -0.015em | Morph dialog title                                        |
+| Accordion       | 17px                                                  | 500    | default         | 0        | Accordion headings                                        |
+| Lead            | 17px                                                  | 400    | 1.6             | 0        | Section subhead (56ch)                                    |
+| Reading body    | 16.5px                                                | 400    | 1.7             | 0        | Legal and changelog prose (68ch)                          |
+| Body            | 15.5px                                                | 400    | 1.65            | 0        | Feature and pricing descriptions                          |
+| UI              | 15px                                                  | 500    | 1.6 in accordion | 0       | Buttons, accordion body, state body                       |
+| Nav             | 14.5px                                                | 500    | default         | 0        | Header and menu links                                     |
+| Row             | 13.5px                                                | 500    | default         | 0        | Sidebar rows, filter chips, rule text, tables, detail     |
+| Control         | 13.5px                                                | 500    | default         | 0        | Segmented and tab labels                                  |
+| Figure          | 13px                                                  | 550    | default         | 0        | Row figures in the Rules table, tabular                   |
+| Caption         | 12.5px                                                | 400    | default         | 0        | Card ranges, app window bar, metric tip text, row captions |
+| Label           | 12px (`text-xs`)                                      | 400    | default         | 0        | KPI labels, chips (550), captions, table headers          |
+| Side chip       | 12px                                                  | 600    | default         | 0        | Long and Short                                            |
+| Axis            | 11px (12px from sm)                                   | 400    | 1rem            | 0        | Chart labels, search key hint                             |
 
-Also in use: 24px (`text-2xl`) for mobile menu links, 16px (`text-base`) default body. App literals, all already in the ramp: 11px (kbd hint), 11.5px (side chip, "+n" chip), 12px (labels, table headers, group labels), 12.5px (mono figures and filter chips), 13px (card body, controls, table text), 13.5px (sidebar rows, cost panel), 14px (menu rows, empty-state lead), 15px (state body, buttons), 16px (state title, import copy), 18px (dialog title), 22px (KPI figure, app title), 40px (hero figure). KPI figures in the app shrink with their tile: `min(22px, max(14px, 100cqi / chars / 0.6))`, so a long P&L never spills.
+Also in use: 24px (`text-2xl`) for mobile menu links, 16px (`text-base`) default body and the large CTA, 14px (`text-sm`) for small CTAs and rule list rows, 11.5px for the "+n" chip. KPI figures in the app shrink with their tile: `min(20px, max(12px, (100cqi - trend) / chars / 0.56))`, so a long P&L never spills. Marketing KPIs use `clamp(15px, 3.6cqi, 22px)` in a wide strip.
 
 ### Named Rules
 
-**The Mono Numbers Rule.** Every number a trader reads is Geist Mono with tabular figures. Never set a figure in the text face.
-**The App Ramp Rule.** The app adds exactly two sizes to the ramp: the 40px mono hero figure and the 14px/600 card title. Anything else in `/app` is a row above. Do not mint a size for one surface.
+**The Tabular Numbers Rule.** Every number a trader reads uses tabular figures (`tnum` or `font-mono`, both the same face). Never set a figure with proportional digits where it sits in a column or beside another figure.
+**The Figure Ramp Rule.** Big figures take their own sizes (88/104 hero numeral, 31 P&L, 21 cost, 22 goal, 20 KPI); everything else in `/app` is a row above. Do not mint a size for one surface.
 **The Measure Rule.** Display headings cap at 11 to 20ch, ledes at 40 to 60ch, reading prose at 68ch.
 
 ## Layout
 
-A single 1280px container (`max-w-[1280px]`) centred, with 20px gutters on phones and 40px from `sm`. The header is 64px. The landing hero is a two-column grid at `lg` (5fr text, 7fr product shot) with a floating trade card overlapping the window's lower left; on phones it stacks and the card sits in flow. Sections breathe with large vertical padding (hero 56px top, 88px bottom); inside product panels density is high: rows are 10px vertical, 14px horizontal padding, 8px gaps.
+A single 1280px container (`max-w-[1280px]`) centred, with 20px gutters on phones and 40px from `sm`. The header is 64px. The landing hero is a two-column grid at `lg` (5fr text, 7fr product shot) with a floating trade detail card overlapping the window's lower left; on phones it stacks and the card sits in flow. Sections breathe with large vertical padding; inside product cards density is high.
 
-The KPI strip is container-query driven (`@container`): two by two when narrow, one row of four from `@md`, so figures scale with the strip, not the viewport. Trade rows collapse tag columns below `sm`. Touch targets are 44px: buttons are 44px high (38px for `sm`), the theme toggle goes from 40px to 44px on coarse pointers.
+The marketing KPI strip is container-query driven (`@container`): two by two when narrow, one row of four from `@md`, so figures scale with the strip, not the viewport. Touch targets are 44px: buttons are 44px high (38px for `sm`), the theme toggle goes from 34px to 44px on coarse pointers.
 
 ### App shell
 
-The app is a labelled **220px sidebar** (sticky, full height, 1px right line, surface fill) beside a column holding the **56px top bar** and the page. Below `lg` the sidebar is a 280px drawer from the left (Radix Dialog, veil, focus trap, closes on Escape, veil, link, route change or workspace switch, focus returns to the trigger) opened from a 44px menu button that leads the bar. A skip link, "Skip to content", is the first tab stop: visually hidden until focused, then a fixed surface chip at top-left targeting `#content` (`main`, `tabIndex -1`).
+The app is a labelled **220px sidebar** (sticky, full height, no fill and no divider: it sits on the canvas) beside a column holding the **top bar** and the page. Below `lg` the sidebar is a 280px drawer from the left (Radix Dialog, veil, focus trap, closes on Escape, veil, link, route change or workspace switch, focus returns to the trigger) opened from a 44px menu button that leads the bar. A skip link, "Skip to content", is the first tab stop: visually hidden until focused, then a fixed surface chip at top-left targeting `#content` (`main`, `tabIndex -1`).
 
-- **Top bar:** sticky, surface fill, 1px bottom line, 20px side padding. Order from the left: menu, title, chips, then search, sample label, Gross/Net, Import, theme. The source keeps that order at every width and nothing is reordered by CSS, so Tab reads the bar as the eye does. One 56px row while the chips fit beside the title; where they do not (measured, not guessed) the title keeps a 48px first row and the chips lead the second, the controls after them at its end.
-- **Filter row:** leaves the title's row only when it overflows. Where even the second row is short, the chips scroll sideways inside their own scroller with a 32px edge fade at whichever side has more past it. "Clear filters" (shown only while a filter is set) sits outside the scroller so it never fades or scrolls away.
-- **Below `sm`:** three rows. The first (menu and title) is pinned to the top with a hairline beneath it; the chips, then a row of search (at its start), the sample label, Gross/Net, Import as an icon and the theme (at its end) scroll away under it.
-- **Dashboard grid:** page padding 20px, 16px gaps. Row 1 is one card: a 290px hero column (percentage, cost panel) beside the rules table from `xl`, stacked below. Row 2 is three cards (one column, two from `md` with Performance spanning, three from `xl`). Row 3 is the recent trades card.
-- **Plain pages** (module placeholders, error and empty states): a centred 520px column with a 32px icon tile, 16px/500 title, 15px muted body and one action.
+- **Top bar:** sticky from `sm`, canvas fill (no border, no white strip), 20px side padding. Order from the left: menu, title (24px/650), chips, then search, sample label, Gross/Net, Import, theme. The source keeps that order at every width and nothing is reordered by CSS, so Tab reads the bar as the eye does. One row while the chips fit beside the title; where they do not (measured, not guessed) the chips lead a second row with the controls after them at its end.
+- **Filter row:** leaves the title's row only when it overflows. Where even the second row is short, the chips scroll sideways inside their own scroller with an edge fade at whichever side has more past it. "Clear filters" (shown only while a filter is set) sits outside the scroller so it never fades or scrolls away.
+- **Below `sm`:** three rows. The first (menu and title) is pinned to the top with a hairline beneath it; the chips, then a row of search, the sample label, Gross/Net, Import as an icon and the theme scroll away under it.
+- **Dashboard grid:** page padding 20px, 16px gaps. Row 1 is the plan: the ultramarine hero (340px column from `xl`, 400px from 1440) beside the Rules card, stacked below. Row 2 is three cards (one column, two from `md` with Performance spanning, three from `xl`): Performance, Mistakes, Goals. Row 3 is the recent trades card.
+- **Plain pages** (module placeholders, error and empty states): a centred 520px column with an icon tile, 16px/500 title, 15px muted body and one action.
 
 ## Elevation & Depth
 
-Flat and bordered. Panels separate from the page by a 1px line and a white-on-grey tonal step. Shadow appears on the product shot, the active segment and floating layers.
+White cards on a tinted canvas, lifted by brand-tinted shadows. A hairline `line` border stays on every card so it holds its edge when the shadow is faint. In dark the shadows go to plain black, because a blue shadow on a dark ground reads as a glow.
 
 ### Shadow Vocabulary
 
-- **Product shot** (`--shadow`: `0 1px 2px rgba(15,18,24,0.05), 0 24px 48px -24px rgba(37,80,224,0.18)` light; `0 1px 2px rgba(0,0,0,0.4), 0 24px 48px -24px rgba(0,0,0,0.7)` dark): the app window and hero cards. A faint cobalt cast in light, plain black in dark.
-- **Active chip** (`--shadow-chip`: `0 1px 2px rgba(15,18,24,0.08)` light; `0 1px 2px rgba(0,0,0,0.4)` dark): the white fill of the selected segment or tab, and in the app every floating layer: filter popovers, the account menu, metric tooltips, the search results list.
-- **Morph dialog** uses `--shadow` (the product-shot value), over the veil.
+- **Card** (`--shadow-card`: `0 1px 2px rgba(18,22,51,0.05), 0 4px 10px -6px rgba(34,42,150,0.1), 0 18px 34px -22px rgba(34,42,150,0.38)` light; `0 1px 2px rgba(0,0,0,0.45), 0 18px 34px -22px rgba(0,0,0,0.8)` dark): every dashboard card, product card and the accordion.
+- **Shadow** (`--shadow`: `0 1px 2px rgba(18,22,51,0.06), 0 24px 48px -20px rgba(34,42,150,0.28)` light; `0 1px 2px rgba(0,0,0,0.5), 0 24px 48px -20px rgba(0,0,0,0.75)` dark): the app window, the trade detail card, and the floating layers: popovers, the account menu, metric tooltips, search results, the Morph dialog.
+- **Chip** (`--shadow-chip`: `0 1px 2px rgba(18,22,51,0.06), 0 2px 6px -2px rgba(34,42,150,0.1)` light; `0 1px 2px rgba(0,0,0,0.45)` dark): the chosen segment or tab, the current nav row, the account box, secondary site CTAs, the task checkbox.
+- **Hero** (`--shadow-hero`: `0 2px 4px rgba(31,39,140,0.18), 0 22px 40px -18px rgba(31,39,140,0.55)` light; `0 2px 4px rgba(0,0,0,0.4), 0 22px 40px -18px rgba(43,53,175,0.55)` dark), plus an inset 1px white highlight at 18%: the ultramarine hero surface.
+- **Raised primary:** an inset 1px white highlight at 20%, `0 1px 2px rgba(31,39,140,0.4)` and `0 6px 14px -6px rgba(43,53,175,0.6)`; in dark the outer shadows go neutral black.
+- **Controls:** a 1px `0 1px 1px rgba(18,22,51,0.04)` rest shadow on white controls (filter chips, theme toggle, app window controls, Pill). Recessed tracks (segmented, tabs) take an inset `0 1px 2px rgba(18,22,51,0.07)` (black at 0.35 in dark).
 
 ### Named Rules
 
-**The Border First Rule.** Depth comes from hairlines and tonal steps. A soft diffuse shadow is allowed on the product shot; hard offset shadows never.
+**The Tinted Lift Rule.** Shadows are soft, diffuse and brand-tinted (neutral black in dark). Hard offset shadows never.
 
 ## Shapes
 
-Three radii, by role: **chips 6px**, **buttons, inputs and inner panels 10px**, **cards and the app window 16px**. Circles only for the button press ripple, the status pill dot, the checkbox ripple and the 24px hover disc behind the Kept mark; tracks are pill-ended bars. Borders are always 1px `line` (or `line-strong` on controls). Focus is a 2px cobalt outline with 3px offset on every focusable element. Exceptions in the app, all 2px: offset 0 for text and date fields inside popovers (the 3px offset would meet the popover's edge; marked important to beat the global rule), offset 2 for table-row buttons, the metric tip and the checkbox, offset 1 for the Kept mark. The filter scroller is padded 6px so rings are never clipped.
-
-Segmented and tab tracks use 7px outer and 5px inner radius, and the brand tile uses 7px: these sit between the rule's steps; treat them as the one documented exception for nested tracks and do not extend it.
+Three radii, by role: **chips 6px**, **buttons, inputs and inner panels 10px**, **cards and the app window 16px**. Documented exceptions, each by role and not to be extended: status and tag chips are pills (full radius), icon tiles and the brand tile are 8px, the side chip 7px, nav rows 9px, the recessed segmented and tab track 11px with an 8px chosen pill, popovers, menus and the account box 12px with 8px items. Circles are the button press ripple, the status pill dot, the checkbox ripple and the 24px hover disc behind the Kept mark; tracks are 3px-ended bars. Borders are 1px `line` (or `line-strong` on controls). Focus is a 2px ultramarine outline with 3px offset on every focusable element. Exceptions in the app, all 2px: offset 0 for text and date fields inside popovers (the 3px offset would meet the popover's edge; marked important to beat the global rule), offset 2 for table-row buttons, the metric tip and the checkbox, offset 1 for the Kept mark. The filter scroller is padded so rings are never clipped.
 
 ## Components
 
 ### Buttons
 
 - **Shape:** 10px radius, 44px high (38px `sm`), 18px horizontal padding, 15px/500 label, 8px icon gap.
-- **Primary:** cobalt fill, white text; hover cobalt-hover.
-- **Secondary:** surface fill, text colour, 1px line-strong border; hover darkens border to faint.
+- **Primary (raised):** the accent lit from its top edge: a vertical gradient from the accent mixed 7% toward white down to the accent, an inner top highlight and a brand shadow beneath (see Elevation). Hover swaps the gradient outright for one a step deeper (accent to accent-hover); it presses 1px. Site link-buttons use the same material (`RAISED`, `CTA_PRIMARY`).
+- **Secondary:** surface fill, text colour, 1px line-strong border; hover darkens the border to faint. Site secondary CTAs add the chip shadow and an accent border at 40% on hover.
 - **Ghost:** transparent; hover sunken.
-- **Press:** scales to 0.97 (down 180ms, up 120ms, out easing) and a 160px ripple at the pointer fades from 16% to 0 over 220ms. Disabled at 50% opacity. Reduced motion removes both.
+- **Press:** scales to 0.97 (down 180ms, up 120ms, out easing) and a 160px ripple at the pointer. Disabled at 50% opacity. Reduced motion removes both.
+- **Site CTA sizes:** 38px in the header, 44px for page actions, 50px for the closing.
 
 ### Chips
 
-- **Style:** 22px high, 6px radius, 8px padding, 12px text. Tones: neutral (sunken/muted), accent (cobalt-soft/cobalt-ink), gain, loss. `mono` for numbers and symbols.
-- **Side chip:** 20px high, 11.5px/500; Long reads gain, Short reads loss.
+- **Style:** 22px high, pill radius, 8px padding, 12px/550 text, 5px gap. Tones: neutral (sunken/muted), accent (accent-soft/accent-ink), gain, loss, warn (marigold), info (cyan). `mono` marks numbers and symbols (the same face, tabular).
+- **Side chip:** 22px high, 7px radius, 12px/600, always neutral. Gain and loss colours are kept for money and for kept or broken, so a side never reads as a result.
+- **Pill (site):** a white pill with a hairline and a 1px shadow for symbols, codes and times set on the canvas or a sunken panel, where a sunken chip would vanish. 22px (12px text) or 28px (13px text).
 - **Status pill:** a chip with a 6px leading dot. The dot is a status marker, the only dot allowed.
 
 ### Segmented control and Tabs
 
-Both share one look: a sunken track (2px padding, 7px radius) holding 13px labels; the active item is a white (surface) chip with 5px radius, text colour and the active-chip shadow. Segmented is a radio group (state flips, no travel). Tabs are a roving-focus tablist whose single white fill slides and resizes to the chosen tab over 320ms on the glide curve. Arrow keys wrap, Home and End jump, selection follows focus.
+Both share one look: a recessed track (accent at 8% over what it sits on, inner top shadow, 3px padding, 11px radius) holding 13.5px/500 labels. The chosen item is a white (surface) pill, 8px radius, one step bolder, with the chip shadow; in dark it fills `line-strong`. An invisible bold twin holds each option's width so choosing never nudges neighbours. Segmented is a radio group (state flips, no travel). Tabs are a roving-focus tablist whose single white fill slides and resizes to the chosen tab over 320ms on the glide curve. Arrow keys wrap, Home and End jump, selection follows focus.
+
+### Cards
+
+White (`surface`), 16px radius, 1px `line` border, `--shadow-card`. App cards pad 18px above, 20px at the sides, 16px below. The header is a 28px row: an icon tile, a 15px/600 title, then the range or a link at the far right in 12.5px. `ProductCard` is the marketing copy of this card for product shots: tile, title, optional quiet meta, and the title is a label, not a heading, so a shot never adds to the page outline.
+
+### Icon tiles
+
+`IconTile`: a 28px square, 8px radius, one 17px duotone Phosphor glyph, decorative (`aria-hidden`). The glyph is one ink and its duotone layer is the same ink at 20%, so a tile reads as one hue in two strengths. Tones and jobs:
+
+- `accent`: accent-soft fill, accent-ink glyph. Performance, plan, account, active product-menu entries.
+- `warn`: warn-soft, warn. Mistakes.
+- `info`: info-soft, info. Goals.
+- `neutral`: sunken, text. Default, state blocks.
+- `gain` and `loss`: soft fills, for signed or kept and broken marks only.
+- `faint`: sunken, faint, duotone layer 0 (outline only). A module that is not live yet.
+- `on-accent`: a translucent white tile (white at 14% with an inset white ring) on the ultramarine hero.
+
+`bare` drops the fill. The tile recolours the glyph's `[opacity]` path.
 
 ### App window (the product shot)
 
-The product pages' hero illustration. 16px radius, 1px line, surface fill, product-shot shadow. A top bar (min 46px) holds an account select, a mono date range, optional meta at the right (the "Sample data" label goes here), and a Gross/Net segmented basis switch. Content below is real components fed by the typed sample dataset: KPI strip, equity chart, trade rows.
+The marketing illustration: a piece of the app on its canvas. 16px radius, 1px `line-strong` border at 80%, canvas fill, inset top highlight and `--shadow`. A bar (min 52px, wraps on phones) holds white controls (30px, 10px radius, hairline and rest shadow): an account select, a date range with a calendar glyph, optional meta at the right (the "Sample data" label goes here), and a recessed Gross/Net switch. Below sit the app's own white cards (`ProductCard`) fed by the typed sample dataset.
 
-### KPI strip
+### Product shot components
 
-Four figures (Net P&L, Win rate, Profit factor, Expectancy): 12px muted label over a 22px mono figure counted up by NumberTicker. A missing value reads "None yet" in faint mono.
+- **ProductCard / CARD:** the card above for shots; `CARD` is the surface alone.
+- **PLAN_SURFACE and CostBand:** the ultramarine hero for marketing. `PLAN_SURFACE` is the Your plan surface (below); `CostBand` is the foot band naming what broken rules cost, with `bleed` set to the surface's side padding.
+- **TradeDetailCard:** a white card, 16px radius, `--shadow`, 16px padding: symbol and time, a two-column grid of values (13.5px/600), then a rules checklist with CheckCircle in `gain-fill` and XCircle in `loss-fill`.
+- **RuleList:** rows on hairline dividers, 14px, with kept and broken marks as above; on the hero it reads white with `on-accent-loss`.
+- **Pill, KpiStrip, TradeRows, equity chart, BreakdownChart:** see below.
+
+### The hero surface ("Your plan")
+
+The one coloured surface. `linear-gradient(155deg, #3440c2, #2b35af 45%, #232b98)`, 16px radius, white text, an inset top highlight and `--shadow-hero`. It is ultramarine in both themes, so its colours are literal brand values, not theme tokens. Contents on the Dashboard: a 28px header (an `on-accent` tile, "Your plan" at 15px/600, the range at 12.5px in `on-ultramarine-muted`); the adherence numeral at 88px (104 from `sm`), 600, tracking -0.05em, stretch 88%, with a small raised "%" at 0.42em, captioned by a metric tip ("of rule checks kept") in white at 85%; a split bar of kept (white at 92%) and broken (`on-ultramarine-loss`) with "Kept" and "Broken" under it; and a foot cost band (`rgb(10 14 70 / 0.22)`, top hairline white at 10%, bleeding to the surface edge, min 54px) with the "Broken rules cost" label and the signed cost at 21px/600, `on-ultramarine-loss` when negative. The numeral counts up once in view; screen readers get the final string once; reduced motion and no-JS show the final figure.
+
+### KPI strip (marketing)
+
+Four figures (Net P&L, Win rate, Profit factor, Expectancy): 12px faint label over a 22px/600 figure counted up by NumberTicker, with hairline dividers between columns. A missing value reads "None yet" in faint.
 
 ### Trade rows
 
-Mono 12.5px list on hairline dividers: faint time, symbol, side chip, up to a few tags (mistakes first, loss tone), right-aligned signed net P&L. Grid `96px 70px 64px 1fr 92px` from `sm`; tags hide on phones.
+A tabular list on hairline dividers: muted time, symbol (600, tracking 0.01em), a neutral side chip, up to a few tags (mistakes first, warn tone), right-aligned signed net P&L (gain or loss text, 500). Grid `96px 64px 60px 1fr 92px` from `sm`; tags hide on phones.
 
 ### P&L sign colouring
 
-Positive is gain, negative is loss, zero stays text colour. Applies to ticker figures, row nets and chart bars. Rule rows use CheckCircle and XCircle (fill) in gain and loss.
+Positive is gain, negative is loss, zero stays text colour. Applies to ticker figures, row nets and chart bars (`gain-fill` and `loss-fill`). Rule rows and trade checklists use CheckCircle in `gain-fill` and XCircle in `loss-fill`.
 
-### Equity chart
+### Charts
 
-2px gain-colour line, rounded joins, a gain gradient fill (16% to 0), three `line` gridlines, drawn in an SVG that scales uniformly.
+- **Equity area (marketing and Performance card):** an accent line (2px on the marketing chart, 1.75px in the Performance card, rounded joins, non-scaling stroke), an accent area gradient (30% at the top, 11% at 55%, 0 at the foot), a dashed `line-strong` hairline at the starting value ("2 4" dash), and a ringed end dot (surface fill, accent stroke; HTML in the card so a stretched viewBox never makes it an oval). The line draws in (`draw`) and the area and dot fade after it; reduced motion shows them finished. The equity line is accent because it shows the account, not a sign.
+- **Rolling KPI sparkline:** `Sparkline variant="line"`: the line alone, 1.5px accent at 85% opacity, 56 by 24 viewBox, `h-6 w-12` beside each app KPI figure (win rate, profit factor, expectancy). Each point is a rolling window of the last 20 closed trades (or an eighth of the range, if more), at up to 24 evenly spaced points; a range with no more closed trades than one window has no line. Labelled for assistive tech ("Rolling n-trade win rate, from x to y") and as its hover title. Hidden in a narrow tile (container under 7rem), where the figure takes the room.
+- **Breakdown bars:** `BreakdownChart` is a 220px area with a `line-strong` baseline; each slot holds a bar that slides up from the baseline (transform only), 6px top radius, max 56px wide, `gain-fill` or `loss-fill`, with a signed value above (11px, 12px from `sm`) and an axis label under. Bars reveal in order on first view; finished without JS or under reduced motion.
+- **Cost bars (Mistakes card):** a 4px bar anchored at the right foot of each row, gradient from the fill to 18% transparent (`loss-fill` for negative cost, `gain-fill` for positive), 80% opacity, 100% on row hover.
+- **Adherence track:** 6px, 3px ends, an accent-soft rail under a left-to-right accent gradient (accent mixed 78% with white up to accent).
+- **Goal tracks:** 6px on a `line` rail, 3px ends. The weekly net goal fills with a cyan gradient (info-fill mixed 70% with white up to info-fill) and turns solid `gain-fill` once reached.
+- **Day grid (Goals card):** the daily loss limit as 32 columns of square cells, 2px gap, 1.5px radius: a kept day is `gain-fill` at 35%, a day that broke the limit is solid `loss-fill`, each with a title ("19 Nov, -$480.00, broke the limit"). The grid has an accessible label and the card's sentence says the same in words.
 
 ### Accordion
 
-One open at a time. Heading button 17px/500, 56px minimum, Phosphor Plus rotating 45deg when open. Panel animates `grid-template-rows` 0fr to 1fr; body 15px muted at 1.6 leading.
+A card (surface, 16px radius, hairline, `--shadow-card`, 20px side padding, 24px from `sm`). One open at a time. Heading button 17px/500, 56px minimum, Phosphor Plus rotating 45deg when open and turning accent-ink, hover accent-ink. Panel animates `grid-template-rows` 0fr to 1fr; body 15px muted at 1.6 leading.
 
 ### Icons
 
 Phosphor (`@phosphor-icons/react`), 18px typically, 13px for small carets, `aria-hidden`. No glyph or emoji icons.
 
-- **Marketing:** regular weight, except fill for CheckCircle and XCircle.
-- **App:** duotone glyphs set in 32px tiles (Icon tiles, below). Fill weight stays for state marks: CheckCircle in gain and XCircle in loss (rule rows, Kept mark, a trade's broken-rule line), never as navigation. Plain regular carets and close marks (CaretUpDown 14px, Check 16px, X 20px, List 20px) are allowed bare.
+- **Marketing:** regular weight, except fill for CheckCircle and XCircle; card headers use duotone tiles.
+- **App:** duotone glyphs set in 28px tiles for card headers, state blocks and the account switcher. The sidebar sets 18px glyphs bare, regular weight, duotone only on the current row. Fill weight stays for state marks: CheckCircle in `gain-fill` and XCircle in `loss-fill` (rule rows, Kept mark, a trade's broken-rule line). Plain regular carets and close marks (CaretUpDown 14px, Check 16px, X 20px, List 20px) are allowed bare.
 
 ### App components
 
-The app restyles the shipped primitives for density and adds the pieces below. All state is URL, token or Radix driven; none adds a colour.
+The app restyles the shipped primitives for density and adds the pieces below. All state is URL, token or Radix driven; none adds a hue outside the data jobs above.
 
-#### Icon tiles and nav rows
+#### Sidebar rows
 
-`IconTile`: 32px square, 6px radius, one 18px duotone glyph, decorative (`aria-hidden`). Duotone's second layer is the glyph's `[opacity]` path, which the tile recolours. Tones: `accent` (cobalt-soft fill, cobalt-ink glyph), `neutral` (sunken, muted), `faint` (sunken, faint, second layer 0). `bare` drops the fill. Used for the sidebar, the account switcher, state blocks and the plan preview.
+Rows are 34px (44px coarse), 9px radius, 13.5px label, 11px gap, 10px side padding, 2px between rows, no tiles. Three looks:
 
-Sidebar rows are 40px (44px coarse), 6px radius on the row, 13.5px label, 10px gap, 4px padding. Three looks:
-
-- **Active** (`aria-current="page"`): `accent` tile (accent-soft fill, accent-ink glyph) and an accent-ink label at weight 500. The row itself has no fill.
-- **Inactive:** a bare transparent tile with a muted glyph whose duotone layer is cobalt at 0.25 opacity in light and 0.45 in dark (a quarter-strength tint vanishes on a dark ground). On row hover the tile fills sunken and the glyph and label go to text; the row also takes the page tone (`bg`).
-- **"Not live yet":** faint glyph, outline only (second layer 0, no cobalt), faint label; hover reaches muted. These sit under a faint 12px "Not live yet" group label. Settings sits at the foot of the column.
+- **Current** (`aria-current="page"`): a white (surface) pill with the chip shadow, 600 text, and a duotone accent-ink glyph.
+- **Other modules:** no fill, 500 muted text and a regular muted glyph; hover takes surface at 60% and text colour.
+- **"Not live yet":** faint 500 text, glyph at 70% opacity, hover to muted. These sit under a faint 12.5px/500 "Not live yet" group label. Settings sits at the foot of the column.
 
 #### Filter chips and popovers
 
-A chip is 30px high (44px coarse), 6px radius, 12.5px text, 9px padding, 1px border, max 192px with truncation. Idle: surface fill, `line` border, muted text; hover or open lifts the border to `line-strong` and the text to `text`. Active (a filter is set): cobalt-soft fill and border, cobalt-ink text. **No trades in the workspace:** the chip keeps its tab stop but is dashed, faint, transparent, `aria-disabled`, and opens nothing; a note is attached by `aria-describedby`. While the page loads the same chip is inert and disabled.
+A chip is 32px high (44px coarse), 10px radius, 13.5px text, 12px left and 10px right padding, 1px border, a 1px rest shadow, max 208px with truncation, a 13px CaretDown. Idle: surface fill, `line` border, muted text; hover or open takes an accent border at 35% and text colour. Active (a filter is set): the leading glyph shows in accent-ink. **No trades in the workspace:** the chip keeps its tab stop but is dashed, faint, transparent, `aria-disabled`, and opens nothing; a note is attached by `aria-describedby`. While the page loads the same chip is inert and disabled.
 
-Popovers are Radix Popover: 256px (300px for the date pair), 10px radius, `line-strong` border, `--shadow-chip`, opening with a 240ms drop (`pop-in`) and leaving as the tooltip does. Enter or Space opens, Escape closes, focus returns to the chip. A footer holds a ghost "Clear" button, disabled while nothing is set. Single choices are native radio rows, multiple choices native checkbox rows (36px, 44px coarse, accent-coloured control). Focus inside a popover sits at offset 0.
+Popovers are Radix Popover: 256px (300px for the date pair), 12px radius, `line` border, `--shadow`, opening with a 240ms drop (`pop-in`) and leaving as the tooltip does. Enter or Space opens, Escape closes, focus returns to the chip. A footer holds a ghost "Clear" action in accent-ink 13px/600, disabled while nothing is set. Single choices are native radio rows, multiple choices native checkbox rows (36px, 44px coarse, accent-coloured control, 8px radius). Text and date fields are 36px with an 8px radius; focus inside a popover sits at offset 0.
 
 #### Account switcher
 
-A 48px box in the sidebar: an accent tile (Wallet), workspace name 13px/500 over an account summary 12px faint, and a 14px CaretUpDown. It opens a Radix menu the width of the trigger (min 240px): a "Workspace" radio group (picking one switches and clears account, strategy and tag filters), then "Accounts" check items ("All accounts" first, then live accounts, then an "Archived" group); accounts toggle in place and the menu stays open. A Check indicator in cobalt-ink marks the selection. If storage fails to open, the box becomes a neutral button with an ArrowClockwise tile reading "Workspace unavailable" over "Try again"; it reloads the page.
+A 52px box on the canvas: surface fill, `line` border, 12px radius, chip shadow, an accent Wallet tile, workspace name 13.5px/600 over an account summary 12px faint, and a 14px CaretUpDown. It opens a Radix menu the width of the trigger (min 240px, 12px radius, `--shadow`): a "Workspace" radio group (picking one switches and clears account, strategy and tag filters), then "Accounts" check items ("All accounts" first, then live accounts, then an "Archived" group); accounts toggle in place and the menu stays open. A Check indicator in accent-ink marks the selection. If storage fails to open, the box becomes a neutral button with an ArrowClockwise tile reading "Workspace unavailable" over "Try again"; it reloads the page.
 
 #### Gross/Net segmented control
 
@@ -451,31 +531,31 @@ The shared Segmented radio group, with two app props: `coarseTargets` makes each
 
 #### Expanding search (HorizonX)
 
-At rest a 36px icon button (40px below `sm`, level with that row's controls; 44px coarse): sunken fill, 1px `line`, 10px radius, 18px magnifier. On focus the field grows over `--dur-glide` (320ms, glide curve) as an overlay, so the bar never reflows: from `sm` leftward to 280px (248px from `sm` to `md`), anchored right; below `sm`, where it starts its row, rightward across the whole row inside the gutters; reduced motion keeps it still. An ARIA combobox with a listbox of results (36px rows, sunken on the active row, 12px faint detail on the right); a faint `kbd` hint shows the shortcut (⌘K on Mac, Ctrl K elsewhere, which focuses the field) while empty and focused. Arrow keys move, Enter picks, Escape clears and returns focus. Focus ring: 2px, offset 3px.
+At rest a 34px icon button (40px below `sm`; 44px coarse): surface fill, 1px `line`, 10px radius, 18px magnifier. On focus the field grows over `--dur-glide` (320ms, glide curve) as an overlay, so the bar never reflows: leftward from `sm`, anchored right; below `sm`, where it starts its row, rightward across the whole row inside the gutters; reduced motion keeps it still. Hover and focus take an accent border at 35%, focus adds the chip shadow. An ARIA combobox with a listbox of results (36px rows, 8px radius, sunken on the active row, 13.5px text, 12px faint detail on the right; panel 12px radius, `--shadow`); a faint `kbd` hint shows the shortcut (⌘K on Mac, Ctrl K elsewhere, which focuses the field) while empty and focused. Arrow keys move, Enter picks, Escape clears and returns focus.
 
 #### Metric tip (HorizonX Signal Tooltip)
 
-Every metric label is a button with a dotted `line-strong` underline (4px offset, darkens to faint on hover), `cursor: help`. Hover, focus and tap open its definition in a Radix tooltip (max 280px, 12px/500 muted, 10px radius, `--shadow-chip`) that rises 6px while scaling from 0.92 over 240ms; Escape closes. On coarse pointers the hit area is 44px high and extends 8px each side; keep at least 8px between a tip and any adjacent control so the areas never overlap. Never place one inside another button.
+Every metric label is a button with a dotted underline that is transparent at rest and shows `faint` on hover and focus, `cursor: help`. Hover, focus and tap open its definition in a Radix tooltip (max 280px, 12.5px/500 muted, 10px radius, `line` border, `--shadow`) that rises 6px while scaling from 0.92 over 240ms; Escape closes. On the hero the label is white and its underline and focus ring go white. On coarse pointers the hit area is 44px high and extends 8px each side; keep at least 8px between a tip and any adjacent control so the areas never overlap. Never place one inside another button.
 
 #### Morph dialog (HorizonX)
 
-The rule and mistake drill-down. A Radix Dialog whose panel grows from the row that opened it (FLIP from the opener's rect over `glide`, closes back over `exit`; opacity only under reduced motion). 720px max, 80dvh max, 16px radius, 1px `line`, `--shadow`, over the veil. Header: 18px/600 title, 13px muted description, 44px close button; body scrolls. Focus is trapped and returns to the `returnFocus` element, which is the opener or, if it is gone, the card's fallback focus target. The trade list is the snapshot taken at opening, so a regraded trade stays put while the figures behind it update.
+The rule and mistake drill-down. A Radix Dialog whose panel grows from the row that opened it (FLIP from the opener's rect over `glide`, closes back over `exit`; opacity only under reduced motion). 760px max, 80dvh max, 16px radius, 1px `line`, `--shadow`, over the veil. Header: 17px/600 title, 13px muted description, 44px close button; body scrolls. Focus is trapped and returns to the `returnFocus` element, which is the opener or, if it is gone, the card's fallback focus target. The trade list is the snapshot taken at opening, so a regraded trade stays put while the figures behind it update.
 
-In a rule's drill-down the first column is **Kept**: a native checkbox visually hidden over a 24px disc holding a gain CheckCircle (kept) or a loss XCircle (broken) that cross-fade and scale over 240ms. Space or a click regrades the trade; it flips at once and reverts with a neutral "Couldn't save. Try again." notice if the save fails. The sr-only text says Kept or Broken.
+In a rule's drill-down the first column is **Kept**: a native checkbox visually hidden over a 24px disc holding a gain CheckCircle (kept) or a loss XCircle (broken) that cross-fade and scale over 240ms. Space or a click regrades the trade; it flips at once and reverts with a neutral "Couldn't save. Try again." notice (sunken, 10px radius) if the save fails. The sr-only text says Kept or Broken.
 
 #### Task checkbox (HorizonX)
 
-Built and tested, not yet used. Reserved for Plan 5 review checklists. A visually hidden native checkbox in its label; an 18px box, 6px radius, `line-strong` border that fills gain over 240ms on the glide curve (no overshoot) with a drawn check; a soft gain disc that grows and fades on false-to-true only. 44px target on coarse pointers.
+Built and tested, not yet used. Reserved for Plan 5 review checklists. A visually hidden native checkbox in its label; an 18px box, 6px radius, `line-strong` border and chip shadow that fills `gain-fill` over 240ms on the glide curve (no overshoot) with a drawn white check; a soft gain disc that grows and fades on false-to-true only. 44px target on coarse pointers.
 
 #### Dashboard cards
 
-Every card: surface, 1px line, 16px radius, 20px by 16px padding, a 14px/600 heading (with the range, e.g. "1-20 Nov", at right in 12px faint where useful).
+Every card follows Cards above, with a tile in its tone.
 
-- **Plan card.** A 40px mono adherence figure that ticks up, captioned by a metric tip ("of rule checks kept"), and a cost panel below it: loss-soft with loss text for a negative cost, gain-soft for positive, sunken for zero. Beside it the **Rules table**: 38px rows on hairline dividers that stop at the content edge while the hover fill reaches 8px past it; columns Rule, Kept, Adherence, %, Cost when broken. Kept reads "x of y" in 12.5px mono. Adherence is a **4px cobalt bar on a `line`-coloured rail** (not sunken, so it survives the row's hover fill), pill-ended. The percentage never displays 100% or 0% unless exact (it gains one decimal short of it). Cost is signed mono; "none" in faint sans when nothing broke. The costliest broken rule, first in cost order and negative, carries a loss "Costliest" chip. A rule that was broken opens its trades; the whole row is the target, the left button is the keyboard's way in. Five rules show, with "Show all n rules". Column widths: Kept 88px (96 from 1440), Adherence 100px (22% from 1440), % 52px, Cost 124px (136 from 1440); below `sm` Kept and the column track hide and the track moves under the rule text.
-- **Mistakes card.** Mistake chip (loss), "n trades" mono, signed cost, costliest first; each row opens its trades.
-- **Goals card.** Goals are **always net** and shown only in the base currency, whatever Gross/Net says. Weekly net goal: label with metric tip and amount, "n% of goal" (floored in integer cents, so never 100% short of it) or a gain "Reached" chip, a **6px track** on `line` (cobalt, gain once reached), the week's signed net. Daily loss limit: the same, with "Kept n of m days" and the latest broken day. "Edit goals" (or "Set goals") turns the card into a form in place (38px mono fields, Save and Cancel); **Escape cancels** (not while a save is in flight), and focus returns to the Edit button.
-- **Performance card.** Four KPI tiles in a **2 by 2 grid** (four across from a `@2xl` container): sunken, 10px radius, 12px faint label as a metric tip over a 22px mono 500 figure counted up by the ticker; missing values read "None yet". Below, the equity **sparkline**: a 56px-high, 300 by 56 viewBox, 1.5px cobalt line (non-scaling stroke, drawn once, not under reduced motion) over a 7% cobalt area, starting at the starting balance and passing through each closed trade. Under it, a metric tip and "start to end" in mono. (The marketing equity chart is gain-coloured and 2px; the app sparkline is cobalt because it shows the account, not a sign.)
-- **Recent trades.** A table of the newest closed trades with columns Time, Symbol, Side, Strategy, P&L, Rules. The instrument is written in words: "TSLA 370 Put" with its expiry faint beside it ("20 Nov"), futures as "ES Dec 26"; the title keeps the traded symbol. Where the table folds the time under the symbol (below `md`) the expiry is hidden so two dates never stack. Side uses the Side chip, Long gain and Short loss. Widths: Time 96px (104 from `xl`), Symbol 100px (128 from `md`, 176 from `xl`), Side 72px, Strategy 128px (144 from `lg`, **180px from `xl`, 272px from 1440**), P&L 92px (104 from `sm`); **Rules flexes with a 280px floor from `xl`**, where every row is one 32px line. Rules cell: "n of m kept" in faint, "Not graded" in faint, or a 14px loss XCircle with "Broke: rule text" and a "+n" loss chip. The "+n" chip sits **inline after the rule text from 1280**, and **under the text below 1280**, where the rule text is clamped to two lines (one line, truncated, from `xl`). Below `sm` Side and Strategy hide.
+- **Plan.** Two columns from `xl` (340px hero, 400px from 1440): the hero surface (see The hero surface) beside the **Rules card**, a white card holding a table with 36px rows on hairline dividers that stop at the content edge while the hover fill reaches 8px past it; columns Rule, Kept, Adherence (with the percentage) and Cost when broken, sorted by cost with an accent arrow. Rule text is 13.5px/500; Kept reads "x of y" at 13px/550, tabular, with a faint "of". Adherence is the 6px accent track beside the percentage, which never displays 100% or 0% unless exact (it gains one decimal short of it). Cost is signed, gain or loss text; "none" in faint when nothing broke. The costliest broken rule, first in cost order and negative, carries a warn "Costliest" chip. A rule that was broken opens its trades; the whole row is the target, the left button is the keyboard's way in. Five rules show, with "Show all n rules" in accent-ink. Column widths: Kept 92px (100 from 1440), Adherence 150px (180 from 1440; 52px, percentage only, below `sm`), Cost 128px (140 from 1440; 100px below `sm`); below `sm` Kept hides and the track moves under the rule text. With no graded trades the plan is one card: an accent tile, "No graded trades in this range." and a muted line.
+- **Mistakes** (marigold tile). Rows 35px: a warn-toned mistake name, "n trades" in faint, signed cost, costliest first, each with a cost bar at its foot (see Charts); each row opens its trades.
+- **Goals** (cyan tile). Goals are **always net** and shown only in the base currency, whatever Gross/Net says. Weekly net goal: label with metric tip and amount, "n% of goal" (floored in integer cents, so never 100% short of it) in info text or a gain "Reached" chip, the week's signed net at 22px/600, a 6px goal track (cyan, gain once reached). Daily loss limit: the same label, "Kept n of m days" with a gain "Kept", the day grid, and a sentence naming the latest broken day. "Edit goals" (or "Set goals", an accent-ink header link) turns the card into a form in place (Save and Cancel); **Escape cancels** (not while a save is in flight), and focus returns to the Edit button.
+- **Performance** (accent tile). The P&L at 31px/600 counted up by the ticker with its metric tip, the equity area (see Charts) from the starting balance through each trading day's close, then a three-column strip under a hairline: win rate, profit factor, expectancy, each a 12px faint metric-tip label over a 20px/600 figure with its rolling sparkline, columns divided by hairlines; missing values read "None yet". The header shows the start and end balance in faint, tabular.
+- **Recent trades.** A table of the newest closed trades with columns Time, Symbol, Side, Strategy, P&L, Rules at 13.5px, rows on `line` at 70% that lift to sunken at 60% on hover. The instrument is written in words: "TSLA 370 Put" with the root in 600 and the contract muted, its expiry faint beside it ("20 Nov"), futures as "ES Dec 26"; the title keeps the traded symbol. Time shows the date muted and the clock time in 600. Where the table folds the time under the symbol (below `md`) the expiry is hidden so two dates never stack. Side uses the neutral side chip. Widths: Time 96px (112 from `xl`), Symbol 100px (128 from `md`, 176 from `xl`), Side 78px, Strategy 128px (144 from `lg`, 180 from `xl`, 272 from 1440), P&L 92px (104 from `sm`); **Rules flexes** and from `xl` every row is one 34px line. Strategy cells carry a warn chip for the first mistake and a neutral "+n" chip for the rest. Rules cell: "n of m kept" muted with a `gain-fill` mark, "Not graded" in faint, or a 14px `loss-fill` XCircle with a loss "Broke:" and the rule text, plus a "+n" loss chip. The "+n" chip sits inline after the rule text from `xl`, and under the text below it, where the rule text clamps to two lines (one line, truncated, from `xl`). Below `sm` Side and Strategy hide.
 
 #### Empty and error states
 
@@ -503,40 +583,43 @@ Commercial licence; each is rebuilt in Keel tokens, never copied wholesale.
 
 Tokens in `src/lib/motion.ts`, mirrored as CSS variables. Several patterns are adapted from HorizonX (commercial licence): button press, number ticker, Beacon Tabs glide, animated accordion timing, and in the app signal tooltip, morph dialog, expanding search and task checkbox (see HorizonX attribution).
 
-- **Enter** 240ms `cubic-bezier(0.2, 0.8, 0.2, 1)`; **Exit** 160ms `cubic-bezier(0.4, 0, 1, 1)`; **Glide** 320ms `cubic-bezier(0.23, 1, 0.32, 1)` (`--dur-glide`, `--ease-glide`; also `--dur-enter` 240ms, `--dur-exit` 160ms); **Press** 0.97 scale, 180ms down, 120ms up.
-- **Hero entrance** (CSS, plays from first paint): `rise` 8px over 240ms; `rise-window` 12px over 400ms; `slide-in` from -16px over 320ms (opaque by 40%); line `draw` and area `fade` 900ms.
+- **Enter** 240ms `cubic-bezier(0.2, 0.8, 0.2, 1)`; **Exit** 160ms `cubic-bezier(0.4, 0, 1, 1)`; **Glide** 320ms `cubic-bezier(0.23, 1, 0.32, 1)` (`--dur-glide`, `--ease-glide`; also `--dur-enter` 240ms, `--dur-exit` 160ms); **Press** 0.97 scale, 180ms down, 120ms up. Colour, border and shadow transitions on controls run 200ms on the glide curve.
+- **Hero entrance** (CSS, plays from first paint): `rise` 8px over 240ms; `rise-window` 12px over 400ms; `slide-in` from -16px over 320ms (opaque by 40%); marketing line `draw` and area `fade` 900ms. The Performance sparkline draws over 1.3s from 150ms and its area and dot fade in at 700ms.
 - **App overlays:** `tip-in` (6px rise, scale from 0.92, 240ms enter curve) and `tip-out` (160ms) for tooltips; `pop-in` (4px drop, scale from 0.98, 240ms) for popovers and menus; the drawer slides from -100% over enter and out over exit; `check-ripple` 360ms.
-- **Number ticker** counts 0 to value in 900ms once in view; screen readers get only the final string.
+- **Number ticker** counts 0 to value in 900ms once in view; screen readers get only the final string. The hero numeral counts on its own frames so its "%" can sit small beside it.
+- **Breakdown bars** slide up from the baseline over 560ms, 50ms apart, once on first view.
 - **TickIn rows** reveal with 110ms stagger, 8px rise, once on first view.
-- **Reduced motion:** all animation and transition durations collapse to 0.01ms; ticker shows the final value; tabs, button and draws skip movement; smooth in-page scroll is off. Without JS everything shows in its final state.
+- **Reduced motion:** all animation and transition durations collapse to 0.01ms; ticker shows the final value; tabs, button, draws and bars skip movement; smooth in-page scroll is off. Without JS everything shows in its final state.
 
 ## Do's and Don'ts
 
 ### Do:
 
-- **Do** use cobalt (#2550e0) as the single accent and only for primary action, selection, focus and accent chips.
-- **Do** set every number in Geist Mono with tabular figures, and colour only signed P&L green or red.
-- **Do** use the three radii: 6 chips, 10 buttons and inner panels, 16 cards.
+- **Do** use Keel Ultramarine (#2b35af) as the one brand hue, for primary action, selection, focus, adherence, the account's own line and the hero surface.
+- **Do** give each data hue its one job: marigold for mistakes, cyan for goal progress, green and red for signed money and kept or broken.
+- **Do** set every number with tabular figures, and colour only signed P&L green or red.
+- **Do** use the three radii: 6 chips, 10 buttons and inner panels, 16 cards, and only the documented role exceptions beside them.
+- **Do** put cards on the canvas as white surfaces with the card shadow and a hairline; keep the "Your plan" hero the only coloured surface.
 - **Do** show the product as a real app window built from live components, and label it "Sample data. Not a real account." wherever invented figures appear.
 - **Do** write copy with commas, periods and colons. Use hyphens only inside words.
 - **Do** use Phosphor icons at 18px, with Motion durations and curves from `src/lib/motion.ts`.
-- **Do** keep light as the default and design dark as the same roles on the dark tokens.
-- **Do** put app icons in 32px duotone tiles: cobalt-soft when current, bare when inactive, outline-only faint when the module is not live.
+- **Do** keep light as the default and design dark as the navy palette with its own tokens, the hero staying ultramarine.
+- **Do** put card-header icons in 28px duotone tiles toned to the card's job: accent, marigold or cyan; outline-only faint when the module is not live.
 - **Do** give every metric a MetricTip definition, keep 8px between a tip and adjacent controls, and keep goals net and in the base currency.
 - **Do** open a rule's or a mistake's exact trades through the Morph dialog, and return focus to the opener.
-- **Do** show loading failures neutrally, and show Long and Short as words in gain and loss chips.
+- **Do** show loading failures neutrally, and show Long and Short as neutral words.
 - **Do** keep every adherence figure honest: never 100% or 0% unless exact.
 
 ### Don't:
 
 - **Don't** add eyebrows, kickers or small-caps labels above headings.
 - **Don't** use em or en dashes in copy.
-- **Don't** add decorative dots, orbs, gradients or mesh backgrounds. The status pill dot is a status, not decoration.
+- **Don't** add decorative dots, orbs, mesh or gradient backgrounds. The gradients that ship are materials, not decoration: the hero surface, the raised primary, the brand tile, bar and area fills. The status pill dot is a status, not decoration.
 - **Don't** present sample data unlabelled, or invent real-sounding user names and figures.
 - **Don't** build metaphor worlds (floors, tickets, stamps, ledgers, cockpits) or editorial serif display type.
-- **Don't** add a second accent colour or use green and red for anything but sign and state.
+- **Don't** add a second brand hue, spend ultramarine on money, or use green and red for anything but signed money and kept or broken.
 - **Don't** use hard offset shadows, glassmorphism or side-stripe borders.
-- **Don't** introduce font sizes outside the ramp above.
-- **Don't** use loss red for an error state, or cobalt for anything that is not action, selection, focus or the account's own line.
-- **Don't** tint a "not live yet" module with duotone fill; it stays an outline.
+- **Don't** introduce font sizes outside the ramp above, or bring back Geist, Geist Mono or the cobalt (#2550e0) look.
+- **Don't** use loss red for an error state, marigold for a warning state, or colour a side (Long or Short) as a result.
+- **Don't** tint a "not live yet" module; its glyph stays an outline.
 - **Don't** reach for a library tooltip, modal or search box that bypasses the HorizonX-adapted ones.

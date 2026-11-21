@@ -91,10 +91,12 @@ test('goals: reached this week; one day broke the loss limit', async () => {
   expect(goals.textContent).toContain('+$200.00 this week, 16-20 Nov');
   expect(goals.textContent).toContain('Daily loss limit');
   expect(goals.textContent).toContain('$300.00');
-  expect(goals.textContent).toContain('1 of 2 days');
+  expect(goals.textContent).toContain('Kept 1 of 2 days');
   expect(goals.textContent).toContain(
-    'Kept 1 of 2 days, all time. Broken Thu 19 Nov at −$400.00.',
+    'Broken once, all time: Thu 19 Nov at −$400.00.',
   );
+  // The kept count is said once, beside the label.
+  expect(goals.textContent?.match(/1 of 2 days/g)).toHaveLength(1);
   expect(
     within(goals).getByRole('button', { name: 'Edit goals' }),
   ).toBeTruthy();
@@ -135,7 +137,7 @@ test('goals: several broken days name the latest and the count', async () => {
   });
   const goals = await goalsCard();
   expect(goals.textContent).toContain(
-    'Kept 0 of 2 days, all time. Broken, latest Thu 19 Nov at −$400.00, 2 days in all.',
+    'Last broken Thu 19 Nov at −$400.00. 2 days broken, all time.',
   );
   // A losing week reads 0% of its goal: an honest figure, not an empty one.
   expect(goals.textContent).toContain('0% of goal');
@@ -404,7 +406,9 @@ test('gross drives the KPIs and the equity line; goals stay net (Review Focus 3)
   ).toBeTruthy();
   const goals = await goalsCard();
   expect(goals.textContent).toContain('+$200.00 this week, 16-20 Nov');
-  expect(goals.textContent).toContain('Broken Thu 19 Nov at −$400.00.');
+  expect(goals.textContent).toContain(
+    'Broken once, all time: Thu 19 Nov at −$400.00.',
+  );
   const table = screen.getByRole('table', { name: 'Recent trades' });
   expect(
     within(table).getByRole('columnheader', { name: 'Gross P&L' }),
@@ -480,7 +484,9 @@ test('a trade that broke two rules and carries two mistakes', async () => {
   // The full list rides in the title, and whole in the text a screen reader gets.
   const rules = within(row).getByTitle(`${r1}, ${r2}`);
   // Below xl the rule wraps to two lines rather than cutting to a stub; from xl it reads on one line.
-  const text = within(rules).getByText(`Broke: ${keepHyphens(r1)}`);
+  // "Broke:" (loss red) and the rule (ink) are two runs in one clamped line.
+  const text = rules.querySelector('.line-clamp-2')!;
+  expect(text.textContent).toBe(`Broke: ${keepHyphens(r1)}`);
   expect(text.className).toContain('line-clamp-2');
   expect(text.className).toContain('xl:truncate');
   expect(text.className).not.toMatch(/(^|\s)truncate/);

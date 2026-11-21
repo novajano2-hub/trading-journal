@@ -4,10 +4,14 @@ import {
   ArrowLeft,
   FileText,
   Trash,
+  UploadSimple,
   Warning,
 } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { DashboardLink } from '@/components/app/dashboard-link';
+import { buttonClasses } from '@/components/ui/button-styles';
+import { IconTile } from '@/components/ui/icon-tile';
 import { clearPendingImport, loadPendingImport } from '@/lib/pending-import';
 
 type Waiting =
@@ -16,6 +20,9 @@ type Waiting =
   | { kind: 'none' };
 
 const ICON = { 'aria-hidden': true } as const;
+
+/** Where an import starts until Keel takes files itself: getting the CSV out of the broker. */
+const EXPORT_GUIDE = '/brokers#export';
 
 const REMOVE_ERROR =
   "Couldn't remove the file from this browser. Try again, or clear this site's data in your browser settings.";
@@ -31,7 +38,7 @@ function kb(bytes: number): string {
 export default function ImportPage() {
   const [waiting, setWaiting] = useState<Waiting>({ kind: 'checking' });
   const [removeError, setRemoveError] = useState(false);
-  const noneRef = useRef<HTMLParagraphElement>(null);
+  const noneRef = useRef<HTMLHeadingElement>(null);
   const removed = useRef(false);
 
   useEffect(() => {
@@ -72,10 +79,13 @@ export default function ImportPage() {
     // The app shell's top bar carries the page title.
     <div className="w-full px-5 pt-6 pb-16">
       <div className="max-w-[640px]">
-        <div className="rounded-card border border-line bg-surface-1 p-6">
-          <h2 className="border-b border-line pb-3 text-[13px] font-medium text-muted">
-            Waiting to be imported
-          </h2>
+        <div className="rounded-card border border-line bg-surface-1 p-6 shadow-[var(--shadow-card)]">
+          {/* With no file the empty state's own title heads the card. */}
+          {waiting.kind === 'none' ? null : (
+            <h2 className="border-b border-line pb-3 text-[13px] font-medium text-muted">
+              Waiting to be imported
+            </h2>
+          )}
           <div aria-live="polite">
             {waiting.kind === 'checking' ? (
               <p className="mt-4 text-[16px] text-muted">
@@ -109,20 +119,37 @@ export default function ImportPage() {
                 </button>
               </>
             ) : (
-              <>
-                <p
+              // The app's empty state: the module's tile, what's missing, what to bring, the way on.
+              <div className="flex flex-col items-center px-2 pt-6 pb-3 text-center sm:px-6">
+                <IconTile
+                  icon={UploadSimple}
+                  tone="accent"
+                  className="size-10! rounded-[11px]! [&_svg]:size-[22px]"
+                />
+                <h2
                   ref={noneRef}
                   tabIndex={-1}
-                  className="mt-4 text-[16px] focus-visible:outline-offset-4"
+                  className="mt-5 text-[17px] leading-snug font-semibold tracking-[-0.015em] text-balance text-text focus-visible:outline-offset-4"
                 >
                   No file waiting.
+                </h2>
+                <p className="mt-2 text-[14.5px] leading-[1.6] text-pretty text-muted">
+                  Bring in trades from your broker&apos;s CSV export.
                 </p>
-                {/* Styled as the placeholders' way back. */}
-                <DashboardLink className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-control text-[15px] font-medium text-accent-ink no-underline hover:underline">
-                  <ArrowLeft {...ICON} size={16} />
-                  Back to the Dashboard
-                </DashboardLink>
-              </>
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
+                  <Link
+                    href={EXPORT_GUIDE}
+                    className={buttonClasses('primary')}
+                  >
+                    How to export your CSV
+                  </Link>
+                  {/* Styled as the placeholders' way back. */}
+                  <DashboardLink className="inline-flex min-h-11 items-center gap-2 rounded-control px-2 text-[14px] font-semibold text-accent-ink no-underline hover:underline">
+                    <ArrowLeft {...ICON} size={16} />
+                    Back to the Dashboard
+                  </DashboardLink>
+                </div>
+              </div>
             )}
           </div>
         </div>

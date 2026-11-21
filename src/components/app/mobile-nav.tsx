@@ -12,10 +12,11 @@ import { WithDashboardHref } from './dashboard-link';
 import { CurrentSidebarNav, SwitcherSlot } from './sidebar';
 
 const ICON_BUTTON =
-  'inline-flex size-11 flex-none cursor-pointer items-center justify-center rounded-control text-text transition-colors duration-120 hover:bg-sunken';
+  'inline-flex size-11 flex-none cursor-pointer items-center justify-center rounded-control text-text transition-colors duration-200 ease-(--ease-glide) hover:bg-surface-1';
 
 /**
- * Below `lg`, the sidebar as a sheet from the left. It traps focus, closes on
+ * Below `lg`, the sidebar as a sheet from the left, on the same canvas. It
+ * traps focus, closes on
  * Escape, the veil, a link, any route change or a workspace switch, and hands
  * focus back to its trigger.
  */
@@ -78,20 +79,20 @@ export function MobileNav({
             </Dialog.Overlay>
             <Dialog.Content asChild forceMount aria-describedby={undefined}>
               <motion.div
-                className="fixed inset-y-0 left-0 z-50 flex w-[280px] max-w-[calc(100vw-48px)] flex-col overflow-y-auto border-r border-line bg-surface-1 px-3 pt-2 pb-4 outline-none"
+                className="fixed inset-y-0 left-0 z-50 flex w-[280px] max-w-[calc(100vw-48px)] flex-col overflow-y-auto bg-bg pt-2 pr-3.5 pb-[18px] pl-[18px] shadow-[var(--shadow)] outline-none"
                 initial={slide.initial}
                 animate={{ ...slide.shown, transition: enter }}
                 exit={{ ...slide.gone, transition: exit }}
               >
                 <Dialog.Title className="sr-only">Navigation</Dialog.Title>
                 {/* Both controls here leave the sheet: the wordmark goes to the Dashboard, filters kept. */}
-                <div className="mb-2 flex items-center justify-between">
+                <div className="flex items-center justify-between">
                   <WithDashboardHref>
                     {(href) => (
                       <BrandMark
                         href={href}
                         onClick={close}
-                        className="h-11 rounded-control px-2"
+                        className="h-11 rounded-control px-1.5"
                       />
                     )}
                   </WithDashboardHref>

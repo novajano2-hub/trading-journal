@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { FeatureVisual } from '@/components/site/feature-visual';
+import { CTA_LG, CTA_MD, CTA_PRIMARY } from '@/components/site/cta';
 import { SectionHeading } from '@/components/site/landing/section-heading';
 import { START_HREF } from '@/components/site/nav-links';
 import { Chip } from '@/components/ui/chip';
@@ -55,7 +56,7 @@ export default async function FeaturePage({
         <div>
           <h1
             id="feature-title"
-            className="max-w-[16ch] text-[clamp(36px,calc(2.6vw+16px),52px)] leading-[1.06] font-semibold tracking-[-0.04em] text-balance motion-safe:animate-rise"
+            className="max-w-[16ch] text-[clamp(36px,calc(2.6vw+16px),52px)] leading-[1.06] font-semibold tracking-[-0.032em] text-balance motion-safe:animate-rise"
           >
             {content.headline}
           </h1>
@@ -74,10 +75,7 @@ export default async function FeaturePage({
                 In development
               </Chip>
             ) : (
-              <Link
-                href={START_HREF}
-                className="inline-flex h-11 items-center rounded-control bg-accent px-[18px] text-[15px] font-medium whitespace-nowrap text-accent-fg no-underline transition-colors hover:bg-accent-hover"
-              >
+              <Link href={START_HREF} className={`${CTA_PRIMARY} ${CTA_MD}`}>
                 Get started
               </Link>
             )}
@@ -96,7 +94,10 @@ export default async function FeaturePage({
         </div>
       </section>
 
-      <section aria-labelledby="points-title" className="border-t border-line">
+      <section
+        aria-labelledby="points-title"
+        className="border-t border-line-2"
+      >
         <div className={`${FRAME} py-24`}>
           <SectionHeading
             id="points-title"
@@ -111,7 +112,7 @@ export default async function FeaturePage({
             className="m-0 mt-14 grid gap-x-16 gap-y-10 md:grid-cols-2"
           >
             {content.points.map((p) => (
-              <div key={p.title} className="border-t border-line pt-5">
+              <div key={p.title} className="border-t border-line-2 pt-5">
                 <dt className="text-[17px] font-semibold tracking-[-0.015em]">
                   {p.title}
                 </dt>
@@ -124,7 +125,7 @@ export default async function FeaturePage({
         </div>
       </section>
 
-      <section aria-labelledby="rest-title" className="border-t border-line">
+      <section aria-labelledby="rest-title" className="border-t border-line-2">
         <div
           className={`${FRAME} flex flex-col items-start justify-between gap-10 py-20 lg:flex-row lg:items-end`}
         >
@@ -150,10 +151,7 @@ export default async function FeaturePage({
               )}
             </ul>
           </div>
-          <Link
-            href={START_HREF}
-            className="inline-flex h-[50px] items-center rounded-control bg-accent px-6 text-base font-medium whitespace-nowrap text-accent-fg no-underline transition-colors hover:bg-accent-hover"
-          >
+          <Link href={START_HREF} className={`${CTA_PRIMARY} ${CTA_LG}`}>
             Get started
           </Link>
         </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { BreakdownChart } from '@/components/product/breakdown-chart';
 import { Segmented } from '@/components/ui/segmented';
@@ -50,10 +50,12 @@ export function ReportsPanel({
     .filter((r) => r.pnl !== 0)
     .sort((a, b) => b.pnl - a.pnl);
   const name = `${basis === 'gross' ? 'Gross' : 'Net'} P&L by ${tab}`;
+  // The app's depth ladder: each row's bar is its share of the largest figure.
+  const top = Math.max(1, ...ranked.map((r) => Math.abs(r.pnl)));
   const monoLabels = tab === 'hour';
 
   return (
-    <div className="mt-12 overflow-hidden rounded-card border border-line bg-surface-1">
+    <div className="mt-12 overflow-hidden rounded-card border border-line bg-surface-1 shadow-[var(--shadow-card)]">
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-3 border-b border-line px-4 py-3.5 text-[13px] sm:px-[18px]">
         <Tabs
           id={ID}
@@ -75,8 +77,9 @@ export function ReportsPanel({
               setChanged(true);
             }}
           />
-          <span className="inline-flex h-7 items-center gap-1.5 rounded-chip border border-line px-2.5 whitespace-nowrap">
-            Breakeven <span className="font-mono">{breakeven}</span>
+          <span className="inline-flex h-7 items-center gap-1.5 rounded-control border border-line bg-surface-1 px-2.5 whitespace-nowrap text-muted shadow-[0_1px_1px_rgb(18_22_51/0.04)]">
+            Breakeven{' '}
+            <span className="font-semibold text-text tnum">{breakeven}</span>
           </span>
           <span className="text-xs text-faint">Sample data</span>
         </div>
@@ -97,7 +100,7 @@ export function ReportsPanel({
           </h3>
           <motion.ol
             key={sideDim}
-            className="mt-3.5 grid gap-3.5 text-sm"
+            className="mt-3.5 grid gap-2 text-sm"
             initial={changed && !reduced ? { opacity: 0, y: 4 } : false}
             animate={{ opacity: 1, y: 0 }}
             transition={enter}
@@ -107,10 +110,22 @@ export function ReportsPanel({
                 key={r.key}
                 layout={reduced ? false : 'position'}
                 transition={glide}
-                className="flex justify-between gap-3"
+                style={
+                  {
+                    '--w': Math.abs(r.pnl) / top,
+                  } as CSSProperties
+                }
+                // A pseudo-element bar, so the row's text stays its only content.
+                className={`relative flex justify-between gap-3 pb-2.5 after:absolute after:right-0 after:bottom-0 after:h-1 after:w-full after:origin-right after:scale-x-(--w) after:rounded-full after:transition-transform after:duration-(--dur-glide) after:ease-(--ease-glide) ${
+                  r.pnl < 0
+                    ? 'after:bg-[linear-gradient(270deg,var(--loss-fill),color-mix(in_oklab,var(--loss-fill)_18%,transparent))]'
+                    : 'after:bg-[linear-gradient(270deg,var(--gain-fill),color-mix(in_oklab,var(--gain-fill)_18%,transparent))]'
+                }`}
               >
                 <span>{r.label}</span>
-                <span className={`font-mono whitespace-nowrap ${tone(r.pnl)}`}>
+                <span
+                  className={`font-medium whitespace-nowrap tnum ${tone(r.pnl)}`}
+                >
                   {formatPnl(r.pnl)}
                 </span>
               </motion.li>

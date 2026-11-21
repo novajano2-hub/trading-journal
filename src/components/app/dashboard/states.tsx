@@ -11,39 +11,60 @@ import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { IconTile } from '@/components/ui/icon-tile';
 import { StorageUnavailableError } from '@/data/repository';
-
-const CARD = 'rounded-card border border-line bg-surface-1';
+import { CARD, CARD_PAD, HERO } from './shared';
 
 function Bar({ className }: { className: string }): React.JSX.Element {
   return <span className={`block rounded-chip bg-sunken ${className}`} />;
 }
 
-/** The Dashboard's shape while its data loads: row 1 and the three cards of row 2, without figures. */
+/** A card's header while it loads: the tile's place, then the title's. */
+function HeaderBars({ title = 'w-28' }: { title?: string }): React.JSX.Element {
+  return (
+    <div className="flex h-7 items-center gap-2.5">
+      <Bar className="size-7 rounded-lg" />
+      <Bar className={`h-3.5 ${title}`} />
+    </div>
+  );
+}
+
+/**
+ * The Dashboard's shape while its data loads: the plan's hero and its rules,
+ * the three cards of row 2 and the recent trades, without figures. The hero
+ * is already ultramarine, so nothing changes colour when the figures land.
+ */
 export function DashboardSkeleton(): React.JSX.Element {
   return (
     <div
       role="status"
       aria-label="Loading your dashboard"
-      className="flex flex-col gap-4 p-5"
+      className="flex flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0"
     >
       <div
         aria-hidden="true"
-        className={`${CARD} flex flex-col gap-6 px-5 py-4 lg:min-h-[288px] lg:flex-row lg:gap-7`}
+        className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)] min-[90rem]:grid-cols-[400px_minmax(0,1fr)]"
       >
-        <div className="flex flex-col justify-center gap-3 border-line max-lg:border-b max-lg:pb-5 lg:w-[290px] lg:flex-none lg:border-r lg:pr-7">
-          <Bar className="h-4 w-40" />
-          <Bar className="h-11 w-28" />
-          <Bar className="h-3.5 w-32" />
-          <Bar className="mt-3 h-10 w-full rounded-control" />
+        <div
+          className={`${HERO} flex min-h-[262px] flex-col overflow-hidden px-[22px] pt-[18px]`}
+        >
+          <div className="flex h-7 items-center gap-2.5">
+            <span className="size-7 rounded-lg bg-white/14" />
+            <span className="h-3.5 w-20 rounded-chip bg-white/18" />
+          </div>
+          <span className="mt-5 h-[72px] w-32 rounded-control bg-white/12" />
+          <span className="mt-[26px] h-2 rounded-[3px] bg-white/18" />
+          <div className="-mx-[22px] mt-auto h-[54px] border-t border-white/10 bg-[rgb(10_14_70/0.22)]" />
         </div>
-        <div className="flex min-w-0 flex-1 flex-col justify-center">
+        <div className={`${CARD} flex flex-col px-5 pt-1.5 pb-4`}>
+          <div className="flex h-[34px] items-center">
+            <Bar className="h-3 w-12" />
+          </div>
           {[0, 1, 2, 3, 4].map((i) => (
             <div
               key={i}
-              className="flex h-[38px] items-center gap-4 border-t border-line first:border-t-0"
+              className="flex h-9 items-center gap-4 border-t border-line"
             >
               <Bar className="h-3.5 w-2/5" />
-              <Bar className="ml-auto h-1 w-1/4 max-sm:hidden" />
+              <Bar className="ml-auto h-1.5 w-1/5 max-sm:hidden" />
               <Bar className="h-3.5 w-16" />
             </div>
           ))}
@@ -51,19 +72,35 @@ export function DashboardSkeleton(): React.JSX.Element {
       </div>
       <div
         aria-hidden="true"
-        className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+        className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)_minmax(0,1.38fr)]"
       >
         {[0, 1, 2].map((i) => (
           <div
             key={i}
-            className={`${CARD} flex h-[268px] flex-col gap-4 px-5 py-4`}
+            className={`${CARD} ${CARD_PAD} flex h-[256px] flex-col gap-4 md:max-xl:last:col-span-2`}
           >
-            <Bar className="h-4 w-32" />
+            <HeaderBars />
             <Bar className="h-3.5 w-full" />
             <Bar className="h-3.5 w-4/5" />
             <Bar className="h-3.5 w-3/5" />
           </div>
         ))}
+      </div>
+      <div aria-hidden="true" className={`${CARD} ${CARD_PAD}`}>
+        <HeaderBars title="w-32" />
+        <div className="mt-3">
+          {[0, 1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="flex h-[34px] items-center gap-6 border-t border-line first:border-t-0"
+            >
+              <Bar className="h-3 w-20" />
+              <Bar className="h-3 w-24" />
+              <Bar className="h-3 w-1/4 max-sm:hidden" />
+              <Bar className="ml-auto h-3 w-16" />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -89,7 +126,7 @@ function StateBlock({
       className="mx-auto flex w-full max-w-[520px] flex-col items-center px-5 py-20 text-center sm:py-28"
     >
       {visual}
-      <h2 className="mt-5 text-[16px] leading-snug font-medium text-balance text-text">
+      <h2 className="mt-5 text-[17px] leading-snug font-semibold tracking-[-0.015em] text-balance text-text">
         {title}
       </h2>
       {body ? (
@@ -119,11 +156,11 @@ function PlanPreview(): React.JSX.Element {
   return (
     <figure
       aria-labelledby={captionId}
-      className="mb-3 w-full rounded-card border border-line bg-surface-1 px-5 pt-4 pb-2 text-left"
+      className={`${CARD} mb-4 w-full px-5 pt-[18px] pb-2 text-left`}
     >
       <figcaption
         id={captionId}
-        className="flex items-center gap-3 text-[13px] leading-snug text-muted"
+        className="flex items-center gap-2.5 text-[13.5px] leading-snug font-medium text-text"
       >
         <IconTile icon={ListChecks} tone="accent" />
         Your rules and what breaking them costs will show here.
@@ -131,9 +168,11 @@ function PlanPreview(): React.JSX.Element {
       {/* The last row fades: the list goes on. */}
       <div
         aria-hidden="true"
-        className="mt-4 [mask-image:linear-gradient(to_bottom,black_55%,transparent)]"
+        className="mt-3 [mask-image:linear-gradient(to_bottom,black_55%,transparent)]"
       >
-        <div className={`${columns} pb-2 text-xs leading-4 text-faint`}>
+        <div
+          className={`${columns} h-[34px] border-b border-line text-xs font-medium text-faint`}
+        >
           <span>Rule</span>
           <span>Adherence</span>
           <span className="text-right">Cost</span>
@@ -141,10 +180,10 @@ function PlanPreview(): React.JSX.Element {
         {GHOST_RULES.map((width) => (
           <div
             key={width}
-            className={`${columns} h-[38px] border-t border-line`}
+            className={`${columns} h-9 border-t border-line first:border-t-0`}
           >
             <Bar className={`h-2.5 ${width}`} />
-            <span className="block h-1 rounded-full bg-line" />
+            <span className="block h-1.5 rounded-[3px] bg-accent-soft" />
             <Bar className="ml-auto h-2.5 w-12" />
           </div>
         ))}

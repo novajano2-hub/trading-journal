@@ -30,26 +30,24 @@ test('the active module is marked and filter-scoped links keep the filters', () 
   ).toBe(false);
 });
 
-test('the current, other and not-live modules each have their own tile', () => {
+test('the current, other and not-live modules each have their own look', () => {
   render(
     <SidebarNav pathname="/app/dashboard" params={new URLSearchParams()} />,
   );
-  const tile = (name: string) =>
-    screen
-      .getByRole('link', { name })
-      .querySelector<HTMLElement>('[aria-hidden="true"]')!;
-  const current = tile('Dashboard');
-  const other = tile('Trades');
-  const notLive = tile('Replay');
-  // Filled cobalt-soft; bare with a cobalt duotone layer; a bare faint outline.
-  expect(current.dataset.tone).toBe('accent');
-  expect(current.className).toContain('bg-accent-soft');
-  expect(other.dataset.tone).toBe('neutral');
-  expect(other.className).not.toMatch(/(^|\s)bg-/);
-  expect(other.className).toContain('[&_[opacity]]:fill-accent');
-  expect(notLive.dataset.tone).toBe('faint');
-  expect(notLive.className).not.toMatch(/(^|\s)bg-/);
-  expect(notLive.className).toContain('[&_[opacity]]:opacity-0');
+  const link = (name: string) => screen.getByRole('link', { name });
+  const glyph = (name: string) =>
+    link(name).querySelector<SVGElement>('svg[aria-hidden="true"]')!;
+  // A white pill with a duotone accent glyph; bare in regular weight; faded.
+  expect(link('Dashboard').className).toContain('bg-surface-1');
+  expect(glyph('Dashboard').getAttribute('data-look')).toBe('current');
+  expect(glyph('Dashboard').getAttribute('class')).toContain('text-accent-ink');
+  expect(glyph('Dashboard').querySelector('[opacity]')).not.toBeNull();
+  expect(link('Trades').className).not.toMatch(/(^|\s)bg-/);
+  expect(glyph('Trades').getAttribute('data-look')).toBe('module');
+  expect(glyph('Trades').querySelector('[opacity]')).toBeNull();
+  expect(link('Replay').className).not.toMatch(/(^|\s)bg-/);
+  expect(glyph('Replay').getAttribute('data-look')).toBe('not-live');
+  expect(glyph('Replay').getAttribute('class')).toContain('opacity-70');
 });
 
 test('"Not live yet" is its own labelled list of four links', () => {

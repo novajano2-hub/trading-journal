@@ -58,14 +58,14 @@ function renderBar(): HTMLElement {
   return screen.getByRole('banner');
 }
 
-// Room beside the title: 900 - 240 - 115 - 8 (title margin) - 2 * 8 (gaps) = 521.
+// Room beside the title: 900 - 240 - 115 - 12 (title margin) - 2 * 8 (gaps) = 517.
 test('chips that fit beside the title sit there', () => {
-  layOut({ titleWidth: 115, chipsWidth: 520 });
+  layOut({ titleWidth: 115, chipsWidth: 516 });
   expect(renderBar().dataset.chips).toBe('inline');
 });
 
 test('chips that need more than the room take their own row', () => {
-  layOut({ titleWidth: 115, chipsWidth: 521 });
+  layOut({ titleWidth: 115, chipsWidth: 517 });
   expect(renderBar().dataset.chips).toBe('wrapped');
 });
 

@@ -1,9 +1,14 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Instrument_Sans } from 'next/font/google';
 import './globals.css';
 
-const sans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
-const mono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
+// Keel's one family, numbers set in its tabular figures (theme.css maps
+// both font-sans and font-mono to it).
+const sans = Instrument_Sans({
+  variable: '--font-keel',
+  subsets: ['latin'],
+  axes: ['wdth'],
+});
 
 export const metadata: Metadata = {
   title: { default: 'Keel', template: '%s · Keel' },
@@ -17,7 +22,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
     <html
       lang="en"
-      className={`${sans.variable} ${mono.variable} h-full antialiased`}
+      className={`${sans.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <head>

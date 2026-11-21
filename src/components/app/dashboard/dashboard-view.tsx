@@ -23,6 +23,7 @@ import {
 } from '@/data/query/hooks';
 import { StorageUnavailableError } from '@/data/repository';
 import { SAMPLE_WORKSPACE } from '@/data/workspaces';
+import { dailyPnl, type DayStat } from '@/domain/metrics/days';
 import { goalWeek } from '@/domain/metrics/goals';
 import { localDate } from '@/domain/time';
 import { rangeCaption } from '@/lib/range-label';
@@ -30,7 +31,12 @@ import { hasActiveFilters, switchWorkspaceFilters } from '../filter-model';
 import { Drilldown } from './drilldown';
 import { GoalsCard } from './goals-card';
 import { MistakesCard } from './mistakes-card';
-import { PerformanceCard } from './performance-card';
+import {
+  equityLine,
+  kpiTrends,
+  NO_TRENDS,
+  PerformanceCard,
+} from './performance-card';
 import { PlanCard } from './plan-card';
 import { RecentTrades } from './recent-trades';
 import { DashboardEmpty, DashboardError, DashboardSkeleton } from './states';
@@ -131,26 +137,54 @@ export function DashboardView(): React.JSX.Element {
     const caption = rangeCaption(range, today);
     const goals = goalsFor(prefs, workspace.data);
     if (withClosed.length === 0)
-      return { withClosed, caption, goals, model: undefined, weekLabel: '' };
+      return {
+        withClosed,
+        caption,
+        goals,
+        model: undefined,
+        weekLabel: '',
+        days: [] as DayStat[],
+        trends: NO_TRENDS,
+        line: undefined,
+      };
     const chosen = withClosed.some((m) => m.currency === currency)
       ? currency
       : undefined;
     const partition = pickPartition(metrics.data, chosen, prefs.baseCurrency);
+    const ctx = metricContextOf(prefs);
     const model = buildDashboard(partition, {
       strategies,
       tags,
       goals,
       baseCurrency: prefs.baseCurrency,
-      ctx: metricContextOf(prefs),
+      ctx,
       range,
       today,
     });
+    // The daily loss limit's grid: every trading day, always on net, as the goal reads them.
+    const days = !model.goals.dailyLoss
+      ? []
+      : partition.summary.basis === 'net'
+        ? partition.days
+        : dailyPnl(partition.trades, { ...ctx, pnlBasis: 'net' });
+    const trends = kpiTrends(partition.trades, ctx);
+    // The partition's days are on the basis its equity is, so the last close is the last balance.
+    const line = equityLine(model.performance.equity, partition.days);
     // "this week" while the goal week is today's; a range that ended earlier reads "that week".
     const week = model.goals.weekly?.window;
     const weekLabel = week
       ? `${week.from >= goalWeek({}, today)!.from ? 'this' : 'that'} week, ${rangeCaption(week, today)}`
       : '';
-    return { withClosed, caption, goals, model, weekLabel };
+    return {
+      withClosed,
+      caption,
+      goals,
+      model,
+      weekLabel,
+      days,
+      trends,
+      line,
+    };
   }, [
     metrics.data,
     shownFilters,
@@ -241,7 +275,7 @@ export function DashboardView(): React.JSX.Element {
   return (
     <div
       data-testid="dashboard-ready"
-      className="flex min-w-0 flex-col gap-4 p-5"
+      className="flex min-w-0 flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0"
     >
       {view.withClosed.length > 1 ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -270,8 +304,8 @@ export function DashboardView(): React.JSX.Element {
         regionRef={planRegion}
         onOpenRule={(ruleId, button) => open({ kind: 'rule', ruleId }, button)}
       />
-      {/* Row 2: three cards from xl; between md and xl two, then Performance across both. */}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {/* Row 2: three cards from xl, Performance the widest; between md and xl two, then Performance across both. */}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)_minmax(0,1.38fr)]">
         <MistakesCard
           mistakes={m.mistakes}
           basis={m.basis}
@@ -286,6 +320,7 @@ export function DashboardView(): React.JSX.Element {
           // A workspace switch drops a half-edited form.
           key={workspace.data?.id}
           goals={m.goals}
+          days={view.days}
           set={view.goals}
           currency={prefs?.baseCurrency ?? m.currency}
           weekLabel={view.weekLabel}
@@ -299,6 +334,8 @@ export function DashboardView(): React.JSX.Element {
         <div className="min-w-0 md:max-xl:col-span-2">
           <PerformanceCard
             performance={m.performance}
+            line={view.line}
+            trends={view.trends}
             basis={m.basis}
             currency={m.currency}
           />

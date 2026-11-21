@@ -47,43 +47,47 @@ export function TradeDetailCard({
     <div
       className={`rounded-card border border-line bg-surface-1 p-4 shadow-[var(--shadow)] ${className}`}
     >
-      <div className="flex items-center justify-between text-[13px]">
-        <b className="flex items-center gap-1.5 font-semibold">
+      <div className="flex items-center justify-between text-sm">
+        <b className="flex items-center gap-2 font-semibold">
           {trade.instrument.symbol}
           <SideChip side={trade.direction} />
         </b>
-        <span className="font-mono text-xs text-faint">
+        <span className="text-xs text-faint tnum">
           {shortTime(trade.openedAt)}
         </span>
       </div>
-      <dl className="my-3.5 grid grid-cols-2 gap-x-4 gap-y-2.5 font-mono text-xs">
+      <dl className="my-3.5 grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs tnum">
         {kv.map(([k, v, tone]) => (
           <div key={k}>
             <dt className="text-faint">{k}</dt>
-            <dd className={`text-[13.5px] font-medium ${tone ?? ''}`}>{v}</dd>
+            <dd className={`mt-0.5 text-[13.5px] font-semibold ${tone ?? ''}`}>
+              {v}
+            </dd>
           </div>
         ))}
       </dl>
-      <ul className="grid gap-2 border-t border-line pt-3 text-[12.5px]">
+      <ul className="grid gap-2 border-t border-line pt-3 text-[12.5px] text-muted">
         {checks.map((c) => (
           <li key={c.text} className="flex items-center gap-2">
             {c.ok ? (
               <CheckCircle
                 size={16}
                 weight="fill"
-                className="text-gain"
+                className="shrink-0 text-gain-fill"
                 aria-hidden="true"
               />
             ) : (
               <XCircle
                 size={16}
                 weight="fill"
-                className="text-loss"
+                className="shrink-0 text-loss-fill"
                 aria-hidden="true"
               />
             )}
             <span className="sr-only">{c.ok ? 'Kept: ' : 'Broken: '}</span>
-            {c.text}
+            <span className={c.ok ? '' : 'font-medium text-text'}>
+              {c.text}
+            </span>
           </li>
         ))}
       </ul>

@@ -8,6 +8,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { MODULES } from '@/content/modules';
 import { enter, exit } from '@/lib/motion';
 import { Chip } from '@/components/ui/chip';
+import { IconTile } from '@/components/ui/icon-tile';
 import { MODULE_ICONS } from './module-icons';
 
 export function ProductMenu({
@@ -72,7 +73,7 @@ export function ProductMenu({
       className={`m-0 grid list-none gap-1 p-0 ${popover ? 'grid-cols-2' : 'grid-cols-1'}`}
     >
       {items.map((m) => {
-        const Icon = MODULE_ICONS[m.slug];
+        const planned = m.status === 'in-development';
         return (
           <li key={m.slug}>
             <Link
@@ -82,18 +83,17 @@ export function ProductMenu({
                 setOpen(false);
                 onNavigate?.();
               }}
-              className="flex h-full gap-3 rounded-control p-3 text-text no-underline hover:bg-sunken"
+              className="flex h-full gap-3 rounded-control p-3 text-text no-underline transition-colors duration-200 ease-(--ease-glide) hover:bg-sunken"
             >
-              <span
-                aria-hidden="true"
-                className="grid size-8 shrink-0 place-items-center rounded-control bg-accent-soft text-accent-ink"
-              >
-                <Icon size={18} />
-              </span>
+              {/* Live modules in ultramarine; a planned one is an outline. */}
+              <IconTile
+                icon={MODULE_ICONS[m.slug]}
+                tone={planned ? 'faint' : 'accent'}
+              />
               <span className="min-w-0">
                 <span className="flex flex-wrap items-center gap-2 text-[14.5px] font-medium">
                   {m.name}
-                  {m.status === 'in-development' && <Chip>In development</Chip>}
+                  {planned && <Chip>In development</Chip>}
                 </span>
                 <span className="mt-0.5 block text-[13px] leading-snug text-muted">
                   {m.oneLine}

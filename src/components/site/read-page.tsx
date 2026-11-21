@@ -14,7 +14,7 @@ export function ReadPage({
 }) {
   return (
     <main className={`${FRAME} pt-16 pb-28`}>
-      <h1 className="max-w-[18ch] text-[clamp(36px,calc(2.6vw+16px),52px)] leading-[1.06] font-semibold tracking-[-0.04em] text-balance motion-safe:animate-rise">
+      <h1 className="max-w-[18ch] text-[clamp(36px,calc(2.6vw+16px),52px)] leading-[1.06] font-semibold tracking-[-0.032em] text-balance motion-safe:animate-rise">
         {title}
       </h1>
       {lede ? (
@@ -47,7 +47,7 @@ export function ReadSection({
     <section
       id={id}
       aria-labelledby={`${id}-title`}
-      className="scroll-mt-24 border-t border-line pt-10 mt-14 first-of-type:mt-12"
+      className="scroll-mt-24 border-t border-line-2 pt-10 mt-14 first-of-type:mt-12"
     >
       <h2
         id={`${id}-title`}

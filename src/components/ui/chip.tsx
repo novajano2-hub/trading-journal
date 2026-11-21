@@ -1,15 +1,18 @@
 import type { ReactNode } from 'react';
 
-export type ChipTone = 'neutral' | 'accent' | 'gain' | 'loss';
+export type ChipTone = 'neutral' | 'accent' | 'gain' | 'loss' | 'warn' | 'info';
 
 const TONE: Record<ChipTone, string> = {
   neutral: 'bg-sunken text-muted',
   accent: 'bg-accent-soft text-accent-ink',
   gain: 'bg-gain-soft text-gain',
   loss: 'bg-loss-soft text-loss',
+  // App-only tones: their tokens exist under the app scope (theme.css).
+  warn: 'bg-warn-soft text-warn',
+  info: 'bg-info-soft text-info',
 };
 
-/** 6px-radius tag. Use `mono` for numbers or symbols. */
+/** A pill tag. Use `mono` for numbers or symbols. */
 export function Chip({
   tone = 'neutral',
   mono = false,
@@ -23,19 +26,20 @@ export function Chip({
 }) {
   return (
     <span
-      className={`inline-flex h-[22px] items-center gap-[5px] rounded-chip px-2 text-xs ${mono ? 'font-mono' : ''} ${TONE[tone]} ${className}`}
+      className={`inline-flex h-[22px] items-center gap-[5px] rounded-full px-2 text-xs font-[550] ${mono ? 'font-mono' : ''} ${TONE[tone]} ${className}`}
     >
       {children}
     </span>
   );
 }
 
-/** Trade side: Long reads gain, Short reads loss. */
+/**
+ * Trade side, in neutral ink: gain and loss colours are kept for signed money
+ * and for rules kept or broken, so a side never reads as a result.
+ */
 export function SideChip({ side }: { side: 'long' | 'short' }) {
   return (
-    <span
-      className={`inline-flex h-5 items-center rounded-chip px-[7px] text-[11.5px] font-medium ${side === 'long' ? 'bg-gain-soft text-gain' : 'bg-loss-soft text-loss'}`}
-    >
+    <span className="inline-flex h-[22px] items-center rounded-[7px] bg-sunken px-[9px] text-xs font-semibold text-muted">
       {side === 'long' ? 'Long' : 'Short'}
     </span>
   );

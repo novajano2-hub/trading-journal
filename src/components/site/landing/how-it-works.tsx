@@ -10,6 +10,7 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import type { Icon } from '@phosphor-icons/react';
 import { Chip } from '@/components/ui/chip';
+import { IconTile, type TileTone } from '@/components/ui/icon-tile';
 import { SectionHeading } from './section-heading';
 import { guessColumns, type PreviewField } from '@/domain/import/guess-columns';
 import { formatPnl } from '@/lib/format';
@@ -29,28 +30,33 @@ const STEP_SERIAL = 6;
 
 const FRAG = 'mt-[18px] flex flex-wrap gap-1.5';
 const MAP_CHIP =
-  'inline-flex h-6 items-center gap-1.5 rounded-chip border border-line bg-surface-1 px-2 text-xs';
+  'inline-flex h-6 items-center gap-1.5 rounded-full border border-line bg-surface-1 px-2.5 text-xs font-[550] shadow-[0_1px_1px_rgb(18_22_51/0.04)]';
 
+/**
+ * One step: its tile in the app's colour code (the trade as it arrives,
+ * mistakes in marigold, the plan in ultramarine, progress in cyan), the
+ * title beside it, then a real fragment of the product.
+ */
 function Step({
-  icon: StepIcon,
+  icon,
+  tone,
   title,
   children,
   fragment,
 }: {
   icon: Icon;
+  tone: TileTone;
   title: string;
   children: ReactNode;
   fragment: ReactNode;
 }) {
   return (
     <li>
-      <span className="grid size-10 place-items-center rounded-control bg-accent-soft text-accent-ink">
-        <StepIcon size={20} aria-hidden="true" />
-      </span>
-      <h3 className="mt-3.5 text-lg font-semibold tracking-[-0.015em]">
-        {title}
-      </h3>
-      <p className="mt-1.5 text-[14.5px] leading-[1.55] text-muted">
+      <div className="flex items-center gap-2.5">
+        <IconTile icon={icon} tone={tone} />
+        <h3 className="text-lg font-semibold tracking-[-0.015em]">{title}</h3>
+      </div>
+      <p className="mt-2.5 text-[14.5px] leading-[1.55] text-muted">
         {children}
       </p>
       {fragment}
@@ -81,7 +87,7 @@ export function HowItWorks({ view }: { view: SampleView }) {
     <section
       id="how"
       aria-labelledby="how-title"
-      className="scroll-mt-16 border-y border-line bg-surface-1 py-28"
+      className="scroll-mt-16 border-y border-line bg-bg py-28"
     >
       <div className="mx-auto max-w-[1280px] px-5 sm:px-10">
         <SectionHeading
@@ -91,6 +97,7 @@ export function HowItWorks({ view }: { view: SampleView }) {
         <ol className="mt-14 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
           <Step
             icon={UploadSimple}
+            tone="neutral"
             title="Import"
             fragment={
               <ul aria-label="Column mapping" className={FRAG}>
@@ -114,12 +121,16 @@ export function HowItWorks({ view }: { view: SampleView }) {
           </Step>
           <Step
             icon={Tag}
+            tone="warn"
             title="Journal"
             fragment={
               <ul aria-label="Tags" className={FRAG}>
                 {tags.map((t) => (
                   <li key={t.id}>
-                    <Chip tone={t.category === 'mistake' ? 'loss' : 'neutral'}>
+                    <Chip
+                      tone={t.category === 'mistake' ? 'warn' : 'neutral'}
+                      className="font-medium"
+                    >
                       {t.name}
                     </Chip>
                   </li>
@@ -131,6 +142,7 @@ export function HowItWorks({ view }: { view: SampleView }) {
           </Step>
           <Step
             icon={ListChecks}
+            tone="accent"
             title="Review"
             fragment={
               <p className={FRAG}>
@@ -149,12 +161,13 @@ export function HowItWorks({ view }: { view: SampleView }) {
           </Step>
           <Step
             icon={ChartBar}
+            tone="info"
             title="Improve"
             fragment={
               <p className={FRAG}>
                 <span className={MAP_CHIP}>
-                  Best hour <span className="font-mono">{best.label}</span>
-                  <b className="font-mono font-medium text-gain">
+                  Best hour <span className="tnum">{best.label}</span>
+                  <b className="font-semibold text-gain tnum">
                     {formatPnl(best.pnl)}
                   </b>
                 </span>

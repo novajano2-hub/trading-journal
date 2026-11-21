@@ -3,7 +3,7 @@ import { SectionHeading } from './section-heading';
 
 /** An operator in a formula, set in the accent so the terms read apart. */
 const Op = ({ children }: { children: ReactNode }) => (
-  <em className="text-accent-ink not-italic">{children}</em>
+  <em className="font-semibold text-accent-ink not-italic">{children}</em>
 );
 
 const DEFINITIONS: readonly { term: string; formula: ReactNode }[] = [
@@ -55,9 +55,9 @@ export function Definitions() {
       </SectionHeading>
       <dl className="mt-12 grid gap-x-16 md:grid-cols-2">
         {DEFINITIONS.map((d) => (
-          <div key={d.term} className="border-t border-line py-[22px]">
+          <div key={d.term} className="border-t border-line-2 py-[22px]">
             <dt className="text-sm text-muted">{d.term}</dt>
-            <dd className="mt-2 font-mono text-base leading-normal">
+            <dd className="mt-2 text-[17px] leading-normal font-medium tnum">
               {d.formula}
             </dd>
           </div>

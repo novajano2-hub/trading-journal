@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Keel Dashboard, Daylight premium</title>
+<!--
+  Direction C: Daylight premium.
+  Brand accent: Keel Ultramarine #2B35AF. Deep-water blue for a product named after the spine under the waterline.
+  It is the one hue the money palette never touches, so green and red stay unambiguous; it holds white numerals at
+  10.8:1; and its red lean reads as pigment, not as the stock framework cobalt the current app ships.
+  Data palette: Ultramarine (equity, adherence), Cyan #0A6F94 (goal progress), Marigold #A55E00 (mistakes),
+  Gain #0A7A52 / Loss #C22E3A (signed money, kept / broken only).
+  Type: Instrument Sans, one family. Sharp, slightly narrow tabular figures, so big money fits and reads as print, not code.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --canvas:#ECEEF8; --card:#fff; --ink:#121633; --ink-2:#4B5175; --ink-3:#686D91; --line:#E7E9F3; --line-2:#F0F1F8;
+  --brand:#2B35AF; --brand-d:#1F278C; --brand-50:#EEEFFC; --brand-100:#DCDFF8;
+  --gain:#0A7A52; --gain-f:#19A672; --gain-50:#DDF3E8;
+  --loss:#C22E3A; --loss-f:#E5484D; --loss-50:#FCECED;
+  --gold:#A55E00; --gold-f:#E9A21A; --gold-50:#FCF1DC;
+  --cyan:#0A6F94; --cyan-f:#1693BE; --cyan-50:#E0F1F8;
+  --r-card:16px; --r-ctl:10px;
+  --sh-card:0 1px 2px rgba(18,22,51,.05), 0 4px 10px -6px rgba(34,42,150,.10), 0 18px 34px -22px rgba(34,42,150,.38);
+  --sh-ctl:0 1px 2px rgba(18,22,51,.06), 0 2px 6px -2px rgba(34,42,150,.10);
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1440px;height:900px;overflow:hidden}
+body{display:grid;grid-template-columns:236px 1fr;background:linear-gradient(180deg,#E9ECF8 0%,#EFF0F8 100%);color:var(--ink);
+  font:400 13.5px/1.4 "Instrument Sans",system-ui,sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;letter-spacing:-.005em}
+::selection{background:var(--brand-100);color:var(--ink)}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:8px}
+button,a{font:inherit;color:inherit;text-decoration:none;background:none;border:0;cursor:pointer}
+svg.i{width:18px;height:18px;fill:currentColor;flex:none}
+.pos{color:var(--gain)} .neg{color:var(--loss)}
+
+/* Sidebar */
+.side{display:flex;flex-direction:column;padding:20px 14px 18px 18px}
+.brand{display:flex;align-items:center;gap:10px;font-size:19px;font-weight:650;letter-spacing:-.03em;padding:2px 6px 0}
+.mark{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:#fff;font-size:15px;font-weight:700;letter-spacing:-.02em;
+  background:linear-gradient(160deg,#3843C6,var(--brand-d));box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 2px 6px -1px rgba(43,53,175,.45)}
+.ws{margin:20px 0 18px;display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px 8px 8px;text-align:left;background:var(--card);
+  border:1px solid rgba(18,22,51,.07);border-radius:12px;box-shadow:var(--sh-ctl)}
+.ws b{display:block;font-weight:600;font-size:13.5px;line-height:1.25} .ws small{display:block;color:var(--ink-3);font-size:12px}
+.ws .cu{margin-left:auto;width:15px;height:15px;color:var(--ink-3)}
+nav{display:flex;flex-direction:column;gap:2px}
+nav a{display:flex;align-items:center;gap:11px;height:34px;padding:0 10px;border-radius:9px;color:var(--ink-2);font-weight:500;transition:background .2s var(--ease),color .2s}
+nav a:hover{background:rgba(255,255,255,.6);color:var(--ink)}
+nav a.on{background:var(--card);color:var(--ink);font-weight:600;box-shadow:var(--sh-ctl)}
+nav a.on svg{color:var(--brand)}
+nav .grp{margin:18px 10px 6px;font-size:12.5px;font-weight:500;color:#5C6185}
+nav a.off{color:#63688B} nav a.off svg{opacity:.7}
+.side .set{margin-top:auto}
+
+/* Top bar */
+main{display:flex;flex-direction:column;padding:0 24px 0 4px;min-width:0}
+.top{height:68px;flex:none;display:flex;align-items:center;gap:18px}
+.top h1{font-size:24px;font-weight:650;letter-spacing:-.035em;margin-right:4px}
+.chips{display:flex;gap:6px}
+.chip{display:flex;align-items:center;gap:6px;height:32px;padding:0 10px 0 12px;border-radius:var(--r-ctl);background:var(--card);border:1px solid rgba(18,22,51,.08);
+  box-shadow:0 1px 1px rgba(18,22,51,.04);color:var(--ink-2);font-weight:500;transition:border-color .2s,color .2s}
+.chip:hover{border-color:rgba(43,53,175,.35);color:var(--ink)} .chip svg.i{width:13px;height:13px;color:var(--ink-3)}
+.chip.set{color:var(--ink);font-weight:600} .chip.set svg.cal{width:15px;height:15px;color:var(--brand)}
+.tools{margin-left:auto;display:flex;align-items:center;gap:10px}
+.ibtn{width:34px;height:34px;display:grid;place-items:center;border-radius:var(--r-ctl);background:var(--card);border:1px solid rgba(18,22,51,.08);color:var(--ink-2)}
+.sample{font-size:12.5px;color:#5C6185;font-weight:500;padding:0 4px}
+.seg{display:flex;padding:3px;border-radius:11px;background:#DFE2F1;box-shadow:inset 0 1px 2px rgba(18,22,51,.07)}
+.seg button{height:28px;padding:0 13px;border-radius:8px;color:var(--ink-2);font-weight:500}
+.seg button.on{background:var(--card);color:var(--ink);font-weight:600;box-shadow:var(--sh-ctl)}
+.imp{display:flex;align-items:center;gap:7px;height:34px;padding:0 15px 0 12px;border-radius:var(--r-ctl);color:#fff;font-weight:600;
+  background:linear-gradient(180deg,#3540BF,var(--brand));box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 1px 2px rgba(31,39,140,.4),0 6px 14px -6px rgba(43,53,175,.6);transition:transform .15s var(--ease)}
+.imp:active{transform:translateY(1px)} .imp svg.i{width:16px;height:16px}
+.me{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:12.5px;font-weight:650;color:var(--brand-d);background:var(--brand-100);box-shadow:inset 0 0 0 1px rgba(43,53,175,.12)}
+
+/* Cards */
+.row{display:grid;gap:16px;flex:none}
+.r1{grid-template-columns:400px 1fr;height:262px}
+.r2{grid-template-columns:344px 300px 1fr;height:256px;margin-top:16px}
+.card{background:var(--card);border:1px solid rgba(18,22,51,.07);border-radius:var(--r-card);box-shadow:var(--sh-card);padding:18px 20px 16px;min-width:0;position:relative}
+.hd{display:flex;align-items:center;gap:10px;height:28px}
+.hd h2{font-size:15px;font-weight:600;letter-spacing:-.015em}
+.hd .meta,.hd .lnk{margin-left:auto;font-size:12.5px;color:var(--ink-3)}
+.hd .lnk{color:var(--brand);font-weight:550}
+.tile{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;flex:none}
+.tile svg.i{width:17px;height:17px}
+.t-gold{background:var(--gold-50);color:var(--gold)} .t-cyan{background:var(--cyan-50);color:var(--cyan)}
+.t-blue{background:var(--brand-50);color:var(--brand)} .t-ink{background:#ECEDF5;color:var(--ink)}
+
+/* Hero */
+.hero{border-radius:var(--r-card);padding:18px 22px 0;color:#fff;display:flex;flex-direction:column;overflow:hidden;position:relative;
+  background:linear-gradient(155deg,#3440C2 0%,var(--brand) 45%,#232B98 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 1px 2px rgba(20,26,110,.35),0 22px 40px -22px rgba(43,53,175,.75)}
+.hero .hd h2{font-size:15px} .hero .meta{color:rgba(255,255,255,.72)}
+.hero .tile{background:rgba(255,255,255,.14);color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.big{display:flex;align-items:flex-end;gap:14px;margin-top:14px}
+.pct{font-size:104px;line-height:.82;font-weight:600;font-stretch:88%;letter-spacing:-.055em;display:flex;align-items:flex-start}
+.pct i{font-style:normal;font-size:44px;line-height:1;letter-spacing:-.02em;margin:4px 0 0 4px;color:rgba(255,255,255,.8)}
+.big p{font-size:15px;line-height:1.3;color:rgba(255,255,255,.82);padding-bottom:3px;white-space:nowrap}
+.split{display:flex;gap:3px;height:8px;margin-top:22px}
+.split i{border-radius:3px;background:rgba(255,255,255,.92)} .split i+i{flex:1;background:#FF9EA3}
+.legend{display:flex;justify-content:space-between;margin-top:7px;font-size:12px;color:rgba(255,255,255,.72)}
+.cost{margin:auto -22px 0;padding:0 22px;height:54px;display:flex;align-items:center;justify-content:space-between;
+  background:rgba(10,14,70,.22);border-top:1px solid rgba(255,255,255,.1);font-size:13.5px;color:rgba(255,255,255,.8)}
+.cost b{font-size:21px;font-weight:600;letter-spacing:-.02em;color:#FFB1B5}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+th{font-size:12px;font-weight:500;color:var(--ink-3);text-align:left;height:34px;border-bottom:1px solid var(--line)}
+td{height:36px;border-bottom:1px solid var(--line-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+tbody tr{transition:background .2s}
+tbody tr:hover{background:#F7F8FD}
+th.n,td.n{text-align:right}
+td.n{font-weight:550}
+.of{color:var(--ink-3);font-weight:400}
+.sort{display:inline-flex;align-items:center;gap:4px;color:var(--ink)} .sort svg.i{width:12px;height:12px;color:var(--brand)}
+.rules{padding-top:6px;padding-bottom:2px;display:flex;flex-direction:column}
+.rules td{height:35px}
+.rules td:first-child{color:var(--ink);font-weight:500}
+.tag{display:inline-flex;align-items:center;height:21px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:550;vertical-align:1px}
+.tag.gold{background:var(--gold-50);color:var(--gold);margin-left:8px}
+.adh{display:flex;align-items:center;gap:10px}
+.bar{flex:1;height:6px;border-radius:3px;background:var(--brand-50);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#5560D6,var(--brand))}
+.adh b{width:34px;text-align:right;font-weight:550}
+.more{margin-top:auto;height:38px;display:flex;align-items:center;gap:6px;color:var(--brand);font-weight:600;font-size:13px}
+.more:hover{color:var(--brand-d)}
+
+/* Mistakes: order-book depth ladder */
+.depth{list-style:none;margin-top:12px}
+.depth li{position:relative;display:flex;align-items:center;height:35px;padding:0 10px;margin:0 -10px;border-radius:8px}
+.depth li{padding-bottom:6px}
+.depth li::before{content:"";position:absolute;right:10px;bottom:3px;height:4px;width:calc((100% - 20px) * var(--w));border-radius:2px;background:linear-gradient(270deg,#E5484D,rgba(229,72,77,.18));transition:opacity .2s;opacity:.8}
+.depth li:hover{background:#F8F9FD} .depth li:hover::before{opacity:1}
+.depth span,.depth b{position:relative}
+.depth .nm{font-weight:500}
+.depth .ct{margin-left:8px;color:var(--ink-3);font-size:12.5px}
+.depth b{margin-left:auto;font-weight:600}
+
+/* Goals */
+.goal{margin-top:12px}
+.gl{display:flex;justify-content:space-between;font-size:12.5px;color:var(--ink-3)}
+.gl b{color:var(--ink-2);font-weight:550}
+.gv{display:flex;align-items:baseline;gap:8px;margin-top:3px}
+.gv>b{font-size:22px;font-weight:600;letter-spacing:-.03em}
+.gv span{font-size:12.5px;color:var(--ink-2);white-space:nowrap}
+.gl em{font-style:normal;font-weight:600;color:var(--cyan)}
+.gl b.pos{color:var(--gain)}
+.prog{position:relative;height:6px;margin-top:9px;border-radius:3px;background:#E9EBF4}
+.prog i{position:absolute;inset:0 auto 0 0;border-radius:3px;background:linear-gradient(90deg,#3FB3D8,var(--cyan-f))}
+.sep{height:1px;background:var(--line);margin:16px 0 0}
+.heat{display:block;margin-top:9px;width:254px;height:30px}
+.heat rect{width:6px;height:6px;rx:1.5px;fill:#B3E1CB} .heat rect.b{fill:var(--loss-f)}
+.gs{margin-top:8px;font-size:12.5px;color:var(--ink-2)}
+
+/* Performance */
+.pnl{display:flex;align-items:baseline;gap:10px;margin-top:6px}
+.pnl b{font-size:31px;line-height:1.1;font-weight:600;letter-spacing:-.04em}
+.pnl span{color:var(--ink-3);font-size:12.5px}
+.eq{display:block;width:100%;height:80px;margin-top:6px;overflow:visible}
+.eq .ln{fill:none;stroke:var(--brand);stroke-width:1.75;stroke-linejoin:round;stroke-linecap:round}
+.eq .base{stroke:#C9CDE6;stroke-dasharray:2 4;stroke-width:1}
+@media (prefers-reduced-motion:no-preference){
+  .eq .ln{stroke-dasharray:1;stroke-dashoffset:1;animation:draw 1.3s var(--ease) .15s forwards}
+  .eq .ar,.eq .end{animation:fade .9s var(--ease) .7s both}
+}
+@keyframes draw{to{stroke-dashoffset:0}} @keyframes fade{from{opacity:0}}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);margin-top:10px;border-top:1px solid var(--line)}
+.kpis div{padding:10px 0 0 14px;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:10px}
+.kpis div:first-child{padding-left:0} .kpis div+div{border-left:1px solid var(--line)}
+.kpis span{grid-column:1/-1;font-size:12px;color:var(--ink-3)}
+.kpis b{font-size:20px;font-weight:600;letter-spacing:-.03em;line-height:1.25}
+.kpis svg{width:56px;height:24px;align-self:end;justify-self:end;margin-right:14px;overflow:visible}
+.kpis path{fill:none;stroke:var(--brand);stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round;opacity:.85}
+
+/* Recent trades */
+.trades{margin-top:16px;flex:1;margin-bottom:16px;padding-bottom:4px}
+.trades table{margin-top:8px}
+.trades th,.trades td{padding-right:16px}
+.trades td{height:34px}
+.trades tbody tr:last-child td{border-bottom:0}
+.tm{color:var(--ink-2)} .tm b{color:var(--ink);font-weight:550;margin-left:4px}
+.sym b{font-weight:650;letter-spacing:.01em} .sym span{color:var(--ink-2);margin-left:4px}
+.side-p{display:inline-flex;height:22px;align-items:center;padding:0 9px;border-radius:7px;font-size:12px;font-weight:600;background:#EEF0F7;color:var(--ink-2)}
+.tag.mis{background:var(--gold-50);color:var(--gold)}
+.rl{display:flex;align-items:center;gap:7px;color:var(--ink-2)}
+.rl svg.i{width:16px;height:16px}
+.rl.ok svg{color:var(--gain-f)} .rl.no svg{color:var(--loss-f)}
+.rl.no b{color:var(--loss);font-weight:600} .rl.no span{color:var(--ink);overflow:hidden;text-overflow:ellipsis}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="SquaresFour-duotone" viewBox="0 0 256 256"><path d="M112,56v48a8,8,0,0,1-8,8H56a8,8,0,0,1-8-8V56a8,8,0,0,1,8-8h48A8,8,0,0,1,112,56Zm88-8H152a8,8,0,0,0-8,8v48a8,8,0,0,0,8,8h48a8,8,0,0,0,8-8V56A8,8,0,0,0,200,48Zm-96,96H56a8,8,0,0,0-8,8v48a8,8,0,0,0,8,8h48a8,8,0,0,0,8-8V152A8,8,0,0,0,104,144Zm96,0H152a8,8,0,0,0-8,8v48a8,8,0,0,0,8,8h48a8,8,0,0,0,8-8V152A8,8,0,0,0,200,144Z" opacity="0.2"/><path d="M200,136H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,200,136Zm0,64H152V152h48v48ZM104,40H56A16,16,0,0,0,40,56v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,104,40Zm0,64H56V56h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,200,40Zm0,64H152V56h48v48Zm-96,32H56a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,104,136Zm0,64H56V152h48v48Z"/></symbol>
+<symbol id="ListBullets" viewBox="0 0 256 256"><path d="M80,64a8,8,0,0,1,8-8H216a8,8,0,0,1,0,16H88A8,8,0,0,1,80,64Zm136,56H88a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Zm0,64H88a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16ZM44,52A12,12,0,1,0,56,64,12,12,0,0,0,44,52Zm0,64a12,12,0,1,0,12,12A12,12,0,0,0,44,116Zm0,64a12,12,0,1,0,12,12A12,12,0,0,0,44,180Z"/></symbol>
+<symbol id="CalendarBlank" viewBox="0 0 256 256"><path d="M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM72,48v8a8,8,0,0,0,16,0V48h80v8a8,8,0,0,0,16,0V48h24V80H48V48ZM208,208H48V96H208V208Z"/></symbol>
+<symbol id="ChartBar" viewBox="0 0 256 256"><path d="M224,200h-8V40a8,8,0,0,0-8-8H152a8,8,0,0,0-8,8V80H96a8,8,0,0,0-8,8v40H48a8,8,0,0,0-8,8v64H32a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16ZM160,48h40V200H160ZM104,96h40V200H104ZM56,144H88v56H56Z"/></symbol>
+<symbol id="Strategy" viewBox="0 0 256 256"><path d="M76,152a36,36,0,1,0,36,36A36,36,0,0,0,76,152Zm0,56a20,20,0,1,1,20-20A20,20,0,0,1,76,208ZM42.34,106.34,56.69,92,42.34,77.66A8,8,0,0,1,53.66,66.34L68,80.69,82.34,66.34A8,8,0,0,1,93.66,77.66L79.31,92l14.35,14.34a8,8,0,0,1-11.32,11.32L68,103.31,53.66,117.66a8,8,0,0,1-11.32-11.32Zm187.32,96a8,8,0,0,1-11.32,11.32L204,199.31l-14.34,14.35a8,8,0,0,1-11.32-11.32L192.69,188l-14.35-14.34a8,8,0,0,1,11.32-11.32L204,176.69l14.34-14.35a8,8,0,0,1,11.32,11.32L215.31,188Zm-45.19-89.51c-6.18,22.33-25.32,41.63-46.53,46.93A8.13,8.13,0,0,1,136,160a8,8,0,0,1-1.93-15.76c15.63-3.91,30.35-18.91,35-35.68,3.19-11.5,3.22-29-14.71-46.9L152,59.31V80a8,8,0,0,1-16,0V40a8,8,0,0,1,8-8h40a8,8,0,0,1,0,16H163.31l2.35,2.34C183.9,68.59,190.58,90.78,184.47,112.83Z"/></symbol>
+<symbol id="Notebook" viewBox="0 0 256 256"><path d="M184,112a8,8,0,0,1-8,8H112a8,8,0,0,1,0-16h64A8,8,0,0,1,184,112Zm-8,24H112a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16Zm48-88V208a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V48A16,16,0,0,1,48,32H208A16,16,0,0,1,224,48ZM48,208H72V48H48Zm160,0V48H88V208H208Z"/></symbol>
+<symbol id="UploadSimple" viewBox="0 0 256 256"><path d="M224,144v64a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V144a8,8,0,0,1,16,0v56H208V144a8,8,0,0,1,16,0ZM93.66,77.66,120,51.31V144a8,8,0,0,0,16,0V51.31l26.34,26.35a8,8,0,0,0,11.32-11.32l-40-40a8,8,0,0,0-11.32,0l-40,40A8,8,0,0,0,93.66,77.66Z"/></symbol>
+<symbol id="ShieldCheck" viewBox="0 0 256 256"><path d="M208,40H48A16,16,0,0,0,32,56v56c0,52.72,25.52,84.67,46.93,102.19,23.06,18.86,46,25.26,47,25.53a8,8,0,0,0,4.2,0c1-.27,23.91-6.67,47-25.53C198.48,196.67,224,164.72,224,112V56A16,16,0,0,0,208,40Zm0,72c0,37.07-13.66,67.16-40.6,89.42A129.3,129.3,0,0,1,128,223.62a128.25,128.25,0,0,1-38.92-21.81C61.82,179.51,48,149.3,48,112l0-56,160,0ZM82.34,141.66a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35a8,8,0,0,1,11.32,11.32l-56,56a8,8,0,0,1-11.32,0Z"/></symbol>
+<symbol id="ClockCounterClockwise" viewBox="0 0 256 256"><path d="M136,80v43.47l36.12,21.67a8,8,0,0,1-8.24,13.72l-40-24A8,8,0,0,1,120,128V80a8,8,0,0,1,16,0Zm-8-48A95.44,95.44,0,0,0,60.08,60.15C52.81,67.51,46.35,74.59,40,82V64a8,8,0,0,0-16,0v40a8,8,0,0,0,8,8H72a8,8,0,0,0,0-16H49c7.15-8.42,14.27-16.35,22.39-24.57a80,80,0,1,1,1.66,114.75,8,8,0,1,0-11,11.64A96,96,0,1,0,128,32Z"/></symbol>
+<symbol id="PlayCircle" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm48.24-94.78-64-40A8,8,0,0,0,100,88v80a8,8,0,0,0,12.24,6.78l64-40a8,8,0,0,0,0-13.56ZM116,153.57V102.43L156.91,128Z"/></symbol>
+<symbol id="UsersThree" viewBox="0 0 256 256"><path d="M244.8,150.4a8,8,0,0,1-11.2-1.6A51.6,51.6,0,0,0,192,128a8,8,0,0,1-7.37-4.89,8,8,0,0,1,0-6.22A8,8,0,0,1,192,112a24,24,0,1,0-23.24-30,8,8,0,1,1-15.5-4A40,40,0,1,1,219,117.51a67.94,67.94,0,0,1,27.43,21.68A8,8,0,0,1,244.8,150.4ZM190.92,212a8,8,0,1,1-13.84,8,57,57,0,0,0-98.16,0,8,8,0,1,1-13.84-8,72.06,72.06,0,0,1,33.74-29.92,48,48,0,1,1,58.36,0A72.06,72.06,0,0,1,190.92,212ZM128,176a32,32,0,1,0-32-32A32,32,0,0,0,128,176ZM72,120a8,8,0,0,0-8-8A24,24,0,1,1,87.24,82a8,8,0,1,0,15.5-4A40,40,0,1,0,37,117.51,67.94,67.94,0,0,0,9.6,139.19a8,8,0,1,0,12.8,9.61A51.6,51.6,0,0,1,64,128,8,8,0,0,0,72,120Z"/></symbol>
+<symbol id="Sparkle" viewBox="0 0 256 256"><path d="M197.58,129.06,146,110l-19-51.62a15.92,15.92,0,0,0-29.88,0L78,110l-51.62,19a15.92,15.92,0,0,0,0,29.88L78,178l19,51.62a15.92,15.92,0,0,0,29.88,0L146,178l51.62-19a15.92,15.92,0,0,0,0-29.88ZM137,164.22a8,8,0,0,0-4.74,4.74L112,223.85,91.78,169A8,8,0,0,0,87,164.22L32.15,144,87,123.78A8,8,0,0,0,91.78,119L112,64.15,132.22,119a8,8,0,0,0,4.74,4.74L191.85,144ZM144,40a8,8,0,0,1,8-8h16V16a8,8,0,0,1,16,0V32h16a8,8,0,0,1,0,16H184V64a8,8,0,0,1-16,0V48H152A8,8,0,0,1,144,40ZM248,88a8,8,0,0,1-8,8h-8v8a8,8,0,0,1-16,0V96h-8a8,8,0,0,1,0-16h8V72a8,8,0,0,1,16,0v8h8A8,8,0,0,1,248,88Z"/></symbol>
+<symbol id="GearSix" viewBox="0 0 256 256"><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm109.94-52.79a8,8,0,0,0-3.89-5.4l-29.83-17-.12-33.62a8,8,0,0,0-2.83-6.08,111.91,111.91,0,0,0-36.72-20.67,8,8,0,0,0-6.46.59L128,41.85,97.88,25a8,8,0,0,0-6.47-.6A112.1,112.1,0,0,0,54.73,45.15a8,8,0,0,0-2.83,6.07l-.15,33.65-29.83,17a8,8,0,0,0-3.89,5.4,106.47,106.47,0,0,0,0,41.56,8,8,0,0,0,3.89,5.4l29.83,17,.12,33.62a8,8,0,0,0,2.83,6.08,111.91,111.91,0,0,0,36.72,20.67,8,8,0,0,0,6.46-.59L128,214.15,158.12,231a7.91,7.91,0,0,0,3.9,1,8.09,8.09,0,0,0,2.57-.42,112.1,112.1,0,0,0,36.68-20.73,8,8,0,0,0,2.83-6.07l.15-33.65,29.83-17a8,8,0,0,0,3.89-5.4A106.47,106.47,0,0,0,237.94,107.21Zm-15,34.91-28.57,16.25a8,8,0,0,0-3,3c-.58,1-1.19,2.06-1.81,3.06a7.94,7.94,0,0,0-1.22,4.21l-.15,32.25a95.89,95.89,0,0,1-25.37,14.3L134,199.13a8,8,0,0,0-3.91-1h-.19c-1.21,0-2.43,0-3.64,0a8.08,8.08,0,0,0-4.1,1l-28.84,16.1A96,96,0,0,1,67.88,201l-.11-32.2a8,8,0,0,0-1.22-4.22c-.62-1-1.23-2-1.8-3.06a8.09,8.09,0,0,0-3-3.06l-28.6-16.29a90.49,90.49,0,0,1,0-28.26L61.67,97.63a8,8,0,0,0,3-3c.58-1,1.19-2.06,1.81-3.06a7.94,7.94,0,0,0,1.22-4.21l.15-32.25a95.89,95.89,0,0,1,25.37-14.3L122,56.87a8,8,0,0,0,4.1,1c1.21,0,2.43,0,3.64,0a8.08,8.08,0,0,0,4.1-1l28.84-16.1A96,96,0,0,1,188.12,55l.11,32.2a8,8,0,0,0,1.22,4.22c.62,1,1.23,2,1.8,3.06a8.09,8.09,0,0,0,3,3.06l28.6,16.29A90.49,90.49,0,0,1,222.9,142.12Z"/></symbol>
+<symbol id="MagnifyingGlass" viewBox="0 0 256 256"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/></symbol>
+<symbol id="CaretUpDown" viewBox="0 0 256 256"><path d="M181.66,170.34a8,8,0,0,1,0,11.32l-48,48a8,8,0,0,1-11.32,0l-48-48a8,8,0,0,1,11.32-11.32L128,212.69l42.34-42.35A8,8,0,0,1,181.66,170.34Zm-96-84.68L128,43.31l42.34,42.35a8,8,0,0,0,11.32-11.32l-48-48a8,8,0,0,0-11.32,0l-48,48A8,8,0,0,0,85.66,85.66Z"/></symbol>
+<symbol id="CaretDown" viewBox="0 0 256 256"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></symbol>
+<symbol id="ArrowDown" viewBox="0 0 256 256"><path d="M205.66,149.66l-72,72a8,8,0,0,1-11.32,0l-72-72a8,8,0,0,1,11.32-11.32L120,196.69V40a8,8,0,0,1,16,0V196.69l58.34-58.35a8,8,0,0,1,11.32,11.32Z"/></symbol>
+<symbol id="Wallet-duotone" viewBox="0 0 256 256"><path d="M224,80V192a8,8,0,0,1-8,8H56a16,16,0,0,1-16-16V56A16,16,0,0,0,56,72H216A8,8,0,0,1,224,80Z" opacity="0.2"/><path d="M216,64H56a8,8,0,0,1,0-16H192a8,8,0,0,0,0-16H56A24,24,0,0,0,32,56V184a24,24,0,0,0,24,24H216a16,16,0,0,0,16-16V80A16,16,0,0,0,216,64Zm0,128H56a8,8,0,0,1-8-8V78.63A23.84,23.84,0,0,0,56,80H216Zm-48-60a12,12,0,1,1,12,12A12,12,0,0,1,168,132Z"/></symbol>
+<symbol id="ListChecks-duotone" viewBox="0 0 256 256"><path d="M216,64V192H128V64Z" opacity="0.2"/><path d="M224,128a8,8,0,0,1-8,8H128a8,8,0,0,1,0-16h88A8,8,0,0,1,224,128ZM128,72h88a8,8,0,0,0,0-16H128a8,8,0,0,0,0,16Zm88,112H128a8,8,0,0,0,0,16h88a8,8,0,0,0,0-16ZM82.34,42.34,56,68.69,45.66,58.34A8,8,0,0,0,34.34,69.66l16,16a8,8,0,0,0,11.32,0l32-32A8,8,0,0,0,82.34,42.34Zm0,64L56,132.69,45.66,122.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32,0l32-32a8,8,0,0,0-11.32-11.32Zm0,64L56,196.69,45.66,186.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32,0l32-32a8,8,0,0,0-11.32-11.32Z"/></symbol>
+<symbol id="Warning-duotone" viewBox="0 0 256 256"><path d="M215.46,216H40.54C27.92,216,20,202.79,26.13,192.09L113.59,40.22c6.3-11,22.52-11,28.82,0l87.46,151.87C236,202.79,228.08,216,215.46,216Z" opacity="0.2"/><path d="M236.8,188.09,149.35,36.22h0a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM222.93,203.8a8.5,8.5,0,0,1-7.48,4.2H40.55a8.5,8.5,0,0,1-7.48-4.2,7.59,7.59,0,0,1,0-7.72L120.52,44.21a8.75,8.75,0,0,1,15,0l87.45,151.87A7.59,7.59,0,0,1,222.93,203.8ZM120,144V104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,180Z"/></symbol>
+<symbol id="Target-duotone" viewBox="0 0 256 256"><path d="M176,128a48,48,0,1,1-48-48A48,48,0,0,1,176,128Z" opacity="0.2"/><path d="M221.87,83.16A104.1,104.1,0,1,1,195.67,49l22.67-22.68a8,8,0,0,1,11.32,11.32l-96,96a8,8,0,0,1-11.32-11.32l27.72-27.72a40,40,0,1,0,17.87,31.09,8,8,0,1,1,16-.9,56,56,0,1,1-22.38-41.65L184.3,60.39a87.88,87.88,0,1,0,23.13,29.67,8,8,0,0,1,14.44-6.9Z"/></symbol>
+<symbol id="ChartLineUp-duotone" viewBox="0 0 256 256"><path d="M224,64V208H32V48H208A16,16,0,0,1,224,64Z" opacity="0.2"/><path d="M232,208a8,8,0,0,1-8,8H32a8,8,0,0,1-8-8V48a8,8,0,0,1,16,0V156.69l50.34-50.35a8,8,0,0,1,11.32,0L128,132.69,180.69,80H160a8,8,0,0,1,0-16h40a8,8,0,0,1,8,8v40a8,8,0,0,1-16,0V91.31l-58.34,58.35a8,8,0,0,1-11.32,0L96,123.31l-56,56V200H224A8,8,0,0,1,232,208Z"/></symbol>
+<symbol id="ArrowsLeftRight-duotone" viewBox="0 0 256 256"><path d="M208,80v96H48V80Z" opacity="0.2"/><path d="M213.66,181.66l-32,32a8,8,0,0,1-11.32-11.32L188.69,184H48a8,8,0,0,1,0-16H188.69l-18.35-18.34a8,8,0,0,1,11.32-11.32l32,32A8,8,0,0,1,213.66,181.66Zm-139.32-64a8,8,0,0,0,11.32-11.32L67.31,88H208a8,8,0,0,0,0-16H67.31L85.66,53.66A8,8,0,0,0,74.34,42.34l-32,32a8,8,0,0,0,0,11.32Z"/></symbol>
+<symbol id="XCircle-fill" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm37.66,130.34a8,8,0,0,1-11.32,11.32L128,139.31l-26.34,26.35a8,8,0,0,1-11.32-11.32L116.69,128,90.34,101.66a8,8,0,0,1,11.32-11.32L128,116.69l26.34-26.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></symbol>
+<symbol id="CheckCircle-fill" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm45.66,85.66-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35a8,8,0,0,1,11.32,11.32Z"/></symbol>
+<linearGradient id="eqfill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2B35AF" stop-opacity=".30"/><stop offset=".55" stop-color="#3C47C8" stop-opacity=".11"/><stop offset="1" stop-color="#2B35AF" stop-opacity="0"/></linearGradient>
+</svg>
+
+<aside class="side">
+  <div class="brand"><span class="mark">K</span>Keel</div>
+  <button class="ws"><span class="tile t-blue"><svg class="i"><use href="#Wallet-duotone"/></svg></span><span><b>Sample workspace</b><small>All accounts</small></span><svg class="i cu"><use href="#CaretUpDown"/></svg></button>
+  <nav>
+    <a class="on" href="#"><svg class="i"><use href="#SquaresFour-duotone"/></svg>Dashboard</a>
+    <a href="#"><svg class="i"><use href="#ListBullets"/></svg>Trades</a>
+    <a href="#"><svg class="i"><use href="#CalendarBlank"/></svg>Calendar</a>
+    <a href="#"><svg class="i"><use href="#ChartBar"/></svg>Reports</a>
+    <a href="#"><svg class="i"><use href="#Strategy"/></svg>Strategies</a>
+    <a href="#"><svg class="i"><use href="#Notebook"/></svg>Notebook</a>
+    <a href="#"><svg class="i"><use href="#UploadSimple"/></svg>Import</a>
+    <a href="#"><svg class="i"><use href="#ShieldCheck"/></svg>Prop firms</a>
+    <p class="grp">Not live yet</p>
+    <a class="off" href="#"><svg class="i"><use href="#ClockCounterClockwise"/></svg>Backtesting</a>
+    <a class="off" href="#"><svg class="i"><use href="#PlayCircle"/></svg>Replay</a>
+    <a class="off" href="#"><svg class="i"><use href="#UsersThree"/></svg>Mentors</a>
+    <a class="off" href="#"><svg class="i"><use href="#Sparkle"/></svg>Assistant</a>
+  </nav>
+  <nav class="set"><a href="#"><svg class="i"><use href="#GearSix"/></svg>Settings</a></nav>
+</aside>
+
+<main>
+  <header class="top">
+    <h1>Dashboard</h1>
+    <div class="chips">
+      <button class="chip set"><svg class="i cal"><use href="#CalendarBlank"/></svg>All time<svg class="i"><use href="#CaretDown"/></svg></button>
+      <button class="chip">Symbol<svg class="i"><use href="#CaretDown"/></svg></button>
+      <button class="chip">Side<svg class="i"><use href="#CaretDown"/></svg></button>
+      <button class="chip">Strategy<svg class="i"><use href="#CaretDown"/></svg></button>
+      <button class="chip">Tags<svg class="i"><use href="#CaretDown"/></svg></button>
+    </div>
+    <div class="tools">
+      <button class="ibtn" aria-label="Search"><svg class="i"><use href="#MagnifyingGlass"/></svg></button>
+      <span class="sample">Sample data</span>
+      <div class="seg" role="group" aria-label="P&amp;L basis"><button>Gross</button><button class="on" aria-pressed="true">Net</button></div>
+      <button class="imp"><svg class="i"><use href="#UploadSimple"/></svg>Import</button>
+      <span class="me" aria-label="Account">MK</span>
+    </div>
+  </header>
+
+  <section class="row r1">
+    <article class="hero">
+      <div class="hd"><span class="tile"><svg class="i"><use href="#ListChecks-duotone"/></svg></span><h2>Your plan</h2><span class="meta">All time</span></div>
+      <div class="big"><span class="pct">87<i>%</i></span><p>of rule checks kept</p></div>
+      <div class="split"><i style="width:87%"></i><i></i></div>
+      <div class="legend"><span>Kept</span><span>Broken</span></div>
+      <div class="cost"><span>Broken rules cost</span><b>−$8,581.08</b></div>
+    </article>
+    <article class="card rules">
+      <table>
+        <colgroup><col><col style="width:100px"><col style="width:180px"><col style="width:136px"></colgroup>
+        <thead><tr><th>Rule</th><th class="n">Kept</th><th style="padding-left:28px">Adherence</th><th class="n"><span class="sort"><svg class="i"><use href="#ArrowDown"/></svg>Cost when broken</span></th></tr></thead>
+        <tbody>
+          <tr><td>Trend is intact on the 1-hour chart<span class="tag gold">Costliest</span></td><td class="n">301 <span class="of">of</span> 348</td><td style="padding-left:28px"><div class="adh"><span class="bar"><i style="width:86%"></i></span><b>86%</b></div></td><td class="n neg">−$4,077.63</td></tr>
+          <tr><td>Pullback holds the 20-period average</td><td class="n">314 <span class="of">of</span> 361</td><td style="padding-left:28px"><div class="adh"><span class="bar"><i style="width:87%"></i></span><b>87%</b></div></td><td class="n neg">−$3,529.53</td></tr>
+          <tr><td>Exit if the trend structure breaks</td><td class="n">313 <span class="of">of</span> 365</td><td style="padding-left:28px"><div class="adh"><span class="bar"><i style="width:86%"></i></span><b>86%</b></div></td><td class="n neg">−$3,270.42</td></tr>
+          <tr><td>Wait for the 15-minute range to complete</td><td class="n">222 <span class="of">of</span> 244</td><td style="padding-left:28px"><div class="adh"><span class="bar"><i style="width:91%"></i></span><b>91%</b></div></td><td class="n neg">−$2,125.91</td></tr>
+          <tr><td>Maximum two attempts per level</td><td class="n">253 <span class="of">of</span> 285</td><td style="padding-left:28px"><div class="adh"><span class="bar"><i style="width:89%"></i></span><b>89%</b></div></td><td class="n neg">−$1,921.51</td></tr>
+        </tbody>
+      </table>
+      <a class="more" href="#">Show all 23 rules</a>
+    </article>
+  </section>
+
+  <section class="row r2">
+    <article class="card">
+      <div class="hd"><span class="tile t-gold"><svg class="i"><use href="#Warning-duotone"/></svg></span><h2>Mistakes by cost</h2></div>
+      <ul class="depth">
+        <li style="--w:1"><span class="nm">FOMO entry</span><span class="ct">64 trades</span><b class="neg">−$4,924.13</b></li>
+        <li style="--w:.942"><span class="nm">Oversized</span><span class="ct">51 trades</span><b class="neg">−$4,639.55</b></li>
+        <li style="--w:.791"><span class="nm">Moved stop</span><span class="ct">49 trades</span><b class="neg">−$3,894.96</b></li>
+        <li style="--w:.765"><span class="nm">Early exit</span><span class="ct">51 trades</span><b class="neg">−$3,769.33</b></li>
+        <li style="--w:.352"><span class="nm">Revenge trade</span><span class="ct">53 trades</span><b class="neg">−$1,732.57</b></li>
+      </ul>
+    </article>
+
+    <article class="card">
+      <div class="hd"><span class="tile t-cyan"><svg class="i"><use href="#Target-duotone"/></svg></span><h2>Goals</h2><a class="lnk" href="#">Edit goals</a></div>
+      <div class="goal">
+        <div class="gl"><span>Weekly net goal <b>$500.00</b></span><em>26% of goal</em></div>
+        <div class="gv"><b class="pos">+$129.19</b><span>this week, 16-20 Nov</span></div>
+        <div class="prog"><i style="width:26%"></i></div>
+      </div>
+      <div class="sep"></div>
+      <div class="goal">
+        <div class="gl"><span>Daily loss limit <b>$600.00</b></span><span><b class="pos">Kept</b> 115 of 127 days</span></div>
+        <svg class="heat" viewBox="0 0 254 30" role="img" aria-label="127 trading days: 115 kept, 12 broken"><rect x=0 y=0 /><rect x=8 y=0 /><rect class=b x=16 y=0 /><rect x=24 y=0 /><rect x=32 y=0 /><rect x=40 y=0 /><rect x=48 y=0 /><rect x=56 y=0 /><rect class=b x=64 y=0 /><rect x=72 y=0 /><rect x=80 y=0 /><rect class=b x=88 y=0 /><rect x=96 y=0 /><rect class=b x=104 y=0 /><rect x=112 y=0 /><rect x=120 y=0 /><rect x=128 y=0 /><rect x=136 y=0 /><rect x=144 y=0 /><rect class=b x=152 y=0 /><rect x=160 y=0 /><rect x=168 y=0 /><rect x=176 y=0 /><rect x=184 y=0 /><rect x=192 y=0 /><rect x=200 y=0 /><rect x=208 y=0 /><rect x=216 y=0 /><rect x=224 y=0 /><rect x=232 y=0 /><rect class=b x=240 y=0 /><rect x=248 y=0 /><rect x=0 y=8 /><rect x=8 y=8 /><rect x=16 y=8 /><rect x=24 y=8 /><rect x=32 y=8 /><rect x=40 y=8 /><rect class=b x=48 y=8 /><rect x=56 y=8 /><rect x=64 y=8 /><rect x=72 y=8 /><rect x=80 y=8 /><rect x=88 y=8 /><rect x=96 y=8 /><rect x=104 y=8 /><rect x=112 y=8 /><rect x=120 y=8 /><rect x=128 y=8 /><rect x=136 y=8 /><rect class=b x=144 y=8 /><rect class=b x=152 y=8 /><rect x=160 y=8 /><rect x=168 y=8 /><rect x=176 y=8 /><rect x=184 y=8 /><rect x=192 y=8 /><rect x=200 y=8 /><rect x=208 y=8 /><rect x=216 y=8 /><rect x=224 y=8 /><rect class=b x=232 y=8 /><rect x=240 y=8 /><rect x=248 y=8 /><rect x=0 y=16 /><rect x=8 y=16 /><rect x=16 y=16 /><rect x=24 y=16 /><rect x=32 y=16 /><rect x=40 y=16 /><rect x=48 y=16 /><rect x=56 y=16 /><rect x=64 y=16 /><rect x=72 y=16 /><rect x=80 y=16 /><rect x=88 y=16 /><rect x=96 y=16 /><rect x=104 y=16 /><rect x=112 y=16 /><rect x=120 y=16 /><rect x=128 y=16 /><rect x=136 y=16 /><rect x=144 y=16 /><rect x=152 y=16 /><rect x=160 y=16 /><rect x=168 y=16 /><rect x=176 y=16 /><rect x=184 y=16 /><rect x=192 y=16 /><rect x=200 y=16 /><rect x=208 y=16 /><rect x=216 y=16 /><rect class=b x=224 y=16 /><rect x=232 y=16 /><rect x=240 y=16 /><rect x=248 y=16 /><rect x=0 y=24 /><rect x=8 y=24 /><rect x=16 y=24 /><rect x=24 y=24 /><rect x=32 y=24 /><rect x=40 y=24 /><rect x=48 y=24 /><rect x=56 y=24 /><rect x=64 y=24 /><rect x=72 y=24 /><rect x=80 y=24 /><rect x=88 y=24 /><rect x=96 y=24 /><rect x=104 y=24 /><rect x=112 y=24 /><rect x=120 y=24 /><rect x=128 y=24 /><rect x=136 y=24 /><rect x=144 y=24 /><rect x=152 y=24 /><rect x=160 y=24 /><rect x=168 y=24 /><rect x=176 y=24 /><rect x=184 y=24 /><rect class=b x=192 y=24 /><rect x=200 y=24 /><rect x=208 y=24 /><rect x=216 y=24 /><rect x=224 y=24 /><rect x=232 y=24 /><rect x=240 y=24 /></svg>
+        <p class="gs">Last broken Thu 12 Nov at <span class="neg">−$616.58</span></p>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="hd"><span class="tile t-blue"><svg class="i"><use href="#ChartLineUp-duotone"/></svg></span><h2>Performance</h2><span class="meta">Equity $175,000.00 to $191,126.81</span></div>
+      <div class="pnl"><b class="pos">+$16,126.81</b><span>Net P&amp;L</span></div>
+      <svg class="eq" viewBox="0 0 460 80" preserveAspectRatio="none" role="img" aria-label="Equity curve from $175,000.00 to $191,126.81">
+        <line class="base" x1="0" x2="460" y1="74.5" y2="74.5"/>
+        <path class="ar" d="M0.0,74.5 L3.9,74.2 L7.7,71.1 L11.6,70.7 L15.5,70.7 L19.3,72.9 L23.2,72.5 L27.1,67.1 L30.9,64.3 L34.8,59.3 L38.7,57.1 L42.5,54.4 L46.4,52.5 L50.3,57.5 L54.1,53.1 L58.0,50.0 L61.8,46.9 L65.7,52.0 L69.6,57.2 L73.4,61.5 L77.3,64.1 L81.2,63.9 L85.0,65.0 L88.9,64.0 L92.8,67.3 L96.6,67.1 L100.5,66.6 L104.4,69.9 L108.2,64.5 L112.1,63.4 L116.0,59.8 L119.8,60.9 L123.7,62.4 L127.6,62.5 L131.4,61.7 L135.3,58.1 L139.2,56.0 L143.0,56.4 L146.9,58.7 L150.8,59.5 L154.6,53.7 L158.5,55.5 L162.4,53.4 L166.2,50.6 L170.1,54.9 L173.9,53.5 L177.8,47.4 L181.7,53.7 L185.5,53.6 L189.4,52.8 L193.3,54.6 L197.1,51.6 L201.0,50.6 L204.9,54.8 L208.7,50.5 L212.6,46.8 L216.5,42.1 L220.3,35.5 L224.2,32.9 L228.1,31.3 L231.9,34.9 L235.8,31.4 L239.7,32.4 L243.5,36.0 L247.4,42.6 L251.3,48.1 L255.1,52.0 L259.0,49.1 L262.9,58.6 L266.7,65.9 L270.6,66.9 L274.5,63.5 L278.3,60.1 L282.2,66.0 L286.1,74.1 L289.9,71.6 L293.8,73.1 L297.6,76.0 L301.5,71.2 L305.4,65.8 L309.2,64.0 L313.1,61.9 L317.0,59.1 L320.8,51.9 L324.7,48.4 L328.6,45.3 L332.4,42.0 L336.3,46.6 L340.2,40.7 L344.0,35.9 L347.9,32.7 L351.8,38.8 L355.6,40.0 L359.5,35.6 L363.4,41.1 L367.2,40.6 L371.1,35.6 L375.0,39.2 L378.8,32.0 L382.7,28.8 L386.6,28.1 L390.4,25.7 L394.3,22.0 L398.2,20.4 L402.0,14.9 L405.9,17.9 L409.7,20.0 L413.6,16.7 L417.5,17.2 L421.3,21.0 L425.2,18.0 L429.1,13.1 L432.9,15.3 L436.8,19.2 L440.7,18.5 L444.5,17.8 L448.4,17.7 L452.3,11.3 L456.1,13.9 L460.0,8.0 L460,80 L0,80 Z" fill="url(#eqfill)"/>
+        <path class="ln" pathLength="1" d="M0.0,74.5 L3.9,74.2 L7.7,71.1 L11.6,70.7 L15.5,70.7 L19.3,72.9 L23.2,72.5 L27.1,67.1 L30.9,64.3 L34.8,59.3 L38.7,57.1 L42.5,54.4 L46.4,52.5 L50.3,57.5 L54.1,53.1 L58.0,50.0 L61.8,46.9 L65.7,52.0 L69.6,57.2 L73.4,61.5 L77.3,64.1 L81.2,63.9 L85.0,65.0 L88.9,64.0 L92.8,67.3 L96.6,67.1 L100.5,66.6 L104.4,69.9 L108.2,64.5 L112.1,63.4 L116.0,59.8 L119.8,60.9 L123.7,62.4 L127.6,62.5 L131.4,61.7 L135.3,58.1 L139.2,56.0 L143.0,56.4 L146.9,58.7 L150.8,59.5 L154.6,53.7 L158.5,55.5 L162.4,53.4 L166.2,50.6 L170.1,54.9 L173.9,53.5 L177.8,47.4 L181.7,53.7 L185.5,53.6 L189.4,52.8 L193.3,54.6 L197.1,51.6 L201.0,50.6 L204.9,54.8 L208.7,50.5 L212.6,46.8 L216.5,42.1 L220.3,35.5 L224.2,32.9 L228.1,31.3 L231.9,34.9 L235.8,31.4 L239.7,32.4 L243.5,36.0 L247.4,42.6 L251.3,48.1 L255.1,52.0 L259.0,49.1 L262.9,58.6 L266.7,65.9 L270.6,66.9 L274.5,63.5 L278.3,60.1 L282.2,66.0 L286.1,74.1 L289.9,71.6 L293.8,73.1 L297.6,76.0 L301.5,71.2 L305.4,65.8 L309.2,64.0 L313.1,61.9 L317.0,59.1 L320.8,51.9 L324.7,48.4 L328.6,45.3 L332.4,42.0 L336.3,46.6 L340.2,40.7 L344.0,35.9 L347.9,32.7 L351.8,38.8 L355.6,40.0 L359.5,35.6 L363.4,41.1 L367.2,40.6 L371.1,35.6 L375.0,39.2 L378.8,32.0 L382.7,28.8 L386.6,28.1 L390.4,25.7 L394.3,22.0 L398.2,20.4 L402.0,14.9 L405.9,17.9 L409.7,20.0 L413.6,16.7 L417.5,17.2 L421.3,21.0 L425.2,18.0 L429.1,13.1 L432.9,15.3 L436.8,19.2 L440.7,18.5 L444.5,17.8 L448.4,17.7 L452.3,11.3 L456.1,13.9 L460.0,8.0"/>
+        <circle class="end" cx="460" cy="8.0" r="3.5" fill="#fff" stroke="#2B35AF" stroke-width="2"/>
+      </svg>
+      <div class="kpis">
+        <div><span>Win rate</span><b>48.8%</b><svg viewBox="0 0 56 24"><path d="M0.0,21.5 L2.2,20.7 L4.5,17.4 L6.7,18.9 L9.0,16.2 L11.2,16.2 L13.4,16.2 L15.7,11.4 L17.9,10.5 L20.2,10.1 L22.4,7.9 L24.6,4.8 L26.9,4.4 L29.1,2.5 L31.4,4.1 L33.6,4.4 L35.8,4.8 L38.1,7.2 L40.3,10.0 L42.6,13.1 L44.8,13.1 L47.0,12.9 L49.3,13.1 L51.5,12.4 L53.8,14.8 L56.0,14.4"/></svg></div>
+        <div><span>Profit factor</span><b>1.16</b><svg viewBox="0 0 56 24"><path d="M0.0,12.0 L2.2,13.9 L4.5,15.6 L6.7,13.3 L9.0,17.7 L11.2,17.2 L13.4,21.5 L15.7,18.2 L17.9,16.9 L20.2,13.0 L22.4,13.3 L24.6,11.6 L26.9,11.4 L29.1,12.3 L31.4,11.1 L33.6,13.2 L35.8,13.2 L38.1,10.8 L40.3,9.8 L42.6,9.9 L44.8,4.1 L47.0,3.2 L49.3,3.7 L51.5,2.5 L53.8,2.9 L56.0,2.9"/></svg></div>
+        <div><span>Expectancy</span><b class="pos">+$13.15</b><svg viewBox="0 0 56 24"><path d="M0.0,17.1 L2.2,20.3 L4.5,18.9 L6.7,15.7 L9.0,16.9 L11.2,20.3 L13.4,20.2 L15.7,18.5 L17.9,15.0 L20.2,18.2 L22.4,21.5 L24.6,19.2 L26.9,17.5 L29.1,12.8 L31.4,9.7 L33.6,9.7 L35.8,10.1 L38.1,2.5 L40.3,3.0 L42.6,4.9 L44.8,7.8 L47.0,7.2 L49.3,6.5 L51.5,7.1 L53.8,7.0 L56.0,5.9"/></svg></div>
+      </div>
+    </article>
+  </section>
+
+  <article class="card trades">
+    <div class="hd"><span class="tile t-ink"><svg class="i"><use href="#ArrowsLeftRight-duotone"/></svg></span><h2>Recent trades</h2><a class="lnk" href="#">All trades</a></div>
+    <table>
+      <colgroup><col style="width:120px"><col style="width:142px"><col style="width:78px"><col style="width:192px"><col style="width:136px"><col style="width:104px"><col></colgroup>
+      <thead><tr><th>Time</th><th>Instrument</th><th>Side</th><th>Strategy</th><th>Mistake</th><th class="n">Net</th><th style="padding-left:12px">Rules</th></tr></thead>
+      <tbody>
+        <tr><td class="tm">20 Nov<b>20:49</b></td><td class="sym"><b>TSLA</b><span>370 Put</span></td><td><span class="side-p">Long</span></td><td>Opening range breakout</td><td></td><td class="n neg">−$189.30</td><td style="padding-left:12px"><div class="rl ok"><svg class="i"><use href="#CheckCircle-fill"/></svg>6 of 6 kept</div></td></tr>
+        <tr><td class="tm">20 Nov<b>18:48</b></td><td class="sym"><b>TSLA</b><span>385 Call</span></td><td><span class="side-p">Long</span></td><td>Trend pullback</td><td><span class="tag mis">Moved stop</span></td><td class="n pos">+$228.70</td><td style="padding-left:12px"><div class="rl no"><svg class="i"><use href="#XCircle-fill"/></svg><b>Broke:</b><span>Pullback holds the 20-period average</span></div></td></tr>
+        <tr><td class="tm">20 Nov<b>18:24</b></td><td class="sym"><b>ES</b><span>Dec 26</span></td><td><span class="side-p">Long</span></td><td>Level reversal</td><td></td><td class="n pos">+$294.80</td><td style="padding-left:12px"><div class="rl ok"><svg class="i"><use href="#CheckCircle-fill"/></svg>6 of 6 kept</div></td></tr>
+        <tr><td class="tm">20 Nov<b>18:21</b></td><td class="sym"><b>AAPL</b></td><td><span class="side-p">Short</span></td><td>Opening range breakout</td><td><span class="tag mis">FOMO entry</span></td><td class="n pos">+$203.72</td><td style="padding-left:12px"><div class="rl no"><svg class="i"><use href="#XCircle-fill"/></svg><b>Broke:</b><span>Stop inside the opposite side of the range</span></div></td></tr>
+        <tr><td class="tm">20 Nov<b>14:36</b></td><td class="sym"><b>EURUSD</b></td><td><span class="side-p">Short</span></td><td>Level reversal</td><td></td><td class="n neg">−$200.60</td><td style="padding-left:12px"><div class="rl ok"><svg class="i"><use href="#CheckCircle-fill"/></svg>6 of 6 kept</div></td></tr>
+      </tbody>
+    </table>
+  </article>
+</main>
+</body>
+</html>

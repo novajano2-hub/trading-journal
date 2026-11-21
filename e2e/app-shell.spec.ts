@@ -62,13 +62,14 @@ test('sidebar by keyboard keeps the filters (desktop)', async ({
   await ready(page);
   await page.getByRole('link', { name: 'Dashboard' }).focus();
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('link', { name: 'Trades' })).toBeFocused();
+  await expect(
+    page.getByRole('link', { name: 'Trades', exact: true }),
+  ).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/app\/trades\?range=last-week$/);
-  await expect(page.getByRole('link', { name: 'Trades' })).toHaveAttribute(
-    'aria-current',
-    'page',
-  );
+  await expect(
+    page.getByRole('link', { name: 'Trades', exact: true }),
+  ).toHaveAttribute('aria-current', 'page');
 });
 
 test('mobile drawer opens, closes on Escape, and returns focus (mobile)', async ({
@@ -259,7 +260,8 @@ test('the chips sit beside the title while they fit, and never clip "Clear filte
 }, info) => {
   test.skip(info.project.name !== 'desktop');
   const bar = page.getByRole('banner');
-  for (const width of [1280, 1366, 1440, 1680]) {
+  // Busy chips are wider since the rebrand's 13.5px chips; they share the title's row from 1920.
+  for (const width of [1280, 1366, 1440, 1680, 1920]) {
     await page.setViewportSize({ width, height: 800 });
     await page.goto('/app/dashboard');
     await ready(page);
@@ -276,7 +278,7 @@ test('the chips sit beside the title while they fit, and never clip "Clear filte
     await expect(clear, `${width} busy`).toBeInViewport({ ratio: 1 });
     await expect(bar).toHaveAttribute(
       'data-chips',
-      width >= 1680 ? 'inline' : 'wrapped',
+      width >= 1920 ? 'inline' : 'wrapped',
     );
     expect(
       await page.evaluate(

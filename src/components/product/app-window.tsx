@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react';
-import { CaretDown } from '@phosphor-icons/react/dist/ssr';
+import { CalendarBlank, CaretDown } from '@phosphor-icons/react/dist/ssr';
 
 /**
- * The product window frame: top bar with account, range and basis, then the
- * content. `meta` sits at the right of the bar, before the basis switch (for
- * example the "Sample data" label). The bar wraps rather than clips on phones.
+ * The product window: a piece of the app on its periwinkle canvas. The top
+ * bar holds the account, the range, optional meta at the right (for example
+ * the "Sample data" label) and the Gross/Net basis, as white controls; the
+ * content below is the app's own white cards (ProductCard). The bar wraps
+ * rather than clips on phones.
  */
 export function AppWindow({
   account,
@@ -19,23 +21,31 @@ export function AppWindow({
   meta?: ReactNode;
   children: ReactNode;
 }) {
-  const sel =
-    'inline-flex h-7 items-center gap-1.5 rounded-chip border border-line px-2.5 text-text';
+  const control =
+    'inline-flex h-[30px] items-center gap-1.5 rounded-control border border-line bg-surface-1 px-2.5 shadow-[0_1px_1px_rgb(18_22_51/0.04)]';
   return (
-    <div className="overflow-hidden rounded-card border border-line bg-surface-1 shadow-[var(--shadow)]">
-      <div className="flex min-h-[46px] flex-wrap items-center gap-2 border-b border-line px-3.5 py-2 text-[12.5px] sm:flex-nowrap sm:py-0">
-        <span className={sel}>
+    <div className="overflow-hidden rounded-card border border-line-2/80 bg-bg shadow-[inset_0_1px_0_rgb(255_255_255/0.6),var(--shadow)] [[data-theme=dark]_&]:shadow-[var(--shadow)]">
+      <div className="flex min-h-[52px] flex-wrap items-center gap-1.5 px-3 py-2.5 text-[12.5px] font-medium text-muted sm:flex-nowrap">
+        <span className={control}>
           {account}
-          <CaretDown size={13} className="text-faint" aria-hidden="true" />
+          <CaretDown size={12} className="text-faint" aria-hidden="true" />
         </span>
-        <span className={`${sel} font-mono`}>{range}</span>
+        <span className={`${control} font-semibold text-text tnum`}>
+          <CalendarBlank
+            size={14}
+            weight="duotone"
+            className="text-accent-ink"
+            aria-hidden="true"
+          />
+          {range}
+        </span>
         <span className="ml-auto flex items-center gap-3">
           {meta}
-          <span className="flex rounded-[7px] bg-sunken p-0.5">
+          <span className="flex rounded-[9px] bg-line-2/55 p-[3px] shadow-[inset_0_1px_2px_rgb(18_22_51/0.07)]">
             {(['Gross', 'Net'] as const).map((b) => (
               <span
                 key={b}
-                className={`rounded-[5px] px-2.5 py-1 ${b === basis ? 'bg-surface-1 text-text shadow-[var(--shadow-chip)]' : 'text-muted'}`}
+                className={`rounded-[7px] px-2.5 py-[3px] ${b === basis ? 'bg-surface-1 font-semibold text-text shadow-[var(--shadow-chip)] [[data-theme=dark]_&]:bg-line-2' : ''}`}
               >
                 {b}
               </span>
@@ -43,7 +53,9 @@ export function AppWindow({
           </span>
         </span>
       </div>
-      {children}
+      <div className="grid gap-2.5 px-2.5 pb-2.5 sm:gap-3 sm:px-3 sm:pb-3">
+        {children}
+      </div>
     </div>
   );
 }

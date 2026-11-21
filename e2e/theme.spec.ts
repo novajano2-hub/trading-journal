@@ -36,7 +36,7 @@ test.describe('theme', () => {
     await page.goto('/');
     await expect(page.locator('body')).toHaveCSS(
       'background-color',
-      'rgb(246, 247, 249)',
+      'rgb(236, 238, 248)',
     );
     expect(await primaryContrast(page)).toBeGreaterThanOrEqual(4.5);
   });
@@ -54,12 +54,12 @@ test.describe('theme', () => {
         (v) => v.trim().toLowerCase(),
       );
     });
-    expect(tokens).toEqual(['#0e1014', '#3866e6']);
+    expect(tokens).toEqual(['#0c0e1c', '#4c57dc']);
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await expect(page.locator('body')).not.toHaveCSS(
       'background-color',
-      'rgb(246, 247, 249)',
+      'rgb(236, 238, 248)',
     );
     await toggle(page).click();
     await expect(page.locator('html')).not.toHaveAttribute(

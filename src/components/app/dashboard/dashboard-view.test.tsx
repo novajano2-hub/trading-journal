@@ -276,7 +276,7 @@ test('a regrade that fails to save reverts with an inline error', async () => {
 test('a mistake opens its trades', async () => {
   renderApp(<DashboardView />, { sample: graded });
   const mistakes = await screen.findByRole('region', {
-    name: 'Mistakes, by cost',
+    name: 'Mistakes by cost',
   });
   const open = within(mistakes).getByRole('button', { name: opener(fomo) });
   expect(open.getAttribute('aria-label')).toBe(
@@ -322,7 +322,7 @@ test("a mistake's rows list only the trade's other mistakes", async () => {
     }),
   });
   const mistakes = await screen.findByRole('region', {
-    name: 'Mistakes, by cost',
+    name: 'Mistakes by cost',
   });
   fireEvent.click(within(mistakes).getByRole('button', { name: opener(fomo) }));
   const dialog = await screen.findByRole('dialog', { name: fomo });

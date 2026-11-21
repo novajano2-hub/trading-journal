@@ -1,5 +1,4 @@
 import { ArrowLeft } from '@phosphor-icons/react/dist/ssr';
-import { IconTile } from '@/components/ui/icon-tile';
 import { DashboardLink } from './dashboard-link';
 import { navItem, type AppModuleId } from './nav';
 
@@ -11,24 +10,33 @@ export function ModulePlaceholder({
 }): React.JSX.Element {
   const item = navItem(module);
   const notLive = item.group === 'not-live';
+  const Glyph = item.icon;
   return (
-    <div className="mx-auto flex w-full max-w-[520px] flex-col items-center px-5 py-20 text-center sm:py-28">
-      <IconTile icon={item.icon} tone={notLive ? 'faint' : 'neutral'} />
-      <h2 className="mt-5 text-[16px] leading-snug font-medium text-text text-balance">
-        {`${item.label} isn't ${notLive ? 'live' : 'built'} yet.`}
-      </h2>
-      <p className="mt-2 text-[15px] leading-[1.6] text-muted text-pretty">
-        {item.summary}
-      </p>
-      {item.reason ? (
-        <p className="mt-1 text-[15px] leading-[1.6] text-muted text-pretty">
-          {item.reason}
+    <div className="mx-auto w-full max-w-[560px] px-5 py-16 sm:py-24">
+      <div className="flex flex-col items-center rounded-card border border-line bg-surface-1 px-6 pt-9 pb-7 text-center shadow-[var(--shadow-card)] sm:px-10">
+        {/* The card-header tile, a size up: a module that isn't live is an outline. */}
+        <span
+          aria-hidden="true"
+          className={`grid size-10 place-items-center rounded-[11px] ${notLive ? 'bg-sunken text-faint [&_[opacity]]:opacity-0' : 'bg-accent-soft text-accent-ink'}`}
+        >
+          <Glyph size={22} weight="duotone" />
+        </span>
+        <h2 className="mt-5 text-[17px] leading-snug font-semibold tracking-[-0.015em] text-balance text-text">
+          {`${item.label} isn't ${notLive ? 'live' : 'built'} yet.`}
+        </h2>
+        <p className="mt-2 text-[14.5px] leading-[1.6] text-pretty text-muted">
+          {item.summary}
         </p>
-      ) : null}
-      <DashboardLink className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-control px-2 text-[15px] font-medium text-accent-ink no-underline hover:underline">
-        <ArrowLeft aria-hidden="true" size={16} />
-        Back to the Dashboard
-      </DashboardLink>
+        {item.reason ? (
+          <p className="mt-1 text-[14.5px] leading-[1.6] text-pretty text-muted">
+            {item.reason}
+          </p>
+        ) : null}
+        <DashboardLink className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-control px-2 text-[14px] font-semibold text-accent-ink no-underline hover:underline">
+          <ArrowLeft aria-hidden="true" size={16} />
+          Back to the Dashboard
+        </DashboardLink>
+      </div>
     </div>
   );
 }

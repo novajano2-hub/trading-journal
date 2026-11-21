@@ -5,7 +5,7 @@ export const AUTH_CLOSED =
   'Accounts open with the app release. Until then, sign-up is closed.';
 
 const INPUT =
-  'block h-11 w-full rounded-control border border-line-2 bg-surface-1 px-3.5 text-[15px] text-text disabled:cursor-not-allowed disabled:opacity-50';
+  'block h-11 w-full rounded-control border border-line-2 bg-surface-1 px-3.5 text-[15px] text-text shadow-[0_1px_1px_rgb(18_22_51/0.04)] disabled:cursor-not-allowed disabled:opacity-50';
 
 function Field({
   id,
@@ -55,7 +55,10 @@ function Field({
 function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   const login = mode === 'login';
   return (
-    <form className="mt-9 flex max-w-[400px] flex-col gap-3" noValidate>
+    <form
+      className="mt-9 flex max-w-[448px] flex-col gap-3 rounded-card bg-surface-1 p-6 shadow-[var(--shadow-card)] sm:p-8"
+      noValidate
+    >
       <p id="auth-note" className="text-sm leading-[1.55] text-muted">
         {AUTH_CLOSED}
       </p>
@@ -97,7 +100,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
   const login = mode === 'login';
   return (
     <main className="mx-auto max-w-[1280px] px-5 pt-16 pb-28 sm:px-10">
-      <h1 className="text-[clamp(36px,calc(2.6vw+16px),52px)] leading-[1.06] font-semibold tracking-[-0.04em] motion-safe:animate-rise">
+      <h1 className="text-[clamp(36px,calc(2.6vw+16px),52px)] leading-[1.06] font-semibold tracking-[-0.032em] motion-safe:animate-rise">
         {login ? 'Log in' : 'Sign up'}
       </h1>
       <AuthForm mode={mode} />
