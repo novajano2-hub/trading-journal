@@ -15,7 +15,7 @@ import {
 } from 'react';
 import { Dialog } from 'radix-ui';
 import { animate, useReducedMotion } from 'motion/react';
-import { X } from '@phosphor-icons/react';
+import { X } from '@phosphor-icons/react/dist/ssr';
 import { exit, glide } from '@/lib/motion';
 
 /** Transform that places the panel exactly over `from`. */
