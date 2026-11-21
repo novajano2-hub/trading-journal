@@ -1,0 +1,159 @@
+'use client';
+
+// Technique adapted from HorizonX Morph Dialog, commercial licence: the
+// shared-element morph, where a card grows into its dialog and closes back into
+// it. Rebuilt on Radix Dialog as a FLIP from the opener's rect (open over
+// `glide`, close over `exit`); under reduced motion only opacity changes. The
+// looks, images, eyebrow, blur and spring are dropped.
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { Dialog } from 'radix-ui';
+import { animate, useReducedMotion } from 'motion/react';
+import { X } from '@phosphor-icons/react';
+import { exit, glide } from '@/lib/motion';
+
+/** Transform that places the panel exactly over `from`. */
+function flipFrom(from: DOMRect, panel: DOMRect) {
+  return {
+    x: from.left + from.width / 2 - (panel.left + panel.width / 2),
+    y: from.top + from.height / 2 - (panel.top + panel.height / 2),
+    scaleX: from.width / panel.width,
+    scaleY: from.height / panel.height,
+  };
+}
+
+/**
+ * A dialog that grows out of the element that opened it (`origin`) and returns
+ * to it. Traps focus, closes on Escape or the close button, and hands focus
+ * to `returnFocus`.
+ */
+export function MorphDialog({
+  open,
+  onOpenChange,
+  origin,
+  returnFocus,
+  title,
+  description,
+  children,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  origin: RefObject<HTMLElement | null>;
+  returnFocus: RefObject<HTMLElement | null>;
+  title: string;
+  description?: ReactNode;
+  children: ReactNode;
+}): React.JSX.Element | null {
+  const reduced = useReducedMotion();
+  // Stays mounted while the exit plays, after `open` has already gone false.
+  const [present, setPresent] = useState(open);
+  const veil = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const body = useRef<HTMLDivElement>(null);
+
+  if (open && !present) setPresent(true);
+
+  useLayoutEffect(() => {
+    if (!open || !present) return;
+    const panelEl = panel.current;
+    const veilEl = veil.current;
+    const bodyEl = body.current;
+    if (!panelEl || !veilEl || !bodyEl) return;
+    const opts = { duration: glide.duration, ease: glide.ease };
+    const fade = animate(veilEl, { opacity: [0, 1] }, opts);
+    if (reduced) {
+      const f = animate(panelEl, { opacity: [0, 1] }, opts);
+      return () => {
+        fade.stop();
+        f.stop();
+      };
+    }
+    const from = origin.current?.getBoundingClientRect();
+    const rect = panelEl.getBoundingClientRect();
+    if (!from || !rect.width || !rect.height) return () => fade.stop();
+    const t = flipFrom(from, rect);
+    const grow = animate(
+      panelEl,
+      { x: [t.x, 0], y: [t.y, 0], scaleX: [t.scaleX, 1], scaleY: [t.scaleY, 1] },
+      opts,
+    );
+    // The rows arrive once the shape is mostly there, so text is never squashed.
+    const content = animate(bodyEl, { opacity: [0, 1] }, { ...opts, delay: 0.1 });
+    return () => {
+      fade.stop();
+      grow.stop();
+      content.stop();
+    };
+  }, [open, present, origin, reduced]);
+
+  useEffect(() => {
+    if (open || !present) return;
+    const panelEl = panel.current;
+    const veilEl = veil.current;
+    const bodyEl = body.current;
+    let cancelled = false;
+    const done = () => {
+      if (!cancelled) setPresent(false);
+    };
+    if (!panelEl || !veilEl || !bodyEl) {
+      done();
+      return;
+    }
+    const opts = { duration: exit.duration, ease: exit.ease };
+    const from = origin.current?.getBoundingClientRect();
+    const rect = panelEl.getBoundingClientRect();
+    const fade = animate(veilEl, { opacity: 0 }, opts);
+    let main;
+    if (reduced || !from || !rect.width) {
+      main = animate(panelEl, { opacity: 0 }, opts);
+    } else {
+      const t = flipFrom(from, rect);
+      animate(bodyEl, { opacity: 0 }, { ...opts, duration: exit.duration / 2 });
+      main = animate(panelEl, t, opts);
+    }
+    Promise.all([main, fade]).then(done, done);
+    return () => {
+      cancelled = true;
+    };
+  }, [open, present, origin, reduced]);
+
+  if (!present) return null;
+
+  return (
+    <Dialog.Root open={present} onOpenChange={onOpenChange}>
+      <Dialog.Portal>
+        <Dialog.Overlay ref={veil} className="fixed inset-0 z-50 bg-veil" />
+        <Dialog.Content
+          ref={panel}
+          {...(description ? {} : { 'aria-describedby': undefined })}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            returnFocus.current?.focus();
+          }}
+          className="fixed inset-0 z-50 m-auto flex h-fit max-h-[80dvh] w-[calc(100%-32px)] max-w-[720px] flex-col rounded-card border border-line bg-surface-1 shadow-[var(--shadow)] outline-none"
+        >
+          <div ref={body} className="flex max-h-[80dvh] min-h-0 flex-col">
+            <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
+              <div className="min-w-0">
+                <Dialog.Title className="text-[18px] font-semibold leading-snug text-text">
+                  {title}
+                </Dialog.Title>
+                {description ? (
+                  <Dialog.Description asChild>
+                    <div className="mt-1 text-[13px] text-muted">{description}</div>
+                  </Dialog.Description>
+                ) : null}
+              </div>
+              <Dialog.Close
+                aria-label="Close"
+                className="-m-1.5 inline-flex size-11 flex-none items-center justify-center rounded-control text-muted transition-colors hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+              >
+                <X size={20} aria-hidden="true" />
+              </Dialog.Close>
+            </div>
+            <div className="min-h-0 overflow-y-auto px-5 py-4">{children}</div>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}

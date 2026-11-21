@@ -44,6 +44,19 @@
   --animate-tip-in: tip-in var(--dur-enter) var(--ease-enter) backwards;
   --animate-tip-out: tip-out var(--dur-exit) var(--ease-exit) forwards;
 
+  /* Task checkbox ripple (HorizonX Task Checkbox technique): a ring that grows and fades. */
+  --animate-check-ripple: check-ripple 360ms ease-out;
+
+  @keyframes check-ripple {
+    from {
+      opacity: 0.6;
+      transform: translate(-50%, -50%) scale(0);
+    }
+    to {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(1);
+    }
+  }
   @keyframes tip-in {
     from {
       opacity: 0;
