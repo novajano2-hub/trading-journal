@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>Keel, Trades</title>
+<link rel="stylesheet" href="shell.css">
+<style>
+.sum { display: grid; grid-template-columns: repeat(5, 1fr) auto; align-items: center; padding: 16px 20px; }
+.sum .kpi > b { font-size: 22px; }
+.sum .note { padding-left: 20px; border-left: 1px solid var(--line); font-size: 12.5px; color: var(--faint); line-height: 1.5; width: 236px; white-space: normal; }
+.tbl { flex: 1; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.bar { display: flex; align-items: center; gap: 8px; height: 60px; padding: 0 20px; border-bottom: 1px solid var(--line); flex: none; }
+.bar .end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.bar .btn { font-weight: 500; color: var(--muted); }
+.bar .btn svg.i { color: var(--faint); }
+.scroll { flex: 1; overflow: hidden; padding: 0 20px; position: relative; }
+.tbl table { font-stretch: 90%; font-size: 13px; }
+.tbl thead th { position: sticky; top: 0; background: var(--surface); z-index: 1; }
+.tbl th, .tbl td { padding-right: 8px; }
+.tbl th:first-child, .tbl td:first-child { padding-right: 0; }
+.tbl tr.sel td { background: color-mix(in srgb, var(--accent-soft) 70%, transparent); }
+.tbl td .tag { max-width: 96px; overflow: hidden; text-overflow: ellipsis; display: inline-block; line-height: 22px; }
+.tbl .stars svg { width: 10.5px; height: 10.5px; }
+.tbl td:nth-last-child(2) { padding-right: 0; }
+.rv { text-align: center; }
+.rvd { display: inline-grid; place-items: center; color: var(--accent); } .rvd svg.i { width: 18px; height: 18px; }
+.rvn { display: inline-block; width: 15px; height: 15px; border-radius: 50%; border: 1.5px dashed var(--line-2); vertical-align: middle; }
+th.c { text-align: center; }
+.foot { display: flex; align-items: center; gap: 6px; height: 52px; padding: 0 20px; border-top: 1px solid var(--line); flex: none; font-size: 12.5px; color: var(--faint); }
+.pg { display: flex; gap: 2px; margin-left: auto; }
+.pg button { min-width: 30px; height: 30px; border-radius: 8px; color: var(--muted); font-weight: 500; display: grid; place-items: center; }
+.pg button:hover { background: var(--sunken); }
+.pg button.on { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: var(--sh-chip), inset 0 0 0 1px var(--line); }
+.pg button svg.i { width: 14px; height: 14px; }
+.bulk { position: absolute; left: 50%; bottom: 72px; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; padding: 6px 6px 6px 14px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--sh), 0 2px 6px rgba(18,22,51,.06); z-index: 4; white-space: nowrap; }
+.bulk .count { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; padding-right: 10px; margin-right: 4px; border-right: 1px solid var(--line); height: 30px; }
+.bulk .btn { height: 32px; border-color: transparent; background: none; font-weight: 500; padding: 0 10px; }
+.bulk .btn:hover { background: var(--sunken); }
+.bulk .btn svg.i { width: 16px; height: 16px; color: var(--muted); }
+.bulk .btn .cd { width: 12px; height: 12px; color: var(--faint); margin-left: -2px; }
+.bulk .vr { width: 1px; height: 22px; background: var(--line); margin: 0 4px; }
+.bulk .x { width: 32px; padding: 0; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="Check" viewBox="0 0 256 256"><path d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"/></symbol><symbol id="CheckCircle-fill" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm45.66,85.66-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35a8,8,0,0,1,11.32,11.32Z"/></symbol><symbol id="Star-fill" viewBox="0 0 256 256"><path d="M234.29,114.85l-45,38.83L203,211.75a16.4,16.4,0,0,1-24.5,17.82L128,198.49,77.47,229.57A16.4,16.4,0,0,1,53,211.75l13.76-58.07-45-38.83A16.46,16.46,0,0,1,31.08,86l59-4.76,22.76-55.08a16.36,16.36,0,0,1,30.27,0l22.75,55.08,59,4.76a16.46,16.46,0,0,1,9.37,28.86Z"/></symbol><symbol id="XCircle-fill" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm37.66,130.34a8,8,0,0,1-11.32,11.32L128,139.31l-26.34,26.35a8,8,0,0,1-11.32-11.32L116.69,128,90.34,101.66a8,8,0,0,1,11.32-11.32L128,116.69l26.34-26.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></symbol><symbol id="SealCheck-duotone" viewBox="0 0 256 256"><path d="M232,128c0,12.51-17.82,21.95-22.68,33.69-4.68,11.32,1.42,30.65-7.78,39.85s-28.53,3.1-39.85,7.78C150,214.18,140.5,232,128,232s-22-17.82-33.69-22.68c-11.32-4.68-30.65,1.42-39.85-7.78s-3.1-28.53-7.78-39.85C41.82,150,24,140.5,24,128s17.82-22,22.68-33.69C51.36,83,45.26,63.66,54.46,54.46S83,51.36,94.31,46.68C106.05,41.82,115.5,24,128,24S150,41.82,161.69,46.68c11.32,4.68,30.65-1.42,39.85,7.78s3.1,28.53,7.78,39.85C214.18,106.05,232,115.5,232,128Z" opacity="0.2"/><path d="M225.86,102.82c-3.77-3.94-7.67-8-9.14-11.57-1.36-3.27-1.44-8.69-1.52-13.94-.15-9.76-.31-20.82-8-28.51s-18.75-7.85-28.51-8c-5.25-.08-10.67-.16-13.94-1.52-3.56-1.47-7.63-5.37-11.57-9.14C146.28,23.51,138.44,16,128,16s-18.27,7.51-25.18,14.14c-3.94,3.77-8,7.67-11.57,9.14C88,40.64,82.56,40.72,77.31,40.8c-9.76.15-20.82.31-28.51,8S41,67.55,40.8,77.31c-.08,5.25-.16,10.67-1.52,13.94-1.47,3.56-5.37,7.63-9.14,11.57C23.51,109.72,16,117.56,16,128s7.51,18.27,14.14,25.18c3.77,3.94,7.67,8,9.14,11.57,1.36,3.27,1.44,8.69,1.52,13.94.15,9.76.31,20.82,8,28.51s18.75,7.85,28.51,8c5.25.08,10.67.16,13.94,1.52,3.56,1.47,7.63,5.37,11.57,9.14C109.72,232.49,117.56,240,128,240s18.27-7.51,25.18-14.14c3.94-3.77,8-7.67,11.57-9.14,3.27-1.36,8.69-1.44,13.94-1.52,9.76-.15,20.82-.31,28.51-8s7.85-18.75,8-28.51c.08-5.25.16-10.67,1.52-13.94,1.47-3.56,5.37-7.63,9.14-11.57C232.49,146.28,240,138.44,240,128S232.49,109.73,225.86,102.82Zm-11.55,39.29c-4.79,5-9.75,10.17-12.38,16.52-2.52,6.1-2.63,13.07-2.73,19.82-.1,7-.21,14.33-3.32,17.43s-10.39,3.22-17.43,3.32c-6.75.1-13.72.21-19.82,2.73-6.35,2.63-11.52,7.59-16.52,12.38S132,224,128,224s-9.15-4.92-14.11-9.69-10.17-9.75-16.52-12.38c-6.1-2.52-13.07-2.63-19.82-2.73-7-.1-14.33-.21-17.43-3.32s-3.22-10.39-3.32-17.43c-.1-6.75-.21-13.72-2.73-19.82-2.63-6.35-7.59-11.52-12.38-16.52S32,132,32,128s4.92-9.15,9.69-14.11,9.75-10.17,12.38-16.52c2.52-6.1,2.63-13.07,2.73-19.82.1-7,.21-14.33,3.32-17.43S70.51,56.9,77.55,56.8c6.75-.1,13.72-.21,19.82-2.73,6.35-2.63,11.52-7.59,16.52-12.38S124,32,128,32s9.15,4.92,14.11,9.69,10.17,9.75,16.52,12.38c6.1,2.52,13.07,2.63,19.82,2.73,7,.1,14.33.21,17.43,3.32s3.22,10.39,3.32,17.43c.1,6.75.21,13.72,2.73,19.82,2.63,6.35,7.59,11.52,12.38,16.52S224,124,224,128,219.08,137.15,214.31,142.11ZM173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34Z"/></symbol><symbol id="FunnelSimple" viewBox="0 0 256 256"><path d="M200,136a8,8,0,0,1-8,8H64a8,8,0,0,1,0-16H192A8,8,0,0,1,200,136Zm32-56H24a8,8,0,0,0,0,16H232a8,8,0,0,0,0-16Zm-80,96H104a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16Z"/></symbol><symbol id="Columns" viewBox="0 0 256 256"><path d="M104,32H64A16,16,0,0,0,48,48V208a16,16,0,0,0,16,16h40a16,16,0,0,0,16-16V48A16,16,0,0,0,104,32Zm0,176H64V48h40ZM192,32H152a16,16,0,0,0-16,16V208a16,16,0,0,0,16,16h40a16,16,0,0,0,16-16V48A16,16,0,0,0,192,32Zm0,176H152V48h40Z"/></symbol><symbol id="ArrowDown" viewBox="0 0 256 256"><path d="M205.66,149.66l-72,72a8,8,0,0,1-11.32,0l-72-72a8,8,0,0,1,11.32-11.32L120,196.69V40a8,8,0,0,1,16,0V196.69l58.34-58.35a8,8,0,0,1,11.32,11.32Z"/></symbol><symbol id="ArrowsDownUp" viewBox="0 0 256 256"><path d="M117.66,170.34a8,8,0,0,1,0,11.32l-32,32a8,8,0,0,1-11.32,0l-32-32a8,8,0,0,1,11.32-11.32L72,188.69V48a8,8,0,0,1,16,0V188.69l18.34-18.35A8,8,0,0,1,117.66,170.34Zm96-96-32-32a8,8,0,0,0-11.32,0l-32,32a8,8,0,0,0,11.32,11.32L168,67.31V208a8,8,0,0,0,16,0V67.31l18.34,18.35a8,8,0,0,0,11.32-11.32Z"/></symbol><symbol id="Tag" viewBox="0 0 256 256"><path d="M243.31,136,144,36.69A15.86,15.86,0,0,0,132.69,32H40a8,8,0,0,0-8,8v92.69A15.86,15.86,0,0,0,36.69,144L136,243.31a16,16,0,0,0,22.63,0l84.68-84.68a16,16,0,0,0,0-22.63Zm-96,96L48,132.69V48h84.69L232,147.31ZM96,84A12,12,0,1,1,84,72,12,12,0,0,1,96,84Z"/></symbol><symbol id="CaretDown" viewBox="0 0 256 256"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></symbol><symbol id="Strategy" viewBox="0 0 256 256"><path d="M76,152a36,36,0,1,0,36,36A36,36,0,0,0,76,152Zm0,56a20,20,0,1,1,20-20A20,20,0,0,1,76,208ZM42.34,106.34,56.69,92,42.34,77.66A8,8,0,0,1,53.66,66.34L68,80.69,82.34,66.34A8,8,0,0,1,93.66,77.66L79.31,92l14.35,14.34a8,8,0,0,1-11.32,11.32L68,103.31,53.66,117.66a8,8,0,0,1-11.32-11.32Zm187.32,96a8,8,0,0,1-11.32,11.32L204,199.31l-14.34,14.35a8,8,0,0,1-11.32-11.32L192.69,188l-14.35-14.34a8,8,0,0,1,11.32-11.32L204,176.69l14.34-14.35a8,8,0,0,1,11.32,11.32L215.31,188Zm-45.19-89.51c-6.18,22.33-25.32,41.63-46.53,46.93A8.13,8.13,0,0,1,136,160a8,8,0,0,1-1.93-15.76c15.63-3.91,30.35-18.91,35-35.68,3.19-11.5,3.22-29-14.71-46.9L152,59.31V80a8,8,0,0,1-16,0V40a8,8,0,0,1,8-8h40a8,8,0,0,1,0,16H163.31l2.35,2.34C183.9,68.59,190.58,90.78,184.47,112.83Z"/></symbol><symbol id="DownloadSimple" viewBox="0 0 256 256"><path d="M224,144v64a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V144a8,8,0,0,1,16,0v56H208V144a8,8,0,0,1,16,0Zm-101.66,5.66a8,8,0,0,0,11.32,0l40-40a8,8,0,0,0-11.32-11.32L136,124.69V32a8,8,0,0,0-16,0v92.69L93.66,98.34a8,8,0,0,0-11.32,11.32Z"/></symbol><symbol id="Trash" viewBox="0 0 256 256"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/></symbol><symbol id="X" viewBox="0 0 256 256"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></symbol><symbol id="CaretLeft" viewBox="0 0 256 256"><path d="M165.66,202.34a8,8,0,0,1-11.32,11.32l-80-80a8,8,0,0,1,0-11.32l80-80a8,8,0,0,1,11.32,11.32L91.31,128Z"/></symbol><symbol id="CaretRight" viewBox="0 0 256 256"><path d="M181.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L164.69,128,90.34,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181.66,133.66Z"/></symbol><symbol id="SquaresFour" viewBox="0 0 256 256"><path d="M104,40H56A16,16,0,0,0,40,56v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,104,40Zm0,64H56V56h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,200,40Zm0,64H152V56h48v48Zm-96,32H56a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,104,136Zm0,64H56V152h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,200,136Zm0,64H152V152h48v48Z"/></symbol><symbol id="ListBullets-duotone" viewBox="0 0 256 256"><path d="M216,64V192H88V64Z" opacity="0.2"/><path d="M80,64a8,8,0,0,1,8-8H216a8,8,0,0,1,0,16H88A8,8,0,0,1,80,64Zm136,56H88a8,8,0,1,0,0,16H216a8,8,0,0,0,0-16Zm0,64H88a8,8,0,1,0,0,16H216a8,8,0,0,0,0-16ZM44,52A12,12,0,1,0,56,64,12,12,0,0,0,44,52Zm0,64a12,12,0,1,0,12,12A12,12,0,0,0,44,116Zm0,64a12,12,0,1,0,12,12A12,12,0,0,0,44,180Z"/></symbol><symbol id="CalendarBlank" viewBox="0 0 256 256"><path d="M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM72,48v8a8,8,0,0,0,16,0V48h80v8a8,8,0,0,0,16,0V48h24V80H48V48ZM208,208H48V96H208V208Z"/></symbol><symbol id="ChartBar" viewBox="0 0 256 256"><path d="M224,200h-8V40a8,8,0,0,0-8-8H152a8,8,0,0,0-8,8V80H96a8,8,0,0,0-8,8v40H48a8,8,0,0,0-8,8v64H32a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16ZM160,48h40V200H160ZM104,96h40V200H104ZM56,144H88v56H56Z"/></symbol><symbol id="Notebook" viewBox="0 0 256 256"><path d="M184,112a8,8,0,0,1-8,8H112a8,8,0,0,1,0-16h64A8,8,0,0,1,184,112Zm-8,24H112a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16Zm48-88V208a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V48A16,16,0,0,1,48,32H208A16,16,0,0,1,224,48ZM48,208H72V48H48Zm160,0V48H88V208H208Z"/></symbol><symbol id="UploadSimple" viewBox="0 0 256 256"><path d="M224,144v64a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V144a8,8,0,0,1,16,0v56H208V144a8,8,0,0,1,16,0ZM93.66,77.66,120,51.31V144a8,8,0,0,0,16,0V51.31l26.34,26.35a8,8,0,0,0,11.32-11.32l-40-40a8,8,0,0,0-11.32,0l-40,40A8,8,0,0,0,93.66,77.66Z"/></symbol><symbol id="ShieldCheck" viewBox="0 0 256 256"><path d="M208,40H48A16,16,0,0,0,32,56v56c0,52.72,25.52,84.67,46.93,102.19,23.06,18.86,46,25.26,47,25.53a8,8,0,0,0,4.2,0c1-.27,23.91-6.67,47-25.53C198.48,196.67,224,164.72,224,112V56A16,16,0,0,0,208,40Zm0,72c0,37.07-13.66,67.16-40.6,89.42A129.3,129.3,0,0,1,128,223.62a128.25,128.25,0,0,1-38.92-21.81C61.82,179.51,48,149.3,48,112l0-56,160,0ZM82.34,141.66a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35a8,8,0,0,1,11.32,11.32l-56,56a8,8,0,0,1-11.32,0Z"/></symbol><symbol id="ClockCounterClockwise" viewBox="0 0 256 256"><path d="M136,80v43.47l36.12,21.67a8,8,0,0,1-8.24,13.72l-40-24A8,8,0,0,1,120,128V80a8,8,0,0,1,16,0Zm-8-48A95.44,95.44,0,0,0,60.08,60.15C52.81,67.51,46.35,74.59,40,82V64a8,8,0,0,0-16,0v40a8,8,0,0,0,8,8H72a8,8,0,0,0,0-16H49c7.15-8.42,14.27-16.35,22.39-24.57a80,80,0,1,1,1.66,114.75,8,8,0,1,0-11,11.64A96,96,0,1,0,128,32Z"/></symbol><symbol id="PlayCircle" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm48.24-94.78-64-40A8,8,0,0,0,100,88v80a8,8,0,0,0,12.24,6.78l64-40a8,8,0,0,0,0-13.56ZM116,153.57V102.43L156.91,128Z"/></symbol><symbol id="UsersThree" viewBox="0 0 256 256"><path d="M244.8,150.4a8,8,0,0,1-11.2-1.6A51.6,51.6,0,0,0,192,128a8,8,0,0,1-7.37-4.89,8,8,0,0,1,0-6.22A8,8,0,0,1,192,112a24,24,0,1,0-23.24-30,8,8,0,1,1-15.5-4A40,40,0,1,1,219,117.51a67.94,67.94,0,0,1,27.43,21.68A8,8,0,0,1,244.8,150.4ZM190.92,212a8,8,0,1,1-13.84,8,57,57,0,0,0-98.16,0,8,8,0,1,1-13.84-8,72.06,72.06,0,0,1,33.74-29.92,48,48,0,1,1,58.36,0A72.06,72.06,0,0,1,190.92,212ZM128,176a32,32,0,1,0-32-32A32,32,0,0,0,128,176ZM72,120a8,8,0,0,0-8-8A24,24,0,1,1,87.24,82a8,8,0,1,0,15.5-4A40,40,0,1,0,37,117.51,67.94,67.94,0,0,0,9.6,139.19a8,8,0,1,0,12.8,9.61A51.6,51.6,0,0,1,64,128,8,8,0,0,0,72,120Z"/></symbol><symbol id="Sparkle" viewBox="0 0 256 256"><path d="M197.58,129.06,146,110l-19-51.62a15.92,15.92,0,0,0-29.88,0L78,110l-51.62,19a15.92,15.92,0,0,0,0,29.88L78,178l19,51.62a15.92,15.92,0,0,0,29.88,0L146,178l51.62-19a15.92,15.92,0,0,0,0-29.88ZM137,164.22a8,8,0,0,0-4.74,4.74L112,223.85,91.78,169A8,8,0,0,0,87,164.22L32.15,144,87,123.78A8,8,0,0,0,91.78,119L112,64.15,132.22,119a8,8,0,0,0,4.74,4.74L191.85,144ZM144,40a8,8,0,0,1,8-8h16V16a8,8,0,0,1,16,0V32h16a8,8,0,0,1,0,16H184V64a8,8,0,0,1-16,0V48H152A8,8,0,0,1,144,40ZM248,88a8,8,0,0,1-8,8h-8v8a8,8,0,0,1-16,0V96h-8a8,8,0,0,1,0-16h8V72a8,8,0,0,1,16,0v8h8A8,8,0,0,1,248,88Z"/></symbol><symbol id="Wallet-duotone" viewBox="0 0 256 256"><path d="M224,80V192a8,8,0,0,1-8,8H56a16,16,0,0,1-16-16V56A16,16,0,0,0,56,72H216A8,8,0,0,1,224,80Z" opacity="0.2"/><path d="M216,64H56a8,8,0,0,1,0-16H192a8,8,0,0,0,0-16H56A24,24,0,0,0,32,56V184a24,24,0,0,0,24,24H216a16,16,0,0,0,16-16V80A16,16,0,0,0,216,64Zm0,128H56a8,8,0,0,1-8-8V78.63A23.84,23.84,0,0,0,56,80H216Zm-48-60a12,12,0,1,1,12,12A12,12,0,0,1,168,132Z"/></symbol><symbol id="CaretUpDown" viewBox="0 0 256 256"><path d="M181.66,170.34a8,8,0,0,1,0,11.32l-48,48a8,8,0,0,1-11.32,0l-48-48a8,8,0,0,1,11.32-11.32L128,212.69l42.34-42.35A8,8,0,0,1,181.66,170.34Zm-96-84.68L128,43.31l42.34,42.35a8,8,0,0,0,11.32-11.32l-48-48a8,8,0,0,0-11.32,0l-48,48A8,8,0,0,0,85.66,85.66Z"/></symbol><symbol id="GearSix" viewBox="0 0 256 256"><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm109.94-52.79a8,8,0,0,0-3.89-5.4l-29.83-17-.12-33.62a8,8,0,0,0-2.83-6.08,111.91,111.91,0,0,0-36.72-20.67,8,8,0,0,0-6.46.59L128,41.85,97.88,25a8,8,0,0,0-6.47-.6A112.1,112.1,0,0,0,54.73,45.15a8,8,0,0,0-2.83,6.07l-.15,33.65-29.83,17a8,8,0,0,0-3.89,5.4,106.47,106.47,0,0,0,0,41.56,8,8,0,0,0,3.89,5.4l29.83,17,.12,33.62a8,8,0,0,0,2.83,6.08,111.91,111.91,0,0,0,36.72,20.67,8,8,0,0,0,6.46-.59L128,214.15,158.12,231a7.91,7.91,0,0,0,3.9,1,8.09,8.09,0,0,0,2.57-.42,112.1,112.1,0,0,0,36.68-20.73,8,8,0,0,0,2.83-6.07l.15-33.65,29.83-17a8,8,0,0,0,3.89-5.4A106.47,106.47,0,0,0,237.94,107.21Zm-15,34.91-28.57,16.25a8,8,0,0,0-3,3c-.58,1-1.19,2.06-1.81,3.06a7.94,7.94,0,0,0-1.22,4.21l-.15,32.25a95.89,95.89,0,0,1-25.37,14.3L134,199.13a8,8,0,0,0-3.91-1h-.19c-1.21,0-2.43,0-3.64,0a8.08,8.08,0,0,0-4.1,1l-28.84,16.1A96,96,0,0,1,67.88,201l-.11-32.2a8,8,0,0,0-1.22-4.22c-.62-1-1.23-2-1.8-3.06a8.09,8.09,0,0,0-3-3.06l-28.6-16.29a90.49,90.49,0,0,1,0-28.26L61.67,97.63a8,8,0,0,0,3-3c.58-1,1.19-2.06,1.81-3.06a7.94,7.94,0,0,0,1.22-4.21l.15-32.25a95.89,95.89,0,0,1,25.37-14.3L122,56.87a8,8,0,0,0,4.1,1c1.21,0,2.43,0,3.64,0a8.08,8.08,0,0,0,4.1-1l28.84-16.1A96,96,0,0,1,188.12,55l.11,32.2a8,8,0,0,0,1.22,4.22c.62,1,1.23,2,1.8,3.06a8.09,8.09,0,0,0,3,3.06l28.6,16.29A90.49,90.49,0,0,1,222.9,142.12Z"/></symbol><symbol id="MagnifyingGlass" viewBox="0 0 256 256"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/></symbol><symbol id="Moon" viewBox="0 0 256 256"><path d="M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23ZM188.9,190.34A88,88,0,0,1,65.66,67.11a89,89,0,0,1,31.4-26A106,106,0,0,0,96,56,104.11,104.11,0,0,0,200,160a106,106,0,0,0,14.92-1.06A89,89,0,0,1,188.9,190.34Z"/></symbol></svg>
+<aside class="side">
+  <a class="brand" href="#"><span class="mark" aria-hidden="true">K</span>Keel</a>
+  <button class="ws"><span class="tile t-a"><svg class="i " aria-hidden="true"><use href="#Wallet-duotone"/></svg></span><span><b>Sample workspace</b><small>All accounts</small></span><svg class="i cu" aria-hidden="true"><use href="#CaretUpDown"/></svg></button>
+  <nav aria-label="App"><a  href="#"><svg class="i " aria-hidden="true"><use href="#SquaresFour"/></svg>Dashboard</a><a class="on" aria-current="page" href="#"><svg class="i " aria-hidden="true"><use href="#ListBullets-duotone"/></svg>Trades</a><a  href="#"><svg class="i " aria-hidden="true"><use href="#CalendarBlank"/></svg>Calendar</a><a  href="#"><svg class="i " aria-hidden="true"><use href="#ChartBar"/></svg>Reports</a><a  href="#"><svg class="i " aria-hidden="true"><use href="#Strategy"/></svg>Strategies</a><a  href="#"><svg class="i " aria-hidden="true"><use href="#Notebook"/></svg>Notebook</a><a  href="#"><svg class="i " aria-hidden="true"><use href="#UploadSimple"/></svg>Import</a><a  href="#"><svg class="i " aria-hidden="true"><use href="#ShieldCheck"/></svg>Prop firms</a><p class="grp">Not live yet</p><a class="off" href="#"><svg class="i " aria-hidden="true"><use href="#ClockCounterClockwise"/></svg>Backtesting</a><a class="off" href="#"><svg class="i " aria-hidden="true"><use href="#PlayCircle"/></svg>Replay</a><a class="off" href="#"><svg class="i " aria-hidden="true"><use href="#UsersThree"/></svg>Mentors</a><a class="off" href="#"><svg class="i " aria-hidden="true"><use href="#Sparkle"/></svg>Assistant</a></nav>
+  <nav class="set"><a  href="#"><svg class="i " aria-hidden="true"><use href="#GearSix"/></svg>Settings</a></nav>
+</aside>
+<div class="col">
+<header class="top">
+  <h1>Trades</h1>
+  <div class="chips"><button class="chip set act"><svg class="i cal" aria-hidden="true"><use href="#CalendarBlank"/></svg>This month<svg class="i " aria-hidden="true"><use href="#CaretDown"/></svg></button><button class="chip">Symbol<svg class="i " aria-hidden="true"><use href="#CaretDown"/></svg></button><button class="chip">Side<svg class="i " aria-hidden="true"><use href="#CaretDown"/></svg></button><button class="chip">Strategy<svg class="i " aria-hidden="true"><use href="#CaretDown"/></svg></button><button class="chip">Tags<svg class="i " aria-hidden="true"><use href="#CaretDown"/></svg></button><button class="clear">Clear filters</button></div>
+  <div class="tools">
+    <button class="ibtn" aria-label="Search"><svg class="i " aria-hidden="true"><use href="#MagnifyingGlass"/></svg></button>
+    <span class="sample">Sample data</span>
+    <div class="seg" role="radiogroup" aria-label="P&amp;L basis"><button role="radio" aria-checked="false">Gross</button><button class="on" role="radio" aria-checked="true">Net</button></div>
+    <button class="imp"><svg class="i " aria-hidden="true"><use href="#UploadSimple"/></svg>Import</button>
+    <button class="ibtn" aria-label="Switch to dark theme"><svg class="i " aria-hidden="true"><use href="#Moon"/></svg></button>
+  </div>
+</header>
+<main class="page" id="content">
+
+<section class="card sum" aria-label="This month">
+  <div class="kpi"><span class="tip">Trades</span><b>157</b><small>closed, 4 still open</small></div>
+  <div class="kpi"><span class="tip">Net P&amp;L</span><b class="pos">+$4,690.81</b><small>after $1,226.45 fees</small></div>
+  <div class="kpi"><span class="tip">Win rate</span><b>49.7%</b><small>78 won, 79 lost</small></div>
+  <div class="kpi"><span class="tip">Profit factor</span><b>1.37</b><small>$1.37 won per $1 lost</small></div>
+  <div class="kpi"><span class="tip">Expectancy</span><b class="pos">+$29.88</b><small>per closed trade</small></div>
+  <p class="note">Figures cover the closed trades in your filters: November, all accounts.</p>
+</section>
+
+<section class="card tbl" aria-label="Trades">
+  <div class="bar">
+    <div class="seg" role="radiogroup" aria-label="Status"><button class="on" role="radio" aria-checked="true">Closed <span class="ct">157</span></button><button role="radio" aria-checked="false">Open <span class="ct">4</span></button></div>
+    <div class="seg" role="radiogroup" aria-label="Review"><button class="on" role="radio" aria-checked="true">All</button><button role="radio" aria-checked="false">Not reviewed <span class="ct">9</span></button><button role="radio" aria-checked="false">Reviewed <span class="ct">148</span></button></div>
+    <div class="end">
+      <button class="btn"><svg class="i " aria-hidden="true"><use href="#FunnelSimple"/></svg>More filters</button>
+      <button class="btn"><svg class="i " aria-hidden="true"><use href="#Columns"/></svg>Columns</button>
+    </div>
+  </div>
+  <div class="scroll">
+  <table>
+    <colgroup><col style="width:28px"><col style="width:82px"><col style="width:102px"><col style="width:56px"><col style="width:32px"><col style="width:66px"><col style="width:66px"><col style="width:74px"><col style="width:60px"><col style="width:54px"><col style="width:60px"><col style="width:140px"><col style="width:110px"><col style="width:84px"><col style="width:62px"><col style="width:64px"></colgroup>
+    <thead><tr>
+      <th><span class="cb mid"></span></th>
+      <th><span class="sort">Closed<svg class="i " aria-hidden="true"><use href="#ArrowDown"/></svg></span></th>
+      <th><span class="hs">Instrument<svg class="i " aria-hidden="true"><use href="#ArrowsDownUp"/></svg></span></th><th><span class="hs">Side<svg class="i " aria-hidden="true"><use href="#ArrowsDownUp"/></svg></span></th><th class="n"><span class="hs">Qty<svg class="i " aria-hidden="true"><use href="#ArrowsDownUp"/></svg></span></th><th class="n"><span class="hs">Entry<svg class="i " aria-hidden="true"><use href="#ArrowsDownUp"/></svg></span></th><th class="n"><span class="hs">Exit<svg class="i " aria-hidden="true"><use href="#ArrowsDownUp"/></svg></span></th><th class="n"><span class="hs">Net P&amp;L<svg class="i " aria-hidden="true"><use href="#ArrowsDownUp"/></svg></span></th><th class="n"><span class="hs"><span class="tip">Net ROI</span><svg class="i " aria-hidden="true"><use href="#ArrowsDownUp"/></svg></span></th><th class="n"><span class="hs"><span class="tip">R</span><svg class="i " aria-hidden="true"><use href="#ArrowsDownUp"/></svg></span></th><th class="n"><span class="hs">Duration<svg class="i " aria-hidden="true"><use href="#ArrowsDownUp"/></svg></span></th><th><span class="hs">Strategy<svg class="i " aria-hidden="true"><use href="#ArrowsDownUp"/></svg></span></th>
+      <th>Tags</th><th><span class="hs">Rules<svg class="i " aria-hidden="true"><use href="#ArrowsDownUp"/></svg></span></th><th><span class="hs">Rating<svg class="i " aria-hidden="true"><use href="#ArrowsDownUp"/></svg></span></th><th class="c">Reviewed</th>
+    </tr></thead>
+    <tbody><tr>
+<td><span class="cb"><svg class="i " aria-hidden="true"><use href="#Check"/></svg></span></td>
+<td class="tm">20 Nov<b>20:49</b></td>
+<td><span class="sym"><b>TSLA</b><span>370 Put</span></span></td>
+<td><span class="sd">Long</span></td>
+<td class="n">1</td>
+<td class="n">3.65</td>
+<td class="n">1.77</td>
+<td class="n f neg">−$189.30</td>
+<td class="n neg">−51.86%</td>
+<td class="n ">−1.48R</td>
+<td class="n mu">25m 19s</td>
+<td class="">Opening range breakout</td>
+<td><span class="tag">Opening range</span></td>
+<td><span class="mk ok"><svg class="i " aria-hidden="true"><use href="#CheckCircle-fill"/></svg>6 of 6</span></td>
+<td><span class="stars"  aria-label="3 of 5"><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i " aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i " aria-hidden="true"><use href="#Star-fill"/></svg></span></td>
+<td class="rv"><span class="rvn" title="Not reviewed"><span class="sr">Not reviewed</span></span></td>
+</tr><tr>
+<td><span class="cb"><svg class="i " aria-hidden="true"><use href="#Check"/></svg></span></td>
+<td class="tm">20 Nov<b>18:48</b></td>
+<td><span class="sym"><b>TSLA</b><span>385 Call</span></span></td>
+<td><span class="sd">Long</span></td>
+<td class="n">1</td>
+<td class="n">4.22</td>
+<td class="n">6.52</td>
+<td class="n f pos">+$228.70</td>
+<td class="n pos">+54.19%</td>
+<td class="n ">+1.55R</td>
+<td class="n mu">18m 08s</td>
+<td class="">Trend pullback</td>
+<td><span class="tag w">Moved stop</span></td>
+<td><span class="mk no"><svg class="i " aria-hidden="true"><use href="#XCircle-fill"/></svg><b>1 broken</b></span></td>
+<td><span class="stars"  aria-label="4 of 5"><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i " aria-hidden="true"><use href="#Star-fill"/></svg></span></td>
+<td class="rv"><span class="rvn" title="Not reviewed"><span class="sr">Not reviewed</span></span></td>
+</tr><tr>
+<td><span class="cb"><svg class="i " aria-hidden="true"><use href="#Check"/></svg></span></td>
+<td class="tm">20 Nov<b>18:24</b></td>
+<td><span class="sym"><b>ES</b><span>Dec 26</span></span></td>
+<td><span class="sd">Long</span></td>
+<td class="n">1</td>
+<td class="n">6,227.25</td>
+<td class="n">6,233.25</td>
+<td class="n f pos">+$294.80</td>
+<td class="n pos">+0.09%</td>
+<td class="n fa">No risk</td>
+<td class="n mu">41m 28s</td>
+<td class="">Level reversal</td>
+<td></td>
+<td><span class="mk ok"><svg class="i " aria-hidden="true"><use href="#CheckCircle-fill"/></svg>6 of 6</span></td>
+<td><span class="fa">None</span></td>
+<td class="rv"><span class="rvn" title="Not reviewed"><span class="sr">Not reviewed</span></span></td>
+</tr><tr>
+<td><span class="cb"><svg class="i " aria-hidden="true"><use href="#Check"/></svg></span></td>
+<td class="tm">20 Nov<b>18:21</b></td>
+<td><span class="sym"><b>AAPL</b></span></td>
+<td><span class="sd">Short</span></td>
+<td class="n">74</td>
+<td class="n">274.47</td>
+<td class="n">271.69</td>
+<td class="n f pos">+$203.72</td>
+<td class="n pos">+1.00%</td>
+<td class="n ">+2.26R</td>
+<td class="n mu">31m 07s</td>
+<td class="">Opening range breakout</td>
+<td><span class="tag w">FOMO entry</span></td>
+<td><span class="mk no"><svg class="i " aria-hidden="true"><use href="#XCircle-fill"/></svg><b>1 broken</b></span></td>
+<td><span class="stars"  aria-label="4 of 5"><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i " aria-hidden="true"><use href="#Star-fill"/></svg></span></td>
+<td class="rv"><span class="rvn" title="Not reviewed"><span class="sr">Not reviewed</span></span></td>
+</tr><tr class="sel">
+<td><span class="cb on"><svg class="i " aria-hidden="true"><use href="#Check"/></svg></span></td>
+<td class="tm">20 Nov<b>14:36</b></td>
+<td><span class="sym"><b>EURUSD</b></span></td>
+<td><span class="sd">Short</span></td>
+<td class="n">1.7</td>
+<td class="n">1.10254</td>
+<td class="n">1.10365</td>
+<td class="n f neg">−$200.60</td>
+<td class="n neg">−0.11%</td>
+<td class="n ">−1.07R</td>
+<td class="n mu">1h 34m</td>
+<td class="">Level reversal</td>
+<td><span class="tag">Pullback</span></td>
+<td><span class="mk ok"><svg class="i " aria-hidden="true"><use href="#CheckCircle-fill"/></svg>6 of 6</span></td>
+<td><span class="fa">None</span></td>
+<td class="rv"><span class="rvn" title="Not reviewed"><span class="sr">Not reviewed</span></span></td>
+</tr><tr class="sel">
+<td><span class="cb on"><svg class="i " aria-hidden="true"><use href="#Check"/></svg></span></td>
+<td class="tm">20 Nov<b>12:59</b></td>
+<td><span class="sym"><b>EURUSD</b></span></td>
+<td><span class="sd">Short</span></td>
+<td class="n">1.7</td>
+<td class="n">1.10267</td>
+<td class="n">1.10413</td>
+<td class="n f neg">−$260.10</td>
+<td class="n neg">−0.14%</td>
+<td class="n ">−1.09R</td>
+<td class="n mu">43m 12s</td>
+<td class="">Level reversal</td>
+<td><span class="tag w">Oversized</span> <span class="more">+1</span></td>
+<td><span class="mk ok"><svg class="i " aria-hidden="true"><use href="#CheckCircle-fill"/></svg>5 of 6</span></td>
+<td><span class="fa">None</span></td>
+<td class="rv"><span class="rvn" title="Not reviewed"><span class="sr">Not reviewed</span></span></td>
+</tr><tr>
+<td><span class="cb"><svg class="i " aria-hidden="true"><use href="#Check"/></svg></span></td>
+<td class="tm">20 Nov<b>12:04</b></td>
+<td><span class="sym"><b>USDJPY</b></span></td>
+<td><span class="sd">Long</span></td>
+<td class="n">1.6</td>
+<td class="n">156.009</td>
+<td class="n">156.316</td>
+<td class="n f pos">+$303.04</td>
+<td class="n pos">+0.19%</td>
+<td class="n ">+1.66R</td>
+<td class="n mu">59m 15s</td>
+<td class="fa">None</td>
+<td></td>
+<td><span class="mk un">Not graded</span></td>
+<td><span class="fa">None</span></td>
+<td class="rv"><span class="rvn" title="Not reviewed"><span class="sr">Not reviewed</span></span></td>
+</tr><tr class="sel">
+<td><span class="cb on"><svg class="i " aria-hidden="true"><use href="#Check"/></svg></span></td>
+<td class="tm">19 Nov<b>20:30</b></td>
+<td><span class="sym"><b>ES</b><span>Dec 26</span></span></td>
+<td><span class="sd">Short</span></td>
+<td class="n">1</td>
+<td class="n">6,212.00</td>
+<td class="n">6,215.00</td>
+<td class="n f neg">−$155.20</td>
+<td class="n neg">−0.05%</td>
+<td class="n ">−1.03R</td>
+<td class="n mu">43m 13s</td>
+<td class="">Level reversal</td>
+<td></td>
+<td><span class="mk ok"><svg class="i " aria-hidden="true"><use href="#CheckCircle-fill"/></svg>6 of 6</span></td>
+<td><span class="stars"  aria-label="2 of 5"><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i " aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i " aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i " aria-hidden="true"><use href="#Star-fill"/></svg></span></td>
+<td class="rv"><span class="rvd" title="Reviewed"><svg class="i " aria-hidden="true"><use href="#SealCheck-duotone"/></svg><span class="sr">Reviewed</span></span></td>
+</tr><tr>
+<td><span class="cb"><svg class="i " aria-hidden="true"><use href="#Check"/></svg></span></td>
+<td class="tm">19 Nov<b>19:42</b></td>
+<td><span class="sym"><b>ES</b><span>Dec 26</span></span></td>
+<td><span class="sd">Long</span></td>
+<td class="n">1</td>
+<td class="n">6,213.25</td>
+<td class="n">6,210.25</td>
+<td class="n f neg">−$155.20</td>
+<td class="n neg">−0.05%</td>
+<td class="n ">−0.96R</td>
+<td class="n mu">18m 33s</td>
+<td class="">Opening range breakout</td>
+<td><span class="tag">Opening range</span></td>
+<td><span class="mk ok"><svg class="i " aria-hidden="true"><use href="#CheckCircle-fill"/></svg>5 of 6</span></td>
+<td><span class="stars"  aria-label="2 of 5"><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i " aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i " aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i " aria-hidden="true"><use href="#Star-fill"/></svg></span></td>
+<td class="rv"><span class="rvd" title="Reviewed"><svg class="i " aria-hidden="true"><use href="#SealCheck-duotone"/></svg><span class="sr">Reviewed</span></span></td>
+</tr><tr>
+<td><span class="cb"><svg class="i " aria-hidden="true"><use href="#Check"/></svg></span></td>
+<td class="tm">19 Nov<b>19:18</b></td>
+<td><span class="sym"><b>MES</b><span>Dec 26</span></span></td>
+<td><span class="sd">Short</span></td>
+<td class="n">5</td>
+<td class="n">6,214.20</td>
+<td class="n">6,208.50</td>
+<td class="n f pos">+$116.50</td>
+<td class="n pos">+0.07%</td>
+<td class="n ">+0.97R</td>
+<td class="n mu">30m 44s</td>
+<td class="fa">None</td>
+<td></td>
+<td><span class="mk un">Not graded</span></td>
+<td><span class="fa">None</span></td>
+<td class="rv"><span class="rvd" title="Reviewed"><svg class="i " aria-hidden="true"><use href="#SealCheck-duotone"/></svg><span class="sr">Reviewed</span></span></td>
+</tr><tr>
+<td><span class="cb"><svg class="i " aria-hidden="true"><use href="#Check"/></svg></span></td>
+<td class="tm">19 Nov<b>18:43</b></td>
+<td><span class="sym"><b>NQ</b><span>Dec 26</span></span></td>
+<td><span class="sd">Long</span></td>
+<td class="n">1</td>
+<td class="n">22,417.00</td>
+<td class="n">22,433.75</td>
+<td class="n f pos">+$329.80</td>
+<td class="n pos">+0.07%</td>
+<td class="n ">+1.65R</td>
+<td class="n mu">45m 47s</td>
+<td class="">Opening range breakout</td>
+<td><span class="tag">Opening range</span></td>
+<td><span class="mk ok"><svg class="i " aria-hidden="true"><use href="#CheckCircle-fill"/></svg>6 of 6</span></td>
+<td><span class="stars"  aria-label="3 of 5"><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i " aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i " aria-hidden="true"><use href="#Star-fill"/></svg></span></td>
+<td class="rv"><span class="rvd" title="Reviewed"><svg class="i " aria-hidden="true"><use href="#SealCheck-duotone"/></svg><span class="sr">Reviewed</span></span></td>
+</tr><tr>
+<td><span class="cb"><svg class="i " aria-hidden="true"><use href="#Check"/></svg></span></td>
+<td class="tm">19 Nov<b>17:55</b></td>
+<td><span class="sym"><b>MES</b><span>Dec 26</span></span></td>
+<td><span class="sd">Long</span></td>
+<td class="n">3</td>
+<td class="n">6,206.83</td>
+<td class="n">6,201.75</td>
+<td class="n f neg">−$91.85</td>
+<td class="n neg">−0.10%</td>
+<td class="n ">−1.10R</td>
+<td class="n mu">13m 19s</td>
+<td class="">Opening range breakout</td>
+<td><span class="tag">Opening range</span></td>
+<td><span class="mk ok"><svg class="i " aria-hidden="true"><use href="#CheckCircle-fill"/></svg>5 of 6</span></td>
+<td><span class="stars"  aria-label="1 of 5"><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i " aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i " aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i " aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i " aria-hidden="true"><use href="#Star-fill"/></svg></span></td>
+<td class="rv"><span class="rvd" title="Reviewed"><svg class="i " aria-hidden="true"><use href="#SealCheck-duotone"/></svg><span class="sr">Reviewed</span></span></td>
+</tr><tr>
+<td><span class="cb"><svg class="i " aria-hidden="true"><use href="#Check"/></svg></span></td>
+<td class="tm">18 Nov<b>22:38</b></td>
+<td><span class="sym"><b>SPY</b><span>576 Put</span></span></td>
+<td><span class="sd">Long</span></td>
+<td class="n">1</td>
+<td class="n">5.61</td>
+<td class="n">2.21</td>
+<td class="n f neg">−$341.30</td>
+<td class="n neg">−60.84%</td>
+<td class="n ">−1.74R</td>
+<td class="n mu">54m 38s</td>
+<td class="">Opening range breakout</td>
+<td><span class="tag w">Moved stop</span></td>
+<td><span class="mk no"><svg class="i " aria-hidden="true"><use href="#XCircle-fill"/></svg><b>3 broken</b></span></td>
+<td><span class="stars"  aria-label="2 of 5"><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i " aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i " aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i " aria-hidden="true"><use href="#Star-fill"/></svg></span></td>
+<td class="rv"><span class="rvd" title="Reviewed"><svg class="i " aria-hidden="true"><use href="#SealCheck-duotone"/></svg><span class="sr">Reviewed</span></span></td>
+</tr><tr>
+<td><span class="cb"><svg class="i " aria-hidden="true"><use href="#Check"/></svg></span></td>
+<td class="tm">18 Nov<b>21:33</b></td>
+<td><span class="sym"><b>NVDA</b><span>165 Call</span></span></td>
+<td><span class="sd">Long</span></td>
+<td class="n">1</td>
+<td class="n">2.15</td>
+<td class="n">1.00</td>
+<td class="n f neg">−$116.30</td>
+<td class="n neg">−54.09%</td>
+<td class="n ">−1.55R</td>
+<td class="n mu">30m 44s</td>
+<td class="">Trend pullback</td>
+<td><span class="tag w">Early exit</span></td>
+<td><span class="mk no"><svg class="i " aria-hidden="true"><use href="#XCircle-fill"/></svg><b>3 broken</b></span></td>
+<td><span class="stars"  aria-label="3 of 5"><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i f" aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i " aria-hidden="true"><use href="#Star-fill"/></svg><svg class="i " aria-hidden="true"><use href="#Star-fill"/></svg></span></td>
+<td class="rv"><span class="rvd" title="Reviewed"><svg class="i " aria-hidden="true"><use href="#SealCheck-duotone"/></svg><span class="sr">Reviewed</span></span></td>
+</tr><tr>
+<td><span class="cb"><svg class="i " aria-hidden="true"><use href="#Check"/></svg></span></td>
+<td class="tm">18 Nov<b>20:57</b></td>
+<td><span class="sym"><b>ETHUSD</b></span></td>
+<td><span class="sd">Long</span></td>
+<td class="n">0.8</td>
+<td class="n">2,500.86</td>
+<td class="n">2,452.46</td>
+<td class="n f neg">−$42.68</td>
+<td class="n neg">−2.13%</td>
+<td class="n ">−0.97R</td>
+<td class="n mu">1h 42m</td>
+<td class="fa">None</td>
+<td></td>
+<td><span class="mk un">Not graded</span></td>
+<td><span class="fa">None</span></td>
+<td class="rv"><span class="rvn" title="Not reviewed"><span class="sr">Not reviewed</span></span></td>
+</tr></tbody>
+  </table>
+  </div>
+  <div class="bulk" role="toolbar" aria-label="3 selected trades">
+    <span class="count"><span class="cb mid"></span>3 selected</span>
+    <button class="btn"><svg class="i " aria-hidden="true"><use href="#Tag"/></svg>Tag<svg class="i cd" aria-hidden="true"><use href="#CaretDown"/></svg></button>
+    <button class="btn"><svg class="i " aria-hidden="true"><use href="#Strategy"/></svg>Add to strategy<svg class="i cd" aria-hidden="true"><use href="#CaretDown"/></svg></button>
+    <button class="btn"><svg class="i " aria-hidden="true"><use href="#SealCheck-duotone"/></svg>Mark reviewed</button>
+    <button class="btn"><svg class="i " aria-hidden="true"><use href="#DownloadSimple"/></svg>Export CSV</button>
+    <span class="vr"></span>
+    <button class="btn"><svg class="i " aria-hidden="true"><use href="#Trash"/></svg>Delete</button>
+    <button class="btn x" aria-label="Clear selection"><svg class="i " aria-hidden="true"><use href="#X"/></svg></button>
+  </div>
+  <div class="foot">
+    <span>1 to 50 of 157 closed trades</span>
+    <div class="pg"><button aria-label="Previous page" disabled><svg class="i " aria-hidden="true"><use href="#CaretLeft"/></svg></button><button class="on">1</button><button>2</button><button>3</button><button>4</button><button aria-label="Next page"><svg class="i " aria-hidden="true"><use href="#CaretRight"/></svg></button></div>
+  </div>
+</section>
+
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>Keel, Settings, accounts</title>
+<link rel="stylesheet" href="shell.css">
+<style>
+.sx { display: grid; grid-template-columns: 180px 1fr; gap: 16px; flex: 1; align-items: start; }
+.sn { padding: 10px; display: flex; flex-direction: column; gap: 2px; }
+.sn a { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 9px; color: var(--muted); font-weight: 500; }
+.sn a svg.i { width: 17px; height: 17px; }
+.sn a:hover { background: var(--sunken); color: var(--ink); }
+.sn a.on { background: var(--accent-soft); color: var(--ink); font-weight: 600; } .sn a.on svg { color: var(--accent); }
+.mc { display: flex; flex-direction: column; gap: 16px; }
+.ac table { margin-top: 10px; }
+.ac td { height: 46px; padding-right: 14px; } .ac th { padding-right: 14px; }
+.ac td b { font-weight: 600; } .ac td:last-child, .ac th:last-child { padding-right: 0; } .mk.st svg { color: var(--accent); } .mk.st { color: var(--ink); font-weight: 500; } .ac td .ro { font-size: 12px; color: var(--faint); margin-left: 8px; }
+.ac tr.sel td { background: color-mix(in srgb, var(--accent-soft) 70%, transparent); }
+.ac tr.arc td { color: var(--faint); } .ac tr.arc td b { color: var(--muted); font-weight: 500; }
+.ac .tag svg.i { width: 13px; height: 13px; }
+.ac .pill { height: 22px; font-weight: 550; }
+.ibtn.sm { width: 28px; height: 28px; border-radius: 8px; display: inline-grid; } .ibtn.sm svg.i { width: 16px; height: 16px; }
+.adj { display: grid; grid-template-columns: 1fr 300px; gap: 28px; }
+.adj table { margin-top: 10px; }
+.adj td { height: 40px; padding-right: 14px; } .adj th { padding-right: 14px; }
+.adj .why { font-size: 12.5px; color: var(--muted); line-height: 1.55; padding: 14px 16px; border-radius: 12px; background: var(--sunken); align-self: start; margin-top: 12px; }
+.adj .why b { color: var(--ink); font-weight: 600; display: block; margin-bottom: 4px; font-size: 13px; }
+.adj .tot td { font-weight: 600; border-bottom: 0; color: var(--ink); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="DotsThree" viewBox="0 0 256 256"><path d="M140,128a12,12,0,1,1-12-12A12,12,0,0,1,140,128Zm56-12a12,12,0,1,0,12,12A12,12,0,0,0,196,116ZM60,116a12,12,0,1,0,12,12A12,12,0,0,0,60,116Z"/></symbol><symbol id="CheckCircle-fill" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm45.66,85.66-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35a8,8,0,0,1,11.32,11.32Z"/></symbol><symbol id="Lock-duotone" viewBox="0 0 256 256"><path d="M216,96V208a8,8,0,0,1-8,8H48a8,8,0,0,1-8-8V96a8,8,0,0,1,8-8H208A8,8,0,0,1,216,96Z" opacity="0.2"/><path d="M208,80H176V56a48,48,0,0,0-96,0V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80ZM96,56a32,32,0,0,1,64,0V80H96ZM208,208H48V96H208V208Zm-68-56a12,12,0,1,1-12-12A12,12,0,0,1,140,152Z"/></symbol><symbol id="User-duotone" viewBox="0 0 256 256"><path d="M192,96a64,64,0,1,1-64-64A64,64,0,0,1,192,96Z" opacity="0.2"/><path d="M230.92,212c-15.23-26.33-38.7-45.21-66.09-54.16a72,72,0,1,0-73.66,0C63.78,166.78,40.31,185.66,25.08,212a8,8,0,1,0,13.85,8c18.84-32.56,52.14-52,89.07-52s70.23,19.44,89.07,52a8,8,0,1,0,13.85-8ZM72,96a56,56,0,1,1,56,56A56.06,56.06,0,0,1,72,96Z"/></symbol><symbol id="Bank-duotone" viewBox="0 0 256 256"><path d="M232,96H24L128,32Z" opacity="0.2"/><path d="M24,104H48v64H32a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16H208V104h24a8,8,0,0,0,4.19-14.81l-104-64a8,8,0,0,0-8.38,0l-104,64A8,8,0,0,0,24,104Zm40,0H96v64H64Zm80,0v64H112V104Zm48,64H160V104h32ZM128,41.39,203.74,88H52.26ZM248,208a8,8,0,0,1-8,8H16a8,8,0,0,1,0-16H240A8,8,0,0,1,248,208Z"/></symbol><symbol id="ClockCounterClockwise-duotone" viewBox="0 0 256 256"><path d="M216,128a88,88,0,1,1-88-88A88,88,0,0,1,216,128Z" opacity="0.2"/><path d="M136,80v43.47l36.12,21.67a8,8,0,0,1-8.24,13.72l-40-24A8,8,0,0,1,120,128V80a8,8,0,0,1,16,0Zm-8-48A95.44,95.44,0,0,0,60.08,60.15C52.81,67.51,46.35,74.59,40,82V64a8,8,0,0,0-16,0v40a8,8,0,0,0,8,8H72a8,8,0,0,0,0-16H49c7.15-8.42,14.27-16.35,22.39-24.57a80,80,0,1,1,1.66,114.75,8,8,0,1,0-11,11.64A96,96,0,1,0,128,32Z"/></symbol><symbol id="Plus" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"/></symbol><symbol id="CurrencyDollar-duotone" viewBox="0 0 256 256"><path d="M192,168a40,40,0,0,1-40,40H128V128h24A40,40,0,0,1,192,168ZM112,48a40,40,0,0,0,0,80h16V48Z" opacity="0.2"/><path d="M152,120H136V56h8a32,32,0,0,1,32,32,8,8,0,0,0,16,0,48.05,48.05,0,0,0-48-48h-8V24a8,8,0,0,0-16,0V40h-8a48,48,0,0,0,0,96h8v64H104a32,32,0,0,1-32-32,8,8,0,0,0-16,0,48.05,48.05,0,0,0,48,48h16v16a8,8,0,0,0,16,0V216h16a48,48,0,0,0,0-96Zm-40,0a32,32,0,0,1,0-64h8v64Zm40,80H136V136h16a32,32,0,0,1,0,64Z"/></symbol><symbol id="SquaresFour" viewBox="0 0 256 256"><path d="M104,40H56A16,16,0,0,0,40,56v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,104,40Zm0,64H56V56h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,200,40Zm0,64H152V56h48v48Zm-96,32H56a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,104,136Zm0,64H56V152h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,200,136Zm0,64H152V152h48v48Z"/></symbol><symbol id="ListBullets" viewBox="0 0 256 256"><path d="M80,64a8,8,0,0,1,8-8H216a8,8,0,0,1,0,16H88A8,8,0,0,1,80,64Zm136,56H88a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Zm0,64H88a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16ZM44,52A12,12,0,1,0,56,64,12,12,0,0,0,44,52Zm0,64a12,12,0,1,0,12,12A12,12,0,0,0,44,116Zm0,64a12,12,0,1,0,12,12A12,12,0,0,0,44,180Z"/></symbol><symbol id="CalendarBlank" viewBox="0 0 256 256"><path d="M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM72,48v8a8,8,0,0,0,16,0V48h80v8a8,8,0,0,0,16,0V48h24V80H48V48ZM208,208H48V96H208V208Z"/></symbol><symbol id="ChartBar" viewBox="0 0 256 256"><path d="M224,200h-8V40a8,8,0,0,0-8-8H152a8,8,0,0,0-8,8V80H96a8,8,0,0,0-8,8v40H48a8,8,0,0,0-8,8v64H32a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16ZM160,48h40V200H160ZM104,96h40V200H104ZM56,144H88v56H56Z"/></symbol><symbol id="Strategy" viewBox="0 0 256 256"><path d="M76,152a36,36,0,1,0,36,36A36,36,0,0,0,76,152Zm0,56a20,20,0,1,1,20-20A20,20,0,0,1,76,208ZM42.34,106.34,56.69,92,42.34,77.66A8,8,0,0,1,53.66,66.34L68,80.69,82.34,66.34A8,8,0,0,1,93.66,77.66L79.31,92l14.35,14.34a8,8,0,0,1-11.32,11.32L68,103.31,53.66,117.66a8,8,0,0,1-11.32-11.32Zm187.32,96a8,8,0,0,1-11.32,11.32L204,199.31l-14.34,14.35a8,8,0,0,1-11.32-11.32L192.69,188l-14.35-14.34a8,8,0,0,1,11.32-11.32L204,176.69l14.34-14.35a8,8,0,0,1,11.32,11.32L215.31,188Zm-45.19-89.51c-6.18,22.33-25.32,41.63-46.53,46.93A8.13,8.13,0,0,1,136,160a8,8,0,0,1-1.93-15.76c15.63-3.91,30.35-18.91,35-35.68,3.19-11.5,3.22-29-14.71-46.9L152,59.31V80a8,8,0,0,1-16,0V40a8,8,0,0,1,8-8h40a8,8,0,0,1,0,16H163.31l2.35,2.34C183.9,68.59,190.58,90.78,184.47,112.83Z"/></symbol><symbol id="Notebook" viewBox="0 0 256 256"><path d="M184,112a8,8,0,0,1-8,8H112a8,8,0,0,1,0-16h64A8,8,0,0,1,184,112Zm-8,24H112a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16Zm48-88V208a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V48A16,16,0,0,1,48,32H208A16,16,0,0,1,224,48ZM48,208H72V48H48Zm160,0V48H88V208H208Z"/></symbol><symbol id="UploadSimple" viewBox="0 0 256 256"><path d="M224,144v64a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V144a8,8,0,0,1,16,0v56H208V144a8,8,0,0,1,16,0ZM93.66,77.66,120,51.31V144a8,8,0,0,0,16,0V51.31l26.34,26.35a8,8,0,0,0,11.32-11.32l-40-40a8,8,0,0,0-11.32,0l-40,40A8,8,0,0,0,93.66,77.66Z"/></symbol><symbol id="ShieldCheck" viewBox="0 0 256 256"><path d="M208,40H48A16,16,0,0,0,32,56v56c0,52.72,25.52,84.67,46.93,102.19,23.06,18.86,46,25.26,47,25.53a8,8,0,0,0,4.2,0c1-.27,23.91-6.67,47-25.53C198.48,196.67,224,164.72,224,112V56A16,16,0,0,0,208,40Zm0,72c0,37.07-13.66,67.16-40.6,89.42A129.3,129.3,0,0,1,128,223.62a128.25,128.25,0,0,1-38.92-21.81C61.82,179.51,48,149.3,48,112l0-56,160,0ZM82.34,141.66a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35a8,8,0,0,1,11.32,11.32l-56,56a8,8,0,0,1-11.32,0Z"/></symbol><symbol id="ClockCounterClockwise" viewBox="0 0 256 256"><path d="M136,80v43.47l36.12,21.67a8,8,0,0,1-8.24,13.72l-40-24A8,8,0,0,1,120,128V80a8,8,0,0,1,16,0Zm-8-48A95.44,95.44,0,0,0,60.08,60.15C52.81,67.51,46.35,74.59,40,82V64a8,8,0,0,0-16,0v40a8,8,0,0,0,8,8H72a8,8,0,0,0,0-16H49c7.15-8.42,14.27-16.35,22.39-24.57a80,80,0,1,1,1.66,114.75,8,8,0,1,0-11,11.64A96,96,0,1,0,128,32Z"/></symbol><symbol id="PlayCircle" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm48.24-94.78-64-40A8,8,0,0,0,100,88v80a8,8,0,0,0,12.24,6.78l64-40a8,8,0,0,0,0-13.56ZM116,153.57V102.43L156.91,128Z"/></symbol><symbol id="UsersThree" viewBox="0 0 256 256"><path d="M244.8,150.4a8,8,0,0,1-11.2-1.6A51.6,51.6,0,0,0,192,128a8,8,0,0,1-7.37-4.89,8,8,0,0,1,0-6.22A8,8,0,0,1,192,112a24,24,0,1,0-23.24-30,8,8,0,1,1-15.5-4A40,40,0,1,1,219,117.51a67.94,67.94,0,0,1,27.43,21.68A8,8,0,0,1,244.8,150.4ZM190.92,212a8,8,0,1,1-13.84,8,57,57,0,0,0-98.16,0,8,8,0,1,1-13.84-8,72.06,72.06,0,0,1,33.74-29.92,48,48,0,1,1,58.36,0A72.06,72.06,0,0,1,190.92,212ZM128,176a32,32,0,1,0-32-32A32,32,0,0,0,128,176ZM72,120a8,8,0,0,0-8-8A24,24,0,1,1,87.24,82a8,8,0,1,0,15.5-4A40,40,0,1,0,37,117.51,67.94,67.94,0,0,0,9.6,139.19a8,8,0,1,0,12.8,9.61A51.6,51.6,0,0,1,64,128,8,8,0,0,0,72,120Z"/></symbol><symbol id="Sparkle" viewBox="0 0 256 256"><path d="M197.58,129.06,146,110l-19-51.62a15.92,15.92,0,0,0-29.88,0L78,110l-51.62,19a15.92,15.92,0,0,0,0,29.88L78,178l19,51.62a15.92,15.92,0,0,0,29.88,0L146,178l51.62-19a15.92,15.92,0,0,0,0-29.88ZM137,164.22a8,8,0,0,0-4.74,4.74L112,223.85,91.78,169A8,8,0,0,0,87,164.22L32.15,144,87,123.78A8,8,0,0,0,91.78,119L112,64.15,132.22,119a8,8,0,0,0,4.74,4.74L191.85,144ZM144,40a8,8,0,0,1,8-8h16V16a8,8,0,0,1,16,0V32h16a8,8,0,0,1,0,16H184V64a8,8,0,0,1-16,0V48H152A8,8,0,0,1,144,40ZM248,88a8,8,0,0,1-8,8h-8v8a8,8,0,0,1-16,0V96h-8a8,8,0,0,1,0-16h8V72a8,8,0,0,1,16,0v8h8A8,8,0,0,1,248,88Z"/></symbol><symbol id="Wallet-duotone" viewBox="0 0 256 256"><path d="M224,80V192a8,8,0,0,1-8,8H56a16,16,0,0,1-16-16V56A16,16,0,0,0,56,72H216A8,8,0,0,1,224,80Z" opacity="0.2"/><path d="M216,64H56a8,8,0,0,1,0-16H192a8,8,0,0,0,0-16H56A24,24,0,0,0,32,56V184a24,24,0,0,0,24,24H216a16,16,0,0,0,16-16V80A16,16,0,0,0,216,64Zm0,128H56a8,8,0,0,1-8-8V78.63A23.84,23.84,0,0,0,56,80H216Zm-48-60a12,12,0,1,1,12,12A12,12,0,0,1,168,132Z"/></symbol><symbol id="CaretUpDown" viewBox="0 0 256 256"><path d="M181.66,170.34a8,8,0,0,1,0,11.32l-48,48a8,8,0,0,1-11.32,0l-48-48a8,8,0,0,1,11.32-11.32L128,212.69l42.34-42.35A8,8,0,0,1,181.66,170.34Zm-96-84.68L128,43.31l42.34,42.35a8,8,0,0,0,11.32-11.32l-48-48a8,8,0,0,0-11.32,0l-48,48A8,8,0,0,0,85.66,85.66Z"/></symbol><symbol id="GearSix-duotone" viewBox="0 0 256 256"><path d="M230.1,108.76,198.25,90.62c-.64-1.16-1.31-2.29-2-3.41l-.12-36A104.61,104.61,0,0,0,162,32L130,49.89c-1.34,0-2.69,0-4,0L94,32A104.58,104.58,0,0,0,59.89,51.25l-.16,36c-.7,1.12-1.37,2.26-2,3.41l-31.84,18.1a99.15,99.15,0,0,0,0,38.46l31.85,18.14c.64,1.16,1.31,2.29,2,3.41l.12,36A104.61,104.61,0,0,0,94,224l32-17.87c1.34,0,2.69,0,4,0L162,224a104.58,104.58,0,0,0,34.08-19.25l.16-36c.7-1.12,1.37-2.26,2-3.41l31.84-18.1A99.15,99.15,0,0,0,230.1,108.76ZM128,168a40,40,0,1,1,40-40A40,40,0,0,1,128,168Z" opacity="0.2"/><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm109.94-52.79a8,8,0,0,0-3.89-5.4l-29.83-17-.12-33.62a8,8,0,0,0-2.83-6.08,111.91,111.91,0,0,0-36.72-20.67,8,8,0,0,0-6.46.59L128,41.85,97.88,25a8,8,0,0,0-6.47-.6A111.92,111.92,0,0,0,54.73,45.15a8,8,0,0,0-2.83,6.07l-.15,33.65-29.83,17a8,8,0,0,0-3.89,5.4,106.47,106.47,0,0,0,0,41.56,8,8,0,0,0,3.89,5.4l29.83,17,.12,33.63a8,8,0,0,0,2.83,6.08,111.91,111.91,0,0,0,36.72,20.67,8,8,0,0,0,6.46-.59L128,214.15,158.12,231a7.91,7.91,0,0,0,3.9,1,8.09,8.09,0,0,0,2.57-.42,112.1,112.1,0,0,0,36.68-20.73,8,8,0,0,0,2.83-6.07l.15-33.65,29.83-17a8,8,0,0,0,3.89-5.4A106.47,106.47,0,0,0,237.94,107.21Zm-15,34.91-28.57,16.25a8,8,0,0,0-3,3c-.58,1-1.19,2.06-1.81,3.06a7.94,7.94,0,0,0-1.22,4.21l-.15,32.25a95.89,95.89,0,0,1-25.37,14.3L134,199.13a8,8,0,0,0-3.91-1h-.19c-1.21,0-2.43,0-3.64,0a8.1,8.1,0,0,0-4.1,1l-28.84,16.1A96,96,0,0,1,67.88,201l-.11-32.2a8,8,0,0,0-1.22-4.22c-.62-1-1.23-2-1.8-3.06a8.09,8.09,0,0,0-3-3.06l-28.6-16.29a90.49,90.49,0,0,1,0-28.26L61.67,97.63a8,8,0,0,0,3-3c.58-1,1.19-2.06,1.81-3.06a7.94,7.94,0,0,0,1.22-4.21l.15-32.25a95.89,95.89,0,0,1,25.37-14.3L122,56.87a8,8,0,0,0,4.1,1c1.21,0,2.43,0,3.64,0a8,8,0,0,0,4.1-1l28.84-16.1A96,96,0,0,1,188.12,55l.11,32.2a8,8,0,0,0,1.22,4.22c.62,1,1.23,2,1.8,3.06a8.09,8.09,0,0,0,3,3.06l28.6,16.29A90.49,90.49,0,0,1,222.9,142.12Z"/></symbol><symbol id="MagnifyingGlass" viewBox="0 0 256 256"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/></symbol><symbol id="Moon" viewBox="0 0 256 256"><path d="M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23ZM188.9,190.34A88,88,0,0,1,65.66,67.11a89,89,0,0,1,31.4-26A106,106,0,0,0,96,56,104.11,104.11,0,0,0,200,160a106,106,0,0,0,14.92-1.06A89,89,0,0,1,188.9,190.34Z"/></symbol></svg>
+<aside class="side">
+  <a class="brand" href="#"><span class="mark" aria-hidden="true">K</span>Keel</a>
+  <button class="ws"><span class="tile t-a"><svg class="i " aria-hidden="true"><use href="#Wallet-duotone"/></svg></span><span><b>Sample workspace</b><small>All accounts</small></span><svg class="i cu" aria-hidden="true"><use href="#CaretUpDown"/></svg></button>
+  <nav aria-label="App"><a  href="#"><svg class="i " aria-hidden="true"><use href="#SquaresFour"/></svg>Dashboard</a><a  href="#"><svg class="i " aria-hidden="true"><use href="#ListBullets"/></svg>Trades</a><a  href="#"><svg class="i " aria-hidden="true"><use href="#CalendarBlank"/></svg>Calendar</a><a  href="#"><svg class="i " aria-hidden="true"><use href="#ChartBar"/></svg>Reports</a><a  href="#"><svg class="i " aria-hidden="true"><use href="#Strategy"/></svg>Strategies</a><a  href="#"><svg class="i " aria-hidden="true"><use href="#Notebook"/></svg>Notebook</a><a  href="#"><svg class="i " aria-hidden="true"><use href="#UploadSimple"/></svg>Import</a><a  href="#"><svg class="i " aria-hidden="true"><use href="#ShieldCheck"/></svg>Prop firms</a><p class="grp">Not live yet</p><a class="off" href="#"><svg class="i " aria-hidden="true"><use href="#ClockCounterClockwise"/></svg>Backtesting</a><a class="off" href="#"><svg class="i " aria-hidden="true"><use href="#PlayCircle"/></svg>Replay</a><a class="off" href="#"><svg class="i " aria-hidden="true"><use href="#UsersThree"/></svg>Mentors</a><a class="off" href="#"><svg class="i " aria-hidden="true"><use href="#Sparkle"/></svg>Assistant</a></nav>
+  <nav class="set"><a class="on" aria-current="page" href="#"><svg class="i " aria-hidden="true"><use href="#GearSix-duotone"/></svg>Settings</a></nav>
+</aside>
+<div class="col">
+<header class="top">
+  <h1>Settings</h1>
+  
+  <div class="tools">
+    <button class="ibtn" aria-label="Search"><svg class="i " aria-hidden="true"><use href="#MagnifyingGlass"/></svg></button>
+    <span class="sample">Sample data</span>
+    <div class="seg" role="radiogroup" aria-label="P&amp;L basis"><button role="radio" aria-checked="false">Gross</button><button class="on" role="radio" aria-checked="true">Net</button></div>
+    <button class="imp"><svg class="i " aria-hidden="true"><use href="#UploadSimple"/></svg>Import</button>
+    <button class="ibtn" aria-label="Switch to dark theme"><svg class="i " aria-hidden="true"><use href="#Moon"/></svg></button>
+  </div>
+</header>
+<main class="page" id="content">
+
+<div class="sx">
+  <nav class="card sn" aria-label="Settings">
+    <a href="#"><svg class="i " aria-hidden="true"><use href="#User-duotone"/></svg>Profile</a>
+    <a class="on" href="#" aria-current="page"><svg class="i " aria-hidden="true"><use href="#Bank-duotone"/></svg>Accounts</a>
+    <a href="#"><svg class="i " aria-hidden="true"><use href="#ClockCounterClockwise-duotone"/></svg>Import history</a>
+  </nav>
+  <div class="mc">
+    <section class="card ac">
+      <div class="hd"><span class="tile t-a"><svg class="i " aria-hidden="true"><use href="#Bank-duotone"/></svg></span><h2>Accounts</h2><span class="meta">Sample workspace, 8 accounts, 1 archived</span><div class="end"><button class="btn pri"><svg class="i " aria-hidden="true"><use href="#Plus"/></svg>Add account</button></div></div>
+      <table>
+        <colgroup><col style="width:176px"><col style="width:180px"><col style="width:124px"><col style="width:68px"><col style="width:126px"><col style="width:104px"><col><col style="width:30px"></colgroup>
+        <thead><tr><th>Name</th><th>Broker</th><th>Type</th><th>Currency</th><th class="n">Starting balance</th><th>Status</th><th>Prop rules</th><th></th></tr></thead>
+        <tbody><tr class=" ">
+<td><b>Futures live</b></td><td class="mu">Sample futures broker</td><td><span class="tag">Live</span></td><td class="mu">USD</td><td class="n f">$50,000.00</td>
+<td><span class="tag">Active</span></td>
+<td><span class="fa">Does not apply</span></td>
+<td class="n"><button class="ibtn sm" aria-label="Actions for Futures live"><svg class="i " aria-hidden="true"><use href="#DotsThree"/></svg></button></td></tr><tr class=" ">
+<td><b>Forex evaluation</b></td><td class="mu">Sample prop firm</td><td><span class="tag a">Prop evaluation</span></td><td class="mu">USD</td><td class="n f">$100,000.00</td>
+<td><span class="tag">Active</span></td>
+<td><span class="mk st"><svg class="i " aria-hidden="true"><use href="#CheckCircle-fill"/></svg>Set</span></td>
+<td class="n"><button class="ibtn sm" aria-label="Actions for Forex evaluation"><svg class="i " aria-hidden="true"><use href="#DotsThree"/></svg></button></td></tr><tr class=" ">
+<td><b>Stocks & options</b></td><td class="mu">Sample multi-asset broker</td><td><span class="tag">Live</span></td><td class="mu">USD</td><td class="n f">$25,000.00</td>
+<td><span class="tag">Active</span></td>
+<td><span class="fa">Does not apply</span></td>
+<td class="n"><button class="ibtn sm" aria-label="Actions for Stocks & options"><svg class="i " aria-hidden="true"><use href="#DotsThree"/></svg></button></td></tr><tr class=" ">
+<td><b>Futures 50K evaluation</b></td><td class="mu">Sample prop firm</td><td><span class="tag a">Prop evaluation</span></td><td class="mu">USD</td><td class="n f">$50,000.00</td>
+<td><span class="tag">Active</span></td>
+<td><span class="mk st"><svg class="i " aria-hidden="true"><use href="#CheckCircle-fill"/></svg>Set</span></td>
+<td class="n"><button class="ibtn sm" aria-label="Actions for Futures 50K evaluation"><svg class="i " aria-hidden="true"><use href="#DotsThree"/></svg></button></td></tr><tr class="sel ">
+<td><b>Futures 50K funded</b></td><td class="mu">Sample prop firm</td><td><span class="tag a">Prop funded</span></td><td class="mu">USD</td><td class="n f">$50,000.00</td>
+<td><span class="tag">Active</span></td>
+<td><span class="mk st"><svg class="i " aria-hidden="true"><use href="#CheckCircle-fill"/></svg>Set</span></td>
+<td class="n"><button class="ibtn sm" aria-label="Actions for Futures 50K funded"><svg class="i " aria-hidden="true"><use href="#DotsThree"/></svg></button></td></tr><tr class=" ">
+<td><b>Index 100K evaluation</b></td><td class="mu">Sample prop firm</td><td><span class="tag a">Prop evaluation</span></td><td class="mu">USD</td><td class="n f">$100,000.00</td>
+<td><span class="tag">Active</span></td>
+<td><span class="mk st"><svg class="i " aria-hidden="true"><use href="#CheckCircle-fill"/></svg>Set</span></td>
+<td class="n"><button class="ibtn sm" aria-label="Actions for Index 100K evaluation"><svg class="i " aria-hidden="true"><use href="#DotsThree"/></svg></button></td></tr><tr class=" ">
+<td><b>Futures 100K evaluation</b></td><td class="mu">Sample prop firm</td><td><span class="tag a">Prop evaluation</span></td><td class="mu">USD</td><td class="n f">$100,000.00</td>
+<td><span class="tag">Active</span></td>
+<td><a class="lnk" href="#">Set up rules</a></td>
+<td class="n"><button class="ibtn sm" aria-label="Actions for Futures 100K evaluation"><svg class="i " aria-hidden="true"><use href="#DotsThree"/></svg></button></td></tr><tr class=" arc">
+<td><b>Paper trading</b><small class="ro">Read-only</small></td><td class="mu">Sample futures broker</td><td><span class="tag">Demo</span></td><td class="mu">USD</td><td class="n f">$100,000.00</td>
+<td><span class="tag"><svg class="i " aria-hidden="true"><use href="#Lock-duotone"/></svg>Archived</span></td>
+<td><span class="fa">Does not apply</span></td>
+<td class="n"><button class="ibtn sm" aria-label="Actions for Paper trading"><svg class="i " aria-hidden="true"><use href="#DotsThree"/></svg></button></td></tr></tbody>
+      </table>
+    </section>
+    <section class="card">
+      <div class="hd"><span class="tile t-a"><svg class="i " aria-hidden="true"><use href="#CurrencyDollar-duotone"/></svg></span><h2>Balance adjustments</h2><span class="meta">Futures 50K funded</span><div class="end"><button class="btn"><svg class="i " aria-hidden="true"><use href="#Plus"/></svg>Add adjustment</button></div></div>
+      <div class="adj">
+        <table>
+          <colgroup><col style="width:130px"><col style="width:130px"><col><col style="width:130px"></colgroup>
+          <thead><tr><th>Date</th><th>Type</th><th>Note</th><th class="n">Amount</th></tr></thead>
+          <tbody>
+            <tr><td>Fri 6 Nov</td><td><span class="tag">Withdrawal</span></td><td class="mu">Second payout</td><td class="n f">−$1,000.00</td></tr>
+            <tr><td>Fri 23 Oct</td><td><span class="tag">Withdrawal</span></td><td class="mu">First payout</td><td class="n f">−$750.00</td></tr>
+            <tr class="tot"><td colspan="3">Total, on a $50,000.00 starting balance</td><td class="n">−$1,750.00</td></tr>
+          </tbody>
+        </table>
+        <p class="why"><b>Not profit or loss</b>Deposits and withdrawals move the balance on their date without counting as P&amp;L, so drawdown % and prop limits stay measured on real money.</p>
+      </div>
+    </section>
+  </div>
+</div>
+
+</main>
+</div>
+</body>
+</html>
