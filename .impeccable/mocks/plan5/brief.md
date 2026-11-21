@@ -76,3 +76,6 @@ Plan 5 builds the rest of Keel's milestone 1 app. Before any code, the user appr
 ## Deliverables
 - The 12 HTML files plus `shell.css`, each rendered to a PNG of the same name at 1440 width. Write your render script at `scripts/.comp-shot.tmp.mjs`, run it from the repo root, and delete it afterwards.
 - Look at every PNG and fix what reads wrong before you finish. All 12 must feel like one product with comp C and the shipped Dashboard.
+
+## Status
+Approved by the user on 2026-11-21 ("Approve designs"). These comps are the binding look for Plan 5. Controls shown without behaviour (Columns, More filters, Cross-analyse by, Compare, Export CSV) and the research gaps are scoped in the Plan 5 build plan.
