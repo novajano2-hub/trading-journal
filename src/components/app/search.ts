@@ -57,3 +57,10 @@ export function isSearchShortcut(
   if (e.key.toLowerCase() !== 'k' || e.altKey || e.shiftKey) return false;
   return platform === 'mac' ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey;
 }
+
+/** The symbols a set of trades covers, as roots, sorted. */
+export function symbolOptions(
+  trades: readonly { instrument: { root: string } }[] | undefined,
+): string[] {
+  return [...new Set((trades ?? []).map((t) => t.instrument.root))].sort();
+}

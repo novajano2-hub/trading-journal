@@ -25,6 +25,7 @@ import {
   SymbolBody,
   TagBody,
 } from './filter-popovers';
+import { symbolOptions } from './search';
 import { useShownFilters } from './use-shown-filters';
 
 const NO_OPTIONS: FilterOptions = { symbols: [], strategies: [], tags: [] };
@@ -249,9 +250,7 @@ export function FilterBar(): React.JSX.Element {
   const timeZone = usePrefs().data?.timeZone;
   const options = useMemo<FilterOptions>(
     () => ({
-      symbols: [
-        ...new Set((trades ?? []).map((t) => t.instrument.root)),
-      ].sort(),
+      symbols: symbolOptions(trades),
       strategies: strategies ?? [],
       tags: tags ?? [],
     }),

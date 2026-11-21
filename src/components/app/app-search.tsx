@@ -9,7 +9,12 @@ import { useStrategies, useTags, useTrades } from '@/data/query/hooks';
 import { useHydrated } from '@/lib/use-hydrated';
 import { activeItem, navHref, navItem } from './nav';
 import { toggleId } from './filter-model';
-import { isSearchShortcut, searchApp, type SearchResult } from './search';
+import {
+  isSearchShortcut,
+  searchApp,
+  symbolOptions,
+  type SearchResult,
+} from './search';
 
 const DETAIL = { module: 'Module', symbol: 'Symbol', strategy: 'Strategy' };
 const CATEGORY = {
@@ -52,11 +57,28 @@ export function AppSearch(): React.JSX.Element {
   const [query, setQuery] = useState('');
   const input = useRef<HTMLInputElement>(null);
   const returnTo = useRef<HTMLElement | null>(null);
+  const viaShortcut = useRef(false);
 
-  const symbols = useMemo(
-    () => [...new Set((trades ?? []).map((t) => t.instrument.root))].sort(),
-    [trades],
-  );
+  // Focus goes back only to where the shortcut came from: any other focus on
+  // the field, or its losing focus, forgets that place.
+  useEffect(() => {
+    const el = input.current;
+    if (!el) return;
+    const forget = () => {
+      returnTo.current = null;
+    };
+    const onFocus = () => {
+      if (!viaShortcut.current) forget();
+    };
+    el.addEventListener('focus', onFocus);
+    el.addEventListener('blur', forget);
+    return () => {
+      el.removeEventListener('focus', onFocus);
+      el.removeEventListener('blur', forget);
+    };
+  }, []);
+
+  const symbols = useMemo(() => symbolOptions(trades), [trades]);
   const found = useMemo(
     () =>
       searchApp(query, {
@@ -85,7 +107,9 @@ export function AppSearch(): React.JSX.Element {
         document.activeElement instanceof HTMLElement
           ? document.activeElement
           : null;
+      viaShortcut.current = true;
       input.current?.focus();
+      viaShortcut.current = false;
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

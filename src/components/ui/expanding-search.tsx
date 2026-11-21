@@ -1,7 +1,7 @@
 'use client';
 
-// Adapted from HorizonX Expanding Search, commercial licence: the field that
-// grows as it takes focus. Restyled to Keel's tokens (sunken fill, 1px line,
+// Technique adapted from HorizonX Expanding Search, commercial licence: the
+// field that grows as it takes focus. Restyled to Keel's tokens (sunken fill, 1px line,
 // cobalt focus ring). The gradient, drop shadow and hover width are dropped:
 // at rest it is a 36px icon button, and it widens over `glide` on focus,
 // staying put under reduced motion. Added: an ARIA combobox and its listbox.
@@ -14,8 +14,13 @@ export interface SearchOption {
   detail?: string;
 }
 
-/** Wide enough for the longest option; never past the bar on a phone. */
-const EXPANDED = 'min(280px, calc(100vw - 8.5rem))';
+/**
+ * Wide enough for the longest option, and never past the bar's left edge: on a
+ * phone it stops short of the screen's, and from `sm` to `md` (where the
+ * field sits furthest left) it is capped so its ring keeps a gutter.
+ */
+const EXPANDED =
+  'data-[open=true]:w-[min(280px,calc(100vw-8.5rem))] sm:max-md:data-[open=true]:w-[248px]';
 
 /**
  * The search field and its results. At rest only the magnifier shows; it
@@ -82,10 +87,10 @@ export function ExpandingSearch({
   return (
     <div className="relative h-9 w-9 flex-none pointer-coarse:h-11 pointer-coarse:w-11">
       <div
-        style={{ width: focused ? EXPANDED : undefined }}
-        className="absolute top-0 right-0 z-10 w-full transition-[width] duration-[325ms] ease-[var(--ease-glide)] motion-reduce:transition-none"
+        data-open={focused}
+        className={`absolute top-0 right-0 z-10 w-full transition-[width] duration-[var(--dur-glide)] ease-[var(--ease-glide)] motion-reduce:transition-none ${EXPANDED}`}
       >
-        <div className="relative h-9 overflow-hidden rounded-control border border-line bg-sunken focus-within:border-accent focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent pointer-coarse:h-11">
+        <div className="relative h-9 overflow-hidden rounded-control border border-line bg-sunken transition-colors hover:border-line-2 focus-within:outline-2 focus-within:outline-offset-3 focus-within:outline-accent pointer-coarse:h-11">
           <MagnifyingGlass
             size={18}
             aria-hidden="true"
