@@ -10,9 +10,14 @@ import { formatPct, formatPnl, formatRatio } from '@/lib/format';
 export type TickerKind = 'money' | 'pct' | 'ratio';
 
 /** The single formatter for each kind: cents for money, 0..1 for pct, a plain ratio for ratio. */
-export function formatTicker(kind: TickerKind, value: number): string {
-  if (kind === 'money') return formatPnl(Math.round(value));
-  if (kind === 'pct') return formatPct(value, 1);
+export function formatTicker(
+  kind: TickerKind,
+  value: number,
+  opts: { digits?: number; currency?: string } = {},
+): string {
+  if (kind === 'money')
+    return formatPnl(Math.round(value), opts.currency ?? 'USD');
+  if (kind === 'pct') return formatPct(value, opts.digits ?? 1);
   return formatRatio(value);
 }
 
@@ -31,19 +36,28 @@ export function NumberTicker({
   value,
   kind,
   delay = 0,
+  digits,
+  currency,
   className = '',
 }: {
   value: number;
   kind: TickerKind;
   /** Seconds to wait once in view, to sit in a larger entrance. */
   delay?: number;
+  /** Decimals for pct (default 1). */
+  digits?: number;
+  /** ISO code for money (default USD). */
+  currency?: string;
   className?: string;
 }) {
   const reduced = useReducedMotion();
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true, amount: 0.6 });
   const [shown, setShown] = useState(0);
-  const final = formatTicker(kind, value);
+  // What is on screen now, so a later value counts from here and not from zero.
+  const shownRef = useRef(0);
+  const fmt = { digits, currency };
+  const final = formatTicker(kind, value, fmt);
   const tone =
     kind === 'money' && Math.round(value) !== 0
       ? value > 0
@@ -53,12 +67,18 @@ export function NumberTicker({
 
   useEffect(() => {
     if (reduced || !inView) return;
-    const controls = animate(0, value, {
+    const controls = animate(shownRef.current, value, {
       delay,
       duration: DURATION_S,
       ease: [...EASING_POINTS.out],
-      onUpdate: setShown,
-      onComplete: () => setShown(value),
+      onUpdate: (v) => {
+        shownRef.current = v;
+        setShown(v);
+      },
+      onComplete: () => {
+        shownRef.current = value;
+        setShown(value);
+      },
     });
     return () => controls.stop();
   }, [delay, inView, reduced, value]);
@@ -74,7 +94,7 @@ export function NumberTicker({
       </noscript>
       <span className="sr-only">{final}</span>
       <span aria-hidden="true" className="ticker-count motion-reduce:hidden">
-        {formatTicker(kind, shown)}
+        {formatTicker(kind, shown, fmt)}
       </span>
       <span
         aria-hidden="true"
