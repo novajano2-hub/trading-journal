@@ -480,8 +480,8 @@ Every card: surface, 1px line, 16px radius, 20px by 16px padding, a 14px/600 hea
 #### Empty and error states
 
 - **No trades** (empty workspace): a ghosted "Your plan" preview (rule rows with empty tracks and no numbers, the last row fading out) captioned "Your rules and what breaking them costs will show here.", then the title, one line of body, Import and "Open the sample workspace". Chips are dashed and inert.
-- **No matches** (trades exist, filters exclude them all): an icon tile, "No trades match these filters." and a single "Clear filters" button. Chips stay live.
-- **No closed trades:** an icon tile and a short line.
+- **No matches** (trades exist, the filters leave none): an icon tile, "No trades match these filters." and a single "Clear filters" button. Chips stay live.
+- **No closed trades:** an icon tile, "No closed trades yet." and a short line saying open positions count once they close. When filters are set and hold only open trades, the title is "No closed trades in these filters yet." with a single "Clear filters" button.
 - **Errors:** neutral tile (Warning), neutral copy, a secondary "Try again". Never loss red.
 - **Loading:** a skeleton of row 1 and the three row-2 cards in sunken bars; no figures.
 

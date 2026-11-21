@@ -188,15 +188,18 @@ export function DashboardView(): React.JSX.Element {
     return <DashboardSkeleton />;
 
   if (allTrades.length === 0 || !view.model) {
+    const filtered = hasActiveFilters(shownFilters);
+    // No matches only when the filters leave no trade at all; open trades in them are "no closed".
     const variant =
       allTrades.length === 0
         ? 'no-trades'
-        : hasActiveFilters(shownFilters)
+        : filtered && set.data?.trades.length === 0
           ? 'no-matches'
           : 'no-closed';
     return (
       <DashboardEmpty
         variant={variant}
+        filtered={filtered}
         onClearFilters={() => {
           focusOnReady.current = true;
           setFilters(EMPTY_FILTERS);

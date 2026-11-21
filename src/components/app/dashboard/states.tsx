@@ -156,15 +156,19 @@ function PlanPreview(): React.JSX.Element {
 /**
  * Why there is nothing to show, with the way out:
  * - `no-trades`: the workspace is empty, so Import or open the sample.
- * - `no-matches`: trades exist but the filters exclude every closed one.
- * - `no-closed`: no filters, and every trade is still open.
+ * - `no-matches`: trades exist but the filters leave none, so Clear filters.
+ * - `no-closed`: every trade shown is still open. When `filtered`, it says
+ *   the filters hold none closed and offers Clear filters.
  */
 export function DashboardEmpty({
   variant,
+  filtered = false,
   onClearFilters,
   onOpenSample,
 }: {
   variant: 'no-trades' | 'no-matches' | 'no-closed';
+  /** Any filter is set. */
+  filtered?: boolean;
   onClearFilters(): void;
   onOpenSample(): void;
 }): React.JSX.Element {
@@ -199,8 +203,17 @@ export function DashboardEmpty({
       return (
         <StateBlock
           visual={<IconTile icon={ClockCounterClockwise} />}
-          title="No closed trades yet."
+          title={
+            filtered
+              ? 'No closed trades in these filters yet.'
+              : 'No closed trades yet.'
+          }
           body="Open positions count here once they close."
+          actions={
+            filtered ? (
+              <Button onClick={onClearFilters}>Clear filters</Button>
+            ) : undefined
+          }
         />
       );
   }

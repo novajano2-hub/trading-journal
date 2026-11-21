@@ -403,6 +403,32 @@ test('open trades only, with no filters, wait for a close', async () => {
   expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
 });
 
+test('filters that match only open trades say so, and offer Clear filters', async () => {
+  renderApp(<DashboardView />, {
+    // f-2 is the only short trade: still open, the Short filter holds no closed one.
+    sample: sampleWith((s) => {
+      const short = s.trades.find((t) => t.id === 'f-2')!;
+      short.status = 'open';
+      delete short.closedAt;
+      delete short.avgExit;
+    }),
+    url: '/app/dashboard?side=short',
+  });
+  expect(
+    await screen.findByText('No closed trades in these filters yet.'),
+  ).toBeTruthy();
+  expect(screen.queryByText('No trades match these filters.')).toBeNull();
+  expect(
+    screen.getByText('Open positions count here once they close.'),
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+  await waitFor(() => expect(window.location.search).toBe(''));
+  const plan = await screen.findByRole('region', {
+    name: 'Your plan, all time',
+  });
+  await waitFor(() => expect(document.activeElement).toBe(plan));
+});
+
 test("ungraded trades show the plan's empty state, not 0% (Review Focus 1)", async () => {
   renderApp(<DashboardView />, {
     sample: async () => dashboardFixture({ graded: false }),
