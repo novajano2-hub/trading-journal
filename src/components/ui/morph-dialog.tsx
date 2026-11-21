@@ -5,7 +5,14 @@
 // it. Rebuilt on Radix Dialog as a FLIP from the opener's rect (open over
 // `glide`, close over `exit`); under reduced motion only opacity changes. The
 // looks, images, eyebrow, blur and spring are dropped.
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { Dialog } from 'radix-ui';
 import { animate, useReducedMotion } from 'motion/react';
 import { X } from '@phosphor-icons/react';
@@ -84,11 +91,20 @@ export function MorphDialog({
     const t = flipFrom(from, rect);
     const grow = animate(
       panelEl,
-      { x: [t.x, 0], y: [t.y, 0], scaleX: [t.scaleX, 1], scaleY: [t.scaleY, 1] },
+      {
+        x: [t.x, 0],
+        y: [t.y, 0],
+        scaleX: [t.scaleX, 1],
+        scaleY: [t.scaleY, 1],
+      },
       opts,
     );
     // The rows arrive once the shape is mostly there, so text is never squashed.
-    const content = animate(bodyEl, { opacity: [0, 1] }, { ...opts, delay: 0.1 });
+    const content = animate(
+      bodyEl,
+      { opacity: [0, 1] },
+      { ...opts, delay: 0.1 },
+    );
     return () => {
       fade.stop();
       grow.stop();
@@ -119,7 +135,13 @@ export function MorphDialog({
       main = animate(panelEl, { opacity: 0 }, opts);
     } else {
       const t = flipFrom(from, rect);
-      controls.push(animate(bodyEl, { opacity: 0 }, { ...opts, duration: exit.duration / 2 }));
+      controls.push(
+        animate(
+          bodyEl,
+          { opacity: 0 },
+          { ...opts, duration: exit.duration / 2 },
+        ),
+      );
       main = animate(panelEl, t, opts);
     }
     controls.push(main);
@@ -154,7 +176,9 @@ export function MorphDialog({
                 </Dialog.Title>
                 {description ? (
                   <Dialog.Description asChild>
-                    <div className="mt-1 text-[13px] text-muted">{description}</div>
+                    <div className="mt-1 text-[13px] text-muted">
+                      {description}
+                    </div>
                   </Dialog.Description>
                 ) : null}
               </div>

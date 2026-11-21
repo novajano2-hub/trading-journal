@@ -12,12 +12,16 @@ test('formatTicker takes digits for pct and a currency for money', () => {
 });
 
 test('Sparkline is a labelled image with an equity path', () => {
-  const html = renderToStaticMarkup(<Sparkline series={[1, 3, 2]} label="Equity" />);
+  const html = renderToStaticMarkup(
+    <Sparkline series={[1, 3, 2]} label="Equity" />,
+  );
   expect(html).toContain('role="img"');
   expect(html).toContain('aria-label="Equity"');
   expect(html).toMatch(/d="M0 /);
 });
 
 test('Sparkline with no points renders nothing', () => {
-  expect(renderToStaticMarkup(<Sparkline series={[]} label="Equity" />)).toBe('');
+  expect(renderToStaticMarkup(<Sparkline series={[]} label="Equity" />)).toBe(
+    '',
+  );
 });

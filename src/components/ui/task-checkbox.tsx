@@ -73,7 +73,10 @@ export function TaskCheckbox({
           />
         </svg>
         {ripple ? (
-          <span data-ripple className="pointer-events-none absolute left-1/2 top-1/2 size-[25px] rounded-full bg-gain/40 motion-safe:animate-check-ripple motion-reduce:hidden" />
+          <span
+            data-ripple
+            className="pointer-events-none absolute left-1/2 top-1/2 size-[25px] rounded-full bg-gain/40 motion-safe:animate-check-ripple motion-reduce:hidden"
+          />
         ) : null}
       </span>
       {children}

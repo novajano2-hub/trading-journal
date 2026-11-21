@@ -21,7 +21,13 @@ test('no definition contains an em or en dash', () => {
 test('the basis shows in the label and the definitions that use it', () => {
   expect(metricDefinition('pnl', 'gross').label).toBe('Gross P&L');
   expect(metricDefinition('pnl', 'net').label).toBe('Net P&L');
-  expect(metricDefinition('rule-cost-broken', 'gross').definition).toContain('gross P&L');
-  expect(metricDefinition('rule-cost-broken', 'net').definition).toContain('net P&L');
-  expect(metricDefinition('weekly-goal', 'gross').definition).toContain('Always net');
+  expect(metricDefinition('rule-cost-broken', 'gross').definition).toContain(
+    'gross P&L',
+  );
+  expect(metricDefinition('rule-cost-broken', 'net').definition).toContain(
+    'net P&L',
+  );
+  expect(metricDefinition('weekly-goal', 'gross').definition).toContain(
+    'Always net',
+  );
 });
