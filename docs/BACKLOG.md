@@ -131,3 +131,6 @@ Origin key: **TZ** = TradeZella has it · **MTJ** = MyTradingJourney has it · *
 | E52 | Focus Not Obscured (WCAG 2.4.11): the sticky desktop bar and the pinned mobile row can cover a focused element when tabbing backwards; needs scroll-padding without breaking the chip scroller | Plan 5 polish |
 | E53 | A closing filter popover stays interactive through its 160ms exit (Escape then fast Tab lands in its fields) | Plan 5 polish |
 | E54 | `useGlobalFilters` writes the pathname it rendered with, and any late `replaceState` during a pending Next navigation discards that navigation (reproduced 0-10ms after a workspace switch); write against `window.location.pathname` and avoid late writes while a navigation is pending | Plan 5 |
+| E55 | Top bar polish: a "controls drop" or three-row layout so wrapped chips keep a full row (prototyped in the Plan 4 re-review); the phone bar overflows below 375px (let the controls row wrap or hide the sample label); extend the Tab-walk e2e to the 640-1023 band; refresh two stale comments | Plan 5 polish |
+| E56 | Remaining Phosphor root imports (theme-toggle, site mobile-menu, product-menu, module-icons) move to dist/ssr | Any |
+| E57 | An archived-only workspace with no filters reads "No closed trades yet", though its trades are closed; say the trades sit in archived accounts | Plan 5 (Settings) |
