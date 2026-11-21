@@ -1,6 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
 import { EMPTY_FILTERS, type GlobalFilters } from '@/data/filters';
 import {
   usePrefs,
@@ -78,7 +85,8 @@ function fadeMask({ start, end }: { start: boolean; end: boolean }) {
  * "Clear filters" while any filter is set. The chips scroll sideways when the
  * bar is too narrow, fading at an edge with more past it; "Clear filters"
  * stays put after them. Every choice calls `onChange` with the whole next
- * filter set.
+ * filter set. In a workspace with no trades at all the chips stay in the tab
+ * order but open nothing; a filter that matches nothing leaves them live.
  */
 export function FilterBarView({
   filters: f,
@@ -86,6 +94,7 @@ export function FilterBarView({
   today,
   onChange,
   disabled = false,
+  noTrades = false,
 }: {
   filters: GlobalFilters;
   options: FilterOptions;
@@ -94,7 +103,11 @@ export function FilterBarView({
   onChange(next: GlobalFilters): void;
   /** The Suspense fallback: same chips, inert. */
   disabled?: boolean;
+  /** The workspace has no trades to filter. */
+  noTrades?: boolean;
 }): React.JSX.Element {
+  const noteId = useId();
+  const unavailableNote = noTrades ? noteId : undefined;
   const first = useRef<HTMLButtonElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const row = useRef<HTMLDivElement>(null);
@@ -140,6 +153,7 @@ export function FilterBarView({
             title="Date"
             active={dateActive}
             disabled={disabled}
+            unavailableNote={unavailableNote}
             onClear={() => onChange({ ...f, range: {} })}
             triggerRef={first}
             wide
@@ -158,6 +172,7 @@ export function FilterBarView({
             title="Symbol"
             active={symbol.active}
             disabled={disabled}
+            unavailableNote={unavailableNote}
             onClear={() => onChange({ ...f, symbols: [] })}
           >
             {() => (
@@ -173,6 +188,7 @@ export function FilterBarView({
             title="Side"
             active={side.active}
             disabled={disabled}
+            unavailableNote={unavailableNote}
             onClear={() => onChange({ ...f, side: undefined })}
           >
             {() => (
@@ -191,6 +207,7 @@ export function FilterBarView({
             title="Strategy"
             active={strategy.active}
             disabled={disabled}
+            unavailableNote={unavailableNote}
             onClear={() => onChange({ ...f, strategyIds: [] })}
           >
             {() => (
@@ -206,6 +223,7 @@ export function FilterBarView({
             title="Tags"
             active={tag.active}
             disabled={disabled}
+            unavailableNote={unavailableNote}
             onClear={() => onChange({ ...f, tagIds: [] })}
           >
             {() => (
@@ -218,6 +236,11 @@ export function FilterBarView({
           </FilterChip>
         </div>
       </div>
+      {noTrades ? (
+        <span id={noteId} hidden>
+          No trades to filter yet.
+        </span>
+      ) : null}
       {hasActiveFilters(f) ? (
         <button
           type="button"
@@ -274,6 +297,7 @@ export function FilterBar(): React.JSX.Element {
       options={options}
       today={localDate(new Date().toISOString(), timeZone)}
       onChange={setFilters}
+      noTrades={trades?.length === 0}
     />
   );
 }

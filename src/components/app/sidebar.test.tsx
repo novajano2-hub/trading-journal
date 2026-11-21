@@ -21,6 +21,28 @@ test('the active module is marked and filter-scoped links keep the filters', () 
   ).toBe(false);
 });
 
+test('the current, other and not-live modules each have their own tile', () => {
+  render(
+    <SidebarNav pathname="/app/dashboard" params={new URLSearchParams()} />,
+  );
+  const tile = (name: string) =>
+    screen
+      .getByRole('link', { name })
+      .querySelector<HTMLElement>('[aria-hidden="true"]')!;
+  const current = tile('Dashboard');
+  const other = tile('Trades');
+  const notLive = tile('Replay');
+  // Filled cobalt-soft; bare with a cobalt duotone layer; a bare faint outline.
+  expect(current.dataset.tone).toBe('accent');
+  expect(current.className).toContain('bg-accent-soft');
+  expect(other.dataset.tone).toBe('neutral');
+  expect(other.className).not.toMatch(/(^|\s)bg-/);
+  expect(other.className).toContain('[&_[opacity]]:fill-accent');
+  expect(notLive.dataset.tone).toBe('faint');
+  expect(notLive.className).not.toMatch(/(^|\s)bg-/);
+  expect(notLive.className).toContain('[&_[opacity]]:opacity-0');
+});
+
 test('"Not live yet" is its own labelled list of four links', () => {
   render(
     <SidebarNav pathname="/app/dashboard" params={new URLSearchParams()} />,

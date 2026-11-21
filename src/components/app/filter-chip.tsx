@@ -8,6 +8,8 @@ const CHIP =
 const CHIP_IDLE =
   'border-line bg-surface-1 text-muted enabled:hover:border-line-2 enabled:hover:text-text data-[state=open]:border-line-2 data-[state=open]:text-text';
 const CHIP_ON = 'border-accent-soft bg-accent-soft text-accent-ink';
+const CHIP_UNAVAILABLE =
+  'cursor-default border-dashed border-line-2 bg-transparent text-faint';
 
 const PANEL =
   'z-50 flex max-h-[min(600px,var(--radix-popover-content-available-height))] max-w-[calc(100vw-24px)] origin-(--radix-popover-content-transform-origin) flex-col rounded-control border border-line-2 bg-surface-1 text-text shadow-[var(--shadow-chip)] outline-none motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in';
@@ -17,19 +19,25 @@ const ROW =
 const BOX = 'size-4 flex-none cursor-pointer accent-accent';
 const GROUP_LABEL = 'px-2 pt-2 pb-1 text-xs text-faint';
 
-/** A text or date field inside a filter popover. */
+/**
+ * A text or date field inside a filter popover. Its focus ring hugs the
+ * border: the global 3px offset would run into the popover's edge. Marked
+ * important to beat that global rule, which sits outside Tailwind's layers.
+ */
 export const FIELD =
-  'h-9 w-full min-w-0 rounded-control border border-line-2 bg-surface-1 px-2 text-text pointer-coarse:h-11';
+  'h-9 w-full min-w-0 rounded-control border border-line-2 bg-surface-1 px-2 text-text focus-visible:outline-offset-0! pointer-coarse:h-11';
 
 /**
  * One chip and its popover. Enter or Space opens it, Escape closes it, and
  * focus goes back to the chip. While `disabled` it is the same chip, inert.
+ * With `unavailableNote` it keeps its tab stop, reads faint and opens nothing.
  */
 export function FilterChip({
   label,
   title,
   active,
   disabled,
+  unavailableNote,
   onClear,
   triggerRef,
   wide = false,
@@ -40,6 +48,8 @@ export function FilterChip({
   title: string;
   active: boolean;
   disabled?: boolean;
+  /** The id of a note saying why there is nothing to filter. */
+  unavailableNote?: string;
   onClear(): void;
   triggerRef?: Ref<HTMLButtonElement>;
   /** Room for a pair of date fields side by side. */
@@ -52,13 +62,37 @@ export function FilterChip({
   const look = `${CHIP} ${active ? CHIP_ON : CHIP_IDLE}`;
   const text = <span className="min-w-0 truncate">{label}</span>;
 
+  const titleNote = active ? (
+    <span id={descId} hidden>
+      {title}
+    </span>
+  ) : null;
+
   // Going inert closes the popover, so it doesn't reopen by itself later.
-  if (disabled && open) setOpen(false);
+  if ((disabled || unavailableNote) && open) setOpen(false);
   if (disabled) {
     return (
       <button type="button" disabled aria-haspopup="dialog" className={look}>
         {text}
       </button>
+    );
+  }
+  if (unavailableNote) {
+    return (
+      <>
+        <button
+          ref={triggerRef}
+          type="button"
+          aria-disabled="true"
+          aria-describedby={
+            active ? `${descId} ${unavailableNote}` : unavailableNote
+          }
+          className={`${CHIP} ${CHIP_UNAVAILABLE}`}
+        >
+          {text}
+        </button>
+        {titleNote}
+      </>
     );
   }
 
@@ -72,11 +106,7 @@ export function FilterChip({
       >
         {text}
       </Popover.Trigger>
-      {active ? (
-        <span id={descId} hidden>
-          {title}
-        </span>
-      ) : null}
+      {titleNote}
       <Popover.Portal>
         <Popover.Content
           ref={panel}

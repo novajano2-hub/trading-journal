@@ -1,6 +1,11 @@
 'use client';
 
-import { CaretUpDown, Check, Wallet } from '@phosphor-icons/react/dist/ssr';
+import {
+  ArrowClockwise,
+  CaretUpDown,
+  Check,
+  Wallet,
+} from '@phosphor-icons/react/dist/ssr';
 import { DropdownMenu } from 'radix-ui';
 import { useId, type ReactNode } from 'react';
 import { IconTile } from '@/components/ui/icon-tile';
@@ -20,6 +25,8 @@ import {
 const ITEM =
   'relative flex min-h-9 cursor-pointer items-center rounded-chip py-1.5 pr-2 pl-8 text-sm text-text select-none data-highlighted:bg-sunken data-disabled:cursor-default data-disabled:opacity-50 pointer-coarse:min-h-11';
 const LABEL = 'px-2 pt-1.5 pb-1 text-xs text-faint';
+const BOX =
+  'flex h-12 w-full items-center gap-2 rounded-control border border-line bg-surface-1 py-2 pl-1.5 text-left transition-colors duration-120 hover:border-line-2';
 
 function Indicator(): React.JSX.Element {
   return (
@@ -51,16 +58,39 @@ function LabelledGroup({
  * The sidebar's workspace and account switcher. It reads the URL filters, so
  * it sits inside `<Suspense>`. Picking a workspace clears the account,
  * strategy and tag filters (ids never cross workspaces); accounts toggle in
- * place and the menu stays open.
+ * place and the menu stays open. A workspace that can't load says so, and
+ * clicking it reloads the page.
  */
 export function AccountSwitcher(): React.JSX.Element {
   const { filters, shown: clean, setFilters } = useShownFilters();
   const workspaces = useWorkspaces().data ?? [];
-  const active = useActiveWorkspace().data;
+  const activeQuery = useActiveWorkspace();
+  const active = activeQuery.data;
   const accounts = useAccounts().data;
   const setActive = useSetActiveWorkspace();
   const workspaceLabel = useId();
 
+  if (!active && activeQuery.error) {
+    return (
+      <button
+        type="button"
+        // Storage that failed to open never recovers in place; a fresh page tries again.
+        onClick={() => window.location.reload()}
+        // Nothing sits at the right end here: the words take its room.
+        className={`${BOX} pr-1`}
+      >
+        <IconTile icon={ArrowClockwise} tone="neutral" />
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-[13px] leading-[1.3] font-medium text-text">
+            Workspace unavailable
+          </span>
+          <span className="truncate text-xs leading-[1.3] text-muted">
+            Try again
+          </span>
+        </span>
+      </button>
+    );
+  }
   if (!active) {
     return (
       <div
@@ -102,7 +132,9 @@ export function AccountSwitcher(): React.JSX.Element {
 
   return (
     <DropdownMenu.Root>
-      <DropdownMenu.Trigger className="flex h-12 w-full items-center gap-2 rounded-control border border-line bg-surface-1 py-2 pr-2 pl-1.5 text-left transition-colors duration-120 hover:border-line-2 data-[state=open]:border-line-2">
+      <DropdownMenu.Trigger
+        className={`${BOX} pr-2 data-[state=open]:border-line-2`}
+      >
         <IconTile icon={Wallet} tone="accent" />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-[13px] leading-[1.3] font-medium text-text">

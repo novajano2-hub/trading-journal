@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Dialog } from 'radix-ui';
 import { useEffect, useState, type ReactNode } from 'react';
 import { BrandMark } from '@/components/site/brand-mark';
+import { useActiveWorkspace } from '@/data/query/hooks';
 import { enter, exit } from '@/lib/motion';
 import { CurrentSidebarNav, SwitcherSlot } from './sidebar';
 
@@ -14,8 +15,8 @@ const ICON_BUTTON =
 
 /**
  * Below `lg`, the sidebar as a sheet from the left. It traps focus, closes on
- * Escape, the veil, a link or any route change, and hands focus back to its
- * trigger.
+ * Escape, the veil, a link, any route change or a workspace switch, and hands
+ * focus back to its trigger.
  */
 export function MobileNav({
   switcher,
@@ -25,11 +26,19 @@ export function MobileNav({
   const [open, setOpen] = useState(false);
   const reduced = useReducedMotion();
   const pathname = usePathname();
-  const [openOn, setOpenOn] = useState(pathname);
-  // A route change, however it happened, closes the sheet.
-  if (openOn !== pathname) {
-    setOpenOn(pathname);
-    setOpen(false);
+  const workspace = useActiveWorkspace().data?.id;
+  const [seen, setSeen] = useState({ pathname, workspace });
+  // A route change or a workspace switch, however it happened, closes the
+  // sheet. The workspace first loading is neither.
+  const moved = seen.pathname !== pathname;
+  const switched =
+    workspace !== undefined &&
+    seen.workspace !== undefined &&
+    workspace !== seen.workspace;
+  const learned = workspace !== undefined && seen.workspace === undefined;
+  if (moved || switched || learned) {
+    setSeen({ pathname, workspace: workspace ?? seen.workspace });
+    if (moved || switched) setOpen(false);
   }
 
   // Crossing into the desktop layout hides the trigger: close the sheet with it.

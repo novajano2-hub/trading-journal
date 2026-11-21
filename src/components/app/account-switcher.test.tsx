@@ -13,19 +13,27 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import { DataProvider } from '@/data/query/provider';
+import { StorageUnavailableError, type Repository } from '@/data/repository';
 import { AccountSwitcher } from './account-switcher';
 
 vi.mock('next/navigation', () => import('./__fixtures__/navigation'));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
-function renderSwitcher(url: string) {
+function renderSwitcher(
+  url: string,
+  patch: (repo: Repository) => Partial<Repository> = () => ({}),
+) {
   window.history.replaceState(null, '', url);
-  const repository = createLocalRepository({
+  const local = createLocalRepository({
     indexedDB: new IDBFactory(),
     IDBKeyRange,
     sample: async () => fixtureSample(),
   });
+  const repository = { ...local, ...patch(local) };
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
@@ -81,4 +89,23 @@ test('switching workspace clears account, strategy and tag filters and keeps the
   await waitFor(() =>
     expect(window.location.search).toBe('?range=this-week&symbol=ES&side=long'),
   );
+});
+
+test('a workspace that cannot load says so, and clicking it reloads the page', async () => {
+  renderSwitcher('/app/dashboard', (repo) => ({
+    workspaces: {
+      ...repo.workspaces,
+      getActive: () => Promise.reject(new StorageUnavailableError()),
+    },
+  }));
+  const retry = await screen.findByRole('button', {
+    name: /Workspace unavailable\s*Try again/,
+  });
+  const reload = vi.fn();
+  vi.spyOn(window, 'location', 'get').mockReturnValue({
+    ...window.location,
+    reload,
+  });
+  fireEvent.click(retry);
+  expect(reload).toHaveBeenCalledOnce();
 });

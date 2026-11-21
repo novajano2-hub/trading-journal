@@ -64,13 +64,46 @@ test('an active side reads on its chip, and "Clear filters" resets every filter'
   expect(onChange).toHaveBeenCalledWith(EMPTY_FILTERS);
 });
 
-function renderBar(url: string) {
-  window.history.replaceState(null, '', url);
-  const repository = createLocalRepository({
+test('with no trades the chips keep their tab stops but open nothing', () => {
+  render(
+    <FilterBarView
+      filters={{ ...EMPTY_FILTERS, side: 'short' }}
+      options={NO_OPTIONS}
+      today="2026-11-20"
+      onChange={() => {}}
+      noTrades
+    />,
+  );
+  for (const name of ['All time', 'Symbol', 'Short', 'Strategy', 'Tags']) {
+    const chip = screen.getByRole('button', { name });
+    expect(chip.getAttribute('aria-disabled')).toBe('true');
+    expect(chip.hasAttribute('disabled')).toBe(false);
+    expect(chip.hasAttribute('aria-haspopup')).toBe(false);
+    expect(chip.tabIndex).toBe(0);
+  }
+  const side = screen.getByRole('button', { name: 'Short' });
+  expect(side.getAttribute('aria-describedby')!.split(' ')).toHaveLength(2);
+  expect(screen.getByText('No trades to filter yet.')).toBeTruthy();
+  fireEvent.click(side);
+  expect(screen.queryByRole('dialog')).toBeNull();
+  // The way out stays live.
+  expect(
+    screen
+      .getByRole('button', { name: 'Clear filters' })
+      .hasAttribute('aria-disabled'),
+  ).toBe(false);
+});
+
+function freshRepository() {
+  return createLocalRepository({
     indexedDB: new IDBFactory(),
     IDBKeyRange,
     sample: async () => fixtureSample(),
   });
+}
+
+function renderBar(url: string, repository = freshRepository()) {
+  window.history.replaceState(null, '', url);
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
@@ -142,6 +175,26 @@ test('a custom date range applies from the date pair', async () => {
   expect(
     await screen.findByRole('button', { name: '1-15 Nov 2026' }),
   ).toBeTruthy();
+});
+
+test('an empty workspace disables the chips; a filter that matches nothing leaves them live', async () => {
+  const empty = freshRepository();
+  await empty.workspaces.setActive('mine');
+  renderBar('/app/dashboard', empty);
+  await waitFor(() =>
+    expect(
+      screen
+        .getByRole('button', { name: 'Side' })
+        .getAttribute('aria-disabled'),
+    ).toBe('true'),
+  );
+  cleanup();
+
+  renderBar('/app/dashboard?symbol=ZZ');
+  const chip = await liveChip('ZZ');
+  expect(chip.hasAttribute('aria-disabled')).toBe(false);
+  fireEvent.click(chip);
+  expect(await screen.findByRole('dialog', { name: 'Symbol' })).toBeTruthy();
 });
 
 test('a stale link never shows its unknown ids as chips', async () => {

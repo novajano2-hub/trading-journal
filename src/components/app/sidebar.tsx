@@ -10,8 +10,13 @@ import { APP_NAV, activeItem, navHref, type NavItem } from './nav';
 const NO_PARAMS = new URLSearchParams();
 
 const ROW =
-  'flex h-10 items-center gap-2.5 rounded-control p-1 pr-2 text-[13.5px] no-underline transition-colors duration-120 pointer-coarse:h-11';
+  'group flex h-10 items-center gap-2.5 rounded-control p-1 pr-2 text-[13.5px] no-underline transition-colors duration-120 pointer-coarse:h-11';
 
+/**
+ * Three looks, by state: the current module's tile is filled cobalt-soft; the
+ * others sit bare, their duotone layer tinted cobalt, and fill on hover; a
+ * module that isn't live is an outline in the faint ink.
+ */
 function NavRow({
   item,
   current,
@@ -25,7 +30,7 @@ function NavRow({
 }): React.JSX.Element {
   const quiet = item.group === 'not-live';
   const look = current
-    ? 'bg-accent-soft font-medium text-accent-ink'
+    ? 'font-medium text-accent-ink'
     : quiet
       ? 'text-faint hover:bg-bg hover:text-muted'
       : 'text-muted hover:bg-bg hover:text-text';
@@ -37,10 +42,20 @@ function NavRow({
         onClick={onNavigate}
         className={`${ROW} ${look}`}
       >
-        <IconTile
-          icon={item.icon}
-          tone={current ? 'accent' : quiet ? 'faint' : 'neutral'}
-        />
+        {current ? (
+          <IconTile icon={item.icon} tone="accent" />
+        ) : (
+          <IconTile
+            icon={item.icon}
+            tone={quiet ? 'faint' : 'neutral'}
+            bare
+            className={
+              quiet
+                ? 'group-hover:bg-sunken group-hover:text-muted'
+                : 'group-hover:bg-sunken group-hover:text-text'
+            }
+          />
+        )}
         <span className="min-w-0 truncate">{item.label}</span>
       </Link>
     </li>

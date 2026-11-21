@@ -109,3 +109,94 @@ test('search opens on a click of its icon and finds a module (mobile)', async ({
   await page.getByRole('option', { name: /Calendar/ }).click();
   await expect(page).toHaveURL(/\/app\/calendar/);
 });
+
+test('switching workspace in the drawer closes it (mobile)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'mobile');
+  await page.goto('/app/dashboard?side=long');
+  await ready(page);
+  await page.getByRole('button', { name: 'Open navigation' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Navigation' });
+  await sheet.getByRole('button', { name: /Sample workspace/ }).click();
+  await page.getByRole('menuitemradio', { name: 'My workspace' }).click();
+  await expect(sheet).toBeHidden();
+  await expect(page).toHaveURL(/\/app\/dashboard\?side=long$/);
+  await expect(
+    page.getByRole('button', { name: 'Open navigation' }),
+  ).toBeFocused();
+});
+
+test('below sm the first row stays put and the chips scroll away (mobile)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'mobile');
+  await page.goto('/app/dashboard');
+  await ready(page);
+  await page.mouse.wheel(0, 700);
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(300);
+  const title = await page.getByRole('heading', { level: 1 }).boundingBox();
+  const chips = await page
+    .getByRole('group', { name: 'Filters' })
+    .boundingBox();
+  expect(title!.y).toBeGreaterThanOrEqual(0);
+  expect(title!.y).toBeLessThan(56);
+  expect(chips!.y + chips!.height).toBeLessThan(0);
+  await expect(page.getByRole('link', { name: 'Import' })).toBeInViewport();
+});
+
+const BUSY =
+  '?from=2026-10-05&to=2026-11-20&symbol=AUDUSD&symbol=BTCUSD&side=short&strategy=sample-strategy-1&tag=sample-tag-4';
+
+test('the chips sit beside the title while they fit, and never clip "Clear filters" (desktop)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop');
+  const bar = page.getByRole('banner');
+  for (const width of [1280, 1366, 1440, 1680]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto('/app/dashboard');
+    await ready(page);
+    await expect(bar, `${width} at rest`).toHaveAttribute(
+      'data-chips',
+      'inline',
+    );
+
+    await page.goto(`/app/dashboard${BUSY}`);
+    const filters = page.getByRole('group', { name: 'Filters' });
+    // The chips are live once the workspace loads, whatever the filters match.
+    await expect(filters.getByRole('button', { name: 'Short' })).toBeEnabled();
+    const clear = filters.getByRole('button', { name: 'Clear filters' });
+    await expect(clear, `${width} busy`).toBeInViewport({ ratio: 1 });
+    await expect(bar).toHaveAttribute(
+      'data-chips',
+      width >= 1680 ? 'inline' : 'wrapped',
+    );
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth - innerWidth,
+      ),
+    ).toBeLessThanOrEqual(0);
+  }
+});
+
+test('an empty workspace shows the chips and Gross/Net unavailable, still in the tab order (desktop)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop');
+  await page.goto('/app/dashboard');
+  await ready(page);
+  await page.getByRole('button', { name: /Sample workspace/ }).click();
+  await page.getByRole('menuitemradio', { name: 'My workspace' }).click();
+  const filters = page.getByRole('group', { name: 'Filters' });
+  const side = filters.getByRole('button', { name: 'Side' });
+  await expect(side).toHaveAttribute('aria-disabled', 'true');
+  await expect(
+    page.getByRole('radiogroup', { name: 'P&L basis' }),
+  ).toHaveAttribute('aria-disabled', 'true');
+  await filters.getByRole('button', { name: 'Symbol' }).focus();
+  await page.keyboard.press('Tab');
+  await expect(side).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
