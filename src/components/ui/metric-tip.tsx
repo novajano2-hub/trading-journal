@@ -1,9 +1,9 @@
 'use client';
 
 // Technique adapted from HorizonX Signal Tooltip, commercial licence: the
-// tooltip reveal (rises 6px while scaling up from .92 over 250ms) and its
-// accent signal mark. Rebuilt on Radix Tooltip in Keel tokens; the trigger is
-// the metric's own label, and the button cluster and tones are dropped.
+// tooltip reveal (rises 6px while scaling up from .92 over 250ms). Rebuilt on
+// Radix Tooltip in Keel tokens; the trigger is the metric's own label, and the
+// button cluster, tones and signal mark are dropped.
 import { useState, type ReactNode } from 'react';
 import { Tooltip } from 'radix-ui';
 import { useReducedMotion } from 'motion/react';
@@ -51,13 +51,9 @@ export function MetricTip({
             side="top"
             sideOffset={8}
             collisionPadding={12}
-            className={`z-50 flex max-w-[280px] origin-(--radix-tooltip-content-transform-origin) items-start gap-2 rounded-control border border-line-2 bg-surface-1 px-3 py-2 text-xs font-medium leading-[1.4] text-muted shadow-chip ${motion}`}
+            className={`z-50 max-w-[280px] origin-(--radix-tooltip-content-transform-origin) rounded-control border border-line-2 bg-surface-1 px-3 py-2 text-xs font-medium leading-[1.4] text-muted shadow-chip ${motion}`}
           >
-            <span
-              aria-hidden="true"
-              className="mt-[5px] size-1.5 shrink-0 rounded-full bg-accent ring-[3px] ring-accent/15"
-            />
-            <span>{definition}</span>
+            {definition}
           </Tooltip.Content>
         </Tooltip.Portal>
       </Tooltip.Root>
