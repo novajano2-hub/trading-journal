@@ -23,12 +23,12 @@ const FILTERS_FALLBACK = (
   />
 );
 
-/** The search before the URL is read: its resting icon (36px, 40px on a phone), inert, holding the bar's place. */
+/** The search before the URL is read: its resting icon (34px, 40px on a phone), inert, holding the bar's place. */
 function SearchFallback(): React.JSX.Element {
   return (
     <span
       aria-hidden="true"
-      className="inline-flex size-9 flex-none items-center justify-center rounded-control border border-line bg-sunken text-muted pointer-coarse:size-11 max-sm:size-10 max-sm:pointer-coarse:size-11"
+      className="inline-flex size-[34px] flex-none items-center justify-center rounded-control border border-line bg-surface-1 text-muted pointer-coarse:size-11 max-sm:size-10 max-sm:pointer-coarse:size-11"
     >
       <MagnifyingGlass size={18} />
     </span>
@@ -45,7 +45,7 @@ export function AppShell({
     <div className="flex flex-1">
       <a
         href="#content"
-        className="sr-only rounded-control bg-surface-1 text-[15px] font-medium text-text focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:border focus:border-line-2 focus:px-4 focus:py-2.5"
+        className="sr-only rounded-control bg-surface-1 text-[15px] font-medium text-text focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:border focus:border-line focus:px-4 focus:py-2.5 focus:shadow-[var(--shadow-chip)]"
       >
         Skip to content
       </a>

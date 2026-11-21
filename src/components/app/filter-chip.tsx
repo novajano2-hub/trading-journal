@@ -1,23 +1,28 @@
 'use client';
 
+import type { Icon } from '@phosphor-icons/react';
+import { CaretDown } from '@phosphor-icons/react/dist/ssr';
 import { Popover } from 'radix-ui';
 import { useId, useRef, useState, type ReactNode, type Ref } from 'react';
 
+/** A white control on the canvas: a hairline edge, a breath of shadow, and a caret. */
 const CHIP =
-  'inline-flex h-[30px] max-w-48 flex-none items-center rounded-chip border px-[9px] text-[12.5px] whitespace-nowrap transition-colors duration-120 pointer-coarse:h-11 pointer-coarse:px-3';
-const CHIP_IDLE =
-  'border-line bg-surface-1 text-muted enabled:hover:border-line-2 enabled:hover:text-text data-[state=open]:border-line-2 data-[state=open]:text-text';
-const CHIP_ON = 'border-accent-soft bg-accent-soft text-accent-ink';
+  'inline-flex h-8 max-w-52 flex-none items-center gap-1.5 rounded-control border pr-2.5 pl-3 text-[13.5px] whitespace-nowrap transition-[border-color,color] duration-200 ease-(--ease-glide) pointer-coarse:h-11 pointer-coarse:px-3.5';
+const CHIP_LIVE =
+  'border-line bg-surface-1 shadow-[0_1px_1px_rgb(18_22_51/0.04)] enabled:hover:border-accent/35 enabled:hover:text-text data-[state=open]:border-accent/35 data-[state=open]:text-text';
+/** At rest the chip names its filter; once set, it reads as the value, in ink. */
+const CHIP_IDLE = `${CHIP_LIVE} font-medium text-muted`;
+const CHIP_ON = `${CHIP_LIVE} font-semibold text-text`;
 const CHIP_UNAVAILABLE =
-  'cursor-default border-dashed border-line-2 bg-transparent text-faint';
+  'cursor-default border-dashed border-line-2 bg-transparent font-medium text-faint';
 
 const PANEL =
-  'z-50 flex max-h-[min(600px,var(--radix-popover-content-available-height))] max-w-[calc(100vw-24px)] origin-(--radix-popover-content-transform-origin) flex-col rounded-control border border-line-2 bg-surface-1 text-text shadow-[var(--shadow-chip)] outline-none motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in';
+  'z-50 flex max-h-[min(600px,var(--radix-popover-content-available-height))] max-w-[calc(100vw-24px)] origin-(--radix-popover-content-transform-origin) flex-col overflow-hidden rounded-[12px] border border-line bg-surface-1 text-text shadow-[var(--shadow)] outline-none motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in';
 
 const ROW =
-  'flex min-h-9 cursor-pointer items-center gap-2.5 rounded-chip px-2 py-1 text-sm text-text hover:bg-sunken pointer-coarse:min-h-11';
+  'flex min-h-9 cursor-pointer items-center gap-2.5 rounded-[8px] px-2 py-1 text-[13.5px] text-text hover:bg-sunken pointer-coarse:min-h-11';
 const BOX = 'size-4 flex-none cursor-pointer accent-accent';
-const GROUP_LABEL = 'px-2 pt-2 pb-1 text-xs text-faint';
+const GROUP_LABEL = 'px-2 pt-2 pb-1 text-[12px] font-medium text-faint';
 
 /**
  * A text or date field inside a filter popover. Its focus ring hugs the
@@ -25,7 +30,7 @@ const GROUP_LABEL = 'px-2 pt-2 pb-1 text-xs text-faint';
  * important to beat that global rule, which sits outside Tailwind's layers.
  */
 export const FIELD =
-  'h-9 w-full min-w-0 rounded-control border border-line-2 bg-surface-1 px-2 text-text focus-visible:outline-offset-0! pointer-coarse:h-11';
+  'h-9 w-full min-w-0 rounded-[8px] border border-line-2 bg-surface-1 px-2 text-text focus-visible:outline-offset-0! pointer-coarse:h-11';
 
 /**
  * One chip and its popover. Enter or Space opens it, Escape closes it, and
@@ -41,6 +46,8 @@ export function FilterChip({
   onClear,
   triggerRef,
   wide = false,
+  icon: Lead,
+  alwaysSet = false,
   children,
 }: {
   label: string;
@@ -54,12 +61,30 @@ export function FilterChip({
   triggerRef?: Ref<HTMLButtonElement>;
   /** Room for a pair of date fields side by side. */
   wide?: boolean;
+  /** A glyph before the label, in the accent. */
+  icon?: Icon;
+  /**
+   * The label is always a value (the date range in force, "All time" at
+   * rest), so the chip reads as set even when nothing is filtered.
+   */
+  alwaysSet?: boolean;
   children(close: () => void): ReactNode;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const descId = useId();
   const panel = useRef<HTMLDivElement>(null);
-  const look = `${CHIP} ${active ? CHIP_ON : CHIP_IDLE}`;
+  const look = `${CHIP} ${active || alwaysSet ? CHIP_ON : CHIP_IDLE}`;
+  const lead = (faint: boolean) =>
+    Lead ? (
+      <Lead
+        size={15}
+        aria-hidden="true"
+        className={`flex-none ${faint ? '' : 'text-accent-ink'}`}
+      />
+    ) : null;
+  const caret = (
+    <CaretDown size={13} aria-hidden="true" className="flex-none text-faint" />
+  );
   const text = <span className="min-w-0 truncate">{label}</span>;
 
   const titleNote = active ? (
@@ -73,7 +98,9 @@ export function FilterChip({
   if (disabled) {
     return (
       <button type="button" disabled aria-haspopup="dialog" className={look}>
+        {lead(false)}
         {text}
+        {caret}
       </button>
     );
   }
@@ -89,6 +116,7 @@ export function FilterChip({
           }
           className={`${CHIP} ${CHIP_UNAVAILABLE}`}
         >
+          {lead(true)}
           {text}
         </button>
         {titleNote}
@@ -104,7 +132,9 @@ export function FilterChip({
         aria-describedby={active ? descId : undefined}
         className={look}
       >
+        {lead(false)}
         {text}
+        {caret}
       </Popover.Trigger>
       {titleNote}
       <Popover.Portal>
@@ -135,7 +165,7 @@ export function FilterChip({
                 onClear();
                 close();
               }}
-              className="h-8 rounded-chip px-2.5 text-[13px] font-medium text-muted transition-colors duration-120 enabled:hover:bg-sunken enabled:hover:text-text disabled:opacity-50 pointer-coarse:h-11"
+              className="h-8 rounded-[8px] px-2.5 text-[13px] font-semibold text-accent-ink transition-colors duration-200 enabled:hover:bg-accent-soft disabled:text-faint disabled:opacity-60 pointer-coarse:h-11"
             >
               Clear
             </button>

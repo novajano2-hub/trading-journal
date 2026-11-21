@@ -1,5 +1,6 @@
 'use client';
 
+import { CalendarBlank } from '@phosphor-icons/react/dist/ssr';
 import {
   useEffect,
   useId,
@@ -146,7 +147,7 @@ export function FilterBarView({
           onFocus={(e) =>
             e.target.scrollIntoView({ block: 'nearest', inline: 'nearest' })
           }
-          className="flex w-max items-center gap-2"
+          className="flex w-max items-center gap-1.5"
         >
           <FilterChip
             label={rangeChipLabel(f.range, datesOf(f.range, today))}
@@ -157,6 +158,8 @@ export function FilterBarView({
             onClear={() => onChange({ ...f, range: {} })}
             triggerRef={first}
             wide
+            icon={CalendarBlank}
+            alwaysSet
           >
             {(close) => (
               <DateBody
@@ -250,7 +253,7 @@ export function FilterBarView({
             first.current?.focus();
           }}
           // ml makes up the 6px the scroller's margin takes from the gap.
-          className="ml-1.5 h-[30px] flex-none rounded-chip px-2 text-[12.5px] font-medium whitespace-nowrap text-muted transition-colors duration-120 enabled:hover:bg-sunken enabled:hover:text-text pointer-coarse:h-11"
+          className="ml-1.5 h-8 flex-none rounded-control px-2.5 text-[13px] font-semibold whitespace-nowrap text-accent-ink transition-colors duration-200 enabled:hover:bg-surface-1 pointer-coarse:h-11"
         >
           Clear filters
         </button>

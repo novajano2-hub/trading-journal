@@ -10,7 +10,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
-import { buttonClasses } from '@/components/ui/button-styles';
+import { RAISED } from '@/components/ui/button-styles';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { pageTitle } from './nav';
 
@@ -28,9 +28,9 @@ const FIT: Record<'bar' | 'title' | 'breaker', Record<ChipsFit, string>> = {
     wrapped: 'sm:flex-wrap sm:pb-3',
   },
   title: {
-    unknown: 'sm:h-12 xl:mr-2 xl:h-14 xl:flex-none',
-    inline: 'sm:mr-2 sm:flex-none',
-    wrapped: 'sm:h-12',
+    unknown: 'sm:h-14 xl:mr-3 xl:h-[68px] xl:flex-none',
+    inline: 'sm:mr-3 sm:flex-none',
+    wrapped: 'sm:h-14',
   },
   breaker: {
     unknown: 'sm:block xl:hidden',
@@ -39,9 +39,15 @@ const FIT: Record<'bar' | 'title' | 'breaker', Record<ChipsFit, string>> = {
   },
 };
 
-/** The bar's gap (gap-x-2), and the title's margin beside the chips (mr-2). */
-const GAP = 8;
-const TITLE_MARGIN = 8;
+/** The bar's gap (gap-x-2.5), and the title's margin beside the chips (mr-3). */
+const GAP = 10;
+const TITLE_MARGIN = 12;
+
+/**
+ * Import, the bar's one primary: 34px, its glyph leading. On a phone it is
+ * the glyph alone, 40px square.
+ */
+const IMPORT = `inline-flex h-[34px] flex-none items-center justify-center gap-[7px] rounded-control pr-[15px] pl-3 text-[13.5px] font-semibold whitespace-nowrap no-underline select-none ${RAISED} pointer-coarse:h-11 max-sm:size-10 max-sm:p-0 max-sm:pointer-coarse:size-11`;
 
 type Ref = RefObject<HTMLElement | null>;
 
@@ -96,11 +102,12 @@ function useChipsFit({
 }
 
 /**
- * The bar over every app page. Its source order is its reading order at every
+ * The bar over every app page, on the canvas with no rule under it. Its
+ * source order is its reading order at every
  * width, so Tab follows what the eye does: the menu (below `lg`), the page
  * title, the filter chips, then search, the sample label, Gross/Net, Import
  * and the theme. Nothing is reordered by CSS.
- * - From `sm` up it is one sticky bar, 56px while the chips fit beside the
+ * - From `sm` up it is one sticky bar, 68px while the chips fit beside the
  *   title. Where they don't, measured, the title keeps the first row and the
  *   chips lead a second one, the controls after them; where even that row is
  *   too short the chips scroll sideways.
@@ -132,13 +139,13 @@ export function TopBar({
     <header
       ref={bar}
       data-chips={filters ? fit : undefined}
-      className={`z-30 border-b border-line bg-surface-1 px-5 max-sm:pt-14 sm:sticky sm:top-0 sm:flex sm:items-center sm:gap-x-2 ${FIT.bar[fit]}`}
+      className={`z-30 bg-bg px-5 max-sm:pt-14 sm:sticky sm:top-0 sm:flex sm:items-center sm:gap-x-2.5 ${FIT.bar[fit]}`}
     >
       {/* Below sm this row is pinned to the top; from sm its items join the bar's. */}
-      <div className="flex h-14 items-center gap-2 max-sm:fixed max-sm:inset-x-0 max-sm:top-0 max-sm:z-30 max-sm:border-b max-sm:border-line max-sm:bg-surface-1 max-sm:px-5 sm:contents">
+      <div className="flex h-14 items-center gap-2 max-sm:fixed max-sm:inset-x-0 max-sm:top-0 max-sm:z-30 max-sm:border-b max-sm:border-line max-sm:bg-bg max-sm:px-5 sm:contents">
         {menu}
         <h1
-          className={`flex h-14 min-w-0 flex-1 items-center text-[22px] leading-[1.2] font-semibold tracking-[-0.02em] max-sm:h-auto ${FIT.title[fit]}`}
+          className={`flex h-[68px] min-w-0 flex-1 items-center text-[24px] leading-[1.2] font-[650] tracking-[-0.035em] max-sm:h-auto max-sm:text-[20px] ${FIT.title[fit]}`}
         >
           <span ref={title} className="truncate">
             {pageTitle(pathname)}
@@ -162,7 +169,7 @@ export function TopBar({
         </>
       ) : null}
       {/* Below sm the last row; from sm its items join the bar's, at its end. */}
-      <div className="flex items-center gap-2 max-sm:pt-2.5 max-sm:pb-3 sm:contents">
+      <div className="flex items-center gap-2.5 max-sm:pt-2.5 max-sm:pb-3 sm:contents">
         {/* Search starts the controls: at the bar's end from sm, the row's start below. */}
         <div
           ref={tail}
@@ -171,23 +178,24 @@ export function TopBar({
           {search}
         </div>
         {label || basis ? (
-          <div ref={controls} className="flex flex-none items-center gap-2">
+          <div ref={controls} className="flex flex-none items-center gap-2.5">
             {label}
             <div className="flex">{basis}</div>
           </div>
         ) : null}
         {/* Import's own page needs no link to itself. */}
         {pathname === '/app/import' ? null : (
-          <Link
-            href="/app/import"
-            aria-label="Import"
-            className={`${buttonClasses('primary', 'sm')} flex-none pointer-coarse:h-11 max-sm:w-[38px] max-sm:px-0 max-sm:pointer-coarse:w-11`}
-          >
-            <UploadSimple size={18} aria-hidden="true" className="sm:hidden" />
+          <Link href="/app/import" aria-label="Import" className={IMPORT}>
+            <UploadSimple
+              size={16}
+              aria-hidden="true"
+              className="flex-none max-sm:size-[18px]"
+            />
             <span className="max-sm:hidden">Import</span>
           </Link>
         )}
-        <ThemeToggle className="flex-none" />
+        {/* The bar's last control: Keel has no signed-in person, so no avatar. */}
+        <ThemeToggle className="flex-none max-sm:size-10 max-sm:pointer-coarse:size-11" />
       </div>
     </header>
   );

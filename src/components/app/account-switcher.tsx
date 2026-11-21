@@ -15,6 +15,7 @@ import {
   useSetActiveWorkspace,
   useWorkspaces,
 } from '@/data/query/hooks';
+import { SwitcherPlaceholder } from './sidebar';
 import { useShownFilters } from './use-shown-filters';
 import {
   accountSummary,
@@ -23,10 +24,11 @@ import {
 } from './filter-model';
 
 const ITEM =
-  'relative flex min-h-9 cursor-pointer items-center rounded-chip py-1.5 pr-2 pl-8 text-sm text-text select-none data-highlighted:bg-sunken data-disabled:cursor-default data-disabled:opacity-50 pointer-coarse:min-h-11';
-const LABEL = 'px-2 pt-1.5 pb-1 text-xs text-faint';
+  'relative flex min-h-9 cursor-pointer items-center rounded-[8px] py-1.5 pr-2 pl-8 text-[13.5px] text-text select-none data-highlighted:bg-sunken data-disabled:cursor-default data-disabled:opacity-50 pointer-coarse:min-h-11';
+const LABEL = 'px-2 pt-2 pb-1 text-[12px] font-medium text-faint';
+/** A white card on the canvas, its edge a hairline that firms on hover and while open. */
 const BOX =
-  'flex h-12 w-full items-center gap-2 rounded-control border border-line bg-surface-1 py-2 pl-1.5 text-left transition-colors duration-120 hover:border-line-2';
+  'flex h-[52px] w-full items-center gap-2.5 rounded-[12px] border border-line bg-surface-1 py-2 pl-2 text-left shadow-[var(--shadow-chip)] transition-[border-color] duration-200 ease-(--ease-glide) hover:border-line-2';
 
 function Indicator(): React.JSX.Element {
   return (
@@ -81,10 +83,10 @@ export function AccountSwitcher(): React.JSX.Element {
       >
         <IconTile icon={ArrowClockwise} tone="neutral" />
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-[13px] leading-[1.3] font-medium text-text">
+          <span className="truncate text-[13.5px] leading-[1.25] font-semibold text-text">
             Workspace unavailable
           </span>
-          <span className="truncate text-xs leading-[1.3] text-muted">
+          <span className="truncate text-[12px] leading-[1.4] text-muted">
             Try again
           </span>
         </span>
@@ -92,12 +94,7 @@ export function AccountSwitcher(): React.JSX.Element {
     );
   }
   if (!active) {
-    return (
-      <div
-        aria-hidden="true"
-        className="h-12 rounded-control border border-line"
-      />
-    );
+    return <SwitcherPlaceholder />;
   }
 
   const selected = clean?.accountIds ?? [];
@@ -133,19 +130,19 @@ export function AccountSwitcher(): React.JSX.Element {
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
-        className={`${BOX} pr-2 data-[state=open]:border-line-2`}
+        className={`${BOX} pr-2.5 data-[state=open]:border-line-2`}
       >
         <IconTile icon={Wallet} tone="accent" />
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-[13px] leading-[1.3] font-medium text-text">
+          <span className="truncate text-[13.5px] leading-[1.25] font-semibold text-text">
             {active.name}
           </span>
-          <span className="truncate text-xs leading-[1.3] text-faint">
+          <span className="truncate text-[12px] leading-[1.4] text-faint">
             {summary}
           </span>
         </span>
         <CaretUpDown
-          size={14}
+          size={15}
           aria-hidden="true"
           className="flex-none text-faint"
         />
@@ -155,7 +152,7 @@ export function AccountSwitcher(): React.JSX.Element {
           align="start"
           sideOffset={6}
           collisionPadding={12}
-          className="z-[60] max-h-(--radix-dropdown-menu-content-available-height) w-(--radix-dropdown-menu-trigger-width) min-w-60 origin-(--radix-dropdown-menu-content-transform-origin) overflow-y-auto rounded-control border border-line-2 bg-surface-1 p-1.5 text-text shadow-[var(--shadow-chip)] outline-none motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in"
+          className="z-[60] max-h-(--radix-dropdown-menu-content-available-height) w-(--radix-dropdown-menu-trigger-width) min-w-60 origin-(--radix-dropdown-menu-content-transform-origin) overflow-y-auto rounded-[12px] border border-line bg-surface-1 p-1.5 text-text shadow-[var(--shadow)] outline-none motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in"
         >
           <DropdownMenu.RadioGroup
             aria-labelledby={workspaceLabel}

@@ -60,7 +60,7 @@ export function MetricTip({
             side="top"
             sideOffset={8}
             collisionPadding={12}
-            className={`z-50 max-w-[280px] origin-(--radix-tooltip-content-transform-origin) rounded-control border border-line-2 bg-surface-1 px-3 py-2 text-xs font-medium leading-[1.4] text-muted shadow-[var(--shadow-chip)] ${motion}`}
+            className={`z-50 max-w-[280px] origin-(--radix-tooltip-content-transform-origin) rounded-control border border-line bg-surface-1 px-3 py-2 text-[12.5px] font-medium leading-[1.45] text-muted shadow-[var(--shadow)] ${motion}`}
           >
             {definition}
           </Tooltip.Content>
