@@ -95,9 +95,18 @@ test('read pages hold a ~68ch measure and use no cards', async ({ page }) => {
 });
 
 test('/app/import is restyled, same behaviour', async ({ page }) => {
-  await page.goto('/app/import');
+  await page.goto('/app/import?side=short&by=day');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Import');
   await expect(page.getByText('No file waiting.')).toBeVisible();
+  // The way out stays in the app and keeps the filters.
+  await expect(
+    page.getByRole('link', { name: 'Back to the Dashboard' }),
+  ).toHaveAttribute('href', '/app/dashboard?side=short');
+  // A flat bordered card, as the app's are.
+  await expect(page.locator('main .rounded-card')).toHaveCSS(
+    'box-shadow',
+    'none',
+  );
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
