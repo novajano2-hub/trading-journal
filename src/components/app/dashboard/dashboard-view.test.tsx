@@ -50,6 +50,32 @@ function sampleWith(edit: (s: SampleWorkspace) => void) {
   };
 }
 
+/** The sample's trades replaced by `kept` that kept r-1 and `broken` that broke it. */
+function adherenceOf(kept: number, broken: number) {
+  return sampleWith((s) => {
+    const base = s.trades.find((t) => t.id === 'f-2')!;
+    s.trades = Array.from({ length: kept + broken }, (_, i) => {
+      const closedAt = Date.UTC(2026, 10, 2, 15) + i * 60_000;
+      return {
+        ...base,
+        id: `g-${i}`,
+        serial: i + 1,
+        openedAt: new Date(closedAt - 30_000).toISOString(),
+        closedAt: new Date(closedAt).toISOString(),
+        ruleChecks: [{ ruleId: 'r-1', followed: i < kept }],
+        tagIds: [],
+      };
+    });
+  });
+}
+
+/** What a screen reader gets: aria-hidden parts (the ticker's count) dropped. */
+function spoken(el: Element): string {
+  const copy = el.cloneNode(true) as Element;
+  copy.querySelectorAll('[aria-hidden="true"]').forEach((n) => n.remove());
+  return copy.textContent ?? '';
+}
+
 /** A fresh local repository over `sample`, with some methods replaced. */
 function repositoryWith(
   patch: (repo: Repository) => Partial<Repository>,
@@ -99,6 +125,31 @@ test('your plan: adherence, cost once per trade, rules by cost with the costlies
     document.querySelector('[data-testid="dashboard-ready"]'),
   ).toBeTruthy();
 });
+
+test.each([
+  [199, 1, '99.5%', /(?<![\d.])100%/],
+  [1, 299, '0.3%', /(?<![\d.])0%/],
+])(
+  'adherence of %i kept and %i broken reads %s in the headline and the row, never an edge it has not reached',
+  async (kept, broken, shown, edge) => {
+    renderApp(<DashboardView />, { sample: adherenceOf(kept, broken) });
+    const plan = await screen.findByRole('region', {
+      name: 'Your plan, all time',
+    });
+    const table = within(plan).getByRole('table', { name: 'Rules' });
+    const row = within(table).getAllByRole('row')[1]!;
+    expect(row.textContent).toContain(shown);
+    expect(row.textContent).not.toMatch(edge);
+    expect(
+      within(row)
+        .getByRole('button', { name: opener(r1) })
+        .getAttribute('aria-label'),
+    ).toContain(`Kept ${kept} of ${kept + broken}, ${shown}.`);
+    const headline = spoken(plan).replace(spoken(table), '');
+    expect(headline).toContain(shown);
+    expect(headline).not.toMatch(edge);
+  },
+);
 
 test('a trade that broke two rules counts once in the headline, in both rows, and the definitions say so (Review Focus 4)', async () => {
   renderApp(<DashboardView />, {
@@ -245,9 +296,11 @@ test('a filter that matches nothing offers Clear filters (Review Focus 2)', asyn
   ).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
   await waitFor(() => expect(window.location.search).toBe(''));
-  expect(
-    await screen.findByRole('region', { name: 'Your plan, all time' }),
-  ).toBeTruthy();
+  const plan = await screen.findByRole('region', {
+    name: 'Your plan, all time',
+  });
+  // The button is gone: focus lands on the plan that replaced it.
+  await waitFor(() => expect(document.activeElement).toBe(plan));
 });
 
 test('an empty workspace offers Import and the sample (Review Focus 2)', async () => {
@@ -268,9 +321,10 @@ test('an empty workspace offers Import and the sample (Review Focus 2)', async (
   fireEvent.click(
     screen.getByRole('button', { name: 'Open the sample workspace' }),
   );
-  expect(
-    await screen.findByRole('region', { name: 'Your plan, all time' }),
-  ).toBeTruthy();
+  const plan = await screen.findByRole('region', {
+    name: 'Your plan, all time',
+  });
+  await waitFor(() => expect(document.activeElement).toBe(plan));
 });
 
 test('open trades only, with no filters, wait for a close', async () => {

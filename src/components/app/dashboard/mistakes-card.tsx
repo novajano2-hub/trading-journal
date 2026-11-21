@@ -8,12 +8,18 @@ import type { PnlBasis } from '@/domain/types';
 import { formatPnl } from '@/lib/format';
 import { signTone } from './plan-card';
 
-/** "1 trade", "2 trades". */
-export function tradeCount(n: number): string {
-  return `${n} ${n === 1 ? 'trade' : 'trades'}`;
+/** "trade" for one, "trades" otherwise. */
+export function tradeNoun(n: number): string {
+  return n === 1 ? 'trade' : 'trades';
 }
 
-const COLUMNS = 'grid grid-cols-[minmax(0,1fr)_5rem_6rem] items-center gap-2';
+/** "1 trade", "2 trades". */
+export function tradeCount(n: number): string {
+  return `${n} ${tradeNoun(n)}`;
+}
+
+/** Mistake, trades and cost: the header and every row share these columns. */
+const COLUMNS = 'grid grid-cols-[minmax(0,1fr)_4.5rem_6rem] items-center gap-2';
 
 /**
  * Row 2's first card: what each mistake tag cost, costliest first. A trade
@@ -57,9 +63,15 @@ export function MistakesCard({
         </p>
       ) : (
         <>
-          {/* The cost column's definition, kept out of the row buttons and 8px clear of them. */}
-          <div className="flex justify-end pb-2 text-xs leading-4 text-faint">
-            <MetricTip id="mistake-cost" basis={basis} />
+          {/* The header row: Cost's definition sits outside the row buttons, 8px clear of them. */}
+          <div
+            className={`${COLUMNS} items-end pb-2 text-xs leading-4 text-faint`}
+          >
+            <span>Mistake</span>
+            <span className="text-right">Trades</span>
+            <span className="text-right">
+              <MetricTip id="mistake-cost" basis={basis} />
+            </span>
           </div>
           <ul ref={listRef} tabIndex={-1} className="outline-none">
             {mistakes.map((m) => {

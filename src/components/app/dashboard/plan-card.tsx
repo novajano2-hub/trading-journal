@@ -9,7 +9,7 @@ import { MetricTip } from '@/components/ui/metric-tip';
 import { RULES_SHOWN, type DashboardModel } from '@/data/dashboard';
 import type { RuleScore } from '@/domain/metrics/rules';
 import type { Cents, PnlBasis } from '@/domain/types';
-import { formatPct, formatPnl } from '@/lib/format';
+import { formatAdherence, formatPnl } from '@/lib/format';
 
 /** Gain or loss text for signed money; zero stays uncoloured. */
 export function signTone(cents: Cents): string {
@@ -26,7 +26,8 @@ function Track({
   return (
     <span
       aria-hidden="true"
-      className={`block h-1 overflow-hidden rounded-full bg-sunken ${className}`}
+      // The rail is `line`, not `sunken`, so it stays visible on a row's hover fill.
+      className={`block h-1 overflow-hidden rounded-full bg-line ${className}`}
     >
       <span
         className="block h-full rounded-full bg-accent"
@@ -47,13 +48,23 @@ const LINE_MID = `${LINE} bg-[length:100%_1px] bg-top`;
 const LINE_START = `${LINE} bg-[length:calc(100%-8px)_1px] bg-[position:right_top]`;
 const LINE_END = `${LINE} bg-[length:calc(100%-8px)_1px] bg-[position:left_top]`;
 
-/** Column padding, shared by the header and the rows. */
+/**
+ * Column padding and widths, shared by the header and the rows. From 1440 the
+ * sketch's widths; narrower below, so the rule text keeps about 280px beside
+ * the hero at 1280; below `sm` only %, and cost remain beside the rule.
+ */
 const PAD = {
   rule: 'pl-2',
-  kept: 'pl-4',
-  track: 'pl-4',
-  pct: 'pl-4 max-sm:pl-2',
-  cost: 'pr-2 pl-4 max-sm:pl-2',
+  kept: 'pl-3 min-[1440px]:pl-4',
+  track: 'pl-3 min-[1440px]:pl-4',
+  pct: 'pl-3 max-sm:pl-2 min-[1440px]:pl-4',
+  cost: 'pr-2 pl-3 max-sm:pl-2 min-[1440px]:pl-4',
+};
+const WIDTH = {
+  kept: 'w-[88px] min-[1440px]:w-24',
+  track: 'w-[100px] min-[1440px]:w-[22%]',
+  pct: 'w-[52px] max-sm:w-12 min-[1440px]:w-16',
+  cost: 'w-[124px] max-sm:w-[104px] min-[1440px]:w-[136px]',
 };
 
 function RuleRow({
@@ -69,7 +80,7 @@ function RuleRow({
 }): React.JSX.Element {
   const button = useRef<HTMLButtonElement>(null);
   const total = rule.kept + rule.broken;
-  const pct = formatPct(rule.adherence, 0);
+  const pct = formatAdherence(rule.adherence);
   const broken = rule.broken > 0;
   const text = (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -151,6 +162,7 @@ export function PlanCard({
   currency,
   caption,
   tableRef,
+  regionRef,
   onOpenRule,
 }: {
   plan: DashboardModel['plan'];
@@ -160,6 +172,8 @@ export function PlanCard({
   caption: string;
   /** The Rules table, which takes focus when a drill-down's opener is gone. */
   tableRef: RefObject<HTMLTableElement | null>;
+  /** The card itself, which takes focus when the state before it (an empty state's button) is gone. */
+  regionRef: RefObject<HTMLElement | null>;
   onOpenRule(ruleId: string, button: HTMLButtonElement): void;
 }): React.JSX.Element {
   const headingId = useId();
@@ -176,8 +190,10 @@ export function PlanCard({
   if (plan.checks === 0 || plan.adherence === null) {
     return (
       <section
+        ref={regionRef}
+        tabIndex={-1}
         aria-labelledby={headingId}
-        className="rounded-card border border-line bg-surface-1 px-5 py-4"
+        className="rounded-card border border-line bg-surface-1 px-5 py-4 outline-none"
       >
         {heading}
         <div className="flex items-start gap-3 pt-4 pb-2">
@@ -207,16 +223,17 @@ export function PlanCard({
 
   return (
     <section
+      ref={regionRef}
+      tabIndex={-1}
       aria-labelledby={headingId}
-      className="flex flex-col gap-4 rounded-card border border-line bg-surface-1 px-5 py-4 xl:flex-row xl:gap-7"
+      className="flex flex-col gap-4 rounded-card border border-line bg-surface-1 px-5 py-4 outline-none xl:flex-row xl:gap-7"
     >
       <div className="flex flex-col border-line max-xl:border-b max-xl:pb-4 sm:max-xl:flex-row sm:max-xl:items-end sm:max-xl:justify-between sm:max-xl:gap-6 xl:w-[290px] xl:flex-none xl:justify-center xl:border-r xl:pr-7">
         <div>
           {heading}
           <NumberTicker
             value={plan.adherence}
-            kind="pct"
-            digits={0}
+            kind="adherence"
             className="mt-2.5 text-[40px] leading-[1.1] font-medium tracking-[-0.02em] text-text"
           />
           <div className="mt-1 text-[13px] text-faint">
@@ -249,25 +266,25 @@ export function PlanCard({
               </th>
               <th
                 scope="col"
-                className={`${TH} ${PAD.kept} w-24 text-right max-sm:hidden`}
+                className={`${TH} ${PAD.kept} ${WIDTH.kept} text-right max-sm:hidden`}
               >
                 <MetricTip id="rule-kept" basis={basis} />
               </th>
               <th
                 scope="col"
-                className={`${TH} ${PAD.track} w-[22%] max-sm:hidden`}
+                className={`${TH} ${PAD.track} ${WIDTH.track} max-sm:hidden`}
               >
                 <MetricTip id="rule-adherence" basis={basis} />
               </th>
               <th
                 scope="col"
-                className={`${TH} ${PAD.pct} w-16 text-right max-sm:w-12`}
+                className={`${TH} ${PAD.pct} ${WIDTH.pct} text-right`}
               >
                 %
               </th>
               <th
                 scope="col"
-                className={`${TH} ${PAD.cost} w-[136px] text-right max-sm:w-[104px]`}
+                className={`${TH} ${PAD.cost} ${WIDTH.cost} text-right`}
               >
                 <MetricTip id="rule-cost-broken" basis={basis} />
               </th>

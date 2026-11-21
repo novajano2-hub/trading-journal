@@ -6,6 +6,7 @@ import { Sparkline } from './sparkline';
 test('formatTicker takes digits for pct and a currency for money', () => {
   expect(formatTicker('pct', 0.91, { digits: 0 })).toBe('91%');
   expect(formatTicker('pct', 0.912)).toBe('91.2%');
+  expect(formatTicker('adherence', 199 / 200)).toBe('99.5%');
   expect(formatTicker('money', 1250, { currency: 'EUR' })).toBe('+€12.50');
   expect(formatTicker('money', 1250)).toBe('+$12.50');
 });

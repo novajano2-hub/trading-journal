@@ -28,6 +28,20 @@ export function formatPct(ratio: number, digits = 0): string {
   }).format(ratio);
 }
 
+/**
+ * Rule adherence, a 0..1 ratio, as a whole percentage that never claims an
+ * edge it hasn't reached: 199 of 200 reads 99.5%, not 100%, and 1 of 300
+ * reads 0.3%, not 0%. Near either edge it shows one decimal, kept between
+ * 0.1% and 99.9%.
+ */
+export function formatAdherence(ratio: number): string {
+  const whole = formatPct(ratio, 0);
+  const atEdge = whole === formatPct(0, 0) || whole === formatPct(1, 0);
+  if (ratio <= 0 || ratio >= 1 || !atEdge) return whole;
+  const tenths = Math.min(999, Math.max(1, Math.round(ratio * 1000)));
+  return formatPct(tenths / 1000, 1);
+}
+
 /** A plain ratio such as profit factor, to two decimals. */
 export function formatRatio(value: number, digits = 2): string {
   return value.toFixed(digits);

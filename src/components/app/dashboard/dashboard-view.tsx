@@ -96,10 +96,10 @@ export function DashboardView(): React.JSX.Element {
   const [currency, setCurrency] = useState<string>();
   const [drill, setDrill] = useState<Drill | null>(null);
   const anchors = useDrillAnchors();
-  const root = useRef<HTMLDivElement>(null);
+  const planRegion = useRef<HTMLElement>(null);
   const rulesTable = useRef<HTMLTableElement>(null);
   const mistakesList = useRef<HTMLUListElement>(null);
-  // After "Clear filters" or "Open the sample workspace" the button is gone: focus the dashboard that replaces it.
+  // After "Clear filters" or "Open the sample workspace" the button is gone: focus the plan that replaces it.
   const focusOnReady = useRef(false);
 
   const timeZone = prefs?.timeZone;
@@ -154,7 +154,7 @@ export function DashboardView(): React.JSX.Element {
   useEffect(() => {
     if (model && focusOnReady.current) {
       focusOnReady.current = false;
-      root.current?.focus();
+      planRegion.current?.focus();
     }
   }, [model]);
 
@@ -225,10 +225,8 @@ export function DashboardView(): React.JSX.Element {
 
   return (
     <div
-      ref={root}
-      tabIndex={-1}
       data-testid="dashboard-ready"
-      className="flex min-w-0 flex-col gap-4 p-5 outline-none"
+      className="flex min-w-0 flex-col gap-4 p-5"
     >
       {view.withClosed.length > 1 ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -254,6 +252,7 @@ export function DashboardView(): React.JSX.Element {
         currency={m.currency}
         caption={caption}
         tableRef={rulesTable}
+        regionRef={planRegion}
         onOpenRule={(ruleId, button) => open({ kind: 'rule', ruleId }, button)}
       />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

@@ -13,7 +13,7 @@ import type { Cents, Strategy, Tag, Trade } from '@/domain/types';
 import { formatPnl } from '@/lib/format';
 import { shortTime } from '@/lib/time-format';
 import type { DrillTarget } from './dashboard-view';
-import { tradeCount } from './mistakes-card';
+import { tradeNoun } from './mistakes-card';
 import { signTone } from './plan-card';
 
 function Money({ cents, currency }: { cents: Cents; currency: string }) {
@@ -25,10 +25,9 @@ function Money({ cents, currency }: { cents: Cents; currency: string }) {
 }
 
 function Count({ n }: { n: number }) {
-  const [count, noun] = tradeCount(n).split(' ');
   return (
     <>
-      <span className="font-mono tabular-nums">{count}</span> {noun}
+      <span className="font-mono tabular-nums">{n}</span> {tradeNoun(n)}
     </>
   );
 }
@@ -189,9 +188,15 @@ function TradesTable({
                     {time}
                   </td>
                   <td
-                    className={`${TD} ${symbolPad} py-1.5 font-mono text-[12.5px] text-text max-sm:break-all`}
+                    className={`${TD} ${symbolPad} py-1.5 font-mono text-[12.5px] text-text`}
                   >
-                    {t.instrument.symbol}
+                    {/* A long option symbol truncates on phones; the title and the Kept box's label carry it whole. */}
+                    <span
+                      title={t.instrument.symbol}
+                      className="block whitespace-nowrap max-sm:max-w-[7rem] max-sm:truncate"
+                    >
+                      {t.instrument.symbol}
+                    </span>
                     <span className="block whitespace-nowrap text-faint tabular-nums sm:hidden">
                       {time}
                     </span>

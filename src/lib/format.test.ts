@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+  formatAdherence,
   formatMoney,
   formatPct,
   formatPnl,
@@ -22,6 +23,17 @@ describe('format', () => {
     expect(formatPct(0.412)).toBe('41%');
     expect(formatPct(0.5421)).toBe('54%');
     expect(formatPct(1)).toBe('100%');
+  });
+  test('formatAdherence never reads 100% or 0% short of it', () => {
+    expect(formatAdherence(1)).toBe('100%');
+    expect(formatAdherence(0)).toBe('0%');
+    expect(formatAdherence(0.874)).toBe('87%');
+    expect(formatAdherence(199 / 200)).toBe('99.5%');
+    expect(formatAdherence(0.9996)).toBe('99.9%');
+    expect(formatAdherence(1 / 300)).toBe('0.3%');
+    expect(formatAdherence(0.0004)).toBe('0.1%');
+    expect(formatAdherence(0.994)).toBe('99%');
+    expect(formatAdherence(0.006)).toBe('1%');
   });
   test('formatRatio keeps two decimals', () => {
     expect(formatRatio(3.1722)).toBe('3.17');

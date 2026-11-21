@@ -5,11 +5,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { animate, useInView, useReducedMotion } from 'motion/react';
 import { EASING_POINTS } from '@/lib/motion';
-import { formatPct, formatPnl, formatRatio } from '@/lib/format';
+import {
+  formatAdherence,
+  formatPct,
+  formatPnl,
+  formatRatio,
+} from '@/lib/format';
 
-export type TickerKind = 'money' | 'pct' | 'ratio';
+export type TickerKind = 'money' | 'pct' | 'adherence' | 'ratio';
 
-/** The single formatter for each kind: cents for money, 0..1 for pct, a plain ratio for ratio. */
+/** The single formatter for each kind: cents for money, 0..1 for pct and adherence, a plain ratio for ratio. */
 export function formatTicker(
   kind: TickerKind,
   value: number,
@@ -18,6 +23,7 @@ export function formatTicker(
   if (kind === 'money')
     return formatPnl(Math.round(value), opts.currency ?? 'USD');
   if (kind === 'pct') return formatPct(value, opts.digits ?? 1);
+  if (kind === 'adherence') return formatAdherence(value);
   return formatRatio(value);
 }
 
