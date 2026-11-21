@@ -11,7 +11,10 @@ const TAG_ORDER: readonly TagCategory[] = [
   'custom',
 ];
 
-/** A trade list in the product's row layout: time, symbol, side, tags, signed net. */
+/**
+ * A trade list in the app's recent-trades layout: time, symbol, a neutral
+ * side chip (the word carries it), tags with mistakes in marigold, signed net.
+ */
 export function TradeRows({
   trades,
   tags,
@@ -34,29 +37,31 @@ export function TradeRows({
       )
       .slice(0, maxTags);
   return (
-    <ul className="border-t border-line font-mono text-[12.5px]">
+    <ul className="mx-4 text-[13px] tnum">
       {trades.map((t) => (
         <li
           key={t.id}
-          className="grid grid-cols-[96px_48px_1fr_auto] items-center gap-2 border-t border-line px-3.5 py-2.5 whitespace-nowrap first:border-t-0 sm:grid-cols-[96px_70px_64px_1fr_92px]"
+          className="grid grid-cols-[92px_52px_1fr_auto] items-center gap-2 border-t border-line py-2.5 whitespace-nowrap first:border-t-0 sm:grid-cols-[96px_64px_60px_1fr_92px]"
         >
-          <span className="text-faint">{shortTime(t.openedAt)}</span>
-          <span>{t.instrument.symbol}</span>
+          <span className="text-muted">{shortTime(t.openedAt)}</span>
+          <span className="font-semibold tracking-[0.01em]">
+            {t.instrument.symbol}
+          </span>
           <span>
             <SideChip side={t.direction} />
           </span>
-          <span className="flex flex-wrap gap-1 font-sans max-sm:hidden">
+          <span className="flex flex-wrap gap-1 max-sm:hidden">
             {shown(t).map((tag) => (
               <Chip
                 key={tag.id}
-                tone={tag.category === 'mistake' ? 'loss' : 'neutral'}
+                tone={tag.category === 'mistake' ? 'warn' : 'neutral'}
               >
                 {tag.name}
               </Chip>
             ))}
           </span>
           <span
-            className={`text-right ${t.net > 0 ? 'text-gain' : t.net < 0 ? 'text-loss' : ''}`}
+            className={`text-right font-medium ${t.net > 0 ? 'text-gain' : t.net < 0 ? 'text-loss' : ''}`}
           >
             {formatPnl(t.net, t.pnlCurrency)}
           </span>

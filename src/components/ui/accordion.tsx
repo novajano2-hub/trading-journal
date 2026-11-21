@@ -41,7 +41,7 @@ export function Accordion({
   const Heading = `h${headingLevel}` as const;
 
   return (
-    <div className="border-b border-line">
+    <div className="rounded-card border border-line bg-surface-1 px-5 shadow-[var(--shadow-card)] sm:px-6">
       {items.map((item) => {
         const isOpen = open === item.value;
         const buttonId = `${base}-${item.value}-button`;
@@ -49,7 +49,10 @@ export function Accordion({
         const t = isOpen ? enter : exit;
         const shown = isOpen || !hydrated;
         return (
-          <div key={item.value} className="border-t border-line">
+          <div
+            key={item.value}
+            className="border-t border-line first:border-t-0"
+          >
             <Heading className="m-0 text-[17px] font-medium">
               <button
                 id={buttonId}
@@ -57,13 +60,13 @@ export function Accordion({
                 aria-expanded={isOpen}
                 aria-controls={panelId}
                 onClick={() => setOpen(isOpen ? undefined : item.value)}
-                className="group flex min-h-14 w-full items-center justify-between gap-4 py-4 text-left text-[17px] font-medium hover:text-accent-ink"
+                className="group flex min-h-14 w-full items-center justify-between gap-4 py-4 text-left text-[17px] font-medium transition-colors duration-200 hover:text-accent-ink"
               >
                 <span className="min-w-0">{item.title}</span>
                 <Plus
                   size={18}
                   aria-hidden="true"
-                  className={`shrink-0 text-faint transition-transform motion-reduce:transition-none ${isOpen ? 'rotate-45' : ''}`}
+                  className={`shrink-0 transition-[rotate,color] motion-reduce:transition-none ${isOpen ? 'rotate-45 text-accent-ink' : 'text-faint'}`}
                   style={{
                     transitionDuration: `${t.duration * 1000}ms`,
                     transitionTimingFunction: curve(t.ease),

@@ -14,7 +14,7 @@ export function SectionHeading({
     <>
       <h2
         id={id}
-        className="max-w-[20ch] text-[clamp(2rem,1.6rem+1.6vw,2.625rem)] leading-[1.08] font-semibold tracking-[-0.035em] text-balance"
+        className="max-w-[20ch] text-[clamp(2rem,1.6rem+1.6vw,2.625rem)] leading-[1.08] font-semibold tracking-[-0.028em] text-balance"
       >
         {title}
       </h2>

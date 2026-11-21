@@ -3,7 +3,7 @@
 // Technique adapted from HorizonX Beacon Tabs, commercial licence: the active
 // fill slides and scales to the chosen tab (cubic-bezier(0.23,1,0.32,1), 320ms).
 // Rebuilt here for auto-width text tabs, with one shared indicator instead of
-// per-tab fills.
+// per-tab fills. Dressed as the app's recessed segmented control.
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { glide } from '@/lib/motion';
@@ -101,7 +101,7 @@ export function Tabs<T extends string>({
         role="tablist"
         aria-label={label}
         onKeyDown={onKeyDown}
-        className="relative flex w-max rounded-[7px] bg-sunken p-0.5"
+        className="relative flex w-max rounded-[11px] bg-accent/8 p-[3px] shadow-[inset_0_1px_2px_rgb(18_22_51/0.07)] [[data-theme=dark]_&]:shadow-[inset_0_1px_2px_rgb(0_0_0/0.35)]"
       >
         {slot ? (
           <motion.span
@@ -109,8 +109,8 @@ export function Tabs<T extends string>({
             data-testid="tab-fill"
             layout={!reduced}
             transition={{ layout: reduced ? { duration: 0 } : glide }}
-            className="absolute inset-y-0.5 bg-surface-1 shadow-[var(--shadow-chip)]"
-            style={{ left: slot.left, width: slot.width, borderRadius: 5 }}
+            className="absolute inset-y-[3px] bg-surface-1 shadow-[var(--shadow-chip)] [[data-theme=dark]_&]:bg-line-2"
+            style={{ left: slot.left, width: slot.width, borderRadius: 8 }}
           />
         ) : null}
         {options.map((o, i) => {
@@ -125,9 +125,9 @@ export function Tabs<T extends string>({
               aria-controls={panelId(id)}
               tabIndex={active ? 0 : -1}
               onClick={() => select(i, false)}
-              className={`relative rounded-[5px] px-2 py-1 text-[13px] font-medium whitespace-nowrap transition-colors duration-300 ease-[var(--ease-glide)] sm:px-2.5 ${
+              className={`relative inline-flex h-7 items-center rounded-[8px] px-2.5 text-[13.5px] font-medium whitespace-nowrap transition-colors duration-300 ease-[var(--ease-glide)] sm:px-[13px] ${
                 active
-                  ? `text-text ${slot ? '' : 'bg-surface-1 shadow-[var(--shadow-chip)]'}`
+                  ? `text-text ${slot ? '' : 'bg-surface-1 shadow-[var(--shadow-chip)] [[data-theme=dark]_&]:bg-line-2'}`
                   : 'text-muted hover:text-text'
               }`}
             >

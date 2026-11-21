@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { BrandMark } from './brand-mark';
+import { CTA_PRIMARY, CTA_SM } from './cta';
 import { MobileMenu } from './mobile-menu';
 import { LOGIN_HREF, PRIMARY_LINKS, START_HREF } from './nav-links';
 import { ProductMenu } from './product-menu';
@@ -9,7 +10,7 @@ const LINK =
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-50 border-b border-line bg-bg [--header-h:65px]">
+    <header className="sticky top-0 z-50 border-b border-line-2/70 bg-bg [--header-h:65px]">
       <div className="mx-auto flex h-16 max-w-[1280px] items-center gap-9 px-5 sm:px-10">
         <BrandMark />
         <nav
@@ -27,10 +28,7 @@ export function SiteHeader() {
           <Link href={LOGIN_HREF} className={LINK}>
             Log in
           </Link>
-          <Link
-            href={START_HREF}
-            className="inline-flex h-[38px] items-center rounded-control bg-accent px-4 text-sm font-medium whitespace-nowrap text-accent-fg no-underline transition-colors hover:bg-accent-hover"
-          >
+          <Link href={START_HREF} className={`${CTA_PRIMARY} ${CTA_SM}`}>
             Get started
           </Link>
         </div>

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ColumnMapping } from '@/components/product/column-mapping';
 import { READ_P, ReadPage, ReadSection } from '@/components/site/read-page';
-import { Chip } from '@/components/ui/chip';
+import { Pill } from '@/components/site/pill';
 import { sampleFillsCsv } from '@/content/landing-sample-csv';
 import { previewFromText } from '@/domain/import/preview';
 import {
@@ -37,9 +37,7 @@ function Pills({ items, label }: { items: readonly string[]; label: string }) {
     <ul aria-label={label} className="m-0 flex list-none flex-wrap gap-1.5 p-0">
       {items.map((i) => (
         <li key={i}>
-          <Chip mono className="h-7 px-2.5 text-[13px]">
-            {i}
-          </Chip>
+          <Pill size="md">{i}</Pill>
         </li>
       ))}
     </ul>
@@ -75,7 +73,7 @@ export default function BrokersPage() {
 
       <ReadSection id="export" title="How to export">
         <ol
-          className={`${READ_P} m-0 list-decimal pl-6 marker:font-mono marker:text-faint`}
+          className={`${READ_P} m-0 list-decimal pl-6 marker:font-medium marker:text-faint`}
         >
           <li className="pl-1">
             In your broker&apos;s platform or web account, open the history of
@@ -116,7 +114,7 @@ export default function BrokersPage() {
           {REQUIRED.map(([name, note]) => (
             <div
               key={name}
-              className="grid gap-x-8 border-t border-line py-3 sm:grid-cols-[9rem_minmax(0,1fr)]"
+              className="grid gap-x-8 border-t border-line-2 py-3 sm:grid-cols-[9rem_minmax(0,1fr)]"
             >
               <dt className="text-[15px] font-semibold">{name}</dt>
               <dd className="m-0 text-[15.5px] leading-[1.6] text-muted">

@@ -24,14 +24,20 @@ export function KpiStrip({
     <div className="@container">
       <dl
         data-testid="kpi-strip"
-        className="grid grid-cols-2 gap-x-2 gap-y-3.5 px-3.5 pt-4 pb-1.5 @md:grid-cols-4"
+        className="grid grid-cols-2 gap-y-3.5 px-4 pt-3.5 pb-1 @md:grid-cols-4"
       >
-        {items.map(([label, value, kind]) => (
-          <div key={label} className="min-w-0">
-            <dt className="text-xs text-muted">{label}</dt>
-            <dd className="mt-1 text-[22px] font-medium tracking-[-0.02em] @md:text-[clamp(15px,3.6cqi,22px)]">
+        {items.map(([label, value, kind], i) => (
+          <div
+            key={label}
+            // The app's KPI row: hairlines between figures once they share a line.
+            className={`min-w-0 ${i % 2 ? 'border-l border-line pl-3.5' : ''} ${i === 2 ? '@md:border-l @md:border-line @md:pl-3.5' : ''}`}
+          >
+            <dt className="text-xs text-faint">{label}</dt>
+            <dd className="mt-1 text-[22px] font-semibold tracking-[-0.03em] @md:text-[clamp(15px,3.6cqi,22px)]">
               {value === null ? (
-                <span className="font-mono text-faint">None yet</span>
+                <span className="font-mono text-[15px] font-normal tracking-normal text-faint">
+                  None yet
+                </span>
               ) : (
                 <NumberTicker value={value} kind={kind} delay={tickerDelay} />
               )}

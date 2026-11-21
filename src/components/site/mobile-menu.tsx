@@ -5,6 +5,7 @@ import { List, X } from '@phosphor-icons/react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { enter, exit } from '@/lib/motion';
+import { CTA_PRIMARY, CTA_SECONDARY } from './cta';
 import { LOGIN_HREF, PRIMARY_LINKS, START_HREF } from './nav-links';
 import { ProductMenu } from './product-menu';
 
@@ -57,7 +58,7 @@ export function MobileMenu() {
         aria-expanded={open}
         aria-controls="mobile-sheet"
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-control border border-line-2 bg-surface-1 px-3.5 text-[14.5px] font-medium text-text hover:border-faint"
+        className={`${CTA_SECONDARY} h-11 cursor-pointer gap-2 px-3.5 text-[14.5px]`}
       >
         {open ? (
           <X aria-hidden="true" size={18} />
@@ -99,14 +100,14 @@ export function MobileMenu() {
                 <Link
                   href={LOGIN_HREF}
                   onClick={close}
-                  className="flex h-12 items-center justify-center rounded-control border border-line-2 bg-surface-1 text-[15px] font-medium text-text no-underline"
+                  className={`${CTA_SECONDARY} h-12 text-[15px]`}
                 >
                   Log in
                 </Link>
                 <Link
                   href={START_HREF}
                   onClick={close}
-                  className="flex h-12 items-center justify-center rounded-control bg-accent text-[15px] font-medium text-accent-fg no-underline hover:bg-accent-hover"
+                  className={`${CTA_PRIMARY} h-12 text-[15px]`}
                 >
                   Get started
                 </Link>

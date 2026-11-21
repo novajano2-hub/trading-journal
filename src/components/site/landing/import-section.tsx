@@ -25,9 +25,9 @@ export function ImportSection() {
             {ASSET_EXAMPLES.map((a) => (
               <li
                 key={a.assetClass}
-                className="inline-flex h-[34px] items-center gap-2 rounded-control border border-line bg-surface-1 px-3 text-[13.5px]"
+                className="inline-flex h-[34px] items-center gap-2 rounded-control border border-line bg-surface-1 px-3 text-[13.5px] shadow-[0_1px_1px_rgb(18_22_51/0.04)]"
               >
-                <b className="font-mono font-medium">{a.display}</b>
+                <b className="font-semibold tnum">{a.display}</b>
                 <span className="text-faint">{a.label}</span>
               </li>
             ))}

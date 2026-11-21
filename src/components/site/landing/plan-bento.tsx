@@ -1,7 +1,16 @@
 import type { ReactNode } from 'react';
+import type { Icon } from '@phosphor-icons/react';
+import {
+  ListChecks,
+  Notebook,
+  ShieldCheck,
+} from '@phosphor-icons/react/dist/ssr';
+import { CostBand, PLAN_SURFACE } from '@/components/product/plan-surface';
 import { RuleList } from '@/components/product/rule-list';
+import { Pill } from '@/components/site/pill';
 import { Chip } from '@/components/ui/chip';
-import { formatMoney, formatPct } from '@/lib/format';
+import { IconTile, type TileTone } from '@/components/ui/icon-tile';
+import { formatMoney, formatPct, formatPnl } from '@/lib/format';
 import type { SampleView } from '@/lib/landing/sample-view';
 import { dayLabel, setupName } from '@/lib/landing/sample-labels';
 import { shortTime } from '@/lib/time-format';
@@ -13,15 +22,47 @@ const RULES_SERIAL = 6;
 /** The two trades the review note covers. */
 const NOTE_SERIALS = [6, 7];
 
-const CELL = 'rounded-card border p-7';
-const INNER = 'mt-[22px] rounded-control border border-line bg-surface-1 px-4';
+/** Cells pad 20px on phones, 28px from `sm`; the plan's cost band bleeds through it. */
+const PAD = 'p-5 sm:p-7';
+const BLEED = '-mx-5 px-5 sm:-mx-7 sm:px-7';
+/** A white cell: the app's card. */
+const CARD_CELL = `${PAD} rounded-card border border-line bg-surface-1 shadow-[var(--shadow-card)]`;
+/** The lead cell is the app's "Your plan" card; its cost band is its foot. */
+const PLAN_CELL = `${PLAN_SURFACE} ${PAD} pb-0 sm:pb-0`;
+const INNER = 'mt-[22px] border-t border-line';
 const STAT = 'flex items-baseline justify-between gap-4 py-3 text-sm';
 
-function CellHead({ title, children }: { title: string; children: ReactNode }) {
+function CellHead({
+  icon,
+  tone,
+  title,
+  meta,
+  onAccent = false,
+  children,
+}: {
+  icon: Icon;
+  tone: TileTone;
+  title: string;
+  meta?: string;
+  onAccent?: boolean;
+  children: ReactNode;
+}) {
   return (
     <div>
-      <h3 className="text-xl font-semibold tracking-[-0.02em]">{title}</h3>
-      <p className="mt-2 max-w-[44ch] text-[14.5px] leading-[1.55] text-muted">
+      <div className="flex items-center gap-2.5">
+        <IconTile icon={icon} tone={tone} />
+        <h3 className="text-xl font-semibold tracking-[-0.02em]">{title}</h3>
+        {meta ? (
+          <span
+            className={`ml-auto shrink-0 pl-2 text-xs ${onAccent ? 'text-on-accent-muted' : 'text-faint'}`}
+          >
+            {meta}
+          </span>
+        ) : null}
+      </div>
+      <p
+        className={`mt-2.5 max-w-[44ch] text-[14.5px] leading-[1.55] ${onAccent ? 'text-on-accent-muted' : 'text-muted'}`}
+      >
         {children}
       </p>
     </div>
@@ -55,48 +96,53 @@ export function PlanBento({ view }: { view: SampleView }) {
     >
       <SectionHeading id="plan-title" title="Hold yourself to your own plan." />
       <div className="mt-12 grid gap-4 lg:grid-cols-12">
-        <div
-          data-testid="bento-cell"
-          className={`${CELL} border-transparent bg-accent-soft lg:col-span-7`}
-        >
-          <CellHead title="Rules, graded on every trade">
+        <div data-testid="bento-cell" className={`${PLAN_CELL} lg:col-span-7`}>
+          <CellHead
+            icon={ListChecks}
+            tone="on-accent"
+            title="Rules, graded on every trade"
+            meta="Sample data"
+            onAccent
+          >
             Write a strategy once. Each trade is checked against it, and the
             misses add up where you can see them.
           </CellHead>
-          <div className="mt-[22px]">
+          <div className="mt-[18px]">
             <TickIn>
               <RuleList
                 rules={rules}
                 label={`Rules for trade ${ruled.serial}`}
+                onAccent
               />
             </TickIn>
           </div>
+          {/* What the broken rule cost on this trade, as the app adds it up. */}
+          <CostBand label="Broken rules cost" bleed={BLEED}>
+            {formatPnl(ruled.net, ruled.pnlCurrency)}
+          </CostBand>
         </div>
 
-        <div
-          data-testid="bento-cell"
-          className={`${CELL} border-line bg-surface-1 lg:col-span-5`}
-        >
-          <div className="flex items-start justify-between gap-4">
-            <CellHead title="Prop rules after every trade">
-              Static, end-of-day or trailing drawdown, daily loss and
-              consistency, as your firm wrote them.
-            </CellHead>
-            <span className="shrink-0 pt-1.5 text-xs text-faint">
-              Sample data
-            </span>
-          </div>
+        <div data-testid="bento-cell" className={`${CARD_CELL} lg:col-span-5`}>
+          <CellHead
+            icon={ShieldCheck}
+            tone="info"
+            title="Prop rules after every trade"
+            meta="Sample data"
+          >
+            Static, end-of-day or trailing drawdown, daily loss and consistency,
+            as your firm wrote them.
+          </CellHead>
           <dl className={`${INNER} divide-y divide-line`}>
             <div className={STAT}>
               <dt className="text-muted">Profit target</dt>
-              <dd className="font-mono font-medium">
+              <dd className="font-semibold tnum">
                 {formatPct(profit.progress)} of {formatMoney(profit.target)}
               </dd>
             </div>
             <div className={STAT}>
               <dt className="text-muted">Trailing drawdown</dt>
               <dd
-                className={`font-mono font-medium ${drawdown.state === 'clear' ? 'text-gain' : 'text-loss'}`}
+                className={`font-semibold tnum ${drawdown.state === 'clear' ? 'text-gain' : 'text-loss'}`}
               >
                 {formatMoney(drawdown.remaining)} left
               </dd>
@@ -105,7 +151,7 @@ export function PlanBento({ view }: { view: SampleView }) {
               <div className={STAT}>
                 <dt className="text-muted">Best day share</dt>
                 <dd className="flex items-center gap-2">
-                  <b className="font-mono font-medium">
+                  <b className="font-semibold tnum">
                     {formatPct(consistency.bestDayShare)}
                   </b>
                   {!consistency.met ? (
@@ -121,14 +167,18 @@ export function PlanBento({ view }: { view: SampleView }) {
 
         <div
           data-testid="bento-cell"
-          className={`${CELL} grid items-center gap-8 border-transparent bg-sunken lg:col-span-12 lg:grid-cols-[minmax(0,4fr)_minmax(0,7fr)] lg:gap-10`}
+          className={`${CARD_CELL} grid items-center gap-8 lg:col-span-12 lg:grid-cols-[minmax(0,4fr)_minmax(0,7fr)] lg:gap-10`}
         >
-          <CellHead title="A notebook beside the trades">
+          <CellHead
+            icon={Notebook}
+            tone="neutral"
+            title="A notebook beside the trades"
+          >
             Plan before the open, review after the close. Each entry links to
             the trades it covers.
           </CellHead>
-          <div className="rounded-control border border-line bg-surface-1 p-4">
-            <p className="font-mono text-xs text-faint">
+          <div className="rounded-control bg-sunken p-4 sm:p-5">
+            <p className="text-xs text-faint tnum">
               Daily review, {dayLabel(ruled)}
             </p>
             <p className="mt-2 text-[15px] leading-[1.65]">
@@ -142,14 +192,16 @@ export function PlanBento({ view }: { view: SampleView }) {
             >
               {noted.map((t) => (
                 <li key={t.serial}>
-                  <Chip mono>
+                  <Pill>
                     {t.instrument.symbol} {clock(t.openedAt)}
-                  </Chip>
+                  </Pill>
                 </li>
               ))}
               {mistakes.slice(0, 1).map((m) => (
                 <li key={m.id}>
-                  <Chip tone="loss">{m.name}</Chip>
+                  <Chip tone="warn" className="font-medium">
+                    {m.name}
+                  </Chip>
                 </li>
               ))}
             </ul>
