@@ -1,31 +1,53 @@
 /*
- * Keel light pro-trading tokens. Light is the default regardless of OS;
- * dark is an explicit [data-theme='dark'] on <html>.
+ * Keel tokens, "Daylight premium" (.impeccable/mocks/rebrand-app/c-daylight-premium.html).
+ * The marketing site wears the app's world: periwinkle canvas, white cards with
+ * brand-tinted shadows, Keel Ultramarine as the one brand hue. Light is the
+ * default regardless of OS; dark is an explicit [data-theme='dark'] on <html>.
  * Radius rule: chips 6, buttons/inputs/inner panels 10, cards 16.
  */
 :root {
   color-scheme: light;
-  --bg: #f6f7f9;
+  --bg: #eceef8;
   --surface-1: #ffffff;
-  --sunken: #eff1f4;
-  --line: #e3e6eb;
-  --line-2: #d3d8df;
-  --text: #0f1218;
-  --muted: #4f5865;
-  --faint: #687080;
-  --accent: #2550e0;
-  --accent-hover: #1e44c4;
-  --accent-soft: #eaf0fe;
-  --accent-ink: #1b3fb8;
+  --sunken: #f0f1f8;
+  --line: #e7e9f3;
+  --line-2: #d5d8ea;
+  --text: #121633;
+  --muted: #4b5175;
+  --faint: #636889;
+  --accent: #2b35af;
+  --accent-hover: #1f278c;
+  --accent-soft: #eeeffc;
+  --accent-ink: #2b35af;
   --accent-fg: #ffffff;
-  --gain: #087a54;
-  --gain-soft: #e6f4ee;
-  --loss: #c8283a;
-  --loss-soft: #fbebed;
+  --accent-deep: #1f278c;
+  --accent-tint: #dcdff8;
+  /* Secondary text and the loss figure on the ultramarine hero surface. */
+  --on-accent-muted: #c9ccf5;
+  --on-accent-loss: #ffb3b8;
+  --gain: #0a7a52;
+  --gain-fill: #19a672;
+  --gain-soft: #ddf3e8;
+  --loss: #c22e3a;
+  --loss-fill: #e5484d;
+  --loss-soft: #fceced;
+  /* Marigold: mistakes. Cyan: goal progress. Never money, never brand. */
+  --warn: #9a5700;
+  --warn-fill: #e9a21a;
+  --warn-soft: #fcf1dc;
+  --info: #0a6f94;
+  --info-fill: #1693be;
+  --info-soft: #e0f1f8;
   --shadow:
-    0 1px 2px rgba(15, 18, 24, 0.05), 0 24px 48px -24px rgba(37, 80, 224, 0.18);
-  --shadow-chip: 0 1px 2px rgba(15, 18, 24, 0.08);
-  --veil: rgba(15, 18, 24, 0.32);
+    0 1px 2px rgba(18, 22, 51, 0.06), 0 24px 48px -20px rgba(34, 42, 150, 0.28);
+  --shadow-card:
+    0 1px 2px rgba(18, 22, 51, 0.05), 0 4px 10px -6px rgba(34, 42, 150, 0.1),
+    0 18px 34px -22px rgba(34, 42, 150, 0.38);
+  --shadow-chip:
+    0 1px 2px rgba(18, 22, 51, 0.06), 0 2px 6px -2px rgba(34, 42, 150, 0.1);
+  --shadow-hero:
+    0 2px 4px rgba(31, 39, 140, 0.18), 0 22px 40px -18px rgba(31, 39, 140, 0.55);
+  --veil: rgba(18, 22, 51, 0.36);
 
   /* One family; `font-mono` keeps its job (tabular numbers) in the same face. */
   --face-sans: var(--font-keel);
@@ -44,28 +66,43 @@
   --dur-exit: 160ms;
 }
 
+/* Deep navy, designed rather than inverted. The hero surface stays ultramarine. */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --bg: #0e1014;
-  --surface-1: #15181e;
-  --sunken: #1b1f26;
-  --line: #262b33;
-  --line-2: #323843;
-  --text: #eceef2;
-  --muted: #a3aab6;
-  --faint: #8e95a1;
-  --accent: #3866e6;
-  --accent-hover: #2f5bd8;
-  --accent-soft: #1a2440;
-  --accent-ink: #9db6ff;
+  --bg: #0c0e1c;
+  --surface-1: #151831;
+  --sunken: #1b1f3b;
+  --line: #262a4a;
+  --line-2: #323760;
+  --text: #eceefb;
+  --muted: #aeb2d2;
+  --faint: #9095bb;
+  --accent: #4c57dc;
+  --accent-hover: #5c66e6;
+  --accent-soft: #22285a;
+  --accent-ink: #aeb4ff;
   --accent-fg: #ffffff;
+  --accent-deep: #1f278c;
+  --accent-tint: #2c336e;
   --gain: #3fc08e;
-  --gain-soft: #14281f;
+  --gain-fill: #2fb27f;
+  --gain-soft: #10291f;
   --loss: #f06a78;
-  --loss-soft: #2e161a;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 24px 48px -24px rgba(0, 0, 0, 0.7);
-  --shadow-chip: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --veil: rgba(0, 0, 0, 0.6);
+  --loss-fill: #e5484d;
+  --loss-soft: #2e1620;
+  --warn: #f0b44a;
+  --warn-fill: #e9a21a;
+  --warn-soft: #2d2210;
+  --info: #4db8e0;
+  --info-fill: #1693be;
+  --info-soft: #0e2533;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 24px 48px -20px rgba(0, 0, 0, 0.75);
+  --shadow-card:
+    0 1px 2px rgba(0, 0, 0, 0.45), 0 18px 34px -22px rgba(0, 0, 0, 0.8);
+  --shadow-chip: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-hero:
+    0 2px 4px rgba(0, 0, 0, 0.4), 0 22px 40px -18px rgba(43, 53, 175, 0.55);
+  --veil: rgba(4, 5, 14, 0.66);
 }
 
 /*
