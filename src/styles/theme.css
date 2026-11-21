@@ -27,9 +27,9 @@
   --shadow-chip: 0 1px 2px rgba(15, 18, 24, 0.08);
   --veil: rgba(15, 18, 24, 0.32);
 
-  /* Type faces; the app scope swaps them (see below). */
-  --face-sans: var(--font-geist-sans);
-  --face-mono: var(--font-geist-mono);
+  /* One family; `font-mono` keeps its job (tabular numbers) in the same face. */
+  --face-sans: var(--font-keel);
+  --face-mono: var(--font-keel);
 
   --r-chip: 6px;
   --r-control: 10px;
@@ -75,9 +75,6 @@
  * tokens above. Keel Ultramarine is the one hue the money palette never uses.
  */
 :root:has([data-surface='app']) {
-  --face-sans: var(--font-app-sans);
-  --face-mono: var(--font-app-sans);
-
   --bg: #eceef8;
   --surface-1: #ffffff;
   --sunken: #f0f1f8;
