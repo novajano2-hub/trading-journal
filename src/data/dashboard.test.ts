@@ -1,4 +1,4 @@
-import { beforeAll, expect, test } from 'vitest';
+import { beforeAll, describe, expect, test } from 'vitest';
 import { SAMPLE_GOALS } from './goals';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import {
@@ -45,7 +45,8 @@ test('the dashboard is the engine, sorted by cost', () => {
   const ctx = defaultMetricContext(NY),
     m = usd(ctx),
     d = buildDashboard(m, env(ctx));
-  expect(d.plan.adherence).toBe(m.summary.ruleAdherence);
+  const kept = d.plan.rules.reduce((n, r) => n + r.kept, 0);
+  expect(d.plan.adherence).toBe(kept / d.plan.checks);
   const broken = d.plan.rules.filter((r) => r.broken > 0);
   expect(broken.map((r) => r.brokenPnl)).toEqual(
     broken.map((r) => r.brokenPnl).sort((a, b) => a - b),
@@ -252,4 +253,71 @@ test('imported trades with no strategy and no rule checks (Review Focus 1)', () 
   for (const n of [p.winRate, p.profitFactor, p.expectancy])
     if (n !== null) expect(Number.isFinite(n)).toBe(true);
   expect(p.equity).toHaveLength(3);
+});
+
+describe('the headline adherence is the rule rows added up', () => {
+  const ctx = defaultMetricContext(NY);
+  const build = (ruleChecks: RuleCheck[][]) => {
+    const strategy = s.strategies[0]!;
+    const trades = ruleChecks.map((checks, i) =>
+      makeTrade({
+        id: `h-${i}`,
+        net: 1000,
+        closedAt: `2026-11-1${i}T15:00:00Z`,
+        strategyId: strategy.id,
+        ruleChecks: checks,
+      }),
+    );
+    const [m] = metricsByCurrency(trades, {
+      accounts: s.accounts,
+      ctx,
+      baseCurrency: 'USD',
+    });
+    return { m: m!, d: buildDashboard(m!, env(ctx)) };
+  };
+  const ruleId = (i: number) => s.strategies[0]!.rules[i]!.id;
+
+  test('a check on an unknown rule id counts in no row, so not in the headline', () => {
+    const { m, d } = build([
+      [
+        { ruleId: ruleId(0), followed: true },
+        { ruleId: 'deleted-rule', followed: false },
+      ],
+      [
+        { ruleId: ruleId(1), followed: true },
+        { ruleId: 'deleted-rule', followed: false },
+      ],
+    ]);
+    expect(m.summary.ruleAdherence).toBe(2 / 4); // the engine counts every check
+    expect(d.plan.checks).toBe(2);
+    expect(d.plan.adherence).toBe(1);
+  });
+
+  test("a trade's repeat check on a rule counts once, as in its row", () => {
+    const { m, d } = build([
+      [
+        { ruleId: ruleId(0), followed: true },
+        { ruleId: ruleId(0), followed: false },
+        { ruleId: ruleId(0), followed: false },
+      ],
+      [{ ruleId: ruleId(1), followed: true }],
+    ]);
+    expect(m.summary.ruleAdherence).toBe(2 / 4);
+    const row = d.plan.rules.find((r) => r.ruleId === ruleId(0))!;
+    expect([row.kept, row.broken]).toEqual([1, 0]);
+    expect(d.plan.checks).toBe(2);
+    expect(d.plan.adherence).toBe(1);
+  });
+
+  test('no decisive check on a known rule reads as no adherence', () => {
+    const { m, d } = build([
+      [
+        { ruleId: 'deleted-rule', followed: true },
+        { ruleId: ruleId(0), followed: null },
+      ],
+    ]);
+    expect(m.summary.ruleAdherence).toBe(1);
+    expect(d.plan.checks).toBe(0);
+    expect(d.plan.adherence).toBeNull();
+  });
 });

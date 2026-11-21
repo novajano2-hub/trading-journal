@@ -85,7 +85,9 @@ export interface DashboardModel {
   basis: PnlBasis;
   closedCount: number;
   plan: {
+    /** Kept over decisive checks, summed over `rules`; null with none. */
     adherence: number | null;
+    /** Decisive checks, summed over `rules`. */
     checks: number;
     cost: { pnl: Cents; tradeCount: number };
     rules: RuleScore[];
@@ -126,6 +128,9 @@ export function buildDashboard(
   );
 
   const rules = ruleScorecard(m.trades, env.strategies, env.ctx);
+  // The headline adds up the rows, so it skips what they skip: checks on
+  // unknown rule ids and a trade's repeat checks on one rule.
+  const kept = rules.reduce((n, r) => n + r.kept, 0);
   const checks = rules.reduce((n, r) => n + r.kept + r.broken, 0);
 
   // Goals run on net P&L whatever the Gross/Net switch says, and only in the base currency.
@@ -179,7 +184,7 @@ export function buildDashboard(
     basis: summary.basis,
     closedCount: summary.closedCount,
     plan: {
-      adherence: summary.ruleAdherence,
+      adherence: checks === 0 ? null : kept / checks,
       checks,
       cost: brokenRulesCost(m.trades, env.strategies, env.ctx),
       rules,
