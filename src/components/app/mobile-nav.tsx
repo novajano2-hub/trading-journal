@@ -1,0 +1,102 @@
+'use client';
+
+import { List, X } from '@phosphor-icons/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { usePathname } from 'next/navigation';
+import { Dialog } from 'radix-ui';
+import { useEffect, useState, type ReactNode } from 'react';
+import { BrandMark } from '@/components/site/brand-mark';
+import { enter, exit } from '@/lib/motion';
+import { CurrentSidebarNav, SwitcherSlot } from './sidebar';
+
+const ICON_BUTTON =
+  'inline-flex size-11 flex-none cursor-pointer items-center justify-center rounded-control text-text transition-colors duration-120 hover:bg-sunken';
+
+/**
+ * Below `lg`, the sidebar as a sheet from the left. It traps focus, closes on
+ * Escape, the veil, a link or any route change, and hands focus back to its
+ * trigger.
+ */
+export function MobileNav({
+  switcher,
+}: {
+  switcher?: ReactNode;
+}): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  const reduced = useReducedMotion();
+  const pathname = usePathname();
+  const [openOn, setOpenOn] = useState(pathname);
+  // A route change, however it happened, closes the sheet.
+  if (openOn !== pathname) {
+    setOpenOn(pathname);
+    setOpen(false);
+  }
+
+  // Crossing into the desktop layout hides the trigger: close the sheet with it.
+  useEffect(() => {
+    const lg = matchMedia('(min-width: 1024px)');
+    const onChange = (e: MediaQueryListEvent) => {
+      if (e.matches) setOpen(false);
+    };
+    lg.addEventListener('change', onChange);
+    return () => lg.removeEventListener('change', onChange);
+  }, []);
+
+  const close = () => setOpen(false);
+  const slide = reduced
+    ? { initial: { opacity: 0 }, shown: { opacity: 1 }, gone: { opacity: 0 } }
+    : { initial: { x: '-100%' }, shown: { x: 0 }, gone: { x: '-100%' } };
+
+  return (
+    <Dialog.Root open={open} onOpenChange={setOpen}>
+      <Dialog.Trigger
+        aria-label="Open navigation"
+        className={`${ICON_BUTTON} -ml-2.5 lg:hidden`}
+      >
+        <List size={20} aria-hidden="true" />
+      </Dialog.Trigger>
+      <AnimatePresence>
+        {open ? (
+          <Dialog.Portal forceMount>
+            <Dialog.Overlay asChild forceMount>
+              <motion.div
+                className="fixed inset-0 z-50 bg-veil"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1, transition: enter }}
+                exit={{ opacity: 0, transition: exit }}
+              />
+            </Dialog.Overlay>
+            <Dialog.Content asChild forceMount aria-describedby={undefined}>
+              <motion.div
+                className="fixed inset-y-0 left-0 z-50 flex w-[280px] max-w-[calc(100vw-48px)] flex-col overflow-y-auto border-r border-line bg-surface-1 px-3 pt-2 pb-4 outline-none"
+                initial={slide.initial}
+                animate={{ ...slide.shown, transition: enter }}
+                exit={{ ...slide.gone, transition: exit }}
+              >
+                <Dialog.Title className="sr-only">Navigation</Dialog.Title>
+                {/* Both controls here leave the sheet: the wordmark goes to the Dashboard. */}
+                <div
+                  className="mb-2 flex items-center justify-between"
+                  onClick={close}
+                >
+                  <BrandMark
+                    href="/app/dashboard"
+                    className="h-11 rounded-control px-2"
+                  />
+                  <Dialog.Close
+                    aria-label="Close navigation"
+                    className={`${ICON_BUTTON} -mr-1`}
+                  >
+                    <X size={20} aria-hidden="true" />
+                  </Dialog.Close>
+                </div>
+                <SwitcherSlot switcher={switcher} />
+                <CurrentSidebarNav onNavigate={close} />
+              </motion.div>
+            </Dialog.Content>
+          </Dialog.Portal>
+        ) : null}
+      </AnimatePresence>
+    </Dialog.Root>
+  );
+}

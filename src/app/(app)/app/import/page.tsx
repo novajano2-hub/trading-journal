@@ -8,7 +8,6 @@ import {
   Warning,
 } from '@phosphor-icons/react/dist/ssr';
 import { useEffect, useRef, useState } from 'react';
-import { BrandMark } from '@/components/site/brand-mark';
 import { clearPendingImport, loadPendingImport } from '@/lib/pending-import';
 
 type Waiting =
@@ -70,14 +69,10 @@ export default function ImportPage() {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-[1280px] flex-1 flex-col px-5 pt-6 pb-16 sm:px-10">
-      <BrandMark />
-      <div className="mt-14 max-w-[640px] md:mt-20">
-        <h1 className="text-[clamp(36px,calc(2.6vw+16px),52px)] leading-[1.06] font-semibold tracking-[-0.04em] motion-safe:animate-rise">
-          Import
-        </h1>
-
-        <div className="mt-8 rounded-card border border-line bg-surface-1 p-6 shadow-[var(--shadow)]">
+    // The app shell's top bar carries the page title.
+    <div className="w-full px-5 pt-6 pb-16">
+      <div className="max-w-[640px]">
+        <div className="rounded-card border border-line bg-surface-1 p-6 shadow-[var(--shadow)]">
           <h2 className="border-b border-line pb-3 text-[13px] font-medium text-muted">
             Waiting to be imported
           </h2>
@@ -145,6 +140,6 @@ export default function ImportPage() {
           </p>
         ) : null}
       </div>
-    </main>
+    </div>
   );
 }

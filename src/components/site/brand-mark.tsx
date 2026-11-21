@@ -1,10 +1,16 @@
 import Link from 'next/link';
 
 /** A 26px rounded square in ink with a K, plus the wordmark. */
-export function BrandMark({ className = '' }: { className?: string }) {
+export function BrandMark({
+  href = '/',
+  className = '',
+}: {
+  href?: string;
+  className?: string;
+}) {
   return (
     <Link
-      href="/"
+      href={href}
       className={`inline-flex items-center gap-2.5 text-[18px] font-semibold tracking-[-0.02em] text-text no-underline ${className}`}
     >
       <span

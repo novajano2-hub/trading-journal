@@ -82,6 +82,12 @@ function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
       >
         {login ? 'Log in' : 'Create account'}
       </Button>
+      <Link
+        href="/app/dashboard"
+        className="inline-flex min-h-11 items-center self-start text-[15px] font-medium text-accent-ink"
+      >
+        Open the sample workspace
+      </Link>
     </form>
   );
 }

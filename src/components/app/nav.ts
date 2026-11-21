@@ -1,0 +1,236 @@
+import type { Icon } from '@phosphor-icons/react';
+import {
+  CalendarBlank,
+  ChartBar,
+  ClockCounterClockwise,
+  GearSix,
+  ListBullets,
+  Notebook,
+  PlayCircle,
+  ShieldCheck,
+  Sparkle,
+  SquaresFour,
+  Strategy,
+  UploadSimple,
+  UsersThree,
+} from '@phosphor-icons/react/dist/ssr';
+import { MODULES, type ModuleInfo } from '@/content/modules';
+import { parseFilters, serializeFilters } from '@/data/filters';
+
+export type AppModuleId =
+  | 'dashboard'
+  | 'trades'
+  | 'calendar'
+  | 'reports'
+  | 'strategies'
+  | 'notebook'
+  | 'import'
+  | 'prop-firms'
+  | 'backtesting'
+  | 'replay'
+  | 'mentors'
+  | 'assistant'
+  | 'settings';
+
+export interface NavItem {
+  id: AppModuleId;
+  label: string;
+  href: `/app/${string}`;
+  icon: Icon;
+  group: 'modules' | 'not-live' | 'settings';
+  /** The link carries the global filters, so the module opens on the same slice. */
+  filterScoped: boolean;
+  built: boolean;
+  /** One line on what the module does, shown on its placeholder. */
+  summary: string;
+  /** Not-live only: what it waits for. */
+  reason?: string;
+}
+
+/** The marketing one-liner for a module that isn't live yet. */
+function oneLine(slug: ModuleInfo['slug']): string {
+  const info = MODULES.find((m) => m.slug === slug);
+  if (!info) throw new Error(`No module info for ${slug}`);
+  return info.oneLine;
+}
+
+const NEEDS_MARKET_DATA = "It needs market data, which Keel doesn't have yet.";
+
+export const APP_NAV: readonly NavItem[] = [
+  {
+    id: 'dashboard',
+    label: 'Dashboard',
+    href: '/app/dashboard',
+    icon: SquaresFour,
+    group: 'modules',
+    filterScoped: true,
+    built: true,
+    summary:
+      'How well you kept your plan, what breaking it cost, and your results.',
+  },
+  {
+    id: 'trades',
+    label: 'Trades',
+    href: '/app/trades',
+    icon: ListBullets,
+    group: 'modules',
+    filterScoped: true,
+    built: false,
+    summary:
+      'Every trade in your filters, with its fills, tags, notes and rule checks.',
+  },
+  {
+    id: 'calendar',
+    label: 'Calendar',
+    href: '/app/calendar',
+    icon: CalendarBlank,
+    group: 'modules',
+    filterScoped: true,
+    built: false,
+    summary: "Each day's P&L on a month grid, with the trades behind it.",
+  },
+  {
+    id: 'reports',
+    label: 'Reports',
+    href: '/app/reports',
+    icon: ChartBar,
+    group: 'modules',
+    filterScoped: true,
+    built: false,
+    summary:
+      'Your results by time of day, weekday, symbol, strategy, tag, side, duration and R.',
+  },
+  {
+    id: 'strategies',
+    label: 'Strategies',
+    href: '/app/strategies',
+    icon: Strategy,
+    group: 'modules',
+    filterScoped: false,
+    built: false,
+    summary:
+      'Your strategies with their rules and checklists, and how each one performs.',
+  },
+  {
+    id: 'notebook',
+    label: 'Notebook',
+    href: '/app/notebook',
+    icon: Notebook,
+    group: 'modules',
+    filterScoped: false,
+    built: false,
+    summary:
+      'Daily reviews, pre-market plans and weekly recaps, linked to your trades.',
+  },
+  {
+    id: 'import',
+    label: 'Import',
+    href: '/app/import',
+    icon: UploadSimple,
+    group: 'modules',
+    filterScoped: false,
+    built: true,
+    summary: "Bring in trades from your broker's CSV export.",
+  },
+  {
+    id: 'prop-firms',
+    label: 'Prop firms',
+    href: '/app/prop-firms',
+    icon: ShieldCheck,
+    group: 'modules',
+    filterScoped: false,
+    built: false,
+    summary:
+      'Your prop accounts against their profit target, loss limits, drawdown and trading days.',
+  },
+  {
+    id: 'backtesting',
+    label: 'Backtesting',
+    href: '/app/backtesting',
+    icon: ClockCounterClockwise,
+    group: 'not-live',
+    filterScoped: false,
+    built: false,
+    summary: oneLine('backtesting'),
+    reason: NEEDS_MARKET_DATA,
+  },
+  {
+    id: 'replay',
+    label: 'Replay',
+    href: '/app/replay',
+    icon: PlayCircle,
+    group: 'not-live',
+    filterScoped: false,
+    built: false,
+    summary: oneLine('replay'),
+    reason: NEEDS_MARKET_DATA,
+  },
+  {
+    id: 'mentors',
+    label: 'Mentors',
+    href: '/app/mentors',
+    icon: UsersThree,
+    group: 'not-live',
+    filterScoped: false,
+    built: false,
+    summary: oneLine('mentors'),
+    reason: 'It needs accounts and sharing, which come with the backend.',
+  },
+  {
+    id: 'assistant',
+    label: 'Assistant',
+    href: '/app/assistant',
+    icon: Sparkle,
+    group: 'not-live',
+    filterScoped: false,
+    built: false,
+    summary: oneLine('assistant'),
+    reason: 'It needs an AI provider, which comes with the backend.',
+  },
+  {
+    id: 'settings',
+    label: 'Settings',
+    href: '/app/settings',
+    icon: GearSix,
+    group: 'settings',
+    filterScoped: false,
+    built: false,
+    summary: 'Your timezone, breakeven range, accounts and import history.',
+  },
+];
+
+/** The item with this id. Every `AppModuleId` has one. */
+export function navItem(id: AppModuleId): NavItem {
+  const item = APP_NAV.find((i) => i.id === id);
+  if (!item) throw new Error(`No nav item ${id}`);
+  return item;
+}
+
+/**
+ * Where the item links from a page with these params. Filter-scoped modules
+ * carry the canonical global filters and drop anything else (`by`, paging).
+ */
+export function navHref(
+  item: NavItem,
+  params: Pick<URLSearchParams, 'get' | 'getAll'>,
+): string {
+  if (!item.filterScoped) return item.href;
+  const query = serializeFilters(parseFilters(params)).toString();
+  return query ? `${item.href}?${query}` : item.href;
+}
+
+/** The item whose href is the longest prefix of `pathname`, by whole segments. */
+export function activeItem(pathname: string): NavItem | undefined {
+  let best: NavItem | undefined;
+  for (const item of APP_NAV) {
+    const inside =
+      pathname === item.href || pathname.startsWith(`${item.href}/`);
+    if (inside && (!best || item.href.length > best.href.length)) best = item;
+  }
+  return best;
+}
+
+/** The top bar's title: the active module, else the product name. */
+export function pageTitle(pathname: string): string {
+  return activeItem(pathname)?.label ?? 'Keel';
+}
