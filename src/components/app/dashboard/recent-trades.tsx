@@ -114,7 +114,9 @@ function StrategyCell({ row }: { row: RecentTrade }): React.JSX.Element {
   return (
     <span className="flex min-w-0 items-center gap-2">
       {row.strategyName !== null ? (
-        <span className="min-w-0 truncate">{row.strategyName}</span>
+        <span title={row.strategyName} className="min-w-0 truncate">
+          {row.strategyName}
+        </span>
       ) : (
         <span className="min-w-0 truncate text-faint">No strategy</span>
       )}
@@ -191,7 +193,8 @@ export function RecentTrades({
             </th>
             <th
               scope="col"
-              className={`${TH} ${GAP} w-32 max-sm:hidden lg:w-36 xl:w-[180px]`}
+              // 90rem, not 1440px: Tailwind orders min-[...] against xl (80rem) only in the same unit.
+              className={`${TH} ${GAP} w-32 max-sm:hidden lg:w-36 xl:w-[180px] min-[90rem]:w-[272px]`}
             >
               Strategy
             </th>

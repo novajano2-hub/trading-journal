@@ -446,6 +446,8 @@ test('recent trades: newest first, with the rules column', async () => {
   expect(rows).toHaveLength(2);
   expect(rows[0]!.textContent).toContain('19 Nov 10:00');
   expect(rows[0]!.textContent).toContain('Opening range breakout');
+  // A cut-short strategy name keeps its whole text in the title.
+  expect(within(rows[0]!).getByTitle('Opening range breakout')).toBeTruthy();
   expect(rows[0]!.textContent).toContain(fomo);
   expect(rows[0]!.textContent).toContain('−$400.00');
   expect(rows[0]!.textContent).toContain(`Broke: ${r1}`);

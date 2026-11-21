@@ -139,6 +139,16 @@ function TradesTable({
   const basisLabel = model.basis === 'gross' ? 'Gross P&L' : 'Net P&L';
   // Below sm the time folds under the symbol, so the symbol may lead the row.
   const symbolPad = rule ? '' : 'max-sm:pl-0';
+  // A mistake's own trades all carry it: list only their others, and drop
+  // the column when no row has another.
+  const rowMistakes = rows.map((t) =>
+    t.tagIds.flatMap((id) =>
+      target.kind === 'mistake' && id === target.tagId
+        ? []
+        : (mistakeName.get(id) ?? []),
+    ),
+  );
+  const showMistakes = rule !== null || rowMistakes.some((m) => m.length > 0);
 
   return (
     <>
@@ -179,20 +189,17 @@ function TradesTable({
               <th scope="col" className={`${TH} text-right`}>
                 {basisLabel}
               </th>
-              <th scope="col" className={`${TH} max-sm:hidden`}>
-                {rule ? 'Mistakes' : 'Other mistakes'}
-              </th>
+              {showMistakes ? (
+                <th scope="col" className={`${TH} max-sm:hidden`}>
+                  {rule ? 'Mistakes' : 'Other mistakes'}
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody>
-            {rows.map((t) => {
+            {rows.map((t, i) => {
               const time = shortTime(t.closedAt ?? t.openedAt, timeZone);
-              // A mistake's own trades all carry it: show only their others.
-              const mistakes = t.tagIds.flatMap((id) =>
-                target.kind === 'mistake' && id === target.tagId
-                  ? []
-                  : (mistakeName.get(id) ?? []),
-              );
+              const mistakes = rowMistakes[i] ?? [];
               const strategy =
                 t.strategyId !== undefined
                   ? strategyName.get(t.strategyId)
@@ -234,7 +241,9 @@ function TradesTable({
                     <SideChip side={t.direction} />
                   </td>
                   <td className={`${TD} max-sm:hidden`}>
-                    {strategy ?? <span className="text-faint">None</span>}
+                    {strategy ?? (
+                      <span className="text-faint">No strategy</span>
+                    )}
                   </td>
                   <td
                     className={`${TD} text-right text-[12.5px] whitespace-nowrap`}
@@ -244,19 +253,21 @@ function TradesTable({
                       currency={t.pnlCurrency}
                     />
                   </td>
-                  <td className={`${TD} max-sm:hidden`}>
-                    {mistakes.length > 0 ? (
-                      <span className="flex flex-wrap gap-1">
-                        {mistakes.map((name) => (
-                          <Chip key={name} tone="loss">
-                            {name}
-                          </Chip>
-                        ))}
-                      </span>
-                    ) : (
-                      <span className="text-faint">None</span>
-                    )}
-                  </td>
+                  {showMistakes ? (
+                    <td className={`${TD} max-sm:hidden`}>
+                      {mistakes.length > 0 ? (
+                        <span className="flex flex-wrap gap-1">
+                          {mistakes.map((name) => (
+                            <Chip key={name} tone="loss">
+                              {name}
+                            </Chip>
+                          ))}
+                        </span>
+                      ) : (
+                        <span className="text-faint">None</span>
+                      )}
+                    </td>
+                  ) : null}
                 </tr>
               );
             })}

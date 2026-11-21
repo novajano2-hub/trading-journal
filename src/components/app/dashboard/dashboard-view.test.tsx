@@ -291,14 +291,13 @@ test('a mistake opens its trades', async () => {
   expect(rows[0]!.textContent).toContain('ES Dec 25');
   expect(within(rows[0]!).getByTitle('ESZ5')).toBeTruthy();
   expect(rows[0]!.textContent).toContain('−$400.00');
-  // Every row carries the opened mistake, so only the others show.
-  expect(
-    within(dialog)
-      .getAllByRole('columnheader')
-      .map((h) => h.textContent),
-  ).toContain('Other mistakes');
+  // Every row carries the opened mistake and none has another: no Mistakes column.
+  const headers = within(dialog)
+    .getAllByRole('columnheader')
+    .map((h) => h.textContent);
+  expect(headers).toEqual(['Time', 'Symbol', 'Side', 'Strategy', 'Net P&L']);
   expect(rows[0]!.textContent).not.toContain(fomo);
-  expect(rows[0]!.textContent).toContain('None');
+  expect(rows[0]!.textContent).not.toContain('None');
   expect(dialog.textContent).toContain('1 trade, all time, −$400.00 net.');
   // A mistake's trades are not regraded here.
   expect(within(dialog).queryByRole('checkbox')).toBeNull();
@@ -317,6 +316,9 @@ test("a mistake's rows list only the trade's other mistakes", async () => {
         category: 'mistake',
       });
       s.trades.find((t) => t.id === 'f-1')!.tagIds = ['tag-fomo', 'tag-size'];
+      const f2 = s.trades.find((t) => t.id === 'f-2')!;
+      f2.tagIds = ['tag-fomo'];
+      delete f2.strategyId;
     }),
   });
   const mistakes = await screen.findByRole('region', {
@@ -324,9 +326,20 @@ test("a mistake's rows list only the trade's other mistakes", async () => {
   });
   fireEvent.click(within(mistakes).getByRole('button', { name: opener(fomo) }));
   const dialog = await screen.findByRole('dialog', { name: fomo });
-  const row = within(dialog).getAllByRole('row')[1]!;
-  expect(row.textContent).toContain('Oversized');
-  expect(row.textContent).not.toContain(fomo);
+  expect(
+    within(dialog)
+      .getAllByRole('columnheader')
+      .map((h) => h.textContent),
+  ).toContain('Other mistakes');
+  const [f1, f2] = within(dialog).getAllByRole('row').slice(1);
+  expect(f1!.textContent).toContain('Oversized');
+  expect(f1!.textContent).not.toContain(fomo);
+  expect(f2!.textContent).not.toContain(fomo);
+  expect(f2!.textContent).toContain('None');
+  // A trade with no strategy reads as Recent trades does.
+  expect(within(f2!).getByText('No strategy').className).toContain(
+    'text-faint',
+  );
 });
 
 test('a filter that matches nothing offers Clear filters (Review Focus 2)', async () => {
