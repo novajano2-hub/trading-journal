@@ -4,85 +4,120 @@
   "title": "Design System: Keel",
   "extensions": {
     "colorMeta": {
-      "cobalt": {
+      "ultramarine": {
         "role": "primary",
-        "displayName": "Cobalt",
-        "canonical": "#2550e0",
+        "displayName": "Keel Ultramarine",
+        "canonical": "#2b35af",
         "tonalRamp": [
-          "#9db6ff",
-          "#3866e6",
-          "#2550e0",
-          "#1e44c4",
-          "#1b3fb8",
-          "#eaf0fe",
-          "#1a2440"
+          "#aeb4ff",
+          "#5c66e6",
+          "#4c57dc",
+          "#2b35af",
+          "#1f278c",
+          "#dcdff8",
+          "#eeeffc",
+          "#2c336e",
+          "#22285a"
         ]
       },
       "bg": {
         "role": "neutral",
-        "displayName": "Cool Page",
-        "canonical": "#f6f7f9",
+        "displayName": "Periwinkle Canvas",
+        "canonical": "#eceef8",
         "tonalRamp": [
           "#ffffff",
-          "#f6f7f9",
-          "#eff1f4",
-          "#e3e6eb",
-          "#d3d8df",
-          "#0e1014"
+          "#f0f1f8",
+          "#eceef8",
+          "#e7e9f3",
+          "#d5d8ea",
+          "#0c0e1c",
+          "#151831",
+          "#1b1f3b"
         ]
       },
       "text": {
         "role": "neutral",
         "displayName": "Ink",
-        "canonical": "#0f1218",
+        "canonical": "#121633",
         "tonalRamp": [
-          "#0f1218",
-          "#4f5865",
-          "#687080",
-          "#a3aab6",
-          "#eceef2"
+          "#121633",
+          "#4b5175",
+          "#636889",
+          "#aeb2d2",
+          "#eceefb"
         ]
       },
       "gain": {
         "role": "signal",
         "displayName": "Gain Green",
-        "canonical": "#087a54",
+        "canonical": "#0a7a52",
         "tonalRamp": [
           "#3fc08e",
-          "#087a54",
-          "#e6f4ee",
-          "#14281f"
+          "#0a7a52",
+          "#19a672",
+          "#2fb27f",
+          "#ddf3e8",
+          "#10291f"
         ]
       },
       "loss": {
         "role": "signal",
         "displayName": "Loss Red",
-        "canonical": "#c8283a",
+        "canonical": "#c22e3a",
         "tonalRamp": [
           "#f06a78",
-          "#c8283a",
-          "#fbebed",
-          "#2e161a"
+          "#c22e3a",
+          "#e5484d",
+          "#fceced",
+          "#2e1620"
+        ]
+      },
+      "warn": {
+        "role": "data",
+        "displayName": "Marigold (mistakes)",
+        "canonical": "#9a5700",
+        "tonalRamp": [
+          "#f0b44a",
+          "#9a5700",
+          "#e9a21a",
+          "#fcf1dc",
+          "#2d2210"
+        ]
+      },
+      "info": {
+        "role": "data",
+        "displayName": "Cyan (goal progress)",
+        "canonical": "#0a6f94",
+        "tonalRamp": [
+          "#4db8e0",
+          "#0a6f94",
+          "#1693be",
+          "#e0f1f8",
+          "#0e2533"
         ]
       },
       "veil": {
         "role": "neutral",
         "displayName": "Veil",
-        "canonical": "rgba(15, 18, 24, 0.32)",
+        "canonical": "rgba(18, 22, 51, 0.36)",
         "tonalRamp": [
-          "rgba(15, 18, 24, 0.32)",
-          "rgba(0, 0, 0, 0.6)"
+          "rgba(18, 22, 51, 0.36)",
+          "rgba(4, 5, 14, 0.66)"
         ]
       }
     },
     "typographyMeta": {
       "display-hero": {
         "displayName": "Hero display",
-        "purpose": "Landing hero headline only."
+        "purpose": "Landing hero headline only. Instrument Sans 600, -0.032em."
       },
       "display-page": {
         "displayName": "Page display",
         "purpose": "Page and auth h1."
+      },
+      "section-heading": {
+        "displayName": "Section heading",
+        "purpose": "Landing section headings, -0.028em."
       },
       "body": {
         "displayName": "Body",
@@ -90,23 +125,27 @@
       },
       "figure-kpi": {
         "displayName": "KPI figure",
-        "purpose": "Geist Mono tabular figure for headline numbers."
+        "purpose": "Instrument Sans tabular figure, 600, -0.03em: marketing KPIs at 22px, app rolling KPIs at 20px shrinking to fit."
       },
       "figure-row": {
         "displayName": "Row figure",
-        "purpose": "Geist Mono 12.5px for trade rows."
+        "purpose": "13px/550 tabular figure in the Rules table."
       },
       "figure-hero": {
-        "displayName": "Hero figure",
-        "purpose": "40px Geist Mono 500, -0.02em: the adherence percentage in the Dashboard's Your plan card."
+        "displayName": "Hero numeral",
+        "purpose": "88px (104px from sm) 600, -0.05em, stretch 88%: the adherence percentage on the ultramarine Your plan hero."
+      },
+      "figure-pnl": {
+        "displayName": "P&L figure",
+        "purpose": "31px/600, -0.04em: the Performance card net P&L."
       },
       "card-title": {
-        "displayName": "App card title",
-        "purpose": "14px/600 heading of every Dashboard card."
+        "displayName": "Card title",
+        "purpose": "15px/600, -0.015em heading of every dashboard and product card."
       },
       "app-title": {
         "displayName": "App title",
-        "purpose": "22px/600, -0.02em: the top bar page title."
+        "purpose": "24px/650, -0.035em (20px on phones): the top bar page title."
       }
     },
     "fontSizesPx": [
@@ -123,29 +162,41 @@
       16,
       16.5,
       17,
-      18,
+      19,
       20,
+      21,
       22,
       24,
       26,
-      40,
-      42
+      31,
+      88,
+      104
     ],
     "shadows": [
       {
-        "name": "product-shot",
-        "value": "0 1px 2px rgba(15,18,24,0.05), 0 24px 48px -24px rgba(37,80,224,0.18)",
-        "purpose": "App window and hero cards, light. Dark: 0 1px 2px rgba(0,0,0,0.4), 0 24px 48px -24px rgba(0,0,0,0.7)."
+        "name": "card",
+        "value": "0 1px 2px rgba(18,22,51,0.05), 0 4px 10px -6px rgba(34,42,150,0.1), 0 18px 34px -22px rgba(34,42,150,0.38)",
+        "purpose": "--shadow-card: every white card. Dark: 0 1px 2px rgba(0,0,0,0.45), 0 18px 34px -22px rgba(0,0,0,0.8)."
       },
       {
-        "name": "active-chip",
-        "value": "0 1px 2px rgba(15,18,24,0.08)",
-        "purpose": "White fill of the selected segment or tab (--shadow-chip). Dark: 0 1px 2px rgba(0,0,0,0.4)."
+        "name": "shadow",
+        "value": "0 1px 2px rgba(18,22,51,0.06), 0 24px 48px -20px rgba(34,42,150,0.28)",
+        "purpose": "--shadow: app window, trade detail card, popovers, menus, tooltips, search results, Morph dialog. Dark: 0 1px 2px rgba(0,0,0,0.5), 0 24px 48px -20px rgba(0,0,0,0.75)."
       },
       {
-        "name": "floating",
-        "value": "var(--shadow-chip)",
-        "purpose": "Filter popovers, account menu, metric tooltips, search results. The morph dialog uses --shadow."
+        "name": "chip",
+        "value": "0 1px 2px rgba(18,22,51,0.06), 0 2px 6px -2px rgba(34,42,150,0.1)",
+        "purpose": "--shadow-chip: chosen segment or tab, current nav row, account box, secondary site CTA. Dark: 0 1px 2px rgba(0,0,0,0.45)."
+      },
+      {
+        "name": "hero",
+        "value": "0 2px 4px rgba(31,39,140,0.18), 0 22px 40px -18px rgba(31,39,140,0.55)",
+        "purpose": "--shadow-hero with an inset 1px white highlight at 18%: the ultramarine Your plan surface. Dark: 0 2px 4px rgba(0,0,0,0.4), 0 22px 40px -18px rgba(43,53,175,0.55)."
+      },
+      {
+        "name": "raised-primary",
+        "value": "inset 0 1px 0 rgba(255,255,255,0.2), 0 1px 2px rgba(31,39,140,0.4), 0 6px 14px -6px rgba(43,53,175,0.6)",
+        "purpose": "Primary button material. Dark: the outer shadows go neutral black."
       }
     ],
     "motion": [
@@ -162,12 +213,12 @@
       {
         "name": "glide",
         "value": "320ms cubic-bezier(0.23, 1, 0.32, 1)",
-        "purpose": "Selection moving between options (tab indicator). Adapted from HorizonX Beacon Tabs."
+        "purpose": "Selection moving between options (tab indicator), control colour and border shifts at 200ms. Adapted from HorizonX Beacon Tabs."
       },
       {
         "name": "press",
         "value": "scale 0.97, 180ms down, 120ms up",
-        "purpose": "Button press, plus a 220ms ripple. Adapted from HorizonX animated-button-press."
+        "purpose": "Button press, plus a 160px ripple. Adapted from HorizonX animated-button-press."
       },
       {
         "name": "number-ticker",
@@ -177,7 +228,7 @@
       {
         "name": "line-draw",
         "value": "900ms, enter curve",
-        "purpose": "Equity line pathLength draw, area fades in."
+        "purpose": "Marketing equity line pathLength draw, area fades in. The Performance sparkline draws over 1.3s from 150ms, fills at 700ms."
       },
       {
         "name": "accordion",
@@ -218,6 +269,11 @@
         "name": "check-ripple",
         "value": "360ms ease-out, ring grows and fades",
         "purpose": "Task checkbox on check. Adapted from HorizonX Task Checkbox. Reserved for Plan 5."
+      },
+      {
+        "name": "breakdown-bars",
+        "value": "560ms enter curve, 50ms stagger, transform only",
+        "purpose": "Bars slide up from the baseline once on first view."
       }
     ],
     "breakpoints": [
@@ -243,7 +299,7 @@
       },
       {
         "name": "wide",
-        "value": "1440px: Strategy 272px, wider rule columns"
+        "value": "1440px: hero column 400px, Strategy 272px, wider rule columns"
       }
     ]
   },
@@ -252,9 +308,9 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "Cobalt call to action, 44px, 10px radius.",
+      "description": "Raised ultramarine call to action: top-lit gradient, inner highlight, brand shadow. 44px, 10px radius, presses 1px.",
       "html": "<button class=\"ds-btn-primary\">Start journaling</button>",
-      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px;border:0;border-radius:var(--r-control);font:500 15px var(--font-geist-sans),system-ui,sans-serif;cursor:pointer;transition:background-color 120ms;background:var(--accent);color:var(--accent-fg);}.ds-btn-primary:hover{background:var(--accent-hover);}.ds-btn-primary:active{transform:scale(.97);}.ds-btn-primary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}"
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px;border:0;border-radius:var(--r-control);font:500 15px var(--font-keel),system-ui,sans-serif;cursor:pointer;color:var(--accent-fg);background:linear-gradient(180deg,color-mix(in oklab,var(--accent),white 7%),var(--accent));box-shadow:inset 0 1px 0 rgb(255 255 255/.2),0 1px 2px rgb(31 39 140/.4),0 6px 14px -6px rgb(43 53 175/.6);}.ds-btn-primary:hover{background:linear-gradient(180deg,var(--accent),var(--accent-hover));}.ds-btn-primary:active{transform:translateY(1px);}.ds-btn-primary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}"
     },
     {
       "name": "Secondary Button",
@@ -262,7 +318,7 @@
       "refersTo": "button-secondary",
       "description": "Surface button with a strong hairline.",
       "html": "<button class=\"ds-btn-secondary\">See pricing</button>",
-      "css": ".ds-btn-secondary{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px;border:0;border-radius:var(--r-control);font:500 15px var(--font-geist-sans),system-ui,sans-serif;cursor:pointer;transition:background-color 120ms;background:var(--surface-1);color:var(--text);border:1px solid var(--line-2);}.ds-btn-secondary:hover{border-color:var(--faint);}.ds-btn-secondary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}"
+      "css": ".ds-btn-secondary{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px;border-radius:var(--r-control);font:500 15px var(--font-keel),system-ui,sans-serif;cursor:pointer;background:var(--surface-1);color:var(--text);border:1px solid var(--line-2);}.ds-btn-secondary:hover{border-color:var(--faint);}.ds-btn-secondary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}"
     },
     {
       "name": "Ghost Button",
@@ -270,129 +326,161 @@
       "refersTo": "button-ghost",
       "description": "Quiet action, sunken on hover.",
       "html": "<button class=\"ds-btn-ghost\">Log in</button>",
-      "css": ".ds-btn-ghost{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px;border:0;border-radius:var(--r-control);font:500 15px var(--font-geist-sans),system-ui,sans-serif;cursor:pointer;transition:background-color 120ms;background:transparent;color:var(--text);}.ds-btn-ghost:hover{background:var(--sunken);}.ds-btn-ghost:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}"
+      "css": ".ds-btn-ghost{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px;border:0;border-radius:var(--r-control);font:500 15px var(--font-keel),system-ui,sans-serif;cursor:pointer;background:transparent;color:var(--text);}.ds-btn-ghost:hover{background:var(--sunken);}.ds-btn-ghost:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}"
     },
     {
       "name": "Chips",
       "kind": "chip",
       "refersTo": "chip-neutral",
-      "description": "6px tags in neutral, accent, gain and loss, plus the Long/Short side chip.",
-      "html": "<span class=\"ds-chip\">Breakout</span> <span class=\"ds-chip ds-chip-loss\">Early exit</span> <span class=\"ds-side\">Long</span>",
-      "css": ".ds-chip{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:var(--r-chip);background:var(--sunken);color:var(--muted);font:400 12px var(--font-geist-sans),system-ui,sans-serif;}.ds-chip-loss{background:var(--loss-soft);color:var(--loss);}.ds-side{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:var(--r-chip);background:var(--gain-soft);color:var(--gain);font:500 11.5px var(--font-geist-sans),system-ui,sans-serif;}"
+      "description": "Pill tags in neutral, accent, gain, loss, marigold (mistakes) and cyan, plus the neutral Long/Short side chip.",
+      "html": "<span class=\"ds-chip\">Breakout</span> <span class=\"ds-chip ds-chip-warn\">Early exit</span> <span class=\"ds-chip ds-chip-gain\">Reached</span> <span class=\"ds-side\">Long</span>",
+      "css": ".ds-chip{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;background:var(--sunken);color:var(--muted);font:550 12px var(--font-keel),system-ui,sans-serif;}.ds-chip-warn{background:var(--warn-soft);color:var(--warn);}.ds-chip-gain{background:var(--gain-soft);color:var(--gain);}.ds-side{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:7px;background:var(--sunken);color:var(--muted);font:600 12px var(--font-keel),system-ui,sans-serif;}"
     },
     {
       "name": "Segmented Control",
       "kind": "custom",
       "refersTo": "segmented",
-      "description": "Sunken track with a white active chip. Tabs share the same look and slide the fill.",
+      "description": "Recessed accent-tinted track with a white chosen pill. Tabs share the look and slide the fill.",
       "html": "<div class=\"ds-seg\"><span class=\"ds-seg-on\">Net</span><span>Gross</span></div>",
-      "css": ".ds-seg{display:inline-flex;padding:2px;border-radius:7px;background:var(--sunken);font:500 13px var(--font-geist-sans),system-ui,sans-serif;color:var(--muted);}.ds-seg span{padding:4px 10px;border-radius:5px;cursor:pointer;}.ds-seg span:hover{color:var(--text);}.ds-seg .ds-seg-on{background:var(--surface-1);color:var(--text);box-shadow:0 1px 2px rgba(15,18,24,.08);}"
+      "css": ".ds-seg{display:inline-flex;padding:3px;border-radius:11px;background:color-mix(in oklab,var(--accent) 8%,transparent);box-shadow:inset 0 1px 2px rgb(18 22 51/.07);font:500 13.5px var(--font-keel),system-ui,sans-serif;color:var(--muted);}.ds-seg span{display:inline-flex;align-items:center;height:28px;padding:0 13px;border-radius:8px;cursor:pointer;}.ds-seg span:hover{color:var(--text);}.ds-seg .ds-seg-on{background:var(--surface-1);color:var(--text);font-weight:600;box-shadow:var(--shadow-chip);}"
     },
     {
-      "name": "KPI Strip",
-      "kind": "custom",
-      "refersTo": "card",
-      "description": "Label over a mono figure; sign colours the figure.",
-      "html": "<dl class=\"ds-kpi\"><div><dt>Net P&amp;L</dt><dd class=\"ds-gain\">+$1,240.50</dd></div><div><dt>Win rate</dt><dd>58.3%</dd></div><div><dt>Profit factor</dt><dd>1.84</dd></div></dl>",
-      "css": ".ds-kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0;padding:16px 14px;background:var(--surface-1);border:1px solid var(--line);border-radius:var(--r-card);}.ds-kpi dt{font:400 12px var(--font-geist-sans),system-ui,sans-serif;color:var(--muted);}.ds-kpi dd{margin:4px 0 0;font:500 22px var(--font-geist-mono),ui-monospace,monospace;letter-spacing:-.02em;font-variant-numeric:tabular-nums;}.ds-gain{color:var(--gain);}"
-    },
-    {
-      "name": "Trade Row",
-      "kind": "custom",
-      "refersTo": "card",
-      "description": "Mono row: time, symbol, side, signed net.",
-      "html": "<div class=\"ds-row\"><span class=\"ds-faint\">09:41</span><span>ES</span><span class=\"ds-side\">Long</span><span class=\"ds-gain\">+$312.00</span></div>",
-      "css": ".ds-row{display:grid;grid-template-columns:96px 70px 64px 1fr;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--line);background:var(--surface-1);font:400 12.5px var(--font-geist-mono),ui-monospace,monospace;font-variant-numeric:tabular-nums;color:var(--text);}.ds-row>:last-child{text-align:right;}.ds-faint{color:var(--faint);}.ds-gain{color:var(--gain);}.ds-side{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:6px;background:var(--gain-soft);color:var(--gain);font:500 11.5px var(--font-geist-sans),system-ui,sans-serif;}"
-    },
-    {
-      "name": "App Window",
+      "name": "Card with Icon Tile",
       "kind": "card",
       "refersTo": "card",
-      "description": "The product shot: 16px card, bar with account, range and basis, then content.",
-      "html": "<div class=\"ds-win\"><div class=\"ds-bar\"><span class=\"ds-sel\">Main account</span><span class=\"ds-sel ds-mono\">Last 30 days</span><span class=\"ds-meta\">Sample data</span></div><div class=\"ds-body\">Content</div></div>",
-      "css": ".ds-win{overflow:hidden;border:1px solid var(--line);border-radius:var(--r-card);background:var(--surface-1);box-shadow:var(--shadow);}.ds-bar{display:flex;align-items:center;gap:8px;min-height:46px;padding:0 14px;border-bottom:1px solid var(--line);font:400 12.5px var(--font-geist-sans),system-ui,sans-serif;color:var(--text);}.ds-sel{display:inline-flex;align-items:center;height:28px;padding:0 10px;border:1px solid var(--line);border-radius:var(--r-chip);}.ds-mono{font-family:var(--font-geist-mono),ui-monospace,monospace;}.ds-meta{margin-left:auto;color:var(--faint);}.ds-body{padding:16px 14px;color:var(--muted);}"
+      "description": "White 16px card with the card shadow; header is a 28px duotone tile in the card's job tone and a 15px/600 title.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-ch\"><span class=\"ds-tile ds-tile-warn\">M</span><b>Mistakes</b><span class=\"ds-cap\">1-20 Nov</span></div><p>Content</p></div>",
+      "css": ".ds-card{width:280px;padding:18px 20px 16px;background:var(--surface-1);border:1px solid var(--line);border-radius:var(--r-card);box-shadow:var(--shadow-card);color:var(--muted);font:400 13px var(--font-keel),system-ui,sans-serif;}.ds-ch{display:flex;align-items:center;gap:10px;min-height:28px;color:var(--text);}.ds-ch b{font:600 15px var(--font-keel),system-ui,sans-serif;letter-spacing:-.015em;}.ds-cap{margin-left:auto;font-size:12.5px;color:var(--faint);}.ds-tile{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;font:600 13px var(--font-keel),system-ui,sans-serif;background:var(--sunken);}.ds-tile-warn{background:var(--warn-soft);color:var(--warn);}"
     },
     {
-      "name": "Nav Row (three looks)",
-      "kind": "nav",
+      "name": "Icon Tiles",
+      "kind": "custom",
       "refersTo": "icon-tile",
-      "description": "Sidebar row: active accent tile, inactive bare duotone tile, not-live outline.",
-      "html": "<div class=\"ds-nav\"><a class=\"ds-nav-row ds-on\"><span class=\"ds-tile ds-tile-on\">D</span>Dashboard</a><a class=\"ds-nav-row\"><span class=\"ds-tile\">T</span>Trades</a><a class=\"ds-nav-row ds-quiet\"><span class=\"ds-tile\">B</span>Backtesting</a></div>",
-      "css": ".ds-nav{width:196px;display:flex;flex-direction:column;gap:2px;}.ds-nav-row{display:flex;align-items:center;gap:10px;height:40px;padding:4px 8px 4px 4px;border-radius:var(--r-control);font:400 13.5px var(--font-geist-sans),system-ui,sans-serif;color:var(--muted);text-decoration:none;}.ds-nav-row:hover{background:var(--bg);color:var(--text);}.ds-tile{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:var(--r-chip);font-size:13px;}.ds-nav-row:hover .ds-tile{background:var(--sunken);}.ds-on{color:var(--accent-ink);font-weight:500;}.ds-on .ds-tile{background:var(--accent-soft);color:var(--accent-ink);}.ds-quiet{color:var(--faint);}"
+      "description": "28px, 8px radius tiles by tone: accent, marigold, cyan, neutral, faint outline, on-accent.",
+      "html": "<span class=\"ds-t ds-t-accent\">P</span> <span class=\"ds-t ds-t-warn\">M</span> <span class=\"ds-t ds-t-info\">G</span> <span class=\"ds-t\">N</span>",
+      "css": ".ds-t{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;font:600 13px var(--font-keel),system-ui,sans-serif;background:var(--sunken);color:var(--text);}.ds-t-accent{background:var(--accent-soft);color:var(--accent-ink);}.ds-t-warn{background:var(--warn-soft);color:var(--warn);}.ds-t-info{background:var(--info-soft);color:var(--info);}"
     },
     {
-      "name": "Filter Chips",
-      "kind": "chip",
-      "refersTo": "filter-chip",
-      "description": "30px chips: idle, active (accent-soft), and the dashed aria-disabled no-trades state.",
-      "html": "<span class=\"ds-fc\">Symbol</span> <span class=\"ds-fc ds-fc-on\">AAPL, TSLA</span> <span class=\"ds-fc ds-fc-off\">Tags</span>",
-      "css": ".ds-fc{display:inline-flex;align-items:center;height:30px;padding:0 9px;border:1px solid var(--line);border-radius:var(--r-chip);background:var(--surface-1);color:var(--muted);font:400 12.5px var(--font-geist-sans),system-ui,sans-serif;}.ds-fc:hover{border-color:var(--line-2);color:var(--text);}.ds-fc-on{background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent-ink);}.ds-fc-off{border-style:dashed;border-color:var(--line-2);background:transparent;color:var(--faint);}"
+      "name": "Your Plan Hero",
+      "kind": "card",
+      "refersTo": "hero-surface",
+      "description": "The one coloured surface: ultramarine gradient, 88px adherence numeral, kept/broken split bar and a cost band.",
+      "html": "<div class=\"ds-hero\"><div class=\"ds-hh\">Your plan</div><div class=\"ds-num\">87<small>%</small></div><div class=\"ds-split\"><i></i><i></i></div><div class=\"ds-band\"><span>Broken rules cost</span><b>-$8,581.08</b></div></div>",
+      "css": ".ds-hero{width:320px;overflow:hidden;padding:18px 22px 0;border-radius:var(--r-card);background:linear-gradient(155deg,#3440c2 0%,#2b35af 45%,#232b98 100%);color:#fff;box-shadow:inset 0 1px 0 rgb(255 255 255/.18),var(--shadow-hero);font-family:var(--font-keel),system-ui,sans-serif;}.ds-hh{font:600 15px var(--font-keel),system-ui,sans-serif;letter-spacing:-.015em;}.ds-num{margin-top:14px;font:600 88px/.82 var(--font-keel),system-ui,sans-serif;letter-spacing:-.05em;font-stretch:88%;font-variant-numeric:tabular-nums;}.ds-num small{font-size:.42em;margin-left:4px;vertical-align:top;color:var(--on-accent-muted);}.ds-split{display:flex;gap:3px;height:8px;margin:22px 0 18px;}.ds-split i{display:block;border-radius:3px;}.ds-split i:first-child{flex:87;background:rgb(255 255 255/.92);}.ds-split i:last-child{flex:13;background:var(--on-accent-loss);}.ds-band{display:flex;align-items:center;justify-content:space-between;min-height:54px;margin:0 -22px;padding:8px 22px;border-top:1px solid rgb(255 255 255/.1);background:rgb(10 14 70/.22);font-size:13.5px;}.ds-band b{font:600 21px var(--font-keel),system-ui,sans-serif;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--on-accent-loss);}"
     },
     {
       "name": "Rule Row",
       "kind": "custom",
       "refersTo": "card",
-      "description": "Rules table row: text, kept x of y in mono, 4px cobalt track on a line rail, percentage, signed cost.",
-      "html": "<div class=\"ds-rule\"><span>Pullback holds the 20-period average</span><span class=\"ds-m\">314 of 361</span><span class=\"ds-rail\"><span class=\"ds-fill\"></span></span><span class=\"ds-m\">87%</span><span class=\"ds-m ds-loss\">-$3,529.53</span></div>",
-      "css": ".ds-rule{display:grid;grid-template-columns:1fr 88px 100px 52px 124px;align-items:center;gap:12px;height:38px;padding:0 8px;border-top:1px solid var(--line);background:var(--surface-1);color:var(--text);font:400 13px var(--font-geist-sans),system-ui,sans-serif;}.ds-rule:hover{background:var(--sunken);}.ds-m{font:400 12.5px var(--font-geist-mono),ui-monospace,monospace;font-variant-numeric:tabular-nums;text-align:right;}.ds-rail{display:block;height:4px;border-radius:999px;background:var(--line);overflow:hidden;}.ds-fill{display:block;height:100%;width:87%;border-radius:999px;background:var(--accent);}.ds-loss{color:var(--loss);}"
+      "description": "Rules table row: text, kept x of y, 6px accent track on a soft rail, percentage, signed cost.",
+      "html": "<div class=\"ds-rule\"><span>Pullback holds the 20-period average</span><span class=\"ds-m\">314 of 361</span><span class=\"ds-adh\"><span class=\"ds-rail\"><span class=\"ds-fill\"></span></span><span class=\"ds-m\">87%</span></span><span class=\"ds-m ds-loss\">-$3,529.53</span></div>",
+      "css": ".ds-rule{display:grid;grid-template-columns:1fr 92px 150px 128px;align-items:center;gap:12px;height:36px;padding:0 8px;border-top:1px solid var(--line);background:var(--surface-1);color:var(--text);font:500 13.5px var(--font-keel),system-ui,sans-serif;}.ds-rule:hover{background:var(--sunken);}.ds-m{font:550 13px var(--font-keel),system-ui,sans-serif;font-variant-numeric:tabular-nums;text-align:right;}.ds-adh{display:flex;align-items:center;gap:10px;}.ds-rail{flex:1;display:block;height:6px;border-radius:3px;background:var(--accent-soft);overflow:hidden;}.ds-fill{display:block;height:100%;width:87%;border-radius:3px;background:linear-gradient(90deg,color-mix(in oklab,var(--accent) 78%,white),var(--accent));}.ds-loss{color:var(--loss);}"
     },
     {
-      "name": "KPI Tile",
-      "kind": "card",
+      "name": "Nav Row (three looks)",
+      "kind": "nav",
+      "refersTo": "surface",
+      "description": "Sidebar row on the canvas: current is a white pill, other modules muted, not-live faint. No tiles.",
+      "html": "<div class=\"ds-nav\"><a class=\"ds-nav-row ds-on\">Dashboard</a><a class=\"ds-nav-row\">Trades</a><a class=\"ds-nav-row ds-quiet\">Backtesting</a></div>",
+      "css": ".ds-nav{width:196px;display:flex;flex-direction:column;gap:2px;padding:8px;background:var(--bg);}.ds-nav-row{display:flex;align-items:center;height:34px;padding:0 10px;border-radius:9px;font:500 13.5px var(--font-keel),system-ui,sans-serif;color:var(--muted);text-decoration:none;}.ds-nav-row:hover{background:color-mix(in oklab,var(--surface-1) 60%,transparent);color:var(--text);}.ds-on{background:var(--surface-1);color:var(--text);font-weight:600;box-shadow:var(--shadow-chip);}.ds-quiet{color:var(--faint);}"
+    },
+    {
+      "name": "Filter Chips",
+      "kind": "chip",
+      "refersTo": "filter-chip",
+      "description": "32px, 10px radius chips: idle, active (accent-ink glyph) and the dashed aria-disabled no-trades state.",
+      "html": "<span class=\"ds-fc\">Symbol</span> <span class=\"ds-fc ds-fc-on\">AAPL, TSLA</span> <span class=\"ds-fc ds-fc-off\">Tags</span>",
+      "css": ".ds-fc{display:inline-flex;align-items:center;height:32px;padding:0 10px 0 12px;border:1px solid var(--line);border-radius:var(--r-control);background:var(--surface-1);box-shadow:0 1px 1px rgb(18 22 51/.04);color:var(--muted);font:400 13.5px var(--font-keel),system-ui,sans-serif;}.ds-fc:hover{border-color:color-mix(in oklab,var(--accent) 35%,transparent);color:var(--text);}.ds-fc-on{color:var(--text);}.ds-fc-off{border-style:dashed;border-color:var(--line-2);background:transparent;box-shadow:none;color:var(--faint);}"
+    },
+    {
+      "name": "KPI with Sparkline",
+      "kind": "custom",
       "refersTo": "kpi-tile",
-      "description": "Performance card tile: faint metric label with dotted tip underline over a 22px mono figure.",
-      "html": "<div class=\"ds-kt\"><span class=\"ds-kl\">Win rate</span><div class=\"ds-kv\">48.8%</div></div>",
-      "css": ".ds-kt{width:160px;padding:8px 12px;border-radius:var(--r-control);background:var(--sunken);}.ds-kl{font:400 12px var(--font-geist-sans),system-ui,sans-serif;color:var(--faint);text-decoration:underline dotted var(--line-2);text-underline-offset:4px;cursor:help;}.ds-kv{margin-top:2px;font:500 22px var(--font-geist-mono),ui-monospace,monospace;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--text);}"
+      "description": "Performance KPI: faint metric-tip label over a 20px/600 tabular figure, with a rolling 1.5px accent sparkline.",
+      "html": "<div class=\"ds-kt\"><span class=\"ds-kl\">Win rate</span><div class=\"ds-kv\"><span>48.8%</span><svg viewBox=\"0 0 56 24\" width=\"48\" height=\"24\"><path d=\"M1 18 L12 14 L22 16 L34 8 L45 11 L55 4\" fill=\"none\" stroke=\"var(--accent)\" stroke-opacity=\".85\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></div></div>",
+      "css": ".ds-kt{width:180px;padding:10px 14px 0;}.ds-kl{font:400 12px var(--font-keel),system-ui,sans-serif;color:var(--faint);text-decoration:underline dotted transparent;text-underline-offset:4px;cursor:help;}.ds-kt:hover .ds-kl{text-decoration-color:var(--faint);}.ds-kv{display:flex;align-items:flex-end;gap:8px;margin-top:2px;}.ds-kv span{flex:1;font:600 20px/1.25 var(--font-keel),system-ui,sans-serif;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--text);}"
     },
     {
-      "name": "Cost Panel",
+      "name": "Day Grid",
       "kind": "custom",
       "refersTo": "card",
-      "description": "Plan card's broken-rules cost: loss-soft panel, label tip and signed mono figure.",
-      "html": "<div class=\"ds-cost\"><span class=\"ds-tipl\">Broken rules cost</span> <span class=\"ds-mono\">-$8,581.08</span></div>",
-      "css": ".ds-cost{display:inline-flex;gap:6px;padding:10px 12px;border-radius:var(--r-control);background:var(--loss-soft);color:var(--loss);font:500 13.5px var(--font-geist-sans),system-ui,sans-serif;}.ds-tipl{text-decoration:underline dotted var(--line-2);text-underline-offset:4px;}.ds-mono{font-family:var(--font-geist-mono),ui-monospace,monospace;font-variant-numeric:tabular-nums;}"
+      "description": "Daily loss limit: square cells, kept days gain-fill at 35%, broken days solid loss-fill.",
+      "html": "<div class=\"ds-days\"><i></i><i></i><i></i><i class=\"ds-x\"></i><i></i><i></i><i></i><i></i><i class=\"ds-x\"></i><i></i><i></i><i></i></div>",
+      "css": ".ds-days{display:grid;grid-template-columns:repeat(12,16px);gap:2px;}.ds-days i{display:block;aspect-ratio:1;border-radius:1.5px;background:color-mix(in oklab,var(--gain-fill) 35%,transparent);}.ds-days .ds-x{background:var(--loss-fill);}"
+    },
+    {
+      "name": "Goal Track",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Weekly goal: 6px cyan gradient on a line rail; solid gain once reached.",
+      "html": "<span class=\"ds-gt\"><span class=\"ds-gf\"></span></span>",
+      "css": ".ds-gt{display:block;width:240px;height:6px;border-radius:3px;background:var(--line);overflow:hidden;}.ds-gf{display:block;height:100%;width:62%;border-radius:3px;background:linear-gradient(90deg,color-mix(in oklab,var(--info-fill) 70%,white),var(--info-fill));}"
+    },
+    {
+      "name": "Cost Bar Row",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Mistakes row: warn chip, trade count, signed cost, 4px cost bar at the foot.",
+      "html": "<div class=\"ds-mr\"><span class=\"ds-chip ds-chip-warn\">Early exit</span><span class=\"ds-cap2\">14 trades</span><b class=\"ds-loss\">-$2,140.00</b><i class=\"ds-cb\"></i></div>",
+      "css": ".ds-mr{position:relative;display:flex;align-items:center;gap:8px;width:300px;height:35px;padding:0 10px 6px;font:500 13.5px var(--font-keel),system-ui,sans-serif;}.ds-chip{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;font:550 12px var(--font-keel),system-ui,sans-serif;}.ds-chip-warn{background:var(--warn-soft);color:var(--warn);}.ds-cap2{font-size:12.5px;color:var(--faint);font-variant-numeric:tabular-nums;}.ds-mr b{margin-left:auto;font-weight:600;font-variant-numeric:tabular-nums;}.ds-loss{color:var(--loss);}.ds-cb{position:absolute;right:10px;bottom:3px;width:96px;height:4px;border-radius:2px;opacity:.8;background:linear-gradient(270deg,var(--loss-fill),color-mix(in oklab,var(--loss-fill) 18%,transparent));}"
+    },
+    {
+      "name": "Trade Row",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Marketing trade row: time, symbol, neutral side chip, signed net.",
+      "html": "<div class=\"ds-row\"><span class=\"ds-faint\">09:41</span><b>ES</b><span class=\"ds-side\">Long</span><span class=\"ds-gain\">+$312.00</span></div>",
+      "css": ".ds-row{display:grid;grid-template-columns:96px 64px 60px 1fr;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--line);background:var(--surface-1);font:400 13px var(--font-keel),system-ui,sans-serif;font-variant-numeric:tabular-nums;color:var(--text);}.ds-row>:last-child{text-align:right;font-weight:500;}.ds-row b{font-weight:600;letter-spacing:.01em;}.ds-faint{color:var(--muted);}.ds-gain{color:var(--gain);}.ds-side{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:7px;background:var(--sunken);color:var(--muted);font:600 12px var(--font-keel),system-ui,sans-serif;}"
+    },
+    {
+      "name": "App Window",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The marketing product shot: 16px window on the canvas, a bar of white controls, then the app's own cards.",
+      "html": "<div class=\"ds-win\"><div class=\"ds-bar\"><span class=\"ds-sel\">Main account</span><span class=\"ds-sel\">Last 30 days</span><span class=\"ds-meta\">Sample data</span></div><div class=\"ds-body\">Content</div></div>",
+      "css": ".ds-win{overflow:hidden;border:1px solid color-mix(in oklab,var(--line-2) 80%,transparent);border-radius:var(--r-card);background:var(--bg);box-shadow:inset 0 1px 0 rgb(255 255 255/.6),var(--shadow);}.ds-bar{display:flex;align-items:center;gap:6px;min-height:52px;padding:10px 12px;font:500 12.5px var(--font-keel),system-ui,sans-serif;color:var(--muted);}.ds-sel{display:inline-flex;align-items:center;height:30px;padding:0 10px;border:1px solid var(--line);border-radius:var(--r-control);background:var(--surface-1);box-shadow:0 1px 1px rgb(18 22 51/.04);}.ds-meta{margin-left:auto;color:var(--faint);}.ds-body{padding:0 12px 12px;color:var(--muted);}"
     }
   ],
   "narrative": {
-    "northStar": "Precise and Plain",
-    "overview": "**Creative North Star: \"Precise and Plain\"** names a register, not a metaphor world. Keel looks like a modern pro trading product: light, exact, quiet. The surface is pale cool grey with white panels, hairline borders, one cobalt accent, and green and red reserved for money. Every figure is set in Geist Mono and lines up in columns. The product itself is the illustration: a real-looking app window with labelled sample data carries the marketing pages.\n\nLight is the default regardless of OS. Dark is an explicit toggle (`data-theme=\"dark\"` on `<html>`, saved as `keel-theme`, applied before first paint). It is the same system with the same roles, not a second design.\n\nRejected, and recorded so they are not rebuilt: metaphor worlds (the earlier trading-floor tickets and stamps), dark mesh hero clichés, editorial serif display type, and anything that reads as AI-generated.",
+    "northStar": "Daylight Premium",
+    "overview": "**Creative North Star: \"Daylight Premium\"** names a register, not a metaphor world. Keel looks like a premium product used in daylight: a periwinkle canvas, white cards that lift on brand-tinted shadows, one deep brand hue (Keel Ultramarine), and one family, Instrument Sans, whose tabular figures set every number. The trader's plan is the one coloured surface: an ultramarine \"Your plan\" hero. The product itself is the illustration: real-looking app windows made of the app's own cards, with labelled sample data, carry the marketing pages.\n\nThe whole product wears one world. The app (`/app/*`) and the marketing site share the same tokens, face, cards and product-shot components; the approved comp is `.impeccable/mocks/rebrand-app/c-daylight-premium.html`. The `:root` tokens and the app-scoped (`:has([data-surface='app'])`) tokens in `src/styles/theme.css` hold the same values, so a Radix portal or page background follows the app while one is mounted.\n\nLight is the default regardless of OS. Dark is an explicit toggle (`data-theme=\"dark\"` on `<html>`, saved as `keel-theme`, applied before first paint). It is a designed deep navy, not an inversion: its own surfaces, lifted accent, brighter data hues and neutral shadows, with the hero surface staying ultramarine.\n\nRejected, and recorded so they are not rebuilt: metaphor worlds (the earlier trading-floor tickets and stamps), dark mesh hero clichés, editorial serif display type, the earlier flat grey-and-cobalt Geist look (replaced by this system; do not bring it back), and anything that reads as AI-generated.",
     "keyCharacteristics": [
-      "Cool off-white page, white panels, hairline borders; depth from border first, shadow only on the product shot.",
-      "One accent: cobalt. Gain green and loss red mean money and nothing else.",
-      "Geist for words, Geist Mono with tabular figures for every number.",
-      "Tight negative tracking on large headings, generous leading on body.",
+      "Periwinkle canvas, white cards, brand-tinted shadows; depth comes from the card shadow and a hairline.",
+      "One brand hue: Keel Ultramarine. Data hues have fixed jobs: marigold for mistakes, cyan for goal progress, green and red for signed money and kept or broken.",
+      "Instrument Sans for everything, with tabular figures wherever a number is read.",
+      "Tight negative tracking on large type, generous leading on body.",
       "Motion is short and decelerating; it announces arrival and selection, then stops.",
-      "The app (`/app`) is the same system at working density: labelled sidebar, 56px top bar, \"Plan vs actual\" Dashboard. Its direction is the trader's own plan as the yardstick: adherence and the cost of broken rules lead, performance follows."
+      "The app (`/app`) is the same system at working density: a labelled sidebar on the canvas, a top bar, a \"Plan vs actual\" Dashboard led by the ultramarine \"Your plan\" hero. Its direction is the trader's own plan as the yardstick: adherence and the cost of broken rules lead, performance follows."
     ],
     "rules": [
       {
-        "name": "The One Accent Rule",
-        "body": "Cobalt is the only brand colour. Never add a second hue for emphasis, category or decoration.",
+        "name": "The One Brand Hue Rule",
+        "body": "Ultramarine is the only brand colour. Never use it for money, and never add another hue for brand, emphasis or decoration.",
         "section": "colors"
       },
       {
-        "name": "The Sign Rule",
-        "body": "Green and red appear only where a number is positive or negative, or a rule is kept or broken. Zero is uncoloured. Never use them for status, branding or ornament.",
+        "name": "The Fixed Jobs Rule",
+        "body": "Marigold means a mistake, cyan means goal progress, green and red mean signed money or kept and broken. A hue never takes a second job. Zero is uncoloured.",
         "section": "colors"
       },
       {
         "name": "The Neutral Error Rule",
-        "body": "Failures to load or save (storage unavailable, dashboard could not load, \"Couldn't save\") are neutral: sunken or faint, with a Warning or ArrowClockwise glyph in muted ink. Loss red is money and broken rules, never an error state.",
+        "body": "Failures to load or save (storage unavailable, dashboard could not load, \"Couldn't save\") are neutral: sunken or faint, with a Warning or ArrowClockwise glyph in muted ink. Loss red is money and broken rules, never an error state, and marigold is mistakes, never a warning state.",
         "section": "colors"
       },
       {
         "name": "The Never Colour Alone Rule",
-        "body": "Sign and state also carry text or an icon (a leading sign in the figure, \"Kept\" / \"Broken\" for screen readers, Long / Short labels). Long and Short chips use gain and loss soft fills; this is sanctioned because the word always travels with the colour.",
+        "body": "Sign and state also carry text or an icon (a leading sign in the figure, \"Kept\" and \"Broken\" for screen readers and the hero's Kept and Broken labels, \"Broke:\" in a trade's rules cell). Long and Short are neutral words, never a result colour.",
         "section": "colors"
       },
       {
-        "name": "The Mono Numbers Rule",
-        "body": "Every number a trader reads is Geist Mono with tabular figures. Never set a figure in the text face.",
+        "name": "The Tabular Numbers Rule",
+        "body": "Every number a trader reads uses tabular figures (`tnum` or `font-mono`, both the same face). Never set a figure with proportional digits where it sits in a column or beside another figure.",
         "section": "typography"
       },
       {
-        "name": "The App Ramp Rule",
-        "body": "The app adds exactly two sizes to the ramp: the 40px mono hero figure and the 14px/600 card title. Anything else in `/app` is a row above. Do not mint a size for one surface.",
+        "name": "The Figure Ramp Rule",
+        "body": "Big figures take their own sizes (88/104 hero numeral, 31 P&L, 21 cost, 22 goal, 20 KPI); everything else in `/app` is a row above. Do not mint a size for one surface.",
         "section": "typography"
       },
       {
@@ -401,36 +489,38 @@
         "section": "typography"
       },
       {
-        "name": "The Border First Rule",
-        "body": "Depth comes from hairlines and tonal steps. A soft diffuse shadow is allowed on the product shot; hard offset shadows never.",
+        "name": "The Tinted Lift Rule",
+        "body": "Shadows are soft, diffuse and brand-tinted (neutral black in dark). Hard offset shadows never.",
         "section": "elevation"
       }
     ],
     "dos": [
-      "**Do** use cobalt (#2550e0) as the single accent and only for primary action, selection, focus and accent chips.",
-      "**Do** set every number in Geist Mono with tabular figures, and colour only signed P&L green or red.",
-      "**Do** use the three radii: 6 chips, 10 buttons and inner panels, 16 cards.",
+      "**Do** use Keel Ultramarine (#2b35af) as the one brand hue, for primary action, selection, focus, adherence, the account's own line and the hero surface.",
+      "**Do** give each data hue its one job: marigold for mistakes, cyan for goal progress, green and red for signed money and kept or broken.",
+      "**Do** set every number with tabular figures, and colour only signed P&L green or red.",
+      "**Do** use the three radii: 6 chips, 10 buttons and inner panels, 16 cards, and only the documented role exceptions beside them.",
+      "**Do** put cards on the canvas as white surfaces with the card shadow and a hairline; keep the \"Your plan\" hero the only coloured surface.",
       "**Do** show the product as a real app window built from live components, and label it \"Sample data. Not a real account.\" wherever invented figures appear.",
       "**Do** write copy with commas, periods and colons. Use hyphens only inside words.",
       "**Do** use Phosphor icons at 18px, with Motion durations and curves from `src/lib/motion.ts`.",
-      "**Do** keep light as the default and design dark as the same roles on the dark tokens.",
-      "**Do** put app icons in 32px duotone tiles: cobalt-soft when current, bare when inactive, outline-only faint when the module is not live.",
+      "**Do** keep light as the default and design dark as the navy palette with its own tokens, the hero staying ultramarine.",
+      "**Do** put card-header icons in 28px duotone tiles toned to the card's job: accent, marigold or cyan; outline-only faint when the module is not live.",
       "**Do** give every metric a MetricTip definition, keep 8px between a tip and adjacent controls, and keep goals net and in the base currency.",
       "**Do** open a rule's or a mistake's exact trades through the Morph dialog, and return focus to the opener.",
-      "**Do** show loading failures neutrally, and show Long and Short as words in gain and loss chips.",
+      "**Do** show loading failures neutrally, and show Long and Short as neutral words.",
       "**Do** keep every adherence figure honest: never 100% or 0% unless exact."
     ],
     "donts": [
       "**Don't** add eyebrows, kickers or small-caps labels above headings.",
       "**Don't** use em or en dashes in copy.",
-      "**Don't** add decorative dots, orbs, gradients or mesh backgrounds. The status pill dot is a status, not decoration.",
+      "**Don't** add decorative dots, orbs, mesh or gradient backgrounds. The gradients that ship are materials, not decoration: the hero surface, the raised primary, the brand tile, bar and area fills. The status pill dot is a status, not decoration.",
       "**Don't** present sample data unlabelled, or invent real-sounding user names and figures.",
       "**Don't** build metaphor worlds (floors, tickets, stamps, ledgers, cockpits) or editorial serif display type.",
-      "**Don't** add a second accent colour or use green and red for anything but sign and state.",
+      "**Don't** add a second brand hue, spend ultramarine on money, or use green and red for anything but signed money and kept or broken.",
       "**Don't** use hard offset shadows, glassmorphism or side-stripe borders.",
-      "**Don't** introduce font sizes outside the ramp above.",
-      "**Don't** use loss red for an error state, or cobalt for anything that is not action, selection, focus or the account's own line.",
-      "**Don't** tint a \"not live yet\" module with duotone fill; it stays an outline.",
+      "**Don't** introduce font sizes outside the ramp above, or bring back Geist, Geist Mono or the cobalt (#2550e0) look.",
+      "**Don't** use loss red for an error state, marigold for a warning state, or colour a side (Long or Short) as a result.",
+      "**Don't** tint a \"not live yet\" module; its glyph stays an outline.",
       "**Don't** reach for a library tooltip, modal or search box that bypasses the HorizonX-adapted ones."
     ]
   }
