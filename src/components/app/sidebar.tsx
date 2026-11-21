@@ -57,7 +57,7 @@ export function SidebarNav({
   params: URLSearchParams;
   onNavigate?(): void;
 }): React.JSX.Element {
-  const notLiveHeading = useId();
+  const notLiveLabel = useId();
   const activeId = activeItem(pathname)?.id;
   const rows = (group: NavItem['group']) =>
     APP_NAV.filter((i) => i.group === group).map((item) => (
@@ -73,13 +73,10 @@ export function SidebarNav({
   return (
     <nav aria-label="App" className="flex flex-1 flex-col">
       <ul className="flex flex-col gap-0.5">{rows('modules')}</ul>
-      <h2
-        id={notLiveHeading}
-        className="px-1 pt-5 pb-1.5 text-[12px] font-normal text-faint"
-      >
+      <p id={notLiveLabel} className="px-1 pt-5 pb-1.5 text-[12px] text-faint">
         Not live yet
-      </h2>
-      <ul aria-labelledby={notLiveHeading} className="flex flex-col gap-0.5">
+      </p>
+      <ul aria-labelledby={notLiveLabel} className="flex flex-col gap-0.5">
         {rows('not-live')}
       </ul>
       <ul className="mt-auto flex flex-col gap-0.5 pt-5">{rows('settings')}</ul>

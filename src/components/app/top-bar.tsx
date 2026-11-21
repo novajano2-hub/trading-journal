@@ -2,16 +2,20 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { UploadSimple } from '@phosphor-icons/react';
+import { UploadSimple } from '@phosphor-icons/react/dist/ssr';
 import type { ReactNode } from 'react';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { pageTitle } from './nav';
 
 /**
- * The 56px bar over every app page: the page title, then the slots, then
- * Import and the theme. Below `lg` the drawer trigger (`menu`) leads it and
- * the filters drop to a second row that scrolls sideways.
+ * The 56px bar over every app page: the page title, the filter chips, then
+ * search, the sample label, Gross/Net, Import and the theme. Below `xl` the
+ * chips drop to their own row that scrolls sideways (from `lg` to `xl` the
+ * sidebar leaves them too little room), and below `lg` the drawer trigger
+ * (`menu`) leads the bar. Below `sm` the sample label and Gross/Net take a row
+ * of their own above the chips, and the bar scrolls away with the page rather
+ * than holding three rows over it.
  */
 export function TopBar({
   menu,
@@ -28,30 +32,38 @@ export function TopBar({
 }): React.JSX.Element {
   const pathname = usePathname();
   return (
-    <header className="sticky top-0 z-30 flex flex-wrap items-center gap-x-2 border-b border-line bg-surface-1 px-5 lg:flex-nowrap">
+    <header className="sticky top-0 z-30 flex flex-wrap items-center gap-x-2 border-b border-line bg-surface-1 px-5 max-sm:static xl:flex-nowrap">
       {menu}
-      <h1 className="flex h-14 min-w-0 flex-1 items-center text-[22px] leading-[1.2] font-semibold tracking-[-0.02em] lg:mr-2 lg:flex-none">
+      <h1 className="flex h-14 min-w-0 flex-1 items-center text-[22px] leading-[1.2] font-semibold tracking-[-0.02em] xl:mr-2 xl:flex-none">
         <span className="truncate">{pageTitle(pathname)}</span>
       </h1>
       {filters ? (
-        // Padded inside the scroller so focus rings are not clipped.
-        <div className="order-last -mx-1 -mt-1.5 flex w-[calc(100%+8px)] min-w-0 items-center gap-2 overflow-x-auto px-1 pt-1.5 pb-3 lg:order-none lg:mx-0 lg:my-0 lg:w-auto lg:flex-1 lg:py-1.5">
+        // Padded inside the scroller, wider than a focus ring's 2px plus 3px offset, so rings are not clipped.
+        <div className="order-last -mx-1.5 -mt-1.5 flex w-[calc(100%+12px)] min-w-0 items-center overflow-x-auto px-1.5 pt-1.5 pb-3 xl:order-none xl:my-0 xl:w-auto xl:flex-1 xl:py-1.5">
           {filters}
         </div>
       ) : null}
-      <div className="ml-auto flex h-14 flex-none items-center gap-2">
+      {/* Below sm this wrapper steps aside, so its items join the bar's own rows. */}
+      <div className="contents sm:ml-auto sm:flex sm:h-14 sm:flex-none sm:items-center sm:gap-2">
         {search}
-        {label}
-        {basis}
-        <Link
-          href="/app/import"
-          aria-label="Import"
-          className={`${buttonClasses('primary', 'sm')} pointer-coarse:h-11 max-sm:w-[38px] max-sm:px-0 max-sm:pointer-coarse:w-11`}
-        >
-          <UploadSimple size={18} aria-hidden="true" className="sm:hidden" />
-          <span className="max-sm:hidden">Import</span>
-        </Link>
-        <ThemeToggle />
+        {label || basis ? (
+          <div className="flex items-center gap-2 max-sm:order-1 max-sm:w-full max-sm:pb-2">
+            {label}
+            <div className="flex max-sm:ml-auto">{basis}</div>
+          </div>
+        ) : null}
+        {/* Import's own page needs no link to itself. */}
+        {pathname === '/app/import' ? null : (
+          <Link
+            href="/app/import"
+            aria-label="Import"
+            className={`${buttonClasses('primary', 'sm')} flex-none pointer-coarse:h-11 max-sm:w-[38px] max-sm:px-0 max-sm:pointer-coarse:w-11`}
+          >
+            <UploadSimple size={18} aria-hidden="true" className="sm:hidden" />
+            <span className="max-sm:hidden">Import</span>
+          </Link>
+        )}
+        <ThemeToggle className="flex-none" />
       </div>
     </header>
   );

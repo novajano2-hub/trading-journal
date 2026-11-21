@@ -1,6 +1,6 @@
 'use client';
 
-import { List, X } from '@phosphor-icons/react';
+import { List, X } from '@phosphor-icons/react/dist/ssr';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { usePathname } from 'next/navigation';
 import { Dialog } from 'radix-ui';
@@ -75,12 +75,10 @@ export function MobileNav({
               >
                 <Dialog.Title className="sr-only">Navigation</Dialog.Title>
                 {/* Both controls here leave the sheet: the wordmark goes to the Dashboard. */}
-                <div
-                  className="mb-2 flex items-center justify-between"
-                  onClick={close}
-                >
+                <div className="mb-2 flex items-center justify-between">
                   <BrandMark
                     href="/app/dashboard"
+                    onClick={close}
                     className="h-11 rounded-control px-2"
                   />
                   <Dialog.Close

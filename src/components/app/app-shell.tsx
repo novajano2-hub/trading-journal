@@ -1,9 +1,25 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { Suspense, type ReactNode } from 'react';
+import { EMPTY_FILTERS } from '@/data/filters';
+import { AccountSwitcher } from './account-switcher';
+import { BasisSwitch } from './basis-switch';
+import { FilterBar, FilterBarView } from './filter-bar';
 import { MobileNav } from './mobile-nav';
+import { SampleLabel } from './sample-label';
 import { Sidebar } from './sidebar';
 import { TopBar } from './top-bar';
+
+/** The chips as prerendered, before the URL is read: all unset and inert. */
+const FILTERS_FALLBACK = (
+  <FilterBarView
+    filters={EMPTY_FILTERS}
+    options={{ symbols: [], strategies: [], tags: [] }}
+    today=""
+    onChange={() => {}}
+    disabled
+  />
+);
 
 /** Every /app page: the sidebar (a drawer below `lg`), the top bar, then the page. */
 export function AppShell({
@@ -19,9 +35,18 @@ export function AppShell({
       >
         Skip to content
       </a>
-      <Sidebar />
+      <Sidebar switcher={<AccountSwitcher />} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar menu={<MobileNav />} />
+        <TopBar
+          menu={<MobileNav switcher={<AccountSwitcher />} />}
+          filters={
+            <Suspense fallback={FILTERS_FALLBACK}>
+              <FilterBar />
+            </Suspense>
+          }
+          basis={<BasisSwitch />}
+          label={<SampleLabel />}
+        />
         <main
           id="content"
           tabIndex={-1}

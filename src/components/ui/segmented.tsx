@@ -10,18 +10,20 @@ export function Segmented<T extends string>({
   options,
   value,
   onChange,
+  className = '',
 }: {
   label: string;
   options: readonly SegmentedOption<T>[];
   value: T;
   onChange: (value: T) => void;
+  className?: string;
 }) {
   const name = useId();
   return (
     <div
       role="radiogroup"
       aria-label={label}
-      className="inline-flex rounded-[7px] bg-sunken p-0.5"
+      className={`inline-flex rounded-[7px] bg-sunken p-0.5 ${className}`}
     >
       {options.map((o) => (
         <label

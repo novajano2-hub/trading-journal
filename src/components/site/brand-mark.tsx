@@ -4,13 +4,16 @@ import Link from 'next/link';
 export function BrandMark({
   href = '/',
   className = '',
+  onClick,
 }: {
   href?: string;
   className?: string;
+  onClick?(): void;
 }) {
   return (
     <Link
       href={href}
+      onClick={onClick}
       className={`inline-flex items-center gap-2.5 text-[18px] font-semibold tracking-[-0.02em] text-text no-underline ${className}`}
     >
       <span

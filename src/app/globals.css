@@ -43,6 +43,8 @@
   /* Metric tooltip reveal (HorizonX Signal Tooltip technique): rise, scale up. */
   --animate-tip-in: tip-in var(--dur-enter) var(--ease-enter) backwards;
   --animate-tip-out: tip-out var(--dur-exit) var(--ease-exit) forwards;
+  /* App popovers and menus drop from their trigger; they leave as the tooltip does. */
+  --animate-pop-in: pop-in var(--dur-enter) var(--ease-enter) backwards;
 
   /* Task checkbox ripple (HorizonX Task Checkbox technique): a ring that grows and fades. */
   --animate-check-ripple: check-ripple 360ms ease-out;
@@ -61,6 +63,12 @@
     from {
       opacity: 0;
       transform: translateY(6px) scale(0.92);
+    }
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
     }
   }
   @keyframes tip-out {
