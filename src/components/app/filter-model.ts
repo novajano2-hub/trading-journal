@@ -1,5 +1,9 @@
 // No 'use client': plain rules for the filter chips and the account switcher.
-import type { GlobalFilters } from '@/data/filters';
+import {
+  resolveRange,
+  type DateRange,
+  type GlobalFilters,
+} from '@/data/filters';
 import type { Account, Strategy, Tag } from '@/domain/types';
 
 /** The top bar's chips other than the date. Accounts live in the sidebar switcher. */
@@ -102,4 +106,20 @@ export function accountSummary(
     'account',
     'accounts',
   );
+}
+
+/** The range's dates. A preset resolves against `today`, and to none while `today` is unknown (empty). */
+export function datesOf(
+  range: DateRange,
+  today: string,
+): { from?: string; to?: string } {
+  if (!('preset' in range)) return range;
+  return today === '' ? {} : resolveRange(range, today);
+}
+
+/** A custom range from the From and To fields: either may be empty, and a reversed pair is swapped. */
+export function customRange(from: string, to: string): DateRange {
+  const [a, b] =
+    from !== '' && to !== '' && from > to ? [to, from] : [from, to];
+  return { ...(a !== '' ? { from: a } : {}), ...(b !== '' ? { to: b } : {}) };
 }

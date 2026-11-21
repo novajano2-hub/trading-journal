@@ -10,7 +10,7 @@ import {
   useSetActiveWorkspace,
   useWorkspaces,
 } from '@/data/query/hooks';
-import { useShownFilters } from './filter-bar';
+import { useShownFilters } from './use-shown-filters';
 import {
   accountSummary,
   switchWorkspaceFilters,
@@ -130,9 +130,13 @@ export function AccountSwitcher(): React.JSX.Element {
             value={active.id}
             onValueChange={(id) => {
               if (id === active.id) return;
-              setActive.mutate(id, {
-                onSuccess: () => setFilters(switchWorkspaceFilters(filters)),
-              });
+              // The promise settles even if this menu unmounts mid-switch (the drawer closing).
+              setActive.mutateAsync(id).then(
+                () => setFilters(switchWorkspaceFilters(filters)),
+                () => {
+                  // The mutation keeps its error; the filters stay as they were.
+                },
+              );
             }}
           >
             <DropdownMenu.Label id={workspaceLabel} className={LABEL}>

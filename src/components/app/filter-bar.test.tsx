@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { QueryClient } from '@tanstack/react-query';
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -14,6 +15,7 @@ import { EMPTY_FILTERS } from '@/data/filters';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import { DataProvider } from '@/data/query/provider';
+import { commitNavigation, deferNavigation } from './__fixtures__/navigation';
 import { FilterBar, FilterBarView } from './filter-bar';
 import type { FilterOptions } from './filter-model';
 
@@ -21,7 +23,10 @@ vi.mock('next/navigation', () => import('./__fixtures__/navigation'));
 
 const NO_OPTIONS: FilterOptions = { symbols: [], strategies: [], tags: [] };
 
-beforeEach(() => window.history.replaceState(null, '', '/app/dashboard'));
+beforeEach(() => {
+  window.history.replaceState(null, '', '/app/dashboard');
+  commitNavigation();
+});
 afterEach(cleanup);
 
 test('five chips, each opening a dialog, and no "Clear filters" with nothing set', () => {
@@ -148,4 +153,32 @@ test('a stale link never shows its unknown ids as chips', async () => {
   await waitFor(() =>
     expect(window.location.search).toBe('?side=long&tag=tag-fomo'),
   );
+});
+
+/** Chooses Short while the router lags, as Next's transition makes it. */
+async function writeShortUnheard(): Promise<void> {
+  fireEvent.click(await liveChip('Long'));
+  const dialog = await screen.findByRole('dialog', { name: 'Side' });
+  deferNavigation();
+  fireEvent.click(within(dialog).getByRole('radio', { name: 'Short' }));
+  // The write shows at once, before the router has it.
+  expect(screen.getByRole('button', { name: 'Short' })).toBeTruthy();
+}
+
+test("back to another page before a write lands shows that page's filters", async () => {
+  renderBar('/app/reports?side=long');
+  await writeShortUnheard();
+  window.history.pushState(null, '', '/app/trades?side=long');
+  act(() => commitNavigation());
+  expect(screen.getByRole('button', { name: 'Long' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Short' })).toBeNull();
+});
+
+test('back to the same page and filters before a write lands shows the URL', async () => {
+  renderBar('/app/dashboard?by=hour&side=long');
+  await writeShortUnheard();
+  window.history.pushState(null, '', '/app/dashboard?side=long');
+  act(() => commitNavigation());
+  expect(screen.getByRole('button', { name: 'Long' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Short' })).toBeNull();
 });

@@ -10,12 +10,14 @@ import { pageTitle } from './nav';
 
 /**
  * The 56px bar over every app page: the page title, the filter chips, then
- * search, the sample label, Gross/Net, Import and the theme. Below `xl` the
- * chips drop to their own row that scrolls sideways (from `lg` to `xl` the
- * sidebar leaves them too little room), and below `lg` the drawer trigger
- * (`menu`) leads the bar. Below `sm` the sample label and Gross/Net take a row
- * of their own above the chips, and the bar scrolls away with the page rather
- * than holding three rows over it.
+ * search, the sample label, Gross/Net, Import and the theme.
+ * - Below 1440px the chips take their own row: beside the sidebar, real
+ *   labels don't fit on one line any narrower. Where even that row is too
+ *   short, they scroll sideways.
+ * - Below `lg` the drawer trigger (`menu`) leads the bar.
+ * - Below `sm` the sample label and Gross/Net take a row of their own above
+ *   the chips, and the bar scrolls away with the page rather than holding
+ *   three rows over it.
  */
 export function TopBar({
   menu,
@@ -32,14 +34,14 @@ export function TopBar({
 }): React.JSX.Element {
   const pathname = usePathname();
   return (
-    <header className="sticky top-0 z-30 flex flex-wrap items-center gap-x-2 border-b border-line bg-surface-1 px-5 max-sm:static xl:flex-nowrap">
+    <header className="sticky top-0 z-30 flex flex-wrap items-center gap-x-2 border-b border-line bg-surface-1 px-5 max-sm:static min-[1440px]:flex-nowrap">
       {menu}
-      <h1 className="flex h-14 min-w-0 flex-1 items-center text-[22px] leading-[1.2] font-semibold tracking-[-0.02em] xl:mr-2 xl:flex-none">
+      <h1 className="flex h-14 min-w-0 flex-1 items-center text-[22px] leading-[1.2] font-semibold tracking-[-0.02em] min-[1440px]:mr-2 min-[1440px]:flex-none">
         <span className="truncate">{pageTitle(pathname)}</span>
       </h1>
       {filters ? (
-        // Padded inside the scroller, wider than a focus ring's 2px plus 3px offset, so rings are not clipped.
-        <div className="order-last -mx-1.5 -mt-1.5 flex w-[calc(100%+12px)] min-w-0 items-center overflow-x-auto px-1.5 pt-1.5 pb-3 xl:order-none xl:my-0 xl:w-auto xl:flex-1 xl:py-1.5">
+        // The chips scroll inside their own group; this only places it.
+        <div className="order-last flex w-full min-w-0 items-center pb-3 min-[1440px]:order-none min-[1440px]:w-auto min-[1440px]:flex-1 min-[1440px]:pb-0">
           {filters}
         </div>
       ) : null}

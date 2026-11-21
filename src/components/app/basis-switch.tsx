@@ -20,7 +20,8 @@ export function BasisSwitch(): React.JSX.Element {
       options={OPTIONS}
       value={pending ?? saved ?? 'net'}
       onChange={(pnlBasis) => update.mutate({ pnlBasis })}
-      className="flex-none pointer-coarse:[&>label]:inline-flex pointer-coarse:[&>label]:min-h-11 pointer-coarse:[&>label]:items-center"
+      coarseTargets
+      className="flex-none"
     />
   );
 }

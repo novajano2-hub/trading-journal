@@ -11,12 +11,15 @@ export function Segmented<T extends string>({
   value,
   onChange,
   className = '',
+  coarseTargets = false,
 }: {
   label: string;
   options: readonly SegmentedOption<T>[];
   value: T;
   onChange: (value: T) => void;
   className?: string;
+  /** Options 44px high on coarse pointers, for touch. */
+  coarseTargets?: boolean;
 }) {
   const name = useId();
   return (
@@ -28,7 +31,7 @@ export function Segmented<T extends string>({
       {options.map((o) => (
         <label
           key={o.value}
-          className="relative cursor-pointer rounded-[5px] px-2.5 py-1 text-[13px] text-muted transition-colors has-[:checked]:bg-surface-1 has-[:checked]:text-text has-[:checked]:shadow-[var(--shadow-chip)] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent"
+          className={`relative cursor-pointer rounded-[5px] px-2.5 py-1 ${coarseTargets ? 'pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center' : ''} text-[13px] text-muted transition-colors has-[:checked]:bg-surface-1 has-[:checked]:text-text has-[:checked]:shadow-[var(--shadow-chip)] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent`}
         >
           <input
             type="radio"

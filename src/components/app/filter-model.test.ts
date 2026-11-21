@@ -4,6 +4,8 @@ import type { Account } from '@/domain/types';
 import {
   accountSummary,
   chipLabel,
+  customRange,
+  datesOf,
   hasActiveFilters,
   switchWorkspaceFilters,
   toggleId,
@@ -109,4 +111,28 @@ test('account summary', () => {
   expect(
     accountSummary(accts, { ...EMPTY_FILTERS, accountIds: ['a', 'b'] }),
   ).toBe('2 accounts');
+});
+
+test('a range resolves to its dates, a preset only once today is known', () => {
+  expect(datesOf({ preset: 'this-week' }, '2026-11-20')).toEqual({
+    from: '2026-11-16',
+    to: '2026-11-20',
+  });
+  expect(datesOf({ preset: 'this-week' }, '')).toEqual({});
+  expect(datesOf({ from: '2026-11-01' }, '')).toEqual({ from: '2026-11-01' });
+  expect(datesOf({}, '2026-11-20')).toEqual({});
+});
+
+test('a custom range keeps what was typed, swapping a reversed pair', () => {
+  expect(customRange('2026-11-01', '2026-11-15')).toEqual({
+    from: '2026-11-01',
+    to: '2026-11-15',
+  });
+  expect(customRange('2026-11-15', '2026-11-01')).toEqual({
+    from: '2026-11-01',
+    to: '2026-11-15',
+  });
+  expect(customRange('2026-11-01', '')).toEqual({ from: '2026-11-01' });
+  expect(customRange('', '2026-11-15')).toEqual({ to: '2026-11-15' });
+  expect(customRange('', '')).toEqual({});
 });
