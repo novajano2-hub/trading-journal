@@ -1,6 +1,15 @@
 import type { Icon } from '@phosphor-icons/react';
 
-export type TileTone = 'accent' | 'neutral' | 'faint';
+export type TileTone =
+  | 'accent'
+  | 'neutral'
+  | 'faint'
+  | 'warn'
+  | 'info'
+  | 'gain'
+  | 'loss'
+  /** On the ultramarine hero card: a translucent white tile. */
+  | 'on-accent';
 
 /**
  * Duotone's second layer is the glyph's `[opacity]` path: this tints it
@@ -14,12 +23,22 @@ const GLYPH: Record<TileTone, string> = {
   neutral: `text-muted ${COBALT_FILL}`,
   // Outline only: a module that isn't live has nothing to fill.
   faint: 'text-faint [&_[opacity]]:opacity-0',
+  warn: 'text-warn [&_[opacity]]:fill-warn-fill [&_[opacity]]:opacity-35',
+  info: 'text-info [&_[opacity]]:fill-info-fill [&_[opacity]]:opacity-35',
+  gain: 'text-gain [&_[opacity]]:fill-gain-fill [&_[opacity]]:opacity-35',
+  loss: 'text-loss [&_[opacity]]:fill-loss-fill [&_[opacity]]:opacity-35',
+  'on-accent': 'text-white [&_[opacity]]:fill-white [&_[opacity]]:opacity-30',
 };
 
 const FILL: Record<TileTone, string> = {
   accent: 'bg-accent-soft',
   neutral: 'bg-sunken',
   faint: 'bg-sunken',
+  warn: 'bg-warn-soft',
+  info: 'bg-info-soft',
+  gain: 'bg-gain-soft',
+  loss: 'bg-loss-soft',
+  'on-accent': 'bg-white/14 shadow-[inset_0_0_0_1px_rgb(255_255_255/0.12)]',
 };
 
 /**

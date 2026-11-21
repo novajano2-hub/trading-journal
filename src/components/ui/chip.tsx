@@ -1,12 +1,21 @@
 import type { ReactNode } from 'react';
 
-export type ChipTone = 'neutral' | 'accent' | 'gain' | 'loss';
+export type ChipTone =
+  | 'neutral'
+  | 'accent'
+  | 'gain'
+  | 'loss'
+  | 'warn'
+  | 'info';
 
 const TONE: Record<ChipTone, string> = {
   neutral: 'bg-sunken text-muted',
   accent: 'bg-accent-soft text-accent-ink',
   gain: 'bg-gain-soft text-gain',
   loss: 'bg-loss-soft text-loss',
+  // App-only tones: their tokens exist under the app scope (theme.css).
+  warn: 'bg-warn-soft text-warn',
+  info: 'bg-info-soft text-info',
 };
 
 /** 6px-radius tag. Use `mono` for numbers or symbols. */
