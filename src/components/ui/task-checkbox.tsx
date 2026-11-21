@@ -2,10 +2,11 @@
 
 // Technique adapted from HorizonX Task Checkbox, commercial licence: the check
 // that draws itself, the fill that grows with a small overshoot (240ms,
-// cubic-bezier(.68,-.275,.265,1.275)) and the ripple ring on checking. Rebuilt
+// cubic-bezier(.68,-.275,.265,1.275)) and the ripple, here a soft disc that
+// grows and fades, on checking. Rebuilt
 // as a native checkbox inside its label in Keel tokens; the strike-through,
 // gradient fill, drop shadow and foreign palette are dropped.
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 /**
  * A real checkbox: visually hidden input inside its label, so the keyboard,
@@ -25,6 +26,15 @@ export function TaskCheckbox({
   'aria-label'?: string;
   disabled?: boolean;
 }): React.JSX.Element {
+  // The ripple belongs to the false-to-true change, not to every checked box:
+  // a box that mounts checked stays still.
+  const [prev, setPrev] = useState(checked);
+  const [ripple, setRipple] = useState(false);
+  if (prev !== checked) {
+    setPrev(checked);
+    setRipple(checked);
+  }
+
   return (
     <label
       className={`group relative inline-flex select-none items-center gap-2.5 text-[14px] text-text pointer-coarse:min-h-11 pointer-coarse:min-w-11 ${
@@ -62,8 +72,8 @@ export function TaskCheckbox({
             }`}
           />
         </svg>
-        {checked ? (
-          <span className="pointer-events-none absolute left-1/2 top-1/2 size-[25px] rounded-full bg-gain/40 motion-safe:animate-check-ripple motion-reduce:hidden" />
+        {ripple ? (
+          <span data-ripple className="pointer-events-none absolute left-1/2 top-1/2 size-[25px] rounded-full bg-gain/40 motion-safe:animate-check-ripple motion-reduce:hidden" />
         ) : null}
       </span>
       {children}

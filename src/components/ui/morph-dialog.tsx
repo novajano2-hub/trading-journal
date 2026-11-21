@@ -49,6 +49,7 @@ export function MorphDialog({
   const veil = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
+  const exiting = useRef<{ stop: () => void }[]>([]);
 
   if (open && !present) setPresent(true);
 
@@ -58,6 +59,13 @@ export function MorphDialog({
     const veilEl = veil.current;
     const bodyEl = body.current;
     if (!panelEl || !veilEl || !bodyEl) return;
+    // A reopen can land mid-exit: stop it and clear its leftovers so the
+    // measurement below sees the panel at rest, not mid-transform.
+    exiting.current.forEach((c) => c.stop());
+    exiting.current = [];
+    panelEl.style.transform = 'none';
+    panelEl.style.opacity = '';
+    bodyEl.style.opacity = '';
     const opts = { duration: glide.duration, ease: glide.ease };
     const fade = animate(veilEl, { opacity: [0, 1] }, opts);
     if (reduced) {
@@ -69,7 +77,10 @@ export function MorphDialog({
     }
     const from = origin.current?.getBoundingClientRect();
     const rect = panelEl.getBoundingClientRect();
-    if (!from || !rect.width || !rect.height) return () => fade.stop();
+    if (!from || !rect.width || !rect.height) {
+      bodyEl.style.opacity = '1';
+      return () => fade.stop();
+    }
     const t = flipFrom(from, rect);
     const grow = animate(
       panelEl,
@@ -102,17 +113,21 @@ export function MorphDialog({
     const from = origin.current?.getBoundingClientRect();
     const rect = panelEl.getBoundingClientRect();
     const fade = animate(veilEl, { opacity: 0 }, opts);
+    const controls: { stop: () => void }[] = [fade];
     let main;
     if (reduced || !from || !rect.width) {
       main = animate(panelEl, { opacity: 0 }, opts);
     } else {
       const t = flipFrom(from, rect);
-      animate(bodyEl, { opacity: 0 }, { ...opts, duration: exit.duration / 2 });
+      controls.push(animate(bodyEl, { opacity: 0 }, { ...opts, duration: exit.duration / 2 }));
       main = animate(panelEl, t, opts);
     }
+    controls.push(main);
+    exiting.current = controls;
     Promise.all([main, fade]).then(done, done);
     return () => {
       cancelled = true;
+      controls.forEach((c) => c.stop());
     };
   }, [open, present, origin, reduced]);
 
@@ -129,7 +144,7 @@ export function MorphDialog({
             event.preventDefault();
             returnFocus.current?.focus();
           }}
-          className="fixed inset-0 z-50 m-auto flex h-fit max-h-[80dvh] w-[calc(100%-32px)] max-w-[720px] flex-col rounded-card border border-line bg-surface-1 shadow-[var(--shadow)] outline-none"
+          className="fixed inset-0 z-50 m-auto flex h-fit max-h-[80dvh] w-[calc(100%-32px)] max-w-[720px] flex-col overflow-hidden rounded-card border border-line bg-surface-1 shadow-[var(--shadow)] outline-none"
         >
           <div ref={body} className="flex max-h-[80dvh] min-h-0 flex-col">
             <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">

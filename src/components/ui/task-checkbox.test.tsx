@@ -31,3 +31,12 @@ test('disabled does not toggle', () => {
   fireEvent.click(screen.getByRole('checkbox', { name: 'x' }));
   expect(onChange).not.toHaveBeenCalled();
 });
+
+test('the ripple plays on checking, never on mount', () => {
+  const { container, rerender } = render(<TaskCheckbox checked onCheckedChange={() => {}} aria-label="kept" />);
+  expect(container.querySelector('[data-ripple]')).toBeNull();
+  rerender(<TaskCheckbox checked={false} onCheckedChange={() => {}} aria-label="kept" />);
+  expect(container.querySelector('[data-ripple]')).toBeNull();
+  rerender(<TaskCheckbox checked onCheckedChange={() => {}} aria-label="kept" />);
+  expect(container.querySelector('[data-ripple]')).not.toBeNull();
+});
