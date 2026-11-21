@@ -38,6 +38,12 @@ function validate(p: Partial<UserPrefs>): void {
     throw new RangeError(
       `Breakeven range must run low to high, got ${range.from} to ${range.to}`,
     );
+  for (const [id, g] of Object.entries(p.goals ?? {}))
+    for (const [field, cents] of Object.entries(g))
+      if (cents !== undefined && !(Number.isSafeInteger(cents) && cents > 0))
+        throw new RangeError(
+          `Goal ${field} for workspace "${id}" must be a positive whole number of cents, got ${cents}`,
+        );
 }
 
 const asPartial = (value: unknown): Partial<UserPrefs> =>
