@@ -18,10 +18,10 @@ export function goalsFor(prefs: UserPrefs, workspace: Workspace): Goals {
 /**
  * The `PrefsRepo.update` patch for one workspace's goals. It names only that
  * workspace; the repository merges per workspace inside its transaction, so
- * stale cached prefs can't overwrite the others. `{}` clears the workspace.
+ * other workspaces' goals are never read or overwritten here. `{}` clears the
+ * workspace.
  */
 export function withGoals(
-  _prefs: UserPrefs,
   workspaceId: string,
   goals: Goals,
 ): Pick<UserPrefs, 'goals'> {

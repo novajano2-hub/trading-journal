@@ -14,18 +14,14 @@ test('sample goals until edited; none for My workspace', () => {
   expect(goalsFor(prefs, USER_WORKSPACE)).toEqual({});
   const edited = {
     ...prefs,
-    ...withGoals(prefs, 'sample', { weeklyNet: 100000 }),
+    ...withGoals('sample', { weeklyNet: 100000 }),
   };
   expect(goalsFor(edited, SAMPLE_WORKSPACE)).toEqual({ weeklyNet: 100000 });
   expect(goalsFor(edited, USER_WORKSPACE)).toEqual({});
 });
 
 test('withGoals names only the edited workspace and drops undefined fields', () => {
-  const prefs = {
-    ...defaultPrefs(),
-    goals: { mine: { weeklyNet: 150000, dailyLossLimit: 20000 } },
-  };
-  const patch = withGoals(prefs, 'sample', {
+  const patch = withGoals('sample', {
     weeklyNet: 100000,
     dailyLossLimit: undefined,
   });

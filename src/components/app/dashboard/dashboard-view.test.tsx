@@ -349,7 +349,8 @@ test("ungraded trades show the plan's empty state, not 0% (Review Focus 1)", asy
     await screen.findByText('No graded trades in this range.'),
   ).toBeTruthy();
   expect(screen.queryByText('0%')).toBeNull();
-  expect(document.body.textContent).not.toMatch(/NaN|0%/);
+  // A bare 0%, not one inside a larger figure such as Performance's 50.0% win rate.
+  expect(document.body.textContent).not.toMatch(/NaN|(?<![\d.])0%/);
   expect(screen.queryByRole('table', { name: 'Rules' })).toBeNull();
   // Mistakes still read real numbers.
   expect(screen.getByRole('button', { name: opener(fomo) })).toBeTruthy();

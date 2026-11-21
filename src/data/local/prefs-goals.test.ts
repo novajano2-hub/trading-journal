@@ -46,9 +46,8 @@ test('editing one workspace read-modify-write keeps the other workspace and othe
     pnlBasis: 'gross',
     goals: { mine: { weeklyNet: 150000, dailyLossLimit: 20000 } },
   });
+  await repo.prefs.update(withGoals('sample', { weeklyNet: 100000 }));
   let prefs = await repo.prefs.get();
-  await repo.prefs.update(withGoals(prefs, 'sample', { weeklyNet: 100000 }));
-  prefs = await repo.prefs.get();
   expect(prefs).toMatchObject({ baseCurrency: 'EUR', pnlBasis: 'gross' });
   expect(goalsFor(prefs, USER_WORKSPACE)).toEqual({
     weeklyNet: 150000,
@@ -56,18 +55,17 @@ test('editing one workspace read-modify-write keeps the other workspace and othe
   });
   expect(goalsFor(prefs, SAMPLE_WORKSPACE)).toEqual({ weeklyNet: 100000 });
   // and the reverse: editing mine leaves sample alone
-  await repo.prefs.update(withGoals(prefs, 'mine', { dailyLossLimit: 30000 }));
+  await repo.prefs.update(withGoals('mine', { dailyLossLimit: 30000 }));
   prefs = await repo.prefs.get();
   expect(goalsFor(prefs, SAMPLE_WORKSPACE)).toEqual({ weeklyNet: 100000 });
   expect(goalsFor(prefs, USER_WORKSPACE)).toEqual({ dailyLossLimit: 30000 });
   expect(prefs.baseCurrency).toBe('EUR');
 });
 
-test('two updates built from the same stale prefs both survive', async () => {
+test('goals patches for two workspaces both survive', async () => {
   const repo = open(new IDBFactory());
-  const stale = await repo.prefs.get();
-  await repo.prefs.update(withGoals(stale, 'sample', { weeklyNet: 100000 }));
-  await repo.prefs.update(withGoals(stale, 'mine', { dailyLossLimit: 30000 }));
+  await repo.prefs.update(withGoals('sample', { weeklyNet: 100000 }));
+  await repo.prefs.update(withGoals('mine', { dailyLossLimit: 30000 }));
   const prefs = await repo.prefs.get();
   expect(goalsFor(prefs, SAMPLE_WORKSPACE)).toEqual({ weeklyNet: 100000 });
   expect(goalsFor(prefs, USER_WORKSPACE)).toEqual({ dailyLossLimit: 30000 });
@@ -75,10 +73,9 @@ test('two updates built from the same stale prefs both survive', async () => {
 
 test('clearing one workspace leaves the other intact', async () => {
   const repo = open(new IDBFactory());
-  const prefs = await repo.prefs.get();
-  await repo.prefs.update(withGoals(prefs, 'mine', { weeklyNet: 150000 }));
-  await repo.prefs.update(withGoals(prefs, 'sample', { weeklyNet: 100000 }));
-  await repo.prefs.update(withGoals(prefs, 'sample', {}));
+  await repo.prefs.update(withGoals('mine', { weeklyNet: 150000 }));
+  await repo.prefs.update(withGoals('sample', { weeklyNet: 100000 }));
+  await repo.prefs.update(withGoals('sample', {}));
   const after = await repo.prefs.get();
   expect(after.goals).toEqual({ mine: { weeklyNet: 150000 }, sample: {} });
   expect(goalsFor(after, SAMPLE_WORKSPACE)).toEqual({});

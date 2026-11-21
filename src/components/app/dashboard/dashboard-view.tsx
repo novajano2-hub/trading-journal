@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Segmented } from '@/components/ui/segmented';
 import { buildDashboard, pickPartition } from '@/data/dashboard';
 import { EMPTY_FILTERS, resolveRange } from '@/data/filters';
-import { goalsFor } from '@/data/goals';
+import { goalsFor, withGoals } from '@/data/goals';
 import { metricContextOf } from '@/data/metrics';
 import {
   useGlobalFilters,
@@ -19,15 +19,20 @@ import {
   useStrategies,
   useTags,
   useTrades,
+  useUpdatePrefs,
 } from '@/data/query/hooks';
 import { StorageUnavailableError } from '@/data/repository';
 import { SAMPLE_WORKSPACE } from '@/data/workspaces';
+import { goalWeek } from '@/domain/metrics/goals';
 import { localDate } from '@/domain/time';
 import { rangeCaption } from '@/lib/range-label';
 import { hasActiveFilters, switchWorkspaceFilters } from '../filter-model';
 import { Drilldown } from './drilldown';
+import { GoalsCard } from './goals-card';
 import { MistakesCard } from './mistakes-card';
+import { PerformanceCard } from './performance-card';
 import { PlanCard } from './plan-card';
+import { RecentTrades } from './recent-trades';
 import { DashboardEmpty, DashboardError, DashboardSkeleton } from './states';
 
 export type DrillTarget =
@@ -91,6 +96,7 @@ export function DashboardView(): React.JSX.Element {
   const strategies = useStrategies().data;
   const tags = useTags().data;
   const setActive = useSetActiveWorkspace();
+  const updatePrefs = useUpdatePrefs();
   const queryClient = useQueryClient();
 
   const [currency, setCurrency] = useState<string>();
@@ -123,8 +129,9 @@ export function DashboardView(): React.JSX.Element {
     const withClosed = metrics.data.filter((m) => m.summary.closedCount > 0);
     const range = resolveRange(shownFilters.range, today);
     const caption = rangeCaption(range, today);
+    const goals = goalsFor(prefs, workspace.data);
     if (withClosed.length === 0)
-      return { withClosed, caption, model: undefined };
+      return { withClosed, caption, goals, model: undefined, weekLabel: '' };
     const chosen = withClosed.some((m) => m.currency === currency)
       ? currency
       : undefined;
@@ -132,13 +139,18 @@ export function DashboardView(): React.JSX.Element {
     const model = buildDashboard(partition, {
       strategies,
       tags,
-      goals: goalsFor(prefs, workspace.data),
+      goals,
       baseCurrency: prefs.baseCurrency,
       ctx: metricContextOf(prefs),
       range,
       today,
     });
-    return { withClosed, caption, model };
+    // "this week" while the goal week is today's; a range that ended earlier reads "that week".
+    const week = model.goals.weekly?.window;
+    const weekLabel = week
+      ? `${week.from >= goalWeek({}, today)!.from ? 'this' : 'that'} week, ${rangeCaption(week, today)}`
+      : '';
+    return { withClosed, caption, goals, model, weekLabel };
   }, [
     metrics.data,
     shownFilters,
@@ -255,6 +267,7 @@ export function DashboardView(): React.JSX.Element {
         regionRef={planRegion}
         onOpenRule={(ruleId, button) => open({ kind: 'rule', ruleId }, button)}
       />
+      {/* Row 2: three cards from xl; between md and xl two, then Performance across both. */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <MistakesCard
           mistakes={m.mistakes}
@@ -266,7 +279,33 @@ export function DashboardView(): React.JSX.Element {
             open({ kind: 'mistake', tagId }, button)
           }
         />
+        <GoalsCard
+          // A workspace switch drops a half-edited form.
+          key={workspace.data?.id}
+          goals={m.goals}
+          set={view.goals}
+          currency={prefs?.baseCurrency ?? m.currency}
+          weekLabel={view.weekLabel}
+          onSave={async (next) => {
+            const ws = workspace.data;
+            if (!ws) throw new Error('No active workspace');
+            await updatePrefs.mutateAsync(withGoals(ws.id, next));
+          }}
+        />
+        <div className="min-w-0 md:max-xl:col-span-2">
+          <PerformanceCard
+            performance={m.performance}
+            basis={m.basis}
+            currency={m.currency}
+          />
+        </div>
       </div>
+      <RecentTrades
+        recent={m.recent}
+        basis={m.basis}
+        timeZone={timeZone}
+        caption={caption}
+      />
       {drill ? (
         <Drilldown
           target={drill.target}
