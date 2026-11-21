@@ -1,17 +1,35 @@
 'use client';
 
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useId } from 'react';
-import { XCircle } from '@phosphor-icons/react/dist/ssr';
+import {
+  ArrowsLeftRight,
+  CheckCircle,
+  XCircle,
+} from '@phosphor-icons/react/dist/ssr';
 import { Chip, SideChip } from '@/components/ui/chip';
 import type { RecentTrade, TradeRulesSummary } from '@/data/dashboard';
 import { pnlOf } from '@/domain/metrics/context';
 import type { PnlBasis } from '@/domain/types';
 import { formatPnl, keepHyphens, plural } from '@/lib/format';
 import { shortTime } from '@/lib/time-format';
-import { InstrumentName, signTone } from './shared';
+import { navHref, navItem } from '../nav';
+import {
+  CARD,
+  Caption,
+  CardHeader,
+  HEADER_LINK,
+  InstrumentName,
+  signTone,
+  TradeTime,
+} from './shared';
 
-const MONO = 'font-mono text-[12.5px] tabular-nums';
-const TH = 'h-5 pb-1.5 align-bottom text-left text-xs font-normal text-faint';
+const TRADES = navItem('trades');
+
+const FIGURE = 'font-[550] tabular-nums';
+const TH =
+  'h-[34px] border-b border-line align-middle text-left text-xs font-medium text-faint';
 /** Cells after the first: 16px apart from sm, 12px on phones. */
 const GAP = 'pl-3 sm:pl-4';
 
@@ -32,9 +50,17 @@ function RulesCell({ rules }: { rules: TradeRulesSummary }): React.JSX.Element {
     return <span className="text-faint">Not graded</span>;
   if (rules.kind === 'kept')
     return (
-      <span className="text-faint">
-        <span className="font-mono tabular-nums">{rules.kept}</span> of{' '}
-        <span className="font-mono tabular-nums">{rules.checked}</span> kept
+      <span className="flex items-center gap-[7px] text-muted">
+        <CheckCircle
+          size={16}
+          weight="fill"
+          aria-hidden="true"
+          className="flex-none text-gain-fill"
+        />
+        <span>
+          <span className="tabular-nums">{rules.kept}</span> of{' '}
+          <span className="tabular-nums">{rules.checked}</span> kept
+        </span>
       </span>
     );
 
@@ -50,21 +76,28 @@ function RulesCell({ rules }: { rules: TradeRulesSummary }): React.JSX.Element {
   return (
     <span
       title={rules.broken.join(', ') || undefined}
-      className="grid min-w-0 grid-cols-[14px_minmax(0,1fr)] items-start gap-x-1.5 text-loss xl:flex xl:items-center"
+      className="grid min-w-0 grid-cols-[16px_minmax(0,1fr)] items-start gap-x-[7px] xl:flex xl:items-center"
     >
       <XCircle
-        size={14}
+        size={16}
         weight="fill"
         aria-hidden="true"
-        className="mt-[3px] xl:mt-0 xl:flex-none"
+        className="mt-px flex-none text-loss-fill xl:mt-0"
       />
       <span aria-hidden="true" className="line-clamp-2 min-w-0 xl:truncate">
-        {first === undefined ? spoken : `Broke: ${keepHyphens(first)}`}
+        {first === undefined ? (
+          <span className="font-semibold text-loss">{spoken}</span>
+        ) : (
+          <>
+            <span className="font-semibold text-loss">Broke:</span>{' '}
+            <span className="text-text">{keepHyphens(first)}</span>
+          </>
+        )}
       </span>
       {rest.length > 0 ? (
         <span
           aria-hidden="true"
-          className="col-start-2 mt-1 inline-flex h-5 items-center justify-self-start rounded-chip bg-loss-soft px-1.5 font-mono text-[11.5px] tabular-nums xl:mt-0 xl:flex-none"
+          className="col-start-2 mt-1 inline-flex h-5 items-center justify-self-start rounded-chip bg-loss-soft px-1.5 text-[11.5px] font-semibold text-loss tabular-nums xl:mt-0 xl:flex-none"
         >
           +{rest.length}
         </span>
@@ -89,14 +122,14 @@ function StrategyCell({ row }: { row: RecentTrade }): React.JSX.Element {
       {first !== undefined ? (
         <>
           <span className="sr-only">Mistakes:</span>
-          <Chip tone="loss" className="max-w-[55%] flex-none">
+          <Chip tone="warn" className="max-w-[55%] flex-none">
             <span className="truncate">{first}</span>
           </Chip>
         </>
       ) : null}
       {rest.length > 0 ? (
         <span title={rest.join(', ')} className="flex-none">
-          <Chip mono>
+          <Chip className="tabular-nums">
             <span aria-hidden="true">+{rest.length}</span>
             <span className="sr-only">and {listOf(rest)}</span>
           </Chip>
@@ -109,7 +142,7 @@ function StrategyCell({ row }: { row: RecentTrade }): React.JSX.Element {
 /**
  * Row 3: the newest closed trades in the filters, each with how it went
  * against its strategy's rules. Rules takes the width the fixed columns
- * leave, at least 280px from `xl`, where every row is one 32px line. Below
+ * leave, at least 280px from `xl`, where every row is one 34px line. Below
  * `md` the time folds under the symbol; below `sm` Side and Strategy hide.
  */
 export function RecentTrades({
@@ -125,27 +158,32 @@ export function RecentTrades({
   caption: string;
 }): React.JSX.Element {
   const headingId = useId();
+  // The Trades page opens on the same filters.
+  const allTrades = navHref(TRADES, useSearchParams());
   return (
     <section
       aria-labelledby={headingId}
-      className="rounded-card border border-line bg-surface-1 px-5 pt-4 pb-2"
+      className={`${CARD} px-5 pt-[18px] pb-1`}
     >
-      <div className="mb-2.5 flex items-baseline gap-3">
-        <h2
-          id={headingId}
-          className="text-[14px] leading-snug font-semibold text-text"
-        >
-          Recent trades
-        </h2>
-        <span className="ml-auto text-xs text-faint">{caption}</span>
-      </div>
+      <CardHeader
+        icon={ArrowsLeftRight}
+        tone="neutral"
+        headingId={headingId}
+        title="Recent trades"
+        after={<Caption>{caption}</Caption>}
+        end={
+          <Link href={allTrades} className={HEADER_LINK}>
+            All trades
+          </Link>
+        }
+      />
       <table
         aria-label="Recent trades"
-        className="w-full table-fixed border-collapse text-[13px]"
+        className="mt-2 w-full table-fixed border-collapse text-[13.5px]"
       >
         <thead>
           <tr>
-            <th scope="col" className={`${TH} w-24 max-md:hidden xl:w-[104px]`}>
+            <th scope="col" className={`${TH} w-24 max-md:hidden xl:w-28`}>
               Time
             </th>
             <th
@@ -154,7 +192,7 @@ export function RecentTrades({
             >
               Symbol
             </th>
-            <th scope="col" className={`${TH} ${GAP} w-[72px] max-sm:hidden`}>
+            <th scope="col" className={`${TH} ${GAP} w-[78px] max-sm:hidden`}>
               Side
             </th>
             <th
@@ -181,19 +219,20 @@ export function RecentTrades({
             const time = shortTime(t.closedAt ?? t.openedAt, timeZone);
             const pnl = pnlOf(t, basis);
             return (
-              <tr key={t.id} className="border-t border-line text-text md:h-8">
-                <td className={`${MONO} whitespace-nowrap max-md:hidden`}>
-                  {time}
+              <tr
+                key={t.id}
+                className="border-t border-line/70 text-text transition-colors duration-200 ease-[var(--ease-glide)] first:border-t-0 hover:bg-sunken/60 md:h-[34px]"
+              >
+                <td className="max-md:hidden">
+                  <TradeTime text={time} />
                 </td>
-                <td className={`${MONO} py-1.5 md:pl-4 xl:py-0`}>
+                <td className="py-1.5 md:pl-4 xl:py-0">
                   <InstrumentName
                     trade={t}
                     className="xl:flex-nowrap"
                     detailClassName="max-md:hidden"
                   />
-                  <span className="block whitespace-nowrap text-faint md:hidden">
-                    {time}
-                  </span>
+                  <TradeTime text={time} className="block text-xs md:hidden" />
                 </td>
                 <td className={`${GAP} max-sm:hidden`}>
                   <SideChip side={t.direction} />
@@ -202,7 +241,7 @@ export function RecentTrades({
                   <StrategyCell row={row} />
                 </td>
                 <td
-                  className={`${GAP} ${MONO} text-right whitespace-nowrap ${signTone(pnl)}`}
+                  className={`${GAP} ${FIGURE} text-right whitespace-nowrap ${signTone(pnl)}`}
                 >
                   {formatPnl(pnl, t.pnlCurrency)}
                 </td>

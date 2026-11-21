@@ -39,7 +39,7 @@ function GoalField({
     <div className="min-w-0">
       <label
         htmlFor={id}
-        className="mb-1.5 block text-[13px] font-medium text-text"
+        className="mb-1.5 block text-[12.5px] font-medium text-muted"
       >
         {label}
       </label>
@@ -53,7 +53,7 @@ function GoalField({
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${hintId} ${errorId}` : hintId}
-        className="block h-[38px] w-full rounded-control border border-line-2 bg-surface-1 px-3 font-mono text-[13px] text-text tabular-nums placeholder:text-faint aria-invalid:border-muted pointer-coarse:h-11"
+        className="block h-[38px] w-full rounded-control border border-line-2 bg-surface-1 px-3 text-[14px] font-[550] text-text tabular-nums shadow-[var(--shadow-chip)] transition-[border-color,box-shadow] duration-200 ease-[var(--ease-glide)] outline-none placeholder:text-faint hover:border-faint focus-visible:border-accent focus-visible:shadow-[0_0_0_3px_var(--accent-soft)] aria-invalid:border-muted pointer-coarse:h-11"
       />
       {/* Always present, so the polite region exists before a message lands in it. */}
       <div id={errorId} aria-live="polite">
@@ -144,7 +144,7 @@ export function GoalsForm({
       }}
       className="@container flex flex-col"
     >
-      <p id={hintId} className="text-xs leading-4 text-faint">
+      <p id={hintId} className="text-[12.5px] leading-[1.45] text-faint">
         Amounts in {currency}, net of fees. Leave one empty to clear it.
       </p>
       <div className="mt-3 grid gap-3 @[20rem]:grid-cols-2">

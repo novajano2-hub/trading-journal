@@ -1,8 +1,14 @@
 'use client';
 
 import { useMemo, useState, type RefObject } from 'react';
-import { CheckCircle, Warning, XCircle } from '@phosphor-icons/react/dist/ssr';
+import {
+  CheckCircle,
+  ListChecks,
+  Warning,
+  XCircle,
+} from '@phosphor-icons/react/dist/ssr';
 import { Chip, SideChip } from '@/components/ui/chip';
+import { IconTile } from '@/components/ui/icon-tile';
 import { MetricTip } from '@/components/ui/metric-tip';
 import { MorphDialog } from '@/components/ui/morph-dialog';
 import type { DashboardModel } from '@/data/dashboard';
@@ -13,11 +19,13 @@ import type { Cents, Strategy, Tag, Trade } from '@/domain/types';
 import { formatPnl, keepHyphens, plural } from '@/lib/format';
 import { shortTime } from '@/lib/time-format';
 import type { DrillTarget } from './dashboard-view';
-import { InstrumentName, signTone } from './shared';
+import { InstrumentName, signTone, TradeTime } from './shared';
 
 function Money({ cents, currency }: { cents: Cents; currency: string }) {
   return (
-    <span className={`font-mono tabular-nums ${signTone(cents)}`}>
+    <span
+      className={`font-[550] whitespace-nowrap tabular-nums ${signTone(cents)}`}
+    >
       {formatPnl(cents, currency)}
     </span>
   );
@@ -26,7 +34,7 @@ function Money({ cents, currency }: { cents: Cents; currency: string }) {
 function Count({ n }: { n: number }) {
   return (
     <>
-      <span className="font-mono tabular-nums">{n}</span> {plural(n, 'trade')}
+      <span className="tabular-nums">{n}</span> {plural(n, 'trade')}
     </>
   );
 }
@@ -92,7 +100,7 @@ function KeptBox({
       />
       <span
         aria-hidden="true"
-        className="relative size-6 rounded-full outline-offset-1 transition-colors duration-120 group-hover:bg-sunken peer-focus-visible:outline-2 peer-focus-visible:outline-accent"
+        className="relative size-6 rounded-full outline-offset-1 transition-colors duration-200 ease-[var(--ease-glide)] group-hover:bg-sunken peer-focus-visible:outline-2 peer-focus-visible:outline-accent"
       >
         <XCircle
           size={20}
@@ -111,7 +119,7 @@ function KeptBox({
 }
 
 const TH =
-  'h-[26px] pb-1 pl-3 align-bottom text-left text-xs font-normal text-faint first:pl-0';
+  'h-[34px] border-b border-line pl-3 align-middle text-left text-xs font-medium text-faint first:pl-0';
 const TD = 'h-[38px] pl-3 align-middle first:pl-0';
 
 /** The trades behind one rule's or one mistake's number. */
@@ -153,7 +161,7 @@ function TradesTable({
       {failed ? (
         <p
           role="alert"
-          className="mb-3 flex items-center gap-2 rounded-control bg-sunken px-3 py-2 text-[13px] text-text"
+          className="mt-2 mb-1 flex items-center gap-2 rounded-control bg-sunken px-3 py-2 text-[13px] text-text"
         >
           <Warning
             size={16}
@@ -164,7 +172,10 @@ function TradesTable({
         </p>
       ) : null}
       <div className="-mx-5 overflow-x-auto px-5">
-        <table aria-label="Trades" className="w-full border-collapse">
+        <table
+          aria-label="Trades"
+          className="w-full border-collapse text-[13.5px]"
+        >
           <thead>
             <tr>
               {rule ? (
@@ -203,7 +214,10 @@ function TradesTable({
                   ? strategyName.get(t.strategyId)
                   : undefined;
               return (
-                <tr key={t.id} className="border-t border-line text-[13px]">
+                <tr
+                  key={t.id}
+                  className="border-t border-line/70 text-text first:border-t-0"
+                >
                   {rule ? (
                     <td className={TD}>
                       <div className="flex items-center">
@@ -217,23 +231,20 @@ function TradesTable({
                       </div>
                     </td>
                   ) : null}
-                  <td
-                    className={`${TD} font-mono text-[12.5px] whitespace-nowrap text-faint tabular-nums max-sm:hidden`}
-                  >
-                    {time}
+                  <td className={`${TD} max-sm:hidden`}>
+                    <TradeTime text={time} />
                   </td>
-                  <td
-                    className={`${TD} ${symbolPad} py-1.5 font-mono text-[12.5px] text-text`}
-                  >
+                  <td className={`${TD} ${symbolPad} py-1.5`}>
                     {/* The title and the Kept box's label keep the symbol as traded; below sm the time takes the expiry's place. */}
                     <InstrumentName
                       trade={t}
                       className="sm:flex-nowrap"
                       detailClassName="max-sm:hidden"
                     />
-                    <span className="block whitespace-nowrap text-faint tabular-nums sm:hidden">
-                      {time}
-                    </span>
+                    <TradeTime
+                      text={time}
+                      className="block text-xs sm:hidden"
+                    />
                   </td>
                   <td className={TD}>
                     <SideChip side={t.direction} />
@@ -243,9 +254,7 @@ function TradesTable({
                       <span className="text-faint">No strategy</span>
                     )}
                   </td>
-                  <td
-                    className={`${TD} text-right text-[12.5px] whitespace-nowrap`}
-                  >
+                  <td className={`${TD} text-right whitespace-nowrap`}>
                     <Money
                       cents={pnlOf(t, model.basis)}
                       currency={t.pnlCurrency}
@@ -256,7 +265,7 @@ function TradesTable({
                       {mistakes.length > 0 ? (
                         <span className="flex flex-wrap gap-1">
                           {mistakes.map((name) => (
-                            <Chip key={name} tone="loss">
+                            <Chip key={name} tone="warn">
                               {name}
                             </Chip>
                           ))}
@@ -361,6 +370,13 @@ export function Drilldown({
       // A rule's title keeps "1-hour" whole on a narrow screen.
       title={target.kind === 'rule' ? keepHyphens(title) : title}
       description={description}
+      icon={
+        target.kind === 'rule' ? (
+          <IconTile icon={ListChecks} tone="accent" />
+        ) : (
+          <IconTile icon={Warning} tone="warn" />
+        )
+      }
     >
       <TradesTable
         key={

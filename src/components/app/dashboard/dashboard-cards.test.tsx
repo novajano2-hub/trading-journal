@@ -480,7 +480,9 @@ test('a trade that broke two rules and carries two mistakes', async () => {
   // The full list rides in the title, and whole in the text a screen reader gets.
   const rules = within(row).getByTitle(`${r1}, ${r2}`);
   // Below xl the rule wraps to two lines rather than cutting to a stub; from xl it reads on one line.
-  const text = within(rules).getByText(`Broke: ${keepHyphens(r1)}`);
+  // "Broke:" (loss red) and the rule (ink) are two runs in one clamped line.
+  const text = rules.querySelector('.line-clamp-2')!;
+  expect(text.textContent).toBe(`Broke: ${keepHyphens(r1)}`);
   expect(text.className).toContain('line-clamp-2');
   expect(text.className).toContain('xl:truncate');
   expect(text.className).not.toMatch(/(^|\s)truncate/);

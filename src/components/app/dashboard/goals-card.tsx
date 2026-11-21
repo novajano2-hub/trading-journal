@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { Check } from '@phosphor-icons/react/dist/ssr';
+import { Check, Target } from '@phosphor-icons/react/dist/ssr';
 import { Chip } from '@/components/ui/chip';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { DashboardModel } from '@/data/dashboard';
+import type { DayStat } from '@/domain/metrics/days';
 import type {
   DailyLossProgress,
   WeeklyGoalProgress,
@@ -13,42 +14,21 @@ import type { Cents, Goals } from '@/domain/types';
 import { formatMoney, formatPnl, plural } from '@/lib/format';
 import { onTradingDate } from '@/lib/time-format';
 import { GoalsForm } from './goals-form';
-import { signTone } from './shared';
+import { CARD, CARD_PAD, CardHeader, HEADER_LINK, signTone } from './shared';
 
 /** Figures never break, so a minus sign can't end up on the line before its amount. */
-const MONO = 'font-mono text-[12.5px] whitespace-nowrap tabular-nums';
+const FIGURE = 'whitespace-nowrap tabular-nums';
 
-/** A figure inside a sentence: mono, at the sentence's size. */
+/** A figure inside a sentence, at the sentence's size. */
 function Num({ children }: { children: React.ReactNode }) {
-  return <span className="font-mono tabular-nums">{children}</span>;
+  return <span className="tabular-nums">{children}</span>;
 }
 
 /** 'Thu 19 Nov' for a local trading date. */
 const dayLabel = (date: string) =>
   onTradingDate(date, { weekday: 'short', day: 'numeric', month: 'short' });
 
-/** A goal's 6px track; `line` rail as on the rule tracks. */
-function GoalTrack({
-  value,
-  tone,
-}: {
-  value: number;
-  tone: 'accent' | 'gain';
-}): React.JSX.Element {
-  return (
-    <span
-      aria-hidden="true"
-      className="mt-2.5 mb-1.5 block h-1.5 overflow-hidden rounded-full bg-line"
-    >
-      <span
-        className={`block h-full rounded-full ${tone === 'gain' ? 'bg-gain' : 'bg-accent'}`}
-        style={{ width: `${value * 100}%` }}
-      />
-    </span>
-  );
-}
-
-/** The label line every goal row opens with: the metric and its amount. */
+/** The label line every goal opens with: the metric and its amount. */
 function GoalLabel({
   id,
   amount,
@@ -59,10 +39,12 @@ function GoalLabel({
   currency: string;
 }): React.JSX.Element {
   return (
-    <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-[13px] text-text">
+    <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-[12.5px] text-faint">
       {/* Goals are always net, whatever the Gross/Net switch says. */}
       <MetricTip id={id} basis="net" />
-      <span className={MONO}>{formatMoney(amount, currency)}</span>
+      <span className={`font-[550] text-muted ${FIGURE}`}>
+        {formatMoney(amount, currency)}
+      </span>
     </span>
   );
 }
@@ -90,57 +72,118 @@ function WeeklyRow({
           currency={currency}
         />
         {weekly.reached ? (
-          <Chip tone="gain" className="flex-none">
-            <Check size={13} aria-hidden="true" />
+          <Chip tone="gain" className="-my-0.5 flex-none">
+            <Check size={13} weight="bold" aria-hidden="true" />
             Reached
           </Chip>
         ) : (
-          <span className={`flex-none text-faint ${MONO}`}>
+          <span
+            className={`flex-none text-[12.5px] font-semibold text-info ${FIGURE}`}
+          >
             {percentOfGoal(weekly)}% of goal
           </span>
         )}
       </div>
-      <GoalTrack
-        value={weekly.fraction}
-        tone={weekly.reached ? 'gain' : 'accent'}
-      />
-      <p className="text-[13px] text-faint">
-        <span className={`${MONO} ${signTone(weekly.net)}`}>
+      <p className="mt-[3px] flex flex-wrap items-baseline gap-x-2">
+        <span
+          className={`text-[22px] leading-[1.25] font-semibold tracking-[-0.03em] ${FIGURE} ${signTone(weekly.net)}`}
+        >
           {formatPnl(weekly.net, currency)}
         </span>{' '}
-        {weekLabel}
+        <span className="text-[12.5px] text-muted">{weekLabel}</span>
       </p>
+      {/* Progress toward the goal: cyan, or gain once reached. */}
+      <span
+        aria-hidden="true"
+        className="mt-[9px] block h-1.5 overflow-hidden rounded-[3px] bg-line"
+      >
+        <span
+          className={`block h-full rounded-[3px] ${
+            weekly.reached
+              ? 'bg-gain-fill'
+              : 'bg-[linear-gradient(90deg,color-mix(in_oklab,var(--info-fill)_70%,white),var(--info-fill))]'
+          }`}
+          style={{ width: `${weekly.fraction * 100}%` }}
+        />
+      </span>
     </div>
+  );
+}
+
+/** Days the grid draws at most: four rows of 32. Older days stay in the sentence's count. */
+const GRID_DAYS = 128;
+
+/**
+ * One square per trading day, oldest first, left to right then down: kept
+ * days soft green, broken days loss red. A day's date and net ride in its
+ * title for a pointer; the grid's label says the totals.
+ */
+function DayGrid({
+  days,
+  limit,
+  currency,
+}: {
+  days: readonly DayStat[];
+  limit: Cents;
+  currency: string;
+}): React.JSX.Element | null {
+  if (days.length === 0) return null;
+  const shown = days.slice(-GRID_DAYS);
+  const broken = shown.filter((d) => d.net < -limit).length;
+  const label =
+    shown.length < days.length
+      ? `Latest ${shown.length} of ${days.length} trading days: ${shown.length - broken} kept, ${broken} broken`
+      : `${shown.length} trading ${plural(shown.length, 'day')}: ${shown.length - broken} kept, ${broken} broken`;
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      className="mt-[9px] grid grid-cols-[repeat(32,minmax(0,1fr))] gap-[2px]"
+    >
+      {shown.map((d) => {
+        const kept = d.net >= -limit;
+        return (
+          <span
+            key={d.date}
+            title={`${dayLabel(d.date)}, ${formatPnl(d.net, currency)}${kept ? '' : ', broke the limit'}`}
+            className={`aspect-square rounded-[1.5px] ${kept ? 'bg-gain-fill/35' : 'bg-loss-fill'}`}
+          />
+        );
+      })}
+    </span>
   );
 }
 
 function DailyLossRow({
   daily,
+  days,
   currency,
   period,
 }: {
   daily: DailyLossProgress;
+  /** Every trading day in the range on net, oldest first. */
+  days: readonly DayStat[];
   currency: string;
   /** The range the days come from, e.g. "all time", so it never reads as the goal week. */
   period: string;
 }): React.JSX.Element {
-  const { keptDays: kept, tradingDays: days, brokenDays } = daily;
+  const { keptDays: kept, tradingDays: count, brokenDays } = daily;
   const latest = brokenDays[brokenDays.length - 1];
   let sentence: React.ReactNode;
-  if (days === 0) sentence = 'No trading days in this range.';
+  if (count === 0) sentence = 'No trading days in this range.';
   else if (!latest) sentence = `Kept every day, ${period}.`;
   else {
     const at = (
       <>
         {dayLabel(latest.date)} at{' '}
-        <span className={`${MONO} ${signTone(latest.net)}`}>
+        <span className={`${FIGURE} ${signTone(latest.net)}`}>
           {formatPnl(latest.net, currency)}
         </span>
       </>
     );
     sentence = (
       <>
-        Kept <Num>{kept}</Num> of <Num>{days}</Num> {plural(days, 'day')},{' '}
+        Kept <Num>{kept}</Num> of <Num>{count}</Num> {plural(count, 'day')},{' '}
         {period}.{' '}
         {brokenDays.length === 1 ? (
           <>Broken {at}.</>
@@ -161,12 +204,12 @@ function DailyLossRow({
           amount={daily.limit}
           currency={currency}
         />
-        <span className={`flex-none text-faint ${MONO}`}>
-          {kept} of {days} {plural(days, 'day')}
+        <span className={`flex-none text-[12.5px] text-muted ${FIGURE}`}>
+          {kept} of {count} {plural(count, 'day')}
         </span>
       </div>
-      <GoalTrack value={days > 0 ? kept / days : 0} tone="accent" />
-      <p className="text-[13px] text-faint">{sentence}</p>
+      <DayGrid days={days} limit={daily.limit} currency={currency} />
+      <p className="mt-2 text-[12.5px] leading-[1.45] text-muted">{sentence}</p>
     </div>
   );
 }
@@ -178,6 +221,7 @@ function DailyLossRow({
  */
 export function GoalsCard({
   goals,
+  days,
   set,
   currency,
   weekLabel,
@@ -185,6 +229,8 @@ export function GoalsCard({
   onSave,
 }: {
   goals: DashboardModel['goals'];
+  /** The range's trading days on net, oldest first, for the daily loss limit's grid. */
+  days: readonly DayStat[];
   /** The goals as stored (or the sample's defaults), which the form starts from. */
   set: Goals;
   /** The base currency, which goals are kept in. */
@@ -228,7 +274,7 @@ export function GoalsCard({
     body = <p className="text-[13px] text-muted">{goals.unavailable}</p>;
   else
     body = (
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col">
         {goals.weekly ? (
           <WeeklyRow
             weekly={goals.weekly}
@@ -242,10 +288,11 @@ export function GoalsCard({
               : 'Your range starts after today.'}
           </p>
         )}
-        <div className="border-t border-line pt-3">
+        <div className="mt-4 border-t border-line pt-3">
           {goals.dailyLoss ? (
             <DailyLossRow
               daily={goals.dailyLoss}
+              days={days}
               currency={currency}
               period={rangeLabel}
             />
@@ -259,27 +306,27 @@ export function GoalsCard({
   return (
     <section
       aria-labelledby={headingId}
-      className="flex h-full flex-col rounded-card border border-line bg-surface-1 px-5 py-4"
+      className={`${CARD} ${CARD_PAD} flex h-full flex-col`}
     >
-      <div className="mb-2.5 flex items-center gap-3">
-        <h2
-          id={headingId}
-          className="text-[14px] leading-snug font-semibold text-text"
-        >
-          Goals
-        </h2>
-        {editing ? null : (
-          <button
-            ref={editButton}
-            type="button"
-            onClick={() => setEditing(true)}
-            // Negative margins keep the header the height of its title, as in the other cards.
-            className="-my-1.5 -mr-2 ml-auto h-8 rounded-chip px-2 text-[13px] font-medium text-muted transition-colors duration-120 hover:bg-sunken hover:text-text pointer-coarse:-my-3 pointer-coarse:h-11"
-          >
-            {none ? 'Set goals' : 'Edit goals'}
-          </button>
-        )}
-      </div>
+      <CardHeader
+        icon={Target}
+        tone="info"
+        headingId={headingId}
+        title="Goals"
+        className="mb-3"
+        end={
+          editing ? undefined : (
+            <button
+              ref={editButton}
+              type="button"
+              onClick={() => setEditing(true)}
+              className={HEADER_LINK}
+            >
+              {none ? 'Set goals' : 'Edit goals'}
+            </button>
+          )
+        }
+      />
       {body}
     </section>
   );
