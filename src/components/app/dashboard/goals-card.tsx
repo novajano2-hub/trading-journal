@@ -181,19 +181,18 @@ function DailyLossRow({
         </span>
       </>
     );
-    sentence = (
-      <>
-        Kept <Num>{kept}</Num> of <Num>{count}</Num> {plural(count, 'day')},{' '}
-        {period}.{' '}
-        {brokenDays.length === 1 ? (
-          <>Broken {at}.</>
-        ) : (
-          <>
-            Broken, latest {at}, <Num>{brokenDays.length}</Num> days in all.
-          </>
-        )}
-      </>
-    );
+    // The kept count sits beside the label; the sentence names the breaks and the period.
+    sentence =
+      brokenDays.length === 1 ? (
+        <>
+          Broken once, {period}: {at}.
+        </>
+      ) : (
+        <>
+          Last broken {at}. <Num>{brokenDays.length}</Num> days broken, {period}
+          .
+        </>
+      );
   }
 
   return (
@@ -204,9 +203,12 @@ function DailyLossRow({
           amount={daily.limit}
           currency={currency}
         />
-        <span className={`flex-none text-[12.5px] text-muted ${FIGURE}`}>
-          {kept} of {count} {plural(count, 'day')}
-        </span>
+        {count > 0 ? (
+          <span className={`flex-none text-[12.5px] text-muted ${FIGURE}`}>
+            <span className="font-semibold text-gain">Kept</span> {kept} of{' '}
+            {count} {plural(count, 'day')}
+          </span>
+        ) : null}
       </div>
       <DayGrid days={days} limit={daily.limit} currency={currency} />
       <p className="mt-2 text-[12.5px] leading-[1.45] text-muted">{sentence}</p>
