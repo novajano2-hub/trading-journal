@@ -3,6 +3,7 @@ import type {
   ImportContext,
   ImportPlan,
 } from '@/domain/import/plan';
+import type { ManualTradeError } from '@/domain/manual-trade';
 import { isValidTimeZone } from '@/domain/time';
 import type {
   Account,
@@ -106,6 +107,17 @@ export class OpenImportedTradeError extends Error {
     super(
       `Trade "${tradeId}" is an open position from import "${importId}"; undo the import instead`,
     );
+  }
+}
+
+/** The fills of a manual trade cannot make one trade; `error` says why, `fillIndex` which fill (0-based) when it is one. */
+export class ManualTradeRejected extends Error {
+  override name = 'ManualTradeRejected';
+  constructor(
+    readonly error: ManualTradeError,
+    readonly fillIndex?: number,
+  ) {
+    super(`Manual trade rejected: ${error}`);
   }
 }
 

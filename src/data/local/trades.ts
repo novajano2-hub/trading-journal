@@ -1,5 +1,7 @@
+import { buildManualTrade } from '@/domain/manual-trade';
 import { strategyRules, type Trade } from '@/domain/types';
 import {
+  ManualTradeRejected,
   NotFoundError,
   OpenImportedTradeError,
   type TradesRepo,
@@ -78,12 +80,63 @@ export function localTrades(ctx: LocalContext): TradesRepo {
       });
     },
 
-    async createManual() {
-      throw new Error('manual trades land in Task 10');
+    async createManual(ws, input) {
+      const db = await ctx.db();
+      const id = `manual:${ctx.newId()}`;
+      return rwTx(db, [db.trades, db.accounts], async () => {
+        const account = await db.accounts.get([ws, input.accountId]);
+        if (!account) throw new NotFoundError('account', input.accountId);
+        let highest = 0;
+        await db.trades
+          .where('workspaceId')
+          .equals(ws)
+          .each((t) => {
+            highest = Math.max(highest, t.serial);
+          });
+        const built = buildManualTrade(input, {
+          workspaceId: ws,
+          serial: highest + 1,
+          accountCurrency: account.currency,
+          id,
+        });
+        if (!built.ok)
+          throw new ManualTradeRejected(built.error, built.fillIndex);
+        await db.trades.put(built.trade);
+        return built.trade;
+      });
     },
 
-    async replaceManual() {
-      throw new Error('manual trades land in Task 10');
+    async replaceManual(ws, id, input) {
+      const db = await ctx.db();
+      return rwTx(db, [db.trades, db.accounts], async () => {
+        const old = await db.trades.get([ws, id]);
+        if (!old) throw new NotFoundError('trade', id);
+        if (old.source !== 'manual')
+          throw new Error(
+            `Trade "${id}" was imported; only manual trades can be rebuilt`,
+          );
+        const account = await db.accounts.get([ws, input.accountId]);
+        if (!account) throw new NotFoundError('account', input.accountId);
+        const built = buildManualTrade(input, {
+          workspaceId: ws,
+          serial: old.serial,
+          accountCurrency: account.currency,
+          id,
+        });
+        if (!built.ok)
+          throw new ManualTradeRejected(built.error, built.fillIndex);
+        // The journal stays; the figures and fills are rebuilt.
+        const next: Trade = {
+          ...built.trade,
+          strategyIds: old.strategyIds,
+          tagIds: old.tagIds,
+          ruleChecks: old.ruleChecks,
+        };
+        for (const k of ['rating', 'noteId', 'reviewed'] as const)
+          if (old[k] !== undefined) Object.assign(next, { [k]: old[k] });
+        await db.trades.put(next);
+        return next;
+      });
     },
 
     async remove(ws, ids) {

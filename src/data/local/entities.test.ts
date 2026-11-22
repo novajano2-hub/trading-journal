@@ -2,7 +2,11 @@ import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { expect, test } from 'vitest';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import { fixtureSample } from '../__fixtures__/sample';
-import { DuplicateNameError, NotFoundError } from '../repository';
+import {
+  DuplicateNameError,
+  ManualTradeRejected,
+  NotFoundError,
+} from '../repository';
 import { KeelDb } from './db';
 import type { ImportJobRecord } from './schema';
 import { createLocalRepository } from './local-repository';
@@ -567,19 +571,78 @@ test('updateMany patches exactly the given trades', async () => {
   expect((await repo.trades.get(S, 'f-1'))?.reviewed).toBe(true);
 });
 
-test('manual trades wait for Task 10', async () => {
-  const { repo } = setup();
-  const input = {
+test('manual trades: created at the next serial, rebuilt keeping the journal, refused when they do not add up', async () => {
+  const { repo } = setup({ newId: () => 'm-1' });
+  const inst = (await repo.trades.get(S, 'f-1'))!.instrument;
+  const t = (hour: number) =>
+    `2026-11-19T${String(hour).padStart(2, '0')}:00:00.000Z`;
+  const fills = (qty: number) => [
+    {
+      time: t(14),
+      side: 'buy' as const,
+      qty: 2,
+      price: 100,
+      commission: 0,
+      fees: 0,
+    },
+    {
+      time: t(15),
+      side: 'sell' as const,
+      qty,
+      price: 101,
+      commission: 0,
+      fees: 0,
+    },
+  ];
+  const before = (await repo.trades.list(S)).length;
+  const top = Math.max(...(await repo.trades.list(S)).map((x) => x.serial));
+
+  const made = await repo.trades.createManual(S, {
     accountId: 'acc-a',
-    instrument: (await repo.trades.get(S, 'f-1'))!.instrument,
+    instrument: inst,
+    fills: fills(2),
+  });
+  expect(made).toMatchObject({
+    id: 'manual:m-1',
+    source: 'manual',
+    serial: top + 1,
+  });
+  expect((await repo.trades.list(S)).length).toBe(before + 1);
+
+  await repo.trades.update(S, made.id, {
+    tagIds: ['tg'],
+    rating: 4,
+    reviewed: true,
+  });
+  const rebuilt = await repo.trades.replaceManual(S, made.id, {
+    accountId: 'acc-a',
+    instrument: inst,
+    fills: fills(1),
+  });
+  expect(rebuilt).toMatchObject({
+    id: made.id,
+    serial: made.serial,
+    status: 'open',
+    tagIds: ['tg'],
+    rating: 4,
+    reviewed: true,
+  });
+
+  const rejected = repo.trades.createManual(S, {
+    accountId: 'acc-a',
+    instrument: inst,
     fills: [],
-  };
-  await expect(repo.trades.createManual(S, input)).rejects.toThrow(
-    'manual trades land in Task 10',
-  );
-  await expect(repo.trades.replaceManual(S, 'f-1', input)).rejects.toThrow(
-    'manual trades land in Task 10',
-  );
+  });
+  await expect(rejected).rejects.toBeInstanceOf(ManualTradeRejected);
+  await expect(rejected).rejects.toMatchObject({ error: 'no-fills' });
+  expect((await repo.trades.list(S)).length).toBe(before + 1);
+  await expect(
+    repo.trades.replaceManual(S, 'f-1', {
+      accountId: 'acc-a',
+      instrument: inst,
+      fills: fills(2),
+    }),
+  ).rejects.toThrow('only manual trades');
 });
 
 test('journal.save creates, then replaces, stamping updatedAt', async () => {
