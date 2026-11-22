@@ -5,7 +5,7 @@ Built on 2026-11-22 from three sources:
 - TradeZella's official MCP connector, read-only, which exposes their data model;
 - their public help centre, summarised in [tradezella-plan5-features.md](tradezella-plan5-features.md).
 
-**Rule:** we take features and behaviour. The look stays Keel's approved Daylight design, the wording is our own, and no screen layout is copied.
+**Rule (the user, 2026-11-22):** TradeZella's system is the reference: where it has a behaviour, Keel adopts it, built in Keel's own UI with better UX where possible. We take features and behaviour. The look stays Keel's approved Daylight design, the wording is our own, and no screen layout is copied.
 
 **Where each item goes:**
 - **P5** goes in Plan 5. These are the milestone 1 modules that already have approved comps; new parts extend the comps' language.
@@ -29,7 +29,7 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | X3 | Pick several accounts at once, with search by name or broker | Built (single) | P5 |
 | X4 | Display unit switch: dollars, % return, R-multiple | Spec has gross/net; Gap 5 | P5 |
 | X5 | Privacy mode that hides every money figure (for screen sharing) | New | P5 |
-| X6 | Display in ticks, pips or points per instrument | New | P6 |
+| X6 | Display in ticks, pips or points per instrument | New | P5 |
 | X7 | Trade-behaviour flags computed by rules, not AI: back-to-back losses, a winner that turned into a loser, holding a loser too long, scaling in/out, unusually high volume. They work as filters and on trades | New | P6 |
 | X8 | Field-level history of edits (entity, field, old value, new value, source: you, import or the app) | New | P6 |
 | X9 | Extra metrics: Sharpe, Sortino, max winning/losing streaks by day, avg daily win %, longest trading day | New | P5 |
@@ -74,7 +74,7 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | IM4 | Import history with fill and trade counts per import, and delete/undo per import | Spec + Gap 11 | P5 |
 | IM5 | Recognise a known broker's file and offer its preset | Backlog #11 | B#11 |
 | IM6 | Broker catalogue: each broker with the methods it supports (sync, file, manual) and the asset types each covers | New | B#10 |
-| IM7 | Excel (.xlsx) and .txt files | E25 | P6 |
+| IM7 | Excel (.xlsx) and .txt files | E25 | P5 |
 | IM8 | Broker auto-sync (e.g. MetaTrader with a read-only investor login) | Backlog #10 | B#10 |
 
 ## Calendar (`/app/calendar`)
@@ -97,7 +97,7 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | RE4 | Compare: two groups, each defined by its own filters, side by side | Gap 10 | P5 |
 | RE5 | Risk report: position size, R-multiple buckets, drawdown | Gap 10 | P5 |
 | RE6 | Performance report with a dollars/R switch | Gap 10 | P5 |
-| RE7 | Options report by days to expiry | Research "Later" | P6 |
+| RE7 | Options report by days to expiry | Research "Later" | P5 |
 | RE8 | Weekly and monthly written recaps | AI | B#22 |
 
 ## Strategies (`/app/strategies`)

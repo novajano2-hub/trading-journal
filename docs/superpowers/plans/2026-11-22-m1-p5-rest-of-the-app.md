@@ -49,6 +49,7 @@
   - If `next dev` rewrites AGENTS.md, commit that change with the task.
 - **Dependencies:** add exactly these, pinned to versions at least two weeks old:
   - `@tanstack/react-table`
+  - `read-excel-file`, for XLSX import
   - Tiptap 3's open-source packages: `@tiptap/react`, `@tiptap/pm`, `@tiptap/starter-kit`, plus the packages that provide task lists, tables, collapsible blocks (details), placeholder and suggestion
   - Before adding each Tiptap package, check its `license` field is MIT. Use no Pro or Cloud package. If collapsible blocks aren't MIT, build them as a small custom node.
   - Add no chart, date-picker or UI kit library.
@@ -84,7 +85,7 @@
    - Expected: each exit's P&L lands on its own local date in the calendar, the dashboard's daily figures and the daily loss limit.
    - The trade's own net, and every trade-level metric, are unchanged. A trade that is still open books nothing.
    - Pinned in Task 3, and in Task 13's calendar test.
-2. **Privacy mode.**
+2. **The Privacy display unit.**
    - Expected: no money amount appears anywhere on screen. That includes text, `aria-label`, `title`, chart axes and readouts, and CSV previews.
    - Counts, %, R and ratios stay, and so does the sign. A CSV export still carries real values.
    - Pinned in Task 5, and asserted again in Tasks 6, 13 and 14.
@@ -96,7 +97,8 @@
    - every new param round-trips through the URL; unknown or malformed values are dropped, not thrown.
    - Pinned in Task 4.
 4. **Removing something other records use:**
-   - a strategy with trades: the trades keep their data and lose the strategy and its rule checks;
+   - a strategy with trades: the trades keep their data and other strategies, and lose this strategy and its rule checks;
+   - a tag category with tags: its tags leave every trade; the Mistakes category can't be deleted;
    - a folder with notes: the notes move to My notes;
    - the default template: the kind falls back to its built-in template;
    - an account with trades: it can't be deleted until it's cleared or archived;
@@ -110,35 +112,39 @@
 
 ## Rulings
 
+**The user's rule (2026-11-22):** TradeZella's system is the reference. Where it has a behaviour, Keel adopts it and builds it in Keel's own UI, aiming for better UX. Keel's own calls are only for what TradeZella doesn't document, and each is marked "Keel's call" below.
+
 | Question | Ruling | Basis |
 |---|---|---|
-| P&L by date (feature map CA4) | A closed trade books each exit fill's realized P&L on that fill's local date. Entry fees are shared among the exits by matched quantity, and the cents left over go to the last exit, so the parts sum to the trade's net exactly. An open trade books nothing until it closes. Day-level figures use this: the calendar, day stats, green days, the dashboard's daily chart, goals, Sharpe and Sortino. Trade-level metrics and the closed-trade equity curve keep using the trade's close time. | TradeZella books P&L on the close or partial-exit date. Keel's metrics are closed-trade based (spec §7). E13 re-checks this against TradeZella once the sample CSVs are imported. |
-| % display | For a trade it shows Net ROI: net ÷ cost basis (`costBasis`). For an aggregate it shows net ÷ the summed balance of the selected accounts at the range start (starting balance plus cash flows before that date). | TradeZella's "Percentage" view; Keel's own base, stated in the MetricTip. |
-| R display | For a trade it shows realized R. For an aggregate it shows the sum of realized R over trades that have risk, labelled "{n} trades without a stop left out" when any are left out. | Spec §7 alignment (Planned vs Realized R). |
-| Privacy | Masks money amounts only, as `+$•••` / `−$•••`, with the accessible text "hidden amount". Counts, %, R, ratios and signs stay. CSV exports carry real values. | The user hides position size when sharing a screen. The direction of a result isn't sensitive. |
-| Sharpe and Sortino | Daily returns = day net ÷ balance at that day's start (starting balance + flows + earlier net). Sharpe = mean ÷ sample standard deviation × √252. Sortino = mean ÷ √(Σ min(0, r)² ÷ n) × √252, with a risk-free rate of 0. Both are null with fewer than 2 days, and Sortino is null with no losing day. | Keel's own definitions. TradeZella shows both but documents neither. |
-| Tag categories | Stay Keel's four fixed categories (setup, mistake, emotion, custom), coloured by token. Tags gain a description. User-made categories go to Plan 6 (new E62). | Spec §7 and the approved comps group by these four. Feature map SE3 is delivered except that part. |
-| One strategy per trade | `Trade.strategyId` stays single. | Spec §7. TradeZella's many-to-many playbooks aren't adopted. |
-| Rule groups | Stay entry, exit, risk and management. Each rule gains "show when" (always, winner, loser, breakeven). | Comp 09. Feature map ST2. |
-| A rule that doesn't apply | A rule whose show-when doesn't match the trade's outcome is hidden on that trade, and adherence leaves that trade out for that rule. An open trade shows only "always" rules. | TradeZella's behaviour. |
-| Sample workspace | Keeps its three accounts (spec §8). The forex evaluation becomes step 1 of a 2-step challenge. The comps' extra accounts were illustrative. Values the seed adds come from separate random streams, so existing trades and P&L don't move. | Spec §8. Plan 4's pinned numbers. |
-| Tables | TanStack Table for the trade log and report tables, at 50 rows a page, with no virtualisation. | Spec §5 lists TanStack Table. Pages keep the DOM small. |
-| Charts | Hand-rolled SVG, no visx or Lightweight Charts. | It matches the dashboard. There are no candles (market data is backlog #13). |
-| Manual trades | Built only from their own fills: they never merge with imported positions. Fills that reverse the position are refused. They are marked `source: 'manual'`, are editable, and can always be deleted. | Keeps the import engine's invariants intact. |
-| Future options | Stored as `assetClass: 'option'`, with `underlying` set to the futures root and `pointValue` = the multiplier. | `AssetClass` already covers it, so the domain type needs no new value. |
-| Excel import | Moves to Plan 6 (E25). The upload step says "Excel files: save as CSV for now." | Keeps the dependency list as it is. |
-| Import encoding | Decode UTF-8, and retry as windows-1252 if U+FFFD appears. `planImport` runs outside render with a pending state. The worker part of E44 moves to Plan 6. | E44. |
-| Trade notes | One per trade, with kind `trade-note`, created on first edit. The title is "{instrument label}, {d MMM yyyy}" of the open date. The entry is stored in the Trade notes folder. | Feature map TD2. |
-| Daily notes | Daily notes are `daily-review` entries keyed by date, opened at `/app/notebook/daily/[date]`. A new day starts from the default daily template. | Feature map NB4. |
-| Folders | Built-in folders are virtual: Favourites, Daily journal, Trade notes, Recaps, Trash. "My notes" holds entries with no folder. User folders are a table. | Feature map NB2. |
-| Trash | `deletedAt` marks a note as trashed. Listing purges entries trashed more than 30 days ago. Restore clears the mark. | Feature map NB3. |
-| Templates | Templates belong to a workspace, with one default per kind. Built-in templates (daily review, pre-market plan, weekly recap) can be edited but not deleted. | Feature map NB4. |
-| Settings pages | The sub-nav reads Profile, Trading, Accounts, Tags, Import history. Comp 11 shows three, and the two extra follow its pattern. | Feature map SE2, SE3. |
-| Challenge status | Computed from the current phase's account through `evaluateProp`: Active, Near a limit, Breached, Passed. The breach reason is computed (which rule, on which date). The trader can close a challenge out as passed or failed. Fees are entered by hand. | Keel computes what TradeZella asks the trader to type. |
-| Reports tabs | The comp's eight tabs, then a "More reports" menu holding Performance, Risk, Wins vs losses and Compare. | Comp 06 fits eight tabs. |
-| Cross-analysis | A second dimension turns any breakdown's table into a matrix: rows by the first dimension, columns by the second, each cell one chosen metric. At most 12 columns, and the rest fold into "Other". | Feature map RE2. |
-| Calendar cell stats | Up to 3 of: net, trades, win rate, R, fees. The default is net and trades. | Feature map CA2. |
-| Display controls | One "Display" button in the top bar opens a popover with the $ / % / R switch and "Hide amounts". While privacy is on, the button shows the crossed-eye glyph. | The top bar's 1280px chip fit leaves room for one button, not two. |
+| P&L by date (feature map CA4) | Each exit fill books its realized P&L on that fill's local date, including the partial exits of a trade that is still open. The part not yet exited books nothing. Entry fees are shared among the exits by matched quantity, and the cents left over go to the last exit of a closed trade. Day-level figures use this: the calendar, day stats, green days, the dashboard's daily chart, goals, Sharpe and Sortino. Trade-level metrics (win rate, profit factor and the rest) still count closed trades by close time. | TradeZella: open positions add nothing until exited; partial exits book on their exit date (HC 10528734). The fee split is Keel's call. |
+| Display units | One menu, as TradeZella has: Dollar, Percentage, Privacy, R-multiple, Ticks (futures), Pips (forex), Points (futures). The choice is saved in prefs and applies to every money figure. | TradeZella's display switch. |
+| Percentage | For a trade it shows Net ROI: net ÷ cost basis (`costBasis`). For an aggregate it shows net ÷ the selected accounts' balance at the range start (starting balance plus cash flows before that date). | TradeZella's Percentage view. The aggregate base is Keel's call, stated in the MetricTip. |
+| R-multiple | For a trade it shows realized R, which needs an initial risk. For an aggregate it shows the sum of realized R over trades that have one, and says "{n} trades without a stop left out" when any are missing. | TradeZella: R-multiple uses entered initial risk only. |
+| Ticks, pips, points | For a trade, the price move per unit in the trade's direction: (avg exit − avg entry) × direction, divided by the tick size (ticks), the pip size of 0.0001, or 0.01 for JPY quotes (pips), or not divided (points). Aggregates sum the eligible trades. Trades of other asset classes are left out and counted, as for R. | TradeZella limits ticks and points to futures and pips to forex. The per-unit formula is Keel's call. |
+| Privacy | Shows money amounts as `+$•••` / `−$•••`, with the accessible text "hidden amount". Signs, counts and ratios stay visible. CSV exports carry real values. | TradeZella's Privacy option masks values. What stays visible is Keel's call. |
+| Sharpe and Sortino | Daily returns = day net ÷ balance at that day's start. Sharpe = mean ÷ sample standard deviation × √252. Sortino = mean ÷ √(Σ min(0, r)² ÷ n) × √252, with a risk-free rate of 0. Both are null with fewer than 2 days, and Sortino is null with no losing day. | TradeZella shows both but documents neither. Keel's call. |
+| Tag categories | Made by the user, each with a name and a colour. Tags belong to one category and can carry a description. Names are stored lowercase and are unique within their category. A new workspace starts with two built-in categories, "Mistakes" (role `mistake`, which feeds the mistake reports and the dashboard's mistakes card) and "Custom tags". Built-in categories can be renamed and recoloured but not deleted. The sample workspace also has "Setups" and "Emotions". | TradeZella's tag categories. The `mistake` role keeps Keel's mistake costs working. |
+| Strategies per trade | A trade can belong to several strategies (`strategyIds`). Rule checks stay keyed by rule id, so each strategy's checklist is graded separately. Filters offer include, exclude, "match all" and "no strategy". | TradeZella's playbooks are many-to-many. |
+| Rule groups | Each strategy has its own titled, ordered groups, each holding ordered rules with a "show when" setting (always, winner, loser, breakeven). A new strategy starts with Entry, Exit, Risk and Management, which can be renamed, removed or added to. | TradeZella's playbook groups. |
+| A rule that doesn't apply | A rule whose show-when doesn't match the trade's outcome is hidden on that trade, and its stats leave that trade out. An open trade shows only "always" rules. | TradeZella's behaviour. |
+| Sample workspace | Keeps its first three accounts and their trades unchanged. It adds two futures prop challenges on new accounts so the prop page shows every state: "Futures 50K" (1-step, evaluation passed, funded phase active) and "Futures 100K" (1-step, breached). The forex evaluation becomes step 1 of the 2-step "Forex 100K". New values come from separate random streams. | Comp 12 shows each state. The new accounts' trades are Keel's sample content, labelled as sample. |
+| Challenge status | Set by the trader, as in TradeZella: phase (evaluation or funded), status (active, passed or breached) and a failure reason. Keel also checks the linked account's rules and, when it finds a breach or a met target, offers a one-click update. For example: "Daily loss limit broken on 12 Nov (−$1,240.00 of −$1,000.00). Mark as breached?" The click fills in the reason. | TradeZella's fields, with Keel's detection as the UX improvement. |
+| Tables | TanStack Table for the trade log and report tables, at 50 rows a page, with no virtualisation. | Keel's call (spec §5). |
+| Charts | Hand-rolled SVG, no chart library. | Keel's call: it matches the dashboard. No candles, since market data is backlog #13. |
+| Manual trades | Built only from their own fills, so they never merge with imported positions. Fills that reverse the position are refused. They are marked `source: 'manual'`, are editable, and can always be deleted. | Keel's call: it keeps the import engine's invariants. TradeZella documents nothing here. |
+| Future options | Stored as `assetClass: 'option'`, with `underlying` set to the futures root and `pointValue` = the multiplier. | Keel's internal model; the form offers TradeZella's seven asset types. |
+| Import files | CSV, TXT and XLSX, as TradeZella accepts. XLSX is read with `read-excel-file` (MIT). The first sheet becomes rows of text, which then go through the same mapping. | TradeZella's generic upload (feature map IM7 moves into Plan 5). |
+| Import encoding | Decode UTF-8, and retry as windows-1252 if U+FFFD appears. `planImport` runs outside render with a pending state. The worker part of E44 stays in Plan 6. | E44. |
+| Trade notes | One per trade, with kind `trade-note`, created on first edit. The title is "{symbol} : {d MMM yyyy}". The entry lives in the Trade notes folder, and its stats card shows net P&L, quantity, volume, commissions, Net ROI and gross P&L. | TradeZella's trade notes. |
+| Notebook folders | Favourites, Trade notes, Daily journal, Sessions recap and My notes, then the user's own folders, then Trash. Built-in folders can't be deleted. User folders are a table. "My notes" holds entries with no folder. | TradeZella's notebook. |
+| Daily notes | `daily-review` entries keyed by date, opened at `/app/notebook/daily/[date]`. A new day starts from the default daily template. | TradeZella's Daily Journal. |
+| Trash | Deleted notes go to Trash, are restorable, and are purged after 30 days. | TradeZella's Trash. |
+| Templates | Templates belong to a workspace, with one default per kind and a template manager. Built-in templates can be edited but not deleted. | TradeZella's default template and manager. |
+| Settings pages | Profile, Accounts, Trading, Tags and Logs (with an Imports tab). TradeZella's other settings pages are Plan 6 or backlog items. | TradeZella's settings structure, limited to what Plan 5 builds. |
+| Reports structure | Tabs: Overview, Performance, Reports, Compare, Calendar. "Reports" is a menu of Day & time (weekday, month, time of day, duration), Symbols, Risk (R-multiple, position size, R distribution), Strategies, Tags, Options (days to expiry) and Wins vs losses. Long and short side by side sits in Overview. The comp's look carries over to this structure. | TradeZella's report set. Feature map RE7 (options DTE) moves into Plan 5. |
+| Cross-analysis | A second dimension turns any breakdown's table into a matrix: rows by the first dimension, columns by the second, each cell one chosen metric. At most 12 columns, and the rest fold into "Other". | TradeZella's cross-analysis. The column cap is Keel's call. |
+| Calendar cell stats | The trader chooses what a day cell shows, at most 3 of: net, trades, win rate, R, fees. The default is net and trades. | TradeZella's calendar settings. The cap is Keel's call. |
+| Calendar page | Keel keeps `/app/calendar` (comp 05) for the month, and Reports → Calendar shows the year. | Spec §6 and TradeZella's Reports → Calendar. |
 
 ## Backlog items owned by this plan
 
@@ -165,13 +171,13 @@
 | E59 recent-trades header, mistake column, 0DTE label | Task 6 |
 | #7 CSV export | Task 6 |
 
+Also delivered here, though the feature map first placed them elsewhere: E25 Excel import (Task 11), E62 user-made tag categories (Tasks 2 and 18), X6 ticks, pips and points (Task 5), IM7 (Task 11) and RE7 options by days to expiry (Task 15).
+
 Moved to Plan 6, recorded in Task 20:
 - E10 merge and split;
-- E25 Excel;
 - E44's worker part;
 - E50 routine goals (the progress tracker);
-- E52 and E55 top-bar polish;
-- the new E62 user-made tag categories.
+- E52 and E55 top-bar polish.
 
 E34 and E39 stay with E31 (milestone 2).
 
@@ -184,8 +190,8 @@ src/domain/prop/       (modified) evaluate.ts   challenge.ts
 src/domain/import/     (modified) plan.ts (direction-flipped flag)  guess-columns.ts mapping.ts (one synonym list)
 src/data/              (modified) repository.ts filters.ts metrics.ts trade-patch.ts dashboard.ts  csv-export.ts
 src/data/local/        (modified) db.ts schema.ts trades.ts accounts.ts journal.ts tags.ts strategies.ts prefs.ts context.ts
-                       folders.ts templates.ts cashflows.ts challenges.ts
-src/data/seed/         (modified) generate.ts journal.ts   templates.ts
+                       tag-categories.ts templates.ts folders.ts cashflows.ts challenges.ts
+src/data/seed/         (modified) generate.ts journal.ts   templates.ts prop.ts
 src/data/query/        (modified) hooks.ts keys.ts derived.ts
 src/lib/               display.ts note-text.ts decode.ts  (modified) format.ts time-format.ts
 src/content/           (modified) metric-definitions.ts   note-templates.ts
@@ -240,35 +246,43 @@ The recipe and probes are in the Plan 2 final re-review (E45 in `docs/BACKLOG.md
 
 ---
 
-### Task 2: Domain types, storage version 2 and hooks
+### Task 2: TradeZella's model, storage version 2 and hooks
 
-Delivers the storage behind TR3, AC2-AC4, NB2-NB5, ST2, ST4, ST5, PF2-PF4, SE1-SE3 and X4-X5.
+Delivers the storage behind TR3, AC2-AC4, NB2-NB5, ST2, ST4, ST5, SE3 and X4-X6. It also brings in the three model changes the Rulings take from TradeZella (several strategies per trade, user-made tag categories, titled rule groups) and moves every consumer onto them.
 
 **Files:**
-- Modify: `src/domain/types.ts`, `src/data/repository.ts`, `src/data/trade-patch.ts`, `src/data/local/{db,schema,trades,accounts,journal,tags,strategies,prefs,context}.ts`, `src/data/query/{hooks,keys}.ts`, `src/data/seed/{generate,journal}.ts`
-- Create: `src/data/local/{folders,templates,cashflows,challenges}.ts`, `src/data/seed/templates.ts`, `src/content/note-templates.ts`
-- Test: `src/data/local/store.test.ts`, `src/data/local/entities.test.ts`, `src/data/local/migration.test.ts` (new), `src/data/seed/generate.test.ts`, `src/data/query/keys.test.ts`
+- Modify: `src/domain/types.ts`, `src/data/repository.ts`, `src/data/trade-patch.ts`, `src/data/filters.ts`, `src/data/dashboard.ts`, `src/domain/metrics/{rules,mistakes,breakdowns,summary}.ts`, `src/data/local/{db,schema,trades,accounts,journal,tags,strategies,prefs,context,imports}.ts`, `src/data/query/{hooks,keys}.ts`, `src/data/seed/{generate,journal,instruments}.ts`, and every component that reads `strategyId`, `Tag.category` or `Rule.group` (`grep -rn "strategyId\|\.category\b\|\.group\b" src`)
+- Create: `src/data/local/{templates,tag-categories}.ts`, `src/data/seed/templates.ts`, `src/content/note-templates.ts`, `src/data/local/migration.test.ts`
+- Test: `store.test.ts`, `entities.test.ts`, `migration.test.ts`, `generate.test.ts`, `keys.test.ts`, plus the existing metric and dashboard tests, updated to the new shapes
 
 **Interfaces:**
 - Produces, in `types.ts`:
   ```ts
-  // Trade: add
+  // Trade: replace `strategyId?: string` with
+  strategyIds: string[];
+  // and add
   reviewed?: boolean; source?: 'import' | 'manual';
   // Account: add
   timeZone?: string; importMapping?: ImportMapping;
   // PropRuleSet: add (undefined = no period / floor at the starting balance)
   periodDays?: number; drawdownFloor?: Cents;
-  // Tag: add
-  description?: string;
+  // Tag categories become records; replace `TagCategory` and `Tag.category`
+  export interface TagCategory { id: string; workspaceId: string; name: string; color: string /* #RRGGBB */;
+    role?: 'mistake'; builtIn: boolean }
+  // Tag: replace `category` with
+  categoryId: string; description?: string;     // name stored lowercase, unique within its category
   export type RuleShowWhen = 'always' | 'winner' | 'loser' | 'breakeven';
-  // Rule: add
-  showWhen?: RuleShowWhen;                       // undefined reads as 'always'
+  export interface Rule { id: string; text: string; showWhen: RuleShowWhen }
+  export interface RuleGroup { id: string; title: string; rules: Rule[] }
+  // Strategy: replace `rules` with
+  groups: RuleGroup[];
+  // and add
+  icon?: StrategyIcon; tone?: StrategyTone;
   export const STRATEGY_ICONS = ['target','lightning','trend-up','trend-down','crosshair','waves',
     'compass','flag','clock','stack','shield','rocket'] as const;
   export type StrategyIcon = (typeof STRATEGY_ICONS)[number];
   export type StrategyTone = 'accent' | 'info' | 'gain' | 'warn' | 'neutral';
-  // Strategy: add
-  icon?: StrategyIcon; tone?: StrategyTone;
+  export function strategyRules(s: Strategy): Rule[];   // flattened, group order then rule order
   // JournalKind: add 'trade-note'
   // JournalEntry: replace `folder?: string` with
   folderId?: string; favorite?: boolean; deletedAt?: string; tags: string[];
@@ -280,11 +294,12 @@ Delivers the storage behind TR3, AC2-AC4, NB2-NB5, ST2, ST4, ST5, PF2-PF4, SE1-S
   export type ChallengeStep = 'step-1' | 'step-2' | 'funded';
   export interface Challenge { id: string; workspaceId: string; name: string; firm: string;
     steps: 1 | 2; phases: { step: ChallengeStep; accountId?: string; startDate?: string }[];
-    evaluationFee?: Cents; activationFee?: Cents; closedOut?: 'passed' | 'failed' }
-  export type DisplayUnit = 'money' | 'percent' | 'r';
+    phase: 'evaluation' | 'funded'; status: 'active' | 'passed' | 'breached'; failureReason?: string;
+    evaluationFee?: Cents; activationFee?: Cents }
+  export type DisplayUnit = 'dollar' | 'percent' | 'privacy' | 'r' | 'ticks' | 'pips' | 'points';
   export type CalendarStat = 'net' | 'trades' | 'winRate' | 'r' | 'fees';
   // UserPrefs: add
-  displayName?: string; displayUnit: DisplayUnit; privacy: boolean; tradeColumns?: string[];
+  displayName?: string; displayUnit: DisplayUnit; tradeColumns?: string[];
   hideTradeSummary: boolean; calendarStats: CalendarStat[]; instrumentsTraded: AssetClass[];
   settleExpiredOptions: boolean;
   ```
@@ -303,78 +318,93 @@ Delivers the storage behind TR3, AC2-AC4, NB2-NB5, ST2, ST4, ST5, PF2-PF4, SE1-S
   trash(ws: string, id: string): Promise<void>; restore(ws: string, id: string): Promise<void>;
   ensureTradeNote(ws: string, tradeId: string): Promise<JournalEntry>;   // creates it and sets trade.noteId in one transaction
   dailyNote(ws: string, date: string): Promise<JournalEntry>;            // opens the day's note or creates it from the default daily template
-  export interface FoldersRepo { list(ws: string): Promise<NoteFolder[]>; create(ws: string, name: string): Promise<NoteFolder>;
-    rename(ws: string, id: string, name: string): Promise<NoteFolder>; remove(ws: string, id: string): Promise<void> }
+  export interface TagCategoriesRepo { list(ws: string): Promise<TagCategory[]>;
+    create(ws: string, input: { name: string; color: string }): Promise<TagCategory>;
+    update(ws: string, id: string, patch: { name?: string; color?: string }): Promise<TagCategory>;
+    remove(ws: string, id: string): Promise<void> }      // refuses built-in; removes its tags from trades, then the tags
   export interface TemplatesRepo { list(ws: string): Promise<NoteTemplate[]>;
     save(ws: string, t: Omit<NoteTemplate, 'id' | 'workspaceId' | 'builtIn'> & { id?: string }): Promise<NoteTemplate>;
     remove(ws: string, id: string): Promise<void>; setDefault(ws: string, id: string): Promise<void> }
-  export interface CashFlowsRepo { list(ws: string): Promise<CashFlow[]>;
-    create(ws: string, input: Omit<CashFlow, 'id' | 'workspaceId'>): Promise<CashFlow>;
-    update(ws: string, id: string, patch: Partial<Omit<CashFlow, 'id' | 'workspaceId'>>): Promise<CashFlow>;
-    remove(ws: string, id: string): Promise<void> }
-  export interface ChallengesRepo { list(ws: string): Promise<Challenge[]>;
-    create(ws: string, input: Omit<Challenge, 'id' | 'workspaceId'>): Promise<Challenge>;
-    update(ws: string, id: string, patch: Partial<Omit<Challenge, 'id' | 'workspaceId'>>): Promise<Challenge>;
-    remove(ws: string, id: string): Promise<void> }
-  // Repository: add folders, templates, cashFlows, challenges
+  // Repository: add tagCategories, templates
   ```
-  `TradePatch` adds `'reviewed'`. `createManual` and `replaceManual` are declared here and wired to the builder in Task 10. Until then they throw `new Error('manual trades land in Task 10')`.
+  - `TradePatch` adds `'reviewed'` and `'strategyIds'`, and drops `'strategyId'`.
+  - `createManual` and `replaceManual` are declared here and wired to the builder in Task 10. Until then they throw `new Error('manual trades land in Task 10')`.
+  - The folders, cash-flow and challenge repositories are added by Tasks 17, 18 and 19. This task only declares their tables.
 - Produces, in `hooks.ts`:
-  - **Queries:** `useFolders`, `useTemplates`, `useCashFlows`, `useChallenges`
-  - **Mutations:** `useCreateFolder`, `useRenameFolder`, `useRemoveFolder`, `useSaveTemplate`, `useRemoveTemplate`, `useSetDefaultTemplate`, `useCreateCashFlow`, `useUpdateCashFlow`, `useRemoveCashFlow`, `useCreateChallenge`, `useUpdateChallenge`, `useRemoveChallenge`, `useCreateManualTrade`, `useReplaceManualTrade`, `useUpdateTrades`, `useClearAccountTrades`, `useTrashJournalEntry`, `useRestoreJournalEntry`, `useEnsureTradeNote`, `useDailyNote`
+  - **Queries:** `useTagCategories`, `useTemplates`
+  - **Mutations:** `useCreateTagCategory`, `useUpdateTagCategory`, `useRemoveTagCategory`, `useSaveTemplate`, `useRemoveTemplate`, `useSetDefaultTemplate`, `useCreateManualTrade`, `useReplaceManualTrade`, `useUpdateTrades`, `useClearAccountTrades`, `useTrashJournalEntry`, `useRestoreJournalEntry`, `useEnsureTradeNote`, `useDailyNote`
   - Each mutation invalidates the query keys it changes.
 
 Behaviour:
-- **Schema:**
-  - Dexie `version(2)` adds `folders`, `templates` and `challenges` (`'[workspaceId+id], workspaceId'`), plus `cashflows` (`'[workspaceId+id], workspaceId, [workspaceId+accountId]'`).
-  - The upgrade turns each distinct `journal.folder` name in a workspace into a `NoteFolder`, sets `folderId`, deletes `folder`, and sets `tags: []`.
+- **Schema:** Dexie `version(2)`:
+  - adds `tagCategories`, `templates`, `folders` and `challenges` (`'[workspaceId+id], workspaceId'`), plus `cashflows` (`'[workspaceId+id], workspaceId, [workspaceId+accountId]'`);
+  - changes the trades index `[workspaceId+strategyId]` to a multi-entry `*strategyIds`;
   - `DATA_TABLES` lists the new tables, so reset and clear cover them.
+- **The upgrade:**
+  - **Trades:** `strategyId` becomes `strategyIds` (`[]` when unset).
+  - **Tags:** each workspace gets "Mistakes" (role `mistake`, built-in, `#D97706`) and "Custom tags" (built-in, `#16A34A`). Old `mistake` tags go to Mistakes and `custom` tags to Custom tags. `setup` and `emotion` tags go to new "Setups" (`#2B35AF`) and "Emotions" (`#0A6F94`) categories, created only when such tags exist.
+  - **Strategies:** `rules` with an enum `group` become titled groups in the order Entry, Exit, Risk, Management, keeping only groups that have rules. Every rule gets `showWhen: 'always'`.
+  - **Journal:** each distinct `folder` name in a workspace becomes a `NoteFolder`. Entries get `folderId` and lose `folder`, and every entry gets `tags: []`.
+- **Consumers:**
+  - Filters, metrics, the rule scorecard, mistake costs (a mistake is a tag whose category has role `mistake`), breakdowns (strategy and tag), the dashboard and the import engine move to `strategyIds`, `categoryId` and `groups`.
+  - The strategy breakdown counts a trade under each of its strategies.
+  - The tag breakdown groups by category name.
+  - Behaviour must not change for the existing sample, so the dashboard's pinned numbers stay put.
 - **Removal rules:**
-  - `strategies.remove` clears `strategyId` and the rule checks of that strategy's rules on its trades.
-  - `folders.remove` moves its notes to no folder.
-  - `templates.remove` refuses a built-in template (`NotFoundError` is wrong here; throw `new Error('built-in template')`). Removing the default makes the kind's built-in template the default.
+  - `strategies.remove` takes the strategy out of `strategyIds` and drops the rule checks of its rules on its trades.
+  - `templates.remove` refuses a built-in template (`new Error('built-in template')`). Removing the default makes the kind's built-in template the default.
   - `accounts.remove` refuses an account that still has trades (`new Error('account has trades')`). If an existing test expects the old cascade, update it and name it in the commit body.
   - `journal.list` purges entries whose `deletedAt` is more than 30 days before now.
   - `setDefault` clears `isDefault` on the kind's other templates.
-- **Built-in templates.** Every workspace has three, seeded on first open and after reset or clear: "Daily review", "Pre-market plan" and "Weekly recap", each the default for its kind. Their bodies are Tiptap JSON documents in `src/content/note-templates.ts`, in our own words.
-  - Daily review: Preparation (watchlist, news and events, bias, levels, game plan), Session log, End of day (how the day went, what worked, what didn't, one thing to do better), each as a collapsible section.
+- **New workspaces:** each starts with the two built-in tag categories and three built-in templates, seeded on first open and after reset or clear. The templates are "Daily review", "Pre-market plan" and "Weekly recap", each the default for its kind, with Tiptap JSON bodies in `src/content/note-templates.ts` written in our own words:
+  - Daily review: Preparation (watchlist, news and events, bias, levels, game plan), Session log, End of day (how the day went, what worked, what didn't, one thing to do better), each a collapsible section.
   - Pre-market plan: bias, levels, setups to watch, risk for the day.
   - Weekly recap: the week in numbers, best and worst trade, rules broken, focus for next week.
-- **Seed additions,** drawn from new random streams (`createRandom(seed + 101)` and up) so no existing value moves:
+- **Seed additions,** drawn from new random streams (`createRandom(seed + 101)` and up) so no existing trade or P&L moves:
   - `reviewed: true` on about 70% of trades closed 7 or more days before the end date.
-  - One "loser" rule per strategy ("Took the loss at the planned stop").
-  - An icon and tone per strategy, and a one-line description per mistake tag.
+  - Categories Setups, Mistakes, Emotions and Custom tags, with the existing tags in them and a one-line description on each mistake tag.
+  - Strategy groups Entry, Exit, Risk and Management, with one "loser" rule per strategy ("Took the loss at the planned stop"), plus an icon and tone per strategy.
+  - About 15% of trades with a strategy get a second strategy.
   - Daily review notes for the last 20 trading days, from the built-in template with short filled-in text.
-  - Challenge "Forex 100K evaluation", 2-step, step 1 linked to the forex evaluation account from its first trade date, evaluation fee $299.00, no activation fee.
   - No cash flows.
-- **Prefs defaults:** `displayUnit: 'money'`, `privacy: false`, `hideTradeSummary: false`, `calendarStats: ['net', 'trades']`, `instrumentsTraded: []`, `settleExpiredOptions: true`.
+- **Prefs defaults:** `displayUnit: 'dollar'`, `hideTradeSummary: false`, `calendarStats: ['net', 'trades']`, `instrumentsTraded: []`, `settleExpiredOptions: true`.
 
 - [ ] **Step 1: Write the failing tests.**
-  - `migration.test.ts`: open a v1 database (built with Dexie `version(1)` and the old stores) holding two entries with `folder: 'Ideas'` and one without. Reopen through `KeelDb`, then expect:
-    - one folder named "Ideas";
-    - both entries carry its id and `tags: []`;
-    - the third has no `folderId`.
+  - `migration.test.ts`: open a v1 database (built with Dexie `version(1)` and the old stores) holding:
+    - a trade with `strategyId: 's1'` and one with none;
+    - tags in all four old categories;
+    - a strategy with rules in the entry and risk groups;
+    - two entries with `folder: 'Ideas'` and one without.
+
+    Reopen through `KeelDb`, then expect:
+    - `strategyIds` of `['s1']` and `[]`;
+    - four categories, Mistakes with role `mistake` and the old mistake tags in it;
+    - the strategy has groups ["Entry", "Risk"] with `showWhen: 'always'`;
+    - one folder "Ideas" holding both entries, each with `tags: []`, while the third has no `folderId`.
   - `entities.test.ts`:
-    - removing a strategy clears `strategyId` and its rule checks on 3 trades;
-    - removing a folder leaves its notes with no `folderId`;
+    - removing a strategy takes it out of `strategyIds` and drops its rule checks on 3 trades;
+    - removing a user category removes its tags from trades, while removing Mistakes is refused;
+    - creating the tag "FOMO" stores "fomo", and creating it again in the same category returns the existing tag;
     - removing the default "Daily review" is refused;
     - after saving a second daily template and calling `setDefault` on it, exactly one daily default exists;
     - `trash` and then `restore` round-trip;
     - an entry with `deletedAt` 31 days ago is gone from `list` and one 29 days ago stays;
     - `ensureTradeNote` twice returns the same id, and the trade's `noteId` equals it;
-    - `dailyNote('2026-11-19')` twice returns one entry of kind `daily-review`, with that date and the default template's body;
+    - `dailyNote('2026-11-19')` twice returns one entry of kind `daily-review` with that date and the default template's body;
     - `accounts.remove` with trades rejects, while `clearTrades` returns the count and then `remove` succeeds;
     - `updateMany` with `{ reviewed: true }` updates exactly the given ids.
   - `generate.test.ts`:
     - the existing pinned trade totals are unchanged;
     - between 60% and 80% of trades closed 7 or more days before the end are reviewed, and none closed within 7 days are;
-    - one challenge links the forex evaluation account;
-    - 20 daily notes exist.
-  - `store.test.ts`: reset and clear empty the four new tables, and reseed the three built-in templates.
-- [ ] **Step 2:** `npm test -- src/data`. Expected: FAIL.
-- [ ] **Step 3:** Implement the types, schema, repositories, hooks, keys and seed.
-- [ ] **Step 4:** `npm test && npm run typecheck && npm run lint`. Expected: PASS.
-- [ ] **Step 5:** Commit: `feat(data): storage v2 for notes, templates, cash flows, challenges and manual trades`.
+    - 10% to 20% of trades with a strategy have two;
+    - 20 daily notes exist;
+    - every strategy has at least one `loser` rule.
+  - `store.test.ts`: reset and clear empty the new tables and reseed the built-in categories and templates.
+  - The existing dashboard, rules, mistakes and breakdown tests pass on the new shapes with the same pinned values.
+- [ ] **Step 2:** `npm test -- src/data src/domain`. Expected: FAIL.
+- [ ] **Step 3:** Implement the types, schema, upgrade, repositories, hooks, keys and seed, and move every consumer onto the new shapes.
+- [ ] **Step 4:** `npm test && npm run typecheck && npm run lint && npm run build`. Expected: PASS.
+- [ ] **Step 5:** Commit: `feat(data): TradeZella's model (several strategies per trade, tag categories, rule groups) and storage v2`.
 
 ---
 
@@ -392,7 +422,7 @@ Delivers CA4, X9 and TR5 (aggregate Net ROI).
   ```ts
   // realized.ts
   export interface Realization { tradeId: string; time: string; gross: Cents; fees: Cents; net: Cents }
-  export function realizations(trade: Trade): Realization[];   // [] for an open trade
+  export function realizations(trade: Trade): Realization[];   // every exit so far, including an open trade's partial exits
   // days.ts: dailyPnl books realizations by local date (signature unchanged); add
   export function dayDurations(trades: readonly Trade[], ctx: MetricContext): { longest: number | null; average: number | null }; // minutes, first entry to last exit per local day
   export function avgDailyWinRate(trades: readonly Trade[], ctx: MetricContext): number | null;
@@ -412,12 +442,12 @@ Delivers CA4, X9 and TR5 (aggregate Net ROI).
       { tradeId, time: '2026-11-17T15:00:00.000Z', gross: 100000, fees: 300, net: 99700 },
     ]);
     // entry fees 301 over three 1-lot exits → fees 250, 250, 251 when each exit fill pays 150 (remainder on the last)
-    // an open trade with one partial exit → []
+    // an open trade (long 2, sold 1) → one realization for the exited lot; the open lot books nothing
     // Σ net of realizations === trade.net for every closed trade in fixtureSample
     ```
   - `days.test.ts`:
     - with `timeZone: 'America/New_York'`, the ES trade gives Mon 16 Nov +49700 and Tue 17 Nov +99700;
-    - an open trade with a partial exit adds no day;
+    - an open trade's partial exit books on its exit day, and an open trade with no exit adds no day;
     - `dayDurations` on a day with entries at 09:30 and 13:00 and exits at 10:00 and 15:30 gives a longest of 360;
     - `avgDailyWinRate` over a day at 2/3 and a day at 1/1 is 0.8333.
   - `risk.test.ts`:
@@ -449,7 +479,7 @@ Delivers X1-X3 and E54.
   export interface NumRange { min?: number; max?: number }
   export type Outcome = 'win' | 'loss' | 'breakeven';
   export interface GlobalFilters {   // existing fields unchanged, plus:
-    excludeSymbols: string[]; excludeStrategyIds: string[]; noStrategy: boolean;
+    excludeSymbols: string[]; excludeStrategyIds: string[]; noStrategy: boolean; strategyMatch: 'any' | 'all';
     excludeTagIds: string[]; tagMatch: 'any' | 'all';
     outcomes: Outcome[]; status?: 'open' | 'closed'; holding?: 'intraday' | 'multiday';
     reviewed?: boolean; ratings: (1 | 2 | 3 | 4 | 5)[]; weekdays: number[] /* 1 Mon … 7 Sun */; months: number[] /* 1-12 */;
@@ -459,7 +489,7 @@ Delivers X1-X3 and E54.
   export function advancedFilterCount(f: GlobalFilters): number;
   ```
 - **URL params,** added to `FILTER_PARAMS`. Lists are comma-separated, numeric ranges use `_` (so negatives work) and time windows use `-`:
-  - `xsym`, `xstrat`, `nostrat=1`, `xtag`, `tagmatch=all`
+  - `xsym`, `xstrat`, `nostrat=1`, `stratmatch=all`, `xtag`, `tagmatch=all`
   - `outcome=win,loss`, `status=open`, `hold=intraday`, `reviewed=1|0`, `rating=4,5`, `wd=1,2`, `mo=11`
   - `entry=09:30-11:00,13:00-`, `exit=…`
   - `dur=5_60`, `ep=100_200`, `xp=…`, `size=1_3`, `r=-1_2`
@@ -468,7 +498,7 @@ Delivers X1-X3 and E54.
 Behaviour:
 - **Semantics,** in `applyFilters`:
   - Exclusions win over inclusions.
-  - `noStrategy` ORs with `strategyIds`.
+  - `noStrategy` ORs with `strategyIds`. `strategyMatch: 'all'` needs every selected strategy on the trade.
   - `tagMatch: 'all'` needs every selected tag.
   - Outcome follows `outcomeOf` with the breakeven range, and only closed trades have one.
   - Intraday means opened and closed on the same local date. Open trades fail `holding`, `duration`, `exitPrice`, `exitWindows`, `r` and `outcomes` whenever those are set.
@@ -476,7 +506,7 @@ Behaviour:
   - `size` tests `maxPosition`. `r` tests realized R, and trades without risk fail it.
 - **More filters panel:**
   - "More filters" opens a Radix popover at `md` and up, and a sheet below `md`.
-  - Its sections are General (outcome, status, holding, reviewed, rating), Day and time (weekday, month, entry and exit windows, duration), Strategy (exclude, no strategy), Tags (exclude, match any or all) and Ranges (entry and exit price, size, R).
+  - Its sections are General (outcome, status, holding, reviewed, rating), Day and time (weekday, month, entry and exit windows, duration), Strategy (include, exclude, match any or all, no strategy), Tags (exclude, match any or all) and Ranges (entry and exit price, size, R).
   - Edits are a draft until Apply. Reset clears the draft, and Cancel or Escape discards it.
   - The button shows the count from `advancedFilterCount` when it is above zero (`aria-label` "More filters, {n} active").
 - **Accounts:** the account switcher becomes a multi-select with a search box over name and broker, plus "All accounts". It writes `account` as a list.
@@ -488,7 +518,8 @@ Behaviour:
     - the window `22:00-02:00` keeps a 23:30 and a 01:15 entry but not a 03:00 one;
     - `r: { min: -1, max: 2 }` drops a trade without risk;
     - `serializeFilters(parseFilters(p))` equals `p` for every new param;
-    - `parseFilters('?dur=abc&wd=9&rating=7')` drops all three.
+    - `parseFilters('?dur=abc&wd=9&rating=7')` drops all three;
+    - `strategyIds: ['a','b'], strategyMatch: 'all'` keeps only trades in both.
   - `more-filters.test.tsx`:
     - choosing "Losses" and Wednesday then Apply writes `outcome=loss&wd=3`;
     - Cancel writes nothing;
@@ -501,9 +532,9 @@ Behaviour:
 
 ---
 
-### Task 5: Display units and privacy
+### Task 5: Display units
 
-Delivers X4 and X5.
+Delivers X4, X5 and X6.
 
 **Files:**
 - Create: `src/lib/display.ts`, `src/components/app/display-menu.tsx`
@@ -513,33 +544,40 @@ Delivers X4 and X5.
 **Interfaces:**
 - Produces:
   ```ts
-  export interface Figure { money: Cents; pct?: number | null; r?: number | null; rLeftOut?: number }
-  export interface DisplayOptions { unit: DisplayUnit; privacy: boolean; currency: string; signed: boolean }
-  export function formatFigure(f: Figure, o: DisplayOptions): { text: string; label: string };
-  export function useDisplay(): DisplayOptions & { figure(f: Figure, signed?: boolean): { text: string; label: string } }; // reads prefs
+  export interface Figure { money: Cents; pct?: number | null; r?: number | null; ticks?: number | null;
+    pips?: number | null; points?: number | null; leftOut?: number }
+  export function tradeFigure(t: Trade, ctx: MetricContext): Figure;   // per-trade values per the Rulings
+  export function sumFigures(figs: readonly Figure[], pctBase: Cents | null): Figure;
+  export function formatFigure(f: Figure, o: { unit: DisplayUnit; currency: string; signed: boolean }): { text: string; label: string };
+  export function useDisplay(): { unit: DisplayUnit; figure(f: Figure, signed?: boolean): { text: string; label: string } }; // reads prefs
   export function DisplayMenu(): JSX.Element;
   ```
-- **Text rules:**
-  - Money uses `formatPnl` / `formatMoney`.
-  - `percent` uses `formatPct` with 2 decimals and a sign, e.g. `+1.25%`.
-  - `r` uses 2 decimals with a sign, e.g. `+3.40R`.
-  - When the chosen unit's value is null or undefined, the money text shows instead.
-  - Under privacy, money reads `+$•••` / `−$•••` / `$•••` (unsigned), with the currency symbol from `Intl`. Its `label` is "hidden amount".
+
+Behaviour:
+- **The menu:** a "Display" button in the top bar. It opens a menu of radio items: Dollar, Percentage, Privacy, R-multiple, Ticks, Pips, Points. The button shows the current choice, with a crossed-eye glyph for Privacy. The choice saves to `displayUnit`.
+- **How each unit reads:**
+  - Dollar: `formatPnl` / `formatMoney`.
+  - Percentage: 2 decimals with a sign, e.g. `+1.25%`.
+  - R-multiple: `+3.40R`. Ticks, Pips and Points: one decimal plus the unit, e.g. `+12.0 ticks`, `+8.5 pips`, `+3.0 pts`.
+  - Privacy: `+$•••` / `−$•••` / `$•••`, with the label "hidden amount".
+- **When a value is missing:** a figure with no value in the chosen unit shows its dollar text, and aggregates say "{n} trades left out".
 
 - [ ] **Step 1: Write the failing tests.**
   - `display.test.ts`:
-    - `formatFigure({ money: 12345 }, money/USD/signed)` gives `{ text: '+$123.45' }`;
-    - with `pct: 0.0125` and unit percent, `+1.25%`;
-    - with `r: 3.4` and unit r, `+3.40R`;
-    - with unit r and `r: null`, it falls back to `+$123.45`;
-    - privacy with money gives `+$•••` and the label "hidden amount";
-    - privacy with unit percent still gives `+1.25%`.
-  - `display-menu.test.tsx`: choosing R and switching on "Hide amounts" saves `displayUnit: 'r', privacy: true`, and the button's accessible name becomes "Display, amounts hidden".
-  - `dashboard-view.test.tsx`: with `privacy: true` in prefs, no text node or `aria-label` in the dashboard matches `/\$\d/`.
+    - `formatFigure({ money: 12345 }, dollar)` gives `+$123.45`;
+    - `pct: 0.0125` with percent gives `+1.25%`;
+    - `r: 3.4` gives `+3.40R`;
+    - unit r with `r: null` falls back to `+$123.45`;
+    - privacy gives `+$•••` and the label "hidden amount";
+    - an ES long 5000 → 5003.25 has `ticks: 13`, `points: 3.25`, and `pips: null`;
+    - EURUSD long 1.07483 → 1.07688 has `pips: 20.5`, and USDJPY long 150.00 → 150.25 has `pips: 25`;
+    - `sumFigures` over one trade with R and one without gives that R and `leftOut: 1`.
+  - `display-menu.test.tsx`: choosing Privacy saves `displayUnit: 'privacy'`, and the button's accessible name becomes "Display: Privacy".
+  - `dashboard-view.test.tsx`: under Privacy, no text node or `aria-label` in the dashboard matches `/\$\d/`.
 - [ ] **Step 2:** `npm test -- src/lib/display src/components/app`. Expected: FAIL.
-- [ ] **Step 3:** Implement. Route every dashboard money figure through `useDisplay`. Aggregate % uses the balance base from the Rulings (`balanceAt`, Task 18 extends it with cash flows). Until then, use the summed starting balances.
+- [ ] **Step 3:** Implement. Route every dashboard money figure through `useDisplay`. Aggregate % uses the balance base from the Rulings (`balanceAt`, which Task 18 extends with cash flows). Until then, use the summed starting balances.
 - [ ] **Step 4:** `npm test && npm run typecheck && npm run lint`. Expected: PASS.
-- [ ] **Step 5:** Commit: `feat(app): $, % and R display, and privacy mode`.
+- [ ] **Step 5:** Commit: `feat(app): display units: dollar, percentage, privacy, R, ticks, pips and points`.
 
 **Module A review** after this task: the controller runs the review package over Tasks 1-5.
 
@@ -558,10 +596,10 @@ Delivers TR1, TR2, TR3, TR5, TR6, E48 (trades) and E59. Comp `01-trades`.
 - Produces:
   ```ts
   export type ColumnId = 'open' | 'close' | 'instrument' | 'account' | 'side' | 'qty' | 'entry' | 'exit' | 'gross' | 'fees'
-    | 'net' | 'roi' | 'realizedR' | 'plannedR' | 'duration' | 'strategy' | 'setups' | 'mistakes' | 'emotions'
+    | 'net' | 'roi' | 'realizedR' | 'plannedR' | 'duration' | 'strategies' | 'tags' | 'mistakes'
     | 'rules' | 'rating' | 'reviewed' | 'status';
   export const DEFAULT_COLUMNS: ColumnId[] = ['open','instrument','side','qty','entry','exit','net','realizedR',
-    'duration','strategy','setups','mistakes','rules','rating','reviewed'];
+    'duration','strategies','tags','mistakes','rules','rating','reviewed'];   // 'tags' shows non-mistake tags with their category colour
   export function tradesCsv(trades: readonly Trade[], columns: readonly ColumnId[], env: CsvEnv): string; // real values, ISO times in the user's zone
   ```
 
@@ -622,7 +660,7 @@ Behaviour:
   - A banner offers "Select all {n} matching trades".
   - The bulk bar appears while anything is selected, reading "{n} selected" with these actions:
     - Tag: adds tags, never replaces;
-    - Strategy: a strategy or "No strategy";
+    - Add to strategy and Remove from strategy;
     - Mark reviewed and Mark not reviewed;
     - Export CSV;
     - Delete: confirm "Delete {n} trades? This can't be undone."
@@ -713,9 +751,9 @@ Behaviour:
   - `FillsTimeline` draws an SVG of price against time from the fills only: buy and sell markers, plus average entry and exit lines. Its label reads "Fills from {first} to {last}, {n} fills".
   - The executions table shows time, side, quantity, price, commission and fees.
 - **Journal:**
-  - A strategy select.
-  - The rule checklist shows only applying rules (`ruleApplies`), each tri-state: kept, broken or not graded (`TaskCheckbox`).
-  - Tags grouped by category, each with a `TagPicker`.
+  - A strategies multi-select.
+  - One rule checklist per selected strategy, by its groups, showing only applying rules (`ruleApplies`). Each rule is tri-state: kept, broken or not graded (`TaskCheckbox`).
+  - Tags grouped by their categories (name and colour), each with a `TagPicker`.
   - Rating: a radio group of 5 stars ("Rating: 4 of 5").
   - A reviewed toggle.
   - The note: a `NoteEditor` bound to `ensureTradeNote` on the first change, with autosave.
@@ -811,7 +849,7 @@ Behaviour:
 
 ### Task 11: Import steps 1 and 2: upload and map
 
-Delivers IM1-IM3, E35, E36, E37 and E44 (encoding). Comp `03-import-map`.
+Delivers IM1-IM3, IM7, E25, E35, E36, E37 and E44 (encoding). Comp `03-import-map`.
 
 **Files:**
 - Create: `src/components/app/import/{import-flow,upload-step,map-step}.tsx`, `src/lib/decode.ts`
@@ -822,15 +860,15 @@ Delivers IM1-IM3, E35, E36, E37 and E44 (encoding). Comp `03-import-map`.
 - Produces:
   ```ts
   export function decodeFile(bytes: ArrayBuffer): { text: string; encoding: 'utf-8' | 'windows-1252' };
+  export async function readSpreadsheet(file: Blob): Promise<string[][]>;   // first sheet, cells as text
   export function ImportFlow(): JSX.Element;   // stepper state in the URL: ?step=upload|map|preview|confirm
   ```
 
 Behaviour:
 - **Stepper:** Upload, Map columns, Preview, Confirm, with `aria-current="step"` on the current step.
 - **Upload:**
-  - A drop zone and file picker accepting `.csv` and `.txt`.
+  - A drop zone and file picker accepting `.csv`, `.txt` and `.xlsx`. An XLSX file's first sheet becomes text rows.
   - The file chip shows name, size and row count, and can be removed.
-  - The line "Excel files: save as CSV for now."
   - A pending file from the landing page (`loadPendingImport`) opens straight into the flow.
 - **Map, settings:**
   - Account select, with "New account" inline: name, broker, type, currency, starting balance, time zone.
@@ -848,7 +886,9 @@ Behaviour:
 - **E36:** the synonym list lives once, in `mapping.ts`, and `guess-columns.ts` imports it.
 
 - [ ] **Step 1: Write the failing tests.**
-  - `decode.test.ts`: UTF-8 bytes of "Prix €" decode as UTF-8, and windows-1252 bytes of "Prix €" decode as windows-1252 with the right text.
+  - `decode.test.ts`:
+    - UTF-8 bytes of "Prix €" decode as UTF-8, and windows-1252 bytes of "Prix €" decode as windows-1252 with the right text;
+    - a two-row XLSX fixture (`src/lib/__fixtures__/fills.xlsx`) reads as the same rows as its CSV twin.
   - `mapping.test.ts`: a header "Exit Strategy" doesn't change the detected kind of a fills file.
   - `map-step.test.tsx`:
     - a file whose time column holds 19/11/2026 detects DMY;
@@ -913,7 +953,7 @@ Behaviour:
 
 ### Task 13: Calendar
 
-Delivers CA1-CA3, with CA4 from Task 3. Comp `05-calendar`.
+Delivers CA1, CA2 and the year grid for CA3 (shown in Task 15), with CA4 from Task 3. Comp `05-calendar`.
 
 **Files:**
 - Create: `src/components/app/calendar/{calendar-view,month-grid,year-grid,day-panel}.tsx`, `src/data/calendar.ts`
@@ -939,7 +979,7 @@ Behaviour:
   - "Previous month", "Next month" and "This month" write `?month=YYYY-MM`.
   - "Stats shown" opens a popover of checkboxes, at most 3.
 - **Selected day:** `?day=YYYY-MM-DD` opens the side panel with that day's stats, its trades (those with an exit that day, linking to their pages) and "Open daily note" (to `/app/notebook/daily/[date]`). Below `lg` the panel is a sheet.
-- **Year view:** a Month / Year switch (`?view=year`) shows twelve small months with day tones and each month's net. Clicking a month opens it.
+- **Year grid:** `year-grid.tsx` draws twelve small months with day tones and each month's net. Reports → Calendar (Task 15) shows it. The calendar page's header links there as "Year view".
 - **Filters:** the global filters and the Gross/Net switch apply.
 
 - [ ] **Step 1: Write the failing tests.**
@@ -953,7 +993,7 @@ Behaviour:
     - selecting 19 Nov lists its trades;
     - choosing "Win rate" as a third stat shows it in the cells;
     - with privacy on, cells show `$•••`;
-    - the year view shows 12 months.
+    - `YearGrid` for 2026 renders 12 months with their nets.
 - [ ] **Step 2:** `npm test -- src/data/calendar src/components/app/calendar`. Expected: FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** `npm test && npm run typecheck && npm run lint && npm run build`. Expected: PASS.
@@ -978,17 +1018,18 @@ Delivers RE1 (overview), RE2, RE6 and E24. Comp `06-reports`.
   export type SeriesMetric = 'net' | 'cumulative-net' | 'win-rate' | 'profit-factor' | 'expectancy' | 'avg-win' | 'avg-loss' | 'trades' | 'fees';
   export type Bucket = 'day' | 'week' | 'month';
   export function timeSeries(trades: readonly Trade[], ctx: MetricContext, metric: SeriesMetric, bucket: Bucket): { key: string; value: number | null }[];
-  export type ReportKey = 'time' | 'symbol' | 'strategy' | 'tags' | 'side' | 'duration' | 'r-distribution'
-    | 'performance' | 'risk' | 'wins-losses' | 'compare';
+  export type ReportKey = 'performance' | 'day-time' | 'symbols' | 'risk' | 'strategies' | 'tags' | 'options'
+    | 'wins-losses' | 'compare' | 'calendar';   // Overview is /app/reports itself
   export function ReportChart(props: { series: { label: string; kind: 'bar' | 'line'; points: { key: string; value: number | null }[]; unit: 'money' | 'pct' | 'ratio' | 'count' }[];
     label: string }): JSX.Element;
   export function SummaryTable<Row>(props: { rows: Row[]; columns: ColumnDef<Row>[]; label: string; initialSort?: SortingState }): JSX.Element;
   ```
 
 Behaviour:
-- **Shell:** the comp's tabs (Overview, Time, Symbol, Strategy, Tags and mistakes, Side, Duration, R distribution), then "More reports" (Performance, Risk, Wins vs losses, Compare). Unknown keys get `notFound()`. The global filters apply.
+- **Shell:** tabs Overview, Performance, Reports, Compare and Calendar. "Reports" is a menu of Day & time, Symbols, Risk, Strategies, Tags, Options and Wins vs losses, and the tab stays current while any of them is open. Unknown keys get `notFound()`. The global filters apply. The look follows comp 06; comp 07 is the template for every breakdown page.
 - **Overview:**
   - KPIs, each with `MetricTip`: net, win rate, profit factor, expectancy, average win and loss, largest win and loss, max drawdown, longest win and loss streak, green-day %, Sharpe and Sortino.
+  - Long and short side by side: trades, win rate, net and profit factor.
   - A cumulative P&L line and daily net bars, by realization date.
 - **Performance:**
   - A metric picker, at most 3, each with Bar or Line, and a Day / Week / Month bucket. A fourth choice is disabled with "Three metrics at most".
@@ -1007,7 +1048,7 @@ Behaviour:
   - `report-chart.test.tsx`:
     - focusing the chart and pressing the right arrow shows the readout for the second period;
     - with privacy on, the readout shows `$•••`.
-  - `overview.test.tsx`: the 14 KPIs render with their `data-metric-tip` ids.
+  - `overview.test.tsx`: the 14 KPIs render with their `data-metric-tip` ids, and the long/short rows' counts add up to the trade count.
   - `performance.test.tsx`: choosing net (bar), win rate (line) and trades (bar) disables the rest.
 - [ ] **Step 2:** `npm test -- src/domain/metrics/series src/components/app/reports`. Expected: FAIL.
 - [ ] **Step 3:** Implement.
@@ -1018,12 +1059,12 @@ Behaviour:
 
 ### Task 15: Breakdown reports, risk, wins vs losses and compare
 
-Delivers RE1 (the breakdowns), RE2 (cross-analysis), RE3, RE4, RE5 and E5. Comp `07-report-time` for Time.
+Delivers RE1 (the breakdowns), RE2 (cross-analysis), RE3, RE4, RE5, RE7, CA3 and E5. Comp `07-report-time` is the template.
 
 **Files:**
-- Create: `src/components/app/reports/{breakdown-report,time-report,risk-report,wins-losses,compare}.tsx`
+- Create: `src/components/app/reports/{breakdown-report,day-time-report,risk-report,options-report,wins-losses,compare,calendar-report}.tsx`
 - Modify: `src/domain/metrics/breakdowns.ts`
-- Test: `breakdowns.test.ts`, `time-report.test.tsx`, `compare.test.tsx`, `wins-losses.test.tsx`
+- Test: `breakdowns.test.ts`, `day-time-report.test.tsx`, `compare.test.tsx`, `wins-losses.test.tsx`, `options-report.test.tsx`
 
 **Interfaces:**
 - Produces:
@@ -1035,19 +1076,20 @@ Delivers RE1 (the breakdowns), RE2 (cross-analysis), RE3, RE4, RE5 and E5. Comp 
     : Record<'wins' | 'losses', { count: number; net: Cents; avgNet: Cents | null; avgDurationMin: number | null; avgR: number | null;
       avgSize: number | null; avgMae: Cents | null; avgMfe: Cents | null; longShare: number | null }>;
   // rDistribution: bins clamp to −5R…+5R with tails '−5R or less' and '+5R or more' (E5)
-  // BreakdownKey gains 'size' (maxPosition buckets) and 'r' (1R buckets)
+  // BreakdownKey gains 'size' (maxPosition buckets), 'r' (1R buckets), 'month' and 'dte' (option days to expiry at entry: 0, 1, 2-7, 8-30, 31+)
   ```
 
 Behaviour:
 - **Every breakdown report:** a chart of net by bucket, a sortable table (trades, win rate, net, profit factor, average), and "Cross-analyse by" (none, or another dimension) that swaps the table for the matrix.
-- **Time:**
-  - A 5 / 15 / 30 / 60-minute bucket switch, an Entry / Exit time switch, net by time of day as bars, and a weekday breakdown.
-  - The URL holds `?bucket=15&basis=exit`.
-- **Symbol, Strategy, Tags and mistakes, Side, Duration and R distribution** follow the same pattern.
-- **Risk:** position size buckets, R buckets, and the drawdown curve.
+- **Day & time:** sub-tabs Weekday, Month, Time of day and Duration.
+  - Time of day has a 5 / 15 / 30 / 60-minute bucket switch and an Entry / Exit switch. The URL holds `?tab=time&bucket=15&basis=exit`.
+- **Symbols, Strategies and Tags** follow the breakdown pattern. Tags has a category select, and a trade counts under each of its strategies.
+- **Risk:** sub-tabs R-multiple (1R buckets), Position size and R distribution (clamped, E5), with the drawdown curve below.
+- **Options:** option trades by days to expiry at entry.
 - **Wins vs losses:** two columns of the stats above, side by side.
+- **Calendar:** the year view (Task 13's `calendarYear` and year grid). Clicking a month opens `/app/calendar?month=`.
 - **Compare:**
-  - Group A and Group B, each with its own symbol, tags, side, outcome, date range, strategy and account. Group A starts from the global filters, and Group B starts empty.
+  - Group A and Group B, each with its own symbol, tags, side, outcome, date range, strategies and account. Group A starts from the global filters, and Group B starts empty.
   - "Compare" shows both summaries side by side with the differences, and both cumulative lines on one chart.
 
 - [ ] **Step 1: Write the failing tests.**
@@ -1055,7 +1097,8 @@ Behaviour:
     - `breakdown2D` of symbol × side on a 4-trade fixture gives a 2×2 matrix with the expected nets;
     - 14 symbols fold into 12 columns with "Other";
     - an 8R trade lands in "+5R or more".
-  - `time-report.test.tsx`: `bucket=15` shows 15-minute labels, and switching to Exit changes a trade's bucket.
+  - `day-time-report.test.tsx`: `bucket=15` shows 15-minute labels, and switching to Exit changes a trade's bucket.
+  - `options-report.test.tsx`: a 0DTE option lands in the 0 bucket, and stock trades are absent.
   - `wins-losses.test.tsx`: counts and average nets match the fixture.
   - `compare.test.tsx`: Group A "ES" against Group B "NQ" shows both nets and the difference.
 - [ ] **Step 2:** `npm test -- src/domain/metrics/breakdowns src/components/app/reports`. Expected: FAIL.
@@ -1091,19 +1134,20 @@ Behaviour:
   - Empty: "No strategies yet." with "New strategy".
 - **Detail:**
   - The header: tile, name, description, Edit, and Archive or Unarchive.
-  - Rules grouped entry, exit, risk and management, each with follow rate, P&L when followed and cost when broken. A rule whose show-when isn't "always" shows a chip: "On winners", "On losers" or "On breakevens".
+  - Rules by the strategy's own groups, each with follow rate, P&L when followed and cost when broken. A rule whose show-when isn't "always" shows a chip: "On winners", "On losers" or "On breakevens".
   - The checklist, the strategy's stats and its equity line.
   - "View {n} trades" goes to `/app/trades?strategy={id}`.
 - **Form:**
   - Name (required, "Give the strategy a name."), description, a 12-icon picker, a 5-tone picker and asset classes.
-  - Rules by group: text, show-when select, Move up / Move down, Remove. Then checklist items.
+  - Groups: a new strategy starts with Entry, Exit, Risk and Management. Groups can be renamed, added ("Add group"), removed (with their rules) and reordered. Each group holds its rules: text, show-when select, Move up / Move down, Remove. Then checklist items.
   - Delete confirms: "Delete {name}? Its {n} trades keep their data and lose this strategy."
 
 - [ ] **Step 1: Write the failing tests.**
   - `rules.test.ts`: a 'loser' rule kept on 2 losses and broken on 1 loss, with 3 wins present, gives `applies: 3`, `followRate: 0.667` and `followedNet` = the 2 losses' net.
   - `strategy-form.test.tsx`:
     - creating with an empty name shows the sentence;
-    - adding an exit rule "Scale out at 2R" with show-when "Winner" saves it;
+    - adding a rule "Scale out at 2R" to Exit with show-when "Winner" saves it;
+    - renaming Risk to "Sizing" and adding a group "News" saves both;
     - Move up reorders.
   - `strategies-view.test.tsx`:
     - the Archived switch lists only archived strategies;
@@ -1122,13 +1166,14 @@ Behaviour:
 Delivers NB1-NB6 and E48 (notes). Comp `10-notebook`.
 
 **Files:**
-- Create: `src/components/app/notebook/{notebook-view,folder-rail,entry-list,day-card,templates-dialog}.tsx`, `src/app/(app)/app/notebook/{[entryId]/page,daily/[date]/page}.tsx`
+- Create: `src/data/local/folders.ts`, `src/components/app/notebook/{notebook-view,folder-rail,entry-list,day-card,templates-dialog}.tsx`, `src/app/(app)/app/notebook/{[entryId]/page,daily/[date]/page}.tsx`
+- Interfaces (produces): `FoldersRepo { list; create(ws, name) /* DuplicateNameError */; rename; remove /* its notes move to no folder */ }` on `Repository.folders`, with the hooks `useFolders`, `useCreateFolder`, `useRenameFolder` and `useRemoveFolder`
 - Modify: `src/app/(app)/app/notebook/page.tsx`
 - Test: `notebook-view.test.tsx`, `templates-dialog.test.tsx`
 
 Behaviour:
 - **Folder rail:**
-  - Favourites, Daily journal, Trade notes, Recaps, My notes, then user folders (with "New folder", plus rename and delete in a row menu), then Trash.
+  - Favourites, Trade notes, Daily journal, Sessions recap and My notes, then user folders (with "New folder", plus rename and delete in a row menu), then Trash.
   - Each entry shows its count. Built-in folders have no row menu.
 - **Entry list:**
   - Title, date, excerpt (`docExcerpt`, 120 characters) and tags.
@@ -1137,7 +1182,7 @@ Behaviour:
 - **Editor pane:**
   - Title, `NoteEditor` (autosave 600 ms), tags input (lowercase, Enter adds, Backspace removes), favourite toggle (star, `aria-pressed`), and "Move to folder".
   - Delete moves the note to Trash: "Moved to Trash. Notes in Trash are deleted after 30 days." with Undo.
-  - A trade note shows the trade's stats card and "Open trade".
+  - A trade note (titled "{symbol} : {d MMM yyyy}") shows the trade's stats card (net P&L, quantity, volume, commissions, Net ROI, gross P&L) and "Open trade".
 - **New:** "Daily note" (today), "Pre-market plan", "Weekly recap" and "Note", each from its kind's default template.
 - **Daily note** (`/app/notebook/daily/[date]`): opens or creates the day's note. The day card shows net, trades and win rate by realization, or "No trades this day." Below it sit chips linking to the day's trades.
 - **Trash:** restore, or "Delete forever" (confirm).
@@ -1167,10 +1212,11 @@ Behaviour:
 
 ### Task 18: Settings: profile, trading, accounts, tags
 
-Delivers SE1-SE3, AC1-AC4, E30 and E57. Comp `11-settings-accounts`.
+Delivers SE1-SE3 (with user-made categories), AC1-AC4, E30 and E57. Comp `11-settings-accounts`.
 
 **Files:**
-- Create: `src/components/app/settings/{settings-nav,profile,trading,accounts,cash-flows,tags}.tsx`, `src/app/(app)/app/settings/{layout,profile/page,trading/page,accounts/page,tags/page}.tsx`, `src/domain/metrics/balance.ts`
+- Create: `src/data/local/cashflows.ts`, `src/components/app/settings/{settings-nav,profile,trading,accounts,cash-flows,tags}.tsx`, `src/app/(app)/app/settings/{layout,profile/page,trading/page,accounts/page,tags/page}.tsx`, `src/domain/metrics/balance.ts`
+- Interfaces (produces): `CashFlowsRepo { list; create; update; remove }` on `Repository.cashFlows`, with the hooks `useCashFlows`, `useCreateCashFlow`, `useUpdateCashFlow` and `useRemoveCashFlow`
 - Modify: `src/app/(app)/app/settings/page.tsx` (redirects to profile), `src/lib/display.ts` (the % base uses `balanceAt`), `src/components/app/dashboard/states.tsx` (E57)
 - Test: `balance.test.ts`, `accounts.test.tsx`, `profile.test.tsx`, `tags.test.tsx`
 
@@ -1182,7 +1228,7 @@ Delivers SE1-SE3, AC1-AC4, E30 and E57. Comp `11-settings-accounts`.
   ```
 
 Behaviour:
-- **Sub-nav:** Profile, Trading, Accounts, Tags, Import history (`aria-current`).
+- **Sub-nav:** Profile, Accounts, Trading, Tags and Logs (`aria-current`). Logs opens on its Imports tab, the import history from Task 12 at `/app/settings/import-history`.
 - **Profile:**
   - Name.
   - Time zone, a searchable list of IANA zones. Until one is picked it reads "Browser default ({zone})" (E30).
@@ -1199,7 +1245,10 @@ Behaviour:
   - Archive / Unarchive.
   - "Clear trades" confirms by typing the account name: "Delete all {n} trades and imports in {account}? This can't be undone."
   - Delete is only offered when the account has no trades.
-- **Tags:** the four categories, each listing its tags with name, description and trade count. Add, rename, describe and delete. Delete confirms: "Delete {tag}? It's removed from {n} trades."
+- **Tags:** two tabs.
+  - **Categories:** a table of name, colour (a swatch picker of 12 token-derived colours plus a hex field), tag count and a row menu. Built-in categories have no Delete.
+  - **Tags:** search, "New tag" (name, category, optional description, with an "Add category" shortcut), and a table of name, category, description, trade count and row menu. Names are stored lowercase.
+  - Deleting a tag confirms "Delete {tag}? It's removed from {n} trades." Deleting a category confirms "Delete {category} and its {k} tags? They're removed from {n} trades."
 - **E57:** a workspace whose accounts are all archived reads "Your trades are in archived accounts." with a link to Accounts.
 
 - [ ] **Step 1: Write the failing tests.**
@@ -1210,7 +1259,10 @@ Behaviour:
     - Delete is absent while the account has trades;
     - archiving shows Archived.
   - `profile.test.tsx`: with no zone saved, it reads "Browser default (…)", and picking Europe/London saves it.
-  - `tags.test.tsx`: deleting a tag used on 3 trades shows "It's removed from 3 trades."
+  - `tags.test.tsx`:
+    - deleting a tag used on 3 trades shows "It's removed from 3 trades.";
+    - creating the category "Sessions" in teal and the tag "London Open" in it stores "london open";
+    - Mistakes has no Delete.
 - [ ] **Step 2:** `npm test -- src/domain/metrics/balance src/components/app/settings`. Expected: FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** `npm test && npm run typecheck && npm run lint && npm run build`. Expected: PASS.
@@ -1225,34 +1277,47 @@ Behaviour:
 Delivers PF1-PF4, E12 and E22. Comp `12-prop-firms`.
 
 **Files:**
-- Create: `src/domain/prop/challenge.ts`, `src/components/app/prop/{prop-view,challenge-card,challenge-form}.tsx`
-- Modify: `src/domain/prop/evaluate.ts`, `src/app/(app)/app/prop-firms/page.tsx`
-- Test: `evaluate.test.ts`, `challenge.test.ts`, `prop-view.test.tsx`, `challenge-form.test.tsx`
+- Create: `src/data/local/challenges.ts`, `src/domain/prop/challenge.ts`, `src/components/app/prop/{prop-view,challenge-card,challenge-form}.tsx`, `src/data/seed/prop.ts`
+- Modify: `src/domain/prop/evaluate.ts`, `src/app/(app)/app/prop-firms/page.tsx`, `src/data/repository.ts`, `src/data/query/{hooks,keys}.ts`, `src/data/seed/generate.ts`
+- Test: `evaluate.test.ts`, `challenge.test.ts`, `generate.test.ts`, `prop-view.test.tsx`, `challenge-form.test.tsx`
 
 **Interfaces:**
 - Produces:
   ```ts
-  // evaluate.ts: evaluateProp honours periodDays (breach reason 'period-ended' when the target isn't met by the period's last local day)
+  // repository.ts
+  export interface ChallengesRepo { list(ws: string): Promise<Challenge[]>;
+    create(ws: string, input: Omit<Challenge, 'id' | 'workspaceId'>): Promise<Challenge>;
+    update(ws: string, id: string, patch: Partial<Omit<Challenge, 'id' | 'workspaceId'>>): Promise<Challenge>;
+    remove(ws: string, id: string): Promise<void> }          // Repository.challenges
+  // hooks: useChallenges, useCreateChallenge, useUpdateChallenge, useRemoveChallenge
+  // evaluate.ts: evaluateProp honours periodDays (breach rule 'period-ended' when the target isn't met by the period's last local day)
   // and drawdownFloor (the drawdown limit never sits below the floor balance)
-  export type BreachReason = { rule: 'daily-loss' | 'max-drawdown' | 'period-ended' | 'consistency'; date: string; value: Cents; limit: Cents };
-  export interface ChallengeState { currentStep: ChallengeStep | null; status: 'active' | 'near' | 'breached' | 'passed' | 'closed-passed' | 'closed-failed';
-    breach?: BreachReason; daysLeft: number | null; phases: { step: ChallengeStep; accountId?: string; archived: boolean; state?: PropStatus }[] }
-  export function challengeState(c: Challenge, accounts: readonly Account[], trades: readonly Trade[], ctx: MetricContext, today: string): ChallengeState;
+  export type BreachFinding = { rule: 'daily-loss' | 'max-drawdown' | 'period-ended' | 'consistency'; date: string; value: Cents; limit: Cents };
+  export interface ChallengeCheck { currentStep: ChallengeStep | null; health: 'active' | 'near' | 'breached' | 'target-met';
+    finding?: BreachFinding; daysLeft: number | null;
+    phases: { step: ChallengeStep; accountId?: string; archived: boolean; state?: PropStatus }[] }
+  export function checkChallenge(c: Challenge, accounts: readonly Account[], trades: readonly Trade[], ctx: MetricContext, today: string): ChallengeCheck;
+  export function findingText(f: BreachFinding, money: (c: Cents) => string): string;
+    // e.g. 'Daily loss limit broken on 12 Nov (−$1,240.00 of −$1,000.00).'
   export function drawdownLabel(t: DrawdownType): string;   // 'Static drawdown' | 'End-of-day drawdown' | 'Trailing drawdown' (E22)
   ```
-  The current step is the first phase with an account that isn't passed.
+  The current step is the first phase that has an account and whose evaluation hasn't met its target, or the funded phase.
 
 Behaviour:
+- **Status is the trader's, as in TradeZella.** `Challenge.phase`, `status` and `failureReason` are what the card shows.
+  - `checkChallenge` only suggests a change. When `health` is `breached` and the status is `active`, the card shows the finding sentence with "Mark as breached", which saves `status: 'breached'` and `failureReason` = the sentence.
+  - When `health` is `target-met` on an evaluation step, the card offers "Mark step passed". On the last evaluation step this also sets `phase: 'funded'`.
+  - The trader can change the status by hand from Edit at any time.
 - **Cards:** one per challenge.
-  - Name, firm, current phase ("Step 1 of 2", "Funded") and a status chip: Active, Near a limit, Breached or Passed.
+  - Name, firm, phase ("Step 1 of 2", "Funded") and a status chip: Active, Near a limit (when active and `health` is `near`), Breached or Passed.
   - Tracks: profit target progress, drawdown left with its label, today's daily loss, minimum trading days, consistency, and "{n} days left" when a period is set.
   - The fees line: "Fees {evaluation} + {activation}".
-  - A breach sentence: "Breached on {date}: daily loss reached {value} of {limit}."
-  - Actions: "Close out as passed", "Close out as failed", Edit.
+  - The failure reason, when breached.
+  - Edit.
 - **Form:**
-  - Name, firm, steps (1 or 2), evaluation fee, activation fee.
+  - Name, firm, steps (1 or 2), phase (evaluation or funded), status (active, passed or breached), failure reason (shown when breached), evaluation fee, activation fee.
   - Per phase:
-    - link an existing account (same workspace, a prop type) or create one, plus a start date;
+    - link an existing account (same workspace) or create one, plus a start date;
     - rules: profit target in $ or %, daily loss in $ or % (E12; % converts against the starting balance), max drawdown in $ or %;
     - drawdown type static, end of day or trailing; floor at the starting balance or a fixed level;
     - minimum trading days; period in days or none; best-day consistency %.
@@ -1260,24 +1325,32 @@ Behaviour:
   - The funded phase has no target or period.
 - **Empty:** "No challenges yet." with "New challenge".
 - **Archived:** a phase whose account is archived reads "Account archived".
+- **Seed** (`src/data/seed/prop.ts`, its own random streams; the first three accounts and their trades don't move):
+  - "Forex 100K": 2-step, step 1 = the forex evaluation account, status active.
+  - "Futures 50K": 1-step, with an evaluation account whose trades met its target, status passed, and a funded account, active, `phase: 'funded'`.
+  - "Futures 100K": 1-step evaluation, status breached, with a failure reason from its finding.
+  - Each new account trades for 25 to 40 weekdays from the futures specs. Choose the stream seeds so each outcome holds, and pin them with a test.
 
 - [ ] **Step 1: Write the failing tests.**
   - `evaluate.test.ts`:
-    - `periodDays: 30` with the target unmet on day 31 gives the breach reason `period-ended`;
+    - `periodDays: 30` with the target unmet on day 31 gives the finding `period-ended`;
     - a trailing drawdown with `drawdownFloor` 100,000 cents above the start never moves the limit below that floor.
   - `challenge.test.ts`:
     - a 2-step challenge whose step 1 met its target and minimum days, with step 2 linked, has `currentStep: 'step-2'`;
-    - a breached step 1 gives `status: 'breached'` with the reason;
-    - `closedOut: 'failed'` gives `closed-failed`.
-  - `prop-view.test.tsx`: the seed's challenge card shows "Step 1 of 2" and the drawdown label from its type.
+    - a step 1 that broke its daily loss gives `health: 'breached'` and a finding, and `findingText` gives the sentence above;
+    - the stored `status` is never changed by `checkChallenge`.
+  - `generate.test.ts`: the three challenges exist with statuses active, passed (funded phase active) and breached, and the first three accounts' totals are unchanged.
+  - `prop-view.test.tsx`:
+    - the Forex card shows "Step 1 of 2" and the drawdown label from its type;
+    - an active challenge with a breach finding shows "Mark as breached", and clicking it saves the status and reason.
   - `challenge-form.test.tsx`:
     - a daily loss of 5% on a $100,000 start saves `dailyLossLimit: 500000`;
     - "Same rules as step 1" copies the rules;
     - the funded phase shows no target field.
-- [ ] **Step 2:** `npm test -- src/domain/prop src/components/app/prop`. Expected: FAIL.
+- [ ] **Step 2:** `npm test -- src/domain/prop src/components/app/prop src/data/seed`. Expected: FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** `npm test && npm run typecheck && npm run lint && npm run build`. Expected: PASS.
-- [ ] **Step 5:** Commit: `feat(prop): challenges with phases, per-phase rules, fees and computed status`.
+- [ ] **Step 5:** Commit: `feat(prop): challenges with phases, per-phase rules, fees, status and breach detection`.
 
 **Module I review** after this task.
 
@@ -1308,8 +1381,8 @@ Behaviour, one journey per spec on the sample workspace unless stated:
   - Run the Impeccable detector, and dispatch `impeccable:impeccable-finish-reviewer` against the comps. Fix its material findings.
   - Then dispatch `impeccable:impeccable-documenter` to record the new components in DESIGN.md.
 - [ ] **Step 4: Records.**
-  - In `BACKLOG.md`, close the items this plan owns, re-own E10, E25, E44's worker part, E50, E52 and E55 to Plan 6, and add E62 (user-made tag categories, Plan 6).
-  - In the feature map, mark delivered P5 rows Done.
+  - In `BACKLOG.md`, close the items this plan owns (including E25 and E62), and re-own E10, E44's worker part, E50, E52 and E55 to Plan 6. Take #48's Excel part and #49's options report out of Plan 6, and #41 (ticks, pips, points).
+  - In the feature map, mark delivered rows Done, and move X6, IM7 and RE7 to P5.
 - [ ] **Step 5: Full gate:** `npm test && npm run typecheck && npm run lint && npx prettier --check . && npm run e2e`. Expected: all green.
 - [ ] **Step 6:** Commit: `test(e2e): journeys for every Plan 5 module; docs: backlog, feature map and DESIGN.md`.
 
@@ -1325,24 +1398,24 @@ Behaviour, one journey per spec on the sample workspace unless stated:
 ## Self-review
 
 1. **Feature map coverage,** every P5 ID against its task:
-   - X1-X3 → 4; X4-X5 → 5; X9 → 3
+   - X1-X3 → 4; X4-X6 → 5; X9 → 3
    - TR1-TR3, TR5, TR6 → 6; TR4 → 7
    - MA1-MA2 → 10; TD1-TD2 → 9
-   - IM1-IM3 → 11; IM1, IM4 → 12
-   - CA1-CA3 → 13; CA4 → 3
-   - RE1, RE2, RE6 → 14; RE1, RE2, RE3-RE5 → 15
+   - IM1-IM3, IM7 → 11; IM1, IM4 → 12
+   - CA1, CA2 → 13; CA4 → 3
+   - RE1, RE2, RE6 → 14; RE1, RE2, RE3-RE5, RE7, CA3 → 15
    - ST1-ST5 → 16 (storage in 2)
    - NB1-NB6 → 8 and 17
    - AC1-AC4 → 18 (AC4 also in 10 and 11)
    - PF1-PF4 → 19
-   - SE1-SE3 → 18, with SE3's user-made categories ruled to Plan 6
+   - SE1-SE3 → 18, with categories stored in 2
 2. **Spec coverage:**
    - §6 routes: trades and `[id]` (6, 9), calendar (13), reports and `[report]` (14, 15), strategies and `[id]` (16), notebook and `[entryId]` (17), import (11, 12), the settings sub-routes (12, 18), prop firms (19).
    - §7: the metrics in Tasks 3, 14 and 15. The import rules in Tasks 11 and 12, with the P&L mismatch flag. The alignment table holds, with the date-booking ruling added.
    - §8: workspaces carry through every repository call (Task 2).
    - §11: every done-when line maps to Task 20.
 3. **Type consistency:**
-   - These are defined once and used under the same names later: `ManualTradeInput`, `ManualTradeError`, `Realization`, `GlobalFilters`, `Figure`, `ColumnId`, `CalendarDay`, `SeriesMetric`, `ReportKey`, `RuleStat`, `ChallengeState`, `BreachReason`, `balanceAt`, `ruleApplies`, `docText`.
+   - These are defined once and used under the same names later: `ManualTradeInput`, `ManualTradeError`, `Realization`, `GlobalFilters`, `Figure`, `ColumnId`, `CalendarDay`, `SeriesMetric`, `ReportKey`, `RuleStat`, `ChallengeCheck`, `BreachFinding`, `TagCategory`, `RuleGroup`, `strategyRules`, `balanceAt`, `ruleApplies`, `docText`.
    - Hook names in Task 2 match their uses in Tasks 7, 9, 10, 12 and 16-19.
 4. **Review Focus:** each line has its pinning test in the owning task (1 → 3 and 13; 2 → 5, 6, 13, 14 and 20; 3 → 4; 4 → 2, 16, 17, 18 and 19; 5 → 10).
 5. **Proportion:** the plan pins names, signatures, exact copy, URL params and test values. Component bodies are left to the implementers against the comps.
