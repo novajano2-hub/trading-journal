@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { makeTrade } from '@/domain/__fixtures__/trades';
-import { applyTradePatch, withRuleCheck } from './trade-patch';
+import { applyTradePatch, withRuleCheck, withTagPick } from './trade-patch';
 
 const t = makeTrade({
   net: 0,
@@ -104,4 +104,21 @@ test('withRuleCheck sets one rule and leaves the others; a new rule is appended'
     { ruleId: 'r3', followed: false },
   ]);
   expect(graded.ruleChecks[0]!.followed).toBe(false);
+});
+
+test('a tag pick applies to the stored list, so two picks from one stale list both land', () => {
+  const stale: string[] = [];
+  const stored = makeTrade({ net: 0, tagIds: ['a'] });
+  // The second pick was made before the first save came back.
+  const patch = withTagPick(stale, ['b'])(stored);
+  expect(patch.tagIds).toEqual(['a', 'b']);
+  // A removal drops only that tag.
+  expect(
+    withTagPick(
+      ['a', 'c'],
+      ['a'],
+    )(makeTrade({ net: 0, tagIds: ['a', 'c', 'd'] })).tagIds,
+  ).toEqual(['a', 'd']);
+  // Picking what is already stored adds nothing twice.
+  expect(withTagPick([], ['a'])(stored).tagIds).toEqual(['a']);
 });

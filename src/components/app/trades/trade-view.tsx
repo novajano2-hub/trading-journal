@@ -38,7 +38,11 @@ import {
 } from '@/data/query/hooks';
 import { StorageUnavailableError } from '@/data/repository';
 import { heldMs, netRoiOf } from '@/data/trade-rows';
-import { withRuleCheck, type TradePatch } from '@/data/trade-patch';
+import {
+  withRuleCheck,
+  withTagPick,
+  type TradePatch,
+} from '@/data/trade-patch';
 import { plannedR, riskFromStop, rOf } from '@/domain/metrics/summary';
 import { strategyRules, type Execution, type Trade } from '@/domain/types';
 import { formatUnitValue, useDisplay, type Display } from '@/lib/display';
@@ -677,7 +681,7 @@ function TradePage({
   };
 
   const href = (id: string, path = '') =>
-    `/app/trades/${id}${path}${queryString ? `?${queryString}` : ''}`;
+    `/app/trades/${encodeURIComponent(id)}${path}${queryString ? `?${queryString}` : ''}`;
   const backHref = `/app/trades${queryString ? `?${queryString}` : ''}`;
 
   // The neighbours: by open time within the filtered set (the trade itself is
@@ -990,7 +994,7 @@ function TradePage({
               tags={tags}
               tagIds={trade.tagIds}
               readOnly={readOnly}
-              onChange={(ids) => save({ tagIds: ids })}
+              onChange={(ids) => save(withTagPick(trade.tagIds, ids))}
             />
             <RatingRow
               rating={trade.rating}

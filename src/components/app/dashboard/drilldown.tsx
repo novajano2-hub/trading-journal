@@ -14,8 +14,8 @@ import { IconTile } from '@/components/ui/icon-tile';
 import { MetricTip } from '@/components/ui/metric-tip';
 import { MorphDialog } from '@/components/ui/morph-dialog';
 import type { DashboardModel } from '@/data/dashboard';
-import { useUpdateTrade } from '@/data/query/hooks';
-import { withRuleCheck } from '@/data/trade-patch';
+import { useUpdateTrade, useUpdateTrades } from '@/data/query/hooks';
+import { withRuleCheck, withTagPick } from '@/data/trade-patch';
 import { pnlOf } from '@/domain/metrics/context';
 import { mistakeTags } from '@/domain/metrics/mistakes';
 import {
@@ -354,7 +354,7 @@ function TagMissing({
   onSaving(): void;
   onFailed(): void;
 }): React.JSX.Element {
-  const update = useUpdateTrade();
+  const update = useUpdateTrades();
   return (
     <Popover.Root>
       <Popover.Trigger
@@ -379,7 +379,7 @@ function TagMissing({
             onChange={(tagIds) => {
               onSaving();
               update.mutate(
-                { id: trade.id, patch: { tagIds } },
+                { ids: [trade.id], patch: withTagPick(trade.tagIds, tagIds) },
                 { onError: onFailed },
               );
             }}

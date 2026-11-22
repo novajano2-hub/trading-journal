@@ -80,3 +80,22 @@ export function withRuleCheck(
       : [...trade.ruleChecks, { ruleId, followed }],
   };
 }
+
+/**
+ * The patch that applies one pick on a tag list: the tags that `after` adds to
+ * or drops from `before`, applied to the trade as stored when the patch runs.
+ * Two quick picks made from the same stale list therefore both land.
+ */
+export function withTagPick(
+  before: readonly string[],
+  after: readonly string[],
+): (t: Trade) => TradePatch {
+  const added = after.filter((id) => !before.includes(id));
+  const dropped = before.filter((id) => !after.includes(id));
+  return (t) => ({
+    tagIds: [
+      ...t.tagIds.filter((id) => !dropped.includes(id)),
+      ...added.filter((id) => !t.tagIds.includes(id)),
+    ],
+  });
+}
