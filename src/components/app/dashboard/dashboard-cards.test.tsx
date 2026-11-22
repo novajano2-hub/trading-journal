@@ -549,5 +549,16 @@ test('every metric carries its definition', async () => {
     screen.getByRole('button', { name: new RegExp(`^${r1}\\.`) }),
   );
   ids.push(...tips(await screen.findByRole('dialog')));
-  expect(new Set(ids)).toEqual(new Set(METRIC_IDS));
+  // Defined ahead of the screens that show them (Plan 5, later tasks).
+  const notOnDashboard = new Set<string>([
+    'net-roi',
+    'sharpe',
+    'sortino',
+    'avg-daily-win-rate',
+    'longest-day',
+    'day-streaks',
+  ]);
+  expect(new Set(ids)).toEqual(
+    new Set(METRIC_IDS.filter((id) => !notOnDashboard.has(id))),
+  );
 });

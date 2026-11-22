@@ -14,6 +14,12 @@ export const METRIC_IDS = [
   'profit-factor',
   'expectancy',
   'equity',
+  'net-roi',
+  'sharpe',
+  'sortino',
+  'avg-daily-win-rate',
+  'longest-day',
+  'day-streaks',
 ] as const;
 
 export type MetricId = (typeof METRIC_IDS)[number];
@@ -83,6 +89,36 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Equity',
     definition:
       'Starting balances of the selected accounts plus cumulative {basis} P&L, after each closed trade.',
+  },
+  'net-roi': {
+    label: 'Net ROI',
+    definition:
+      'Net P&L of closed trades divided by the capital they committed (average entry times peak position times point value). Always net.',
+  },
+  sharpe: {
+    label: 'Sharpe ratio',
+    definition:
+      'Mean daily return divided by its sample standard deviation, times the square root of 252. A day return is its net P&L over the balance at the start of that day, with a risk-free rate of zero.',
+  },
+  sortino: {
+    label: 'Sortino ratio',
+    definition:
+      'Mean daily return divided by the downside deviation, the root of the average squared losing return over all days, times the square root of 252. None yet without a losing day.',
+  },
+  'avg-daily-win-rate': {
+    label: 'Average daily win rate',
+    definition:
+      'For each day, wins divided by wins plus losses, then the mean over days. P&L is booked on the day of each exit, and days with no win or loss are left out.',
+  },
+  'longest-day': {
+    label: 'Day length',
+    definition:
+      'Minutes from the first entry to the last exit of each day, in your timezone. Shows the longest and the average.',
+  },
+  'day-streaks': {
+    label: 'Day streaks',
+    definition:
+      'Longest run of green days and of red days. A flat day, inside your breakeven range, neither extends nor breaks a run.',
   },
 };
 

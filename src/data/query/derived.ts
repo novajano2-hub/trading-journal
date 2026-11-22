@@ -146,9 +146,9 @@ export interface TradeSet {
  * - With no account filter only active accounts count; an archived account
  *   counts only when it is selected.
  * - A date range matches a trade's day: the local date of `closedAt`, or of
- *   `openedAt` while it is open, in the prefs timezone (`today` too). For a
- *   closed trade that is the day `dailyPnl` buckets it by, so filtered totals
- *   equal the sum of the daily bars.
+ *   `openedAt` while it is open, in the prefs timezone (`today` too). Daily
+ *   bars book each exit on its own date, so a trade held over several days
+ *   can sit in a different bar than the day this filter uses.
  */
 export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
   const trades = useTrades();

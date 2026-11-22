@@ -2,7 +2,17 @@ import { describe, expect, test } from 'vitest';
 import { makeTrade } from '../__fixtures__/trades';
 import { outcomeOf } from '../outcome';
 import { defaultMetricContext } from './context';
-import { dailyPnl, dayStreaks, daySummary, type DayStat } from './days';
+import {
+  avgDailyWinRate,
+  dailyPnl,
+  dayDurations,
+  dayStreaks,
+  daySummary,
+  type DayStat,
+} from './days';
+import { buildTrades } from '../trade-builder';
+import { resolveInstrument } from '../instruments';
+import type { Execution } from '../types';
 
 const ctx = defaultMetricContext('America/New_York');
 
@@ -138,5 +148,96 @@ describe('days', () => {
       net: 1000,
       wins: 1,
     });
+  });
+});
+
+function fill(
+  id: string,
+  side: 'buy' | 'sell',
+  qty: number,
+  price: number,
+  time: string,
+  fees = 0,
+): Execution {
+  return {
+    id,
+    accountId: 'a1',
+    symbol: 'ESZ5',
+    side,
+    qty,
+    price,
+    time,
+    fees,
+    commission: 0,
+  };
+}
+const build = (execs: Execution[]) =>
+  buildTrades(execs, {
+    workspaceId: 'w',
+    startSerial: 1,
+    resolve: () => resolveInstrument('ESZ5'),
+    accountCurrency: () => 'USD',
+  }).trades;
+
+describe('days booked by exit', () => {
+  test('a trade held over two days books each exit on its own local date', () => {
+    const t = build([
+      fill('e1', 'buy', 2, 5000, '2026-11-16T15:00:00Z', 300),
+      fill('x1', 'sell', 1, 5010, '2026-11-16T20:00:00Z', 150),
+      fill('x2', 'sell', 1, 5020, '2026-11-17T15:00:00Z', 150),
+    ]);
+    const days = dailyPnl(t, ctx);
+    expect(days.map((d) => [d.date, d.net])).toEqual([
+      ['2026-11-16', 49700],
+      ['2026-11-17', 99700],
+    ]);
+  });
+  test('an open trade books its partial exit; with no exit it adds no day', () => {
+    const partial = build([
+      fill('e1', 'buy', 2, 5000, '2026-11-16T15:00:00Z', 300),
+      fill('x1', 'sell', 1, 5010, '2026-11-16T20:00:00Z', 150),
+    ]);
+    expect(dailyPnl(partial, ctx).map((d) => [d.date, d.net])).toEqual([
+      ['2026-11-16', 49700],
+    ]);
+    const none = build([
+      fill('e1', 'buy', 2, 5000, '2026-11-16T15:00:00Z', 300),
+    ]);
+    expect(dailyPnl(none, ctx)).toEqual([]);
+  });
+  test('gross basis books gross', () => {
+    const t = build([
+      fill('e1', 'buy', 1, 5000, '2026-11-16T15:00:00Z', 100),
+      fill('x1', 'sell', 1, 5010, '2026-11-16T20:00:00Z', 100),
+    ]);
+    expect(dailyPnl(t, { ...ctx, pnlBasis: 'gross' })[0]?.net).toBe(50000);
+  });
+  test('longest and average day: first entry to last exit', () => {
+    const t = build([
+      fill('e1', 'buy', 1, 5000, '2026-11-16T14:30:00Z'),
+      fill('x1', 'sell', 1, 5001, '2026-11-16T15:00:00Z'),
+      fill('e2', 'buy', 1, 5000, '2026-11-16T18:00:00Z'),
+      fill('x2', 'sell', 1, 5001, '2026-11-16T20:30:00Z'),
+      fill('e3', 'buy', 1, 5000, '2026-11-17T14:30:00Z'),
+      fill('x3', 'sell', 1, 5001, '2026-11-17T15:30:00Z'),
+    ]);
+    expect(dayDurations(t, ctx)).toEqual({ longest: 360, average: 210 });
+    expect(dayDurations([], ctx)).toEqual({ longest: null, average: null });
+  });
+  test('average daily win rate is the mean of each day win rate', () => {
+    const t = build([
+      // Mon: two wins and a loss
+      fill('a1', 'buy', 1, 5000, '2026-11-16T15:00:00Z'),
+      fill('a2', 'sell', 1, 5010, '2026-11-16T15:10:00Z'),
+      fill('b1', 'buy', 1, 5000, '2026-11-16T16:00:00Z'),
+      fill('b2', 'sell', 1, 5010, '2026-11-16T16:10:00Z'),
+      fill('c1', 'buy', 1, 5000, '2026-11-16T17:00:00Z'),
+      fill('c2', 'sell', 1, 4990, '2026-11-16T17:10:00Z'),
+      // Tue: one win
+      fill('d1', 'buy', 1, 5000, '2026-11-17T15:00:00Z'),
+      fill('d2', 'sell', 1, 5010, '2026-11-17T15:10:00Z'),
+    ]);
+    expect(avgDailyWinRate(t, ctx)).toBeCloseTo(0.8333, 4);
+    expect(avgDailyWinRate([], ctx)).toBeNull();
   });
 });

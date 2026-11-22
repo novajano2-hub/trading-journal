@@ -3,8 +3,21 @@ import { format } from 'date-fns';
 
 /** Local calendar date (YYYY-MM-DD) of an instant in the given IANA time zone. */
 export function localDate(iso: string, timeZone: string): string {
-  return format(new TZDate(Date.parse(iso), timeZone), 'yyyy-MM-dd');
+  let f = dateFormats.get(timeZone);
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    dateFormats.set(timeZone, f);
+  }
+  return f.format(Date.parse(iso));
 }
+
+/** One formatter per zone: building them is the slow part of bucketing thousands of fills. */
+const dateFormats = new Map<string, Intl.DateTimeFormat>();
 
 export interface LocalParts {
   date: string;

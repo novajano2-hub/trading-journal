@@ -1,6 +1,8 @@
 import { partitionByCurrency } from '../domain/currency';
 import {
+  winRateOfDays,
   dailyPnl,
+  dayDurations,
   dayStreaks,
   daySummary,
   type DayStat,
@@ -12,6 +14,7 @@ import {
   type Drawdown,
   type EquityPoint,
 } from '../domain/metrics/equity';
+import { riskRatios } from '../domain/metrics/risk';
 import { tradeStreaks, type StreakResult } from '../domain/metrics/streaks';
 import { summarize, type Summary } from '../domain/metrics/summary';
 import type { Account, Cents, Trade, UserPrefs } from '../domain/types';
@@ -35,6 +38,9 @@ export interface CurrencyMetrics {
   drawdown: Drawdown;
   tradeStreaks: StreakResult;
   dayStreaks: StreakResult;
+  dayDurations: ReturnType<typeof dayDurations>;
+  avgDailyWinRate: number | null;
+  risk: ReturnType<typeof riskRatios>;
 }
 
 /**
@@ -72,6 +78,9 @@ export function metricsByCurrency(
       drawdown: maxDrawdown(own, startingBalance, ctx),
       tradeStreaks: tradeStreaks(own, ctx),
       dayStreaks: dayStreaks(days, ctx),
+      dayDurations: dayDurations(own, ctx),
+      avgDailyWinRate: winRateOfDays(days),
+      risk: riskRatios(days, startingBalance),
     };
   });
 }

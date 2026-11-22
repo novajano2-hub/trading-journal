@@ -31,6 +31,8 @@ export interface Summary {
   largestWin: Cents | null;
   largestLoss: Cents | null;
   ruleAdherence: number | null;
+  /** Net P&L over capital committed (cost basis), summed over closed trades; null with no cost basis. Always net. */
+  netRoi: number | null;
   /** Sorted distinct pnlCurrency values of the closed trades; more than one means the set is mixed. */
   currencies: string[];
 }
@@ -147,6 +149,10 @@ export function summarize(
     largestWin: wins === 0 ? null : Math.max(...winNets),
     largestLoss: losses === 0 ? null : Math.min(...lossNets),
     ruleAdherence: ratio(followed, checks.length),
+    netRoi: ratio(
+      sum(closed.map((t) => t.net)),
+      sum(closed.map((t) => costBasis(t))),
+    ),
     currencies: [...new Set(closed.map((t) => t.pnlCurrency))].sort(),
   };
 }

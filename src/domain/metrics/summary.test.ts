@@ -233,3 +233,15 @@ describe('summarize', () => {
     });
   });
 });
+
+describe('netRoi', () => {
+  test('net over cost basis of closed trades; null when empty', () => {
+    const a = makeTrade({ net: 10000 });
+    const b = makeTrade({ net: -4000 });
+    expect(summarize([a, b], ctx).netRoi).toBeCloseTo(
+      6000 / (costBasis(a) + costBasis(b)),
+      10,
+    );
+    expect(summarize([], ctx).netRoi).toBeNull();
+  });
+});

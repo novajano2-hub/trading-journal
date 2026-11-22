@@ -15,9 +15,38 @@ export interface BuildResult {
 
 const QTY_EPS = 1e-9;
 
-interface Lot {
+export interface Lot {
   qty: number;
   price: number;
+  /** Set by callers that need each entry's own cost and starting size (realized P&L by exit). */
+  fees?: number;
+  origQty?: number;
+}
+
+/**
+ * FIFO-match `closeQty` against the open lots, consuming them in place. Returns the
+ * quote-currency P&L (signed per direction, `sign` is 1 for long and -1 for short)
+ * and the pieces matched, so a caller can share per-lot figures by matched quantity.
+ */
+export function matchLots(
+  lots: Lot[],
+  closeQty: number,
+  exitPrice: number,
+  pointValue: number,
+  sign: 1 | -1,
+): { pnl: number; matched: { lot: Lot; qty: number }[] } {
+  let pnl = 0;
+  const matched: { lot: Lot; qty: number }[] = [];
+  let remaining = closeQty;
+  for (let lot = lots[0]; remaining > QTY_EPS && lot; lot = lots[0]) {
+    const m = Math.min(lot.qty, remaining);
+    pnl += (exitPrice - lot.price) * m * pointValue * sign;
+    matched.push({ lot, qty: m });
+    lot.qty -= m;
+    remaining -= m;
+    if (lot.qty <= QTY_EPS) lots.shift();
+  }
+  return { pnl, matched };
 }
 
 /** Mutable accumulator for the trade currently in progress. */
@@ -168,14 +197,7 @@ function buildGroup(
     }
     d.executions.push(closing);
 
-    let remaining = closeQty;
-    for (let lot = d.lots[0]; remaining > QTY_EPS && lot; lot = d.lots[0]) {
-      const m = Math.min(lot.qty, remaining);
-      d.pnl += (f.price - lot.price) * m * inst.pointValue * sign;
-      lot.qty -= m;
-      remaining -= m;
-      if (lot.qty <= QTY_EPS) d.lots.shift();
-    }
+    d.pnl += matchLots(d.lots, closeQty, f.price, inst.pointValue, sign).pnl;
     d.exitQty += closeQty;
     d.exitNotional += closeQty * f.price;
     position -= sign * closeQty;
