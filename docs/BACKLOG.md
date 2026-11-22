@@ -18,6 +18,28 @@ Origin key: **TZ** = TradeZella has it · **MTJ** = MyTradingJourney has it · *
 | 8 | Multi-currency aggregation with FX rates | Keel | Sample accounts are USD-only | FX rate source |
 | 9 | Internationalisation (languages, number formats) | — | English-only to start | — |
 
+## Plan 6: new modules on local data
+
+Picked by the user on 2026-11-22 from the TradeZella feature map (`docs/research/tradezella-feature-map.md`, rows marked P6). Each needs its own comps before it is built.
+
+| # | Item | Feature map IDs | Waiting on |
+|---|---|---|---|
+| 35 | Progress tracker: trading days, a daily discipline score from prepare/trade/reflect rules, custom checklist rules, heatmap, streaks, follow rate, and its dashboard card (absorbs E50) | PT1, PT2, DA3 | Comps |
+| 36 | Day page: plan mode (daily note, chart screenshots) and review mode (the day's trades and stats), with the day's checklist | DV1 | Comps, #35 |
+| 37 | Trade log grouped by day and by week, with a mini calendar | TR7 | Comps |
+| 38 | Merge and split trades; move trades between accounts (absorbs E10) | TR8, TR9 | Comps |
+| 39 | Several targets and stops per trade with partial sizes; default stop/target rules and default commission/fee rules per account and instrument | TD3, SE4, SE5 | Comps |
+| 40 | Trade-behaviour flags computed by rules (back-to-back losses, winner turned loser, held a loser, scaling, high volume) as filters and trade badges | X7 | Comps |
+| 41 | Display in ticks, pips or points per instrument | X6 | — |
+| 42 | Edit history: field-level log of changes with their source | X8 | Comps |
+| 43 | Screenshots on trades and images in notes, stored locally; note column layouts, colours, font settings, version history, voice dictation | TD4, NB7, NB8, NB9 | Comps |
+| 44 | Missed trades logged against a strategy; a strategy template gallery written by us, with example trades | ST6, ST7 | Comps, template content |
+| 45 | Prop finances (payouts, fees, resets; totals invested, earned, net) and pass-rate / breach-reason insights | PF5, PF6 | Comps |
+| 46 | Saved dashboard layouts with widgets; balance, drawdown, time-of-day and duration charts on the dashboard (absorbs E51) | DA1, DA2 | Comps |
+| 47 | Getting started: first-run setup and sign-up survey (experience, capital, broker, instruments, goals, referral source) that tailor defaults; a getting-started checklist | ON1, ON2, ON3 | Comps |
+| 48 | Excel and .txt import; import parsing in a worker (absorbs E25, E44's worker part) | IM7 | — |
+| 49 | Options report by days to expiry; cost method per account (LIFO, average); save the calendar as an image | RE7, AC5, CA5 | Comps |
+
 ## Data in
 
 | # | Item | Origin | Why deferred | Waiting on |
@@ -138,3 +160,4 @@ Origin key: **TZ** = TradeZella has it · **MTJ** = MyTradingJourney has it · *
 | E59 | Recent trades against comp C: the header still reads "Symbol" (the comp says "Instrument") and mistakes sit in the Strategy cell rather than a Mistake column; an option's expiry ("TSLA 370 Put 20 Nov") reads like a repeat of the Time column on 0DTE trades | Plan 5 (Trades) |
 | E60 | `Chip` has no raised tone (white, hairline, lift), so the site keeps its own `Pill` for codes on the canvas; an accent `IconTile` on the canvas loses its fill (accent-soft is close to #ECEEF8), so pricing uses tinted tiles on a white card; fold both into the shared parts | Any |
 | E61 | The app scope in theme.css repeats the root values now that marketing follows Daylight premium; collapse it to what the app actually overrides once the two settle | Any |
+| E62 | User-made tag categories with their own colours (TradeZella has them); Plan 5 keeps the four fixed categories | Plan 6 |

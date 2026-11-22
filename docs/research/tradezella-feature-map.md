@@ -11,7 +11,8 @@ Built on 2026-11-22 from three sources:
 - **P5** goes in Plan 5. These are the milestone 1 modules that already have approved comps; new parts extend the comps' language.
 - **P6** goes in Plan 6. These are new modules that still run on local data but need their own comps first.
 - **B#n** goes to the backlog, waiting on a backend, market data, AI or a provider (the number is the BACKLOG.md item).
-- **Skip** means we don't build it.
+
+Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and you decide when it comes in.
 
 **Keel today:**
 - **Built** means it ships on main now.
@@ -163,7 +164,7 @@ Built on 2026-11-22 from three sources:
 | PF5 | Prop finances: payouts, fees and resets as dated transactions marked reviewed or ignored, with totals invested, earned and net | Research "Later" | P6 |
 | PF6 | Pass rate and top breach reasons across challenges | Research "Later" | P6 |
 | PF7 | Firm presets (plans, sizes, fees). Our own data only | Backlog #24 | B#24 |
-| PF8 | Importing prop fees from a bank feed | New | Skip |
+| PF8 | Importing prop fees from a bank feed | New | B#10 |
 
 ## Settings
 
@@ -193,7 +194,9 @@ Built on 2026-11-22 from three sources:
 |---|---|---|---|
 | ON1 | First-run setup: what you trade, live or prop or both, time zone, base currency. It hides the prop pages for traders who don't use prop firms | New | P6 |
 | ON2 | A getting-started checklist (add an account, import trades, set up a strategy) | New | P6 |
-| ON3 | Sign-up survey, paywall, retention offers, referral programme | New | Skip until B#2/B#3 |
+| ON3 | Sign-up survey: experience level, what capital you trade (own, prop, not yet), main broker, instruments, goals (journal, analyse, backtest, learn), how you heard of us. It tailors the defaults, for example hiding prop pages | New | P6 (with ON1) |
+| ON4 | Paywall, plan choice, retention offers | New | B#3 |
+| ON5 | Referral programme | New | B#3 |
 
 ## Not for milestone 1
 
