@@ -406,14 +406,16 @@ function Form({
       else if (Number.isNaN(cost(r.commission)) || Number.isNaN(cost(r.fees)))
         local[`row:${r.key}`] =
           `Check fill ${i + 1}: commission and fees must be numbers.`;
+      else if (cost(r.commission) < 0 || cost(r.fees) < 0)
+        local[`row:${r.key}`] = 'Enter fees as a positive amount.';
       else
         fills.push({
           time,
           side: r.side,
           qty: num(r.qty),
           price: num(r.price),
-          commission: toCents(Math.abs(cost(r.commission))),
-          fees: toCents(Math.abs(cost(r.fees))),
+          commission: toCents(cost(r.commission)),
+          fees: toCents(cost(r.fees)),
         });
     });
     const price = (s: string, k: 'stop' | 'target') => {
@@ -461,7 +463,9 @@ function Form({
     }
   };
 
-  const cancelHref = trade ? `/app/trades/${trade.id}` : '/app/trades';
+  const cancelHref = trade
+    ? `/app/trades/${encodeURIComponent(trade.id)}`
+    : '/app/trades';
   const fillsErr = errors.fills;
   const qtyLabel = lots ? 'Lots' : 'Quantity';
 
@@ -980,7 +984,7 @@ export function ManualTradeForm({ tradeId }: { tradeId?: string }) {
           trade page.
         </p>
         <Link
-          href={`/app/trades/${trade.data.id}`}
+          href={`/app/trades/${encodeURIComponent(trade.data.id)}`}
           className={buttonClasses('secondary')}
         >
           Back to trade

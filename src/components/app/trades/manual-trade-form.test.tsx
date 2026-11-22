@@ -234,3 +234,52 @@ test('an imported trade cannot be edited here', async () => {
     }),
   ).toBeTruthy();
 });
+
+test('the links back to a trade encode an id that holds a slash', async () => {
+  const renamed =
+    (withManual: boolean, from: string) =>
+    async (): Promise<SampleWorkspace> => {
+      const w = await sample(withManual)();
+      return {
+        ...w,
+        trades: w.trades.map((t) =>
+          t.id === from ? { ...t, id: 'acc:EUR/USD:x' } : t,
+        ),
+      };
+    };
+  renderApp(<ManualTradeForm tradeId="acc:EUR/USD:x" />, {
+    sample: renamed(false, 'f-1'),
+    url: '/app/trades/x/edit',
+  });
+  const back = await screen.findByRole('link', { name: 'Back to trade' });
+  expect(back.getAttribute('href')).toBe('/app/trades/acc%3AEUR%2FUSD%3Ax');
+  cleanup();
+  renderApp(<ManualTradeForm tradeId="acc:EUR/USD:x" />, {
+    sample: renamed(true, 'man-1'),
+    url: '/app/trades/x/edit',
+  });
+  await screen.findByText('Times in America/New_York');
+  for (const cancel of screen.getAllByRole('link', { name: /Cancel|Back/ }))
+    expect(cancel.getAttribute('href')).toBe('/app/trades/acc%3AEUR%2FUSD%3Ax');
+});
+
+test('a negative commission or fee is refused at its fill, not flipped', async () => {
+  const { repo } = renderApp(<ManualTradeForm />, {
+    sample: sample(),
+    url: '/app/trades/new',
+  });
+  await fillFuture();
+  addExit('1');
+  const before = (await repo.trades.list(WS)).length;
+  for (const field of ['commission', 'fees']) {
+    set(`Fill 1 ${field}`, '-1.5');
+    fireEvent.click(screen.getByRole('button', { name: 'Save trade' }));
+    const msg = await screen.findByText('Enter fees as a positive amount.');
+    expect(
+      screen.getByLabelText(`Fill 1 ${field}`).getAttribute('aria-describedby'),
+    ).toContain(msg.id);
+    expect((await repo.trades.list(WS)).length).toBe(before);
+    set(`Fill 1 ${field}`, '');
+  }
+  expect(window.location.pathname).toBe('/app/trades/new');
+});

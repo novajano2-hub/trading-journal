@@ -212,7 +212,7 @@ export function TradeLink({
 }): React.JSX.Element {
   return (
     <Link
-      href={`/app/trades/${id}`}
+      href={`/app/trades/${encodeURIComponent(id)}`}
       className="inline-flex min-w-0 rounded-chip underline-offset-4 outline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-accent"
     >
       {children}
