@@ -17,6 +17,7 @@ import { FigureText } from '@/components/product/figure-text';
 import { keepHyphens, plural } from '@/lib/format';
 import { shortTime } from '@/lib/time-format';
 import { navHref, navItem } from '../nav';
+import { TradeLink } from '../trades/cells';
 import {
   CARD,
   Caption,
@@ -247,12 +248,14 @@ export function RecentTrades({
                   <TradeTime text={time} />
                 </td>
                 <td className="py-1.5 md:pl-4 xl:py-0">
-                  <InstrumentName
-                    trade={t}
-                    timeZone={timeZone}
-                    className="xl:flex-nowrap"
-                    detailClassName="max-md:hidden"
-                  />
+                  <TradeLink id={t.id}>
+                    <InstrumentName
+                      trade={t}
+                      timeZone={timeZone}
+                      className="xl:flex-nowrap"
+                      detailClassName="max-md:hidden"
+                    />
+                  </TradeLink>
                   <TradeTime text={time} className="block text-xs md:hidden" />
                 </td>
                 <td className={`${GAP} max-sm:hidden`}>

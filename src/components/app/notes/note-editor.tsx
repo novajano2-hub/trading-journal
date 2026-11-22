@@ -138,7 +138,8 @@ export function NoteEditor({
   }, [editor, value]);
 
   useEffect(() => {
-    editor?.setEditable(!readOnly);
+    // No update event: switching modes is not an edit.
+    editor?.setEditable(!readOnly, false);
   }, [editor, readOnly]);
 
   useEffect(() => {

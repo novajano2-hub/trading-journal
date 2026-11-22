@@ -56,3 +56,17 @@ export function useSearchParams(): URLSearchParams {
 export function usePathname(): string {
   return useSyncExternalStore(subscribe, snapshot).pathname;
 }
+
+/** `router.push` and `replace` write the address bar, as a client navigation does. */
+export function useRouter(): {
+  push(url: string): void;
+  replace(url: string): void;
+} {
+  return useMemo(
+    () => ({
+      push: (url: string) => window.history.pushState(null, '', url),
+      replace: (url: string) => window.history.replaceState(null, '', url),
+    }),
+    [],
+  );
+}

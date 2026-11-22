@@ -103,14 +103,14 @@ function tickDecimals(tick: number): number {
 }
 
 /** A price to its instrument's tick: 6,227.25, 1.10254. At least two decimals, so averages never run on. */
-const price = (n: number, tick: number) => {
+export const price = (n: number, tick: number) => {
   const digits = Math.max(2, Math.min(6, tickDecimals(tick)));
   return n.toLocaleString('en-US', {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
 };
-const qty = (n: number) =>
+export const qty = (n: number) =>
   n.toLocaleString('en-US', { maximumFractionDigits: 4 });
 
 /** A column's text-or-number value for sorting; undefined sorts last. */

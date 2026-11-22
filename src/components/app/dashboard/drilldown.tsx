@@ -31,6 +31,7 @@ import { keepHyphens, plural } from '@/lib/format';
 import { shortTime } from '@/lib/time-format';
 import type { DrillTarget } from './dashboard-view';
 import { TagPicker } from '../tag-picker';
+import { TradeLink } from '../trades/cells';
 import { InstrumentName, signTone, TradeTime } from './shared';
 
 /** An amount in the chosen unit: one trade's, a set's by id, or a bare sum (a percentage reads over the account's base, other units in dollars). */
@@ -271,12 +272,14 @@ function TradesTable({
                   </td>
                   <td className={`${TD} ${symbolPad} py-1.5`}>
                     {/* The title and the Kept box's label keep the symbol as traded; below sm the time takes the expiry's place. */}
-                    <InstrumentName
-                      trade={t}
-                      timeZone={timeZone}
-                      className="sm:flex-nowrap"
-                      detailClassName="max-sm:hidden"
-                    />
+                    <TradeLink id={t.id}>
+                      <InstrumentName
+                        trade={t}
+                        timeZone={timeZone}
+                        className="sm:flex-nowrap"
+                        detailClassName="max-sm:hidden"
+                      />
+                    </TradeLink>
                     <TradeTime
                       text={time}
                       className="block text-xs sm:hidden"
