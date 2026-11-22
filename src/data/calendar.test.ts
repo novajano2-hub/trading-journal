@@ -3,8 +3,14 @@ import { makeTrade } from '@/domain/__fixtures__/trades';
 import { resolveInstrument } from '@/domain/instruments';
 import { defaultMetricContext } from '@/domain/metrics/context';
 import { buildTrades } from '@/domain/trade-builder';
-import type { Execution, JournalEntry } from '@/domain/types';
-import { calendarMonth, calendarYear } from './calendar';
+import type {
+  Execution,
+  JournalEntry,
+  Strategy,
+  Tag,
+  TagCategory,
+} from '@/domain/types';
+import { calendarMonth, calendarYear, dayExits, dayGrading } from './calendar';
 
 const ctx = defaultMetricContext('America/New_York');
 
@@ -196,5 +202,186 @@ describe('calendarYear', () => {
     expect(nov.days).toHaveLength(30);
     expect(y[0]!.net).toBe(0);
     expect(y[0]!.days).toHaveLength(31);
+  });
+});
+
+describe('trades that cross the month edge (U4)', () => {
+  /** Two ES contracts in on 29 Oct: one out on 30 Oct, one out on 2 Nov. */
+  const crossesIn = () =>
+    buildTrades(
+      [
+        fill('e1', 'buy', 2, 5000, '2026-10-29T15:00:00Z', 300),
+        fill('x1', 'sell', 1, 5010, '2026-10-30T15:00:00Z', 150),
+        fill('x2', 'sell', 1, 5020, '2026-11-02T15:00:00Z', 150),
+      ],
+      {
+        workspaceId: 'w',
+        startSerial: 1,
+        resolve: () => resolveInstrument('ESZ5'),
+        accountCurrency: () => 'USD',
+      },
+    ).trades;
+
+  test('a trade opened before the month books only its in-month exits, on their own day', () => {
+    const m = calendarMonth(crossesIn(), [], '2026-11', ctx);
+    expect(dayOf(m, '2026-11-02')).toMatchObject({
+      trades: 1,
+      gross: 100000,
+      // Half the entry fee and the exit's own: the same split as a 2-day hold.
+      fees: 300,
+      net: 99700,
+    });
+    expect(m.summary).toMatchObject({ trades: 1, tradingDays: 1 });
+    expect(m.summary.net).toBe(dayOf(m, '2026-11-02')!.net);
+    // October's exit stays in October.
+    const oct = calendarMonth(crossesIn(), [], '2026-10', ctx);
+    expect(dayOf(oct, '2026-10-30')).toMatchObject({ trades: 1, gross: 50000 });
+    expect(dayOf(oct, '2026-10-29')!.trades).toBe(0);
+  });
+
+  test('an open trade with a partial exit books that exit on its day', () => {
+    const open = buildTrades(
+      [
+        fill('e1', 'buy', 2, 5000, '2026-11-16T15:00:00Z', 300),
+        fill('x1', 'sell', 1, 5010, '2026-11-17T15:00:00Z', 150),
+      ],
+      {
+        workspaceId: 'w',
+        startSerial: 1,
+        resolve: () => resolveInstrument('ESZ5'),
+        accountCurrency: () => 'USD',
+      },
+    ).trades;
+    expect(open[0]!.status).toBe('open');
+    const m = calendarMonth(open, [], '2026-11', ctx);
+    expect(dayOf(m, '2026-11-17')).toMatchObject({
+      trades: 1,
+      gross: 50000,
+      net: 49700,
+    });
+    expect(dayOf(m, '2026-11-16')!.trades).toBe(0);
+    expect(dayExits(open, '2026-11-17', ctx)).toHaveLength(1);
+  });
+});
+
+describe('the date range (I4)', () => {
+  const trades = [
+    makeTrade({ net: 1000, closedAt: '2026-11-02T15:00:00Z' }),
+    makeTrade({ net: 2000, closedAt: '2026-11-12T15:00:00Z' }),
+    makeTrade({ net: -500, closedAt: '2026-11-15T15:00:00Z' }),
+    makeTrade({ net: 4000, closedAt: '2026-11-25T15:00:00Z' }),
+  ];
+  const ranged = { ...ctx, range: { from: '2026-11-10', to: '2026-11-20' } };
+
+  test('days outside the range are outside: no figures, left out of totals and summary', () => {
+    const m = calendarMonth(trades, [], '2026-11', ranged);
+    expect(dayOf(m, '2026-11-02')).toMatchObject({
+      outside: true,
+      trades: 0,
+      net: 0,
+      tone: 'none',
+    });
+    expect(dayOf(m, '2026-11-25')!.outside).toBe(true);
+    expect(dayOf(m, '2026-11-12')).toMatchObject({
+      outside: false,
+      net: 2000,
+    });
+    expect(dayOf(m, '2026-11-11')!.outside).toBe(false);
+    expect(m.summary).toMatchObject({
+      net: 1500,
+      trades: 2,
+      tradingDays: 2,
+      outsideDays: 19,
+    });
+    expect(m.weeks.reduce((s, w) => s + w.net, 0)).toBe(1500);
+  });
+
+  test('without a range, or with one that holds the month, no day is outside', () => {
+    expect(calendarMonth(trades, [], '2026-11', ctx).summary.outsideDays).toBe(
+      0,
+    );
+    const wide = { ...ctx, range: { from: '2026-10-01', to: '2026-12-31' } };
+    expect(calendarMonth(trades, [], '2026-11', wide).summary).toMatchObject({
+      outsideDays: 0,
+      trades: 4,
+    });
+  });
+
+  test('a range that misses the month leaves every day outside', () => {
+    const away = { ...ctx, range: { from: '2026-12-01', to: '2026-12-31' } };
+    const m = calendarMonth(trades, [], '2026-11', away);
+    expect(m.summary).toMatchObject({ trades: 0, outsideDays: 30 });
+  });
+});
+
+describe('dayGrading (I1)', () => {
+  const strategy = {
+    id: 's1',
+    workspaceId: 'w',
+    name: 'S',
+    description: '',
+    assetClasses: [],
+    checklist: [],
+    status: 'active',
+    groups: [
+      {
+        id: 'g',
+        title: 'G',
+        rules: [
+          { id: 'r1', text: 'Always', showWhen: 'always' },
+          { id: 'r2', text: 'Loser only', showWhen: 'loser' },
+        ],
+      },
+    ],
+  } as Strategy;
+  const categories = [
+    { id: 'cm', role: 'mistake' },
+    { id: 'cs' },
+  ] as TagCategory[];
+  const tags = [
+    { id: 'mist', categoryId: 'cm' },
+    { id: 'setup', categoryId: 'cs' },
+  ] as Tag[];
+  const win = makeTrade({
+    id: 'w1',
+    net: 10000,
+    closedAt: '2026-11-02T15:00:00Z',
+    strategyIds: ['s1'],
+    // r2 is graded on losers only: this winner's mark doesn't count.
+    ruleChecks: [
+      { ruleId: 'r1', followed: true },
+      { ruleId: 'r2', followed: false },
+    ],
+    tagIds: ['setup'],
+  });
+  const loss = makeTrade({
+    id: 'l1',
+    net: -5000,
+    closedAt: '2026-11-02T16:00:00Z',
+    strategyIds: ['s1'],
+    ruleChecks: [
+      { ruleId: 'r1', followed: false },
+      { ruleId: 'r2', followed: true },
+    ],
+    tagIds: ['mist', 'setup'],
+  });
+
+  test('rules kept counts graded checks of applying rules; mistakes counts mistake-tagged trades and their day P&L', () => {
+    const exits = dayExits([win, loss], '2026-11-02', ctx);
+    expect(dayGrading(exits, [strategy], tags, categories, ctx)).toEqual({
+      rules: { kept: 2, checked: 3 },
+      mistakes: { trades: 1, pnl: -5000 },
+    });
+  });
+
+  test('a trade with two exits that day counts once, and a day with none grades nothing', () => {
+    const exits = dayExits([loss, loss], '2026-11-02', ctx);
+    expect(
+      dayGrading(exits, [strategy], tags, categories, ctx).mistakes.trades,
+    ).toBe(1);
+    expect(dayGrading([], [strategy], tags, categories, ctx)).toEqual({
+      rules: { kept: 0, checked: 0 },
+      mistakes: { trades: 0, pnl: 0 },
+    });
   });
 });

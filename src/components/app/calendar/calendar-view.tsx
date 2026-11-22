@@ -5,6 +5,7 @@ import {
   CalendarBlank,
   CaretLeft,
   CaretRight,
+  NotePencil,
   SlidersHorizontal,
   X,
 } from '@phosphor-icons/react/dist/ssr';
@@ -24,14 +25,17 @@ import { buttonClasses } from '@/components/ui/button-styles';
 import { Segmented } from '@/components/ui/segmented';
 import { MetricTip } from '@/components/ui/metric-tip';
 import { TaskCheckbox } from '@/components/ui/task-checkbox';
-import { calendarMonth, dayExits } from '@/data/calendar';
-import { serializeFilters } from '@/data/filters';
+import { calendarMonth, dayExits, dayGrading } from '@/data/calendar';
+import { resolveRange, serializeFilters } from '@/data/filters';
 import { metricContextOf } from '@/data/metrics';
 import { useGlobalFilters, useTradeSet } from '@/data/query/derived';
 import {
   useAccounts,
   useJournal,
   usePrefs,
+  useStrategies,
+  useTagCategories,
+  useTags,
   useTrades,
   useUpdatePrefs,
 } from '@/data/query/hooks';
@@ -82,16 +86,25 @@ function writeParams(patch: Record<string, string | null>): void {
   );
 }
 
-/** The `?month` value when it is a month, else this month. */
-function monthOf(search: string, today: string | undefined) {
-  const param = new URLSearchParams(search).get('month');
-  return param !== null && MONTH.test(param) ? param : today?.slice(0, 7);
+/** Whether `date` is a real calendar date: 2026-02-31 is not. */
+function realDate(date: string): boolean {
+  const d = new Date(`${date}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === date;
 }
 
-/** The `?day` value when it is a date. */
+/** The `?day` value when it is a real date. */
 function dayOf(search: string) {
   const param = new URLSearchParams(search).get('day');
-  return param !== null && DAY.test(param) ? param : undefined;
+  return param !== null && DAY.test(param) && realDate(param)
+    ? param
+    : undefined;
+}
+
+/** The `?month` value when it is a month, else the month of `?day`, else this month. */
+function monthOf(search: string, today: string | undefined) {
+  const param = new URLSearchParams(search).get('month');
+  if (param !== null && MONTH.test(param)) return param;
+  return dayOf(search)?.slice(0, 7) ?? today?.slice(0, 7);
 }
 
 function shiftMonth(month: string, by: number): string {
@@ -100,15 +113,20 @@ function shiftMonth(month: string, by: number): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
-/** Whether the viewport is `lg` or wider. Prerenders as wide. */
+/**
+ * Whether the viewport is `xl` (1280px) or wider, where the day panel sits
+ * beside the grid. Narrower, the panel is a sheet and the grid keeps the full
+ * width for its in-cell figures. Prerenders as wide.
+ */
+const WIDE = '(min-width: 1280px)';
 function useDesktop(): boolean {
   return useSyncExternalStore(
     (notify) => {
-      const query = matchMedia('(min-width: 1024px)');
+      const query = matchMedia(WIDE);
       query.addEventListener('change', notify);
       return () => query.removeEventListener('change', notify);
     },
-    () => matchMedia('(min-width: 1024px)').matches,
+    () => matchMedia(WIDE).matches,
     () => true,
   );
 }
@@ -168,7 +186,7 @@ function StatsMenu({
   );
 }
 
-/** The day panel below `lg`: a sheet rising from the bottom edge. */
+/** The day panel below `xl`: a sheet rising from the bottom edge. */
 function DaySheet({
   open,
   onClose,
@@ -270,6 +288,9 @@ export function CalendarView(): React.JSX.Element {
   const notes = useJournal().data;
   const allTrades = useTrades().data;
   const accounts = useAccounts().data;
+  const strategies = useStrategies().data;
+  const tags = useTags().data;
+  const tagCategories = useTagCategories().data;
   const search = useSearchParams().toString();
   const updatePrefs = useUpdatePrefs();
   const queryClient = useQueryClient();
@@ -299,12 +320,25 @@ export function CalendarView(): React.JSX.Element {
         ? baseCurrency
         : (currencies[0] ?? baseCurrency);
 
+  const dateRange = set.data?.filters.range;
   const model = useMemo(() => {
-    if (!dayTrades || !prefs || !notes || month === undefined) return undefined;
-    const ctx = metricContextOf(prefs);
+    if (
+      !dayTrades ||
+      !prefs ||
+      !notes ||
+      month === undefined ||
+      today === undefined ||
+      dateRange === undefined
+    )
+      return undefined;
+    // The global date range clips the month: its days outside it are left out.
+    const ctx = {
+      ...metricContextOf(prefs),
+      range: resolveRange(dateRange, today),
+    };
     const trades = dayTrades.filter((t) => t.pnlCurrency === currency);
     return { ctx, trades, ...calendarMonth(trades, notes, month, ctx) };
-  }, [dayTrades, prefs, notes, month, currency]);
+  }, [dayTrades, prefs, notes, month, currency, dateRange, today]);
 
   const accountIds = set.data?.filters.accountIds;
   const pctBase = useMemo(
@@ -365,29 +399,16 @@ export function CalendarView(): React.JSX.Element {
   const thisMonth = today.slice(0, 7);
   const goMonth = (next: string) =>
     writeParams({ month: next === thisMonth ? null : next, day: null });
-  const selected = weeks.flatMap((w) => w.days).find((d) => d?.date === day);
-  const selectedDay =
-    selected ??
-    (day
-      ? {
-          date: day,
-          net: 0,
-          gross: 0,
-          fees: 0,
-          trades: 0,
-          wins: 0,
-          losses: 0,
-          r: null,
-          tone: 'none' as const,
-          hasNote: false,
-        }
-      : undefined);
-  const exits = day ? dayExits(trades, day, ctx) : [];
-  const stillOpen = day
+  // A pick counts only inside the shown month and the date range.
+  const selected = weeks
+    .flatMap((w) => w.days)
+    .find((d) => d !== null && d.date === day && !d.outside);
+  const exits = selected ? dayExits(trades, selected.date, ctx) : [];
+  const stillOpen = selected
     ? trades.filter(
         (t) =>
           t.status === 'open' &&
-          localDate(t.openedAt, ctx.timeZone) === day &&
+          localDate(t.openedAt, ctx.timeZone) === selected.date &&
           !exits.some((e) => e.trade.id === t.id),
       ).length
     : 0;
@@ -400,28 +421,35 @@ export function CalendarView(): React.JSX.Element {
       : `${range.from * 100}% to ${range.to * 100}%`;
   const filterQuery = serializeFilters(set.data.filters).toString();
   const yearHref = `/app/reports/calendar${filterQuery ? `?${filterQuery}` : ''}`;
-  const panel =
-    day && selectedDay ? (
-      <DayPanel
-        date={day}
-        day={selectedDay}
-        exits={exits}
-        stillOpen={stillOpen}
-        fmt={fmt}
-        basis={ctx.pnlBasis}
-        timeZone={ctx.timeZone}
-        filters={set.data.filters}
-        headingId={titleId}
-        inSheet={!desktop}
-      />
-    ) : null;
+  const panel = selected ? (
+    <DayPanel
+      date={selected.date}
+      day={selected}
+      exits={exits}
+      grading={dayGrading(
+        exits,
+        strategies ?? [],
+        tags ?? [],
+        tagCategories ?? [],
+        ctx,
+      )}
+      currency={currency}
+      stillOpen={stillOpen}
+      fmt={fmt}
+      basis={ctx.pnlBasis}
+      timeZone={ctx.timeZone}
+      filters={set.data.filters}
+      headingId={titleId}
+      inSheet={!desktop}
+    />
+  ) : null;
   const best = summary.best;
   const worst = summary.worst;
 
   return (
     <div
       data-testid="calendar-ready"
-      className="grid min-w-0 gap-4 px-5 pt-1 pb-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:pt-0 min-[1400px]:grid-cols-[minmax(0,1fr)_350px]"
+      className="grid min-w-0 gap-4 px-5 pt-1 pb-5 lg:pt-0 xl:grid-cols-[minmax(0,1fr)_300px] min-[1400px]:grid-cols-[minmax(0,1fr)_350px]"
     >
       <section
         aria-label={monthName}
@@ -491,7 +519,7 @@ export function CalendarView(): React.JSX.Element {
             </span>
           </Kpi>
           <Kpi
-            label="Trading days"
+            label={<MetricTip id="trading-days" basis={ctx.pnlBasis} />}
             small={
               summary.tradingDays === 0
                 ? 'None this month'
@@ -501,7 +529,7 @@ export function CalendarView(): React.JSX.Element {
             {summary.tradingDays}
           </Kpi>
           <Kpi
-            label="Green days"
+            label={<MetricTip id="green-days" basis={ctx.pnlBasis} />}
             small={`${summary.greenDays} of ${summary.tradingDays} green days`}
           >
             {summary.tradingDays === 0
@@ -509,7 +537,7 @@ export function CalendarView(): React.JSX.Element {
               : formatPct(summary.greenDays / summary.tradingDays, 1)}
           </Kpi>
           <Kpi
-            label="Best day"
+            label={<MetricTip id="best-day" basis={ctx.pnlBasis} />}
             small={best ? dayLabel(best.date) : 'No trades'}
           >
             {best ? (
@@ -521,7 +549,7 @@ export function CalendarView(): React.JSX.Element {
             )}
           </Kpi>
           <Kpi
-            label="Worst day"
+            label={<MetricTip id="worst-day" basis={ctx.pnlBasis} />}
             small={worst ? dayLabel(worst.date) : 'No trades'}
           >
             {worst ? (
@@ -533,6 +561,14 @@ export function CalendarView(): React.JSX.Element {
             )}
           </Kpi>
         </div>
+
+        {summary.outsideDays > 0 ? (
+          <p className="mt-3 text-[13px] text-muted">
+            Your date range applies here. {summary.outsideDays}{' '}
+            {plural(summary.outsideDays, 'day')} of {monthName} sit outside it
+            and are left out of the figures.
+          </p>
+        ) : null}
 
         {allTrades?.length === 0 ? (
           <p className="mt-3 text-[13.5px] text-muted">
@@ -552,9 +588,12 @@ export function CalendarView(): React.JSX.Element {
           weeks={weeks}
           stats={stats}
           fmt={fmt}
+          currency={currency}
           today={today}
-          selected={day}
-          onSelect={(date) => writeParams({ day: date === day ? null : date })}
+          selected={selected?.date}
+          onSelect={(date) =>
+            writeParams({ day: date === selected?.date ? null : date })
+          }
         />
 
         <div className="mt-3.5 flex flex-wrap items-center gap-x-[18px] gap-y-2 text-[12px] text-muted">
@@ -579,6 +618,15 @@ export function CalendarView(): React.JSX.Element {
             />
             Breakeven, {rangeText}
           </span>
+          <span className="inline-flex items-center gap-[7px]">
+            <NotePencil
+              size={15}
+              weight="duotone"
+              aria-hidden="true"
+              className="text-muted"
+            />
+            Journal entry
+          </span>
           <span>Days are booked on the date a trade exits.</span>
           <Link
             href="/app/settings"
@@ -591,8 +639,8 @@ export function CalendarView(): React.JSX.Element {
 
       {desktop ? (
         <aside
-          aria-labelledby={day ? titleId : undefined}
-          aria-label={day ? undefined : 'Day'}
+          aria-labelledby={selected ? titleId : undefined}
+          aria-label={selected ? undefined : 'Day'}
           className={`${CARD} min-w-0 self-start p-5`}
         >
           {panel ?? (

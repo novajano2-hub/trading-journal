@@ -1,9 +1,18 @@
 import { outcomeOf } from '@/domain/outcome';
+import { mistakeTags } from '@/domain/metrics/mistakes';
 import { dailyPnl } from '@/domain/metrics/days';
 import type { MetricContext } from '@/domain/metrics/context';
 import { realizations } from '@/domain/metrics/realized';
 import { localDate } from '@/domain/time';
-import type { Cents, JournalEntry, Trade } from '@/domain/types';
+import type {
+  Cents,
+  JournalEntry,
+  Strategy,
+  Tag,
+  TagCategory,
+  Trade,
+} from '@/domain/types';
+import { tradeRulesSummary } from './dashboard';
 
 /**
  * One day on the calendar, booked on the dates of the trades' exits: a trade
@@ -24,6 +33,8 @@ export interface CalendarDay {
   /** `flat` is inside the breakeven range; `none` is a day with no exit. */
   tone: 'gain' | 'loss' | 'flat' | 'none';
   hasNote: boolean;
+  /** The day is outside the global date range: no figures, not selectable. */
+  outside: boolean;
 }
 
 export interface CalendarWeek {
@@ -45,6 +56,8 @@ export interface CalendarSummary {
   redDays: number;
   flatDays: number;
   tradingDays: number;
+  /** Days of the month the global date range leaves out. */
+  outsideDays: number;
   best: CalendarDay | null;
   worst: CalendarDay | null;
 }
@@ -94,6 +107,7 @@ function bookDays(
       r: null,
       tone: toneOf(s.net, s.costBasis, ctx),
       hasNote: noted.has(s.date),
+      outside: false,
     });
   }
   // Gross, fees and R come from the same exits the day's net was booked from.
@@ -134,7 +148,11 @@ function toneOf(
   return o === 'win' ? 'gain' : o === 'loss' ? 'loss' : 'flat';
 }
 
-const emptyDay = (date: string, notes: ReadonlySet<string>): CalendarDay => ({
+const emptyDay = (
+  date: string,
+  notes: ReadonlySet<string>,
+  outside = false,
+): CalendarDay => ({
   date,
   net: 0,
   gross: 0,
@@ -145,6 +163,7 @@ const emptyDay = (date: string, notes: ReadonlySet<string>): CalendarDay => ({
   r: null,
   tone: 'none',
   hasNote: notes.has(date),
+  outside,
 });
 
 function notedDates(notes: readonly JournalEntry[]): Set<string> {
@@ -163,8 +182,10 @@ function notedDates(notes: readonly JournalEntry[]): Set<string> {
 /**
  * A month as Monday-to-Sunday weeks. Each in-month date is a day (`tone: 'none'`
  * when nothing exited); dates of the neighbouring months are null. `trades` is
- * the whole set: only exits dated inside the month count, and `ctx.range` is
- * ignored. Input must be a single-currency set.
+ * the whole set: only exits dated inside the month and inside `ctx.range` (the
+ * resolved global date range) count. A day outside the range is `outside`: it
+ * books nothing and stays out of the week totals and the summary. Input must
+ * be a single-currency set.
  */
 export function calendarMonth(
   trades: readonly Trade[],
@@ -175,8 +196,15 @@ export function calendarMonth(
   const count = daysInMonth(month);
   const first = `${month}-01`;
   const last = `${month}-${pad(count)}`;
-  const booked = bookDays(trades, notes, ctx, { from: first, to: last });
+  const from =
+    ctx.range?.from !== undefined && ctx.range.from > first
+      ? ctx.range.from
+      : first;
+  const to =
+    ctx.range?.to !== undefined && ctx.range.to < last ? ctx.range.to : last;
+  const booked = bookDays(trades, notes, ctx, { from, to });
   const noted = notedDates(notes);
+  const outside = (date: string) => date < from || date > to;
   const weeks: CalendarWeek[] = [];
   for (
     let start = addDays(first, -mondayIndex(first));
@@ -187,7 +215,9 @@ export function calendarMonth(
       const date = addDays(start, i);
       return date < first || date > last
         ? null
-        : (booked.get(date) ?? emptyDay(date, noted));
+        : outside(date)
+          ? emptyDay(date, noted, true)
+          : (booked.get(date) ?? emptyDay(date, noted));
     });
     const live = days.filter((d): d is CalendarDay => d !== null);
     weeks.push({
@@ -218,6 +248,9 @@ export function calendarMonth(
       redDays: tonal('loss'),
       flatDays: tonal('flat'),
       tradingDays: traded.length,
+      outsideDays: Array.from({ length: count }, (_, i) =>
+        outside(`${month}-${pad(i + 1)}`),
+      ).filter(Boolean).length,
       best,
       worst,
     },
@@ -282,6 +315,49 @@ export function dayExits(
     }
   }
   return out.sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
+}
+
+/** What a day's trades were graded on and what mistakes they carried. */
+export interface DayGrading {
+  /** Rule checks kept of those graded, over the rules that apply to each trade. */
+  rules: { kept: number; checked: number };
+  /** Trades with a mistake-role tag, and what they made that day (their exits' values). */
+  mistakes: { trades: number; pnl: Cents };
+}
+
+/**
+ * The grading of the trades that exited on a day. A trade counts once however
+ * many times it exited; its rules are those that apply to it, as in the trade
+ * log's Rules column.
+ */
+export function dayGrading(
+  exits: readonly DayExit[],
+  strategies: readonly Strategy[],
+  tags: readonly Tag[],
+  categories: readonly TagCategory[],
+  ctx: MetricContext,
+): DayGrading {
+  const mistakeIds = new Set(mistakeTags(tags, categories).map((t) => t.id));
+  const seen = new Set<string>();
+  const out: DayGrading = {
+    rules: { kept: 0, checked: 0 },
+    mistakes: { trades: 0, pnl: 0 },
+  };
+  const wrong = new Set<string>();
+  for (const e of exits)
+    if (e.trade.tagIds.some((id) => mistakeIds.has(id))) {
+      wrong.add(e.trade.id);
+      out.mistakes.pnl += e.value;
+    }
+  out.mistakes.trades = wrong.size;
+  for (const { trade } of exits) {
+    if (seen.has(trade.id)) continue;
+    seen.add(trade.id);
+    const r = tradeRulesSummary(trade, strategies, ctx);
+    out.rules.kept += r.kept;
+    out.rules.checked += r.checked;
+  }
+  return out;
 }
 
 export { addDays, mondayIndex, daysInMonth };

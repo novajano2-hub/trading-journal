@@ -25,6 +25,13 @@ export const METRIC_IDS = [
   'avg-daily-win-rate',
   'longest-day',
   'day-streaks',
+  'trading-days',
+  'green-days',
+  'best-day',
+  'worst-day',
+  'fees',
+  'gross-pnl',
+  'net-pnl',
 ] as const;
 
 export type MetricId = (typeof METRIC_IDS)[number];
@@ -149,6 +156,37 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Day streaks',
     definition:
       'Longest run of green days and of red days. A flat day, inside your breakeven range, neither extends nor breaks a run.',
+  },
+  'trading-days': {
+    label: 'Trading days',
+    definition:
+      'Days with at least one trade exit. A trade is booked on the date it exits, so a trade held over two days counts on both.',
+  },
+  'green-days': {
+    label: 'Green days',
+    definition:
+      'Trading days that ended in profit, outside your breakeven range, as a share of all trading days. Flat days count as trading days.',
+  },
+  'best-day': {
+    label: 'Best day',
+    definition: 'The trading day with the highest {basis} P&L.',
+  },
+  'worst-day': {
+    label: 'Worst day',
+    definition: 'The trading day with the lowest {basis} P&L.',
+  },
+  fees: {
+    label: 'Fees',
+    definition:
+      'Fees and commissions paid on the exits booked here. The entry fee is split across the exits of the trade.',
+  },
+  'gross-pnl': {
+    label: 'Gross',
+    definition: 'P&L before fees and commissions.',
+  },
+  'net-pnl': {
+    label: 'Net',
+    definition: 'P&L after fees and commissions.',
   },
 };
 

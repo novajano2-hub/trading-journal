@@ -563,6 +563,14 @@ test('every metric carries its definition', async () => {
     'avg-daily-win-rate',
     'longest-day',
     'day-streaks',
+    // On the calendar (Task 13).
+    'trading-days',
+    'green-days',
+    'best-day',
+    'worst-day',
+    'fees',
+    'gross-pnl',
+    'net-pnl',
   ]);
   expect(new Set(ids)).toEqual(
     new Set(METRIC_IDS.filter((id) => !notOnDashboard.has(id))),

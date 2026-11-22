@@ -12,7 +12,8 @@ import { FigureText } from '@/components/product/figure-text';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { Chip, SideChip } from '@/components/ui/chip';
 import { IconTile } from '@/components/ui/icon-tile';
-import type { CalendarDay, DayExit } from '@/data/calendar';
+import { MetricTip } from '@/components/ui/metric-tip';
+import type { CalendarDay, DayExit, DayGrading } from '@/data/calendar';
 import { serializeFilters, type GlobalFilters } from '@/data/filters';
 import { formatUnitValue } from '@/lib/display';
 import { formatPct, plural } from '@/lib/format';
@@ -71,7 +72,7 @@ function DayChart({
       viewBox={`0 0 ${W} ${H}`}
       role="img"
       aria-label={label}
-      className="mt-2 block h-auto w-full overflow-visible"
+      className="mt-2 block h-auto w-full max-w-[460px] overflow-visible"
     >
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
@@ -108,6 +109,8 @@ export function DayPanel({
   date,
   day,
   exits,
+  grading,
+  currency,
   stillOpen,
   fmt,
   basis,
@@ -119,6 +122,8 @@ export function DayPanel({
   date: string;
   day: CalendarDay;
   exits: readonly DayExit[];
+  grading: DayGrading;
+  currency: string;
   /** Trades opened on this date that have no exit yet. */
   stillOpen: number;
   fmt: FormatMoney;
@@ -135,20 +140,69 @@ export function DayPanel({
     ...filters,
     range: { from: date, to: date },
   }).toString();
-  const mini: [string, React.ReactNode][] = [
-    ['Trades', day.trades],
+  const tip = (
+    id: Parameters<typeof MetricTip>[0]['id'],
+    label: string,
+    note?: string,
+  ) => (
+    <MetricTip id={id} basis={basis} note={note}>
+      {label}
+    </MetricTip>
+  );
+  const mini: [string, React.ReactNode, React.ReactNode][] = [
+    [
+      'Trades',
+      tip('trades', 'Trades', 'Here, trades with an exit on this day.'),
+      day.trades,
+    ],
     [
       'Win rate',
+      tip('win-rate', 'Win rate'),
       decided === 0 ? 'None decided' : formatPct(day.wins / decided, 1),
     ],
-    ['Fees', <FigureText key="f" f={fmt(-day.fees)} />],
-    [basis === 'net' ? 'Gross' : 'Net', <FigureText key="g" f={fmt(other)} />],
+    ['Fees', tip('fees', 'Fees'), <FigureText key="f" f={fmt(-day.fees)} />],
+    [
+      basis === 'net' ? 'Gross' : 'Net',
+      basis === 'net' ? tip('gross-pnl', 'Gross') : tip('net-pnl', 'Net'),
+      <FigureText key="g" f={fmt(other)} />,
+    ],
   ];
   if (day.r !== null)
     mini.push([
       'Realized R',
-      formatUnitValue('r', day.r, { currency: 'USD', signed: true }),
+      tip('realized-r', 'Realized R'),
+      formatUnitValue('r', day.r, { currency, signed: true }),
     ]);
+  const { rules, mistakes } = grading;
+  mini.push(
+    [
+      'Rules kept',
+      tip(
+        'rule-adherence',
+        'Rules kept',
+        'Here, the checks on the trades that exited this day, for the rules that apply to each.',
+      ),
+      rules.checked === 0 ? 'None graded' : `${rules.kept} of ${rules.checked}`,
+    ],
+    [
+      'Mistakes',
+      tip(
+        'mistake-cost',
+        'Mistakes',
+        'Here, trades that exited this day with a mistake tag, and what they made on it.',
+      ),
+      mistakes.trades === 0 ? (
+        'None'
+      ) : (
+        <>
+          {mistakes.trades}
+          <small className="block truncate text-[12px] font-medium text-muted">
+            <FigureText f={fmt(mistakes.pnl)} />
+          </small>
+        </>
+      ),
+    ],
+  );
   return (
     <div className="flex min-h-0 flex-col">
       <div className={`flex items-center gap-2.5 ${inSheet ? 'pr-11' : ''}`}>
@@ -180,13 +234,13 @@ export function DayPanel({
               <FigureText f={fmt(day.net, day.r)} />
             </b>
             <span className="text-[12.5px] text-faint">
-              {basis === 'net' ? 'Net' : 'Gross'} P&amp;L
+              <MetricTip id="pnl" basis={basis} />
             </span>
           </p>
           <dl className="mt-3 grid grid-cols-3 gap-x-3 gap-y-2.5 border-t border-line pt-2.5">
-            {mini.map(([k, v]) => (
+            {mini.map(([k, label, v]) => (
               <div key={k} className="min-w-0">
-                <dt className="text-[12px] text-faint">{k}</dt>
+                <dt className="text-[12px] text-faint">{label}</dt>
                 <dd className="truncate text-[15px] font-semibold tabular-nums text-text">
                   {v}
                 </dd>
