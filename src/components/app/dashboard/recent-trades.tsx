@@ -12,7 +12,8 @@ import { Chip, SideChip } from '@/components/ui/chip';
 import type { RecentTrade, TradeRulesSummary } from '@/data/dashboard';
 import { pnlOf } from '@/domain/metrics/context';
 import type { PnlBasis } from '@/domain/types';
-import { formatPnl, keepHyphens, plural } from '@/lib/format';
+import { useDisplay } from '@/lib/display';
+import { keepHyphens, plural } from '@/lib/format';
 import { shortTime } from '@/lib/time-format';
 import { navHref, navItem } from '../nav';
 import {
@@ -158,6 +159,7 @@ export function RecentTrades({
   caption: string;
 }): React.JSX.Element {
   const headingId = useId();
+  const display = useDisplay();
   // The Trades page opens on the same filters.
   const allTrades = navHref(TRADES, useSearchParams());
   return (
@@ -243,7 +245,7 @@ export function RecentTrades({
                 <td
                   className={`${GAP} ${FIGURE} text-right whitespace-nowrap ${signTone(pnl)}`}
                 >
-                  {formatPnl(pnl, t.pnlCurrency)}
+                  {display.figure(display.ofTrade(t), true, t.pnlCurrency).text}
                 </td>
                 <td className={`${GAP} py-1.5`}>
                   <RulesCell rules={row.rules} />

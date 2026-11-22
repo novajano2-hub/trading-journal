@@ -1,0 +1,102 @@
+// @vitest-environment happy-dom
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
+import { afterEach, expect, test, vi } from 'vitest';
+import { fixtureSample } from '@/data/__fixtures__/sample';
+import { createLocalRepository } from '@/data/local/local-repository';
+import { renderApp } from './__fixtures__/render-app';
+import { DisplayMenu } from './display-menu';
+
+vi.mock('next/navigation', () => import('./__fixtures__/navigation'));
+
+afterEach(cleanup);
+
+/** Radix opens its menu on pointer down, not click. */
+function open(name: RegExp | string) {
+  const button = screen.getByRole('button', { name });
+  fireEvent.pointerDown(button, { button: 0, ctrlKey: false });
+  return button;
+}
+
+test('the button names the unit and the basis, and starts as Net, $', async () => {
+  renderApp(<DisplayMenu />);
+  const button = await screen.findByRole('button', {
+    name: 'Display: Dollar, Net P&L',
+  });
+  expect(button.textContent).toBe('Net, $');
+});
+
+test('choosing Privacy saves displayUnit and renames the button', async () => {
+  const { repo } = renderApp(<DisplayMenu />);
+  open('Display: Dollar, Net P&L');
+  fireEvent.click(
+    await screen.findByRole('menuitemradio', { name: 'Privacy' }),
+  );
+  await waitFor(async () =>
+    expect((await repo.prefs.get()).displayUnit).toBe('privacy'),
+  );
+  const button = await screen.findByRole('button', {
+    name: 'Display: Privacy, Net P&L',
+    hidden: true,
+  });
+  // A crossed eye, no unit word: the glyph is decoration, "Net" is the label.
+  expect(button.textContent).toBe('Net');
+});
+
+test('Gross and Net save the basis, as the old switch did', async () => {
+  const { repo } = renderApp(<DisplayMenu />);
+  open('Display: Dollar, Net P&L');
+  const net = await screen.findByRole('menuitemradio', { name: 'Net' });
+  await waitFor(() => expect(net.hasAttribute('data-disabled')).toBe(false));
+  fireEvent.click(screen.getByRole('menuitemradio', { name: 'Gross' }));
+  await waitFor(async () =>
+    expect((await repo.prefs.get()).pnlBasis).toBe('gross'),
+  );
+  const renamed = await screen.findByRole('button', {
+    name: 'Display: Dollar, Gross P&L',
+    hidden: true,
+  });
+  expect(renamed.textContent).toBe('Gross, $');
+});
+
+test('the units are one radio group, the basis another', async () => {
+  renderApp(<DisplayMenu />);
+  open('Display: Dollar, Net P&L');
+  const units = await screen.findByRole('group', { name: 'Show as' });
+  expect(
+    Array.from(units.querySelectorAll('[role="menuitemradio"]')).map(
+      (n) => n.textContent,
+    ),
+  ).toEqual([
+    'Dollar',
+    'Percentage',
+    'Privacy',
+    'R-multiple',
+    'Ticks',
+    'Pips',
+    'Points',
+  ]);
+  expect(screen.getByRole('group', { name: 'P&L' })).toBeTruthy();
+});
+
+test('with no trades the P&L group is unavailable and changes nothing; the unit still changes', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+  await repository.workspaces.setActive('mine');
+  renderApp(<DisplayMenu />, { repository });
+  open('Display: Dollar, Net P&L');
+  const gross = await screen.findByRole('menuitemradio', { name: 'Gross' });
+  await waitFor(() => expect(gross.hasAttribute('data-disabled')).toBe(true));
+  expect(
+    screen.getByRole('group', { name: 'P&L' }).getAttribute('aria-disabled'),
+  ).toBe('true');
+  fireEvent.click(gross);
+  expect((await repository.prefs.get()).pnlBasis).toBe('net');
+  fireEvent.click(screen.getByRole('menuitemradio', { name: 'Percentage' }));
+  await waitFor(async () =>
+    expect((await repository.prefs.get()).displayUnit).toBe('percent'),
+  );
+});

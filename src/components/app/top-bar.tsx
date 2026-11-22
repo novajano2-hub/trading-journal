@@ -68,7 +68,7 @@ function useChipsFit({
   title: Ref;
   /** The first control on the right. */
   tail: Ref;
-  /** The sample label and Gross/Net, which come and go. */
+  /** The sample label and the Display menu, which come and go. */
   controls: Ref;
   chips: Ref;
 }): ChipsFit {
@@ -105,7 +105,7 @@ function useChipsFit({
  * The bar over every app page, on the canvas with no rule under it. Its
  * source order is its reading order at every
  * width, so Tab follows what the eye does: the menu (below `lg`), the page
- * title, the filter chips, then search, the sample label, Gross/Net, Import
+ * title, the filter chips, then search, the sample label, the Display menu, Import
  * and the theme. Nothing is reordered by CSS.
  * - From `sm` up it is one sticky bar, 68px while the chips fit beside the
  *   title. Where they don't, measured, the title keeps the first row and the

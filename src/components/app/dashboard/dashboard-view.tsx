@@ -13,6 +13,7 @@ import {
   useTradeSet,
 } from '@/data/query/derived';
 import {
+  useAccounts,
   useActiveWorkspace,
   usePrefs,
   useSetActiveWorkspace,
@@ -27,6 +28,16 @@ import { SAMPLE_WORKSPACE } from '@/data/workspaces';
 import { dailyPnl, type DayStat } from '@/domain/metrics/days';
 import { goalWeek } from '@/domain/metrics/goals';
 import { localDate } from '@/domain/time';
+import {
+  FigureSourceContext,
+  meanFigure,
+  meanInUnit,
+  pctBaseOf,
+  shownUnit,
+  tradeFigure,
+  type FigureSource,
+} from '@/lib/display';
+import { closedInOrder } from '@/domain/trade-status';
 import { rangeCaption } from '@/lib/range-label';
 import { hasActiveFilters, switchWorkspaceFilters } from '../filter-model';
 import { Drilldown } from './drilldown';
@@ -100,6 +111,7 @@ export function DashboardView(): React.JSX.Element {
   const prefs = usePrefs().data;
   const workspace = useActiveWorkspace();
   const allTrades = useTrades().data;
+  const accounts = useAccounts().data;
   const strategies = useStrategies().data;
   const tags = useTags().data;
   const categories = useTagCategories().data;
@@ -132,6 +144,8 @@ export function DashboardView(): React.JSX.Element {
       !strategies ||
       !tags ||
       !categories ||
+      !accounts ||
+      !allTrades ||
       today === undefined
     )
       return undefined;
@@ -149,6 +163,7 @@ export function DashboardView(): React.JSX.Element {
         days: [] as DayStat[],
         trends: NO_TRENDS,
         line: undefined,
+        source: undefined,
       };
     const chosen = withClosed.some((m) => m.currency === currency)
       ? currency
@@ -172,7 +187,34 @@ export function DashboardView(): React.JSX.Element {
       : partition.summary.basis === 'net'
         ? partition.days
         : dailyPnl(partition.trades, { ...ctx, pnlBasis: 'net' });
-    const trends = kpiTrends(partition.trades, ctx);
+    // What the display units divide by, and the trades behind each figure.
+    const pctBase = pctBaseOf({
+      accounts,
+      trades: allTrades,
+      accountIds: shownFilters.accountIds,
+      currency: partition.currency,
+      from: range.from,
+      timeZone: prefs.timeZone,
+    });
+    const source: FigureSource = {
+      tradesById: model.tradesById,
+      ctx,
+      pctBase,
+    };
+    // A KPI trend reads in the unit its figure does; dollars and Privacy keep the summary's own.
+    const closed = closedInOrder(partition.trades);
+    const mean = meanFigure(
+      closed.map((t) => tradeFigure(t, ctx)),
+      pctBase,
+    );
+    const trendUnit = shownUnit(mean, prefs.displayUnit);
+    const trends = kpiTrends(
+      partition.trades,
+      ctx,
+      trendUnit === 'dollar' || trendUnit === 'privacy'
+        ? undefined
+        : (window) => meanInUnit(window, trendUnit, ctx, pctBase),
+    );
     // The partition's days are on the basis its equity is, so the last close is the last balance.
     const line = equityLine(model.performance.equity, partition.days);
     // "this week" while the goal week is today's; a range that ended earlier reads "that week".
@@ -189,6 +231,7 @@ export function DashboardView(): React.JSX.Element {
       days,
       trends,
       line,
+      source,
     };
   }, [
     metrics.data,
@@ -198,6 +241,8 @@ export function DashboardView(): React.JSX.Element {
     strategies,
     tags,
     categories,
+    accounts,
+    allTrades,
     today,
     currency,
   ]);
@@ -279,99 +324,103 @@ export function DashboardView(): React.JSX.Element {
   };
 
   return (
-    <div
-      data-testid="dashboard-ready"
-      className="flex min-w-0 flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0"
-    >
-      {view.withClosed.length > 1 ? (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <Segmented
-            label="Currency"
-            options={view.withClosed.map((c) => ({
-              value: c.currency,
-              label: c.currency,
-            }))}
-            value={m.currency}
-            onChange={setCurrency}
-            coarseTargets
-          />
-          <p className="text-[13px] text-muted">
-            Each currency is shown on its own. Converting between them
-            isn&apos;t built yet.
-          </p>
-        </div>
-      ) : null}
-      <PlanCard
-        plan={m.plan}
-        basis={m.basis}
-        currency={m.currency}
-        caption={caption}
-        tableRef={rulesTable}
-        regionRef={planRegion}
-        onOpenRule={(ruleId, button) => open({ kind: 'rule', ruleId }, button)}
-      />
-      {/* Row 2: three cards from xl, Performance the widest; between md and xl two, then Performance across both. */}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)_minmax(0,1.38fr)]">
-        <MistakesCard
-          mistakes={m.mistakes}
+    <FigureSourceContext.Provider value={view.source ?? null}>
+      <div
+        data-testid="dashboard-ready"
+        className="flex min-w-0 flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0"
+      >
+        {view.withClosed.length > 1 ? (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <Segmented
+              label="Currency"
+              options={view.withClosed.map((c) => ({
+                value: c.currency,
+                label: c.currency,
+              }))}
+              value={m.currency}
+              onChange={setCurrency}
+              coarseTargets
+            />
+            <p className="text-[13px] text-muted">
+              Each currency is shown on its own. Converting between them
+              isn&apos;t built yet.
+            </p>
+          </div>
+        ) : null}
+        <PlanCard
+          plan={m.plan}
           basis={m.basis}
           currency={m.currency}
           caption={caption}
-          listRef={mistakesList}
-          onOpenMistake={(tagId, button) =>
-            open({ kind: 'mistake', tagId }, button)
+          tableRef={rulesTable}
+          regionRef={planRegion}
+          onOpenRule={(ruleId, button) =>
+            open({ kind: 'rule', ruleId }, button)
           }
         />
-        <GoalsCard
-          // A workspace switch drops a half-edited form.
-          key={workspace.data?.id}
-          goals={m.goals}
-          days={view.days}
-          set={view.goals}
-          currency={prefs?.baseCurrency ?? m.currency}
-          weekLabel={view.weekLabel}
-          rangeLabel={caption}
-          onSave={async (next) => {
-            const ws = workspace.data;
-            if (!ws) throw new Error('No active workspace');
-            await updatePrefs.mutateAsync(withGoals(ws.id, next));
-          }}
-        />
-        <div className="min-w-0 md:max-xl:col-span-2">
-          <PerformanceCard
-            performance={m.performance}
-            line={view.line}
-            trends={view.trends}
+        {/* Row 2: three cards from xl, Performance the widest; between md and xl two, then Performance across both. */}
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)_minmax(0,1.38fr)]">
+          <MistakesCard
+            mistakes={m.mistakes}
             basis={m.basis}
             currency={m.currency}
+            caption={caption}
+            listRef={mistakesList}
+            onOpenMistake={(tagId, button) =>
+              open({ kind: 'mistake', tagId }, button)
+            }
           />
+          <GoalsCard
+            // A workspace switch drops a half-edited form.
+            key={workspace.data?.id}
+            goals={m.goals}
+            days={view.days}
+            set={view.goals}
+            currency={prefs?.baseCurrency ?? m.currency}
+            weekLabel={view.weekLabel}
+            rangeLabel={caption}
+            onSave={async (next) => {
+              const ws = workspace.data;
+              if (!ws) throw new Error('No active workspace');
+              await updatePrefs.mutateAsync(withGoals(ws.id, next));
+            }}
+          />
+          <div className="min-w-0 md:max-xl:col-span-2">
+            <PerformanceCard
+              performance={m.performance}
+              line={view.line}
+              trends={view.trends}
+              basis={m.basis}
+              currency={m.currency}
+            />
+          </div>
         </div>
-      </div>
-      <RecentTrades
-        recent={m.recent}
-        basis={m.basis}
-        timeZone={timeZone}
-        caption={caption}
-      />
-      {drill ? (
-        <Drilldown
-          target={drill.target}
-          tradeIds={drill.tradeIds}
-          open={drill.open}
-          onOpenChange={(next) =>
-            setDrill((d) => (d ? { ...d, open: next } : d))
-          }
-          origin={anchors.origin}
-          returnFocus={anchors.returnFocus}
-          model={m}
-          caption={caption}
+        <RecentTrades
+          recent={m.recent}
+          basis={m.basis}
           timeZone={timeZone}
-          trades={allTrades}
-          strategies={strategies ?? []}
-          tags={tags ?? []}
-          categories={categories ?? []}
+          caption={caption}
         />
-      ) : null}
-    </div>
+        {drill ? (
+          <Drilldown
+            target={drill.target}
+            tradeIds={drill.tradeIds}
+            open={drill.open}
+            onOpenChange={(next) =>
+              setDrill((d) => (d ? { ...d, open: next } : d))
+            }
+            origin={anchors.origin}
+            returnFocus={anchors.returnFocus}
+            model={m}
+            caption={caption}
+            timeZone={timeZone}
+            trades={allTrades}
+            strategies={strategies ?? []}
+            tags={tags ?? []}
+            categories={categories ?? []}
+          />
+        ) : null}
+      </div>
+    </FigureSourceContext.Provider>
   );
 }

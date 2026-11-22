@@ -82,16 +82,32 @@ test('Gross/Net relabels P&L', async ({ page }) => {
   await ready(page);
   const pnl = page.getByTestId('kpi-pnl');
   await expect(pnl).toContainText('Net P&L');
-  await page
-    .getByRole('radiogroup', { name: 'P&L basis' })
-    .locator('label', { hasText: 'Gross' })
-    .click();
+  const display = page.getByRole('button', { name: /^Display: / });
+  await display.click();
+  await page.getByRole('menuitemradio', { name: 'Gross' }).click();
   await expect(pnl).toContainText('Gross P&L');
-  await page
-    .getByRole('radiogroup', { name: 'P&L basis' })
-    .locator('label', { hasText: 'Net' })
-    .click();
+  await page.getByRole('menuitemradio', { name: 'Net' }).click();
   await expect(pnl).toContainText('Net P&L');
+  await page.keyboard.press('Escape');
+});
+
+test('the Display menu hides every amount under Privacy and brings them back', async ({
+  page,
+}) => {
+  await page.goto('/app/dashboard');
+  await ready(page);
+  await page.getByRole('button', { name: /^Display: / }).click();
+  await page.getByRole('menuitemradio', { name: 'Privacy' }).click();
+  await page.keyboard.press('Escape');
+  await expect(
+    page.getByRole('button', { name: 'Display: Privacy, Net P&L' }),
+  ).toBeFocused();
+  await expect(page.getByTestId('kpi-pnl')).toContainText('$•••');
+  expect(await page.locator('body').innerText()).not.toMatch(/\$\d/);
+  await page.getByRole('button', { name: /^Display: / }).click();
+  await page.getByRole('menuitemradio', { name: 'Dollar' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('kpi-pnl')).toContainText(/\$\d/);
 });
 
 test('goals edit in place and keep the saved amount', async ({ page }) => {

@@ -11,7 +11,8 @@ import type {
   WeeklyGoalProgress,
 } from '@/domain/metrics/goals';
 import type { Cents, Goals } from '@/domain/types';
-import { formatMoney, formatPnl, plural } from '@/lib/format';
+import { useDisplay } from '@/lib/display';
+import { plural } from '@/lib/format';
 import { onTradingDate } from '@/lib/time-format';
 import { GoalsForm } from './goals-form';
 import { CARD, CARD_PAD, CardHeader, HEADER_LINK, signTone } from './shared';
@@ -38,12 +39,13 @@ function GoalLabel({
   amount: Cents;
   currency: string;
 }): React.JSX.Element {
+  const display = useDisplay();
   return (
     <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-[12.5px] text-faint">
       {/* Goals are always net, whatever the Gross/Net switch says. */}
       <MetricTip id={id} basis="net" />
       <span className={`font-[550] text-muted ${FIGURE}`}>
-        {formatMoney(amount, currency)}
+        {display.figure({ money: amount }, false, currency).text}
       </span>
     </span>
   );
@@ -63,6 +65,7 @@ function WeeklyRow({
   currency: string;
   weekLabel: string;
 }): React.JSX.Element {
+  const display = useDisplay();
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
@@ -88,7 +91,7 @@ function WeeklyRow({
         <span
           className={`text-[22px] leading-[1.25] font-semibold tracking-[-0.03em] ${FIGURE} ${signTone(weekly.net)}`}
         >
-          {formatPnl(weekly.net, currency)}
+          {display.cash(weekly.net, true, currency).text}
         </span>{' '}
         <span className="text-[12.5px] text-muted">{weekLabel}</span>
       </p>
@@ -127,6 +130,7 @@ function DayGrid({
   limit: Cents;
   currency: string;
 }): React.JSX.Element | null {
+  const display = useDisplay();
   if (days.length === 0) return null;
   const shown = days.slice(-GRID_DAYS);
   const broken = shown.filter((d) => d.net < -limit).length;
@@ -145,7 +149,7 @@ function DayGrid({
         return (
           <span
             key={d.date}
-            title={`${dayLabel(d.date)}, ${formatPnl(d.net, currency)}${kept ? '' : ', broke the limit'}`}
+            title={`${dayLabel(d.date)}, ${display.cash(d.net, true, currency).text}${kept ? '' : ', broke the limit'}`}
             className={`aspect-square rounded-[1.5px] ${kept ? 'bg-gain-fill/35' : 'bg-loss-fill'}`}
           />
         );
@@ -167,6 +171,7 @@ function DailyLossRow({
   /** The range the days come from, e.g. "all time", so it never reads as the goal week. */
   period: string;
 }): React.JSX.Element {
+  const display = useDisplay();
   const { keptDays: kept, tradingDays: count, brokenDays } = daily;
   const latest = brokenDays[brokenDays.length - 1];
   let sentence: React.ReactNode;
@@ -177,7 +182,7 @@ function DailyLossRow({
       <>
         {dayLabel(latest.date)} at{' '}
         <span className={`${FIGURE} ${signTone(latest.net)}`}>
-          {formatPnl(latest.net, currency)}
+          {display.cash(latest.net, true, currency).text}
         </span>
       </>
     );

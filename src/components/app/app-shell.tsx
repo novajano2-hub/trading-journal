@@ -5,7 +5,7 @@ import { MagnifyingGlass } from '@phosphor-icons/react/dist/ssr';
 import { EMPTY_FILTERS } from '@/data/filters';
 import { AccountSwitcher } from './account-switcher';
 import { AppSearch } from './app-search';
-import { BasisSwitch } from './basis-switch';
+import { DisplayMenu } from './display-menu';
 import { FilterBar, FilterBarView } from './filter-bar';
 import { MobileNav } from './mobile-nav';
 import { SampleLabel } from './sample-label';
@@ -63,7 +63,7 @@ export function AppShell({
               <AppSearch />
             </Suspense>
           }
-          basis={<BasisSwitch />}
+          basis={<DisplayMenu />}
           label={<SampleLabel />}
         />
         <main

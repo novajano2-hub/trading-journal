@@ -24,17 +24,39 @@ import {
   type TagCategory,
   type Trade,
 } from '@/domain/types';
-import { formatPnl, keepHyphens, plural } from '@/lib/format';
+import { useDisplay } from '@/lib/display';
+import { keepHyphens, plural } from '@/lib/format';
 import { shortTime } from '@/lib/time-format';
 import type { DrillTarget } from './dashboard-view';
 import { InstrumentName, signTone, TradeTime } from './shared';
 
-function Money({ cents, currency }: { cents: Cents; currency: string }) {
+/** An amount in the chosen unit: one trade's, a set's by id, or a bare sum (a percentage reads over the account's base, other units in dollars). */
+function Money({
+  cents,
+  currency,
+  trade,
+  ids,
+}: {
+  cents: Cents;
+  currency: string;
+  trade?: Trade;
+  ids?: readonly string[];
+}) {
+  const display = useDisplay();
+  const figure = trade
+    ? display.ofTrade(trade)
+    : ids
+      ? display.ofTrades(ids, cents)
+      : { money: cents };
+  const { text } =
+    trade || ids
+      ? display.figure(figure, true, currency)
+      : display.cash(cents, true, currency);
   return (
     <span
       className={`font-[550] whitespace-nowrap tabular-nums ${signTone(cents)}`}
     >
-      {formatPnl(cents, currency)}
+      {text}
     </span>
   );
 }
@@ -264,6 +286,7 @@ function TradesTable({
                   </td>
                   <td className={`${TD} text-right whitespace-nowrap`}>
                     <Money
+                      trade={t}
                       cents={pnlOf(t, model.basis)}
                       currency={t.pnlCurrency}
                     />
@@ -353,8 +376,13 @@ export function Drilldown({
     description = (
       <>
         Broken on <Count n={score?.broken ?? 0} />, {caption}. Cost when broken{' '}
-        <Money cents={score?.brokenPnl ?? 0} currency={currency} />. Trades that
-        kept it: <Money cents={score?.keptPnl ?? 0} currency={currency} />.
+        <Money
+          cents={score?.brokenPnl ?? 0}
+          currency={currency}
+          ids={score?.brokenTradeIds ?? []}
+        />
+        . Trades that kept it:{' '}
+        <Money cents={score?.keptPnl ?? 0} currency={currency} />.
       </>
     );
   } else {
@@ -363,7 +391,12 @@ export function Drilldown({
     description = (
       <>
         <Count n={cost?.tradeCount ?? 0} />, {caption},{' '}
-        <Money cents={cost?.pnl ?? 0} currency={currency} /> {model.basis}.
+        <Money
+          cents={cost?.pnl ?? 0}
+          currency={currency}
+          ids={cost?.tradeIds ?? []}
+        />{' '}
+        {model.basis}.
       </>
     );
   }

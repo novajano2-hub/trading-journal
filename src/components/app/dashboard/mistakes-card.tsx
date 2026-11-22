@@ -5,7 +5,8 @@ import { Warning } from '@phosphor-icons/react/dist/ssr';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { MistakeCost } from '@/domain/metrics/mistakes';
 import type { PnlBasis } from '@/domain/types';
-import { formatPnl, plural } from '@/lib/format';
+import { useDisplay } from '@/lib/display';
+import { plural } from '@/lib/format';
 import { CARD, CARD_PAD, Caption, CardHeader, signTone } from './shared';
 
 /**
@@ -32,6 +33,7 @@ export function MistakesCard({
   onOpenMistake(tagId: string, button: HTMLButtonElement): void;
 }): React.JSX.Element {
   const headingId = useId();
+  const display = useDisplay();
   const largest = Math.max(0, ...mistakes.map((m) => Math.abs(m.pnl)));
   return (
     <section
@@ -64,7 +66,11 @@ export function MistakesCard({
       ) : (
         <ul ref={listRef} tabIndex={-1} className="mt-3 outline-none">
           {mistakes.map((m) => {
-            const amount = formatPnl(m.pnl, currency);
+            const amount = display.figure(
+              display.ofTrades(m.tradeIds, m.pnl),
+              true,
+              currency,
+            ).text;
             const trades = `${m.tradeCount} ${plural(m.tradeCount, 'trade')}`;
             const share = largest > 0 ? Math.abs(m.pnl) / largest : 0;
             return (

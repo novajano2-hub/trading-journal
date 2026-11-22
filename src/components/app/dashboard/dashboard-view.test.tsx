@@ -535,3 +535,59 @@ test('two currencies: one at a time, with a switch and a plain note', async () =
     ).toContain('100%'),
   );
 });
+
+/** Every text node and every attribute value under `root`, which is what any reader (a screen, a tooltip, a screen reader) can get. */
+function everyString(root: Element): string[] {
+  const out: string[] = [];
+  const walk = document.createTreeWalker(
+    root,
+    NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
+  );
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+    if (n.nodeType === Node.TEXT_NODE) out.push(n.textContent ?? '');
+    else
+      for (const a of Array.from((n as Element).attributes)) out.push(a.value);
+  }
+  return out;
+}
+
+async function inUnit(displayUnit: 'privacy' | 'percent' | 'r') {
+  const repository = repositoryWith(() => ({}));
+  await repository.prefs.update({ displayUnit });
+  return renderApp(<DashboardView />, { repository });
+}
+
+test('under Privacy no amount survives anywhere in the dashboard, not a label, a title or a ticker', async () => {
+  await inUnit('privacy');
+  await screen.findByTestId('dashboard-ready');
+  const root = document.body;
+  expect(everyString(root).filter((s) => /\$\d/.test(s))).toEqual([]);
+  const plan = screen.getByRole('region', { name: 'Your plan, all time' });
+  expect(plan.textContent).toContain('−$•••');
+  expect(plan.textContent).not.toContain('−$400.00');
+  // The drill-down's own amounts are hidden too.
+  fireEvent.click(within(plan).getByRole('button', { name: opener(r1) }));
+  const dialog = await screen.findByRole('dialog');
+  expect(everyString(dialog).filter((s) => /\$\d/.test(s))).toEqual([]);
+  expect(dialog.textContent).toContain('$•••');
+});
+
+test('in Percentage the amounts read over the accounts, signed to two decimals', async () => {
+  await inUnit('percent');
+  await screen.findByTestId('dashboard-ready');
+  const plan = screen.getByRole('region', { name: 'Your plan, all time' });
+  expect(plan.textContent).toMatch(/−\d+\.\d{2}%/);
+  expect(plan.textContent).not.toContain('−$400.00');
+  expect(
+    within(screen.getByTestId('kpi-pnl')).getAllByText(/%/).length,
+  ).toBeGreaterThan(0);
+});
+
+test('in R a figure without a risk shows its dollars, so nothing is blank', async () => {
+  await inUnit('r');
+  await screen.findByTestId('dashboard-ready');
+  const text = document.body.textContent ?? '';
+  expect(text).not.toMatch(/NaN|undefined|null/);
+  const plan = screen.getByRole('region', { name: 'Your plan, all time' });
+  expect(plan.textContent).toMatch(/−\$400\.00|−?\d+\.\d{2}R/);
+});

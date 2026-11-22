@@ -81,7 +81,7 @@ test('below sm the chips always have their own row, under the pinned first row',
   ).toContain('max-sm:fixed');
 });
 
-test('the source reads as the bar does: menu, title, chips, search, label, Gross/Net, Import, theme; none reordered by CSS', () => {
+test('the source reads as the bar does: menu, title, chips, search, label, Display menu, Import, theme; none reordered by CSS', () => {
   layOut({ titleWidth: 115, chipsWidth: 100 });
   render(
     <TopBar

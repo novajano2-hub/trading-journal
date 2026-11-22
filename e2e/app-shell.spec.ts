@@ -207,7 +207,7 @@ async function walkBar(page: Page, from: Locator, stops: Locator[]) {
   }
 }
 
-test('Tab walks the top bar in the order it reads: title, chips, search, Gross/Net, Import, theme', async ({
+test('Tab walks the top bar in the order it reads: title, chips, search, Display, Import, theme', async ({
   page,
 }, info) => {
   const mobile = info.project.name === 'mobile';
@@ -217,7 +217,7 @@ test('Tab walks the top bar in the order it reads: title, chips, search, Gross/N
     filters.getByRole('button', { name, exact: true });
   const tail = [
     bar.getByRole('combobox', { name: 'Search' }),
-    bar.getByRole('radio', { name: 'Net' }),
+    bar.getByRole('button', { name: /^Display: / }),
     bar.getByRole('link', { name: 'Import' }),
     bar.getByRole('button', { name: 'Switch to dark theme' }),
   ];
@@ -263,7 +263,7 @@ test('the chips sit beside the title while they fit, and never clip "Clear filte
 }, info) => {
   test.skip(info.project.name !== 'desktop');
   const bar = page.getByRole('banner');
-  // Busy chips are wider since the rebrand's 13.5px chips; they share the title's row from 1920.
+  // Busy chips are wider since the rebrand's 13.5px chips; they share the title's row from 1680 (the Display button is narrower than the Gross/Net switch was).
   for (const width of [1280, 1366, 1440, 1680, 1920]) {
     await page.setViewportSize({ width, height: 800 });
     await page.goto('/app/dashboard');
@@ -281,7 +281,7 @@ test('the chips sit beside the title while they fit, and never clip "Clear filte
     await expect(clear, `${width} busy`).toBeInViewport({ ratio: 1 });
     await expect(bar).toHaveAttribute(
       'data-chips',
-      width >= 1920 ? 'inline' : 'wrapped',
+      width >= 1680 ? 'inline' : 'wrapped',
     );
     expect(
       await page.evaluate(
@@ -291,7 +291,7 @@ test('the chips sit beside the title while they fit, and never clip "Clear filte
   }
 });
 
-test('an empty workspace shows the chips and Gross/Net unavailable, still in the tab order (desktop)', async ({
+test('an empty workspace shows the chips and the P&L choice unavailable, still in the tab order (desktop)', async ({
   page,
 }, info) => {
   test.skip(info.project.name !== 'desktop');
@@ -302,9 +302,19 @@ test('an empty workspace shows the chips and Gross/Net unavailable, still in the
   const filters = page.getByRole('group', { name: 'Filters' });
   const side = filters.getByRole('button', { name: 'Side' });
   await expect(side).toHaveAttribute('aria-disabled', 'true');
+  // The Display button stays in the bar; its P&L group reads unavailable inside.
+  await page
+    .getByRole('banner')
+    .getByRole('button', { name: /^Display: / })
+    .click();
+  await expect(page.getByRole('group', { name: 'P&L' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
   await expect(
-    page.getByRole('radiogroup', { name: 'P&L basis' }),
-  ).toHaveAttribute('aria-disabled', 'true');
+    page.getByRole('menuitemradio', { name: 'Gross' }),
+  ).toHaveAttribute('data-disabled', '');
+  await page.keyboard.press('Escape');
   await filters.getByRole('button', { name: 'Symbol' }).focus();
   await page.keyboard.press('Tab');
   await expect(side).toBeFocused();

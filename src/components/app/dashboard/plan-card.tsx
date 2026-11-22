@@ -10,7 +10,8 @@ import { MetricTip } from '@/components/ui/metric-tip';
 import { RULES_SHOWN, type DashboardModel } from '@/data/dashboard';
 import type { RuleScore } from '@/domain/metrics/rules';
 import type { PnlBasis } from '@/domain/types';
-import { formatAdherence, formatPnl, keepHyphens } from '@/lib/format';
+import { useDisplay } from '@/lib/display';
+import { formatAdherence, keepHyphens } from '@/lib/format';
 import { EASING_POINTS } from '@/lib/motion';
 import { CARD, CardHeader, HERO, signTone } from './shared';
 
@@ -76,6 +77,12 @@ function RuleRow({
   onOpen(button: HTMLButtonElement): void;
 }): React.JSX.Element {
   const button = useRef<HTMLButtonElement>(null);
+  const display = useDisplay();
+  const cost = display.figure(
+    display.ofTrades(rule.brokenTradeIds, rule.brokenPnl),
+    true,
+    currency,
+  );
   const total = rule.kept + rule.broken;
   const pct = formatAdherence(rule.adherence);
   const broken = rule.broken > 0;
@@ -108,7 +115,7 @@ function RuleRow({
           <button
             ref={button}
             type="button"
-            aria-label={`${rule.text}. Kept ${rule.kept} of ${total}, ${pct}. Cost when broken ${formatPnl(rule.brokenPnl, currency)}. Show the trades.`}
+            aria-label={`${rule.text}. Kept ${rule.kept} of ${total}, ${pct}. Cost when broken ${cost.label}. Show the trades.`}
             onClick={(e) => onOpen(e.currentTarget)}
             className="flex min-h-9 w-full items-center rounded-chip py-1.5 text-left text-[13.5px] font-medium text-text outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
           >
@@ -138,9 +145,7 @@ function RuleRow({
         className={`${PAD.cost} ${LINE_END} text-right whitespace-nowrap ${FIGURE}`}
       >
         {broken ? (
-          <span className={signTone(rule.brokenPnl)}>
-            {formatPnl(rule.brokenPnl, currency)}
-          </span>
+          <span className={signTone(rule.brokenPnl)}>{cost.text}</span>
         ) : (
           <span className="font-normal text-faint">none</span>
         )}
@@ -264,6 +269,7 @@ export function PlanCard({
   onOpenRule(ruleId: string, button: HTMLButtonElement): void;
 }): React.JSX.Element {
   const headingId = useId();
+  const display = useDisplay();
   const [all, setAll] = useState(false);
 
   if (plan.checks === 0 || plan.adherence === null) {
@@ -295,6 +301,15 @@ export function PlanCard({
 
   const shown = all ? plan.rules : plan.rules.slice(0, RULES_SHOWN);
   const cost = plan.cost.pnl;
+  // Each trade once, as the cost counts them.
+  const costed = display.figure(
+    display.ofTrades(
+      [...new Set(plan.rules.flatMap((r) => r.brokenTradeIds))],
+      cost,
+    ),
+    true,
+    currency,
+  );
   const kept = plan.adherence;
 
   return (
@@ -369,7 +384,7 @@ export function PlanCard({
           <span
             className={`text-[21px] font-semibold tracking-[-0.02em] whitespace-nowrap tabular-nums ${cost < 0 ? 'text-on-accent-loss' : 'text-white'}`}
           >
-            {formatPnl(cost, currency)}
+            {costed.text}
           </span>
         </div>
       </div>

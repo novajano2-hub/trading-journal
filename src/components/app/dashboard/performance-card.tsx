@@ -16,12 +16,9 @@ import type { DayStat } from '@/domain/metrics/days';
 import { summarize } from '@/domain/metrics/summary';
 import { closedInOrder } from '@/domain/trade-status';
 import type { Cents, PnlBasis, Trade } from '@/domain/types';
-import { formatMoney, formatPnl } from '@/lib/format';
+import { leftOutIn, useDisplay, type TickerSpec } from '@/lib/display';
+import { plural } from '@/lib/format';
 import { CARD, CARD_PAD, CardHeader } from './shared';
-
-/** A balance: unsigned, unless it has gone below zero. */
-const balance = (cents: Cents, currency: string) =>
-  cents < 0 ? formatPnl(cents, currency) : formatMoney(cents, currency);
 
 /** How each KPI moved through the range, each point over a trailing window. */
 export interface KpiTrends {
@@ -58,6 +55,8 @@ export const trendWindow = (closed: number): number =>
 export function kpiTrends(
   trades: readonly Trade[],
   ctx: MetricContext,
+  /** Reads a window's expectancy in a display unit; default: the summary's, in cents. */
+  expectancyOf?: (window: readonly Trade[]) => number | null,
 ): KpiTrends {
   const closed = closedInOrder(trades);
   const size = trendWindow(closed.length);
@@ -76,7 +75,10 @@ export function kpiTrends(
     const s = summarize(closed.slice(end - size, end), ctx);
     if (s.winRate !== null) trends.winRate.push(s.winRate);
     if (s.profitFactor !== null) trends.profitFactor.push(s.profitFactor);
-    if (s.expectancy !== null) trends.expectancy.push(s.expectancy);
+    const expectancy = expectancyOf
+      ? expectancyOf(closed.slice(end - size, end))
+      : s.expectancy;
+    if (expectancy !== null) trends.expectancy.push(expectancy);
   }
   return trends;
 }
@@ -117,6 +119,7 @@ function Kpi({
   id,
   value,
   kind,
+  spec,
   basis,
   currency,
   trend,
@@ -125,14 +128,18 @@ function Kpi({
   id: MetricId;
   value: number | null;
   kind: TickerKind;
+  /** A money KPI in the chosen display unit: its number and how it reads. */
+  spec?: TickerSpec;
   basis: PnlBasis;
   currency: string;
   trend: readonly number[];
   /** Closed trades behind each trend point. */
   windowSize: number;
 }): React.JSX.Element {
-  const fmt = (v: number) => formatTicker(kind, v, { digits: 1, currency });
-  const text = value === null ? 'None yet' : fmt(value);
+  const fmt = (v: number) =>
+    spec ? spec.format(v) : formatTicker(kind, v, { digits: 1, currency });
+  const shown = spec && value !== null ? spec.value : value;
+  const text = shown === null ? 'None yet' : fmt(shown);
   const hasTrend = trend.length >= 2;
   // Says what the line is: a rolling window, not the range's figure beside it.
   const trendLabel = hasTrend
@@ -154,14 +161,15 @@ function Kpi({
           className="min-w-0 flex-1 leading-[1.25] font-semibold tracking-[-0.03em] whitespace-nowrap"
           style={{ fontSize: figureSize(text.length) }}
         >
-          {value === null ? (
+          {shown === null ? (
             <span className="font-medium text-faint">None yet</span>
           ) : (
             <NumberTicker
-              value={value}
+              value={shown}
               kind={kind}
               digits={1}
               currency={currency}
+              format={spec?.format}
             />
           )}
         </div>
@@ -199,8 +207,19 @@ export function PerformanceCard({
 }): React.JSX.Element {
   const headingId = useId();
   const { equity } = performance;
-  const start = balance(equity[0] ?? 0, currency);
-  const end = balance(equity[equity.length - 1] ?? 0, currency);
+  const display = useDisplay();
+  // A balance is an amount, never a return: dollars, or hidden.
+  const balance = (cents: Cents) =>
+    display.figure({ money: cents }, false, currency).text;
+  const start = balance(equity[0] ?? 0);
+  const end = balance(equity[equity.length - 1] ?? 0);
+  const pnl = display.ofAll(performance.pnl);
+  const pnlTicker = display.ticker(pnl, currency);
+  const leftOut = leftOutIn(pnl, display.unit);
+  const expectancy =
+    performance.expectancy === null
+      ? undefined
+      : display.ticker(display.meanOfAll(performance.expectancy), currency);
 
   return (
     <section
@@ -242,18 +261,24 @@ export function PerformanceCard({
             aria-hidden="true"
             className="invisible col-start-1 row-start-1"
           >
-            {formatTicker('money', performance.pnl, { currency })}
+            {pnlTicker.format(pnlTicker.value)}
           </span>
           <NumberTicker
-            value={performance.pnl}
+            value={pnlTicker.value}
             kind="money"
             currency={currency}
+            format={pnlTicker.format}
             className="col-start-1 row-start-1 min-w-0!"
           />
         </span>
         <span className="text-[12.5px] text-faint">
           <MetricTip id="pnl" basis={basis} />
         </span>
+        {leftOut > 0 ? (
+          <span className="text-[12.5px] text-faint">
+            {leftOut} {plural(leftOut, 'trade')} left out
+          </span>
+        ) : null}
       </div>
       <Sparkline
         series={line.points}
@@ -283,6 +308,7 @@ export function PerformanceCard({
           id="expectancy"
           value={performance.expectancy}
           kind="money"
+          spec={expectancy}
           basis={basis}
           currency={currency}
           trend={trends.expectancy}
