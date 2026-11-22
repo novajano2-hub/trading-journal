@@ -46,6 +46,8 @@ export function ImportFlow() {
   const [accountId, setAccountId] = useState<string | null>(null);
   const [mapState, setMapState] = useState<MapState | null>(null);
   const [save, setSave] = useState(true);
+  /** Preview's "Set point values" asked Map to put the cursor in the first point value. */
+  const [focusPoint, setFocusPoint] = useState(false);
   /** The import that was written; Confirm shows it. */
   const [done, setDone] = useState<ImportJob | null>(null);
 
@@ -63,7 +65,7 @@ export function ImportFlow() {
   const account = accounts.find((a) => a.id === accountId);
   const key =
     file && prefs && accountsQuery.data
-      ? `${file.id}:${account?.id ?? ''}`
+      ? `${file.id}:${accountId ?? ''}`
       : null;
   if (key && file && prefs && mapState?.key !== key)
     setMapState(openMapState(key, file.parsed, account, prefs.timeZone));
@@ -135,6 +137,14 @@ export function ImportFlow() {
       .finally(() => setChecking(false));
   }, [open]);
 
+  // An account made on Map is chosen with the mapping as it stands: a new account has no saved one.
+  function accountCreated(id: string) {
+    setAccountId(id);
+    setMapState((s) => (s && file ? { ...s, key: `${file.id}:${id}` } : s));
+  }
+
+  const focused = useCallback(() => setFocusPoint(false), []);
+
   async function choose(chosen: File) {
     // A new file replaces the one waiting in this browser.
     clearPendingImport().catch(() => undefined);
@@ -174,6 +184,9 @@ export function ImportFlow() {
           accounts={accounts}
           accountId={accountId}
           onAccount={setAccountId}
+          onAccountCreated={accountCreated}
+          focusPoint={focusPoint}
+          onFocused={focused}
           state={mapState}
           onState={setMapState}
           save={save}
@@ -190,6 +203,10 @@ export function ImportFlow() {
           mapping={mapState.mapping}
           account={account}
           onBack={() => go('map')}
+          onSetPoints={() => {
+            setFocusPoint(true);
+            go('map');
+          }}
           onChooseAnother={() => go('upload')}
           onDone={(job) => {
             setDone(job);

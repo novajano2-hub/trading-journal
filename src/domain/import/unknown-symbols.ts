@@ -10,6 +10,16 @@ export interface UnknownRoot {
   symbols: string[];
   /** Rows that trade it. */
   rows: number;
+  /** The tick size its prices suggest: the last decimal they write (0.0005 for four decimals ending in 0 or 5). */
+  tickSize: number;
+}
+
+/** The price columns a mapping reads. */
+function priceColumns(mapping: ImportMapping): number[] {
+  const c: Record<string, number | undefined> = mapping.columns;
+  return (
+    mapping.kind === 'fills' ? [c.price] : [c.entryPrice, c.exitPrice]
+  ).filter((i): i is number => i !== undefined);
 }
 
 /**
@@ -24,7 +34,13 @@ export function unknownRoots(
 ): UnknownRoot[] {
   const column = mapping.columns.symbol;
   if (column === undefined) return [];
-  const roots = new Map<string, UnknownRoot>();
+  const prices = priceColumns(mapping);
+  const mark = mapping.decimal.replace('.', '\\.');
+  const places = new RegExp(`${mark}(\\d+)$`);
+  const roots = new Map<
+    string,
+    UnknownRoot & { places: number; halves: boolean }
+  >();
   for (const { cells } of parsed.rows) {
     const symbol = cells[column] ?? '';
     if (!symbol) continue;
@@ -38,10 +54,27 @@ export function unknownRoots(
       })
     )
       continue;
-    const root = roots.get(key) ?? { key, symbols: [], rows: 0 };
+    const root = roots.get(key) ?? {
+      key,
+      symbols: [],
+      rows: 0,
+      tickSize: 0.01,
+      places: 0,
+      halves: true,
+    };
     root.rows += 1;
+    for (const p of prices) {
+      const digits = places.exec((cells[p] ?? '').trim())?.[1] ?? '';
+      root.places = Math.max(root.places, Math.min(digits.length, 8));
+      // A price written short ("4.2") reads as if padded with zeros.
+      if (!'05'.includes(digits.padEnd(4, '0')[3]!)) root.halves = false;
+    }
     if (!root.symbols.includes(symbol)) root.symbols.push(symbol);
     roots.set(key, root);
   }
-  return [...roots.values()];
+  return [...roots.values()].map(({ places: n, halves, ...root }) => ({
+    ...root,
+    tickSize:
+      n === 4 && halves ? 0.0005 : prices.length === 0 ? 0.01 : 10 ** -n,
+  }));
 }

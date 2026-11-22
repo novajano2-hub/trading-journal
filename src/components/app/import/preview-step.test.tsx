@@ -13,6 +13,8 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import type { NewAccount, Repository } from '@/data/repository';
+import type { UserPrefs } from '@/domain/types';
+import { useActiveWorkspace, useSetActiveWorkspace } from '@/data/query/hooks';
 import { renderApp } from '../__fixtures__/render-app';
 import { ImportFlow } from './import-flow';
 
@@ -41,16 +43,35 @@ function csv(lines: readonly string[], name = 'trades.csv') {
   return new File([lines.join('\n')], name, { type: 'text/csv' });
 }
 
-async function toPreview(file: File): Promise<{ repo: Repository }> {
+/** What the sidebar's switcher does, beside the flow. */
+function SampleSwitch() {
+  const active = useActiveWorkspace().data;
+  const set = useSetActiveWorkspace();
+  return (
+    <div>
+      <p>Active: {active?.id}</p>
+      <button type="button" onClick={() => set.mutate('sample')}>
+        Switch to sample
+      </button>
+    </div>
+  );
+}
+
+async function toPreview(
+  file: File,
+  prefs: Partial<UserPrefs> = {},
+): Promise<{ repo: Repository }> {
   const repo = createLocalRepository({
     indexedDB: new IDBFactory(),
     IDBKeyRange,
     sample: async () => fixtureSample(),
   });
   await repo.accounts.create('mine', futures);
+  if (Object.keys(prefs).length > 0) await repo.prefs.update(prefs);
   renderApp(
     <Suspense fallback={null}>
       <ImportFlow />
+      <SampleSwitch />
     </Suspense>,
     { repository: repo, url: '/app/import' },
   );
@@ -126,7 +147,7 @@ test('Confirm commits the plan and says what landed where', async () => {
   ).toBeTruthy();
 });
 
-test('a plan blocked by unpriced symbols names them and goes back to the point values', async () => {
+test('a plan blocked by unpriced symbols names them and goes back to the point values, focused', async () => {
   await toPreview(
     csv([
       FILLS,
@@ -138,6 +159,147 @@ test('a plan blocked by unpriced symbols names them and goes back to the point v
   expect(screen.queryByRole('button', { name: /^Import \d/ })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Set point values' }));
   await waitFor(() => expect(window.location.search).toContain('step=map'));
+  // Map opens with the first point-value input ready to type in.
+  const input = await screen.findByLabelText('HG point value');
+  await waitFor(() => expect(document.activeElement).toBe(input));
+});
+
+test('a symbol Keel cannot place is not offered a point value: it says to check the Symbol column', async () => {
+  await toPreview(
+    csv([
+      FILLS,
+      '11/19/2026 09:30:00,FUT-01,Buy,1,4.10',
+      '11/19/2026 09:45:00,FUT-01,Sell,1,4.20',
+    ]),
+  );
+  expect(
+    await screen.findByText('FUT-01 is not a symbol Keel knows'),
+  ).toBeTruthy();
+  expect(
+    screen.getByText(
+      "Keel doesn't recognise the symbol, check the Symbol column.",
+    ),
+  ).toBeTruthy();
+  // The way out is not a Map with nothing to set.
+  expect(screen.queryByRole('button', { name: 'Set point values' })).toBeNull();
+  expect(screen.queryByText(/needs a point value/)).toBeNull();
+  expect(
+    screen.getByRole('button', { name: 'Choose another file' }),
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Back to columns' }));
+  await waitFor(() => expect(window.location.search).toContain('step=map'));
+});
+
+test('with both kinds, the priceable root is asked for and the other symbol is named apart', async () => {
+  await toPreview(
+    csv([
+      FILLS,
+      '11/19/2026 09:30:00,HGZ6,Buy,1,4.10',
+      '11/19/2026 09:45:00,HGZ6,Sell,1,4.20',
+      '11/19/2026 09:50:00,FUT-01,Buy,1,4.10',
+    ]),
+  );
+  expect(await screen.findByText(/HG needs a point value/)).toBeTruthy();
+  expect(
+    screen.getByText(/Keel doesn't recognise FUT-01, check the Symbol column/),
+  ).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Set point values' })).toBeTruthy();
+});
+
+const stalePlan =
+  'Your trades changed while you were mapping. Review the preview again.';
+
+test('a trade made while the plan waits makes Confirm say so, and the preview is read again', async () => {
+  const { repo } = await toPreview(csv([TRIPS, row('200.00')]));
+  const button = await screen.findByRole('button', {
+    name: 'Import 1 trade into Futures',
+  });
+  const [account] = await repo.accounts.list('mine');
+  await repo.trades.createManual('mine', {
+    accountId: account!.id,
+    instrument: {
+      symbol: 'AAPL',
+      root: 'AAPL',
+      assetClass: 'stock',
+      pointValue: 1,
+      tickSize: 0.01,
+      quoteCurrency: 'USD',
+    },
+    fills: [
+      {
+        time: '2026-11-16T14:00:00.000Z',
+        side: 'buy',
+        qty: 1,
+        price: 200,
+        commission: 0,
+        fees: 0,
+      },
+    ],
+  });
+  fireEvent.click(button);
+  expect(await screen.findByText(stalePlan)).toBeTruthy();
+  expect(await repo.imports.list('mine')).toHaveLength(0);
+  // The plan is built again over the new import state: Confirm now goes through.
+  await waitFor(async () => {
+    const again = screen.queryByRole('button', {
+      name: 'Import 1 trade into Futures',
+    });
+    if (again) fireEvent.click(again);
+    expect(await repo.imports.list('mine')).toHaveLength(1);
+  });
+  expect(
+    await screen.findByText('1 trade imported into Futures.'),
+  ).toBeTruthy();
+});
+
+test('View trades switches to My workspace first, then opens the account in the log', async () => {
+  const { repo } = await toPreview(csv([TRIPS, row('200.00')]));
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Import 1 trade into Futures' }),
+  );
+  await screen.findByText('1 trade imported into Futures.');
+  // The commit made My workspace active; the sidebar is switched to the sample afterwards.
+  fireEvent.click(screen.getByRole('button', { name: 'Switch to sample' }));
+  await screen.findByText('Active: sample');
+  const [account] = await repo.accounts.list('mine');
+
+  const order: string[] = [];
+  const setActive = repo.workspaces.setActive.bind(repo.workspaces);
+  repo.workspaces.setActive = async (id) => {
+    await setActive(id);
+    order.push(`switch ${id}`);
+  };
+  const pushState = window.history.pushState;
+  window.history.pushState = (...args) => {
+    order.push('push');
+    pushState.apply(window.history, args);
+  };
+  try {
+    fireEvent.click(screen.getByRole('button', { name: 'View trades' }));
+    await waitFor(() => expect(order).toEqual(['switch mine', 'push']));
+  } finally {
+    window.history.pushState = pushState;
+  }
+  expect(window.location.pathname).toBe('/app/trades');
+  expect(new URLSearchParams(window.location.search).get('account')).toBe(
+    account!.id,
+  );
+  expect((await repo.workspaces.getActive()).id).toBe('mine');
+});
+
+test('under Privacy a skipped row hides the money value it quotes', async () => {
+  await toPreview(
+    csv([
+      TRIPS,
+      row('200.00'),
+      '2026-11-16 12:30:00,2026-11-16 12:45:00,ESZ6,Long,1,6000,6004,5.00,"$1,2x"',
+    ]),
+    { displayUnit: 'privacy' },
+  );
+  await screen.findByRole('region', { name: 'What Keel read' });
+  expect(screen.getByText('Row 3')).toBeTruthy();
+  expect(document.body.textContent).not.toContain('$1,2x');
+  expect(screen.getAllByLabelText('hidden amount').length).toBeGreaterThan(0);
 });
 
 test('a file whose rows are all imported already says so and offers another file', async () => {

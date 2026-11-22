@@ -1,6 +1,7 @@
-import { guessDateOrder } from '@/domain/import/fill-time';
+import { detectDateOrder, guessDateOrder } from '@/domain/import/fill-time';
 import {
   applySavedMapping,
+  detectDecimal,
   guessMapping,
   type ImportMapping,
   type MappingOptions,
@@ -18,11 +19,56 @@ export interface MapState {
   matched: readonly string[];
   /** Opened from the account's saved mapping. */
   usedSaved: boolean;
+  /** Where the file's own evidence beat the saved mapping, in words. */
+  overruled: readonly string[];
   /** Options the visitor set: a new guess leaves them alone. */
   touched: { dateOrder: boolean; decimal: boolean };
 }
 
 const UNTOUCHED = { dateOrder: false, decimal: false };
+
+const ORDER_WORDS = {
+  mdy: 'month first',
+  dmy: 'day first',
+  ymd: 'year first',
+} as const;
+const MARK_WORDS = {
+  '.': 'a point as the decimal mark',
+  ',': 'a comma as the decimal mark',
+} as const;
+
+/**
+ * The saved mapping, with the date order and decimal mark the file itself
+ * proves where they differ from the saved ones, and a sentence for each.
+ */
+function readSavedAgainstFile(
+  saved: ImportMapping,
+  parsed: ParsedCsv,
+): { mapping: ImportMapping; overruled: string[] } {
+  const overruled: string[] = [];
+  let { dateOrder, decimal } = saved;
+  const column = timeColumn(saved);
+  const seenOrder =
+    column === undefined
+      ? null
+      : detectDateOrder(
+          parsed.rows.slice(0, 50).map((r) => r.cells[column] ?? ''),
+        );
+  if (seenOrder && seenOrder !== dateOrder) {
+    overruled.push(
+      `This file uses ${ORDER_WORDS[seenOrder]}; your saved mapping said ${ORDER_WORDS[dateOrder]}.`,
+    );
+    dateOrder = seenOrder;
+  }
+  const seenMark = detectDecimal(parsed, saved);
+  if (seenMark && seenMark !== decimal) {
+    overruled.push(
+      `This file uses ${MARK_WORDS[seenMark]}; your saved mapping said ${MARK_WORDS[decimal]}.`,
+    );
+    decimal = seenMark;
+  }
+  return { mapping: { ...saved, dateOrder, decimal }, overruled };
+}
 
 /** The mapping a file opens with: the account's saved one when it fits, else Keel's guess. */
 export function openMapState(
@@ -34,14 +80,18 @@ export function openMapState(
   const saved = account?.importMapping
     ? applySavedMapping(account.importMapping, parsed.headers)
     : null;
-  if (saved)
+  if (saved) {
+    // A saved order or mark stands unless the file itself proves another.
+    const { mapping, overruled } = readSavedAgainstFile(saved, parsed);
     return {
       key,
-      mapping: saved,
-      matched: Object.keys(saved.columns),
+      mapping,
+      matched: Object.keys(mapping.columns),
       usedSaved: true,
+      overruled,
       touched: { dateOrder: true, decimal: true },
     };
+  }
   const mapping = guessMapping(parsed, {
     sourceTimeZone: account?.timeZone ?? userTimeZone,
   });
@@ -50,6 +100,7 @@ export function openMapState(
     mapping,
     matched: Object.keys(mapping.columns),
     usedSaved: false,
+    overruled: [],
     touched: UNTOUCHED,
   };
 }

@@ -148,11 +148,12 @@ export function fillTimeToUtc(
 }
 
 /**
- * Year-first when a slashed sample opens with a four-digit year. Otherwise
- * day-first when a slashed sample's first number exceeds 12 and no sample's
- * second number does, and month-first when the samples cannot tell.
+ * The date order the samples prove, or null when they cannot tell. A slashed
+ * sample that opens with a four-digit year is year-first; one whose first number
+ * exceeds 12 (and no sample's second does) is day-first; the reverse is
+ * month-first. Samples that contradict each other prove nothing.
  */
-export function guessDateOrder(samples: readonly string[]): DateOrder {
+export function detectDateOrder(samples: readonly string[]): DateOrder | null {
   let firstOver12 = false;
   let secondOver12 = false;
   for (const raw of samples) {
@@ -163,5 +164,11 @@ export function guessDateOrder(samples: readonly string[]): DateOrder {
     if (Number(m[1]) > 12) firstOver12 = true;
     if (Number(m[2]) > 12) secondOver12 = true;
   }
-  return firstOver12 && !secondOver12 ? 'dmy' : 'mdy';
+  if (firstOver12 === secondOver12) return null;
+  return firstOver12 ? 'dmy' : 'mdy';
+}
+
+/** The order the samples prove, else month-first, which is what they read as when they cannot tell. */
+export function guessDateOrder(samples: readonly string[]): DateOrder {
+  return detectDateOrder(samples) ?? 'mdy';
 }

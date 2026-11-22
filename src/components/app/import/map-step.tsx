@@ -9,8 +9,10 @@ import {
   Warning,
 } from '@phosphor-icons/react/dist/ssr';
 import {
+  useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
   type Dispatch,
   type SetStateAction,
@@ -22,18 +24,24 @@ import { Segmented } from '@/components/ui/segmented';
 import { useImportContext, useUpdateUserAccount } from '@/data/query/hooks';
 import { useImportPlan } from '@/data/query/derived';
 import { missingFields, REQUIRED_FIELDS } from '@/domain/import/mapping';
-import { parseDecimal } from '@/domain/import/numbers';
-import { unknownRoots } from '@/domain/import/unknown-symbols';
+import { parseDecimal, type DecimalMark } from '@/domain/import/numbers';
+import {
+  unknownRoots,
+  type UnknownRoot,
+} from '@/domain/import/unknown-symbols';
 import type { Account } from '@/domain/types';
 import type { ImportFile } from '@/lib/decode';
+import { useDisplay } from '@/lib/display';
 import {
   columnLetter,
   FIELD_HINT,
   ISSUE_REASON,
   FIELD_LABEL,
   FIELD_ORDER,
+  MONEY_FIELDS,
   type FieldKey,
 } from './fields';
+import { HiddenAmount } from './hidden-amount';
 import {
   timeColumn,
   withColumn,
@@ -41,7 +49,7 @@ import {
   withOptions,
   type MapState,
 } from './mapping-state';
-import { NewAccountForm } from './new-account-form';
+import { NewAccountForm, type NewAccountSubmit } from './new-account-form';
 import { fileSummary } from './upload-step';
 import { SelectField } from './select-field';
 import { HELP, INPUT, LABEL } from './styles';
@@ -50,11 +58,17 @@ import { TimeZoneField } from './time-zone-field';
 const ICON = { 'aria-hidden': true } as const;
 const NEW_ACCOUNT = '__new';
 
-const POINT_TICK = 0.01;
+/** A point value the way the file writes numbers: 25,000 or 25.000. */
+function showPoint(value: number, mark: DecimalMark): string {
+  return value.toLocaleString(mark === ',' ? 'de-DE' : 'en-US', {
+    maximumFractionDigits: 8,
+  });
+}
 
-/** A point value the way a person writes it: 25,000. */
-function showPoint(value: number): string {
-  return value.toLocaleString('en-US', { maximumFractionDigits: 8 });
+/** A tick size as plain digits with the file's mark: 0.0005 or 0,0005. */
+function showTick(value: number, mark: DecimalMark): string {
+  const plain = value.toFixed(8).replace(/0+$/, '').replace(/\.$/, '');
+  return mark === ',' ? plain.replace('.', ',') : plain;
 }
 
 export function plural(n: number, one: string, many = `${one}s`): string {
@@ -67,10 +81,13 @@ export function MapStep({
   accounts,
   accountId,
   onAccount,
+  onAccountCreated,
   state,
   onState,
   save,
   onSave,
+  focusPoint,
+  onFocused,
   onBack,
   onContinue,
 }: {
@@ -79,10 +96,15 @@ export function MapStep({
   accounts: readonly Account[];
   accountId: string | null;
   onAccount: (id: string) => void;
+  /** A new account was made here: it is chosen, and the mapping stays as it is. */
+  onAccountCreated: (id: string) => void;
   state: MapState;
   onState: Dispatch<SetStateAction<MapState | null>>;
   save: boolean;
   onSave: (save: boolean) => void;
+  /** Opened from Preview's "Set point values": the first point-value input takes focus. */
+  focusPoint: boolean;
+  onFocused: () => void;
   onBack: () => void;
   onContinue: () => void;
 }) {
@@ -90,15 +112,28 @@ export function MapStep({
   const { parsed } = file;
   const { mapping } = state;
   const account = accounts.find((a) => a.id === accountId);
+  const display = useDisplay();
+  const hideMoney = display.unit === 'privacy';
   const [creating, setCreating] = useState(false);
+  const newAccount = useRef<NewAccountSubmit | null>(null);
+  const [newValid, setNewValid] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       Object.entries(mapping.overrides).map(([k, v]) => [
         k,
-        showPoint(v.pointValue),
+        showPoint(v.pointValue, mapping.decimal),
       ]),
     ),
   );
+  const [tickDrafts, setTickDrafts] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      Object.entries(mapping.overrides).map(([k, v]) => [
+        k,
+        showTick(v.tickSize, mapping.decimal),
+      ]),
+    ),
+  );
+  const firstPoint = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const updateAccount = useUpdateUserAccount();
@@ -120,7 +155,7 @@ export function MapStep({
   // The plan reads the file with these settings: here, only to say what it would skip.
   // No file or account yet: null, which stays pending without a spinner.
   const plan = useImportPlan(
-    valid && accountId
+    valid && accountId && !showCreate
       ? { parsed, mapping, accountId, fileName: file.name }
       : null,
   ).data;
@@ -159,25 +194,79 @@ export function MapStep({
     (f) => columns[f] !== undefined,
   ).length;
 
-  function setPoint(key: string, text: string) {
-    setDrafts((d) => ({ ...d, [key]: text }));
-    const n = parseDecimal(text, '.');
+  // The point value and the tick size are read with the file's decimal mark.
+  // A root has an override only while both are numbers above zero.
+  function setOverride(
+    key: string,
+    point: string,
+    tick: string,
+    mark: DecimalMark,
+  ) {
+    const pointValue = parseDecimal(point, mark);
+    const tickSize = parseDecimal(tick, mark);
     update((s) => {
       const overrides = { ...s.mapping.overrides };
-      if (n !== null && n > 0)
-        overrides[key] = { pointValue: n, tickSize: POINT_TICK };
+      if (
+        pointValue !== null &&
+        pointValue > 0 &&
+        tickSize !== null &&
+        tickSize > 0
+      )
+        overrides[key] = { pointValue, tickSize };
       else delete overrides[key];
       return withOptions(s, { overrides });
     });
   }
 
+  const tickOf = (root: { key: string; tickSize: number }) =>
+    tickDrafts[root.key] ?? showTick(root.tickSize, mapping.decimal);
+
+  function setPoint(root: UnknownRoot, text: string) {
+    setDrafts((d) => ({ ...d, [root.key]: text }));
+    setOverride(root.key, text, tickOf(root), mapping.decimal);
+  }
+
+  function setTick(root: UnknownRoot, text: string) {
+    setTickDrafts((d) => ({ ...d, [root.key]: text }));
+    setOverride(root.key, drafts[root.key] ?? '', text, mapping.decimal);
+  }
+
+  // Changing the decimal mark reads what was typed again.
+  function setDecimal(decimal: DecimalMark) {
+    update((s) => withOptions(s, { decimal }));
+    for (const root of roots)
+      setOverride(root.key, drafts[root.key] ?? '', tickOf(root), decimal);
+  }
+
+  // Once the remembered point values are known, the roots are too: the first input takes the cursor.
+  const rootsKnown = known !== undefined;
+  useEffect(() => {
+    if (!focusPoint || !rootsKnown) return;
+    firstPoint.current?.focus();
+    onFocused();
+  }, [focusPoint, rootsKnown, onFocused]);
+
+  const canContinue = valid && !saving && (showCreate ? newValid : !!account);
+
   async function next() {
     setSaveError(false);
-    if (save && account) {
+    setSaving(true);
+    let target = account;
+    if (showCreate) {
+      // Continue makes the new account first, and goes on into it, never into the one chosen before.
+      const created = await newAccount.current?.();
+      if (!created) {
+        setSaving(false);
+        return;
+      }
+      target = created;
+    }
+    setSaving(false);
+    if (save && target) {
       setSaving(true);
       try {
         await updateAccount.mutateAsync({
-          id: account.id,
+          id: target.id,
           patch: { importMapping: { ...mapping, headers: [...headers] } },
         });
       } catch {
@@ -234,9 +323,11 @@ export function MapStep({
             </p>
             {showCreate ? (
               <NewAccountForm
+                submitRef={newAccount}
+                onValid={setNewValid}
                 onCreated={(a) => {
                   setCreating(false);
-                  onAccount(a.id);
+                  onAccountCreated(a.id);
                 }}
                 onCancel={
                   accounts.length > 0 ? () => setCreating(false) : undefined
@@ -303,7 +394,7 @@ export function MapStep({
               className="w-full [&>label]:flex-1 [&>label]:justify-center"
               coarseTargets
               value={mapping.decimal}
-              onChange={(decimal) => update((s) => withOptions(s, { decimal }))}
+              onChange={setDecimal}
               options={[
                 { value: '.', label: 'Point' },
                 { value: ',', label: 'Comma' },
@@ -316,7 +407,7 @@ export function MapStep({
             </p>
           </div>
 
-          {account ? (
+          {account || showCreate ? (
             <label className="flex min-h-9 cursor-pointer items-start gap-2.5 text-[13.5px] leading-snug text-text pointer-coarse:min-h-11">
               <input
                 type="checkbox"
@@ -324,7 +415,8 @@ export function MapStep({
                 onChange={(e) => onSave(e.target.checked)}
                 className="mt-0.5 size-4 shrink-0 accent-accent"
               />
-              Save this mapping for {account.name}
+              Save this mapping for{' '}
+              {showCreate ? 'the new account' : account?.name}
             </label>
           ) : null}
         </div>
@@ -351,10 +443,17 @@ export function MapStep({
           {file.name}: {fileSummary(file)}
         </p>
         {state.usedSaved && account ? (
-          <p className="mt-3 flex items-center gap-2 rounded-control bg-accent-soft px-3 py-2 text-[13px] font-medium text-accent-ink">
-            <Check {...ICON} size={15} weight="bold" className="shrink-0" />
-            Using your saved mapping for {account.name}.
-          </p>
+          <div className="mt-3 grid gap-1.5 rounded-control bg-accent-soft px-3 py-2 text-[13px] font-medium text-accent-ink">
+            <p className="flex items-center gap-2">
+              <Check {...ICON} size={15} weight="bold" className="shrink-0" />
+              Using your saved mapping for {account.name}.
+            </p>
+            {state.overruled.map((note) => (
+              <p key={note} className="pl-[23px]">
+                {note}
+              </p>
+            ))}
+          </div>
         ) : null}
 
         <div className="mt-2 overflow-x-auto">
@@ -391,6 +490,7 @@ export function MapStep({
                 const isRequired = required.has(field);
                 const isMatched =
                   index !== undefined && state.matched.includes(field);
+                const masked = hideMoney && MONEY_FIELDS.has(field);
                 const values = fit(sample(index));
                 return (
                   <tr key={field} className="border-t border-line align-middle">
@@ -413,7 +513,10 @@ export function MapStep({
                       ) : null}
                       {values.length > 0 ? (
                         <span className="mt-0.5 block truncate font-mono text-[12px] text-faint md:hidden">
-                          {values.slice(0, 2).join(', ')}
+                          {values
+                            .slice(0, 2)
+                            .map((v) => (masked ? '•••' : v))
+                            .join(', ')}
                         </span>
                       ) : null}
                     </th>
@@ -452,7 +555,9 @@ export function MapStep({
                             key={i}
                             className="inline-flex h-[22px] max-w-full items-center rounded-[6px] bg-sunken px-[7px] font-mono text-[12px] font-medium text-muted"
                           >
-                            <span className="truncate">{v}</span>
+                            <span className="truncate">
+                              {masked ? <HiddenAmount /> : v}
+                            </span>
                           </span>
                         ))}
                       </span>
@@ -498,7 +603,12 @@ export function MapStep({
                   {plural(parsed.rows.length, 'row')} would be skipped
                 </b>{' '}
                 with these settings. The first is row {first.rowIndex}: the{' '}
-                {FIELD_LABEL[first.field].toLowerCase()} &quot;{first.value}
+                {FIELD_LABEL[first.field].toLowerCase()} &quot;
+                {hideMoney && MONEY_FIELDS.has(first.field) ? (
+                  <HiddenAmount />
+                ) : (
+                  first.value
+                )}
                 &quot; {ISSUE_REASON[first.code]}.
                 {first.code === 'time-unparseable'
                   ? ' Check the date order and the time zone.'
@@ -508,17 +618,23 @@ export function MapStep({
           ) : null}
         </div>
 
-        {roots.map((root) => {
+        {roots.map((root, at) => {
           const draft = drafts[root.key] ?? '';
-          const bad =
-            draft.trim() !== '' && mapping.overrides[root.key] === undefined;
+          const tick = tickOf(root);
+          const override = mapping.overrides[root.key];
+          const pointBad =
+            draft.trim() !== '' &&
+            (parseDecimal(draft, mapping.decimal) ?? 0) <= 0;
+          const tickBad = (parseDecimal(tick, mapping.decimal) ?? 0) <= 0;
+          const bad = override === undefined && (pointBad || tickBad);
           const inputId = `${ids}-pv-${root.key}`;
+          const example = showPoint(25000, mapping.decimal);
           return (
             <div
               key={root.key}
               role="group"
               aria-label={`Point value for ${root.key}`}
-              className="mt-3.5 grid items-center gap-3 rounded-[12px] bg-sunken px-4 py-3.5 sm:grid-cols-[28px_1fr_240px]"
+              className="mt-3.5 grid items-center gap-3 rounded-[12px] bg-sunken px-4 py-3.5 sm:grid-cols-[28px_1fr_300px]"
             >
               <IconTile icon={Warning} tone="warn" className="hidden sm:grid" />
               <div>
@@ -529,42 +645,58 @@ export function MapStep({
                   {plural(root.rows, 'row')} trade{root.rows === 1 ? 's' : ''}{' '}
                   <span className="font-mono">{root.symbols.join(', ')}</span>.
                   Enter the dollars one full point is worth, so Keel can work
-                  out P&amp;L. Keel remembers it next time.
+                  out P&amp;L, and the smallest price step. Keel remembers them
+                  next time.
                 </p>
               </div>
               <div>
-                <label htmlFor={inputId} className={LABEL}>
-                  {root.key} point value
-                </label>
-                <div className="relative">
-                  <span
-                    aria-hidden="true"
-                    className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-faint"
-                  >
-                    $
-                  </span>
-                  <input
-                    id={inputId}
-                    inputMode="decimal"
-                    value={draft}
-                    onChange={(e) => setPoint(root.key, e.target.value)}
-                    aria-invalid={bad || undefined}
-                    aria-describedby={bad ? `${inputId}-err` : undefined}
-                    className={`${INPUT} pr-16 pl-7 font-semibold`}
-                  />
-                  <span
-                    aria-hidden="true"
-                    className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[12.5px] text-faint"
-                  >
-                    per 1.00
-                  </span>
+                <div className="grid grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-2">
+                  <div>
+                    <label htmlFor={inputId} className={LABEL}>
+                      {root.key} point value
+                    </label>
+                    <div className="relative">
+                      <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-faint"
+                      >
+                        $
+                      </span>
+                      <input
+                        ref={at === 0 ? firstPoint : undefined}
+                        id={inputId}
+                        inputMode="decimal"
+                        value={draft}
+                        onChange={(e) => setPoint(root, e.target.value)}
+                        aria-invalid={(bad && pointBad) || undefined}
+                        aria-describedby={bad ? `${inputId}-err` : undefined}
+                        className={`${INPUT} pl-7 font-semibold`}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor={`${inputId}-tick`} className={LABEL}>
+                      {root.key} tick size
+                    </label>
+                    <input
+                      id={`${inputId}-tick`}
+                      inputMode="decimal"
+                      value={tick}
+                      onChange={(e) => setTick(root, e.target.value)}
+                      aria-invalid={(bad && tickBad) || undefined}
+                      aria-describedby={bad ? `${inputId}-err` : undefined}
+                      className={`${INPUT} font-semibold`}
+                    />
+                  </div>
                 </div>
                 {bad ? (
                   <p
                     id={`${inputId}-err`}
                     className="mt-1.5 text-[12.5px] font-medium text-loss"
                   >
-                    Enter a number above zero, like 25,000.
+                    {pointBad
+                      ? `Enter a number above zero, like ${example}.`
+                      : `Enter a tick size above zero, like ${showTick(root.tickSize, mapping.decimal)}.`}
                   </p>
                 ) : null}
               </div>
@@ -605,12 +737,18 @@ export function MapStep({
                 to go on without it.
               </p>
             ) : null}
-            {!account ? <p>Choose or create an account to continue.</p> : null}
+            {showCreate ? (
+              !newValid ? (
+                <p>Fill in the new account to continue.</p>
+              ) : null
+            ) : !account ? (
+              <p>Choose or create an account to continue.</p>
+            ) : null}
           </div>
           <button
             type="button"
             onClick={next}
-            disabled={!valid || !account || saving}
+            disabled={!canContinue}
             className={`${buttonClasses('primary')} ml-auto disabled:cursor-default disabled:opacity-45`}
           >
             Preview {plural(parsed.rows.length, 'row')}

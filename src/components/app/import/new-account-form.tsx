@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type RefObject } from 'react';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { useCreateUserAccount, usePrefs } from '@/data/query/hooks';
 import { toCents } from '@/domain/money';
@@ -17,12 +17,21 @@ const TYPES: readonly { value: AccountType; label: string }[] = [
   { value: 'prop-funded', label: 'Prop funded' },
 ];
 
+/** Makes the account from what is typed; null, with the errors shown, when it cannot. */
+export type NewAccountSubmit = () => Promise<Account | null>;
+
 /** The fields of a new account, inline in the import's account card. */
 export function NewAccountForm({
   onCreated,
   onCancel,
+  submitRef,
+  onValid,
 }: {
   onCreated: (account: Account) => void;
+  /** Lets the page create the account for its own Continue. */
+  submitRef?: RefObject<NewAccountSubmit | null>;
+  /** Whether the fields can make an account, as they are. */
+  onValid?: (valid: boolean) => void;
   /** Present when the visitor already has an account to go back to. */
   onCancel?: () => void;
 }) {
@@ -46,19 +55,27 @@ export function NewAccountForm({
   const shownCurrency = currency ?? prefs?.baseCurrency ?? 'USD';
   const shownZone = zone ?? prefs?.timeZone ?? 'UTC';
 
-  async function submit() {
+  const amount = Number(balance.replace(/,/g, ''));
+  const valid =
+    name.trim() !== '' &&
+    /^[A-Za-z]{3}$/.test(shownCurrency) &&
+    balance.trim() !== '' &&
+    Number.isFinite(amount) &&
+    amount >= 0;
+  useEffect(() => onValid?.(valid), [valid, onValid]);
+
+  async function submit(): Promise<Account | null> {
     const next: typeof errors = {};
     if (!name.trim()) next.name = 'Give the account a name.';
     if (!/^[A-Za-z]{3}$/.test(shownCurrency))
       next.currency = 'Use a three-letter code, like USD.';
-    const amount = Number(balance.replace(/,/g, ''));
     if (balance.trim() === '' || !Number.isFinite(amount) || amount < 0)
       next.balance = 'Enter an amount of zero or more.';
     setErrors(next);
     setFailed(false);
     if (Object.keys(next).length > 0) {
       if (next.name) nameRef.current?.focus();
-      return;
+      return null;
     }
     try {
       const account = await create.mutateAsync({
@@ -71,10 +88,20 @@ export function NewAccountForm({
         ...(isValidTimeZone(shownZone) ? { timeZone: shownZone } : {}),
       });
       onCreated(account);
+      return account;
     } catch {
       setFailed(true);
+      return null;
     }
   }
+
+  useEffect(() => {
+    if (!submitRef) return;
+    submitRef.current = submit;
+    return () => {
+      submitRef.current = null;
+    };
+  });
 
   return (
     <div
@@ -192,7 +219,7 @@ export function NewAccountForm({
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={submit}
+          onClick={() => void submit()}
           disabled={create.isPending}
           className={buttonClasses('primary', 'sm')}
         >

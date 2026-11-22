@@ -79,3 +79,10 @@ export const ISSUE_REASON: Record<RowIssueCode, string> = {
   'side-unrecognised': 'is not a buy or a sell',
   'close-before-open': 'closes before it opens',
 };
+
+/** The fields whose cells are money amounts: Privacy hides what the file holds for them. */
+export const MONEY_FIELDS: ReadonlySet<FieldKey> = new Set<FieldKey>([
+  'pnl',
+  'fees',
+  'commission',
+]);

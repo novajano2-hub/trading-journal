@@ -14,7 +14,8 @@ import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import type { NewAccount, Repository } from '@/data/repository';
 import { parseCsv } from '@/domain/import/csv';
-import { guessMapping } from '@/domain/import/mapping';
+import type { UserPrefs } from '@/domain/types';
+import { guessMapping, type ImportMapping } from '@/domain/import/mapping';
 import { renderApp } from '../__fixtures__/render-app';
 import { ImportFlow } from './import-flow';
 
@@ -46,6 +47,7 @@ const futures: NewAccount = {
 async function open(
   accounts: readonly NewAccount[],
   url = '/app/import',
+  prefs: Partial<UserPrefs> = {},
 ): Promise<{ repo: Repository }> {
   const repo = createLocalRepository({
     indexedDB: new IDBFactory(),
@@ -55,6 +57,7 @@ async function open(
   for (const a of accounts) {
     await repo.accounts.create('mine', a);
   }
+  if (Object.keys(prefs).length > 0) await repo.prefs.update(prefs);
   renderApp(
     <Suspense fallback={null}>
       <ImportFlow />
@@ -114,24 +117,57 @@ test('with everything mapped but Price, Price is listed and Continue is disabled
   ).toBeGreaterThan(0);
 });
 
-test('an account with a saved mapping opens pre-filled and says so', async () => {
+/** An account whose saved mapping (read for HEADER) says what the arguments say. */
+function savedFor(
+  options: Partial<Pick<ImportMapping, 'dateOrder' | 'decimal'>>,
+): NewAccount {
   const mapping = guessMapping(parseCsv(`${HEADER}\n`), {
     sourceTimeZone: 'America/Chicago',
-  });
+  }) as Extract<ImportMapping, { kind: 'fills' }>;
   // Saved from a file whose columns sat in another order.
-  const saved = {
-    ...mapping,
-    columns: { time: 0, symbol: 1, side: 2, qty: 3, price: 4 },
-    dateOrder: 'dmy' as const,
-    headers: [...parseCsv(`${HEADER}\n`).headers],
+  return {
+    ...futures,
+    importMapping: {
+      ...mapping,
+      columns: { time: 0, symbol: 1, side: 2, qty: 3, price: 4 },
+      headers: [...parseCsv(`${HEADER}\n`).headers],
+      ...options,
+    },
   };
-  await open([{ ...futures, importMapping: saved }]);
-  // This file's dates are month first; the saved mapping wins.
-  await upload(csvFile(['11/19/2026 09:30:00,ESZ6,Buy,1,5000']));
+}
+
+test('an account with a saved mapping opens pre-filled and says so', async () => {
+  await open([savedFor({ dateOrder: 'dmy' })]);
+  // The file does not say which order it is in (11 and 05 are both months): the saved one stands.
+  await upload(csvFile(['11/05/2026 09:30:00,ESZ6,Buy,1,5000']));
   expect(
     screen.getByText('Using your saved mapping for Futures.'),
   ).toBeTruthy();
   expect(checked('Day first')).toBe(true);
+  expect(screen.queryByText(/This file uses/)).toBeNull();
+});
+
+test('a saved date order loses to a file that proves another, and the step says so', async () => {
+  await open([savedFor({ dateOrder: 'dmy' })]);
+  // 19 can only be a day: this file is month first.
+  await upload(csvFile(['11/19/2026 09:30:00,ESZ6,Buy,1,5000']));
+  expect(checked('Month first')).toBe(true);
+  expect(
+    screen.getByText(
+      'This file uses month first; your saved mapping said day first.',
+    ),
+  ).toBeTruthy();
+});
+
+test('a saved decimal mark loses to a file that proves another, and the step says so', async () => {
+  await open([savedFor({ dateOrder: 'mdy', decimal: ',' })]);
+  await upload(csvFile(['11/19/2026 09:30:00,ESZ6,Buy,1,5000.25']));
+  expect(checked('Point')).toBe(true);
+  expect(
+    screen.getByText(
+      'This file uses a point as the decimal mark; your saved mapping said a comma as the decimal mark.',
+    ),
+  ).toBeTruthy();
 });
 
 test('a saved mapping for other columns is left alone', async () => {
@@ -196,7 +232,7 @@ test('a new account is made inline and chosen', async () => {
   expect(screen.queryByRole('group', { name: 'New account' })).toBeNull();
 });
 
-test('Continue saves the mapping on the account, and not when unticked', async () => {
+test('Continue saves the mapping on the account', async () => {
   const { repo } = await open([futures]);
   await upload(csvFile(ROWS));
   expect(
@@ -220,4 +256,108 @@ test('switching to closed trades asks for the trade columns', async () => {
   expect(screen.getByText(/^Map these to continue:/).textContent).toContain(
     'Exit time',
   );
+});
+
+test('Continue does not save the mapping when Save is unticked', async () => {
+  const { repo } = await open([futures]);
+  await upload(csvFile(ROWS));
+  fireEvent.click(screen.getByLabelText('Save this mapping for Futures'));
+  fireEvent.click(screen.getByRole('button', { name: /^Preview/ }));
+  await waitFor(() => expect(window.location.search).toContain('step=preview'));
+  const [account] = await repo.accounts.list('mine');
+  expect(account?.importMapping).toBeUndefined();
+});
+
+test('in New account mode Continue waits for the form, then creates the account and continues into it', async () => {
+  const { repo } = await open([futures]);
+  await upload(csvFile(ROWS));
+  fireEvent.change(screen.getByLabelText('Account'), {
+    target: { value: '__new' },
+  });
+  const next = screen.getByRole('button', {
+    name: /^Preview/,
+  }) as HTMLButtonElement;
+  // The form is empty: Continue is off, and nothing flows into Futures.
+  expect(next.disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText('Account name'), {
+    target: { value: 'Prop eval' },
+  });
+  expect(next.disabled).toBe(false);
+  fireEvent.click(next);
+  await waitFor(() => expect(window.location.search).toContain('step=preview'));
+  expect(
+    await screen.findByRole('button', {
+      name: 'Import 1 trade into Prop eval',
+    }),
+  ).toBeTruthy();
+  const accounts = await repo.accounts.list('mine');
+  expect(accounts.map((a) => a.name).sort()).toEqual(['Futures', 'Prop eval']);
+  // The saved mapping went to the new account, not the one chosen before.
+  expect(
+    accounts.find((a) => a.name === 'Futures')?.importMapping,
+  ).toBeUndefined();
+  expect(
+    accounts.find((a) => a.name === 'Prop eval')?.importMapping?.headers,
+  ).toEqual(HEADER.split(','));
+});
+
+const HG_SEMICOLON = [
+  'Time;Symbol;Side;Quantity;Price',
+  '19/11/2026 09:30:00;HGZ6;Buy;1;"4,1005"',
+  '19/11/2026 09:45:00;HGZ6;Sell;1;"4,2000"',
+].join('\n');
+
+test('with a comma file the point value is read with a comma, and the tick size sits beside it', async () => {
+  const { repo } = await open([futures]);
+  await upload(new File([HG_SEMICOLON], 'hg.csv', { type: 'text/csv' }));
+  expect(checked('Comma')).toBe(true);
+  const group = screen.getByRole('group', { name: 'Point value for HG' });
+  const point = within(group).getByLabelText('HG point value');
+  const tick = within(group).getByLabelText('HG tick size') as HTMLInputElement;
+  // Four decimals ending in 0 or 5: the half tick, written with the file's mark.
+  expect(tick.value).toBe('0,0005');
+  // 25.000 is twenty-five thousand where the comma is the decimal mark.
+  fireEvent.change(point, { target: { value: '25.000' } });
+  expect(point.getAttribute('aria-invalid')).toBeNull();
+  fireEvent.change(tick, { target: { value: '0,001' } });
+  expect(tick.getAttribute('aria-invalid')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: /^Preview/ }));
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Import 1 trade into Futures' }),
+  );
+  await screen.findByText('1 trade imported into Futures.');
+  const [account] = await repo.accounts.list('mine');
+  expect((await repo.imports.context('mine', account!.id)).overrides).toEqual({
+    HG: { pointValue: 25000, tickSize: 0.001 },
+  });
+});
+
+const TRIPS_HEADER =
+  'Open Time,Close Time,Symbol,Side,Qty,Entry Price,Exit Price,Commission,P&L';
+const TRIPS_ROWS = [
+  '2026-11-16 09:30:00,2026-11-16 09:45:00,ESZ6,Long,1,6000,6004,3.75,21.90',
+  '2026-11-16 10:30:00,2026-11-16 10:45:00,ESZ6,Long,1,6000,6004,3.75,15.60',
+  '2026-11-16 11:30:00,2026-11-16 11:45:00,ESZ6,Long,1,6000,6004,3.75,"$1,2x"',
+];
+
+test('under Privacy the file money values are masked on Map: samples and the skipped-row warning', async () => {
+  await open([futures], '/app/import', { displayUnit: 'privacy' });
+  await upload(csvFile(TRIPS_ROWS, TRIPS_HEADER));
+  // The warning is there, so the quoted value would be too.
+  await screen.findByText(/would be skipped/);
+  const text = document.body.textContent ?? '';
+  for (const raw of ['21.90', '15.60', '3.75', '$1,2x'])
+    expect(text, raw).not.toContain(raw);
+  expect(screen.getAllByLabelText('hidden amount').length).toBeGreaterThan(0);
+  // Prices are not money amounts: they still show.
+  expect(screen.getAllByText('6000').length).toBeGreaterThan(0);
+});
+
+test('in dollars the same values show as the file writes them', async () => {
+  await open([futures]);
+  await upload(csvFile(TRIPS_ROWS, TRIPS_HEADER));
+  await screen.findByText(/would be skipped/);
+  expect(screen.getAllByText('21.90').length).toBeGreaterThan(0);
+  expect(document.body.textContent).toContain('$1,2x');
+  expect(screen.queryByLabelText('hidden amount')).toBeNull();
 });

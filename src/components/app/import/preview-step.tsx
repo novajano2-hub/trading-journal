@@ -18,12 +18,14 @@ import { useImportContext } from '@/data/query/hooks';
 import type { ImportMapping } from '@/domain/import/mapping';
 import type { ImportPlan, TradeFlag } from '@/domain/import/plan';
 import type { RowIssue } from '@/domain/import/rows';
+import { unknownRoots } from '@/domain/import/unknown-symbols';
 import type { Account, ImportJob, Trade } from '@/domain/types';
 import type { ImportFile } from '@/lib/decode';
 import { useDisplay, type Display } from '@/lib/display';
 import { plural } from '@/lib/format';
 import { ConfirmStep } from './confirm-step';
-import { FIELD_LABEL, ISSUE_REASON } from './fields';
+import { FIELD_LABEL, ISSUE_REASON, MONEY_FIELDS } from './fields';
+import { HiddenAmount } from './hidden-amount';
 
 const ICON = { 'aria-hidden': true } as const;
 const ISSUES_SHOWN = 20;
@@ -94,6 +96,7 @@ export function PreviewStep({
   account,
   onBack,
   onChooseAnother,
+  onSetPoints,
   onDone,
 }: {
   file: ImportFile;
@@ -101,6 +104,8 @@ export function PreviewStep({
   account: Account;
   onBack: () => void;
   onChooseAnother: () => void;
+  /** Back to Map, with the first point-value input in focus. */
+  onSetPoints: () => void;
   onDone: (job: ImportJob) => void;
 }) {
   const display = useDisplay();
@@ -124,6 +129,13 @@ export function PreviewStep({
       out.set(f.tradeId, [...(out.get(f.tradeId) ?? []), f]);
     return out;
   }, [plan]);
+
+  // The roots a point value can be given for; other unresolved symbols can't take one.
+  const known = context.data?.overrides;
+  const priceable = useMemo(
+    () => unknownRoots(file.parsed, mapping, known ?? {}).map((r) => r.key),
+    [file.parsed, mapping, known],
+  );
 
   if (planned.status === 'error')
     return (
@@ -211,7 +223,9 @@ export function PreviewStep({
         <Blocked
           plan={plan}
           account={account}
+          priceable={priceable}
           onBack={onBack}
+          onSetPoints={onSetPoints}
           onChooseAnother={onChooseAnother}
         />
       ) : (
@@ -279,29 +293,49 @@ function Tile({
 function Blocked({
   plan,
   account,
+  priceable,
   onBack,
+  onSetPoints,
   onChooseAnother,
 }: {
   plan: ImportPlan;
   account: Account;
+  /** The futures roots Map can ask a point value for. */
+  priceable: readonly string[];
   onBack: () => void;
+  onSetPoints: () => void;
   onChooseAnother: () => void;
 }) {
   const [allIssues, setAllIssues] = useState(false);
-  const head =
-    plan.blocked === 'unresolved-symbols'
-      ? `${symbolList(plan.unresolvedKeys)} ${plan.unresolvedKeys.length === 1 ? 'needs' : 'need'} a point value`
-      : plan.blocked === 'nothing-new'
-        ? `Every row is already imported into ${account.name}`
-        : 'Keel found no rows it could read';
-  const body =
-    plan.blocked === 'unresolved-symbols'
+  // Unresolved symbols split in two: roots that take a point value, and symbols
+  // Keel does not recognise at all (usually the wrong column read as Symbol).
+  const unresolved = plan.blocked === 'unresolved-symbols';
+  const pricing = unresolved
+    ? plan.unresolvedKeys.filter((k) => priceable.includes(k))
+    : [];
+  const unknown = unresolved
+    ? plan.unresolvedKeys.filter((k) => !priceable.includes(k))
+    : [];
+  const head = unresolved
+    ? pricing.length > 0
+      ? `${symbolList(pricing)} ${pricing.length === 1 ? 'needs' : 'need'} a point value`
+      : `${symbolList(unknown)} ${unknown.length === 1 ? 'is not a symbol' : 'are not symbols'} Keel knows`
+    : plan.blocked === 'nothing-new'
+      ? `Every row is already imported into ${account.name}`
+      : 'Keel found no rows it could read';
+  const unknownNote =
+    unknown.length === 1
+      ? "Keel doesn't recognise the symbol, check the Symbol column."
+      : "Keel doesn't recognise these symbols, check the Symbol column.";
+  const body = unresolved
+    ? pricing.length > 0
       ? "Keel can't price these futures without a point value (dollars per point), so it can't work out their P&L. Set them in the Map step, then come back."
-      : plan.blocked === 'nothing-new'
-        ? 'Nothing here is new, so there is nothing to add. Choose a different file, or go back if you picked the wrong account.'
-        : plan.issues.length > 0
-          ? 'Every row was skipped. The reasons are listed; the date order, time zone and columns are the usual cause.'
-          : 'The file has no data rows under its header. Choose another file.';
+      : unknownNote
+    : plan.blocked === 'nothing-new'
+      ? 'Nothing here is new, so there is nothing to add. Choose a different file, or go back if you picked the wrong account.'
+      : plan.issues.length > 0
+        ? 'Every row was skipped. The reasons are listed; the date order, time zone and columns are the usual cause.'
+        : 'The file has no data rows under its header. Choose another file.';
   const primary = buttonClasses('primary');
   const secondary = buttonClasses('secondary');
   return (
@@ -317,11 +351,24 @@ function Blocked({
           title={head}
         />
         <p className="mt-2.5 text-[14px] leading-normal text-muted">{body}</p>
+        {pricing.length > 0 && unknown.length > 0 ? (
+          <p className="mt-2 text-[14px] leading-normal text-muted">
+            Keel doesn&apos;t recognise {symbolList(unknown)}, check the Symbol
+            column.
+          </p>
+        ) : null}
         <div className="mt-4 flex flex-wrap gap-2">
-          {plan.blocked === 'unresolved-symbols' ? (
-            <button type="button" onClick={onBack} className={primary}>
-              Set point values
-            </button>
+          {pricing.length > 0 ? (
+            <>
+              <button type="button" onClick={onSetPoints} className={primary}>
+                Set point values
+              </button>
+              {unknown.length > 0 ? (
+                <button type="button" onClick={onBack} className={secondary}>
+                  Back to columns
+                </button>
+              ) : null}
+            </>
           ) : plan.blocked === 'nothing-new' ? (
             <>
               <button
@@ -372,6 +419,7 @@ function IssuesCard({
   onAll: () => void;
 }) {
   const shown = all ? issues : issues.slice(0, ISSUES_SHOWN);
+  const hideMoney = useDisplay().unit === 'privacy';
   return (
     <section className={`${CARD} ${CARD_PAD}`} aria-labelledby="import-issues">
       <CardHeader
@@ -401,7 +449,11 @@ function IssuesCard({
                 <span className="mt-1 flex items-center gap-1.5 text-[12.5px] font-normal text-muted">
                   {FIELD_LABEL[issue.field]}:
                   <span className="inline-flex h-[22px] max-w-full items-center truncate rounded-chip bg-sunken px-1.5 text-[12px] font-medium">
-                    {issue.value}
+                    {hideMoney && MONEY_FIELDS.has(issue.field) ? (
+                      <HiddenAmount />
+                    ) : (
+                      issue.value
+                    )}
                   </span>
                 </span>
               ) : null}

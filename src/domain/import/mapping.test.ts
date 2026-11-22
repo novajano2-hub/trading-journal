@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { parseCsv } from './csv';
-import { applySavedMapping, guessMapping, missingFields } from './mapping';
+import {
+  applySavedMapping,
+  detectDecimal,
+  guessMapping,
+  missingFields,
+} from './mapping';
 
 const ny = { sourceTimeZone: 'America/New_York' };
 const g = (text: string) => guessMapping(parseCsv(text), ny);
@@ -214,7 +219,19 @@ test('a saved mapping does not apply when one of its columns is gone', () => {
   ).toBeNull();
 });
 
-test('a saved mapping with no headers applies when its indexes are inside the file', () => {
-  expect(applySavedMapping(saved, ['a', 'b', 'c', 'd', 'e'])).toEqual(saved);
-  expect(applySavedMapping(saved, ['a', 'b'])).toBeNull();
+test('a saved mapping with no headers is never applied by position', () => {
+  expect(applySavedMapping(saved, ['a', 'b', 'c', 'd', 'e'])).toBeNull();
+  expect(
+    applySavedMapping(saved, ['Time', 'Symbol', 'Side', 'Qty', 'Price']),
+  ).toBeNull();
+});
+
+test('detectDecimal reads a mark off the mapped numeric columns, or says it cannot', () => {
+  const dot = parseCsv('Time,Symbol,Side,Qty,Price\nx,ES,Buy,1,5000.25\n');
+  const comma = parseCsv('Time,Symbol,Side,Qty,Price\nx,ES,Buy,1,"5000,25"\n');
+  const none = parseCsv('Time,Symbol,Side,Qty,Price\nx,ES,Buy,1,5000\n');
+  const m = guessMapping(dot, ny);
+  expect(detectDecimal(dot, m)).toBe('.');
+  expect(detectDecimal(comma, m)).toBe(',');
+  expect(detectDecimal(none, m)).toBeNull();
 });

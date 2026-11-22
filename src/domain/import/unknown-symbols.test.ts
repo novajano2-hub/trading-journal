@@ -16,7 +16,7 @@ const mapping = guessMapping(parsed, { sourceTimeZone: 'UTC' });
 
 test('a futures root Keel does not know is listed with the file symbols and the row count', () => {
   expect(unknownRoots(parsed, mapping, {})).toEqual([
-    { key: 'HG', symbols: ['HGZ6', 'HGH7'], rows: 3 },
+    { key: 'HG', symbols: ['HGZ6', 'HGH7'], rows: 3, tickSize: 0.1 },
   ]);
 });
 
@@ -34,4 +34,29 @@ test('no symbol column, no roots', () => {
     columns: { ...mapping.columns, symbol: undefined },
   };
   expect(unknownRoots(parsed, none, {})).toEqual([]);
+});
+
+const hg = (prices: readonly string[], decimal: '.' | ',' = '.') => {
+  const p = parseCsv(
+    [
+      'Time,Symbol,Side,Qty,Price',
+      ...prices.map((x) => `2026-11-19 09:30:00,HGZ6,Buy,1,"${x}"`),
+    ].join('\n'),
+  );
+  return unknownRoots(
+    p,
+    { ...guessMapping(p, { sourceTimeZone: 'UTC' }), decimal },
+    {},
+  )[0]!.tickSize;
+};
+
+test('the default tick size follows the price precision', () => {
+  // Four decimals, every one ending in 0 or 5: the half tick of copper.
+  expect(hg(['4.1005', '4.2', '4.1050'])).toBe(0.0005);
+  // Four decimals that do not: the last decimal.
+  expect(hg(['4.1003'])).toBe(0.0001);
+  expect(hg(['4.25', '4.30'])).toBe(0.01);
+  expect(hg(['4'])).toBe(1);
+  // The file's own mark.
+  expect(hg(['4,1005'], ',')).toBe(0.0005);
 });

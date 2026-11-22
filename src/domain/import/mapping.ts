@@ -282,15 +282,11 @@ function decimalEvidence(raw: string): DecimalMark | null {
   return parts[1]!.length === 3 ? null : mark;
 }
 
-/**
- * Read the decimal mark off the numeric columns; when the data cannot decide
- * (no evidence, or both marks), fall back on the delimiter: ';' files are
- * usually European.
- */
-function guessDecimal(
+/** The decimal mark the numeric columns prove, or null when they prove none or both. */
+function decimalFrom(
   parsed: ParsedCsv,
   columns: readonly (number | undefined)[],
-): DecimalMark {
+): DecimalMark | null {
   let dot = false;
   let comma = false;
   for (const row of parsed.rows.slice(0, 50)) {
@@ -301,8 +297,35 @@ function guessDecimal(
       else if (mark === ',') comma = true;
     }
   }
-  if (dot !== comma) return dot ? '.' : ',';
-  return parsed.delimiter === ';' ? ',' : '.';
+  return dot !== comma ? (dot ? '.' : ',') : null;
+}
+
+/** The numeric columns a mapping reads. */
+function numericColumns(mapping: ImportMapping): (number | undefined)[] {
+  const c: Record<string, number | undefined> = mapping.columns;
+  return mapping.kind === 'fills'
+    ? [c.price, c.qty, c.fees, c.commission]
+    : [c.entryPrice, c.exitPrice, c.qty, c.fees, c.commission];
+}
+
+/** The decimal mark this file proves for the columns the mapping reads, if it proves one. */
+export function detectDecimal(
+  parsed: ParsedCsv,
+  mapping: ImportMapping,
+): DecimalMark | null {
+  return decimalFrom(parsed, numericColumns(mapping));
+}
+
+/**
+ * Read the decimal mark off the numeric columns; when the data cannot decide
+ * (no evidence, or both marks), fall back on the delimiter: ';' files are
+ * usually European.
+ */
+function guessDecimal(
+  parsed: ParsedCsv,
+  columns: readonly (number | undefined)[],
+): DecimalMark {
+  return decimalFrom(parsed, columns) ?? (parsed.delimiter === ';' ? ',' : '.');
 }
 
 export function guessMapping(
@@ -375,8 +398,9 @@ export function missingFields(mapping: ImportMapping): string[] {
 
 /**
  * A mapping saved on an account, brought to this file: its columns are found
- * again by the header names they were saved with (or, for a mapping saved
- * without them, by position). Null when a column it needs is not in the file.
+ * again by the header names they were saved with. Null when a column it needs
+ * is not in the file, or when it was saved without header names (it cannot be
+ * told where its columns went).
  */
 export function applySavedMapping(
   saved: ImportMapping,
@@ -389,8 +413,7 @@ export function applySavedMapping(
   ];
   if (used.length === 0) return null;
   const savedHeaders = saved.headers;
-  if (!savedHeaders)
-    return used.every((i) => i < headers.length) ? saved : null;
+  if (!savedHeaders) return null;
 
   const norm = headers.map(normalizeHeader);
   const taken = new Set<number>();
