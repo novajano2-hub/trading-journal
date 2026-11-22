@@ -8,6 +8,7 @@ import {
 } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
+import { commitNavigation } from './__fixtures__/navigation';
 import { renderApp } from './__fixtures__/render-app';
 import { TopBar } from './top-bar';
 
@@ -56,7 +57,9 @@ function layOut({
   );
 }
 
-function renderBar(): HTMLElement {
+function renderBar(path = '/app/dashboard'): HTMLElement {
+  window.history.replaceState(null, '', path);
+  commitNavigation();
   render(
     <TopBar
       filters={<div data-testid="chips" />}
@@ -65,6 +68,18 @@ function renderBar(): HTMLElement {
   );
   return screen.getByRole('banner');
 }
+
+test('the chips show only on the routes the filters drive', () => {
+  layOut({ titleWidth: 115, chipsWidth: 100 });
+  for (const path of ['/app/import', '/app/settings/import-history']) {
+    const bar = renderBar(path);
+    expect(screen.queryByTestId('chips'), path).toBeNull();
+    expect(bar.dataset.chips, path).toBeUndefined();
+    cleanup();
+  }
+  renderBar('/app/trades');
+  expect(screen.getByTestId('chips')).toBeTruthy();
+});
 
 // Room beside the title: 900 - 240 - 115 - 12 (title margin) - 2 * 8 (gaps) = 517.
 test('chips that fit beside the title sit there', () => {

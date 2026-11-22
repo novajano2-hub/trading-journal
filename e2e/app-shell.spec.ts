@@ -34,6 +34,17 @@ test('every app route renders its title without overflow; placeholders state it 
     await page.goto(path);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(title);
     if (path === '/app/dashboard') await ready(page);
+    // The chips show only where the filters drive the page.
+    await expect(page.getByRole('group', { name: 'Filters' })).toHaveCount(
+      [
+        '/app/dashboard',
+        '/app/trades',
+        '/app/calendar',
+        '/app/reports',
+      ].includes(path)
+        ? 1
+        : 0,
+    );
     if (path === '/app/trades')
       await expect(page.getByRole('table', { name: 'Trades' })).toBeVisible();
     expect(

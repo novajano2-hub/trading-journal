@@ -14,7 +14,7 @@ import {
 import { RAISED } from '@/components/ui/button-styles';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useTrade } from '@/data/query/hooks';
-import { pageTitle, tradePageId } from './nav';
+import { filtersApply, pageTitle, tradePageId } from './nav';
 
 /**
  * Where the chips sit from `sm` up: beside the title, or with the controls on
@@ -169,9 +169,10 @@ export function TopBar({
   const chips = useRef<HTMLDivElement>(null);
   const tradeId = tradePageId(pathname);
   const measured = useChipsFit({ bar, title, tail, controls, chips });
-  // A trade page's bar carries no filter chips (its Previous and Next keep the
-  // URL's), so it is laid out as the chips-beside-the-title case.
-  const showFilters = filters && tradeId === undefined;
+  // The chips show only where the filters drive the page. A trade page's bar
+  // carries none (its Previous and Next keep the URL's), nor does Import; those
+  // are laid out as the chips-beside-the-title case.
+  const showFilters = filters && filtersApply(pathname);
   const fit = showFilters ? measured : 'inline';
 
   return (

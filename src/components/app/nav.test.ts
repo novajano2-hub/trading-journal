@@ -5,6 +5,7 @@ import {
   navHref,
   pageTitle,
   tradePageId,
+  filtersApply,
   type AppModuleId,
 } from './nav';
 
@@ -52,4 +53,25 @@ test('tradePageId reads the id of a trade page, decoded, and nothing else', () =
   expect(tradePageId('/app/trades/new')).toBeUndefined();
   expect(tradePageId('/app/trades/t-c/edit')).toBeUndefined();
   expect(tradePageId('/app/notes/t-c')).toBeUndefined();
+});
+
+test('filtersApply is true only on the routes the global filters drive', () => {
+  for (const p of [
+    '/app/dashboard',
+    '/app/trades',
+    '/app/calendar',
+    '/app/reports',
+    '/app/reports/time',
+  ])
+    expect(filtersApply(p), p).toBe(true);
+  for (const p of [
+    '/app/import',
+    '/app/settings/import-history',
+    '/app/trades/t-c',
+    '/app/trades/new',
+    '/app/trades/t-c/edit',
+    '/app/strategies',
+    '/app/settings',
+  ])
+    expect(filtersApply(p), p).toBe(false);
 });

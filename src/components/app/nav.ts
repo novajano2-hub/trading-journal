@@ -245,3 +245,11 @@ export function tradePageId(pathname: string): string | undefined {
     return m[1];
   }
 }
+
+/** Whether the global filters drive this page: Dashboard, the trade log, Calendar and Reports. Elsewhere the bar shows no chips. */
+export function filtersApply(pathname: string): boolean {
+  return (
+    /^\/app\/(dashboard|trades|calendar)$/.test(pathname) ||
+    /^\/app\/reports(\/|$)/.test(pathname)
+  );
+}
