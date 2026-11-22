@@ -1,6 +1,14 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen } from '@testing-library/react';
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
+import { fixtureSample } from '@/data/__fixtures__/sample';
+import { renderApp } from './__fixtures__/render-app';
 import { TopBar } from './top-bar';
 
 vi.mock('next/navigation', () => import('./__fixtures__/navigation'));
@@ -127,4 +135,35 @@ test('below sm the pinned row holds only the menu and the title', () => {
   expect(pinned.className).toContain('max-sm:fixed');
   expect(pinned.children).toHaveLength(2);
   expect(pinned.firstElementChild).toBe(screen.getByTestId('menu'));
+});
+
+test('a trade page titles the bar "Trades" then the trade number, and shows no filter chips', async () => {
+  const id = fixtureSample().trades[0]!;
+  renderApp(
+    <TopBar
+      filters={<div data-testid="chips" />}
+      search={<button data-testid="search">Search</button>}
+    />,
+    { url: `/app/trades/${encodeURIComponent(id.id)}?symbol=ES` },
+  );
+  const title = screen.getByRole('heading', { level: 1 });
+  const back = within(title).getByRole('link', { name: 'Trades' });
+  expect(back.getAttribute('href')).toBe('/app/trades?symbol=ES');
+  await waitFor(() => expect(title.textContent).toContain(String(id.serial)));
+  expect(screen.queryByTestId('chips')).toBeNull();
+  expect(screen.getByRole('banner').dataset.chips).toBeUndefined();
+});
+
+test('the trade log keeps its plain title and its chips', () => {
+  renderApp(
+    <TopBar
+      filters={<div data-testid="chips" />}
+      search={<button data-testid="search">Search</button>}
+    />,
+    { url: '/app/trades' },
+  );
+  const title = screen.getByRole('heading', { level: 1 });
+  expect(title.textContent).toBe('Trades');
+  expect(within(title).queryByRole('link')).toBeNull();
+  expect(screen.getByTestId('chips')).toBeTruthy();
 });

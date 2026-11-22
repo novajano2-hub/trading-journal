@@ -24,6 +24,7 @@ import { buttonClasses } from '@/components/ui/button-styles';
 import { Chip, SideChip } from '@/components/ui/chip';
 import { IconTile } from '@/components/ui/icon-tile';
 import { MetricTip } from '@/components/ui/metric-tip';
+import type { MetricId } from '@/content/metric-definitions';
 import { metricContextOf } from '@/data/metrics';
 import { useGlobalFilters, useTradeSet } from '@/data/query/derived';
 import {
@@ -44,14 +45,19 @@ import {
   type TradePatch,
 } from '@/data/trade-patch';
 import { plannedR, riskFromStop, rOf } from '@/domain/metrics/summary';
-import { strategyRules, type Execution, type Trade } from '@/domain/types';
+import {
+  strategyRules,
+  type Execution,
+  type PnlBasis,
+  type Trade,
+} from '@/domain/types';
 import { formatUnitValue, useDisplay, type Display } from '@/lib/display';
 import { formatDuration, formatInstrument, plural } from '@/lib/format';
 import { CARD, CardHeader, InstrumentName } from '../dashboard/shared';
 import { ConfirmDialog } from '../confirm-dialog';
 import type { NoteEditorHandle } from '../notes/note-editor';
 import { price, qty } from './columns';
-import { FillsTimeline, sortedFills } from './fills-timeline';
+import { FillsTimeline, positions, sortedFills } from './fills-timeline';
 import { RuleChecklist } from './rule-checklist';
 import { clock, clockOnDay, dayLabel } from './trade-time';
 import { RatingRow, StrategyPicker, TagRows, TradeNote } from './trade-journal';
@@ -166,18 +172,31 @@ function PriceField({
 
 function Stat({
   label,
+  tip,
+  basis,
   sub,
   tone = '',
   children,
 }: {
   label: string;
+  /** The metric whose definition the label carries. */
+  tip?: MetricId;
+  basis?: PnlBasis;
   sub?: React.ReactNode;
   tone?: string;
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
     <div className="min-w-0 bg-surface-1 px-3.5 py-3 first:pl-0 sm:[&:nth-child(4n+1)]:pl-0 sm:[&:not(:nth-child(4n+1))]:pl-4">
-      <span className="block text-xs text-faint">{label}</span>
+      <span className="block text-xs text-faint">
+        {tip && basis ? (
+          <MetricTip id={tip} basis={basis}>
+            {label}
+          </MetricTip>
+        ) : (
+          label
+        )}
+      </span>
       <b
         className={`mt-0.5 block text-[17px] leading-8 font-semibold tracking-[-0.02em] tabular-nums ${tone}`}
       >
@@ -208,13 +227,6 @@ function noun(t: Trade, n: number): string {
 
 function sum(list: readonly Execution[], pick: (e: Execution) => number) {
   return list.reduce((n, e) => n + pick(e), 0);
-}
-
-/** The running position after each fill, in the direction of the trade. */
-function positions(trade: Trade, fills: readonly Execution[]): number[] {
-  const into = trade.direction === 'long' ? 'buy' : 'sell';
-  let held = 0;
-  return fills.map((f) => (held += f.side === into ? f.qty : -f.qty));
 }
 
 function Stats({
@@ -372,6 +384,8 @@ function Stats({
       </Stat>
       <Stat
         label="Planned R"
+        tip="planned-r"
+        basis={basis}
         sub={
           planned === undefined
             ? 'needs a stop and a target'
@@ -386,6 +400,8 @@ function Stats({
       </Stat>
       <Stat
         label="Realized R"
+        tip="realized-r"
+        basis={basis}
         tone={r === undefined ? '' : tone(r)}
         sub={
           r === undefined || trade.initialRisk === undefined ? (
@@ -405,6 +421,8 @@ function Stats({
       </Stat>
       <Stat
         label="MAE"
+        tip="mae"
+        basis={basis}
         tone={trade.mae === undefined ? '' : tone(trade.mae)}
         sub="worst open P&L"
       >
@@ -418,6 +436,8 @@ function Stats({
       </Stat>
       <Stat
         label="MFE"
+        tip="mfe"
+        basis={basis}
         tone={trade.mfe === undefined ? '' : tone(trade.mfe)}
         sub="best open P&L"
       >
@@ -866,7 +886,9 @@ function TradePage({
           </b>
         </div>
         <div className="lg:border-l lg:border-line lg:px-7">
-          <span className="block text-xs text-faint">Realized R</span>
+          <span className="block text-xs text-faint">
+            <MetricTip id="realized-r" basis={basis} />
+          </span>
           <b
             className={`block text-[22px] leading-[1.6] font-semibold tracking-[-0.03em] tabular-nums ${r === undefined ? '' : tone(r)}`}
           >
@@ -911,9 +933,19 @@ function TradePage({
               after={
                 <span className="text-[12.5px] text-faint">
                   {trade.instrument.symbol}
-                  {trade.instrument.pointValue !== 1
-                    ? `, ${display.cash(Math.round(trade.instrument.pointValue * 100), false, cur).text} per point`
-                    : ''}
+                  {trade.instrument.pointValue !== 1 ? (
+                    <>
+                      {', '}
+                      <FigureText
+                        f={display.cash(
+                          Math.round(trade.instrument.pointValue * 100),
+                          false,
+                          cur,
+                        )}
+                      />{' '}
+                      per point
+                    </>
+                  ) : null}
                 </span>
               }
             />
@@ -938,7 +970,7 @@ function TradePage({
                   {plural(trade.executions.length, 'execution')}
                 </span>
               }
-              end={<Legend />}
+              end={<Legend trade={trade} />}
             />
             <FillsTimeline
               trade={trade}
@@ -1031,7 +1063,7 @@ function pnlTone(cents: number): string {
   return tone(cents);
 }
 
-function Legend(): React.JSX.Element {
+function Legend({ trade }: { trade: Trade }): React.JSX.Element {
   return (
     <span className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
       <span className="inline-flex items-center gap-1.5">
@@ -1055,32 +1087,24 @@ function Legend(): React.JSX.Element {
         </svg>
         Sell
       </span>
-      <span className="inline-flex items-center gap-1.5">
-        <svg width="16" height="4" aria-hidden="true" className="stroke-accent">
-          <line
-            x1="0"
-            x2="16"
-            y1="2"
-            y2="2"
-            strokeWidth="1.5"
-            strokeDasharray="4 3"
+      {trade.plannedTarget === undefined ? null : (
+        <span className="inline-flex items-center gap-1.5">
+          <i
+            aria-hidden="true"
+            className="inline-block size-2.5 border border-gain-fill bg-gain-soft"
           />
-        </svg>
-        Avg entry
-      </span>
-      <span className="inline-flex items-center gap-1.5">
-        <svg width="16" height="4" aria-hidden="true" className="stroke-muted">
-          <line
-            x1="0"
-            x2="16"
-            y1="2"
-            y2="2"
-            strokeWidth="1.5"
-            strokeDasharray="4 3"
+          Target zone
+        </span>
+      )}
+      {trade.plannedStop === undefined ? null : (
+        <span className="inline-flex items-center gap-1.5">
+          <i
+            aria-hidden="true"
+            className="inline-block size-2.5 border border-loss-fill bg-loss-soft"
           />
-        </svg>
-        Avg exit
-      </span>
+          Risk zone
+        </span>
+      )}
     </span>
   );
 }

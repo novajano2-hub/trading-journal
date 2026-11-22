@@ -16,6 +16,7 @@ import type { SampleWorkspace } from '@/data/seed/generate';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import { resolveInstrument } from '@/domain/instruments';
 import type { Execution, Trade } from '@/domain/types';
+import { everyString } from '../__fixtures__/every-string';
 import { renderApp } from '../__fixtures__/render-app';
 import type { NoteEditorHandle } from '../notes/note-editor';
 import { TradeView } from './trade-view';
@@ -476,4 +477,99 @@ test('only looking at a trade never creates its note', async () => {
   await new Promise((r) => setTimeout(r, 900));
   expect((await repo.trades.get(WS, 't-c'))?.noteId).toBeUndefined();
   expect(screen.queryByText('Saved')).toBeNull();
+});
+
+test('under Privacy no amount survives anywhere on the trade page, and the fills readout says hidden amount', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: sample({ initialRisk: 15000, plannedStop: 6304.75, mae: -2079 }),
+  });
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<TradeView id="t-c" />, { repository, url: URL_C });
+  await screen.findByRole('region', { name: 'Trade 1132' });
+  // The Execution header, its stats grid and the executions table.
+  const exec = screen.getByRole('region', { name: 'Execution' });
+  expect(within(exec).getAllByText('hidden amount').length).toBeGreaterThan(0);
+  const marker = screen.getAllByRole('img', { name: /^Buy 3 at/ })[0]!;
+  fireEvent.focus(marker);
+  const readout = screen.getByRole('status', { name: 'Fill readout' });
+  expect(within(readout).getAllByText('hidden amount')).toHaveLength(2);
+  expect(everyString(document.body).filter((s) => /\$\d/.test(s))).toEqual([]);
+});
+
+test('the Execution header hides its per point amount from a screen reader under Privacy', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: sample({ instrument: resolveInstrument('ESZ5')! }),
+  });
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<TradeView id="t-c" />, { repository, url: URL_C });
+  const exec = await screen.findByRole('region', { name: 'Execution' });
+  const head = exec.querySelector('h2')!.parentElement!;
+  expect(head.textContent).toContain('per point');
+  expect(within(head).getByText('hidden amount')).toBeTruthy();
+});
+
+test('the labels of realized R, planned R, MAE and MFE carry their definitions', async () => {
+  renderApp(<TradeView id="t-c" />, {
+    sample: sample({ initialRisk: 15000 }),
+    url: URL_C,
+  });
+  const exec = await screen.findByRole('region', { name: 'Execution' });
+  const tips = (root: Element) =>
+    [...root.querySelectorAll('[data-metric-tip]')].map(
+      (e) => (e as HTMLElement).dataset.metricTip,
+    );
+  expect(tips(exec)).toEqual(
+    expect.arrayContaining(['realized-r', 'planned-r', 'mae', 'mfe']),
+  );
+  const head = screen.getByRole('region', { name: 'Trade 1132' });
+  expect(tips(head)).toEqual(
+    expect.arrayContaining(['pnl', 'net-roi', 'realized-r']),
+  );
+});
+
+test('the planned stop and target are drawn as dashed lines with their zones and legend', async () => {
+  renderApp(<TradeView id="t-c" />, {
+    sample: sample({
+      initialRisk: 15000,
+      plannedStop: 6304.75,
+      plannedTarget: 6319,
+    }),
+    url: URL_C,
+  });
+  const fills = await screen.findByRole('region', { name: 'Fills' });
+  const chart = within(fills).getByRole('group', { name: /^Fills from/ });
+  expect(chart.querySelector('[data-plan="target-zone"]')).not.toBeNull();
+  expect(chart.querySelector('[data-plan="risk-zone"]')).not.toBeNull();
+  expect(chart.querySelector('[data-plan="target-line"]')).not.toBeNull();
+  expect(chart.querySelector('[data-plan="stop-line"]')).not.toBeNull();
+  // happy-dom has no layout, so the chart is at its narrow width and short labels.
+  expect(chart.textContent).toContain('Target');
+  expect(chart.textContent).toContain('6,319.00');
+  expect(chart.textContent).toContain('Stop');
+  expect(chart.textContent).toContain('6,304.75');
+  expect(within(fills).getByText('Target zone')).toBeTruthy();
+  expect(within(fills).getByText('Risk zone')).toBeTruthy();
+});
+
+test('without a plan the chart draws no planned lines and the legend has no zones', async () => {
+  renderApp(<TradeView id="t-c" />, { sample: sample(), url: URL_C });
+  const fills = await screen.findByRole('region', { name: 'Fills' });
+  expect(fills.querySelector('[data-plan]')).toBeNull();
+  expect(within(fills).queryByText('Target zone')).toBeNull();
+});
+
+test('the position strip steps through the running position and ends flat', async () => {
+  renderApp(<TradeView id="t-c" />, { sample: sample(), url: URL_C });
+  const strip = await screen.findByRole('img', {
+    name: 'Position size: 3, then 6, then 3, then flat',
+  });
+  expect(strip.textContent).toContain('max 6');
+  const quantities = [...strip.querySelectorAll('[data-qty]')].map(
+    (e) => e.textContent,
+  );
+  expect(quantities).toEqual(['3', '6', '3']);
 });

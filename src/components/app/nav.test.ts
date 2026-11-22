@@ -4,6 +4,7 @@ import {
   activeItem,
   navHref,
   pageTitle,
+  tradePageId,
   type AppModuleId,
 } from './nav';
 
@@ -42,4 +43,13 @@ test('active item and title', () => {
   expect(activeItem('/app/trades/abc')?.id).toBe('trades');
   expect(pageTitle('/app/prop-firms')).toBe('Prop firms');
   expect(activeItem('/app/nope')).toBeUndefined();
+});
+
+test('tradePageId reads the id of a trade page, decoded, and nothing else', () => {
+  expect(tradePageId('/app/trades/t-c')).toBe('t-c');
+  expect(tradePageId('/app/trades/acc%3AEUR%2FUSD%3Ac')).toBe('acc:EUR/USD:c');
+  expect(tradePageId('/app/trades')).toBeUndefined();
+  expect(tradePageId('/app/trades/new')).toBeUndefined();
+  expect(tradePageId('/app/trades/t-c/edit')).toBeUndefined();
+  expect(tradePageId('/app/notes/t-c')).toBeUndefined();
 });

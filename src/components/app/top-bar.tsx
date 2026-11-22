@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { UploadSimple } from '@phosphor-icons/react/dist/ssr';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { CaretRight, UploadSimple } from '@phosphor-icons/react/dist/ssr';
 import {
+  Suspense,
   useLayoutEffect,
   useRef,
   useState,
@@ -12,7 +13,8 @@ import {
 } from 'react';
 import { RAISED } from '@/components/ui/button-styles';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
-import { pageTitle } from './nav';
+import { useTrade } from '@/data/query/hooks';
+import { pageTitle, tradePageId } from './nav';
 
 /**
  * Where the chips sit from `sm` up: beside the title, or with the controls on
@@ -101,6 +103,38 @@ function useChipsFit({
   return fit;
 }
 
+/** "Trades" as the way back to the log, with the filters it was left with. */
+function BackToTrades(): React.JSX.Element {
+  const search = useSearchParams().toString();
+  return (
+    <Link
+      href={`/app/trades${search ? `?${search}` : ''}`}
+      className="rounded-chip text-faint no-underline outline-offset-2 hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+    >
+      Trades
+    </Link>
+  );
+}
+
+/** The trade's number after the caret; nothing until it loads or when it isn't there. */
+function TradeNumber({ id }: { id: string }): React.JSX.Element | null {
+  const trade = useTrade(id);
+  if (!trade.data) return null;
+  return (
+    <>
+      <CaretRight
+        size={16}
+        aria-hidden="true"
+        className="mx-1 flex-none text-faint"
+      />
+      <span>
+        <span className="sr-only">Trade </span>
+        {trade.data.serial}
+      </span>
+    </>
+  );
+}
+
 /**
  * The bar over every app page, on the canvas with no rule under it. Its
  * source order is its reading order at every
@@ -133,12 +167,17 @@ export function TopBar({
   const tail = useRef<HTMLDivElement>(null);
   const controls = useRef<HTMLDivElement>(null);
   const chips = useRef<HTMLDivElement>(null);
-  const fit = useChipsFit({ bar, title, tail, controls, chips });
+  const tradeId = tradePageId(pathname);
+  const measured = useChipsFit({ bar, title, tail, controls, chips });
+  // A trade page's bar carries no filter chips (its Previous and Next keep the
+  // URL's), so it is laid out as the chips-beside-the-title case.
+  const showFilters = filters && tradeId === undefined;
+  const fit = showFilters ? measured : 'inline';
 
   return (
     <header
       ref={bar}
-      data-chips={filters ? fit : undefined}
+      data-chips={showFilters ? fit : undefined}
       className={`z-30 bg-bg px-5 max-sm:pt-14 sm:sticky sm:top-0 sm:flex sm:items-center sm:gap-x-2 ${FIT.bar[fit]}`}
     >
       {/* Below sm this row is pinned to the top; from sm its items join the bar's. */}
@@ -147,12 +186,24 @@ export function TopBar({
         <h1
           className={`flex h-[68px] min-w-0 flex-1 items-center text-[24px] leading-[1.2] font-[650] tracking-[-0.035em] max-sm:h-auto max-sm:text-[20px] ${FIT.title[fit]}`}
         >
-          <span ref={title} className="truncate">
-            {pageTitle(pathname)}
+          <span
+            ref={title}
+            className={tradeId === undefined ? 'truncate' : 'flex items-center'}
+          >
+            {tradeId === undefined ? (
+              pageTitle(pathname)
+            ) : (
+              <>
+                <Suspense fallback={<span>Trades</span>}>
+                  <BackToTrades />
+                </Suspense>
+                <TradeNumber id={tradeId} />
+              </>
+            )}
           </span>
         </h1>
       </div>
-      {filters ? (
+      {showFilters ? (
         <>
           {/* Ends the title's row when the chips lead the next. */}
           <div

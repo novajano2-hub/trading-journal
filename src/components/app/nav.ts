@@ -234,3 +234,14 @@ export function activeItem(pathname: string): NavItem | undefined {
 export function pageTitle(pathname: string): string {
   return activeItem(pathname)?.label ?? 'Keel';
 }
+
+/** The trade id when `pathname` is one trade's page (not the log, the new-trade form or an edit), decoded. */
+export function tradePageId(pathname: string): string | undefined {
+  const m = /^\/app\/trades\/([^/]+)$/.exec(pathname);
+  if (!m || m[1] === 'new') return undefined;
+  try {
+    return decodeURIComponent(m[1]!);
+  } catch {
+    return m[1];
+  }
+}
