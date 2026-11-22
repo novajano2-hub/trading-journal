@@ -1,3 +1,4 @@
+import { localDate } from '@/domain/time';
 import type { Cents, Instrument } from '@/domain/types';
 
 function currencyString(cents: Cents, currency: string): string {
@@ -83,7 +84,11 @@ const MONTH_CODES = 'FGHJKMNQUVXZ';
 export interface InstrumentLabel {
   /** "TSLA 370 Put", "ES Dec 26", or the symbol as traded. */
   name: string;
-  /** An option's expiry, "20 Nov", with the year ("15 Jan 27") when it isn't the trade's. */
+  /**
+   * An option's expiry, "20 Nov", with the year ("15 Jan 27") when it isn't the
+   * trade's. Left out when it is the day the trade opened: a same-day option
+   * says nothing more by repeating it.
+   */
   detail?: string;
 }
 
@@ -92,11 +97,13 @@ export interface InstrumentLabel {
  * expiry beside it, a future as its root and contract month (the root is what
  * the Symbol filter matches). Stocks, forex and crypto read as traded, and so
  * does anything without the fields to decode. `tradedAt` (an ISO time) places
- * a one-digit contract year in its decade; it defaults to now.
+ * a one-digit contract year in its decade; it defaults to now. `timeZone` is
+ * the zone the trade's day is read in (UTC by default).
  */
 export function formatInstrument(
   instrument: Instrument,
   tradedAt: string = new Date().toISOString(),
+  timeZone = 'UTC',
 ): InstrumentLabel {
   const tradeYear = Number(tradedAt.slice(0, 4));
   const { symbol, underlying, strike, right, expiry } = instrument;
@@ -115,10 +122,9 @@ export function formatInstrument(
     }).format(strike);
     const yearText =
       year === tradeYear ? '' : ` ${String(year % 100).padStart(2, '0')}`;
-    return {
-      name: `${underlying} ${strikeText} ${right === 'put' ? 'Put' : 'Call'}`,
-      detail: `${day} ${MONTHS[month - 1] ?? ''}${yearText}`,
-    };
+    const name = `${underlying} ${strikeText} ${right === 'put' ? 'Put' : 'Call'}`;
+    if (expiry === localDate(tradedAt, timeZone)) return { name };
+    return { name, detail: `${day} ${MONTHS[month - 1] ?? ''}${yearText}` };
   }
 
   if (instrument.assetClass === 'future') {
@@ -160,4 +166,20 @@ export function keepHyphens(text: string): string {
 /** The noun for `n` of a thing: `one` for exactly one, else `many` ("trade", "trades"). */
 export function plural(n: number, one: string, many = `${one}s`): string {
   return n === 1 ? one : many;
+}
+
+/**
+ * How long a trade was held: "45s", "25m 19s", "1h 34m", "2d 3h". The two
+ * largest units, so a long hold never reads to the second.
+ */
+export function formatDuration(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const d = Math.floor(total / 86_400);
+  const h = Math.floor((total % 86_400) / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${String(s).padStart(2, '0')}s`;
+  return `${s}s`;
 }

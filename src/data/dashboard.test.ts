@@ -85,9 +85,10 @@ test('a recent trade in two strategies names both', () => {
     ],
     { accounts: s.accounts, ctx, baseCurrency: 'USD' },
   );
-  expect(buildDashboard(m!, env(ctx)).recent[0]!.strategyName).toBe(
-    `${a!.name}, ${b!.name}`,
-  );
+  expect(buildDashboard(m!, env(ctx)).recent[0]!.strategyNames).toEqual([
+    a!.name,
+    b!.name,
+  ]);
 });
 
 test('goals need the base currency, and are absent when unset', () => {
@@ -269,7 +270,7 @@ test('imported trades with no strategy and no rule checks (Review Focus 1)', () 
   expect(d.mistakes).toEqual([]);
   expect(
     d.recent.every(
-      (r) => r.rules.kind === 'ungraded' && r.strategyName === null,
+      (r) => r.rules.kind === 'ungraded' && r.strategyNames.length === 0,
     ),
   ).toBe(true);
   const p = d.performance;

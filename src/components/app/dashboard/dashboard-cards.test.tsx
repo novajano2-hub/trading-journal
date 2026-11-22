@@ -440,9 +440,10 @@ test('recent trades: newest first, with the rules column', async () => {
     .map((h) => h.textContent);
   expect(headers).toEqual([
     'Time',
-    'Symbol',
+    'Instrument',
     'Side',
     'Strategy',
+    'Mistake',
     'Net P&L',
     'Rules',
   ]);
@@ -551,6 +552,7 @@ test('every metric carries its definition', async () => {
   ids.push(...tips(await screen.findByRole('dialog')));
   // Defined ahead of the screens that show them (Plan 5, later tasks).
   const notOnDashboard = new Set<string>([
+    'trades',
     'net-roi',
     'sharpe',
     'sortino',

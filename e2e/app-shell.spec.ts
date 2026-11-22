@@ -34,13 +34,15 @@ test('every app route renders its title without overflow; placeholders state it 
     await page.goto(path);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(title);
     if (path === '/app/dashboard') await ready(page);
+    if (path === '/app/trades')
+      await expect(page.getByRole('table', { name: 'Trades' })).toBeVisible();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth - innerWidth,
       ),
       path,
     ).toBeLessThanOrEqual(0);
-    if (!['/app/dashboard', '/app/import'].includes(path)) {
+    if (!['/app/dashboard', '/app/import', '/app/trades'].includes(path)) {
       await expect(page.locator('main')).toContainText(
         /isn't (built|live) yet\./,
       );

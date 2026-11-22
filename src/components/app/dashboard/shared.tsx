@@ -108,20 +108,28 @@ export function TradeTime({
 
 /**
  * The instrument in words, "TSLA 370 Put" with the root in weight, the
- * contract muted and its expiry faint beside it, or "ES Dec 26". The title
+ * contract muted and its expiry faint beside it (left out when it is the day the
+ * trade opened), or "ES Dec 26". The title
  * keeps the symbol as traded. Where a table folds the trade's time under the
  * symbol, `detailClassName` hides the expiry, so the two dates never stack.
  */
 export function InstrumentName({
   trade,
+  timeZone,
   className = '',
   detailClassName = '',
 }: {
   trade: Trade;
+  /** The zone the trade's open day is read in: an option's expiry shows only when it is another day. */
+  timeZone?: string;
   className?: string;
   detailClassName?: string;
 }): React.JSX.Element {
-  const { name, detail } = formatInstrument(trade.instrument, trade.openedAt);
+  const { name, detail } = formatInstrument(
+    trade.instrument,
+    trade.openedAt,
+    timeZone,
+  );
   // Only a name Keel composed (an option, a dated future) splits into root and contract.
   const at = name === trade.instrument.symbol ? -1 : name.indexOf(' ');
   return (

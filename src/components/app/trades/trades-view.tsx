@@ -1,0 +1,726 @@
+'use client';
+
+import { useQueryClient } from '@tanstack/react-query';
+import { useTable, type SortingState } from '@tanstack/react-table';
+import Link from 'next/link';
+import { useMemo, useState } from 'react';
+import {
+  CaretDown,
+  CaretLeft,
+  CaretRight,
+  CaretUp,
+  DownloadSimple,
+  FunnelSimple,
+  MagnifyingGlass,
+  Plus,
+  Table as TableIcon,
+  Warning,
+} from '@phosphor-icons/react/dist/ssr';
+import { Button } from '@/components/ui/button';
+import { buttonClasses } from '@/components/ui/button-styles';
+import { IconTile } from '@/components/ui/icon-tile';
+import { Segmented } from '@/components/ui/segmented';
+import { tradesCsv } from '@/data/csv-export';
+import { EMPTY_FILTERS, resolveRange } from '@/data/filters';
+import { metricContextOf } from '@/data/metrics';
+import { useGlobalFilters, useTradeSet } from '@/data/query/derived';
+import {
+  useAccounts,
+  usePrefs,
+  useStrategies,
+  useTagCategories,
+  useTags,
+  useTrades,
+  useUpdatePrefs,
+} from '@/data/query/hooks';
+import { StorageUnavailableError } from '@/data/repository';
+import {
+  COLUMN_LABELS,
+  DEFAULT_COLUMNS,
+  sanitizeColumns,
+  type ColumnId,
+} from '@/data/trade-columns';
+import { rowFacts, type RowFacts } from '@/data/trade-rows';
+import { summarize } from '@/domain/metrics/summary';
+import { isClosed } from '@/domain/trade-status';
+import { localDate } from '@/domain/time';
+import type { Trade } from '@/domain/types';
+import {
+  meanFigure,
+  pctBaseOf,
+  sumFigures,
+  tradeFigure,
+  useDisplay,
+} from '@/lib/display';
+import { plural } from '@/lib/format';
+import { rangeCaption } from '@/lib/range-label';
+import { hasActiveFilters } from '../filter-model';
+import { CARD } from '../dashboard/shared';
+import { ALIGN, buildColumns, features, type CellEnv } from './columns';
+import { ColumnsMenu } from './columns-menu';
+import { SummaryStrip } from './summary-strip';
+
+const PAGE_SIZE = 50;
+const NEWEST_OPEN: SortingState = [{ id: 'open', desc: true }];
+
+type Status = 'closed' | 'open';
+type Review = 'all' | 'unreviewed' | 'reviewed';
+
+/** Newest open first: the order the rows keep when no sorted column is shown. */
+function byNewest(a: Trade, b: Trade): number {
+  return Date.parse(b.openedAt) - Date.parse(a.openedAt) || b.serial - a.serial;
+}
+
+/** Whether a trade matches the search: symbol, #serial, strategy and tag names. */
+function matches(t: Trade, query: string, facts: RowFacts): boolean {
+  if (query.startsWith('#')) {
+    const serial = query.slice(1);
+    return /^\d+$/.test(serial) && t.serial === Number(serial);
+  }
+  const hay = [
+    t.instrument.symbol,
+    t.instrument.root,
+    t.instrument.underlying ?? '',
+    ...facts.strategyNames(t),
+    ...facts.tagsOf(t).map((x) => x.name),
+    ...facts.mistakesOf(t),
+  ];
+  return hay.some((h) => h.toLowerCase().includes(query));
+}
+
+/** The pages to show as buttons: the first, the last and the current with its neighbours; `null` is a gap. */
+function pageButtons(index: number, count: number): (number | null)[] {
+  const wanted = [...new Set([0, index - 1, index, index + 1, count - 1])]
+    .filter((p) => p >= 0 && p < count)
+    .sort((a, b) => a - b);
+  const out: (number | null)[] = [];
+  wanted.forEach((p, i) => {
+    if (i > 0 && p - wanted[i - 1]! > 1) out.push(null);
+    out.push(p);
+  });
+  return out;
+}
+
+function StateBlock({
+  icon,
+  title,
+  body,
+  actions,
+  role,
+}: {
+  icon: typeof FunnelSimple;
+  title: string;
+  body?: string;
+  actions?: React.ReactNode;
+  role?: 'alert';
+}): React.JSX.Element {
+  return (
+    <div
+      role={role}
+      className="mx-auto flex w-full max-w-[520px] flex-col items-center px-5 py-16 text-center"
+    >
+      <IconTile icon={icon} />
+      <h2 className="mt-5 text-[17px] leading-snug font-semibold tracking-[-0.015em] text-balance text-text">
+        {title}
+      </h2>
+      {body ? (
+        <p className="mt-2 text-[15px] leading-[1.6] text-pretty text-muted">
+          {body}
+        </p>
+      ) : null}
+      {actions ? (
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          {actions}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Skeleton(): React.JSX.Element {
+  return (
+    <div
+      role="status"
+      aria-label="Loading your trades"
+      className="flex flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0"
+    >
+      <div className={`${CARD} h-[104px]`} aria-hidden="true" />
+      <div className={`${CARD} h-[480px]`} aria-hidden="true" />
+    </div>
+  );
+}
+
+function SortMark({
+  state,
+}: {
+  state: false | 'asc' | 'desc';
+}): React.JSX.Element {
+  const Mark = state === 'asc' ? CaretUp : CaretDown;
+  return (
+    <Mark
+      size={11}
+      weight="bold"
+      aria-hidden="true"
+      className={`flex-none transition-opacity duration-200 ${state ? 'text-text' : 'opacity-0 group-hover/sort:opacity-60'}`}
+    />
+  );
+}
+
+/** Saves a CSV as a download, named keel-trades-YYYY-MM-DD.csv. */
+function download(csv: string, day: string): void {
+  // The byte order mark makes Excel read it as UTF-8.
+  const url = URL.createObjectURL(
+    new Blob(['﻿', csv], { type: 'text/csv;charset=utf-8' }),
+  );
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `keel-trades-${day}.csv`;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * The trade log on the URL's filters. Render inside `<Suspense>`: it reads the
+ * search params. The Closed / Open switch writes the `status` filter (closed
+ * when it is absent); a summary strip of the closed trades sits above the
+ * table, which sorts by any column and pages at 50.
+ */
+export function TradesView(): React.JSX.Element {
+  const { filters, setFilters } = useGlobalFilters();
+  // Every status and review state: the switches' counts need both sides of each.
+  const set = useTradeSet({
+    ...filters,
+    status: undefined,
+    reviewed: undefined,
+  });
+  const allTrades = useTrades().data;
+  const prefs = usePrefs().data;
+  const accounts = useAccounts().data;
+  const strategies = useStrategies().data;
+  const tags = useTags().data;
+  const categories = useTagCategories().data;
+  const updatePrefs = useUpdatePrefs();
+  const queryClient = useQueryClient();
+  const display = useDisplay();
+
+  const [search, setSearch] = useState('');
+  const [sorting, setSorting] = useState<SortingState>(NEWEST_OPEN);
+  const [pagination, setPagination] = useState({
+    pageIndex: 0,
+    pageSize: PAGE_SIZE,
+  });
+
+  // A pending save shows at once, as the Display menu's does.
+  const pendingColumns = updatePrefs.isPending
+    ? updatePrefs.variables?.tradeColumns
+    : undefined;
+  const columnIds: ColumnId[] = useMemo(
+    () => sanitizeColumns(pendingColumns ?? prefs?.tradeColumns),
+    [pendingColumns, prefs?.tradeColumns],
+  );
+  const hideSummary =
+    (updatePrefs.isPending
+      ? updatePrefs.variables?.hideTradeSummary
+      : undefined) ??
+    prefs?.hideTradeSummary ??
+    false;
+
+  const timeZone = prefs?.timeZone;
+  const ctx = useMemo(
+    () => (prefs ? metricContextOf(prefs) : undefined),
+    [prefs],
+  );
+  const facts = useMemo(
+    () =>
+      timeZone && accounts && strategies && tags && categories
+        ? rowFacts({
+            timeZone,
+            accounts,
+            strategies,
+            tags,
+            categories,
+          })
+        : undefined,
+    [timeZone, accounts, strategies, tags, categories],
+  );
+
+  const status: Status = filters.status ?? 'closed';
+  const review: Review =
+    filters.reviewed === undefined
+      ? 'all'
+      : filters.reviewed
+        ? 'reviewed'
+        : 'unreviewed';
+
+  const model = useMemo(() => {
+    const trades = set.data?.trades;
+    if (!trades || !facts) return undefined;
+    const closed = trades.filter(isClosed);
+    const open = trades.filter((t) => t.status === 'open');
+    const inStatus = status === 'open' ? open : closed;
+    const reviewedCount = inStatus.filter((t) => t.reviewed === true).length;
+    const byReview = (list: Trade[]) =>
+      filters.reviewed === undefined
+        ? list
+        : list.filter((t) => (t.reviewed === true) === filters.reviewed);
+    const query = search.trim().toLowerCase();
+    const inReview = byReview(inStatus);
+    const rows = (
+      query === '' ? inReview : inReview.filter((t) => matches(t, query, facts))
+    )
+      .slice()
+      .sort(byNewest);
+    return {
+      closedCount: closed.length,
+      openCount: open.length,
+      reviewedCount,
+      unreviewedCount: inStatus.length - reviewedCount,
+      /** The strip: closed trades in the filters, the review switch included. */
+      stripTrades: byReview(closed),
+      rows,
+    };
+  }, [set.data?.trades, facts, status, filters.reviewed, search]);
+
+  const rows = model?.rows ?? NO_ROWS;
+  const cellEnv: CellEnv | undefined = useMemo(
+    () =>
+      ctx && timeZone && facts ? { timeZone, ctx, display, facts } : undefined,
+    [ctx, timeZone, facts, display],
+  );
+  const columns = useMemo(
+    () => (cellEnv ? buildColumns(columnIds, cellEnv) : []),
+    [columnIds, cellEnv],
+  );
+
+  const table = useTable({
+    features,
+    columns,
+    data: rows,
+    state: { sorting, pagination },
+    onSortingChange: setSorting,
+    onPaginationChange: setPagination,
+    enableSortingRemoval: false,
+    getRowId: (t) => t.id,
+  });
+
+  const error = set.error;
+  if (error) {
+    return (
+      <StateBlock
+        role="alert"
+        icon={Warning}
+        title={
+          error instanceof StorageUnavailableError
+            ? "Keel can't open storage in this browser, so your workspace can't load."
+            : "Your trades couldn't load."
+        }
+        actions={
+          <Button
+            variant="secondary"
+            onClick={() => {
+              if (error instanceof StorageUnavailableError)
+                window.location.reload();
+              else void queryClient.resetQueries({ queryKey: ['keel'] });
+            }}
+          >
+            Try again
+          </Button>
+        }
+      />
+    );
+  }
+  if (
+    !model ||
+    !allTrades ||
+    !prefs ||
+    !accounts ||
+    !ctx ||
+    !timeZone ||
+    !facts ||
+    !cellEnv
+  )
+    return <Skeleton />;
+
+  if (allTrades.length === 0)
+    return (
+      <StateBlock
+        icon={TableIcon}
+        title="No trades yet."
+        body="Import a CSV from your broker, or enter a trade by hand."
+        actions={
+          <>
+            <Link href="/app/import" className={buttonClasses('primary')}>
+              Import
+            </Link>
+            <Link href="/app/trades/new" className={buttonClasses('secondary')}>
+              Add a trade
+            </Link>
+          </>
+        }
+      />
+    );
+
+  const today = localDate(new Date().toISOString(), timeZone);
+  const range = resolveRange(set.data?.filters.range ?? {}, today);
+  const filtered =
+    hasActiveFilters(filters) ||
+    filters.status !== undefined ||
+    filters.reviewed !== undefined ||
+    search.trim() !== '';
+
+  const savePrefs = (patch: Parameters<typeof updatePrefs.mutate>[0]) =>
+    updatePrefs.mutate(patch);
+
+  // The strip: the base currency's closed trades, or the first one with any.
+  const currencies = [...new Set(model.stripTrades.map((t) => t.pnlCurrency))];
+  const stripCurrency = currencies.includes(prefs.baseCurrency)
+    ? prefs.baseCurrency
+    : (currencies[0] ?? prefs.baseCurrency);
+  const stripTrades = model.stripTrades.filter(
+    (t) => t.pnlCurrency === stripCurrency,
+  );
+  const summary = summarize(stripTrades, ctx);
+  const pctBase = pctBaseOf({
+    accounts,
+    trades: allTrades,
+    accountIds: set.data?.filters.accountIds ?? [],
+    currency: stripCurrency,
+    from: range.from,
+    timeZone,
+  });
+  const figures = stripTrades.map((t) => tradeFigure(t, ctx));
+  const basisMoney =
+    ctx.pnlBasis === 'gross' ? summary.grossPnl : summary.netPnl;
+  const pnlFigure = {
+    ...sumFigures(figures, pctBase),
+    money: basisMoney,
+    pct: pctBase ? basisMoney / pctBase : null,
+  };
+  const expectancyFigure =
+    summary.expectancy === null
+      ? null
+      : {
+          ...meanFigure(figures, pctBase),
+          money: summary.expectancy,
+          pct: pctBase ? summary.expectancy / pctBase : null,
+        };
+  const pnl = {
+    ...display.figure(pnlFigure, true, stripCurrency),
+    cents: basisMoney,
+  };
+
+  const page = table.getRowModel().rows;
+  const total = rows.length;
+  const from = pagination.pageIndex * PAGE_SIZE + 1;
+  const to = Math.min(total, from + page.length - 1);
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const exportCsv = () =>
+    download(
+      tradesCsv(rows, columnIds, {
+        timeZone,
+        accounts,
+        strategies: strategies ?? [],
+        tags: tags ?? [],
+        categories: categories ?? [],
+      }),
+      today,
+    );
+
+  return (
+    <div className="flex min-w-0 flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0">
+      {hideSummary ? (
+        <div className="flex">
+          <button
+            type="button"
+            onClick={() => savePrefs({ hideTradeSummary: false })}
+            className="inline-flex h-8 items-center rounded-chip px-2 text-[12.5px] font-semibold text-accent-ink hover:bg-accent-soft focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11"
+          >
+            Show summary
+          </button>
+        </div>
+      ) : (
+        <SummaryStrip
+          summary={summary}
+          basis={ctx.pnlBasis}
+          pnl={pnl}
+          fees={display.cash(summary.fees, false, stripCurrency)}
+          expectancy={
+            expectancyFigure === null || summary.expectancy === null
+              ? null
+              : {
+                  ...display.figure(expectancyFigure, true, stripCurrency),
+                  cents: summary.expectancy,
+                }
+          }
+          openCount={model.openCount}
+          scope={rangeCaption(range, today)}
+          otherCurrencies={model.stripTrades.length - stripTrades.length}
+          onHide={() => savePrefs({ hideTradeSummary: true })}
+        />
+      )}
+
+      <section
+        aria-label="Trade log"
+        className={`${CARD} min-w-0 overflow-hidden`}
+      >
+        <div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-3">
+          <Segmented<Status>
+            label="Status"
+            coarseTargets
+            value={status}
+            options={[
+              { value: 'closed', label: `Closed ${model.closedCount}` },
+              { value: 'open', label: `Open ${model.openCount}` },
+            ]}
+            onChange={(next) => {
+              setFilters({
+                ...filters,
+                status: next === 'closed' ? undefined : next,
+              });
+            }}
+          />
+          <Segmented<Review>
+            label="Review"
+            coarseTargets
+            value={review}
+            options={[
+              { value: 'all', label: 'All' },
+              {
+                value: 'unreviewed',
+                label: `Not reviewed ${model.unreviewedCount}`,
+              },
+              { value: 'reviewed', label: `Reviewed ${model.reviewedCount}` },
+            ]}
+            onChange={(next) =>
+              setFilters({
+                ...filters,
+                reviewed: next === 'all' ? undefined : next === 'reviewed',
+              })
+            }
+          />
+          <label className="relative min-w-[180px] flex-1 sm:max-w-[280px]">
+            <MagnifyingGlass
+              size={15}
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-faint"
+            />
+            <input
+              type="search"
+              aria-label="Search trades"
+              placeholder="Symbol, #serial, strategy, tag"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPagination((p) => ({ ...p, pageIndex: 0 }));
+              }}
+              className="h-[34px] w-full rounded-control border border-line bg-surface-1 pr-3 pl-9 text-[13.5px] text-text placeholder:text-faint hover:border-accent/35 focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11"
+            />
+          </label>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <ColumnsMenu
+              columns={columnIds}
+              onChange={(next) => savePrefs({ tradeColumns: next })}
+              onReset={() => savePrefs({ tradeColumns: [...DEFAULT_COLUMNS] })}
+            />
+            <button
+              type="button"
+              onClick={exportCsv}
+              disabled={rows.length === 0}
+              className="inline-flex h-[34px] items-center gap-1.5 rounded-control border border-line bg-surface-1 px-3 text-[13.5px] font-medium whitespace-nowrap text-muted shadow-[0_1px_1px_rgb(18_22_51/0.04)] transition-[border-color] duration-200 ease-(--ease-glide) hover:border-accent/35 focus-visible:outline-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-50 pointer-coarse:h-11"
+            >
+              <DownloadSimple
+                size={16}
+                aria-hidden="true"
+                className="text-faint"
+              />
+              Export CSV
+            </button>
+            <Link
+              href="/app/trades/new"
+              className={`${buttonClasses('primary', 'sm')} gap-1.5 px-3.5 text-[13.5px] pointer-coarse:h-11`}
+            >
+              <Plus size={14} weight="bold" aria-hidden="true" />
+              Add trade
+            </Link>
+          </div>
+        </div>
+
+        {rows.length === 0 ? (
+          filtered ? (
+            <StateBlock
+              icon={FunnelSimple}
+              title="No trades match these filters."
+              actions={
+                <Button
+                  onClick={() => {
+                    setSearch('');
+                    setFilters(EMPTY_FILTERS);
+                  }}
+                >
+                  Clear filters
+                </Button>
+              }
+            />
+          ) : (
+            <StateBlock
+              icon={TableIcon}
+              title={`No ${status} trades yet.`}
+              body={
+                status === 'closed'
+                  ? 'Open positions show here once they close.'
+                  : 'Every position is closed.'
+              }
+            />
+          )
+        ) : (
+          <>
+            <div className="relative overflow-x-auto px-4">
+              <table
+                aria-label="Trades"
+                className="w-full border-collapse text-[13px] whitespace-nowrap [font-stretch:90%]"
+              >
+                <thead>
+                  {table.getHeaderGroups().map((group) => (
+                    <tr key={group.id}>
+                      {group.headers.map((header) => {
+                        const id = header.column.id as ColumnId;
+                        const sorted = header.column.getIsSorted();
+                        const align = ALIGN[id];
+                        const canSort = header.column.getCanSort();
+                        return (
+                          <th
+                            key={header.id}
+                            scope="col"
+                            aria-sort={
+                              canSort
+                                ? sorted === 'asc'
+                                  ? 'ascending'
+                                  : sorted === 'desc'
+                                    ? 'descending'
+                                    : 'none'
+                                : undefined
+                            }
+                            className={`h-10 border-b border-line pr-[7px] align-middle text-xs font-medium text-faint last:pr-0 ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'}`}
+                          >
+                            {canSort ? (
+                              <button
+                                type="button"
+                                onClick={header.column.getToggleSortingHandler()}
+                                className={`group/sort -mx-1.5 inline-flex h-7 items-center gap-1 rounded-chip px-1.5 font-medium text-faint outline-offset-0 hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 ${align === 'right' ? 'flex-row-reverse' : ''}`}
+                              >
+                                {COLUMN_LABELS[id].label}
+                                <SortMark state={sorted} />
+                              </button>
+                            ) : (
+                              COLUMN_LABELS[id].label
+                            )}
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </thead>
+                <tbody>
+                  {page.map((row) => (
+                    <tr
+                      key={row.id}
+                      className="h-[38px] border-t border-line/70 text-text transition-colors duration-200 ease-(--ease-glide) first:border-t-0 hover:bg-sunken/60"
+                    >
+                      {row.getAllCells().map((cell) => {
+                        const id = cell.column.id as ColumnId;
+                        const align = ALIGN[id];
+                        return (
+                          <td
+                            key={cell.id}
+                            className={`max-w-[200px] py-1 pr-[7px] last:pr-0 ${align === 'right' ? 'text-right tabular-nums' : align === 'center' ? 'text-center' : 'text-left'}`}
+                          >
+                            <table.FlexRender cell={cell} />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-line px-5 py-3 text-[12.5px] text-faint">
+              <p>
+                <span className="tabular-nums">
+                  {from}-{to} of {total}
+                </span>{' '}
+                {status} {plural(total, 'trade')}
+              </p>
+              <nav
+                aria-label="Pages"
+                className="ml-auto flex items-center gap-0.5"
+              >
+                <PageButton
+                  label="Previous page"
+                  disabled={pagination.pageIndex === 0}
+                  onClick={() => table.previousPage()}
+                >
+                  <CaretLeft size={14} aria-hidden="true" />
+                </PageButton>
+                {pageButtons(pagination.pageIndex, pageCount).map((p, i) =>
+                  p === null ? (
+                    <span key={`gap-${i}`} aria-hidden="true" className="px-1">
+                      ...
+                    </span>
+                  ) : (
+                    <PageButton
+                      key={p}
+                      label={`Page ${p + 1}`}
+                      current={p === pagination.pageIndex}
+                      onClick={() => table.setPageIndex(p)}
+                    >
+                      {p + 1}
+                    </PageButton>
+                  ),
+                )}
+                <PageButton
+                  label="Next page"
+                  disabled={pagination.pageIndex >= pageCount - 1}
+                  onClick={() => table.nextPage()}
+                >
+                  <CaretRight size={14} aria-hidden="true" />
+                </PageButton>
+              </nav>
+            </div>
+          </>
+        )}
+      </section>
+    </div>
+  );
+}
+
+const NO_ROWS: Trade[] = [];
+
+function PageButton({
+  label,
+  disabled,
+  current,
+  onClick,
+  children,
+}: {
+  label: string;
+  disabled?: boolean;
+  current?: boolean;
+  onClick(): void;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-current={current ? 'page' : undefined}
+      disabled={disabled}
+      onClick={onClick}
+      className={`grid h-[30px] min-w-[30px] place-items-center rounded-[8px] px-1 text-[13px] font-medium tabular-nums text-muted outline-offset-0 hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-40 pointer-coarse:h-11 pointer-coarse:min-w-11 ${current ? 'bg-surface-1 font-semibold text-text shadow-[var(--shadow-chip),inset_0_0_0_1px_var(--line)]' : ''}`}
+    >
+      {children}
+    </button>
+  );
+}

@@ -9,6 +9,7 @@ export const METRIC_IDS = [
   'mistake-cost',
   'weekly-goal',
   'daily-loss-limit',
+  'trades',
   'pnl',
   'win-rate',
   'profit-factor',
@@ -64,6 +65,11 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Daily loss limit',
     definition:
       'A day breaks the limit when its net P&L after fees falls below minus the limit. A day exactly at the limit keeps it. Always net.',
+  },
+  trades: {
+    label: 'Trades',
+    definition:
+      "Closed trades in your filters. Open positions are counted apart, and aren't in the figures beside it.",
   },
   pnl: {
     label: '{Basis} P&L',

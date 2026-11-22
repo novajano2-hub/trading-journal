@@ -109,26 +109,37 @@ function RulesCell({ rules }: { rules: TradeRulesSummary }): React.JSX.Element {
   );
 }
 
-/** Strategy name (or "No strategy"), then the first mistake and how many more. */
+/** The strategy names: the first, then how many more (all of them in the title and to a screen reader). */
 function StrategyCell({ row }: { row: RecentTrade }): React.JSX.Element {
-  const [first, ...rest] = row.mistakes;
+  if (row.strategyNames.length === 0)
+    return <span className="text-faint">No strategy</span>;
+  const [first, ...rest] = row.strategyNames;
   return (
-    <span className="flex min-w-0 items-center gap-2">
-      {row.strategyName !== null ? (
-        <span title={row.strategyName} className="min-w-0 truncate">
-          {row.strategyName}
-        </span>
-      ) : (
-        <span className="min-w-0 truncate text-faint">No strategy</span>
-      )}
-      {first !== undefined ? (
-        <>
-          <span className="sr-only">Mistakes:</span>
-          <Chip tone="warn" className="max-w-[55%] flex-none">
-            <span className="truncate">{first}</span>
-          </Chip>
-        </>
+    <span
+      title={row.strategyNames.join(', ')}
+      className="flex min-w-0 items-center gap-2"
+    >
+      <span className="min-w-0 truncate">{first}</span>
+      {rest.length > 0 ? (
+        <Chip className="flex-none tabular-nums">
+          <span aria-hidden="true">+{rest.length}</span>
+          <span className="sr-only">and {listOf(rest)}</span>
+        </Chip>
       ) : null}
+    </span>
+  );
+}
+
+/** The first mistake in a warn chip, then how many more; nothing when the trade has none. */
+function MistakeCell({ row }: { row: RecentTrade }): React.JSX.Element | null {
+  const [first, ...rest] = row.mistakes;
+  if (first === undefined) return null;
+  return (
+    <span className="flex min-w-0 items-center gap-1.5">
+      <span className="sr-only">Mistakes:</span>
+      <Chip tone="warn" className="max-w-full min-w-0">
+        <span className="truncate">{first}</span>
+      </Chip>
       {rest.length > 0 ? (
         <span title={rest.join(', ')} className="flex-none">
           <Chip className="tabular-nums">
@@ -193,7 +204,7 @@ export function RecentTrades({
               scope="col"
               className={`${TH} w-[100px] md:w-32 md:pl-4 xl:w-[176px]`}
             >
-              Symbol
+              Instrument
             </th>
             <th scope="col" className={`${TH} ${GAP} w-[78px] max-sm:hidden`}>
               Side
@@ -201,9 +212,15 @@ export function RecentTrades({
             <th
               scope="col"
               // 90rem, not 1440px: Tailwind orders min-[...] against xl (80rem) only in the same unit.
-              className={`${TH} ${GAP} w-32 max-sm:hidden lg:w-36 xl:w-[180px] min-[90rem]:w-[272px]`}
+              className={`${TH} ${GAP} w-28 max-sm:hidden lg:w-32 xl:w-[136px] min-[90rem]:w-[208px]`}
             >
               Strategy
+            </th>
+            <th
+              scope="col"
+              className={`${TH} ${GAP} w-28 max-sm:hidden lg:w-32 xl:w-[136px] min-[90rem]:w-[172px]`}
+            >
+              Mistake
             </th>
             <th
               scope="col"
@@ -232,6 +249,7 @@ export function RecentTrades({
                 <td className="py-1.5 md:pl-4 xl:py-0">
                   <InstrumentName
                     trade={t}
+                    timeZone={timeZone}
                     className="xl:flex-nowrap"
                     detailClassName="max-md:hidden"
                   />
@@ -242,6 +260,9 @@ export function RecentTrades({
                 </td>
                 <td className={`${GAP} max-sm:hidden`}>
                   <StrategyCell row={row} />
+                </td>
+                <td className={`${GAP} max-sm:hidden`}>
+                  <MistakeCell row={row} />
                 </td>
                 <td
                   className={`${GAP} ${FIGURE} text-right whitespace-nowrap ${signTone(pnl)}`}

@@ -268,6 +268,7 @@ function TradesTable({
                     {/* The title and the Kept box's label keep the symbol as traded; below sm the time takes the expiry's place. */}
                     <InstrumentName
                       trade={t}
+                      timeZone={timeZone}
                       className="sm:flex-nowrap"
                       detailClassName="max-sm:hidden"
                     />

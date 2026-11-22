@@ -68,8 +68,8 @@ export function tradeRulesSummary(
 
 export interface RecentTrade {
   trade: Trade;
-  /** The names of its known strategies, joined with commas; null with none. */
-  strategyName: string | null;
+  /** The names of its known strategies, in the trade's order. */
+  strategyNames: string[];
   mistakes: string[];
   rules: TradeRulesSummary;
 }
@@ -174,10 +174,9 @@ export function buildDashboard(
     .slice(0, RECENT_TRADE_COUNT)
     .map((trade) => ({
       trade,
-      strategyName:
-        trade.strategyIds
-          .flatMap((id) => strategyName.get(id) ?? [])
-          .join(', ') || null,
+      strategyNames: trade.strategyIds.flatMap(
+        (id) => strategyName.get(id) ?? [],
+      ),
       mistakes: trade.tagIds.flatMap((id) => mistakeTag.get(id) ?? []),
       rules: tradeRulesSummary(trade, ruleText),
     }));
