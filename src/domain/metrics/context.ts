@@ -8,6 +8,23 @@ export interface MetricContext {
   timeZone: string;
   breakevenRange: BreakevenRange;
   pnlBasis: PnlBasis;
+  /**
+   * The date filter, resolved (inclusive local dates; an open end is open).
+   * Day-level figures take only the realizations and fills dated inside it;
+   * trade-level sets are already chosen by the filters.
+   */
+  range?: { from?: string; to?: string };
+}
+
+/** Whether a local date falls inside `range` (always, when there is none). */
+export function inRange(
+  date: string,
+  range: { from?: string; to?: string } | undefined,
+): boolean {
+  if (!range) return true;
+  if (range.from !== undefined && date < range.from) return false;
+  if (range.to !== undefined && date > range.to) return false;
+  return true;
 }
 
 export function defaultMetricContext(timeZone: string): MetricContext {

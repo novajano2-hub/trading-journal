@@ -233,7 +233,9 @@ test('Tab walks the top bar in the order it reads: title, chips, search, Gross/N
   await ready(page);
   await walkBar(page, before, [
     ...menu,
-    ...['All time', 'Symbol', 'Side', 'Strategy', 'Tags'].map(chip),
+    ...['All time', 'Symbol', 'Side', 'Strategy', 'Tags', 'More filters'].map(
+      chip,
+    ),
     ...tail,
   ]);
 
@@ -249,6 +251,7 @@ test('Tab walks the top bar in the order it reads: title, chips, search, Gross/N
       'Short',
       'Opening range breakout',
       'Trend continuation',
+      'More filters',
       'Clear filters',
     ].map(chip),
     ...tail,

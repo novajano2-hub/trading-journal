@@ -34,6 +34,7 @@ import {
   SymbolBody,
   TagBody,
 } from './filter-popovers';
+import { MoreFilters } from './more-filters';
 import { symbolOptions } from './search';
 import { useShownFilters } from './use-shown-filters';
 
@@ -92,7 +93,7 @@ function fadeMask({ start, end }: { start: boolean; end: boolean }) {
 
 /**
  * The top bar's filter chips: date, symbol, side, strategy and tags, then
- * "Clear filters" while any filter is set. The chips scroll sideways when the
+ * "More filters" (which stays put after them, as "Clear filters" does) and "Clear filters" while any filter is set. The chips scroll sideways when the
  * bar is too narrow, fading at an edge with more past it; "Clear filters"
  * stays put after them. On a phone, with nothing after them, the row runs to
  * the screen's edge and fades out there, as a row that scrolls does. Every
@@ -163,7 +164,7 @@ export function FilterBarView({
           onFocus={(e) =>
             e.target.scrollIntoView({ block: 'nearest', inline: 'nearest' })
           }
-          className="flex w-max items-center gap-1.5"
+          className="flex w-max items-center gap-1"
         >
           <FilterChip
             label={rangeChipLabel(f.range, datesOf(f.range, today))}
@@ -256,6 +257,13 @@ export function FilterBarView({
           </FilterChip>
         </div>
       </div>
+      <MoreFilters
+        filters={f}
+        options={options}
+        onChange={onChange}
+        disabled={disabled}
+        unavailableNote={unavailableNote}
+      />
       {noTrades ? (
         <span id={noteId} hidden>
           No trades to filter yet.

@@ -154,7 +154,8 @@ export function DashboardView(): React.JSX.Element {
       ? currency
       : undefined;
     const partition = pickPartition(metrics.data, chosen, prefs.baseCurrency);
-    const ctx = metricContextOf(prefs);
+    // Day figures (the loss-limit grid, goals) take the exits dated in the range.
+    const ctx = { ...metricContextOf(prefs), range };
     const model = buildDashboard(partition, {
       strategies,
       tags,

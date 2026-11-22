@@ -7,7 +7,7 @@ import { useId, useRef, useState, type ReactNode, type Ref } from 'react';
 
 /** A white control on the canvas: a hairline edge, a breath of shadow, and a caret. */
 const CHIP =
-  'inline-flex h-8 max-w-52 flex-none items-center gap-1.5 rounded-control border pr-2.5 pl-3 text-[13.5px] whitespace-nowrap transition-[border-color,color] duration-200 ease-(--ease-glide) pointer-coarse:h-11 pointer-coarse:px-3.5';
+  'inline-flex h-8 max-w-52 flex-none items-center gap-1.5 rounded-control border pr-2 pl-2.5 text-[13.5px] whitespace-nowrap transition-[border-color,color] duration-200 ease-(--ease-glide) pointer-coarse:h-11 pointer-coarse:px-3.5';
 const CHIP_LIVE =
   'border-line bg-surface-1 shadow-[0_1px_1px_rgb(18_22_51/0.04)] enabled:hover:border-accent/35 enabled:hover:text-text data-[state=open]:border-accent/35 data-[state=open]:text-text';
 /** At rest the chip names its filter; once set, it reads as the value, in ink. */

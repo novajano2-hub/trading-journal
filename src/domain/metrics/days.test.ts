@@ -240,4 +240,31 @@ describe('days booked by exit', () => {
     expect(avgDailyWinRate(t, ctx)).toBeCloseTo(0.8333, 4);
     expect(avgDailyWinRate([], ctx)).toBeNull();
   });
+  test('a range clips day figures to the exits dated inside it', () => {
+    // Opened 18 Nov, exits on the 19th and the 20th, the last lot still open.
+    const t = build([
+      fill('e1', 'buy', 3, 5000, '2026-11-18T15:00:00Z', 300),
+      fill('x1', 'sell', 1, 5010, '2026-11-19T15:00:00Z', 100),
+      fill('x2', 'sell', 1, 5020, '2026-11-20T15:00:00Z', 100),
+    ]);
+    const all = dailyPnl(t, ctx);
+    expect(all.map((d) => d.date)).toEqual(['2026-11-19', '2026-11-20']);
+    const clipped = dailyPnl(t, {
+      ...ctx,
+      range: { from: '2026-11-20', to: '2026-11-20' },
+    });
+    expect(clipped).toEqual([all[1]]);
+    expect(clipped[0]?.tradeCount).toBe(1);
+    // An open end keeps everything on that side.
+    expect(
+      dailyPnl(t, { ...ctx, range: { to: '2026-11-19' } }).map((d) => d.date),
+    ).toEqual(['2026-11-19']);
+    expect(
+      // Only the 20th's exit counts: one day, no entry fill left in it.
+      dayDurations(t, {
+        ...ctx,
+        range: { from: '2026-11-20', to: '2026-11-20' },
+      }),
+    ).toEqual({ longest: 0, average: 0 });
+  });
 });

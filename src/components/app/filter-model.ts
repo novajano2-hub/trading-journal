@@ -1,5 +1,6 @@
 // No 'use client': plain rules for the filter chips and the account switcher.
 import {
+  advancedFilterCount,
   resolveRange,
   type DateRange,
   type GlobalFilters,
@@ -83,13 +84,21 @@ export function hasActiveFilters(f: GlobalFilters): boolean {
     f.symbols.length > 0 ||
     f.side !== undefined ||
     f.strategyIds.length > 0 ||
-    f.tagIds.length > 0
+    f.tagIds.length > 0 ||
+    advancedFilterCount(f) > 0
   );
 }
 
-/** Ids never cross workspaces: drop accounts, strategies and tags; keep date, symbol and side. */
+/** Ids never cross workspaces: drop accounts, strategies and tags (included or excluded); keep the rest. */
 export function switchWorkspaceFilters(f: GlobalFilters): GlobalFilters {
-  return { ...f, accountIds: [], strategyIds: [], tagIds: [] };
+  return {
+    ...f,
+    accountIds: [],
+    strategyIds: [],
+    tagIds: [],
+    excludeStrategyIds: [],
+    excludeTagIds: [],
+  };
 }
 
 /** The switcher's second line: "All accounts", the one account's name, or a count. */

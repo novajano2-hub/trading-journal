@@ -26,12 +26,13 @@ afterEach(() => {
 function renderSwitcher(
   url: string,
   patch: (repo: Repository) => Partial<Repository> = () => ({}),
+  sample: () => ReturnType<typeof fixtureSample> = fixtureSample,
 ) {
   window.history.replaceState(null, '', url);
   const local = createLocalRepository({
     indexedDB: new IDBFactory(),
     IDBKeyRange,
-    sample: async () => fixtureSample(),
+    sample: async () => sample(),
   });
   const repository = { ...local, ...patch(local) };
   const queryClient = new QueryClient({
@@ -61,7 +62,7 @@ test('accounts toggle in place, archived ones listed apart, and "All accounts" c
   expect(within(menu).getByRole('group', { name: 'Archived' })).toBeTruthy();
 
   fireEvent.click(
-    within(menu).getByRole('menuitemcheckbox', { name: 'Futures main' }),
+    within(menu).getByRole('menuitemcheckbox', { name: /Futures main/ }),
   );
   expect(window.location.search).toBe('?account=acc-a&side=long');
   expect(screen.getByRole('menu')).toBe(menu);
@@ -108,4 +109,59 @@ test('a workspace that cannot load says so, and clicking it reloads the page', a
   });
   fireEvent.click(retry);
   expect(reload).toHaveBeenCalledOnce();
+});
+
+/** The fixture's two accounts plus a forex one at another broker. */
+function withForex() {
+  const s = fixtureSample();
+  s.accounts.push({
+    ...s.accounts[0]!,
+    id: 'acc-fx',
+    name: 'Forex prop',
+    broker: 'Oanda',
+  });
+  return s;
+}
+
+test('the search narrows accounts by name or broker, and the rest stay out of the list', async () => {
+  renderSwitcher('/app/dashboard', undefined, withForex);
+  const menu = await openMenu(/Sample workspace\s*All accounts/);
+  const search = within(menu).getByRole('searchbox', {
+    name: 'Search accounts',
+  });
+  fireEvent.change(search, { target: { value: 'forex' } });
+  const items = () =>
+    within(menu)
+      .getAllByRole('menuitemcheckbox')
+      .map((i) => i.textContent);
+  expect(items()).toEqual(['All accounts', 'Forex prop' + 'Oanda']);
+  fireEvent.change(search, { target: { value: 'sample broker' } });
+  expect(items()).toEqual([
+    'All accounts',
+    'Futures mainSample broker',
+    'Old demoSample broker',
+  ]);
+  fireEvent.change(search, { target: { value: 'zzz' } });
+  expect(within(menu).getByText('No accounts match.')).toBeTruthy();
+});
+
+test('selecting two accounts writes them as one list', async () => {
+  renderSwitcher('/app/dashboard', undefined, withForex);
+  const menu = await openMenu(/Sample workspace\s*All accounts/);
+  fireEvent.click(
+    within(menu).getByRole('menuitemcheckbox', { name: /Futures main/ }),
+  );
+  fireEvent.click(
+    within(menu).getByRole('menuitemcheckbox', { name: /Forex prop/ }),
+  );
+  expect(window.location.search).toBe('?account=acc-a,acc-fx');
+  expect(
+    within(menu)
+      .getByRole('menuitemcheckbox', { name: 'All accounts' })
+      .getAttribute('aria-checked'),
+  ).toBe('false');
+  await screen.findByRole('button', {
+    name: /Sample workspace\s*2 accounts/,
+    hidden: true,
+  });
 });

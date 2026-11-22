@@ -1,23 +1,27 @@
 import { describe, expect, test } from 'vitest';
 import { makeTrade } from '../domain/__fixtures__/trades';
 import { resolveInstrument } from '../domain/instruments';
-import type { Account } from '../domain/types';
+import type { Account, Trade } from '../domain/types';
 import {
   applyFilters,
   EMPTY_FILTERS,
   mergeFilterParams,
   parseFilters,
+  queryString,
   resolveRange,
   sanitizeFilters,
   selectedAccounts,
   serializeFilters,
   type DatePreset,
   type GlobalFilters,
+  advancedFilterCount,
+  type FilterEnv,
+  DATE_PRESETS,
 } from './filters';
 
 const acct = (id: string, status: Account['status'] = 'active') =>
   ({ id, status }) as Account;
-const env = {
+const env: FilterEnv = {
   timeZone: 'America/New_York',
   today: '2026-11-20',
   accounts: [acct('a'), acct('b', 'archived')],
@@ -32,6 +36,7 @@ describe('global filters', () => {
     expect(r('this-month')).toEqual({ from: '2026-11-01', to: '2026-11-20' });
     expect(r('last-month')).toEqual({ from: '2026-10-01', to: '2026-10-31' });
     expect(r('last-30-days')).toEqual({ from: '2026-10-22', to: '2026-11-20' });
+    expect(r('this-quarter')).toEqual({ from: '2026-10-01', to: '2026-11-20' });
     expect(r('ytd')).toEqual({ from: '2026-01-01', to: '2026-11-20' });
     expect(resolveRange({}, '2026-11-20')).toEqual({});
     expect(resolveRange({ from: '2026-01-01' }, '2026-11-20')).toEqual({
@@ -146,6 +151,7 @@ describe('global filters', () => {
 
   test('URL round trip is canonical', () => {
     const f: GlobalFilters = {
+      ...EMPTY_FILTERS,
       range: { from: '2026-01-01', to: '2026-03-31' },
       accountIds: ['b', 'a'],
       symbols: ['ES'],
@@ -154,11 +160,15 @@ describe('global filters', () => {
       tagIds: ['t2', 't1'],
     };
     const qs =
-      'from=2026-01-01&to=2026-03-31&account=a&account=b&symbol=ES&side=long&strategy=s1&tag=t1&tag=t2';
-    expect(serializeFilters(f).toString()).toBe(qs);
+      'from=2026-01-01&to=2026-03-31&account=a,b&symbol=ES&side=long&strategy=s1&tag=t1,t2';
+    expect(queryString(serializeFilters(f))).toBe(qs);
     expect(
-      serializeFilters(parseFilters(new URLSearchParams(qs))).toString(),
+      queryString(serializeFilters(parseFilters(new URLSearchParams(qs)))),
     ).toBe(qs);
+    // Repeated keys from older links still read.
+    expect(
+      parseFilters(new URLSearchParams('account=a&account=b&tag=t1&tag=t2')),
+    ).toMatchObject({ accountIds: ['a', 'b'], tagIds: ['t1', 't2'] });
     expect(serializeFilters(EMPTY_FILTERS).toString()).toBe('');
     expect(
       serializeFilters({
@@ -233,5 +243,246 @@ describe('global filters', () => {
     });
     expect(clean).toEqual(EMPTY_FILTERS);
     expect(applyFilters([t], clean, env)).toEqual([t]);
+  });
+
+  test('the date presets include the quarter, and old keys keep their values', () => {
+    expect([...DATE_PRESETS]).toEqual(
+      expect.arrayContaining([
+        'today',
+        'this-week',
+        'this-month',
+        'last-30-days',
+        'last-month',
+        'this-quarter',
+        'ytd',
+      ]),
+    );
+  });
+});
+
+describe('the full filter set', () => {
+  // 09:30 New York is 14:30Z in November.
+  const at = (hhmm: string, day = '2026-11-18') => `${day}T${hhmm}:00Z`;
+  const trade = (p: Partial<Trade>) =>
+    makeTrade({ net: 100, accountId: 'a', ...p });
+  const run = (ts: Trade[], f: Partial<GlobalFilters>) =>
+    applyFilters(ts, { ...EMPTY_FILTERS, ...f }, env);
+
+  test('exclusions win over inclusions', () => {
+    const es = trade({ instrument: resolveInstrument('ESZ5')! });
+    const nq = trade({ instrument: resolveInstrument('NQZ5')! });
+    expect(run([es, nq], { symbols: ['ES'], excludeSymbols: ['ES'] })).toEqual(
+      [],
+    );
+    expect(run([es, nq], { excludeSymbols: ['ES'] })).toEqual([nq]);
+    const s1 = trade({ strategyIds: ['s1'] });
+    const s2 = trade({ strategyIds: ['s2'] });
+    expect(
+      run([s1, s2], { strategyIds: ['s1', 's2'], excludeStrategyIds: ['s1'] }),
+    ).toEqual([s2]);
+    const t1 = trade({ tagIds: ['t1', 't2'] });
+    expect(run([t1], { tagIds: ['t1'], excludeTagIds: ['t2'] })).toEqual([]);
+  });
+
+  test('strategy: no strategy ORs with the selection, and all needs every one', () => {
+    const none = trade({ strategyIds: [] });
+    const a = trade({ strategyIds: ['a'] });
+    const ab = trade({ strategyIds: ['a', 'b'] });
+    expect(run([none, a, ab], { noStrategy: true })).toEqual([none]);
+    expect(
+      run([none, a, ab], { noStrategy: true, strategyIds: ['b'] }),
+    ).toEqual([none, ab]);
+    expect(
+      run([none, a, ab], { strategyIds: ['a', 'b'], strategyMatch: 'all' }),
+    ).toEqual([ab]);
+    expect(run([none, a, ab], { strategyIds: ['a', 'b'] })).toEqual([a, ab]);
+  });
+
+  test('tag: all needs every selected tag', () => {
+    const one = trade({ tagIds: ['x'] });
+    const two = trade({ tagIds: ['x', 'y'] });
+    expect(run([one, two], { tagIds: ['x', 'y'], tagMatch: 'all' })).toEqual([
+      two,
+    ]);
+    expect(run([one, two], { tagIds: ['x', 'y'] })).toEqual([one, two]);
+  });
+
+  test('outcome follows the breakeven range; only closed trades have one', () => {
+    const win = trade({ net: 500 });
+    const loss = trade({ net: -500 });
+    const flat = trade({ net: 0 });
+    const open = trade({ status: 'open', net: 0 });
+    const ts = [win, loss, flat, open];
+    expect(run(ts, { outcomes: ['win'] })).toEqual([win]);
+    expect(run(ts, { outcomes: ['loss', 'breakeven'] })).toEqual([loss, flat]);
+    const wide: FilterEnv = {
+      ...env,
+      breakevenRange: { unit: 'amount', from: -600, to: 600 },
+    };
+    expect(
+      applyFilters(ts, { ...EMPTY_FILTERS, outcomes: ['breakeven'] }, wide),
+    ).toEqual([win, loss, flat]);
+  });
+
+  test('status and holding: intraday is one local date, open trades fail holding', () => {
+    const same = trade({ openedAt: at('14:30'), closedAt: at('15:30') });
+    const overnight = trade({
+      openedAt: at('14:30'),
+      closedAt: at('14:30', '2026-11-19'),
+    });
+    // 23:30 New York on the 18th to 00:30 on the 19th is two local dates.
+    const midnight = trade({
+      openedAt: '2026-11-19T04:30:00Z',
+      closedAt: '2026-11-19T05:30:00Z',
+    });
+    const open = trade({ status: 'open', openedAt: at('14:30') });
+    const ts = [same, overnight, midnight, open];
+    expect(run(ts, { holding: 'intraday' })).toEqual([same]);
+    expect(run(ts, { holding: 'multiday' })).toEqual([overnight, midnight]);
+    expect(run(ts, { status: 'open' })).toEqual([open]);
+    expect(run(ts, { status: 'closed' })).toEqual([same, overnight, midnight]);
+  });
+
+  test('reviewed, rating, weekday and month', () => {
+    // 18 Nov 2026 is a Wednesday.
+    const r = trade({ reviewed: true, rating: 4, openedAt: at('14:30') });
+    const u = trade({ openedAt: at('14:30', '2026-12-02') });
+    const sunday = trade({ openedAt: at('14:30', '2026-11-22') });
+    expect(run([r, u], { reviewed: true })).toEqual([r]);
+    expect(run([r, u], { reviewed: false })).toEqual([u]);
+    expect(run([r, u], { ratings: [4, 5] })).toEqual([r]);
+    expect(run([r, u, sunday], { weekdays: [3] })).toEqual([r, u]);
+    expect(run([r, u, sunday], { weekdays: [7] })).toEqual([sunday]);
+    expect(run([r, u], { months: [12] })).toEqual([u]);
+  });
+
+  test('a window wraps past midnight and an open end is open', () => {
+    // New York is UTC-5 in November: 23:30 local is 04:30Z next day.
+    const late = trade({ openedAt: '2026-11-19T04:30:00Z' });
+    const early = trade({ openedAt: '2026-11-19T06:15:00Z' }); // 01:15 local
+    const three = trade({ openedAt: '2026-11-19T08:00:00Z' }); // 03:00 local
+    const ts = [late, early, three];
+    expect(run(ts, { entryWindows: [{ from: '22:00', to: '02:00' }] })).toEqual(
+      [late, early],
+    );
+    expect(run(ts, { entryWindows: [{ from: '02:00' }] })).toEqual([
+      late,
+      three,
+    ]);
+    expect(run(ts, { entryWindows: [{ to: '02:00' }] })).toEqual([early]);
+    expect(
+      run(ts, {
+        entryWindows: [
+          { from: '23:00', to: '23:59' },
+          { from: '03:00', to: '04:00' },
+        ],
+      }),
+    ).toEqual([late, three]);
+  });
+
+  test('exit windows and duration fail open trades', () => {
+    const closed = trade({
+      openedAt: at('14:30'),
+      closedAt: at('15:00'), // 10:00 local, 30 minutes
+    });
+    const open = trade({ status: 'open', openedAt: at('14:30') });
+    expect(
+      run([closed, open], { exitWindows: [{ from: '09:00', to: '11:00' }] }),
+    ).toEqual([closed]);
+    expect(run([closed, open], { duration: { min: 10, max: 60 } })).toEqual([
+      closed,
+    ]);
+    expect(run([closed, open], { duration: { min: 31 } })).toEqual([]);
+    expect(run([closed, open], { exitPrice: { min: 0 } })).toEqual([closed]);
+  });
+
+  test('price, size and R ranges; a trade without risk fails R', () => {
+    const risked = trade({
+      avgEntry: 150,
+      avgExit: 160,
+      maxPosition: 2,
+      net: 200,
+      initialRisk: 200,
+    });
+    const unrisked = trade({ avgEntry: 50, avgExit: 40, maxPosition: 5 });
+    const ts = [risked, unrisked];
+    expect(run(ts, { entryPrice: { min: 100, max: 200 } })).toEqual([risked]);
+    expect(run(ts, { exitPrice: { max: 45 } })).toEqual([unrisked]);
+    expect(run(ts, { size: { min: 1, max: 3 } })).toEqual([risked]);
+    expect(run(ts, { r: { min: -1, max: 2 } })).toEqual([risked]);
+    expect(run(ts, { r: { min: 2 } })).toEqual([]);
+  });
+
+  test('every new param survives a round trip', () => {
+    for (const qs of [
+      'xsym=NQ,YM',
+      'xstrat=s1,s2',
+      'nostrat=1',
+      'stratmatch=all',
+      'xtag=t1',
+      'tagmatch=all',
+      'outcome=win,loss',
+      'status=open',
+      'hold=intraday',
+      'reviewed=1',
+      'reviewed=0',
+      'rating=4,5',
+      'wd=1,2',
+      'mo=11',
+      'entry=09:30-11:00,13:00-',
+      'exit=-10:00',
+      'dur=5_60',
+      'ep=100_200',
+      'xp=_50',
+      'size=1_3',
+      'r=-1_2',
+    ]) {
+      const f = parseFilters(new URLSearchParams(qs));
+      expect(f).not.toEqual(EMPTY_FILTERS);
+      expect(queryString(serializeFilters(f))).toBe(qs);
+    }
+  });
+
+  test('bad values for the new params are dropped', () => {
+    expect(parseFilters(new URLSearchParams('dur=abc&wd=9&rating=7'))).toEqual(
+      EMPTY_FILTERS,
+    );
+    expect(
+      parseFilters(
+        new URLSearchParams(
+          'entry=25:00-26:00&outcome=huge&status=maybe&mo=13',
+        ),
+      ),
+    ).toEqual(EMPTY_FILTERS);
+  });
+
+  test('the advanced count is one per group in use', () => {
+    expect(advancedFilterCount(EMPTY_FILTERS)).toBe(0);
+    expect(
+      advancedFilterCount({
+        ...EMPTY_FILTERS,
+        outcomes: ['loss'],
+        weekdays: [3],
+      }),
+    ).toBe(2);
+    expect(
+      advancedFilterCount({
+        ...EMPTY_FILTERS,
+        noStrategy: true,
+        excludeSymbols: ['ES'],
+        r: { min: 1 },
+        entryWindows: [{ from: '09:00' }],
+      }),
+    ).toBe(4);
+    // Symbol, side, strategy, tags and the date have chips of their own.
+    expect(
+      advancedFilterCount({
+        ...EMPTY_FILTERS,
+        symbols: ['ES'],
+        side: 'long',
+        strategyIds: ['s'],
+        tagIds: ['t'],
+      }),
+    ).toBe(0);
   });
 });

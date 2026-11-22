@@ -11,6 +11,8 @@ import {
   applyFilters,
   mergeFilterParams,
   parseFilters,
+  queryString,
+  resolveRange,
   sanitizeFilters,
   selectedAccounts,
   serializeFilters,
@@ -107,22 +109,26 @@ export function useGlobalFilters(): {
     [raw, accounts, strategies, tags],
   );
 
-  const write = useCallback(
-    (next: GlobalFilters) => {
-      const qs = mergeFilterParams(
-        new URLSearchParams(window.location.search),
-        next,
-      ).toString();
-      window.history.replaceState(null, '', pathname + (qs ? '?' + qs : ''));
-    },
-    [pathname],
-  );
+  // Writes go to the address bar's own pathname: the one this render holds
+  // can be a page behind a navigation that has landed since (E54).
+  const write = useCallback((next: GlobalFilters) => {
+    const qs = queryString(
+      mergeFilterParams(new URLSearchParams(window.location.search), next),
+    );
+    window.history.replaceState(
+      null,
+      '',
+      window.location.pathname + (qs ? '?' + qs : ''),
+    );
+  }, []);
 
   const dirty =
     serializeFilters(raw).toString() !== serializeFilters(filters).toString();
   useEffect(() => {
-    if (dirty) write(filters);
-  }, [dirty, filters, write]);
+    // While the address bar and this render disagree on the page, a navigation
+    // is landing: a write now would put the cleaned filters on the wrong page.
+    if (dirty && pathname === window.location.pathname) write(filters);
+  }, [dirty, filters, write, pathname]);
 
   return { filters, setFilters: write };
 }
@@ -146,9 +152,11 @@ export interface TradeSet {
  * - With no account filter only active accounts count; an archived account
  *   counts only when it is selected.
  * - A date range matches a trade's day: the local date of `closedAt`, or of
- *   `openedAt` while it is open, in the prefs timezone (`today` too). Daily
- *   bars book each exit on its own date, so a trade held over several days
- *   can sit in a different bar than the day this filter uses.
+ *   `openedAt` while it is open, in the prefs timezone (`today` too). That
+ *   picks the trades for the log, win rate and profit factor. Day figures
+ *   (calendar, daily bars, day stats, goals) take instead the exits dated
+ *   inside the range (`MetricContext.range`), so a trade held over several
+ *   days books each exit on its own day and only those in the range.
  */
 export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
   const trades = useTrades();
@@ -187,6 +195,7 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
         timeZone,
         today,
         accounts: accounts.data,
+        breakevenRange: prefs.data?.breakevenRange,
       }),
       accounts: selectedAccounts(accounts.data, clean),
     };
@@ -198,6 +207,7 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
     timeZone,
     today,
     filterKey,
+    prefs.data?.breakevenRange,
   ]);
 
   return { ...state, data: state.status === 'success' ? data : undefined };
@@ -217,7 +227,14 @@ export function useMetrics(filters: GlobalFilters): Derived<CurrencyMetrics[]> {
       set.data && prefs
         ? metricsByCurrency(set.data.trades, {
             accounts: set.data.accounts,
-            ctx: metricContextOf(prefs),
+            // Day figures count only the exits dated inside the date range.
+            ctx: {
+              ...metricContextOf(prefs),
+              range: resolveRange(
+                set.data.filters.range,
+                localDate(new Date().toISOString(), prefs.timeZone),
+              ),
+            },
             baseCurrency: prefs.baseCurrency,
           })
         : undefined,

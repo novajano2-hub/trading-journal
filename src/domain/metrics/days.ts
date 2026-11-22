@@ -1,7 +1,7 @@
 import { outcomeOf } from '../outcome';
 import { localDate } from '../time';
 import type { Cents, Trade } from '../types';
-import { costBasis, type MetricContext } from './context';
+import { costBasis, inRange, type MetricContext } from './context';
 import { sizedRealizations } from './realized';
 import { streaksOf, type StreakResult } from './streaks';
 
@@ -28,7 +28,8 @@ function dayOutcome(d: DayStat, ctx: MetricContext) {
  * Realized P&L bucketed by the local (timeZone) date of each exit fill, ascending, so a
  * partial exit books on its own day even while the rest of the trade is open. A trade
  * counts once on each day it exits; its cost basis is shared among those days by exited
- * quantity. Input must be a single-currency set.
+ * quantity. With `ctx.range` only the exits dated inside it count. Input must be a
+ * single-currency set.
  */
 export function dailyPnl(
   trades: readonly Trade[],
@@ -47,6 +48,7 @@ export function dailyPnl(
     const parts = new Map<string, { value: Cents; qty: number }>();
     for (const r of sizedRealizations(t)) {
       const date = localDate(r.time, ctx.timeZone);
+      if (!inRange(date, ctx.range)) continue;
       const p = parts.get(date) ?? { value: 0, qty: 0 };
       p.value += ctx.pnlBasis === 'gross' ? r.gross : r.net;
       p.qty += r.qty;
@@ -98,6 +100,7 @@ export function dayDurations(
     for (const e of t.executions) {
       const at = Date.parse(e.time);
       const date = localDate(e.time, ctx.timeZone);
+      if (!inRange(date, ctx.range)) continue;
       const d = byDate.get(date) ?? {
         firstEntry: Infinity,
         firstAny: Infinity,

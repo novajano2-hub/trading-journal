@@ -39,9 +39,7 @@ test('the account switcher writes the account filter (desktop)', async ({
   await page.goto('/app/dashboard');
   await ready(page);
   await page.getByRole('button', { name: /Sample workspace/ }).click();
-  await page
-    .getByRole('menuitemcheckbox', { name: 'Futures live', exact: true })
-    .click();
+  await page.getByRole('menuitemcheckbox', { name: /^Futures live/ }).click();
   await expect(page).toHaveURL(/[?&]account=sample-futures(&|$)/);
   await page.keyboard.press('Escape');
   await expect(

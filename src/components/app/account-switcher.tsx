@@ -4,10 +4,11 @@ import {
   ArrowClockwise,
   CaretUpDown,
   Check,
+  MagnifyingGlass,
   Wallet,
 } from '@phosphor-icons/react/dist/ssr';
 import { DropdownMenu } from 'radix-ui';
-import { useId, type ReactNode } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import { IconTile } from '@/components/ui/icon-tile';
 import {
   useAccounts,
@@ -15,6 +16,7 @@ import {
   useSetActiveWorkspace,
   useWorkspaces,
 } from '@/data/query/hooks';
+import { FIELD } from './filter-chip';
 import { SwitcherPlaceholder } from './sidebar';
 import { useShownFilters } from './use-shown-filters';
 import {
@@ -75,6 +77,8 @@ export function AccountSwitcher(): React.JSX.Element {
   const accounts = useAccounts().data;
   const setActive = useSetActiveWorkspace();
   const workspaceLabel = useId();
+  const [query, setQuery] = useState('');
+  const list = useRef<HTMLDivElement>(null);
 
   if (!active && activeQuery.error) {
     return (
@@ -109,13 +113,21 @@ export function AccountSwitcher(): React.JSX.Element {
       : filters.accountIds.length === 0
         ? 'All accounts'
         : '\u00a0';
-  const live = (accounts ?? []).filter((a) => a.status === 'active');
-  const archived = (accounts ?? []).filter((a) => a.status === 'archived');
+  // The search matches an account's name or its broker.
+  const needle = query.trim().toLowerCase();
+  const found = (accounts ?? []).filter(
+    (a) =>
+      needle === '' ||
+      a.name.toLowerCase().includes(needle) ||
+      a.broker.toLowerCase().includes(needle),
+  );
+  const live = found.filter((a) => a.status === 'active');
+  const archived = found.filter((a) => a.status === 'archived');
   const writeAccounts = (accountIds: string[]) => {
     if (clean) setFilters({ ...clean, accountIds });
   };
 
-  const accountItem = (id: string, name: string) => (
+  const accountItem = (id: string, name: string, broker: string) => (
     <DropdownMenu.CheckboxItem
       key={id}
       checked={selected.includes(id)}
@@ -128,11 +140,16 @@ export function AccountSwitcher(): React.JSX.Element {
     >
       <Indicator />
       <span className="min-w-0 truncate">{name}</span>
+      {broker ? (
+        <span className="ml-2 min-w-0 flex-none truncate text-[12px] text-faint">
+          {broker}
+        </span>
+      ) : null}
     </DropdownMenu.CheckboxItem>
   );
 
   return (
-    <DropdownMenu.Root>
+    <DropdownMenu.Root onOpenChange={(open) => !open && setQuery('')}>
       <DropdownMenu.Trigger
         className={`${BOX} pr-2 data-[state=open]:border-line-2`}
       >
@@ -190,28 +207,65 @@ export function AccountSwitcher(): React.JSX.Element {
           </DropdownMenu.RadioGroup>
           <DropdownMenu.Separator className="-mx-1.5 my-1.5 h-px bg-line" />
           <LabelledGroup label="Accounts">
-            <DropdownMenu.CheckboxItem
-              checked={selected.length === 0}
-              disabled={!clean}
-              onSelect={(e) => {
-                e.preventDefault();
-                writeAccounts([]);
-              }}
-              className={ITEM}
-            >
-              <Indicator />
-              All accounts
-            </DropdownMenu.CheckboxItem>
-            {live.map((a) => accountItem(a.id, a.name))}
-            {accounts && accounts.length === 0 ? (
-              <p className="px-2 py-1.5 text-[13px] text-muted">
-                No accounts yet.
-              </p>
+            {(accounts?.length ?? 0) > 1 ? (
+              <div className="relative px-1 pb-1.5">
+                <MagnifyingGlass
+                  size={14}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute top-[11px] left-3.5 text-faint"
+                />
+                <input
+                  type="search"
+                  aria-label="Search accounts"
+                  placeholder="Search accounts"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    // The menu would take a typed letter as a jump to an item.
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      list.current
+                        ?.querySelector<HTMLElement>(
+                          '[role="menuitemcheckbox"]',
+                        )
+                        ?.focus();
+                    }
+                    if (e.key !== 'Escape' && e.key !== 'Tab')
+                      e.stopPropagation();
+                  }}
+                  className={`${FIELD} pl-8 text-[13.5px] placeholder:text-faint`}
+                />
+              </div>
             ) : null}
+            <div ref={list}>
+              <DropdownMenu.CheckboxItem
+                checked={selected.length === 0}
+                disabled={!clean}
+                onSelect={(e) => {
+                  e.preventDefault();
+                  writeAccounts([]);
+                }}
+                className={ITEM}
+              >
+                <Indicator />
+                All accounts
+              </DropdownMenu.CheckboxItem>
+              {live.map((a) => accountItem(a.id, a.name, a.broker))}
+              {accounts && accounts.length === 0 ? (
+                <p className="px-2 py-1.5 text-[13px] text-muted">
+                  No accounts yet.
+                </p>
+              ) : null}
+              {accounts && accounts.length > 0 && found.length === 0 ? (
+                <p className="px-2 py-1.5 text-[13px] text-muted">
+                  No accounts match.
+                </p>
+              ) : null}
+            </div>
           </LabelledGroup>
           {archived.length > 0 ? (
             <LabelledGroup label="Archived">
-              {archived.map((a) => accountItem(a.id, a.name))}
+              {archived.map((a) => accountItem(a.id, a.name, a.broker))}
             </LabelledGroup>
           ) : null}
         </DropdownMenu.Content>

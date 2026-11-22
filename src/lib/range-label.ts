@@ -8,6 +8,7 @@ export const PRESET_LABELS: Record<DatePreset, string> = {
   'this-month': 'This month',
   'last-month': 'Last month',
   'last-30-days': 'Last 30 days',
+  'this-quarter': 'This quarter',
   ytd: 'Year to date',
 };
 

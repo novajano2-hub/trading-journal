@@ -34,7 +34,7 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-test('five chips, each opening a dialog, and no "Clear filters" with nothing set', () => {
+test('five chips and More filters, each opening a dialog, and no "Clear filters" with nothing set', () => {
   render(
     <FilterBarView
       filters={EMPTY_FILTERS}
@@ -48,7 +48,12 @@ test('five chips, each opening a dialog, and no "Clear filters" with nothing set
       screen.getByRole('button', { name }).getAttribute('aria-haspopup'),
     ).toBe('dialog');
   }
-  expect(screen.getAllByRole('button')).toHaveLength(5);
+  expect(
+    screen
+      .getByRole('button', { name: 'More filters' })
+      .getAttribute('aria-haspopup'),
+  ).toBe('dialog');
+  expect(screen.getAllByRole('button')).toHaveLength(6);
   expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
 });
 
@@ -256,4 +261,29 @@ test('back to the same page and filters before a write lands shows the URL', asy
   act(() => commitNavigation());
   expect(screen.getByRole('button', { name: 'Long' })).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Short' })).toBeNull();
+});
+
+test("a write lands on the address bar's page, not the one this render holds (E54)", async () => {
+  renderBar('/app/dashboard');
+  fireEvent.click(await liveChip('Side'));
+  const dialog = await screen.findByRole('dialog', { name: 'Side' });
+  // A navigation has landed in the address bar; React has not rendered it yet.
+  deferNavigation();
+  window.history.pushState(null, '', '/app/trades');
+  fireEvent.click(within(dialog).getByRole('radio', { name: 'Short' }));
+  expect(window.location.pathname).toBe('/app/trades');
+  expect(window.location.search).toBe('?side=short');
+});
+
+test('cleaning a stale link waits while a navigation is landing (E54)', async () => {
+  renderBar('/app/dashboard?side=long&tag=ghost');
+  deferNavigation();
+  window.history.pushState(null, '', '/app/trades?side=long&tag=ghost');
+  // The workspace loads while the router still renders the old page.
+  await new Promise((r) => setTimeout(r, 150));
+  expect(window.location.pathname).toBe('/app/trades');
+  expect(window.location.search).toBe('?side=long&tag=ghost');
+  act(() => commitNavigation());
+  await waitFor(() => expect(window.location.search).toBe('?side=long'));
+  expect(window.location.pathname).toBe('/app/trades');
 });
