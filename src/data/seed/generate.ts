@@ -22,7 +22,6 @@ import { SAMPLE_WORKSPACE } from '../workspaces';
 import { DAY_MS, NY, dow, isWeekday, nyMs, parseYmd, ymd } from './calendar';
 import {
   CUSTOM_NAMES,
-  LOSER_RULE,
   MISTAKE_NAMES,
   NEGATIVE_EMOTIONS,
   POSITIVE_EMOTIONS,
@@ -481,7 +480,7 @@ function buildStrategiesAndTags(): {
     const id = `sample-strategy-${i + 1}`;
     const loser: Rule = {
       id: `${id}-rule-${s.rules.length + 1}`,
-      text: LOSER_RULE,
+      text: s.loserRule,
       showWhen: 'loser',
     };
     return {

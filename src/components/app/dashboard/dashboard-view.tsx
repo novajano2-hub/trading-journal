@@ -182,11 +182,7 @@ export function DashboardView(): React.JSX.Element {
       today,
     });
     // The daily loss limit's grid: every trading day, always on net, as the goal reads them.
-    const days = !model.goals.dailyLoss
-      ? []
-      : partition.summary.basis === 'net'
-        ? partition.days
-        : dailyPnl(partition.trades, { ...ctx, pnlBasis: 'net' });
+    const days = !model.goals.dailyLoss ? [] : partition.netDays;
     // What the display units divide by, and the trades behind each figure.
     const pctBase = pctBaseOf({
       accounts,
@@ -216,7 +212,11 @@ export function DashboardView(): React.JSX.Element {
         : (window) => meanInUnit(window, trendUnit, ctx, pctBase),
     );
     // The partition's days are on the basis its equity is, so the last close is the last balance.
-    const line = equityLine(model.performance.equity, partition.days);
+    // Its days come from the same trades as the equity, so the last close is the last balance.
+    const line = equityLine(
+      model.performance.equity,
+      dailyPnl(partition.trades, metricContextOf(prefs)),
+    );
     // "this week" while the goal week is today's; a range that ended earlier reads "that week".
     const week = model.goals.weekly?.window;
     const weekLabel = week

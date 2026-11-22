@@ -100,11 +100,20 @@ describe('sample workspace generator', () => {
         'Management',
       ]);
       expect(strategyRules(st).filter((r) => r.showWhen === 'loser')).toEqual([
-        expect.objectContaining({ text: 'Took the loss at the planned stop' }),
+        expect.objectContaining({
+          text: expect.stringMatching(/^Took the loss /),
+        }),
       ]);
       expect(st.icon).toBeDefined();
       expect(st.tone).toBeDefined();
     }
+  });
+
+  test('no two rules in the workspace share a wording', () => {
+    const texts = s.strategies.flatMap((st) =>
+      strategyRules(st).map((r) => r.text),
+    );
+    expect(new Set(texts).size).toBe(texts.length);
   });
 
   test('tags sit in Setups, Mistakes, Emotions and Custom tags', () => {

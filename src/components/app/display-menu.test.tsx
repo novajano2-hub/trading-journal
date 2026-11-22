@@ -18,17 +18,18 @@ function open(name: RegExp | string) {
   return button;
 }
 
-test('the button names the unit and the basis, and starts as Net, $', async () => {
+test('the button names the unit and the basis, starts as Net, $, and its name contains its visible label', async () => {
   renderApp(<DisplayMenu />);
   const button = await screen.findByRole('button', {
-    name: 'Display: Dollar, Net P&L',
+    name: 'Net, $, show as Dollar',
   });
   expect(button.textContent).toBe('Net, $');
+  expect(button.getAttribute('aria-label')).toContain(button.textContent);
 });
 
 test('choosing Privacy saves displayUnit and renames the button', async () => {
   const { repo } = renderApp(<DisplayMenu />);
-  open('Display: Dollar, Net P&L');
+  open('Net, $, show as Dollar');
   fireEvent.click(
     await screen.findByRole('menuitemradio', { name: 'Privacy' }),
   );
@@ -36,7 +37,7 @@ test('choosing Privacy saves displayUnit and renames the button', async () => {
     expect((await repo.prefs.get()).displayUnit).toBe('privacy'),
   );
   const button = await screen.findByRole('button', {
-    name: 'Display: Privacy, Net P&L',
+    name: 'Net, show as Privacy',
     hidden: true,
   });
   // A crossed eye, no unit word: the glyph is decoration, "Net" is the label.
@@ -45,7 +46,7 @@ test('choosing Privacy saves displayUnit and renames the button', async () => {
 
 test('Gross and Net save the basis, as the old switch did', async () => {
   const { repo } = renderApp(<DisplayMenu />);
-  open('Display: Dollar, Net P&L');
+  open('Net, $, show as Dollar');
   const net = await screen.findByRole('menuitemradio', { name: 'Net' });
   await waitFor(() => expect(net.hasAttribute('data-disabled')).toBe(false));
   fireEvent.click(screen.getByRole('menuitemradio', { name: 'Gross' }));
@@ -53,7 +54,7 @@ test('Gross and Net save the basis, as the old switch did', async () => {
     expect((await repo.prefs.get()).pnlBasis).toBe('gross'),
   );
   const renamed = await screen.findByRole('button', {
-    name: 'Display: Dollar, Gross P&L',
+    name: 'Gross, $, show as Dollar',
     hidden: true,
   });
   expect(renamed.textContent).toBe('Gross, $');
@@ -61,7 +62,7 @@ test('Gross and Net save the basis, as the old switch did', async () => {
 
 test('the units are one radio group, the basis another', async () => {
   renderApp(<DisplayMenu />);
-  open('Display: Dollar, Net P&L');
+  open('Net, $, show as Dollar');
   const units = await screen.findByRole('group', { name: 'Show as' });
   expect(
     Array.from(units.querySelectorAll('[role="menuitemradio"]')).map(
@@ -87,7 +88,7 @@ test('with no trades the P&L group is unavailable and changes nothing; the unit 
   });
   await repository.workspaces.setActive('mine');
   renderApp(<DisplayMenu />, { repository });
-  open('Display: Dollar, Net P&L');
+  open('Net, $, show as Dollar');
   const gross = await screen.findByRole('menuitemradio', { name: 'Gross' });
   await waitFor(() => expect(gross.hasAttribute('data-disabled')).toBe(true));
   expect(

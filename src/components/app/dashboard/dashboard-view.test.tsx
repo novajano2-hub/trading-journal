@@ -38,6 +38,8 @@ const r1 = rule('r-1');
 const r2 = rule('r-2');
 /** r-1 as it shows: "15-minute" can't break at its hyphen. */
 const r1Shown = keepHyphens(r1);
+/** The drill-down's title: the rule, then its strategy. */
+const r1Dialog = keepHyphens(`${r1} (${fx.strategies[0]!.name})`);
 const fomo = fx.tags.find((t) => t.id === 'tag-fomo')!.name;
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** Rule and mistake buttons' aria-labels start "{text}." */
@@ -114,6 +116,9 @@ test('your plan: adherence, cost once per trade, rules by cost with the costlies
   expect(r1Shown).not.toBe(r1);
   expect(rows[0]!.textContent).toContain(r1Shown);
   expect(rows[0]!.textContent).toContain('Costliest');
+  // Each row names its strategy on the line under the rule.
+  expect(rows[0]!.textContent).toContain(fx.strategies[0]!.name);
+  expect(rows[1]!.textContent).toContain(fx.strategies[0]!.name);
   expect(rows[1]!.textContent).toContain(r2);
   expect(rows[1]!.textContent).toContain('none');
   // A never-broken rule is not a drill-down.
@@ -197,7 +202,7 @@ test('a rule opens its trades; Escape closes; focus returns (signature move)', a
   const open = await screen.findByRole('button', { name: opener(r1) });
   open.focus();
   fireEvent.click(open);
-  const dialog = await screen.findByRole('dialog', { name: r1Shown });
+  const dialog = await screen.findByRole('dialog', { name: r1Dialog });
   expect(within(dialog).getAllByRole('row')).toHaveLength(2);
   expect(dialog.textContent).toContain(
     'Broken on 1 trade, all time. Cost when broken −$400.00. Trades that kept it: +$600.00.',
@@ -211,13 +216,13 @@ test('clicking anywhere on a rule row opens it', async () => {
   renderApp(<DashboardView />, { sample: graded });
   const open = await screen.findByRole('button', { name: opener(r1) });
   fireEvent.click(open.closest('tr')!.lastElementChild!);
-  expect(await screen.findByRole('dialog', { name: r1Shown })).toBeTruthy();
+  expect(await screen.findByRole('dialog', { name: r1Dialog })).toBeTruthy();
 });
 
 test('regrading in the drill-down saves the check, keeps the row, and updates the plan', async () => {
   const { repo } = renderApp(<DashboardView />, { sample: graded });
   fireEvent.click(await screen.findByRole('button', { name: opener(r1) }));
-  const dialog = await screen.findByRole('dialog', { name: r1Shown });
+  const dialog = await screen.findByRole('dialog', { name: r1Dialog });
   const kept = within(dialog).getByRole('checkbox', {
     name: new RegExp(`^Kept ${esc(r1)} on ESZ5 `),
   }) as HTMLInputElement;
@@ -262,7 +267,7 @@ test('a regrade that fails to save reverts with an inline error', async () => {
   }));
   renderApp(<DashboardView />, { repository });
   fireEvent.click(await screen.findByRole('button', { name: opener(r1) }));
-  const dialog = await screen.findByRole('dialog', { name: r1Shown });
+  const dialog = await screen.findByRole('dialog', { name: r1Dialog });
   const kept = within(dialog).getByRole('checkbox', {
     name: new RegExp(`^Kept ${esc(r1)}`),
   }) as HTMLInputElement;
@@ -551,8 +556,11 @@ function everyString(root: Element): string[] {
   return out;
 }
 
-async function inUnit(displayUnit: 'privacy' | 'percent' | 'r') {
-  const repository = repositoryWith(() => ({}));
+async function inUnit(
+  displayUnit: 'privacy' | 'percent' | 'r',
+  sample = graded,
+) {
+  const repository = repositoryWith(() => ({}), sample);
   await repository.prefs.update({ displayUnit });
   return renderApp(<DashboardView />, { repository });
 }
@@ -590,4 +598,53 @@ test('in R a figure without a risk shows its dollars, so nothing is blank', asyn
   expect(text).not.toMatch(/NaN|undefined|null/);
   const plan = screen.getByRole('region', { name: 'Your plan, all time' });
   expect(plan.textContent).toMatch(/−\$400\.00|−?\d+\.\d{2}R/);
+});
+
+test('under Privacy the screen-reader text of every amount reads "hidden amount", never the bullets', async () => {
+  await inUnit('privacy');
+  await screen.findByTestId('dashboard-ready');
+  const pnl = screen.getByTestId('kpi-pnl');
+  expect(
+    Array.from(pnl.querySelectorAll('.sr-only')).map((e) => e.textContent),
+  ).toContain('hidden amount');
+  const plan = screen.getByRole('region', { name: 'Your plan, all time' });
+  expect(
+    Array.from(plan.querySelectorAll('.sr-only')).map((e) => e.textContent),
+  ).toContain('hidden amount');
+  // Nothing a screen reader can get is bullets: every sr-only string and every label.
+  const heard = [
+    ...Array.from(document.body.querySelectorAll('.sr-only')).map(
+      (e) => e.textContent ?? '',
+    ),
+    ...Array.from(document.body.querySelectorAll('[aria-label]')).map(
+      (e) => e.getAttribute('aria-label') ?? '',
+    ),
+  ];
+  expect(heard.filter((s) => s.includes('•'))).toEqual([]);
+  const mistake = screen.getByRole('region', { name: /mistakes/i });
+  expect(
+    within(mistake)
+      .getAllByRole('button')
+      .some((b) => /hidden amount/.test(b.getAttribute('aria-label') ?? '')),
+  ).toBe(true);
+});
+
+test('under R an aggregate reports how many trades it leaves out, to a screen reader too', async () => {
+  // Only the first trade has a risk, so the others are left out of every R figure.
+  await inUnit(
+    'r',
+    sampleWith((s) => {
+      s.trades[0]!.initialRisk = 10000;
+    }),
+  );
+  await screen.findByTestId('dashboard-ready');
+  const text = (e: Element) => e.textContent ?? '';
+  const pnl = screen.getByTestId('kpi-pnl');
+  const heard = [
+    ...Array.from(pnl.querySelectorAll('.sr-only')).map(text),
+    ...Array.from(document.body.querySelectorAll('[aria-label]')).map(
+      (e) => e.getAttribute('aria-label') ?? '',
+    ),
+  ];
+  expect(heard.some((s) => /\d+ trades? left out/.test(s))).toBe(true);
 });

@@ -1,9 +1,14 @@
 import { quoteToPnl } from '../currency';
 import { roundHalfEven, toCents } from '../money';
-import { outcomeOf } from '../outcome';
 import { isClosed } from '../trade-status';
 import type { Cents, Trade } from '../types';
-import { costBasis, pnlOf, type MetricContext, type PnlBasis } from './context';
+import {
+  classify,
+  costBasis,
+  pnlOf,
+  type MetricContext,
+  type PnlBasis,
+} from './context';
 
 /** `netPnl`/`grossPnl` are always the true net and gross totals; `basis` says which one every other figure uses. */
 export interface Summary {
@@ -78,18 +83,7 @@ export function summarize(
   ctx: MetricContext,
 ): Summary {
   const closed = trades.filter(isClosed);
-  const classified = closed.map((t) => {
-    const value = pnlOf(t, ctx.pnlBasis);
-    const basis = costBasis(t);
-    return {
-      value,
-      outcome: outcomeOf(
-        value,
-        ctx.breakevenRange,
-        basis > 0 ? value / basis : undefined,
-      ),
-    };
-  });
+  const classified = closed.map((t) => classify(t, ctx));
   const winNets = classified
     .filter((c) => c.outcome === 'win')
     .map((c) => c.value);

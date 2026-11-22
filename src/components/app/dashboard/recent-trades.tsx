@@ -13,6 +13,7 @@ import type { RecentTrade, TradeRulesSummary } from '@/data/dashboard';
 import { pnlOf } from '@/domain/metrics/context';
 import type { PnlBasis } from '@/domain/types';
 import { useDisplay } from '@/lib/display';
+import { FigureText } from '@/components/product/figure-text';
 import { keepHyphens, plural } from '@/lib/format';
 import { shortTime } from '@/lib/time-format';
 import { navHref, navItem } from '../nav';
@@ -245,7 +246,9 @@ export function RecentTrades({
                 <td
                   className={`${GAP} ${FIGURE} text-right whitespace-nowrap ${signTone(pnl)}`}
                 >
-                  {display.figure(display.ofTrade(t), true, t.pnlCurrency).text}
+                  <FigureText
+                    f={display.figure(display.ofTrade(t), true, t.pnlCurrency)}
+                  />
                 </td>
                 <td className={`${GAP} py-1.5`}>
                   <RulesCell rules={row.rules} />

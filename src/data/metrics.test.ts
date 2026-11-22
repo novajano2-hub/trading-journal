@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { makeTrade } from '../domain/__fixtures__/trades';
 import type { Account, UserPrefs } from '../domain/types';
 import { defaultPrefs } from './repository';
+import { riskRatios } from '../domain/metrics/risk';
 import { metricContextOf, metricsByCurrency } from './metrics';
 import { generateSampleWorkspace, SAMPLE_SEED } from './seed/generate';
 
@@ -106,5 +107,76 @@ describe('performance (spec §10)', () => {
     }
     times.sort((a, b) => a - b);
     expect(times[2]!).toBeLessThan(50);
+  });
+});
+
+describe('Sharpe and Sortino inputs', () => {
+  const on = (date: string, net: number, fees = 0) =>
+    makeTrade({
+      net,
+      fees,
+      gross: net + fees,
+      openedAt: `${date}T15:00:00Z`,
+      closedAt: `${date}T15:05:00Z`,
+    });
+  const day = (date: string, net: number) => ({
+    date,
+    net,
+    tradeCount: 1,
+    wins: 0,
+    losses: 0,
+    costBasis: 0,
+  });
+
+  test('always on net days, whatever the basis shows', () => {
+    const trades = [
+      on('2026-11-16', 10_000, 4_000),
+      on('2026-11-17', -5_000, 1_000),
+      on('2026-11-18', 20_000, 2_000),
+    ];
+    const [usd] = metricsByCurrency(trades, {
+      accounts: [acct('a', 1_000_000)],
+      ctx: { ...ctx, pnlBasis: 'gross' },
+      baseCurrency: 'USD',
+    });
+    // Gross days are what the bundle shows; the ratios still read the net ones.
+    expect(usd!.days.map((d) => d.net)).toEqual([14_000, -4_000, 22_000]);
+    expect(usd!.risk).toEqual(
+      riskRatios(
+        [
+          day('2026-11-16', 10_000),
+          day('2026-11-17', -5_000),
+          day('2026-11-18', 20_000),
+        ],
+        1_000_000,
+      ),
+    );
+  });
+
+  test('under a date range the balance starts from what was booked before it', () => {
+    const before = on('2026-11-10', 1_000_000);
+    const inside = [
+      on('2026-11-16', 10_000),
+      on('2026-11-17', -5_000),
+      on('2026-11-18', 20_000),
+    ];
+    const [usd] = metricsByCurrency([before, ...inside], {
+      accounts: [acct('a', 1_000_000)],
+      ctx: { ...ctx, range: { from: '2026-11-16', to: '2026-11-20' } },
+      baseCurrency: 'USD',
+      dayTrades: [before, ...inside],
+    });
+    const days = [
+      day('2026-11-16', 10_000),
+      day('2026-11-17', -5_000),
+      day('2026-11-18', 20_000),
+    ];
+    expect(usd!.days.map((d) => d.date)).toEqual([
+      '2026-11-16',
+      '2026-11-17',
+      '2026-11-18',
+    ]);
+    expect(usd!.risk).toEqual(riskRatios(days, 2_000_000));
+    expect(usd!.risk).not.toEqual(riskRatios(days, 1_000_000));
   });
 });

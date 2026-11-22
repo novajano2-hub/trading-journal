@@ -217,7 +217,7 @@ test('Tab walks the top bar in the order it reads: title, chips, search, Display
     filters.getByRole('button', { name, exact: true });
   const tail = [
     bar.getByRole('combobox', { name: 'Search' }),
-    bar.getByRole('button', { name: /^Display: / }),
+    bar.getByRole('button', { name: /show as / }),
     bar.getByRole('link', { name: 'Import' }),
     bar.getByRole('button', { name: 'Switch to dark theme' }),
   ];
@@ -305,7 +305,7 @@ test('an empty workspace shows the chips and the P&L choice unavailable, still i
   // The Display button stays in the bar; its P&L group reads unavailable inside.
   await page
     .getByRole('banner')
-    .getByRole('button', { name: /^Display: / })
+    .getByRole('button', { name: /show as / })
     .click();
   await expect(page.getByRole('group', { name: 'P&L' })).toHaveAttribute(
     'aria-disabled',

@@ -1,5 +1,4 @@
 import type { MetricContext } from '@/domain/metrics/context';
-import { dailyPnl } from '@/domain/metrics/days';
 import {
   dailyLossProgress,
   goalWeek,
@@ -153,12 +152,8 @@ export function buildDashboard(
       unavailable: `Goals use your base currency (${env.baseCurrency}).`,
     };
   } else {
-    // m.days is already net when m was built on net; only gross needs a second pass.
-    // env.ctx must be the ctx that m was built with.
-    const days =
-      summary.basis === 'net'
-        ? m.days
-        : dailyPnl(m.trades, { ...env.ctx, pnlBasis: 'net' });
+    // Goals read the net days, whatever the basis shows.
+    const days = m.netDays;
     const window = goalWeek(env.range, env.today);
     goals = {
       weekly:

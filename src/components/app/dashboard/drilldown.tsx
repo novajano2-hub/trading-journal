@@ -365,14 +365,16 @@ export function Drilldown({
   const currency = model.currency;
 
   let title: string;
+  let ruleText = '';
   let description: React.ReactNode;
   if (target.kind === 'rule') {
     const score = model.plan.rules.find((r) => r.ruleId === target.ruleId);
-    title =
+    ruleText =
       score?.text ??
       strategies.flatMap(strategyRules).find((r) => r.id === target.ruleId)
         ?.text ??
       '';
+    title = score ? `${ruleText} (${score.strategyName})` : ruleText;
     description = (
       <>
         Broken on <Count n={score?.broken ?? 0} />, {caption}. Cost when broken{' '}
@@ -426,7 +428,7 @@ export function Drilldown({
         }
         target={target}
         rows={rows}
-        ruleText={title}
+        ruleText={ruleText}
         model={model}
         timeZone={timeZone}
         strategyName={strategyName}

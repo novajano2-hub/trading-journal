@@ -53,26 +53,25 @@ export function DisplayMenu(): React.JSX.Element {
   const basisLabel = useId();
   const current = UNITS.find((u) => u.value === unit) ?? UNITS[0]!;
   const basisName = BASES.find((b) => b.value === basis)?.name ?? 'Net';
+  // The accessible name starts with the face, so the visible label is always in it.
+  const face =
+    unit === 'privacy' ? basisName : `${basisName}, ${current.short}`;
 
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
-        aria-label={`Display: ${current.name}, ${basisName} P&L`}
+        aria-label={`${face}, show as ${current.name}`}
         className={TRIGGER}
       >
+        {face}
         {unit === 'privacy' ? (
-          <>
-            {basisName}
-            <EyeSlash
-              size={15}
-              weight="bold"
-              aria-hidden="true"
-              className="-mr-0.5 flex-none text-muted"
-            />
-          </>
-        ) : (
-          `${basisName}, ${current.short}`
-        )}
+          <EyeSlash
+            size={15}
+            weight="bold"
+            aria-hidden="true"
+            className="-mr-0.5 flex-none text-muted"
+          />
+        ) : null}
         <CaretDown
           size={12}
           weight="bold"

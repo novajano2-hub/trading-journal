@@ -11,6 +11,7 @@ import { RULES_SHOWN, type DashboardModel } from '@/data/dashboard';
 import type { RuleScore } from '@/domain/metrics/rules';
 import type { PnlBasis } from '@/domain/types';
 import { useDisplay } from '@/lib/display';
+import { FigureText } from '@/components/product/figure-text';
 import { formatAdherence, keepHyphens } from '@/lib/format';
 import { EASING_POINTS } from '@/lib/motion';
 import { CARD, CardHeader, HERO, signTone } from './shared';
@@ -87,9 +88,15 @@ function RuleRow({
   const pct = formatAdherence(rule.adherence);
   const broken = rule.broken > 0;
   const text = (
-    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      <span className="line-clamp-2">{keepHyphens(rule.text)}</span>
-      {costliest ? <Chip tone="warn">Costliest</Chip> : null}
+    <span className="flex flex-col items-start">
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="line-clamp-2">{keepHyphens(rule.text)}</span>
+        {costliest ? <Chip tone="warn">Costliest</Chip> : null}
+      </span>
+      {/* Each rule belongs to a playbook, as in TradeZella. */}
+      <span className="text-xs font-normal text-muted">
+        {rule.strategyName}
+      </span>
     </span>
   );
 
@@ -145,7 +152,9 @@ function RuleRow({
         className={`${PAD.cost} ${LINE_END} text-right whitespace-nowrap ${FIGURE}`}
       >
         {broken ? (
-          <span className={signTone(rule.brokenPnl)}>{cost.text}</span>
+          <span className={signTone(rule.brokenPnl)}>
+            <FigureText f={cost} />
+          </span>
         ) : (
           <span className="font-normal text-faint">none</span>
         )}
@@ -384,7 +393,7 @@ export function PlanCard({
           <span
             className={`text-[21px] font-semibold tracking-[-0.02em] whitespace-nowrap tabular-nums ${cost < 0 ? 'text-on-accent-loss' : 'text-white'}`}
           >
-            {costed.text}
+            <FigureText f={costed} />
           </span>
         </div>
       </div>

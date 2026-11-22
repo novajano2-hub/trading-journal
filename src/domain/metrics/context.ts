@@ -1,5 +1,6 @@
 import { quoteToPnl } from '../currency';
 import { toCents } from '../money';
+import { outcomeOf } from '../outcome';
 import type { BreakevenRange, Cents, PnlBasis, Trade } from '../types';
 
 export type { BreakevenRange, PnlBasis } from '../types';
@@ -50,4 +51,25 @@ export function costBasis(t: Trade): Cents {
       t.avgEntry,
     ),
   );
+}
+
+/**
+ * The one way a closed trade is classified: its P&L on the chosen basis against
+ * the breakeven range (percent ranges use Net ROI on the cost basis). `summarize`
+ * and the Outcome filter both call it, so they never disagree.
+ */
+export function classify(
+  t: Trade,
+  ctx: Pick<MetricContext, 'pnlBasis' | 'breakevenRange'>,
+): { value: Cents; outcome: 'win' | 'loss' | 'breakeven' } {
+  const value = pnlOf(t, ctx.pnlBasis);
+  const basis = costBasis(t);
+  return {
+    value,
+    outcome: outcomeOf(
+      value,
+      ctx.breakevenRange,
+      basis > 0 ? value / basis : undefined,
+    ),
+  };
 }

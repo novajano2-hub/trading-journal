@@ -10,15 +10,14 @@ export const SEED_GROUPS = [
 ] as const;
 export type SeedGroup = (typeof SEED_GROUPS)[number][0];
 
-/** Each strategy's one 'loser' rule, in its Risk group. */
-export const LOSER_RULE = 'Took the loss at the planned stop';
-
 export interface StrategySeed {
   name: string;
   description: string;
   assetClasses: AssetClass[];
   /** The 'always' rules, in group order. */
   rules: { group: SeedGroup; text: string }[];
+  /** The strategy's one 'loser' rule, in its Risk group; worded for the strategy, so no two rows read alike. */
+  loserRule: string;
   checklist: string[];
   /** Name of the setup tag that goes with this strategy. */
   setupTag: string;
@@ -46,6 +45,7 @@ export const STRATEGY_SEEDS: readonly StrategySeed[] = [
       { group: 'risk', text: 'Risk no more than 0.5% of the account' },
       { group: 'management', text: 'No re-entry after two failed breaks' },
     ],
+    loserRule: 'Took the loss at the stop inside the range',
     checklist: [
       'Range marked before the open',
       'Higher-timeframe trend agrees',
@@ -69,6 +69,7 @@ export const STRATEGY_SEEDS: readonly StrategySeed[] = [
       { group: 'risk', text: 'Stop beyond the pullback extreme' },
       { group: 'management', text: 'Move the stop to breakeven after 1R' },
     ],
+    loserRule: 'Took the loss when the pullback extreme broke',
     checklist: [
       'Trend direction written down',
       'Pullback depth is shallow',
@@ -94,6 +95,7 @@ export const STRATEGY_SEEDS: readonly StrategySeed[] = [
       { group: 'risk', text: 'Maximum two attempts per level' },
       { group: 'management', text: 'Stand aside after two losses in a row' },
     ],
+    loserRule: 'Took the loss when the level failed to hold',
     checklist: [
       'Level is on the plan',
       'Rejection candle confirmed',
@@ -120,6 +122,7 @@ export const STRATEGY_SEEDS: readonly StrategySeed[] = [
       { group: 'risk', text: 'Stop under the breakout candle' },
       { group: 'management', text: 'Scale out a third at 1R' },
     ],
+    loserRule: 'Took the loss when the momentum stalled',
     checklist: [
       'Calendar checked for high-impact news',
       'Spread is normal',

@@ -12,6 +12,7 @@ import type {
 } from '@/domain/metrics/goals';
 import type { Cents, Goals } from '@/domain/types';
 import { useDisplay } from '@/lib/display';
+import { FigureText } from '@/components/product/figure-text';
 import { plural } from '@/lib/format';
 import { onTradingDate } from '@/lib/time-format';
 import { GoalsForm } from './goals-form';
@@ -45,7 +46,7 @@ function GoalLabel({
       {/* Goals are always net, whatever the Gross/Net switch says. */}
       <MetricTip id={id} basis="net" />
       <span className={`font-[550] text-muted ${FIGURE}`}>
-        {display.figure({ money: amount }, false, currency).text}
+        <FigureText f={display.figure({ money: amount }, false, currency)} />
       </span>
     </span>
   );
@@ -91,7 +92,7 @@ function WeeklyRow({
         <span
           className={`text-[22px] leading-[1.25] font-semibold tracking-[-0.03em] ${FIGURE} ${signTone(weekly.net)}`}
         >
-          {display.cash(weekly.net, true, currency).text}
+          <FigureText f={display.cash(weekly.net, true, currency)} />
         </span>{' '}
         <span className="text-[12.5px] text-muted">{weekLabel}</span>
       </p>
@@ -149,7 +150,7 @@ function DayGrid({
         return (
           <span
             key={d.date}
-            title={`${dayLabel(d.date)}, ${display.cash(d.net, true, currency).text}${kept ? '' : ', broke the limit'}`}
+            title={`${dayLabel(d.date)}, ${display.cash(d.net, true, currency).label}${kept ? '' : ', broke the limit'}`}
             className={`aspect-square rounded-[1.5px] ${kept ? 'bg-gain-fill/35' : 'bg-loss-fill'}`}
           />
         );
@@ -182,7 +183,7 @@ function DailyLossRow({
       <>
         {dayLabel(latest.date)} at{' '}
         <span className={`${FIGURE} ${signTone(latest.net)}`}>
-          {display.cash(latest.net, true, currency).text}
+          <FigureText f={display.cash(latest.net, true, currency)} />
         </span>
       </>
     );

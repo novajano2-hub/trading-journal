@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { makeTrade } from '../domain/__fixtures__/trades';
 import { resolveInstrument } from '../domain/instruments';
+import { summarize } from '../domain/metrics/summary';
 import type { Account, Trade } from '../domain/types';
 import {
   applyFilters,
@@ -322,6 +323,51 @@ describe('the full filter set', () => {
     expect(
       applyFilters(ts, { ...EMPTY_FILTERS, outcomes: ['breakeven'] }, wide),
     ).toEqual([win, loss, flat]);
+  });
+
+  test('outcome and summarize classify alike under a percent band and on either basis', () => {
+    // ES, 1 lot at 5000: cost basis $250,000, so +$100 net is +0.04%.
+    const es = trade({
+      instrument: resolveInstrument('ESZ5')!,
+      avgEntry: 5000,
+      maxPosition: 1,
+      net: 10000,
+      gross: 10000,
+    });
+    // Gross is a win even though the net is not: +$100 net, +$300 gross.
+    const costly = trade({
+      instrument: resolveInstrument('ESZ5')!,
+      avgEntry: 5000,
+      maxPosition: 1,
+      net: -100,
+      gross: 30000,
+      fees: 30100,
+    });
+    const band = { unit: 'percent', from: -0.001, to: 0.001 } as const;
+    for (const pnlBasis of ['net', 'gross'] as const) {
+      const e: FilterEnv = { ...env, breakevenRange: band, pnlBasis };
+      const ctx = {
+        timeZone: env.timeZone,
+        breakevenRange: band,
+        pnlBasis,
+      };
+      for (const t of [es, costly]) {
+        const filtered = (o: 'win' | 'loss' | 'breakeven') =>
+          applyFilters([t], { ...EMPTY_FILTERS, outcomes: [o] }, e).length;
+        const s = summarize([t], ctx);
+        expect(filtered('win')).toBe(s.wins);
+        expect(filtered('loss')).toBe(s.losses);
+        expect(filtered('breakeven')).toBe(s.breakevens);
+      }
+    }
+    // The probe: +0.04% sits inside +-0.1%, so it is breakeven and not a win.
+    const probe: FilterEnv = { ...env, breakevenRange: band };
+    expect(
+      applyFilters([es], { ...EMPTY_FILTERS, outcomes: ['breakeven'] }, probe),
+    ).toEqual([es]);
+    expect(
+      applyFilters([es], { ...EMPTY_FILTERS, outcomes: ['win'] }, probe),
+    ).toEqual([]);
   });
 
   test('status and holding: intraday is one local date, open trades fail holding', () => {

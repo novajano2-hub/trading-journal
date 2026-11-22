@@ -82,7 +82,7 @@ test('Gross/Net relabels P&L', async ({ page }) => {
   await ready(page);
   const pnl = page.getByTestId('kpi-pnl');
   await expect(pnl).toContainText('Net P&L');
-  const display = page.getByRole('button', { name: /^Display: / });
+  const display = page.getByRole('button', { name: /show as / });
   await display.click();
   await page.getByRole('menuitemradio', { name: 'Gross' }).click();
   await expect(pnl).toContainText('Gross P&L');
@@ -96,15 +96,15 @@ test('the Display menu hides every amount under Privacy and brings them back', a
 }) => {
   await page.goto('/app/dashboard');
   await ready(page);
-  await page.getByRole('button', { name: /^Display: / }).click();
+  await page.getByRole('button', { name: /show as / }).click();
   await page.getByRole('menuitemradio', { name: 'Privacy' }).click();
   await page.keyboard.press('Escape');
   await expect(
-    page.getByRole('button', { name: 'Display: Privacy, Net P&L' }),
+    page.getByRole('button', { name: 'Net, show as Privacy' }),
   ).toBeFocused();
   await expect(page.getByTestId('kpi-pnl')).toContainText('$•••');
   expect(await page.locator('body').innerText()).not.toMatch(/\$\d/);
-  await page.getByRole('button', { name: /^Display: / }).click();
+  await page.getByRole('button', { name: /show as / }).click();
   await page.getByRole('menuitemradio', { name: 'Dollar' }).click();
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('kpi-pnl')).toContainText(/\$\d/);

@@ -69,6 +69,7 @@ export function NumberTicker({
   digits,
   currency,
   format,
+  label,
   className = '',
 }: {
   value: number;
@@ -84,6 +85,8 @@ export function NumberTicker({
    * unit (a percentage, R, a hidden amount). The tone follows the value's sign.
    */
   format?: (value: number) => string;
+  /** What a screen reader gets in place of the final text ("hidden amount", "n trades left out"). */
+  label?: string;
   className?: string;
 }) {
   const reduced = useReducedMotion();
@@ -129,7 +132,7 @@ export function NumberTicker({
       <noscript>
         <style>{NO_SCRIPT_CSS}</style>
       </noscript>
-      <span className="sr-only">{final}</span>
+      <span className="sr-only">{label ?? final}</span>
       <span aria-hidden="true" className="ticker-count motion-reduce:hidden">
         {frame(shown)}
       </span>

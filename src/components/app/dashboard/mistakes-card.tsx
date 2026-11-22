@@ -70,7 +70,7 @@ export function MistakesCard({
               display.ofTrades(m.tradeIds, m.pnl),
               true,
               currency,
-            ).text;
+            ).label;
             const trades = `${m.tradeCount} ${plural(m.tradeCount, 'trade')}`;
             const share = largest > 0 ? Math.abs(m.pnl) / largest : 0;
             return (

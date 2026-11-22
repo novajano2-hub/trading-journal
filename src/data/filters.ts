@@ -9,12 +9,13 @@ import {
   startOfYear,
   subMonths,
 } from 'date-fns';
-import { outcomeOf } from '../domain/outcome';
+import { classify } from '../domain/metrics/context';
 import { localDate, localParts } from '../domain/time';
 import type {
   Account,
   BreakevenRange,
   Direction,
+  PnlBasis,
   Trade,
 } from '../domain/types';
 
@@ -448,6 +449,8 @@ export interface FilterEnv {
   accounts: readonly Account[];
   /** What counts as breakeven for the outcome filter; default is exactly 0. */
   breakevenRange?: BreakevenRange;
+  /** The basis the outcome is read on, as `summarize` reads it; default net. */
+  pnlBasis?: PnlBasis;
 }
 
 const NO_RANGE: BreakevenRange = { unit: 'amount', from: 0, to: 0 };
@@ -531,12 +534,10 @@ export function applyFilters(
     if (f.status !== undefined && t.status !== f.status) return false;
     if (outcomes.size > 0) {
       if (!closed) return false;
-      const cost = t.avgEntry * t.maxPosition * t.instrument.pointValue;
-      const o = outcomeOf(
-        t.net,
-        breakeven,
-        cost > 0 ? t.net / cost : undefined,
-      );
+      const o = classify(t, {
+        breakevenRange: breakeven,
+        pnlBasis: env.pnlBasis ?? 'net',
+      }).outcome;
       if (!outcomes.has(o)) return false;
     }
     if (f.holding !== undefined) {

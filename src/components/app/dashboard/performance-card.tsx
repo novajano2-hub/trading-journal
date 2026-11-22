@@ -170,6 +170,7 @@ function Kpi({
               digits={1}
               currency={currency}
               format={spec?.format}
+              label={spec?.label}
             />
           )}
         </div>
@@ -210,7 +211,7 @@ export function PerformanceCard({
   const display = useDisplay();
   // A balance is an amount, never a return: dollars, or hidden.
   const balance = (cents: Cents) =>
-    display.figure({ money: cents }, false, currency).text;
+    display.figure({ money: cents }, false, currency);
   const start = balance(equity[0] ?? 0);
   const end = balance(equity[equity.length - 1] ?? 0);
   const pnl = display.ofAll(performance.pnl);
@@ -245,7 +246,7 @@ export function PerformanceCard({
             />{' '}
             {/* The line's own label already says this to a screen reader. */}
             <span aria-hidden="true" className="whitespace-nowrap tabular-nums">
-              {start} to {end}
+              {start.text} to {end.text}
             </span>
           </span>
         }
@@ -268,6 +269,7 @@ export function PerformanceCard({
             kind="money"
             currency={currency}
             format={pnlTicker.format}
+            label={pnlTicker.label}
             className="col-start-1 row-start-1 min-w-0!"
           />
         </span>
@@ -275,14 +277,15 @@ export function PerformanceCard({
           <MetricTip id="pnl" basis={basis} />
         </span>
         {leftOut > 0 ? (
-          <span className="text-[12.5px] text-faint">
+          // The figure's spoken label already says it.
+          <span aria-hidden="true" className="text-[12.5px] text-faint">
             {leftOut} {plural(leftOut, 'trade')} left out
           </span>
         ) : null}
       </div>
       <Sparkline
         series={line.points}
-        label={`Equity, from ${start} to ${end}`}
+        label={`Equity, from ${start.label} to ${end.label}`}
         className="mt-1.5 mb-2.5"
       />
       <div className="mt-auto grid grid-cols-3 border-t border-line">

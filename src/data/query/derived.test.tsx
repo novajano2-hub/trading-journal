@@ -16,10 +16,11 @@ import {
 import { parseCsv } from '@/domain/import/csv';
 import { guessMapping } from '@/domain/import/mapping';
 import { EMPTY_FILTERS } from '../filters';
+import { makeTrade } from '@/domain/__fixtures__/trades';
 import { fixtureSample } from '../__fixtures__/sample';
 import { createLocalRepository } from '../local/local-repository';
 import type { Repository } from '../repository';
-import { USER_WORKSPACE } from '../workspaces';
+import { SAMPLE_WORKSPACE, USER_WORKSPACE } from '../workspaces';
 import {
   useGlobalFilters,
   useImportPlan,
@@ -39,11 +40,11 @@ vi.mock('next/navigation', () => ({
 beforeEach(() => window.history.replaceState(null, '', '/app/dashboard'));
 afterEach(cleanup);
 
-function setup() {
+function setup(sample = fixtureSample) {
   const repository = createLocalRepository({
     indexedDB: new IDBFactory(),
     IDBKeyRange,
-    sample: async () => fixtureSample(),
+    sample: async () => sample(),
   });
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
@@ -350,4 +351,60 @@ test('useImportPlan: an inline input object does not loop', async () => {
   await new Promise((r) => setTimeout(r, 50));
   expect(renders).toBeLessThan(10);
   expect(result.current.data).toBeDefined();
+});
+
+test('useMetrics: day figures keep an exit dated inside the range when the open trade is matched outside it', async () => {
+  // ES long opened Fri 13 Nov; one lot sold Tue 17 Nov for -$1,000; one lot still open.
+  const held = makeTrade({
+    id: 'held',
+    workspaceId: SAMPLE_WORKSPACE.id,
+    accountId: 'acc-a',
+    status: 'open',
+    openedAt: '2026-11-13T15:00:00Z',
+    net: 0,
+    gross: 0,
+    maxPosition: 2,
+    avgEntry: 5000,
+    executions: [
+      {
+        id: 'e1',
+        accountId: 'acc-a',
+        symbol: 'ESZ5',
+        side: 'buy',
+        qty: 2,
+        price: 5000,
+        time: '2026-11-13T15:00:00Z',
+        fees: 0,
+        commission: 0,
+      },
+      {
+        id: 'e2',
+        accountId: 'acc-a',
+        symbol: 'ESZ5',
+        side: 'sell',
+        qty: 1,
+        price: 4980,
+        time: '2026-11-17T15:00:00Z',
+        fees: 0,
+        commission: 0,
+      },
+    ],
+  });
+  const { Wrapper } = setup(() => ({ ...fixtureSample(), trades: [held] }));
+  const { result } = renderHook(
+    () =>
+      useMetrics({
+        ...EMPTY_FILTERS,
+        range: { from: '2026-11-16', to: '2026-11-20' },
+      }),
+    { wrapper: Wrapper },
+  );
+  await waitFor(() => expect(result.current.status).toBe('success'));
+  const usd = result.current.data![0]!;
+  expect(usd.days.map((d) => [d.date, d.net])).toEqual([
+    ['2026-11-17', -100000],
+  ]);
+  expect(usd.netDays.map((d) => [d.date, d.net])).toEqual([
+    ['2026-11-17', -100000],
+  ]);
 });

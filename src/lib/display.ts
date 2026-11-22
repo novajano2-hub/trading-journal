@@ -249,6 +249,8 @@ export const FigureSourceContext = createContext<FigureSource | null>(null);
 export interface TickerSpec {
   value: number;
   format: (value: number) => string;
+  /** What a screen reader gets for the final figure. */
+  label: string;
 }
 
 export interface Display {
@@ -363,6 +365,7 @@ export function useDisplay(): Display {
       return {
         value: unitValue(f, shown)!,
         format: (v) => formatUnitValue(shown, v, { currency, signed: true }),
+        label: figure(f, true, currency).label,
       };
     },
   };

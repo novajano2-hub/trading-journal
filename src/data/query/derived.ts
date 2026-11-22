@@ -137,6 +137,8 @@ export interface TradeSet {
   /** The filters as applied: cleaned of ids the workspace doesn't have. Chips read these. */
   filters: GlobalFilters;
   trades: Trade[];
+  /** The same filters except the date: what the day figures are built from. */
+  dayTrades: Trade[];
   /** The selected accounts: the active ones when no account is filtered. */
   accounts: Account[];
 }
@@ -156,7 +158,9 @@ export interface TradeSet {
  *   picks the trades for the log, win rate and profit factor. Day figures
  *   (calendar, daily bars, day stats, goals) take instead the exits dated
  *   inside the range (`MetricContext.range`), so a trade held over several
- *   days books each exit on its own day and only those in the range.
+ *   days books each exit on its own day and only those in the range. They
+ *   are built from `dayTrades` (every filter but the date), so an exit in the
+ *   range counts even when its trade is matched outside it.
  */
 export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
   const trades = useTrades();
@@ -189,14 +193,17 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
       strategies.data,
       tags.data,
     );
+    const env = {
+      timeZone,
+      today,
+      accounts: accounts.data,
+      breakevenRange: prefs.data?.breakevenRange,
+      pnlBasis: prefs.data?.pnlBasis,
+    };
     return {
       filters: clean,
-      trades: applyFilters(trades.data, clean, {
-        timeZone,
-        today,
-        accounts: accounts.data,
-        breakevenRange: prefs.data?.breakevenRange,
-      }),
+      trades: applyFilters(trades.data, clean, env),
+      dayTrades: applyFilters(trades.data, { ...clean, range: {} }, env),
       accounts: selectedAccounts(accounts.data, clean),
     };
   }, [
@@ -208,6 +215,7 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
     today,
     filterKey,
     prefs.data?.breakevenRange,
+    prefs.data?.pnlBasis,
   ]);
 
   return { ...state, data: state.status === 'success' ? data : undefined };
@@ -226,6 +234,7 @@ export function useMetrics(filters: GlobalFilters): Derived<CurrencyMetrics[]> {
     () =>
       set.data && prefs
         ? metricsByCurrency(set.data.trades, {
+            dayTrades: set.data.dayTrades,
             accounts: set.data.accounts,
             // Day figures count only the exits dated inside the date range.
             ctx: {
