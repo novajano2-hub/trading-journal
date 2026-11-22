@@ -17,6 +17,8 @@ export type BreakdownKey =
 export interface BreakdownOptions {
   strategyNames?: Record<string, string>;
   tagNames?: Record<string, string>;
+  /** Each tag's category name: the tag breakdown groups its rows by them. */
+  tagCategoryNames?: Record<string, string>;
   /** Which instant the time reports (weekday, hour, time-of-day, session) bucket by. Default 'entry'. */
   timeBasis?: 'entry' | 'exit';
   /** Time-of-day bucket width in minutes. Default 30. */
@@ -25,6 +27,8 @@ export interface BreakdownOptions {
 export interface BreakdownRow {
   key: string;
   label: string;
+  /** The tag breakdown's category name, when `tagCategoryNames` names one. */
+  group?: string;
   summary: Summary;
 }
 export interface RBin {
@@ -126,11 +130,13 @@ function fixed(
 
 const basisPnl = (s: Summary) => (s.basis === 'gross' ? s.grossPnl : s.netPnl);
 
+/** Rows for the keys the trades carry: by P&L, best first, with the none row last; with `groupOf`, by group name first. */
 function dynamic(
   closed: ClosedTrade[],
   keysOf: (t: ClosedTrade) => string[],
   labelOf: (key: string) => string,
   ctx: MetricContext,
+  groupOf?: (key: string) => string | undefined,
 ): BreakdownRow[] {
   const groups = new Map<string, ClosedTrade[]>();
   for (const t of closed) {
@@ -140,15 +146,21 @@ function dynamic(
       else groups.set(k, [t]);
     }
   }
-  const rows = [...groups].map(([key, ts]) => ({
-    key,
-    label: labelOf(key),
-    summary: summarize(ts, ctx),
-  }));
+  const rows = [...groups].map(([key, ts]): BreakdownRow => {
+    const group = key === NONE ? undefined : groupOf?.(key);
+    return {
+      key,
+      label: labelOf(key),
+      ...(group !== undefined && { group }),
+      summary: summarize(ts, ctx),
+    };
+  });
   // Array.prototype.sort is stable, so ties keep first-appearance order.
   return rows.sort((a, b) => {
     if (a.key === NONE) return b.key === NONE ? 0 : 1;
     if (b.key === NONE) return -1;
+    if (groupOf && a.group !== b.group)
+      return (a.group ?? '').localeCompare(b.group ?? '');
     return basisPnl(b.summary) - basisPnl(a.summary);
   });
 }
@@ -201,7 +213,9 @@ export function breakdown(
     case 'strategy':
       return dynamic(
         closed,
-        (t) => [t.strategyId ?? NONE],
+        // A trade counts under each of its strategies.
+        (t) =>
+          t.strategyIds.length === 0 ? [NONE] : [...new Set(t.strategyIds)],
         (k) => (k === NONE ? 'No strategy' : (ctx.strategyNames?.[k] ?? k)),
         ctx,
       );
@@ -211,6 +225,7 @@ export function breakdown(
         (t) => (t.tagIds.length === 0 ? [NONE] : [...new Set(t.tagIds)]),
         (k) => (k === NONE ? 'Untagged' : (ctx.tagNames?.[k] ?? k)),
         ctx,
+        ctx.tagCategoryNames && ((k) => ctx.tagCategoryNames?.[k]),
       );
   }
 }

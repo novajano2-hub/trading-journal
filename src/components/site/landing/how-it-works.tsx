@@ -13,6 +13,7 @@ import { Chip } from '@/components/ui/chip';
 import { IconTile, type TileTone } from '@/components/ui/icon-tile';
 import { SectionHeading } from './section-heading';
 import { guessColumns, type PreviewField } from '@/domain/import/guess-columns';
+import { mistakeTags } from '@/domain/metrics/mistakes';
 import { formatPnl } from '@/lib/format';
 import type { SampleView } from '@/lib/landing/sample-view';
 
@@ -76,6 +77,9 @@ export function HowItWorks({ view }: { view: SampleView }) {
     const tag = view.tags.find((t) => t.id === id);
     return tag ? [tag] : [];
   });
+  const mistakes = new Set(
+    mistakeTags(view.tags, view.tagCategories).map((t) => t.id),
+  );
   const checks = view.checksFor(trade);
   const kept = checks.filter((c) => c.ok).length;
   const broken = checks.length - kept;
@@ -128,7 +132,7 @@ export function HowItWorks({ view }: { view: SampleView }) {
                 {tags.map((t) => (
                   <li key={t.id}>
                     <Chip
-                      tone={t.category === 'mistake' ? 'warn' : 'neutral'}
+                      tone={mistakes.has(t.id) ? 'warn' : 'neutral'}
                       className="font-medium"
                     >
                       {t.name}

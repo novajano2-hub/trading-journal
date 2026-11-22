@@ -8,6 +8,7 @@ const WS = SAMPLE_WORKSPACE.id;
 /**
  * Test-only: a tiny sample workspace for store and hook tests. Fresh objects on every call.
  * Active `acc-a` holds closed USD trades `f-1` (win, note `j-1`) and `f-2` (loss); archived `acc-b` holds `f-3`.
+ * Tags `tag-setup` (Setups) and `tag-fomo` (the built-in Mistakes); `str-1` has an Entry and a Risk group.
  */
 export function fixtureSample(): SampleWorkspace {
   return {
@@ -42,25 +43,72 @@ export function fixtureSample(): SampleWorkspace {
         name: 'Opening range breakout',
         description: 'Trade the break of the first 15-minute range.',
         assetClasses: ['future'],
-        rules: [
+        groups: [
           {
-            id: 'r-1',
-            text: 'Wait for the 15-minute range to close',
-            group: 'entry',
+            id: 'g-entry',
+            title: 'Entry',
+            rules: [
+              {
+                id: 'r-1',
+                text: 'Wait for the 15-minute range to close',
+                showWhen: 'always',
+              },
+            ],
           },
           {
-            id: 'r-2',
-            text: 'Stop beyond the far side of the range',
-            group: 'risk',
+            id: 'g-risk',
+            title: 'Risk',
+            rules: [
+              {
+                id: 'r-2',
+                text: 'Stop beyond the far side of the range',
+                showWhen: 'always',
+              },
+            ],
           },
         ],
         checklist: ['Check the economic calendar'],
         status: 'active',
       },
     ],
+    tagCategories: [
+      {
+        id: 'setups',
+        workspaceId: WS,
+        name: 'Setups',
+        color: '#2B35AF',
+        builtIn: false,
+      },
+      {
+        id: 'mistakes',
+        workspaceId: WS,
+        name: 'Mistakes',
+        color: '#D97706',
+        role: 'mistake',
+        builtIn: true,
+      },
+      {
+        id: 'custom-tags',
+        workspaceId: WS,
+        name: 'Custom tags',
+        color: '#16A34A',
+        builtIn: true,
+      },
+    ],
     tags: [
-      { id: 'tag-setup', workspaceId: WS, name: 'Breakout', category: 'setup' },
-      { id: 'tag-fomo', workspaceId: WS, name: 'FOMO', category: 'mistake' },
+      {
+        id: 'tag-setup',
+        workspaceId: WS,
+        name: 'Breakout',
+        categoryId: 'setups',
+      },
+      {
+        id: 'tag-fomo',
+        workspaceId: WS,
+        name: 'FOMO',
+        categoryId: 'mistakes',
+        description: 'Entered because the move was running away.',
+      },
     ],
     trades: [
       makeTrade({
@@ -74,7 +122,7 @@ export function fixtureSample(): SampleWorkspace {
         avgExit: 6005,
         net: 24_550,
         fees: 450,
-        strategyId: 'str-1',
+        strategyIds: ['str-1'],
         ruleChecks: [
           { ruleId: 'r-1', followed: true },
           { ruleId: 'r-2', followed: true },
@@ -131,6 +179,7 @@ export function fixtureSample(): SampleWorkspace {
           ],
         },
         linkedTradeIds: ['f-1'],
+        tags: [],
         updatedAt: '2026-11-16T21:00:00.000Z',
       },
     ],

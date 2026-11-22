@@ -21,7 +21,12 @@ import type { FilterOptions } from './filter-model';
 
 vi.mock('next/navigation', () => import('./__fixtures__/navigation'));
 
-const NO_OPTIONS: FilterOptions = { symbols: [], strategies: [], tags: [] };
+const NO_OPTIONS: FilterOptions = {
+  symbols: [],
+  strategies: [],
+  tags: [],
+  categories: [],
+};
 
 beforeEach(() => {
   window.history.replaceState(null, '', '/app/dashboard');
@@ -157,6 +162,23 @@ test('symbols are the workspace roots, and checking one filters by it', async ()
   fireEvent.click(within(dialog).getByRole('button', { name: 'Clear' }));
   expect(window.location.search).toBe('');
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+});
+
+test('tags group under their categories, by name', async () => {
+  renderBar('/app/dashboard');
+  fireEvent.click(await liveChip('Tags'));
+  const dialog = await screen.findByRole('dialog', { name: 'Tags' });
+  const groups = within(dialog).getAllByRole('group');
+  expect(groups.map((g) => g.querySelector('legend')!.textContent)).toEqual([
+    'Mistakes',
+    'Setups',
+  ]);
+  expect(
+    within(groups[0]!).getByRole('checkbox', { name: 'FOMO' }),
+  ).toBeTruthy();
+  expect(
+    within(groups[1]!).getByRole('checkbox', { name: 'Breakout' }),
+  ).toBeTruthy();
 });
 
 test('a custom date range applies from the date pair', async () => {

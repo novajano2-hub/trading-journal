@@ -5,7 +5,7 @@ import { mergePatch } from './merge';
 export type TradePatch = Partial<
   Pick<
     Trade,
-    | 'strategyId'
+    | 'strategyIds'
     | 'tagIds'
     | 'rating'
     | 'ruleChecks'
@@ -13,42 +13,55 @@ export type TradePatch = Partial<
     | 'plannedTarget'
     | 'initialRisk'
     | 'noteId'
+    | 'reviewed'
   >
 >;
 
 /** The optional fields of Trade that a patch may clear with `undefined`. */
 const CLEARABLE = [
-  'strategyId',
   'rating',
   'plannedStop',
   'plannedTarget',
   'initialRisk',
   'noteId',
+  'reviewed',
 ];
 
 /**
  * A new trade with the patch applied; the input is never mutated.
- * `undefined` removes an optional field; the required `tagIds` and `ruleChecks` become empty.
+ * `undefined` removes an optional field; the required `strategyIds`, `tagIds`
+ * and `ruleChecks` become empty. When the patch leaves a strategy and sets no
+ * `ruleChecks`, the checks of that strategy's rules (by `rulesOf`) are dropped.
  */
-export function applyTradePatch(trade: Trade, patch: TradePatch): Trade {
+export function applyTradePatch(
+  trade: Trade,
+  patch: TradePatch,
+  rulesOf?: (strategyId: string) => readonly string[] | undefined,
+): Trade {
   const result = mergePatch(trade, patch, CLEARABLE);
 
   if ('plannedStop' in patch && !('initialRisk' in patch)) {
     if (patch.plannedStop === undefined) delete result.initialRisk;
     else result.initialRisk = riskFromStop(result, patch.plannedStop);
   }
-  if (
-    'strategyId' in patch &&
-    patch.strategyId !== trade.strategyId &&
-    !('ruleChecks' in patch)
-  ) {
-    result.ruleChecks = [];
-  }
-  // These two are required on Trade: clearing them means empty.
+  // These are required on Trade: clearing them means empty.
+  if ('strategyIds' in patch && patch.strategyIds === undefined)
+    result.strategyIds = [];
   if ('ruleChecks' in patch && patch.ruleChecks === undefined)
     result.ruleChecks = [];
   if ('tagIds' in patch && patch.tagIds === undefined) result.tagIds = [];
+  result.strategyIds = [...new Set(result.strategyIds)];
   result.tagIds = [...new Set(result.tagIds)];
+
+  if ('strategyIds' in patch && !('ruleChecks' in patch) && rulesOf) {
+    const kept = new Set(result.strategyIds);
+    const gone = new Set(
+      trade.strategyIds
+        .filter((id) => !kept.has(id))
+        .flatMap((id) => rulesOf(id) ?? []),
+    );
+    result.ruleChecks = result.ruleChecks.filter((c) => !gone.has(c.ruleId));
+  }
   return result;
 }
 

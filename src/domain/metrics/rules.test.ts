@@ -10,7 +10,11 @@ const strat = (id: string, name: string, rules: Rule[]) =>
   ({
     id,
     name,
-    rules,
+    // The first two rules open the strategy's first group, the rest its second.
+    groups: [
+      { id: `${id}-a`, title: 'Risk', rules: rules.slice(0, 2) },
+      { id: `${id}-b`, title: 'Management', rules: rules.slice(2) },
+    ],
     workspaceId: 'w',
     description: '',
     assetClasses: [],
@@ -19,9 +23,17 @@ const strat = (id: string, name: string, rules: Rule[]) =>
   }) as Strategy;
 const strategies = [
   strat('s1', 'Range break', [
-    { id: 'r-stop', text: 'Stop stays where it was placed', group: 'risk' },
-    { id: 'r-size', text: 'Risk no more than 1R per trade', group: 'risk' },
-    { id: 'r-max', text: 'Max 6 trades a day', group: 'management' },
+    {
+      id: 'r-stop',
+      text: 'Stop stays where it was placed',
+      showWhen: 'always',
+    },
+    {
+      id: 'r-size',
+      text: 'Risk no more than 1R per trade',
+      showWhen: 'always',
+    },
+    { id: 'r-max', text: 'Max 6 trades a day', showWhen: 'always' },
   ]),
 ];
 const chk = (ruleId: string, followed: boolean | null) => ({
@@ -69,6 +81,7 @@ describe('ruleScorecard', () => {
     const [stop, size, max] = ruleScorecard(trades, strategies, ctx);
     expect(stop).toMatchObject({
       ruleId: 'r-stop',
+      group: 'Risk',
       strategyName: 'Range break',
       kept: 1,
       broken: 2,
@@ -85,6 +98,7 @@ describe('ruleScorecard', () => {
     });
     expect(max).toMatchObject({
       ruleId: 'r-max',
+      group: 'Management',
       kept: 3,
       broken: 0,
       brokenPnl: 0,
@@ -120,10 +134,10 @@ describe('ruleScorecard', () => {
   test('never-broken rules follow broken ones, by adherence then text', () => {
     const ss = [
       strat('s1', 'S', [
-        { id: 'a', text: 'B rule', group: 'entry' },
-        { id: 'b', text: 'A rule', group: 'entry' },
-        { id: 'c', text: 'C rule', group: 'entry' },
-        { id: 'd', text: 'Broken', group: 'entry' },
+        { id: 'a', text: 'B rule', showWhen: 'always' },
+        { id: 'b', text: 'A rule', showWhen: 'always' },
+        { id: 'c', text: 'C rule', showWhen: 'always' },
+        { id: 'd', text: 'Broken', showWhen: 'always' },
       ]),
     ];
     const ts = [
@@ -170,7 +184,7 @@ describe('ruleScorecard', () => {
         {
           id: 'r2-stop',
           text: 'Stop stays where it was placed',
-          group: 'risk',
+          showWhen: 'always',
         },
       ]),
     ];

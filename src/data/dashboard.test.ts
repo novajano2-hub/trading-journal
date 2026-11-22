@@ -5,7 +5,7 @@ import {
   defaultMetricContext,
   type MetricContext,
 } from '@/domain/metrics/context';
-import type { RuleCheck } from '@/domain/types';
+import { strategyRules, type RuleCheck } from '@/domain/types';
 import {
   buildDashboard,
   pickPartition,
@@ -34,6 +34,7 @@ const usd = (ctx: MetricContext) =>
 const env = (ctx: MetricContext): DashboardEnv => ({
   strategies: s.strategies,
   tags: s.tags,
+  tagCategories: s.tagCategories,
   goals: { weeklyNet: 150000, dailyLossLimit: 50000 },
   baseCurrency: 'USD',
   ctx,
@@ -69,6 +70,24 @@ test('the dashboard is the engine, sorted by cost', () => {
   expect(d.goals.dailyLoss!.limit).toBe(50000);
   expect(d.tradesById.size).toBe(m.trades.length);
   expect(d.closedCount).toBe(m.summary.closedCount);
+});
+
+test('a recent trade in two strategies names both', () => {
+  const ctx = defaultMetricContext(NY);
+  const [a, b] = s.strategies;
+  const [m] = metricsByCurrency(
+    [
+      makeTrade({
+        net: 100,
+        closedAt: '2026-11-18T15:00:00Z',
+        strategyIds: [a!.id, 'deleted', b!.id],
+      }),
+    ],
+    { accounts: s.accounts, ctx, baseCurrency: 'USD' },
+  );
+  expect(buildDashboard(m!, env(ctx)).recent[0]!.strategyName).toBe(
+    `${a!.name}, ${b!.name}`,
+  );
 });
 
 test('goals need the base currency, and are absent when unset', () => {
@@ -237,7 +256,12 @@ test('imported trades with no strategy and no rule checks (Review Focus 1)', () 
     ctx,
     baseCurrency: 'USD',
   });
-  const d = buildDashboard(m!, { ...env(ctx), strategies: [], tags: [] });
+  const d = buildDashboard(m!, {
+    ...env(ctx),
+    strategies: [],
+    tags: [],
+    tagCategories: [],
+  });
   expect(d.plan.adherence).toBeNull();
   expect(d.plan.checks).toBe(0);
   expect(d.plan.rules).toEqual([]);
@@ -264,7 +288,7 @@ describe('the headline adherence is the rule rows added up', () => {
         id: `h-${i}`,
         net: 1000,
         closedAt: `2026-11-1${i}T15:00:00Z`,
-        strategyId: strategy.id,
+        strategyIds: [strategy.id],
         ruleChecks: checks,
       }),
     );
@@ -275,7 +299,7 @@ describe('the headline adherence is the rule rows added up', () => {
     });
     return { m: m!, d: buildDashboard(m!, env(ctx)) };
   };
-  const ruleId = (i: number) => s.strategies[0]!.rules[i]!.id;
+  const ruleId = (i: number) => strategyRules(s.strategies[0]!)[i]!.id;
 
   test('a check on an unknown rule id counts in no row, so not in the headline', () => {
     const { m, d } = build([

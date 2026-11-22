@@ -4,17 +4,18 @@ import {
   type DateRange,
   type GlobalFilters,
 } from '@/data/filters';
-import type { Account, Strategy, Tag } from '@/domain/types';
+import type { Account, Strategy, Tag, TagCategory } from '@/domain/types';
 import { plural } from '@/lib/format';
 
 /** The top bar's chips other than the date. Accounts live in the sidebar switcher. */
 export type ChipDimension = 'symbol' | 'side' | 'strategy' | 'tag';
 
-/** What the chip popovers offer: the workspace's symbol roots, strategies and tags. */
+/** What the chip popovers offer: the workspace's symbol roots, strategies, tags and the categories they sit in. */
 export interface FilterOptions {
   symbols: string[];
   strategies: Strategy[];
   tags: Tag[];
+  categories: TagCategory[];
 }
 
 /** `list` with `id` added or removed, sorted ascending. */

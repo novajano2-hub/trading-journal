@@ -49,7 +49,12 @@ function Journal({ view }: { view: SampleView }) {
           className="pb-1"
         >
           <div className="mt-2">
-            <TradeRows trades={rows} tags={view.tags} maxTags={1} />
+            <TradeRows
+              trades={rows}
+              tags={view.tags}
+              categories={view.tagCategories}
+              maxTags={1}
+            />
           </div>
         </ProductCard>
       </AppWindow>

@@ -263,10 +263,13 @@ describe('imports.commit', () => {
     const { repo, plan, commit } = await setup();
     await commit(OPEN_ES, 'impA');
     const [open] = await repo.trades.list(M);
-    const keep = await repo.tags.create(M, { name: 'Keep', category: 'setup' });
+    const keep = await repo.tags.create(M, {
+      name: 'Keep',
+      categoryId: 'custom-tags',
+    });
     const drop = await repo.tags.create(M, {
       name: 'Drop',
-      category: 'mistake',
+      categoryId: 'mistakes',
     });
     await repo.trades.update(M, open!.id, { tagIds: [keep.id, drop.id] });
     const p = await plan(CLOSE_ES, 'impB');
@@ -384,13 +387,14 @@ describe('imports.undo', () => {
     const [opened] = await repo.trades.list(M);
     const tag = await repo.tags.create(M, {
       name: 'Breakout',
-      category: 'setup',
+      categoryId: 'custom-tags',
     });
     const note = await repo.journal.save(M, {
       kind: 'note',
       title: 'ES long',
       body: null,
       linkedTradeIds: [opened!.id],
+      tags: [],
     });
     const tagged = await repo.trades.update(M, opened!.id, {
       tagIds: [tag.id],
@@ -441,18 +445,26 @@ describe('imports.undo', () => {
       'impA',
     );
     const [es, nq] = await repo.trades.list(M);
-    const keep = await repo.tags.create(M, { name: 'Keep', category: 'setup' });
+    const keep = await repo.tags.create(M, {
+      name: 'Keep',
+      categoryId: 'custom-tags',
+    });
     const drop = await repo.tags.create(M, {
       name: 'Drop',
-      category: 'mistake',
+      categoryId: 'mistakes',
     });
     const edited = await repo.strategies.create(M, {
       name: 'Edited',
       description: '',
       assetClasses: ['future'],
-      rules: [
-        { id: 'r-1', text: 'One', group: 'entry' },
-        { id: 'r-2', text: 'Two', group: 'risk' },
+      groups: [
+        {
+          title: 'Entry',
+          rules: [
+            { id: 'r-1', text: 'One', showWhen: 'always' },
+            { id: 'r-2', text: 'Two', showWhen: 'always' },
+          ],
+        },
       ],
       checklist: [],
       status: 'active',
@@ -461,7 +473,12 @@ describe('imports.undo', () => {
       name: 'Removed',
       description: '',
       assetClasses: ['future'],
-      rules: [{ id: 'r-3', text: 'Three', group: 'entry' }],
+      groups: [
+        {
+          title: 'Entry',
+          rules: [{ id: 'r-3', text: 'Three', showWhen: 'always' }],
+        },
+      ],
       checklist: [],
       status: 'active',
     });
@@ -470,19 +487,21 @@ describe('imports.undo', () => {
       title: 'ES',
       body: null,
       linkedTradeIds: [],
+      tags: [],
     });
     await repo.trades.update(M, es!.id, {
       tagIds: [keep.id, drop.id],
-      strategyId: edited.id,
+      strategyIds: [edited.id, removed.id],
       ruleChecks: [
         { ruleId: 'r-1', followed: true },
         { ruleId: 'r-2', followed: false },
+        { ruleId: 'r-3', followed: true },
       ],
       noteId: note.id,
       rating: 4,
     });
     await repo.trades.update(M, nq!.id, {
-      strategyId: removed.id,
+      strategyIds: [removed.id],
       ruleChecks: [{ ruleId: 'r-3', followed: true }],
     });
 
@@ -493,7 +512,12 @@ describe('imports.undo', () => {
     );
     await repo.tags.remove(M, drop.id);
     await repo.strategies.update(M, edited.id, {
-      rules: [{ id: 'r-2', text: 'Two', group: 'risk' }],
+      groups: [
+        {
+          title: 'Risk',
+          rules: [{ id: 'r-2', text: 'Two', showWhen: 'always' }],
+        },
+      ],
     });
     await repo.strategies.remove(M, removed.id);
     await repo.journal.remove(M, note.id);
@@ -504,7 +528,7 @@ describe('imports.undo', () => {
       id: es!.id,
       status: 'open',
       tagIds: [keep.id],
-      strategyId: edited.id,
+      strategyIds: [edited.id],
       ruleChecks: [{ ruleId: 'r-2', followed: false }],
       rating: 4,
     });
@@ -512,9 +536,9 @@ describe('imports.undo', () => {
     expect(nqBack).toMatchObject({
       id: nq!.id,
       status: 'open',
+      strategyIds: [],
       ruleChecks: [],
     });
-    expect(nqBack).not.toHaveProperty('strategyId');
   });
 
   test('trades deleted by hand after an import do not stop its undo', async () => {
@@ -634,13 +658,17 @@ describe('imports.undo', () => {
       alter: (c) => ({ ...c, openTrades: [] }),
     });
     const [x, y] = await repo.trades.list(M);
-    const tag = await repo.tags.create(M, { name: 'T', category: 'setup' });
+    const tag = await repo.tags.create(M, {
+      name: 'T',
+      categoryId: 'custom-tags',
+    });
     await repo.trades.update(M, y!.id, { tagIds: [tag.id] });
     const note = await repo.journal.save(M, {
       kind: 'note',
       title: 'Y',
       body: null,
       linkedTradeIds: [y!.id],
+      tags: [],
     });
     const before = await repo.trades.list(M);
     expect(before.map((t) => t.status)).toEqual(['open', 'open']);
@@ -704,6 +732,7 @@ describe('imports.undo', () => {
       title: '',
       body: null,
       linkedTradeIds: open!.id as unknown as string[],
+      tags: [],
       updatedAt: '2026-11-20T00:00:00.000Z',
     });
     await expect(repo.imports.undo(M, a.id)).rejects.toThrow();
@@ -728,6 +757,7 @@ describe('trades.remove of an imported trade', () => {
       title: 'Both',
       body: null,
       linkedTradeIds: [es!.id, zc!.id],
+      tags: [],
     });
     const before = await repo.trades.list(M);
 

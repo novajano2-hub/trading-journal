@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { makeTrade } from '../domain/__fixtures__/trades';
 import type { Account, UserPrefs } from '../domain/types';
+import { defaultPrefs } from './repository';
 import { metricContextOf, metricsByCurrency } from './metrics';
 import { generateSampleWorkspace, SAMPLE_SEED } from './seed/generate';
 
@@ -70,6 +71,7 @@ describe('metricsByCurrency', () => {
 
 test('metricContextOf maps prefs', () => {
   const prefs: UserPrefs = {
+    ...defaultPrefs(),
     timeZone: 'Europe/London',
     baseCurrency: 'GBP',
     breakevenRange: { unit: 'amount', from: -500, to: 500 },

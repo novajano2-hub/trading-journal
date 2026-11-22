@@ -25,6 +25,30 @@ test('the invalidation table', () => {
   ]);
 });
 
+test('Plan 5 writes invalidate what they change', () => {
+  const ws = 'mine';
+  const k = (...names: (keyof typeof keys)[]) =>
+    names.map((n) => (keys[n] as (w: string) => readonly unknown[])(ws));
+  const table: [Parameters<typeof invalidationsFor>[0], unknown[]][] = [
+    ['tagCategories.create', k('tagCategories')],
+    ['tagCategories.update', k('tagCategories')],
+    ['tagCategories.remove', k('tagCategories', 'tags', 'trades', 'imports')],
+    ['templates.save', k('templates')],
+    ['templates.remove', k('templates')],
+    ['templates.setDefault', k('templates')],
+    ['trades.createManual', k('trades', 'imports')],
+    ['trades.replaceManual', k('trades', 'imports')],
+    ['trades.updateMany', k('trades', 'imports')],
+    ['accounts.clearTrades', k('trades', 'journal', 'imports')],
+    ['journal.trash', k('journal')],
+    ['journal.restore', k('journal')],
+    ['journal.ensureTradeNote', k('journal', 'trades', 'imports')],
+    ['journal.dailyNote', k('journal')],
+  ];
+  for (const [write, expected] of table)
+    expect(invalidationsFor(write, ws), write).toEqual(expected);
+});
+
 test('every write that changes what an import context holds makes it stale', () => {
   // The context holds the account's currency and open trades with their journaling.
   for (const write of [
@@ -35,6 +59,12 @@ test('every write that changes what an import context holds makes it stale', () 
     'strategies.remove',
     'journal.remove',
     'accounts.update',
+    'accounts.clearTrades',
+    'tagCategories.remove',
+    'trades.updateMany',
+    'trades.createManual',
+    'trades.replaceManual',
+    'journal.ensureTradeNote',
   ] as const)
     expect(invalidationsFor(write, 'mine'), write).toContainEqual(
       keys.imports('mine'),

@@ -19,7 +19,7 @@ describe('product previews render engine values', () => {
   test('rows and detail card', () => {
     const last = v.trades.slice(-3).reverse();
     const rows = renderToStaticMarkup(
-      <TradeRows trades={last} tags={v.tags} />,
+      <TradeRows trades={last} tags={v.tags} categories={v.tagCategories} />,
     );
     expect(rows).toContain('20 Nov 10:15');
     expect(rows).toContain('Opening range break');
@@ -80,12 +80,17 @@ describe('product previews render engine values', () => {
   test('rows can show just the most telling tag, mistakes first', () => {
     const six = v.trades.find((t) => t.serial === 6)!;
     const all = renderToStaticMarkup(
-      <TradeRows trades={[six]} tags={v.tags} />,
+      <TradeRows trades={[six]} tags={v.tags} categories={v.tagCategories} />,
     );
     expect(all).toContain('Breakout');
     expect(all).toContain('Impatient');
     const one = renderToStaticMarkup(
-      <TradeRows trades={[six]} tags={v.tags} maxTags={1} />,
+      <TradeRows
+        trades={[six]}
+        tags={v.tags}
+        categories={v.tagCategories}
+        maxTags={1}
+      />,
     );
     expect(one).toContain('Moved stop');
     expect(one).not.toContain('Breakout');

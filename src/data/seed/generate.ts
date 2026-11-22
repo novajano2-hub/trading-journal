@@ -1,26 +1,32 @@
 import { settleExpiredOptions } from '@/domain/import/expiry';
 import { resolveInstrument } from '@/domain/instruments';
+import { mistakeTags } from '@/domain/metrics/mistakes';
 import { riskFromStop } from '@/domain/metrics/summary';
 import { localDate } from '@/domain/time';
 import { buildTrades } from '@/domain/trade-builder';
 import { closedInOrder } from '@/domain/trade-status';
-import type {
-  Account,
-  AssetClass,
-  Execution,
-  JournalEntry,
-  Side,
-  Strategy,
-  Tag,
-  Trade,
+import {
+  strategyRules,
+  type Account,
+  type AssetClass,
+  type Execution,
+  type JournalEntry,
+  type Rule,
+  type Side,
+  type Strategy,
+  type Tag,
+  type TagCategory,
+  type Trade,
 } from '@/domain/types';
 import { SAMPLE_WORKSPACE } from '../workspaces';
 import { DAY_MS, NY, dow, isWeekday, nyMs, parseYmd, ymd } from './calendar';
 import {
   CUSTOM_NAMES,
+  LOSER_RULE,
   MISTAKE_NAMES,
   NEGATIVE_EMOTIONS,
   POSITIVE_EMOTIONS,
+  SEED_GROUPS,
   STRATEGY_SEEDS,
   TAG_SEEDS,
 } from './content';
@@ -40,8 +46,9 @@ import {
   type AccountSpec,
   type InstSpec,
 } from './instruments';
-import { writeJournal } from './journal';
+import { writeDailyNotes, writeJournal } from './journal';
 import { createRandom, type Random } from './random';
+import { CATEGORIES, categoryIn } from './templates';
 
 const WS = SAMPLE_WORKSPACE.id;
 
@@ -52,6 +59,7 @@ export interface SampleWorkspace {
   endDate: string;
   accounts: Account[];
   strategies: Strategy[];
+  tagCategories: TagCategory[];
   tags: Tag[];
   trades: Trade[];
   journal: JournalEntry[];
@@ -288,17 +296,30 @@ export function generateSampleWorkspace(opts: {
     );
   const trades = built.trades;
 
-  const { strategies, tags } = buildStrategiesAndTags();
-  for (const t of trades)
-    decorate(rng, t, firstFillPlan.get(t.executions[0]!.id)!, strategies, tags);
-  pinLatestTrades(trades, strategies, tags);
-  const journal = writeJournal(rng, trades, days, lastDay);
+  const { strategies, tagCategories, tags } = buildStrategiesAndTags();
+  const planOf = (t: Trade) => firstFillPlan.get(t.executions[0]!.id)!;
+  for (const t of trades) decorate(rng, t, planOf(t), strategies, tags);
+  // Plan 5's additions draw from streams of their own, so nothing above moves.
+  addSecondStrategies(
+    createRandom(opts.seed + 102),
+    trades,
+    planOf,
+    strategies,
+  );
+  gradeLoserRules(createRandom(opts.seed + 103), trades, planOf, strategies);
+  pinLatestTrades(trades, strategies, tags, tagCategories);
+  markReviewed(createRandom(opts.seed + 101), trades, endDate);
+  const journal = [
+    ...writeJournal(rng, trades, days, lastDay),
+    ...writeDailyNotes(createRandom(opts.seed + 104), trades, days),
+  ];
 
   return {
     seed: opts.seed,
     endDate,
     accounts,
     strategies,
+    tagCategories,
     tags,
     trades,
     journal,
@@ -451,28 +472,136 @@ function planTrade(
 
 // ---- strategies, tags and trade decoration ---------------------------------
 
-function buildStrategiesAndTags(): { strategies: Strategy[]; tags: Tag[] } {
-  const strategies: Strategy[] = STRATEGY_SEEDS.map((s, i) => ({
-    id: `sample-strategy-${i + 1}`,
-    workspaceId: WS,
-    name: s.name,
-    description: s.description,
-    assetClasses: [...s.assetClasses],
-    rules: s.rules.map((r, j) => ({
-      id: `sample-strategy-${i + 1}-rule-${j + 1}`,
-      text: r.text,
-      group: r.group,
-    })),
-    checklist: [...s.checklist],
-    status: 'active',
-  }));
+function buildStrategiesAndTags(): {
+  strategies: Strategy[];
+  tagCategories: TagCategory[];
+  tags: Tag[];
+} {
+  const strategies: Strategy[] = STRATEGY_SEEDS.map((s, i) => {
+    const id = `sample-strategy-${i + 1}`;
+    const loser: Rule = {
+      id: `${id}-rule-${s.rules.length + 1}`,
+      text: LOSER_RULE,
+      showWhen: 'loser',
+    };
+    return {
+      id,
+      workspaceId: WS,
+      name: s.name,
+      description: s.description,
+      assetClasses: [...s.assetClasses],
+      groups: SEED_GROUPS.map(([key, title]) => ({
+        id: `${id}-group-${key}`,
+        title,
+        rules: [
+          ...s.rules.flatMap((r, j): Rule[] =>
+            r.group === key
+              ? [
+                  {
+                    id: `${id}-rule-${j + 1}`,
+                    text: r.text,
+                    showWhen: 'always',
+                  },
+                ]
+              : [],
+          ),
+          ...(key === 'risk' ? [loser] : []),
+        ],
+      })),
+      checklist: [...s.checklist],
+      status: 'active',
+      icon: s.icon,
+      tone: s.tone,
+    };
+  });
+  const tagCategories = [
+    CATEGORIES.setups,
+    CATEGORIES.mistakes,
+    CATEGORIES.emotions,
+    CATEGORIES.custom,
+  ].map((c) => categoryIn(WS, c));
   const tags: Tag[] = TAG_SEEDS.map((t, i) => ({
     id: `sample-tag-${i + 1}`,
     workspaceId: WS,
     name: t.name,
-    category: t.category,
+    categoryId: CATEGORIES[t.category].id,
+    ...(t.description !== undefined && { description: t.description }),
   }));
-  return { strategies, tags };
+  return { strategies, tagCategories, tags };
+}
+
+/** The rules graded on every trade, in group order: all but the outcome-specific ones. */
+const alwaysRules = (s: Strategy): Rule[] =>
+  strategyRules(s).filter((r) => r.showWhen === 'always');
+
+/** A check drawn as Plan 4 drew them: sometimes left ungraded, broken more often when the plan broke. */
+function drawCheck(rng: Random, ruleId: string, broke: boolean) {
+  return {
+    ruleId,
+    followed: rng.chance(0.08) ? null : !rng.chance(broke ? 0.45 : 0.045),
+  };
+}
+
+/** About 15% of the trades with one strategy follow a second one that fits their asset class, graded on it too. */
+function addSecondStrategies(
+  rng: Random,
+  trades: readonly Trade[],
+  planOf: (t: Trade) => Plan,
+  strategies: readonly Strategy[],
+): void {
+  for (const t of trades) {
+    if (t.strategyIds.length !== 1 || !rng.chance(0.15)) continue;
+    const others = strategies.filter(
+      (s) =>
+        s.id !== t.strategyIds[0] &&
+        s.assetClasses.includes(t.instrument.assetClass),
+    );
+    if (others.length === 0) continue;
+    const second = rng.pick(others);
+    t.strategyIds = [...t.strategyIds, second.id];
+    t.ruleChecks = [
+      ...t.ruleChecks,
+      ...alwaysRules(second).map((r) => drawCheck(rng, r.id, planOf(t).broke)),
+    ];
+  }
+}
+
+/** A closed losing trade is graded on its strategies' 'loser' rules: the stop is skipped more often when the plan broke. */
+function gradeLoserRules(
+  rng: Random,
+  trades: readonly Trade[],
+  planOf: (t: Trade) => Plan,
+  strategies: readonly Strategy[],
+): void {
+  const byId = new Map(strategies.map((s) => [s.id, s]));
+  for (const t of trades) {
+    if (t.status !== 'closed' || t.net >= 0) continue;
+    for (const id of t.strategyIds)
+      for (const r of strategyRules(byId.get(id)!))
+        if (r.showWhen === 'loser')
+          t.ruleChecks.push({
+            ruleId: r.id,
+            followed: rng.chance(0.08)
+              ? null
+              : !rng.chance(planOf(t).broke ? 0.5 : 0.1),
+          });
+  }
+}
+
+/** About 70% of the trades closed a week or more before the end date are marked reviewed. */
+function markReviewed(
+  rng: Random,
+  trades: readonly Trade[],
+  endDate: string,
+): void {
+  const cutoff = ymd(parseYmd(endDate) - 7 * DAY_MS);
+  for (const t of trades)
+    if (
+      t.status === 'closed' &&
+      localDate(t.closedAt!, NY) <= cutoff &&
+      rng.chance(0.7)
+    )
+      t.reviewed = true;
 }
 
 /**
@@ -493,6 +622,7 @@ function pinLatestTrades(
   trades: readonly Trade[],
   strategies: readonly Strategy[],
   tags: readonly Tag[],
+  categories: readonly TagCategory[],
 ): void {
   const latest = closedInOrder(trades).slice(-LATEST_MIX.length).reverse();
   latest.forEach((closed, i) => {
@@ -502,16 +632,15 @@ function pinLatestTrades(
       s.assetClasses.includes(t.instrument.assetClass),
     );
     const st = eligible[i % eligible.length]!;
-    t.strategyId = st.id;
-    const brokenRule = i % st.rules.length;
-    t.ruleChecks = st.rules.map((r, j) => ({
+    t.strategyIds = [st.id];
+    const rules = alwaysRules(st);
+    const brokenRule = i % rules.length;
+    t.ruleChecks = rules.map((r, j) => ({
       ruleId: r.id,
       followed: !(mix.broken && j === brokenRule),
     }));
-    const mistakeTags = new Set(
-      tags.filter((x) => x.category === 'mistake').map((x) => x.id),
-    );
-    const kept = t.tagIds.filter((id) => !mistakeTags.has(id));
+    const mistakes = new Set(mistakeTags(tags, categories).map((x) => x.id));
+    const kept = t.tagIds.filter((id) => !mistakes.has(id));
     const mistake = tags.find((x) => x.name === mix.mistake);
     t.tagIds = mistake ? [...kept, mistake.id] : kept;
   });
@@ -536,14 +665,9 @@ function decorate(
   let strategyIndex = -1;
   if (rng.chance(0.85) && eligible.length > 0) {
     const st = rng.pick(eligible);
-    t.strategyId = st.id;
+    t.strategyIds = [st.id];
     strategyIndex = strategies.indexOf(st);
-    t.ruleChecks = st.rules.map((r) => ({
-      ruleId: r.id,
-      followed: rng.chance(0.08)
-        ? null
-        : !rng.chance(plan.broke ? 0.45 : 0.045),
-    }));
+    t.ruleChecks = alwaysRules(st).map((r) => drawCheck(rng, r.id, plan.broke));
   }
 
   // Tags: setup, emotion, mistakes (on losses and rule breaks), custom.

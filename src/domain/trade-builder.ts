@@ -87,6 +87,7 @@ function finalize(
     gross,
     fees,
     net: gross - fees,
+    strategyIds: [],
     tagIds: [],
     ruleChecks: [],
   };

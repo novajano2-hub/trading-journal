@@ -16,7 +16,7 @@ import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import type { Repository } from '@/data/repository';
 import type { SampleWorkspace } from '@/data/seed/generate';
-import type { UserPrefs } from '@/domain/types';
+import { strategyRules, type UserPrefs } from '@/domain/types';
 import { keepHyphens } from '@/lib/format';
 import { dashboardFixture } from '../__fixtures__/dashboard-sample';
 import { renderApp } from '../__fixtures__/render-app';
@@ -40,7 +40,7 @@ afterEach(() => {
 
 const fx = fixtureSample();
 const rule = (id: string) =>
-  fx.strategies[0]!.rules.find((r) => r.id === id)!.text;
+  strategyRules(fx.strategies[0]!).find((r) => r.id === id)!.text;
 const r1 = rule('r-1');
 const r2 = rule('r-2');
 const fomo = fx.tags.find((t) => t.id === 'tag-fomo')!.name;
@@ -469,7 +469,7 @@ test('a trade that broke two rules and carries two mistakes', async () => {
         id: 'tag-size',
         workspaceId: 'sample',
         name: 'Oversized',
-        category: 'mistake',
+        categoryId: 'mistakes',
       });
       const f1 = s.trades.find((t) => t.id === 'f-1')!;
       f1.ruleChecks = [

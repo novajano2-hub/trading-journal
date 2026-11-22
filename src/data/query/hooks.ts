@@ -12,8 +12,10 @@ import type {
   Account,
   ImportJob,
   JournalEntry,
+  NoteTemplate,
   Strategy,
   Tag,
+  TagCategory,
   Trade,
   UserPrefs,
   Workspace,
@@ -21,12 +23,14 @@ import type {
 import type {
   AccountPatch,
   JournalDraft,
+  ManualTradeInput,
   NewAccount,
   NewStrategy,
   NewTag,
   Repository,
   StrategyPatch,
   TagPatch,
+  TemplateDraft,
   UndoResult,
 } from '../repository';
 import type { TradePatch } from '../trade-patch';
@@ -99,6 +103,16 @@ export function useStrategy(id: string): UseQueryResult<Strategy | null> {
 
 export function useTags(): UseQueryResult<Tag[]> {
   return useWorkspaceQuery(keys.tags, (r, ws) => r.tags.list(ws));
+}
+
+export function useTagCategories(): UseQueryResult<TagCategory[]> {
+  return useWorkspaceQuery(keys.tagCategories, (r, ws) =>
+    r.tagCategories.list(ws),
+  );
+}
+
+export function useTemplates(): UseQueryResult<NoteTemplate[]> {
+  return useWorkspaceQuery(keys.templates, (r, ws) => r.templates.list(ws));
 }
 
 export function useJournal(): UseQueryResult<JournalEntry[]> {
@@ -249,6 +263,17 @@ export function useRemoveAccount(): UseMutationResult<void, Error, string> {
   );
 }
 
+/** Resolves to the number of trades removed. */
+export function useClearAccountTrades(): UseMutationResult<
+  number,
+  Error,
+  string
+> {
+  return useWorkspaceWrite('accounts.clearTrades', (r, ws, id: string) =>
+    r.accounts.clearTrades(ws, id),
+  );
+}
+
 export function useUpdateTrade(): UseMutationResult<
   Trade,
   Error,
@@ -258,6 +283,47 @@ export function useUpdateTrade(): UseMutationResult<
     'trades.update',
     (r, ws, v: { id: string; patch: TradePatch }) =>
       r.trades.update(ws, v.id, v.patch),
+  );
+}
+
+export function useUpdateTrades(): UseMutationResult<
+  Trade[],
+  Error,
+  { ids: readonly string[]; patch: TradePatch | ((t: Trade) => TradePatch) }
+> {
+  return useWorkspaceWrite(
+    'trades.updateMany',
+    (
+      r,
+      ws,
+      v: {
+        ids: readonly string[];
+        patch: TradePatch | ((t: Trade) => TradePatch);
+      },
+    ) => r.trades.updateMany(ws, v.ids, v.patch),
+  );
+}
+
+export function useCreateManualTrade(): UseMutationResult<
+  Trade,
+  Error,
+  ManualTradeInput
+> {
+  return useWorkspaceWrite(
+    'trades.createManual',
+    (r, ws, v: ManualTradeInput) => r.trades.createManual(ws, v),
+  );
+}
+
+export function useReplaceManualTrade(): UseMutationResult<
+  Trade,
+  Error,
+  { id: string; input: ManualTradeInput }
+> {
+  return useWorkspaceWrite(
+    'trades.replaceManual',
+    (r, ws, v: { id: string; input: ManualTradeInput }) =>
+      r.trades.replaceManual(ws, v.id, v.input),
   );
 }
 
@@ -323,6 +389,62 @@ export function useRemoveTag(): UseMutationResult<void, Error, string> {
   );
 }
 
+export function useCreateTagCategory(): UseMutationResult<
+  TagCategory,
+  Error,
+  { name: string; color: string }
+> {
+  return useWorkspaceWrite(
+    'tagCategories.create',
+    (r, ws, v: { name: string; color: string }) =>
+      r.tagCategories.create(ws, v),
+  );
+}
+
+export function useUpdateTagCategory(): UseMutationResult<
+  TagCategory,
+  Error,
+  { id: string; patch: { name?: string; color?: string } }
+> {
+  return useWorkspaceWrite(
+    'tagCategories.update',
+    (r, ws, v: { id: string; patch: { name?: string; color?: string } }) =>
+      r.tagCategories.update(ws, v.id, v.patch),
+  );
+}
+
+export function useRemoveTagCategory(): UseMutationResult<void, Error, string> {
+  return useWorkspaceWrite('tagCategories.remove', (r, ws, id: string) =>
+    r.tagCategories.remove(ws, id),
+  );
+}
+
+export function useSaveTemplate(): UseMutationResult<
+  NoteTemplate,
+  Error,
+  TemplateDraft
+> {
+  return useWorkspaceWrite('templates.save', (r, ws, v: TemplateDraft) =>
+    r.templates.save(ws, v),
+  );
+}
+
+export function useRemoveTemplate(): UseMutationResult<void, Error, string> {
+  return useWorkspaceWrite('templates.remove', (r, ws, id: string) =>
+    r.templates.remove(ws, id),
+  );
+}
+
+export function useSetDefaultTemplate(): UseMutationResult<
+  void,
+  Error,
+  string
+> {
+  return useWorkspaceWrite('templates.setDefault', (r, ws, id: string) =>
+    r.templates.setDefault(ws, id),
+  );
+}
+
 export function useSaveJournalEntry(): UseMutationResult<
   JournalEntry,
   Error,
@@ -340,6 +462,41 @@ export function useRemoveJournalEntry(): UseMutationResult<
 > {
   return useWorkspaceWrite('journal.remove', (r, ws, id: string) =>
     r.journal.remove(ws, id),
+  );
+}
+
+export function useTrashJournalEntry(): UseMutationResult<void, Error, string> {
+  return useWorkspaceWrite('journal.trash', (r, ws, id: string) =>
+    r.journal.trash(ws, id),
+  );
+}
+
+export function useRestoreJournalEntry(): UseMutationResult<
+  void,
+  Error,
+  string
+> {
+  return useWorkspaceWrite('journal.restore', (r, ws, id: string) =>
+    r.journal.restore(ws, id),
+  );
+}
+
+/** Takes the trade id; resolves to its note, created and linked on first use. */
+export function useEnsureTradeNote(): UseMutationResult<
+  JournalEntry,
+  Error,
+  string
+> {
+  return useWorkspaceWrite(
+    'journal.ensureTradeNote',
+    (r, ws, tradeId: string) => r.journal.ensureTradeNote(ws, tradeId),
+  );
+}
+
+/** Takes a YYYY-MM-DD date; resolves to that day's note, created from the default daily template when missing. */
+export function useDailyNote(): UseMutationResult<JournalEntry, Error, string> {
+  return useWorkspaceWrite('journal.dailyNote', (r, ws, date: string) =>
+    r.journal.dailyNote(ws, date),
   );
 }
 

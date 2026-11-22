@@ -1,7 +1,12 @@
 import type { Workspace } from '@/domain/types';
 import { NotFoundError, type WorkspacesRepo } from '../repository';
 import { SAMPLE_WORKSPACE, USER_WORKSPACE, WORKSPACES } from '../workspaces';
-import { writeSample, type LocalContext, type SampleSource } from './context';
+import {
+  writeBuiltIns,
+  writeSample,
+  type LocalContext,
+  type SampleSource,
+} from './context';
 import type { KeelDb } from './db';
 import { DATA_TABLES, META } from './schema';
 
@@ -45,6 +50,7 @@ export function localWorkspaces(
       await db.transaction('rw', [...DATA_TABLES, 'meta'], async () => {
         await deleteWorkspaceRows(db, USER_WORKSPACE.id);
         await db.meta.delete(META.overrides(USER_WORKSPACE.id));
+        await writeBuiltIns(db, USER_WORKSPACE.id);
       });
     },
   };

@@ -46,4 +46,9 @@ export const DATA_TABLES = [
   'tags',
   'journal',
   'imports',
+  'tagCategories',
+  'templates',
+  'folders',
+  'cashflows',
+  'challenges',
 ] as const;

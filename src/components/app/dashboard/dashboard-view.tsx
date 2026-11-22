@@ -17,6 +17,7 @@ import {
   usePrefs,
   useSetActiveWorkspace,
   useStrategies,
+  useTagCategories,
   useTags,
   useTrades,
   useUpdatePrefs,
@@ -101,6 +102,7 @@ export function DashboardView(): React.JSX.Element {
   const allTrades = useTrades().data;
   const strategies = useStrategies().data;
   const tags = useTags().data;
+  const categories = useTagCategories().data;
   const setActive = useSetActiveWorkspace();
   const updatePrefs = useUpdatePrefs();
   const queryClient = useQueryClient();
@@ -129,6 +131,7 @@ export function DashboardView(): React.JSX.Element {
       !workspace.data ||
       !strategies ||
       !tags ||
+      !categories ||
       today === undefined
     )
       return undefined;
@@ -155,6 +158,7 @@ export function DashboardView(): React.JSX.Element {
     const model = buildDashboard(partition, {
       strategies,
       tags,
+      tagCategories: categories,
       goals,
       baseCurrency: prefs.baseCurrency,
       ctx,
@@ -192,6 +196,7 @@ export function DashboardView(): React.JSX.Element {
     workspace.data,
     strategies,
     tags,
+    categories,
     today,
     currency,
   ]);
@@ -363,6 +368,7 @@ export function DashboardView(): React.JSX.Element {
           trades={allTrades}
           strategies={strategies ?? []}
           tags={tags ?? []}
+          categories={categories ?? []}
         />
       ) : null}
     </div>

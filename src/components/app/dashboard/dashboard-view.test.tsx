@@ -9,6 +9,7 @@ import {
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
+import { strategyRules } from '@/domain/types';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import { StorageUnavailableError, type Repository } from '@/data/repository';
@@ -32,7 +33,7 @@ afterEach(() => {
 
 const fx = fixtureSample();
 const rule = (id: string) =>
-  fx.strategies[0]!.rules.find((r) => r.id === id)!.text;
+  strategyRules(fx.strategies[0]!).find((r) => r.id === id)!.text;
 const r1 = rule('r-1');
 const r2 = rule('r-2');
 /** r-1 as it shows: "15-minute" can't break at its hyphen. */
@@ -313,12 +314,12 @@ test("a mistake's rows list only the trade's other mistakes", async () => {
         id: 'tag-size',
         workspaceId: 'sample',
         name: 'Oversized',
-        category: 'mistake',
+        categoryId: 'mistakes',
       });
       s.trades.find((t) => t.id === 'f-1')!.tagIds = ['tag-fomo', 'tag-size'];
       const f2 = s.trades.find((t) => t.id === 'f-2')!;
       f2.tagIds = ['tag-fomo'];
-      delete f2.strategyId;
+      f2.strategyIds = [];
     }),
   });
   const mistakes = await screen.findByRole('region', {
@@ -489,9 +490,9 @@ test('the five costliest rules show, then all of them on request', async () => {
       const extra = [3, 4, 5, 6].map((n) => ({
         id: `r-${n}`,
         text: `Extra rule ${n}`,
-        group: 'risk' as const,
+        showWhen: 'always' as const,
       }));
-      s.strategies[0]!.rules.push(...extra);
+      s.strategies[0]!.groups[1]!.rules.push(...extra);
       s.trades
         .find((t) => t.id === 'f-2')!
         .ruleChecks.push(

@@ -10,7 +10,15 @@ import {
   parseYmd,
   ymd,
 } from './calendar';
-import { FOLDERS, PHRASES, bullets, doc, heading, paragraph } from './content';
+import { DAILY_REVIEW_BODY } from '@/content/note-templates';
+import {
+  PHRASES,
+  bullets,
+  doc,
+  heading,
+  paragraph,
+  type TiptapNode,
+} from './content';
 import type { Random } from './random';
 
 const WS = SAMPLE_WORKSPACE.id;
@@ -30,6 +38,24 @@ const picks = (rng: Random, xs: readonly string[], n: number): string[] => {
   return out;
 };
 
+/** The trades by the New York date they opened. */
+function tradesByDay(trades: readonly Trade[]): Map<string, Trade[]> {
+  const byDay = new Map<string, Trade[]>();
+  for (const t of trades) {
+    const d = localDate(t.openedAt, NY);
+    byDay.set(d, [...(byDay.get(d) ?? []), t]);
+  }
+  return byDay;
+}
+
+function daySummary(day: readonly Trade[]): string {
+  const closed = day.filter((t) => t.status === 'closed');
+  const net = closed.reduce((s, t) => s + t.net, 0);
+  const w = closed.filter((t) => t.net > 0).length;
+  return `${day.length} trades, ${w} won and ${closed.length - w} did not. Net ${money(net)} after costs.`;
+}
+
+/** Pre-market plans, weekly recaps and trade notes, on the generator's main stream. */
 export function writeJournal(
   rng: Random,
   trades: readonly Trade[],
@@ -37,21 +63,22 @@ export function writeJournal(
   lastDay: string,
 ): JournalEntry[] {
   const journal: JournalEntry[] = [];
-  const add = (e: Omit<JournalEntry, 'id' | 'workspaceId'>): JournalEntry => {
+  let serial = 0;
+  const nextId = () => `sample-journal-${String(++serial).padStart(4, '0')}`;
+  const add = (
+    e: Omit<JournalEntry, 'id' | 'workspaceId' | 'tags'>,
+  ): JournalEntry => {
     const entry: JournalEntry = {
-      id: `sample-journal-${String(journal.length + 1).padStart(4, '0')}`,
+      id: nextId(),
       workspaceId: WS,
       ...e,
+      tags: [],
     };
     journal.push(entry);
     return entry;
   };
 
-  const byDay = new Map<string, Trade[]>();
-  for (const t of trades) {
-    const d = localDate(t.openedAt, NY);
-    byDay.set(d, [...(byDay.get(d) ?? []), t]);
-  }
+  const byDay = tradesByDay(trades);
 
   for (const date of days) {
     const day = byDay.get(date);
@@ -70,34 +97,18 @@ export function writeJournal(
           paragraph(rng.pick(PHRASES.riskNotes)),
         ),
         linkedTradeIds: [],
-        folder: FOLDERS.plan,
         updatedAt: nyIso(date, 8, 40 + rng.int(0, 15)),
       });
     }
     if (date === lastDay || rng.chance(0.88)) {
-      const closed = day.filter((t) => t.status === 'closed');
-      const net = closed.reduce((s, t) => s + t.net, 0);
-      const w = closed.filter((t) => t.net > 0).length;
-      add({
-        kind: 'daily-review',
-        date,
-        title: `Daily review, ${dayLabel(date)}`,
-        body: doc(
-          heading('Summary'),
-          paragraph(
-            `${day.length} trades, ${w} won and ${closed.length - w} did not. Net ${money(net)} after costs.`,
-          ),
-          heading('What went well'),
-          bullets(picks(rng, PHRASES.wentWell, 2)),
-          heading('To improve'),
-          bullets(picks(rng, PHRASES.toImprove, 2)),
-          heading('Takeaway'),
-          paragraph(rng.pick(PHRASES.lessons)),
-        ),
-        linkedTradeIds: day.map((t) => t.id),
-        folder: FOLDERS.daily,
-        updatedAt: nyIso(date, 16, 30 + rng.int(0, 25)),
-      });
+      // Plan 4 wrote a daily review here. Its draws and its id stay, so the
+      // stream and every later entry (and the trades' notes) are unchanged;
+      // the daily notes now come from the template, in `writeDailyNotes`.
+      picks(rng, PHRASES.wentWell, 2);
+      picks(rng, PHRASES.toImprove, 2);
+      rng.pick(PHRASES.lessons);
+      rng.int(0, 25);
+      nextId();
     }
   }
 
@@ -132,7 +143,6 @@ export function writeJournal(
         bullets(picks(rng, PHRASES.weeklyFocus, 2)),
       ),
       linkedTradeIds: [...new Set([best.id, worst.id])],
-      folder: FOLDERS.weekly,
       updatedAt: nyIso(friday, 17, 30 + rng.int(0, 20)),
     });
   }
@@ -158,7 +168,6 @@ export function writeJournal(
         ),
       ),
       linkedTradeIds: [t.id],
-      folder: FOLDERS.note,
       updatedAt: new Date(
         Date.parse(when) + rng.int(10, 90) * 60_000,
       ).toISOString(),
@@ -166,4 +175,70 @@ export function writeJournal(
     t.noteId = note.id;
   }
   return journal;
+}
+
+/**
+ * A copy of the template with each empty paragraph filled: under a prompt
+ * heading from `answers[heading]`, in a section with no prompts from
+ * `answers[section title]`.
+ */
+function fillPrompts(
+  node: TiptapNode,
+  answers: Readonly<Record<string, string>>,
+  section = '',
+): TiptapNode {
+  const textOf = (n: TiptapNode | undefined) =>
+    (n?.content ?? []).map((c) => c.text ?? '').join('');
+  const title =
+    node.type === 'details'
+      ? textOf(node.content?.find((c) => c.type === 'detailsSummary'))
+      : section;
+  let label = title;
+  const content = node.content?.map((child) => {
+    if (child.type === 'heading') label = textOf(child);
+    const answer = answers[label];
+    if (child.type === 'paragraph' && !child.content && answer !== undefined)
+      return paragraph(answer);
+    return fillPrompts(child, answers, title);
+  });
+  return content ? { ...node, content } : { ...node };
+}
+
+const DAILY_NOTE_DAYS = 20;
+
+/** Daily review notes for the last 20 trading days, from the daily template with short filled-in text. */
+export function writeDailyNotes(
+  rng: Random,
+  trades: readonly Trade[],
+  days: readonly string[],
+): JournalEntry[] {
+  const byDay = tradesByDay(trades);
+  const traded = days.filter((d) => byDay.has(d)).slice(-DAILY_NOTE_DAYS);
+  return traded.map((date) => {
+    const day = byDay.get(date)!;
+    const roots = [...new Set(day.map((t) => t.instrument.root))];
+    const body = fillPrompts(DAILY_REVIEW_BODY, {
+      Watchlist: `${roots.join(', ')}.`,
+      'News and events': rng.pick(PHRASES.news),
+      Bias: rng.pick(PHRASES.marketView),
+      Levels: rng.pick(PHRASES.levels),
+      'Game plan': rng.pick(PHRASES.planItems),
+      'Session log': daySummary(day),
+      'How the day went': rng.pick(PHRASES.lessons),
+      'What worked': rng.pick(PHRASES.wentWell),
+      "What didn't": rng.pick(PHRASES.toImprove),
+      'One thing to do better': rng.pick(PHRASES.weeklyFocus),
+    });
+    return {
+      id: `sample-daily-${date}`,
+      workspaceId: WS,
+      kind: 'daily-review',
+      date,
+      title: `Daily review, ${dayLabel(date)}`,
+      body,
+      linkedTradeIds: day.map((t) => t.id),
+      tags: [],
+      updatedAt: nyIso(date, 16, 30 + rng.int(0, 25)),
+    };
+  });
 }

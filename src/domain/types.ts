@@ -58,11 +58,14 @@ export interface Trade {
   initialRisk?: Cents;
   mae?: Cents;
   mfe?: Cents;
-  strategyId?: string;
+  /** Every strategy the trade follows; its rule checks are keyed by rule id, so each is graded on its own. */
+  strategyIds: string[];
   tagIds: string[];
   rating?: 1 | 2 | 3 | 4 | 5;
   ruleChecks: RuleCheck[];
   noteId?: string;
+  reviewed?: boolean;
+  source?: 'import' | 'manual';
   /** The import that last built this trade. */
   importId?: string;
 }
@@ -76,6 +79,10 @@ export interface PropRuleSet {
   drawdownType: DrawdownType;
   minTradingDays: number;
   consistencyPct?: number /* 0..1 */;
+  /** undefined: no time limit. */
+  periodDays?: number;
+  /** undefined: the drawdown floor is the starting balance. */
+  drawdownFloor?: Cents;
 }
 export type AccountType = 'live' | 'demo' | 'prop-evaluation' | 'prop-funded';
 export interface Account {
@@ -88,32 +95,76 @@ export interface Account {
   startingBalance: Cents;
   status: 'active' | 'archived';
   propRules?: PropRuleSet;
+  /** The zone fill times are read in; undefined: the trader's own (`UserPrefs.timeZone`). */
+  timeZone?: string;
+  /** The column mapping the account's last import used. */
+  importMapping?: ImportMapping;
 }
-export type TagCategory = 'setup' | 'mistake' | 'emotion' | 'custom';
-export interface Tag {
+/** A user-made group of tags. The built-in ones can be renamed and recoloured, not deleted. */
+export interface TagCategory {
   id: string;
   workspaceId: string;
   name: string;
-  category: TagCategory;
+  color: string /* #RRGGBB */;
+  /** 'mistake': its tags feed the mistake reports and the dashboard's mistakes card. */
+  role?: 'mistake';
+  builtIn: boolean;
 }
-export type RuleGroup = 'entry' | 'exit' | 'risk' | 'management';
+export interface Tag {
+  id: string;
+  workspaceId: string;
+  /** Stored lowercase, unique within its category. */
+  name: string;
+  categoryId: string;
+  description?: string;
+}
+/** Which trades a rule is graded on, by their outcome. */
+export type RuleShowWhen = 'always' | 'winner' | 'loser' | 'breakeven';
 export interface Rule {
   id: string;
   text: string;
-  group: RuleGroup;
+  showWhen: RuleShowWhen;
 }
+/** A strategy's own titled, ordered group of rules. */
+export interface RuleGroup {
+  id: string;
+  title: string;
+  rules: Rule[];
+}
+export const STRATEGY_ICONS = [
+  'target',
+  'lightning',
+  'trend-up',
+  'trend-down',
+  'crosshair',
+  'waves',
+  'compass',
+  'flag',
+  'clock',
+  'stack',
+  'shield',
+  'rocket',
+] as const;
+export type StrategyIcon = (typeof STRATEGY_ICONS)[number];
+export type StrategyTone = 'accent' | 'info' | 'gain' | 'warn' | 'neutral';
 export interface Strategy {
   id: string;
   workspaceId: string;
   name: string;
   description: string;
   assetClasses: AssetClass[];
-  rules: Rule[];
+  groups: RuleGroup[];
   checklist: string[];
   status: 'active' | 'archived';
+  icon?: StrategyIcon;
+  tone?: StrategyTone;
+}
+/** A strategy's rules flattened: group order, then rule order. */
+export function strategyRules(s: Strategy): Rule[] {
+  return s.groups.flatMap((g) => g.rules);
 }
 export type JournalKind =
-  'daily-review' | 'pre-market' | 'weekly-recap' | 'note';
+  'daily-review' | 'pre-market' | 'weekly-recap' | 'note' | 'trade-note';
 export interface JournalEntry {
   id: string;
   workspaceId: string;
@@ -122,8 +173,52 @@ export interface JournalEntry {
   title: string;
   body: unknown /* Tiptap JSON */;
   linkedTradeIds: string[];
-  folder?: string;
+  /** A user folder; undefined: My notes, or the built-in folder its kind belongs to. */
+  folderId?: string;
+  favorite?: boolean;
+  /** When it went to Trash; purged 30 days later. */
+  deletedAt?: string;
+  /** The note's own tags, separate from trade tags. */
+  tags: string[];
   updatedAt: string;
+}
+export interface NoteFolder {
+  id: string;
+  workspaceId: string;
+  name: string;
+  createdAt: string;
+}
+export interface NoteTemplate {
+  id: string;
+  workspaceId: string;
+  name: string;
+  kind: JournalKind;
+  body: unknown /* Tiptap JSON */;
+  /** One per kind: a new entry of the kind starts from it. */
+  isDefault: boolean;
+  builtIn: boolean;
+}
+export interface CashFlow {
+  id: string;
+  workspaceId: string;
+  accountId: string;
+  date: string /* YYYY-MM-DD */;
+  amount: Cents /* + deposit, − withdrawal */;
+  note?: string;
+}
+export type ChallengeStep = 'step-1' | 'step-2' | 'funded';
+export interface Challenge {
+  id: string;
+  workspaceId: string;
+  name: string;
+  firm: string;
+  steps: 1 | 2;
+  phases: { step: ChallengeStep; accountId?: string; startDate?: string }[];
+  phase: 'evaluation' | 'funded';
+  status: 'active' | 'passed' | 'breached';
+  failureReason?: string;
+  evaluationFee?: Cents;
+  activationFee?: Cents;
 }
 export interface ImportJob {
   id: string;
@@ -149,6 +244,9 @@ export type BreakevenRange =
   | { unit: 'amount'; from: Cents; to: Cents }
   | { unit: 'percent'; from: number; to: number };
 export type PnlBasis = 'net' | 'gross';
+export type DisplayUnit =
+  'dollar' | 'percent' | 'privacy' | 'r' | 'ticks' | 'pips' | 'points';
+export type CalendarStat = 'net' | 'trades' | 'winRate' | 'r' | 'fees';
 /** One workspace's goals, in its base currency. A missing field means that goal isn't set. */
 export interface Goals {
   weeklyNet?: Cents;
@@ -161,4 +259,14 @@ export interface UserPrefs {
   pnlBasis: PnlBasis;
   /** Goals per workspace id; a workspace with no entry has none set (the sample workspace falls back to its defaults). */
   goals?: Record<string, Goals>;
+  displayName?: string;
+  /** How every money figure shows. */
+  displayUnit: DisplayUnit;
+  /** The trade log's columns, in order; undefined: its default set. */
+  tradeColumns?: string[];
+  hideTradeSummary: boolean;
+  /** What a calendar day shows, at most 3. */
+  calendarStats: CalendarStat[];
+  instrumentsTraded: AssetClass[];
+  settleExpiredOptions: boolean;
 }

@@ -1,5 +1,6 @@
 import { NotFoundError, type AccountsRepo } from '../repository';
 import type { LocalContext } from './context';
+import { bumpImportRevision } from './imports';
 import { rwTx } from './tx';
 import { pruneJournalLinks } from './journal';
 import { mergePatch } from '../merge';
@@ -25,7 +26,11 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
         const account = await db.accounts.get([ws, id]);
         if (!account) throw new NotFoundError('account', id);
         const next = {
-          ...mergePatch(account, patch, ['propRules']),
+          ...mergePatch(account, patch, [
+            'propRules',
+            'timeZone',
+            'importMapping',
+          ]),
           id,
           workspaceId: ws,
         };
@@ -36,27 +41,48 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
 
     async remove(ws, id) {
       const db = await ctx.db();
-      await rwTx(
+      await rwTx(db, [db.accounts, db.trades, db.imports], async () => {
+        if (!(await db.accounts.get([ws, id])))
+          throw new NotFoundError('account', id);
+        const trades = await db.trades
+          .where('[workspaceId+accountId]')
+          .equals([ws, id])
+          .count();
+        if (trades > 0) throw new Error('account has trades');
+        // Undone imports keep their history rows; they go with the account.
+        await db.imports
+          .where('[workspaceId+accountId]')
+          .equals([ws, id])
+          .delete();
+        await db.accounts.delete([ws, id]);
+      });
+    },
+
+    async clearTrades(ws, id) {
+      const db = await ctx.db();
+      return rwTx(
         db,
-        [db.accounts, db.trades, db.journal, db.imports],
+        [db.accounts, db.trades, db.journal, db.imports, db.meta],
         async () => {
           if (!(await db.accounts.get([ws, id])))
             throw new NotFoundError('account', id);
-          const tradeIds = await db.trades
+          const tradeKeys = await db.trades
             .where('[workspaceId+accountId]')
             .equals([ws, id])
             .primaryKeys();
-          await db.trades.bulkDelete(tradeIds);
+          await db.trades.bulkDelete(tradeKeys);
           await pruneJournalLinks(
             db,
             ws,
-            tradeIds.map(([, tradeId]) => tradeId),
+            tradeKeys.map(([, tradeId]) => tradeId),
           );
           await db.imports
             .where('[workspaceId+accountId]')
             .equals([ws, id])
             .delete();
-          await db.accounts.delete([ws, id]);
+          // A plan made before this would write onto trades that are gone.
+          await bumpImportRevision(db, ws);
+          return tradeKeys.length;
         },
       );
     },

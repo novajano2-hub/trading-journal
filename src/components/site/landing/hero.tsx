@@ -100,7 +100,13 @@ export function Hero({ view }: { view: SampleView }) {
             </ProductCard>
             {/* Recent trades; the trade card below opens one of them. */}
             <div className={`${CARD} py-1`}>
-              <TradeRows trades={rows} tags={view.tags} maxTags={1} inset />
+              <TradeRows
+                trades={rows}
+                tags={view.tags}
+                categories={view.tagCategories}
+                maxTags={1}
+                inset
+              />
             </div>
           </AppWindow>
         </div>

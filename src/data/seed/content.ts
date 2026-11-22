@@ -1,13 +1,29 @@
-import type { AssetClass, RuleGroup, TagCategory } from '@/domain/types';
+import type { AssetClass, StrategyIcon, StrategyTone } from '@/domain/types';
+import type { CATEGORIES } from './templates';
+
+/** The four groups every sample strategy has, in order. */
+export const SEED_GROUPS = [
+  ['entry', 'Entry'],
+  ['exit', 'Exit'],
+  ['risk', 'Risk'],
+  ['management', 'Management'],
+] as const;
+export type SeedGroup = (typeof SEED_GROUPS)[number][0];
+
+/** Each strategy's one 'loser' rule, in its Risk group. */
+export const LOSER_RULE = 'Took the loss at the planned stop';
 
 export interface StrategySeed {
   name: string;
   description: string;
   assetClasses: AssetClass[];
-  rules: { group: RuleGroup; text: string }[];
+  /** The 'always' rules, in group order. */
+  rules: { group: SeedGroup; text: string }[];
   checklist: string[];
   /** Name of the setup tag that goes with this strategy. */
   setupTag: string;
+  icon: StrategyIcon;
+  tone: StrategyTone;
 }
 
 export const STRATEGY_SEEDS: readonly StrategySeed[] = [
@@ -37,6 +53,8 @@ export const STRATEGY_SEEDS: readonly StrategySeed[] = [
       'Size set from the stop',
     ],
     setupTag: 'Opening range',
+    icon: 'target',
+    tone: 'accent',
   },
   {
     name: 'Trend pullback',
@@ -57,6 +75,8 @@ export const STRATEGY_SEEDS: readonly StrategySeed[] = [
       'Stop and target placed before entry',
     ],
     setupTag: 'Pullback',
+    icon: 'trend-up',
+    tone: 'gain',
   },
   {
     name: 'Level reversal',
@@ -82,6 +102,8 @@ export const STRATEGY_SEEDS: readonly StrategySeed[] = [
       'Calm, not chasing',
     ],
     setupTag: 'Reversal',
+    icon: 'crosshair',
+    tone: 'warn',
   },
   {
     name: 'Session momentum',
@@ -104,24 +126,52 @@ export const STRATEGY_SEEDS: readonly StrategySeed[] = [
       'Stop distance fits the daily range',
     ],
     setupTag: 'Trend continuation',
+    icon: 'lightning',
+    tone: 'info',
   },
 ];
 
-export const TAG_SEEDS: readonly { name: string; category: TagCategory }[] = [
-  { name: 'Opening range', category: 'setup' },
-  { name: 'Pullback', category: 'setup' },
-  { name: 'Reversal', category: 'setup' },
-  { name: 'Trend continuation', category: 'setup' },
-  { name: 'FOMO entry', category: 'mistake' },
-  { name: 'Moved stop', category: 'mistake' },
-  { name: 'Oversized', category: 'mistake' },
-  { name: 'Early exit', category: 'mistake' },
-  { name: 'Revenge trade', category: 'mistake' },
-  { name: 'Confident', category: 'emotion' },
-  { name: 'Calm', category: 'emotion' },
-  { name: 'Anxious', category: 'emotion' },
-  { name: 'Frustrated', category: 'emotion' },
-  { name: 'Impatient', category: 'emotion' },
+export interface TagSeed {
+  name: string;
+  category: keyof typeof CATEGORIES;
+  description?: string;
+}
+
+export const TAG_SEEDS: readonly TagSeed[] = [
+  { name: 'Opening range', category: 'setups' },
+  { name: 'Pullback', category: 'setups' },
+  { name: 'Reversal', category: 'setups' },
+  { name: 'Trend continuation', category: 'setups' },
+  {
+    name: 'FOMO entry',
+    category: 'mistakes',
+    description: 'Entered because the move was leaving without me.',
+  },
+  {
+    name: 'Moved stop',
+    category: 'mistakes',
+    description: 'Moved the stop away from price instead of taking the loss.',
+  },
+  {
+    name: 'Oversized',
+    category: 'mistakes',
+    description: 'Traded more size than the stop allowed.',
+  },
+  {
+    name: 'Early exit',
+    category: 'mistakes',
+    description: 'Closed a working trade before the plan said to.',
+  },
+  {
+    name: 'Revenge trade',
+    category: 'mistakes',
+    description: 'Traded to win back the last loss.',
+  },
+  { name: 'Confident', category: 'emotions' },
+  { name: 'Calm', category: 'emotions' },
+  { name: 'Anxious', category: 'emotions' },
+  { name: 'Frustrated', category: 'emotions' },
+  { name: 'Impatient', category: 'emotions' },
   { name: 'A+ setup', category: 'custom' },
   { name: 'News day', category: 'custom' },
   { name: 'Low volume', category: 'custom' },
@@ -140,13 +190,6 @@ export const MISTAKE_NAMES = [
   'Revenge trade',
 ] as const;
 export const CUSTOM_NAMES = ['A+ setup', 'News day', 'Low volume'] as const;
-
-export const FOLDERS = {
-  daily: 'Daily reviews',
-  plan: 'Plans',
-  weekly: 'Weekly recaps',
-  note: 'Trade notes',
-} as const;
 
 /** Phrase banks for journal bodies. */
 export const PHRASES = {
@@ -198,6 +241,19 @@ export const PHRASES = {
     'Daily loss limit is firm: stop at the line, no exceptions.',
     'Keeping size at half until the week turns positive.',
     'Max risk per trade unchanged; no adding to losers.',
+  ],
+  news: [
+    'CPI at 8:30; no entries until it prints.',
+    'No major releases today.',
+    'Fed speaker at 10:00; keeping size light around it.',
+    'Jobless claims before the open.',
+    'Oil inventories mid-morning.',
+  ],
+  levels: [
+    "Yesterday's high and low, plus the overnight range.",
+    'Prior day close and the weekly open.',
+    'The overnight low and the round number above it.',
+    "Last week's high, marked on the daily chart.",
   ],
   weeklyFocus: [
     'Stick to one setup per session.',

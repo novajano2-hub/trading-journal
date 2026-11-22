@@ -15,7 +15,15 @@ import type { DashboardModel } from '@/data/dashboard';
 import { useUpdateTrade } from '@/data/query/hooks';
 import { withRuleCheck } from '@/data/trade-patch';
 import { pnlOf } from '@/domain/metrics/context';
-import type { Cents, Strategy, Tag, Trade } from '@/domain/types';
+import { mistakeTags } from '@/domain/metrics/mistakes';
+import {
+  strategyRules,
+  type Cents,
+  type Strategy,
+  type Tag,
+  type TagCategory,
+  type Trade,
+} from '@/domain/types';
 import { formatPnl, keepHyphens, plural } from '@/lib/format';
 import { shortTime } from '@/lib/time-format';
 import type { DrillTarget } from './dashboard-view';
@@ -210,9 +218,9 @@ function TradesTable({
               const time = shortTime(t.closedAt ?? t.openedAt, timeZone);
               const mistakes = rowMistakes[i] ?? [];
               const strategy =
-                t.strategyId !== undefined
-                  ? strategyName.get(t.strategyId)
-                  : undefined;
+                t.strategyIds
+                  .flatMap((id) => strategyName.get(id) ?? [])
+                  .join(', ') || undefined;
               return (
                 <tr
                   key={t.id}
@@ -303,6 +311,7 @@ export function Drilldown({
   trades,
   strategies,
   tags,
+  categories,
 }: {
   /** Kept after closing, so the dialog can play its exit. */
   target: DrillTarget;
@@ -318,6 +327,7 @@ export function Drilldown({
   trades: readonly Trade[];
   strategies: readonly Strategy[];
   tags: readonly Tag[];
+  categories: readonly TagCategory[];
 }): React.JSX.Element | null {
   const byId = useMemo(() => new Map(trades.map((t) => [t.id, t])), [trades]);
   const strategyName = useMemo(
@@ -325,11 +335,8 @@ export function Drilldown({
     [strategies],
   );
   const mistakeName = useMemo(
-    () =>
-      new Map(
-        tags.filter((t) => t.category === 'mistake').map((t) => [t.id, t.name]),
-      ),
-    [tags],
+    () => new Map(mistakeTags(tags, categories).map((t) => [t.id, t.name])),
+    [tags, categories],
   );
   const rows = tradeIds.flatMap((id) => byId.get(id) ?? []);
   const currency = model.currency;
@@ -340,7 +347,7 @@ export function Drilldown({
     const score = model.plan.rules.find((r) => r.ruleId === target.ruleId);
     title =
       score?.text ??
-      strategies.flatMap((s) => s.rules).find((r) => r.id === target.ruleId)
+      strategies.flatMap(strategyRules).find((r) => r.id === target.ruleId)
         ?.text ??
       '';
     description = (

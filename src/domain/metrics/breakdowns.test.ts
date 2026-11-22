@@ -95,11 +95,46 @@ describe('breakdowns', () => {
     expect(breakdown(t, 'strategy', ctx).map((r) => r.label)).toContain(
       'No strategy',
     );
+    // A trade counts under each of its strategies.
+    const multi = breakdown(
+      [
+        makeTrade({ net: 3000, strategyIds: ['orb', 'trend'] }),
+        makeTrade({ net: -1000, strategyIds: ['orb'] }),
+      ],
+      'strategy',
+      { ...ctx, strategyNames: { orb: 'ORB', trend: 'Trend' } },
+    );
+    expect(
+      multi.map((r) => [r.label, r.summary.closedCount, r.summary.netPnl]),
+    ).toEqual([
+      ['Trend', 1, 3000],
+      ['ORB', 2, 2000],
+    ]);
     const es = [
       makeTrade({ net: 1, instrument: resolveInstrument('ESZ5')! }),
       makeTrade({ net: 1, instrument: resolveInstrument('ESH6')! }),
     ];
     expect(breakdown(es, 'symbol', ctx).map((r) => r.key)).toEqual(['ES']);
+  });
+
+  test('tags group by category name, then P&L, untagged last', () => {
+    const t = [
+      makeTrade({ net: 500, tagIds: ['calm'] }),
+      makeTrade({ net: -2000, tagIds: ['fomo', 'orb'] }),
+      makeTrade({ net: 4000, tagIds: ['orb'] }),
+      makeTrade({ net: 100 }),
+    ];
+    const rows = breakdown(t, 'tag', {
+      ...ctx,
+      tagNames: { orb: 'ORB', fomo: 'FOMO', calm: 'Calm' },
+      tagCategoryNames: { orb: 'Setups', fomo: 'Mistakes', calm: 'Emotions' },
+    });
+    expect(rows.map((r) => [r.group, r.label])).toEqual([
+      ['Emotions', 'Calm'],
+      ['Mistakes', 'FOMO'],
+      ['Setups', 'ORB'],
+      [undefined, 'Untagged'],
+    ]);
   });
 
   test('time-of-day buckets by entry or exit time', () => {

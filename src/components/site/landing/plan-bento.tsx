@@ -10,6 +10,7 @@ import { RuleList } from '@/components/product/rule-list';
 import { Pill } from '@/components/site/pill';
 import { Chip } from '@/components/ui/chip';
 import { IconTile, type TileTone } from '@/components/ui/icon-tile';
+import { mistakeTags } from '@/domain/metrics/mistakes';
 import { formatMoney, formatPct, formatPnl } from '@/lib/format';
 import type { SampleView } from '@/lib/landing/sample-view';
 import { dayLabel, setupName } from '@/lib/landing/sample-labels';
@@ -82,12 +83,12 @@ export function PlanBento({ view }: { view: SampleView }) {
   const { profit, drawdown, consistency } = view.prop;
 
   const noted = NOTE_SERIALS.flatMap((n) => bySerial.get(n) ?? []);
+  const mistakeTagsById = new Map(
+    mistakeTags(view.tags, view.tagCategories).map((t) => [t.id, t]),
+  );
   const mistakes = noted
     .flatMap((t) => t.tagIds)
-    .flatMap(
-      (id) =>
-        view.tags.find((x) => x.id === id && x.category === 'mistake') ?? [],
-    );
+    .flatMap((id) => mistakeTagsById.get(id) ?? []);
 
   return (
     <section

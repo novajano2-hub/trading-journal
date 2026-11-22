@@ -206,10 +206,7 @@ export function applyFilters(
     }
     if (symbols.size > 0 && !symbols.has(t.instrument.root)) return false;
     if (f.side !== undefined && t.direction !== f.side) return false;
-    if (
-      strategies.size > 0 &&
-      (t.strategyId === undefined || !strategies.has(t.strategyId))
-    )
+    if (strategies.size > 0 && !t.strategyIds.some((id) => strategies.has(id)))
       return false;
     if (tags.size > 0 && !t.tagIds.some((id) => tags.has(id))) return false;
     return true;

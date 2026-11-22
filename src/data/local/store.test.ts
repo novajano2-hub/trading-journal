@@ -1,7 +1,17 @@
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { afterEach, expect, test, vi } from 'vitest';
 import { makeTrade } from '@/domain/__fixtures__/trades';
-import type { Account, JournalEntry, Strategy, Tag } from '@/domain/types';
+import type {
+  Account,
+  CashFlow,
+  Challenge,
+  JournalEntry,
+  NoteFolder,
+  NoteTemplate,
+  Strategy,
+  Tag,
+  TagCategory,
+} from '@/domain/types';
 import { fixtureSample } from '../__fixtures__/sample';
 import {
   defaultPrefs,
@@ -9,6 +19,7 @@ import {
   StorageUnavailableError,
 } from '../repository';
 import type { SampleWorkspace } from '../seed/generate';
+import { builtInCategories, builtInTemplates } from '../seed/templates';
 import { SAMPLE_WORKSPACE, USER_WORKSPACE, WORKSPACES } from '../workspaces';
 import { KeelDb } from './db';
 import type { ImportJobRecord } from './schema';
@@ -121,11 +132,18 @@ test('reset restores the seed; clear empties only My workspace', async () => {
   await db.tags.put({
     id: 'tag-extra',
     workspaceId: 'sample',
-    name: 'Extra',
-    category: 'custom',
+    name: 'extra',
+    categoryId: 'custom-tags',
   });
+  await db.tagCategories.update(['sample', 'mistakes'], { name: 'Errors' });
+  const drift = rowsIn(SAMPLE_WORKSPACE.id);
+  await db.templates.put(drift.template);
+  await db.folders.put(drift.folder);
+  await db.cashflows.put(drift.flow);
+  await db.challenges.put(drift.challenge);
   const mine = mineRows();
   await putMine(db, mine);
+  await db.tagCategories.update(['mine', 'mistakes'], { name: 'Errors' });
   await db.meta.put({ key: 'overrides:mine', value: { ZC: {} } });
 
   clock = new Date('2026-11-23T15:00:00.000Z');
@@ -138,11 +156,17 @@ test('reset restores the seed; clear empties only My workspace', async () => {
     endDate: fixture.endDate,
     seededAt: '2026-11-23T15:00:00.000Z',
   });
-  expect(await mineCounts(db)).toEqual([1, 1, 1, 1, 1, 1]);
+  // My workspace keeps its built-ins (2 categories, 3 templates) and its own rows.
+  expect(await mineCounts(db)).toEqual([1, 1, 1, 1, 1, 1, 3, 4, 1, 1, 1]);
   expect(await db.trades.get(['mine', mine.trade.id])).toEqual(mine.trade);
 
   await repo.workspaces.clearUser();
-  expect(await mineCounts(db)).toEqual([0, 0, 0, 0, 0, 0]);
+  expect(await mineCounts(db)).toEqual([0, 0, 0, 0, 0, 0, 2, 3, 0, 0, 0]);
+  const builtIns = await mineRowsOf(db, ['tagCategories', 'templates']);
+  expect(builtIns).toEqual([
+    [...builtInCategories(USER_WORKSPACE.id)].sort(byId),
+    [...builtInTemplates(USER_WORKSPACE.id)].sort(byId),
+  ]);
   expect(await db.meta.get('overrides:mine')).toBeUndefined();
   expect(await sampleRows(db)).toEqual(sortedRows(fixture));
 });
@@ -180,6 +204,11 @@ test('default prefs use the browser zone, else New York', () => {
     baseCurrency: 'USD',
     breakevenRange: { unit: 'amount', from: 0, to: 0 },
     pnlBasis: 'net',
+    displayUnit: 'dollar',
+    hideTradeSummary: false,
+    calendarStats: ['net', 'trades'],
+    instrumentsTraded: [],
+    settleExpiredOptions: true,
   });
 
   const resolved = Intl.DateTimeFormat().resolvedOptions();
@@ -216,7 +245,56 @@ const TABLES = [
   'tags',
   'journal',
   'imports',
+  'tagCategories',
+  'templates',
+  'folders',
+  'cashflows',
+  'challenges',
 ] as const;
+
+/** A row for each table that Plan 5 added, in workspace `ws`. */
+function rowsIn(ws: string) {
+  const category: TagCategory = {
+    id: 'c-x',
+    workspaceId: ws,
+    name: 'Sessions',
+    color: '#0F766E',
+    builtIn: false,
+  };
+  const template: NoteTemplate = {
+    id: 'tpl-x',
+    workspaceId: ws,
+    name: 'Mine',
+    kind: 'note',
+    body: null,
+    isDefault: false,
+    builtIn: false,
+  };
+  const folder: NoteFolder = {
+    id: 'fold-x',
+    workspaceId: ws,
+    name: 'Ideas',
+    createdAt: '2026-11-20T15:00:00.000Z',
+  };
+  const flow: CashFlow = {
+    id: 'flow-x',
+    workspaceId: ws,
+    accountId: 'acc-m',
+    date: '2026-11-02',
+    amount: 100_000,
+  };
+  const challenge: Challenge = {
+    id: 'ch-x',
+    workspaceId: ws,
+    name: 'Futures 50K',
+    firm: 'Sample',
+    steps: 1,
+    phases: [{ step: 'step-1', accountId: 'acc-m' }],
+    phase: 'evaluation',
+    status: 'active',
+  };
+  return { category, template, folder, flow, challenge };
+}
 
 function mineRows() {
   const ws = USER_WORKSPACE.id;
@@ -242,15 +320,15 @@ function mineRows() {
     name: 'Mine',
     description: '',
     assetClasses: ['future'],
-    rules: [],
+    groups: [],
     checklist: [],
     status: 'active',
   };
   const tag: Tag = {
     id: 'g-m',
     workspaceId: ws,
-    name: 'Mine',
-    category: 'custom',
+    name: 'mine',
+    categoryId: 'custom-tags',
   };
   const note: JournalEntry = {
     id: 'j-m',
@@ -259,6 +337,7 @@ function mineRows() {
     title: 'Mine',
     body: null,
     linkedTradeIds: ['t-m'],
+    tags: [],
     updatedAt: '2026-11-20T15:00:00.000Z',
   };
   const job: ImportJobRecord = {
@@ -286,7 +365,7 @@ function mineRows() {
     tradeIds: [],
     revision: 1,
   };
-  return { account, trade, strategy, tag, note, job };
+  return { account, trade, strategy, tag, note, job, ...rowsIn(ws) };
 }
 
 async function putMine(db: KeelDb, m: ReturnType<typeof mineRows>) {
@@ -296,6 +375,11 @@ async function putMine(db: KeelDb, m: ReturnType<typeof mineRows>) {
   await db.tags.put(m.tag);
   await db.journal.put(m.note);
   await db.imports.put(m.job);
+  await db.tagCategories.put(m.category);
+  await db.templates.put(m.template);
+  await db.folders.put(m.folder);
+  await db.cashflows.put(m.flow);
+  await db.challenges.put(m.challenge);
 }
 
 const mineCounts = (db: KeelDb) =>
@@ -308,6 +392,15 @@ const mineCounts = (db: KeelDb) =>
 const byId = (a: { id: string }, b: { id: string }) =>
   a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 
+async function mineRowsOf(db: KeelDb, tables: readonly string[]) {
+  const rows = await Promise.all(
+    tables.map((t) =>
+      db.table(t).where('workspaceId').equals(USER_WORKSPACE.id).toArray(),
+    ),
+  );
+  return rows.map((r) => [...r].sort(byId));
+}
+
 async function sampleRows(db: KeelDb) {
   const rows = await Promise.all(
     TABLES.map((t) =>
@@ -318,7 +411,17 @@ async function sampleRows(db: KeelDb) {
 }
 
 function sortedRows(s: SampleWorkspace) {
-  return [s.trades, s.accounts, s.strategies, s.tags, s.journal, []].map(
-    (r: { id: string }[]) => [...r].sort(byId),
-  );
+  return [
+    s.trades,
+    s.accounts,
+    s.strategies,
+    s.tags,
+    s.journal,
+    [],
+    s.tagCategories,
+    builtInTemplates(SAMPLE_WORKSPACE.id),
+    [],
+    [],
+    [],
+  ].map((r: { id: string }[]) => [...r].sort(byId));
 }

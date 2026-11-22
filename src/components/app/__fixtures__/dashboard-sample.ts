@@ -11,7 +11,7 @@ const GRADED: Record<string, Patch> = {
     gross: -39_500,
     fees: 500,
     closedAt: '2026-11-19T15:00:00.000Z',
-    strategyId: 'str-1',
+    strategyIds: ['str-1'],
     ruleChecks: [
       { ruleId: 'r-1', followed: false },
       { ruleId: 'r-2', followed: true },
@@ -23,7 +23,7 @@ const GRADED: Record<string, Patch> = {
     gross: 60_500,
     fees: 500,
     closedAt: '2026-11-18T15:00:00.000Z',
-    strategyId: 'str-1',
+    strategyIds: ['str-1'],
     ruleChecks: [
       { ruleId: 'r-1', followed: true },
       { ruleId: 'r-2', followed: true },
@@ -49,7 +49,7 @@ export function dashboardFixture(
       if (!patch) return t;
       const next: Trade = { ...t, ...patch };
       if (!graded) {
-        delete next.strategyId;
+        next.strategyIds = [];
         next.ruleChecks = [];
       }
       return next;

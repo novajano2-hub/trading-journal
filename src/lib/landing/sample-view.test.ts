@@ -37,7 +37,9 @@ describe('landing sample', () => {
     const setups = v.trades.map((t) =>
       t.tagIds
         .map(name)
-        .filter((n) => v.tags.find((x) => x.name === n)?.category === 'setup'),
+        .filter(
+          (n) => v.tags.find((x) => x.name === n)?.categoryId === 'setups',
+        ),
     );
     expect(setups.flat()).toEqual([
       'Opening range break',

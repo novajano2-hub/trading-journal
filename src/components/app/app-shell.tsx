@@ -16,7 +16,7 @@ import { TopBar } from './top-bar';
 const FILTERS_FALLBACK = (
   <FilterBarView
     filters={EMPTY_FILTERS}
-    options={{ symbols: [], strategies: [], tags: [] }}
+    options={{ symbols: [], strategies: [], tags: [], categories: [] }}
     today=""
     onChange={() => {}}
     disabled

@@ -7,20 +7,26 @@ import {
   type DailyLossProgress,
   type WeeklyGoalProgress,
 } from '@/domain/metrics/goals';
-import { mistakeCosts, type MistakeCost } from '@/domain/metrics/mistakes';
+import {
+  mistakeCosts,
+  mistakeTags,
+  type MistakeCost,
+} from '@/domain/metrics/mistakes';
 import {
   brokenRulesCost,
   ruleScorecard,
   type RuleScore,
 } from '@/domain/metrics/rules';
 import { closedInOrder } from '@/domain/trade-status';
-import type {
-  Cents,
-  Goals,
-  PnlBasis,
-  Strategy,
-  Tag,
-  Trade,
+import {
+  strategyRules,
+  type Cents,
+  type Goals,
+  type PnlBasis,
+  type Strategy,
+  type Tag,
+  type TagCategory,
+  type Trade,
 } from '@/domain/types';
 import type { CurrencyMetrics } from './metrics';
 
@@ -63,6 +69,7 @@ export function tradeRulesSummary(
 
 export interface RecentTrade {
   trade: Trade;
+  /** The names of its known strategies, joined with commas; null with none. */
   strategyName: string | null;
   mistakes: string[];
   rules: TradeRulesSummary;
@@ -71,6 +78,7 @@ export interface RecentTrade {
 export interface DashboardEnv {
   strategies: readonly Strategy[];
   tags: readonly Tag[];
+  tagCategories: readonly TagCategory[];
   goals: Goals;
   /** Goals are in the base currency only. */
   baseCurrency: string;
@@ -120,11 +128,11 @@ export function buildDashboard(
 
   const ruleText = new Map<string, string>();
   for (const s of env.strategies)
-    for (const r of s.rules)
+    for (const r of strategyRules(s))
       if (!ruleText.has(r.id)) ruleText.set(r.id, r.text);
   const strategyName = new Map(env.strategies.map((s) => [s.id, s.name]));
   const mistakeTag = new Map(
-    env.tags.filter((t) => t.category === 'mistake').map((t) => [t.id, t.name]),
+    mistakeTags(env.tags, env.tagCategories).map((t) => [t.id, t.name]),
   );
 
   const rules = ruleScorecard(m.trades, env.strategies, env.ctx);
@@ -172,9 +180,9 @@ export function buildDashboard(
     .map((trade) => ({
       trade,
       strategyName:
-        trade.strategyId !== undefined
-          ? (strategyName.get(trade.strategyId) ?? null)
-          : null,
+        trade.strategyIds
+          .flatMap((id) => strategyName.get(id) ?? [])
+          .join(', ') || null,
       mistakes: trade.tagIds.flatMap((id) => mistakeTag.get(id) ?? []),
       rules: tradeRulesSummary(trade, ruleText),
     }));
@@ -189,7 +197,7 @@ export function buildDashboard(
       cost: brokenRulesCost(m.trades, env.strategies, env.ctx),
       rules,
     },
-    mistakes: mistakeCosts(m.trades, env.tags, env.ctx),
+    mistakes: mistakeCosts(m.trades, env.tags, env.tagCategories, env.ctx),
     goals,
     performance: {
       pnl: summary.basis === 'gross' ? summary.grossPnl : summary.netPnl,

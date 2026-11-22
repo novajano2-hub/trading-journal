@@ -1,7 +1,7 @@
 import type { InstrumentOverrides } from '@/domain/import/mapping';
 import type { ImportPlan } from '@/domain/import/plan';
 import { canonicalSymbol } from '@/domain/trade-builder';
-import type { ImportJob, Trade } from '@/domain/types';
+import { strategyRules, type ImportJob, type Trade } from '@/domain/types';
 import {
   ImportBlockedError,
   NotFoundError,
@@ -51,8 +51,11 @@ async function importRevision(db: KeelDb, ws: string): Promise<number> {
   return (value as number | undefined) ?? 0;
 }
 
-/** Returns the new revision. Call inside the rw transaction of the commit or undo. */
-async function bumpImportRevision(db: KeelDb, ws: string): Promise<number> {
+/** Returns the new revision. Call inside the rw transaction of the write that moved the import context (a commit, an undo, clearing an account). */
+export async function bumpImportRevision(
+  db: KeelDb,
+  ws: string,
+): Promise<number> {
   const next = (await importRevision(db, ws)) + 1;
   await db.meta.put({ key: META.importRevision(ws), value: next });
   return next;
@@ -125,7 +128,7 @@ async function withLiveReferences(
     [...new Set(ids)].map((id): [string, string] => [ws, id]);
   const tags = await db.tags.bulkGet(keys(trades.flatMap((t) => t.tagIds)));
   const strategies = await db.strategies.bulkGet(
-    keys(trades.flatMap((t) => t.strategyId ?? [])),
+    keys(trades.flatMap((t) => t.strategyIds)),
   );
   const notes = await db.journal.bulkGet(
     keys(trades.flatMap((t) => t.noteId ?? [])),
@@ -133,7 +136,9 @@ async function withLiveReferences(
   const tagIds = new Set(tags.flatMap((t) => (t ? [t.id] : [])));
   const noteIds = new Set(notes.flatMap((n) => (n ? [n.id] : [])));
   const ruleIds = new Map(
-    strategies.flatMap((s) => (s ? [[s.id, s.rules.map((r) => r.id)]] : [])),
+    strategies.flatMap((s) =>
+      s ? [[s.id, strategyRules(s).map((r) => r.id)] as const] : [],
+    ),
   );
 
   return trades.map((stored) => {
@@ -142,14 +147,11 @@ async function withLiveReferences(
       tagIds: stored.tagIds.filter((id) => tagIds.has(id)),
     };
     if (t.noteId !== undefined && !noteIds.has(t.noteId)) delete t.noteId;
-    if (t.strategyId !== undefined) {
-      const rules = ruleIds.get(t.strategyId);
-      if (rules)
-        t.ruleChecks = t.ruleChecks.filter((c) => rules.includes(c.ruleId));
-      else {
-        delete t.strategyId;
-        t.ruleChecks = [];
-      }
+    if (t.strategyIds.length > 0) {
+      // Only the live strategies stay, with the checks on their current rules.
+      t.strategyIds = t.strategyIds.filter((id) => ruleIds.has(id));
+      const rules = new Set(t.strategyIds.flatMap((id) => ruleIds.get(id)!));
+      t.ruleChecks = t.ruleChecks.filter((c) => rules.has(c.ruleId));
     }
     return t;
   });

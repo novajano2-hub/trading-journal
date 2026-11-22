@@ -247,11 +247,12 @@ function inherit(built: Trade, stored: Trade): Trade {
     ...built,
     id: stored.id,
     serial: stored.serial,
+    strategyIds: [...stored.strategyIds],
     tagIds: [...stored.tagIds],
     ruleChecks: stored.ruleChecks.map((r) => ({ ...r })),
   };
-  if (stored.strategyId !== undefined) t.strategyId = stored.strategyId;
   if (stored.rating !== undefined) t.rating = stored.rating;
+  if (stored.reviewed !== undefined) t.reviewed = stored.reviewed;
   if (stored.noteId !== undefined) t.noteId = stored.noteId;
   if (built.direction !== stored.direction) return t;
   if (stored.plannedStop !== undefined) t.plannedStop = stored.plannedStop;

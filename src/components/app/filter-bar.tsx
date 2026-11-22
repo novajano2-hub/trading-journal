@@ -13,6 +13,7 @@ import { EMPTY_FILTERS, type GlobalFilters } from '@/data/filters';
 import {
   usePrefs,
   useStrategies,
+  useTagCategories,
   useTags,
   useTrades,
 } from '@/data/query/hooks';
@@ -36,7 +37,12 @@ import {
 import { symbolOptions } from './search';
 import { useShownFilters } from './use-shown-filters';
 
-const NO_OPTIONS: FilterOptions = { symbols: [], strategies: [], tags: [] };
+const NO_OPTIONS: FilterOptions = {
+  symbols: [],
+  strategies: [],
+  tags: [],
+  categories: [],
+};
 
 /**
  * How far each edge fade reaches into a row that scrolls. The end's is the
@@ -242,6 +248,7 @@ export function FilterBarView({
             {() => (
               <TagBody
                 tags={options.tags}
+                categories={options.categories}
                 selected={f.tagIds}
                 onChange={(tagIds) => onChange({ ...f, tagIds })}
               />
@@ -283,14 +290,16 @@ export function FilterBar(): React.JSX.Element {
   const trades = useTrades().data;
   const strategies = useStrategies().data;
   const tags = useTags().data;
+  const categories = useTagCategories().data;
   const timeZone = usePrefs().data?.timeZone;
   const options = useMemo<FilterOptions>(
     () => ({
       symbols: symbolOptions(trades),
       strategies: strategies ?? [],
       tags: tags ?? [],
+      categories: categories ?? [],
     }),
-    [trades, strategies, tags],
+    [trades, strategies, tags, categories],
   );
 
   if (!shown || timeZone === undefined) {

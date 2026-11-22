@@ -1,5 +1,6 @@
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { expect, test } from 'vitest';
+import type { UserPrefs } from '@/domain/types';
 import { fixtureSample } from '../__fixtures__/sample';
 import { goalsFor, withGoals } from '../goals';
 import { defaultPrefs } from '../repository';
@@ -91,3 +92,30 @@ test.each([null, 5, 'x'])(
     ).rejects.toBeInstanceOf(RangeError);
   },
 );
+
+test('display prefs persist', async () => {
+  const indexedDB = new IDBFactory();
+  await open(indexedDB).prefs.update({
+    displayUnit: 'privacy',
+    calendarStats: ['net', 'winRate', 'fees'],
+  });
+  expect(await open(indexedDB).prefs.get()).toMatchObject({
+    displayUnit: 'privacy',
+    calendarStats: ['net', 'winRate', 'fees'],
+    hideTradeSummary: false,
+  });
+});
+
+test.each([
+  { displayUnit: 'yen' },
+  { calendarStats: [] },
+  { calendarStats: ['net', 'trades', 'fees', 'r'] },
+  { calendarStats: ['net', 'net'] },
+  { calendarStats: ['volume'] },
+])('invalid display pref %j is refused with RangeError', async (p) => {
+  const repo = open(new IDBFactory());
+  await expect(
+    repo.prefs.update(p as Partial<UserPrefs>),
+  ).rejects.toBeInstanceOf(RangeError);
+  expect(await repo.prefs.get()).toEqual(defaultPrefs());
+});

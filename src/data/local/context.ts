@@ -1,5 +1,7 @@
 import { StorageUnavailableError } from '../repository';
 import type { SampleWorkspace } from '../seed/generate';
+import { builtInCategories, builtInTemplates } from '../seed/templates';
+import { SAMPLE_WORKSPACE, WORKSPACES } from '../workspaces';
 import type { KeelDb } from './db';
 import { DATA_TABLES, META, type SeedMeta } from './schema';
 
@@ -64,6 +66,9 @@ export function createLocalContext(opts: LocalContextOptions): LocalContext {
         await writeSample(db, sample, at);
       });
     }
+    await db.transaction('rw', [db.tagCategories, db.templates], async () => {
+      for (const w of WORKSPACES) await writeBuiltIns(db, w.id);
+    });
     return db;
   }
 
@@ -112,6 +117,7 @@ export async function writeSample(
 ): Promise<void> {
   await db.accounts.bulkPut(sample.accounts);
   await db.strategies.bulkPut(sample.strategies);
+  await db.tagCategories.bulkPut(sample.tagCategories);
   await db.tags.bulkPut(sample.tags);
   await db.trades.bulkPut(sample.trades);
   await db.journal.bulkPut(sample.journal);
@@ -121,4 +127,25 @@ export async function writeSample(
     seededAt: at.toISOString(),
   };
   await db.meta.put({ key: META.seed, value: seed });
+  await writeBuiltIns(db, SAMPLE_WORKSPACE.id);
+}
+
+/**
+ * Adds whichever of the workspace's built-in tag categories and templates are
+ * missing; ones the user renamed or edited stay as they are. Call inside an
+ * rw transaction over `tagCategories` and `templates`.
+ */
+export async function writeBuiltIns(db: KeelDb, ws: string): Promise<void> {
+  const keys = (rows: readonly { id: string }[]) =>
+    rows.map((r): [string, string] => [ws, r.id]);
+  const categories = builtInCategories(ws);
+  const haveCategories = await db.tagCategories.bulkGet(keys(categories));
+  await db.tagCategories.bulkPut(
+    categories.filter((_, i) => haveCategories[i] === undefined),
+  );
+  const templates = builtInTemplates(ws);
+  const haveTemplates = await db.templates.bulkGet(keys(templates));
+  await db.templates.bulkPut(
+    templates.filter((_, i) => haveTemplates[i] === undefined),
+  );
 }

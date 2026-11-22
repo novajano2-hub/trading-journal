@@ -1,15 +1,38 @@
 import { isValidTimeZone } from '@/domain/time';
-import type { UserPrefs } from '@/domain/types';
+import type { CalendarStat, DisplayUnit, UserPrefs } from '@/domain/types';
 import { defaultPrefs, type PrefsRepo } from '../repository';
 import type { LocalContext } from './context';
+import type { KeelDb } from './db';
 import { META } from './schema';
+
+const DISPLAY_UNITS: readonly DisplayUnit[] = [
+  'dollar',
+  'percent',
+  'privacy',
+  'r',
+  'ticks',
+  'pips',
+  'points',
+];
+const CALENDAR_STATS: readonly CalendarStat[] = [
+  'net',
+  'trades',
+  'winRate',
+  'r',
+  'fees',
+];
+const MAX_CALENDAR_STATS = 3;
+
+/** The prefs as stored, over the defaults. Works inside a transaction that includes `db.meta`. */
+export async function readPrefs(db: KeelDb): Promise<UserPrefs> {
+  return withDefaults((await db.meta.get(META.prefs))?.value);
+}
 
 /** Stores only the prefs the user set, so the rest keep following `defaultPrefs()` (e.g. the browser zone). */
 export function localPrefs(ctx: LocalContext): PrefsRepo {
   return {
     async get() {
-      const db = await ctx.db();
-      return withDefaults((await db.meta.get(META.prefs))?.value);
+      return readPrefs(await ctx.db());
     },
 
     async update(patch) {
@@ -39,6 +62,19 @@ function validate(p: Partial<UserPrefs>): void {
   if (range && !(range.from <= range.to))
     throw new RangeError(
       `Breakeven range must run low to high, got ${range.from} to ${range.to}`,
+    );
+  if (p.displayUnit !== undefined && !DISPLAY_UNITS.includes(p.displayUnit))
+    throw new RangeError(`Unknown display unit "${p.displayUnit}"`);
+  const stats = p.calendarStats;
+  if (
+    stats &&
+    (stats.length === 0 ||
+      stats.length > MAX_CALENDAR_STATS ||
+      new Set(stats).size !== stats.length ||
+      !stats.every((x) => CALENDAR_STATS.includes(x)))
+  )
+    throw new RangeError(
+      `Calendar stats must be 1 to ${MAX_CALENDAR_STATS} of ${CALENDAR_STATS.join(', ')}, got ${stats.join(', ')}`,
     );
   for (const [id, g] of Object.entries(p.goals ?? {})) {
     if (typeof g !== 'object' || g === null)

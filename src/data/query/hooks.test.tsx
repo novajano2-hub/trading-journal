@@ -13,10 +13,19 @@ import { USER_WORKSPACE } from '../workspaces';
 import {
   useActiveWorkspace,
   useCommitImport,
+  useCreateTagCategory,
+  useDailyNote,
+  useEnsureTradeNote,
+  useJournal,
+  useRemoveTagCategory,
   useSetActiveWorkspace,
+  useTagCategories,
+  useTags,
+  useTemplates,
   useTrade,
   useTrades,
   useUpdateTrade,
+  useUpdateTrades,
 } from './hooks';
 import { DataProvider } from './provider';
 
@@ -43,6 +52,88 @@ function wrapper() {
 test('useTrades loads the active workspace', async () => {
   const { result } = renderHook(() => useTrades(), { wrapper: wrapper() });
   await waitFor(() => expect(result.current.data).toHaveLength(3));
+});
+
+test('categories and templates load, and category writes refresh tags and trades', async () => {
+  const { result } = renderHook(
+    () => ({
+      categories: useTagCategories(),
+      templates: useTemplates(),
+      tags: useTags(),
+      trades: useTrades(),
+      create: useCreateTagCategory(),
+      remove: useRemoveTagCategory(),
+    }),
+    { wrapper: wrapper() },
+  );
+  await waitFor(() =>
+    expect(result.current.categories.data?.map((c) => c.name)).toEqual([
+      'Custom tags',
+      'Mistakes',
+      'Setups',
+    ]),
+  );
+  await waitFor(() => expect(result.current.templates.data).toHaveLength(3));
+  await waitFor(() => expect(result.current.trades.data).toHaveLength(3));
+  await act(async () => {
+    await result.current.create.mutateAsync({
+      name: 'Sessions',
+      color: '#0F766E',
+    });
+  });
+  await waitFor(() =>
+    expect(result.current.categories.data?.map((c) => c.name)).toContain(
+      'Sessions',
+    ),
+  );
+  await act(async () => {
+    await expect(result.current.remove.mutateAsync('mistakes')).rejects.toThrow(
+      'built-in category',
+    );
+    await result.current.remove.mutateAsync('setups');
+  });
+  await waitFor(() =>
+    expect(result.current.tags.data?.map((t) => t.id)).toEqual(['tag-fomo']),
+  );
+  expect(result.current.categories.data?.map((c) => c.id)).not.toContain(
+    'setups',
+  );
+});
+
+test('a bulk update, a trade note and a daily note refresh what they change', async () => {
+  const { result } = renderHook(
+    () => ({
+      trades: useTrades(),
+      journal: useJournal(),
+      updateMany: useUpdateTrades(),
+      ensureNote: useEnsureTradeNote(),
+      daily: useDailyNote(),
+    }),
+    { wrapper: wrapper() },
+  );
+  await waitFor(() => expect(result.current.journal.data).toHaveLength(1));
+  await act(async () => {
+    await result.current.updateMany.mutateAsync({
+      ids: ['f-1', 'f-2'],
+      patch: { reviewed: true },
+    });
+  });
+  await waitFor(() =>
+    expect(result.current.trades.data?.map((t) => t.reviewed)).toEqual([
+      true,
+      true,
+      undefined,
+    ]),
+  );
+  let noteId = '';
+  await act(async () => {
+    noteId = (await result.current.ensureNote.mutateAsync('f-2')).id;
+    await result.current.daily.mutateAsync('2026-11-19');
+  });
+  await waitFor(() => expect(result.current.journal.data).toHaveLength(3));
+  expect(result.current.trades.data?.find((t) => t.id === 'f-2')?.noteId).toBe(
+    noteId,
+  );
 });
 
 test('an update shows up in the list', async () => {

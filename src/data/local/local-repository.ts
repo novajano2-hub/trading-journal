@@ -6,7 +6,9 @@ import { localImports } from './imports';
 import { localJournal } from './journal';
 import { localPrefs } from './prefs';
 import { localStrategies } from './strategies';
+import { localTagCategories } from './tag-categories';
 import { localTags } from './tags';
+import { localTemplates } from './templates';
 import { localTrades } from './trades';
 import { localWorkspaces } from './workspaces';
 
@@ -34,6 +36,8 @@ export function createLocalRepository(
     accounts: localAccounts(ctx),
     strategies: localStrategies(ctx),
     tags: localTags(ctx),
+    tagCategories: localTagCategories(ctx),
+    templates: localTemplates(ctx),
     journal: localJournal(ctx),
     imports: localImports(ctx),
   };

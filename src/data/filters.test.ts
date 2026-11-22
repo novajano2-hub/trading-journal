@@ -112,20 +112,20 @@ describe('global filters', () => {
     const esz = makeTrade({
       ...base,
       instrument: resolveInstrument('ESZ5')!,
-      strategyId: 's1',
+      strategyIds: ['s1'],
       tagIds: ['t1', 't2'],
     });
     const esh = makeTrade({
       ...base,
       instrument: resolveInstrument('ESH6')!,
       direction: 'short',
-      strategyId: 's1',
+      strategyIds: ['s1'],
       tagIds: ['t3'],
     });
     const nq = makeTrade({
       ...base,
       instrument: resolveInstrument('NQZ5')!,
-      strategyId: 's2',
+      strategyIds: ['s2', 's3'],
     });
     const ts = [esz, esh, nq];
     const run = (f: Partial<GlobalFilters>) =>
@@ -133,6 +133,9 @@ describe('global filters', () => {
     expect(run({ symbols: ['ES'] })).toEqual([esz, esh]);
     expect(run({ symbols: ['ES'], side: 'short' })).toEqual([esh]);
     expect(run({ strategyIds: ['s1'] })).toEqual([esz, esh]);
+    // A trade in several strategies matches any of them.
+    expect(run({ strategyIds: ['s3'] })).toEqual([nq]);
+    expect(run({ strategyIds: ['s1', 's2'] })).toEqual(ts);
     expect(run({ tagIds: ['t2'] })).toEqual([esz]);
     expect(run({ tagIds: ['t2', 't3'] })).toEqual([esz, esh]);
     expect(
@@ -216,7 +219,7 @@ describe('global filters', () => {
     const t = makeTrade({
       net: 1,
       accountId: 'a',
-      strategyId: 's1',
+      strategyIds: ['s1'],
       tagIds: ['t1'],
     });
     const link = parseFilters(

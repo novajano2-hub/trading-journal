@@ -1,11 +1,12 @@
 import { expect, test } from 'vitest';
-import type { Strategy, Tag } from '@/domain/types';
+import type { Strategy, Tag, TagCategory } from '@/domain/types';
 import { isSearchShortcut, MAX_RESULTS, searchApp } from './search';
 
 const src = {
   symbols: ['CL', 'ES', 'NQ'],
   strategies: [{ id: 's1', name: 'Range break' }] as Strategy[],
-  tags: [{ id: 't1', name: 'Revenge trade', category: 'mistake' }] as Tag[],
+  tags: [{ id: 't1', name: 'Revenge trade', categoryId: 'c1' }] as Tag[],
+  categories: [{ id: 'c1', name: 'Mistakes' }] as TagCategory[],
 };
 
 test('modules by word start, then symbols, strategies, tags', () => {
@@ -37,9 +38,9 @@ test('symbols match by prefix, case-insensitively, and results are capped', () =
   expect(searchApp('a', { ...src, symbols: many })).toHaveLength(MAX_RESULTS);
 });
 
-test('a tag result carries its category', () => {
+test("a tag result carries its category's name", () => {
   expect(searchApp('revenge', src)).toEqual([
-    { kind: 'tag', id: 't1', label: 'Revenge trade', category: 'mistake' },
+    { kind: 'tag', id: 't1', label: 'Revenge trade', category: 'Mistakes' },
   ]);
 });
 

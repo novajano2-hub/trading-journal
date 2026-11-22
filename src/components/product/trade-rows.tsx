@@ -3,14 +3,6 @@ import { formatPnl } from '@/lib/format';
 import { shortTime } from '@/lib/time-format';
 import { Chip, SideChip } from '@/components/ui/chip';
 
-/** Which tag a compact row shows first: the mistake, then the setup. */
-const TAG_ORDER: readonly TagCategory[] = [
-  'mistake',
-  'setup',
-  'emotion',
-  'custom',
-];
-
 /**
  * A trade list in the app's recent-trades layout: time, symbol, a neutral
  * side chip (the word carries it), tags with mistakes in marigold, signed net.
@@ -18,11 +10,14 @@ const TAG_ORDER: readonly TagCategory[] = [
 export function TradeRows({
   trades,
   tags,
+  categories,
   maxTags,
   inset,
 }: {
   trades: readonly Trade[];
   tags: readonly Tag[];
+  /** Mistake-role categories' tags come first, then the others in this order. */
+  categories: readonly TagCategory[];
   /** Show only the most telling tags per row, mistakes first. */
   maxTags?: number;
   /**
@@ -32,15 +27,21 @@ export function TradeRows({
   inset?: boolean;
 }) {
   const byId = new Map(tags.map((t) => [t.id, t]));
+  const isMistake = (tag: Tag) =>
+    categories.some((c) => c.id === tag.categoryId && c.role === 'mistake');
+  /** Which tag a compact row shows first: the mistake, then the categories in order. */
+  const rank = (tag: Tag) => {
+    if (isMistake(tag)) return -1;
+    const i = categories.findIndex((c) => c.id === tag.categoryId);
+    return i < 0 ? categories.length : i;
+  };
   const shown = (t: Trade) =>
     t.tagIds
       .flatMap((id) => {
         const tag = byId.get(id);
         return tag ? [tag] : [];
       })
-      .sort(
-        (a, b) => TAG_ORDER.indexOf(a.category) - TAG_ORDER.indexOf(b.category),
-      )
+      .sort((a, b) => rank(a) - rank(b))
       .slice(0, maxTags);
   return (
     <ul
@@ -64,10 +65,7 @@ export function TradeRows({
           </span>
           <span className="flex min-w-0 flex-wrap gap-1 max-sm:hidden">
             {shown(t).map((tag) => (
-              <Chip
-                key={tag.id}
-                tone={tag.category === 'mistake' ? 'warn' : 'neutral'}
-              >
+              <Chip key={tag.id} tone={isMistake(tag) ? 'warn' : 'neutral'}>
                 {tag.name}
               </Chip>
             ))}

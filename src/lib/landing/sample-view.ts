@@ -33,6 +33,8 @@ export interface SampleView {
   equity: EquityPoint[];
   prop: PropStatus;
   tags: Tag[];
+  /** Setups, Mistakes (the mistake role) and Emotions. */
+  tagCategories: TagCategory[];
   tagNames: Record<string, string>;
   /** Engine breakdowns on each P&L basis, so gross is re-derived, never adjusted by hand. */
   breakdowns: Record<PnlBasis, Record<BreakdownTab, BreakdownRowView[]>>;
@@ -74,29 +76,56 @@ const SETUP_BY_SERIAL: Record<number, string> = {
 const MISTAKE_BY_SERIAL: Record<number, string> = { 6: 'Moved stop' };
 const EMOTION_BY_SERIAL: Record<number, string> = { 6: 'Impatient' };
 
-const TAGS_BY_CATEGORY: [TagCategory, Record<number, string>][] = [
+const category = (
+  id: string,
+  name: string,
+  color: string,
+  role?: 'mistake',
+): TagCategory => ({
+  id,
+  workspaceId: 'sample',
+  name,
+  color,
+  ...(role && { role }),
+  builtIn: role !== undefined,
+});
+/** The landing's categories, in the order a trade's tags read after its mistakes. */
+export const SAMPLE_CATEGORIES = {
+  setup: category('setups', 'Setups', '#2B35AF'),
+  mistake: category('mistakes', 'Mistakes', '#D97706', 'mistake'),
+  emotion: category('emotions', 'Emotions', '#0A6F94'),
+} as const;
+
+const TAGS_BY_CATEGORY: [
+  keyof typeof SAMPLE_CATEGORIES,
+  Record<number, string>,
+][] = [
   ['setup', SETUP_BY_SERIAL],
   ['mistake', MISTAKE_BY_SERIAL],
   ['emotion', EMOTION_BY_SERIAL],
 ];
 
 function makeTags(): Tag[] {
-  const tag = (name: string, category: TagCategory): Tag => ({
-    id: `tag-${category}-${name.toLowerCase().replace(/\s+/g, '-')}`,
+  const tag = (name: string, key: keyof typeof SAMPLE_CATEGORIES): Tag => ({
+    id: `tag-${key}-${name.toLowerCase().replace(/\s+/g, '-')}`,
     workspaceId: 'sample',
     name,
-    category,
+    categoryId: SAMPLE_CATEGORIES[key].id,
   });
-  return TAGS_BY_CATEGORY.flatMap(([category, bySerial]) =>
-    [...new Set(Object.values(bySerial))].map((n) => tag(n, category)),
+  return TAGS_BY_CATEGORY.flatMap(([key, bySerial]) =>
+    [...new Set(Object.values(bySerial))].map((n) => tag(n, key)),
   );
 }
 
 export const SAMPLE_RULES: Rule[] = [
-  { id: 'r-entry', text: 'Entered on the range break', group: 'entry' },
-  { id: 'r-risk', text: 'Risk no more than 1R per trade', group: 'risk' },
-  { id: 'r-stop', text: 'Stop stays where it was placed', group: 'management' },
-  { id: 'r-two-losses', text: 'No new trade after two losses', group: 'risk' },
+  { id: 'r-entry', text: 'Entered on the range break', showWhen: 'always' },
+  { id: 'r-risk', text: 'Risk no more than 1R per trade', showWhen: 'always' },
+  { id: 'r-stop', text: 'Stop stays where it was placed', showWhen: 'always' },
+  {
+    id: 'r-two-losses',
+    text: 'No new trade after two losses',
+    showWhen: 'always',
+  },
 ];
 /** Trade 6 is graded against every rule; it moved its stop. */
 const BROKEN_RULE_ID = 'r-stop';
@@ -177,11 +206,13 @@ export function getSampleView(): SampleView {
       label: r.label,
       pnl: basisPnl(r.summary),
     }));
-  const onlyCategory = (category: TagCategory) =>
+  const onlyCategory = (key: keyof typeof SAMPLE_CATEGORIES) =>
     trades.map((t) => ({
       ...t,
       tagIds: t.tagIds.filter(
-        (id) => tags.find((x) => x.id === id)?.category === category,
+        (id) =>
+          tags.find((x) => x.id === id)?.categoryId ===
+          SAMPLE_CATEGORIES[key].id,
       ),
     }));
   const breakdownsOn = (
@@ -214,6 +245,7 @@ export function getSampleView(): SampleView {
       now: NOW,
     }),
     tags,
+    tagCategories: Object.values(SAMPLE_CATEGORIES),
     tagNames,
     breakdowns: { net: breakdownsOn('net'), gross: breakdownsOn('gross') },
     checksFor: (t) =>

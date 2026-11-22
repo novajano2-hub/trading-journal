@@ -1,11 +1,12 @@
-import type { Cents, Rule, RuleGroup, Strategy, Trade } from '../types';
+import type { Cents, Rule, Strategy, Trade } from '../types';
 import { closedInOrder, type ClosedTrade } from '../trade-status';
 import { pnlOf, type MetricContext } from './context';
 
 export interface RuleScore {
   ruleId: string;
   text: string;
-  group: RuleGroup;
+  /** The title of the strategy's group that holds the rule. */
+  group: string;
   strategyId: string;
   strategyName: string;
   kept: number;
@@ -21,14 +22,17 @@ export interface RuleScore {
 
 interface RuleOwner {
   rule: Rule;
+  group: string;
   strategy: Strategy;
 }
 
 function ruleIndex(strategies: readonly Strategy[]): Map<string, RuleOwner> {
   const index = new Map<string, RuleOwner>();
   for (const strategy of strategies)
-    for (const rule of strategy.rules)
-      if (!index.has(rule.id)) index.set(rule.id, { rule, strategy });
+    for (const group of strategy.groups)
+      for (const rule of group.rules)
+        if (!index.has(rule.id))
+          index.set(rule.id, { rule, group: group.title, strategy });
   return index;
 }
 
@@ -60,13 +64,13 @@ export function ruleScorecard(
   for (const t of closedInOrder(trades).reverse()) {
     const pnl = pnlOf(t, ctx.pnlBasis);
     for (const { ruleId, followed } of decisiveChecks(t, index)) {
-      const { rule, strategy } = index.get(ruleId)!;
+      const { rule, group, strategy } = index.get(ruleId)!;
       let row = rows.get(ruleId);
       if (!row) {
         row = {
           ruleId,
           text: rule.text,
-          group: rule.group,
+          group,
           strategyId: strategy.id,
           strategyName: strategy.name,
           kept: 0,
