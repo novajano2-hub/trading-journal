@@ -162,6 +162,15 @@ Later:
 - Share trade, share note, share strategy; PDF export; note version history; rich-text and font settings.
 - Broker sync with its refresh cadence; Zella-style AI insights; Start my day planning and mood flow; trade replay; saved filter sets (not yet shipped by TradeZella); dashboard widget templates.
 
+## Terms of Use check (2026-11-21)
+
+Read before deciding on a paid walkthrough: https://app.tradezella.com/information/terms (effective 6 Nov 2026). Paraphrased:
+- Section 10 bans accessing the service by automated means, with one exception: an AI assistant connected through TradeZella's own connector. An agent driving the web app in a browser pane falls under the ban.
+- Section 11 licenses the service only for the subscriber's personal trading activity. Subscribing to study the product for a competing one sits outside that licence.
+- Section 10 also bans reverse engineering and commercial use without written consent.
+
+Route: no agent walkthrough of the web app (Section 10). TradeZella's official MCP connector is the AI access route their terms allow (https://mcp.tradezella.com/mcp, read-only by default; sees trades, reports, strategies, notes and stats; cannot add, edit or delete trades; 30 requests a minute, 1,000 a day). The user may connect it read-only to an account holding imported trades; findings from it are recorded below as behaviour and data shape only. Licence scope (Section 11) was flagged to the user, who decides on their own use. Not legal advice.
+
 ## Sources not fetched or unreachable
 
 - mytradingjourney.com: redirects to a domain broker page; no docs found.
