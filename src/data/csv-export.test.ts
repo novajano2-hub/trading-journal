@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { makeTrade } from '@/domain/__fixtures__/trades';
+import { defaultMetricContext } from '@/domain/metrics/context';
 import { fixtureSample } from './__fixtures__/sample';
 import { tradesCsv, type CsvEnv } from './csv-export';
 
@@ -10,6 +11,7 @@ const env: CsvEnv = {
   strategies: fx.strategies,
   tags: fx.tags,
   categories: fx.tagCategories,
+  ctx: defaultMetricContext('America/New_York'),
 };
 
 const loss = makeTrade({

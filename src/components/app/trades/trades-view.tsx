@@ -245,16 +245,17 @@ export function TradesView(): React.JSX.Element {
   );
   const facts = useMemo(
     () =>
-      timeZone && accounts && strategies && tags && categories
+      timeZone && accounts && strategies && tags && categories && ctx
         ? rowFacts({
             timeZone,
             accounts,
             strategies,
             tags,
             categories,
+            ctx,
           })
         : undefined,
-    [timeZone, accounts, strategies, tags, categories],
+    [timeZone, accounts, strategies, tags, categories, ctx],
   );
 
   const status: Status = filters.status ?? 'closed';
@@ -456,6 +457,7 @@ export function TradesView(): React.JSX.Element {
         strategies: strategies ?? [],
         tags: tags ?? [],
         categories: categories ?? [],
+        ctx: ctx!,
       }),
       today,
     );

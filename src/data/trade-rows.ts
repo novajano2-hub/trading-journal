@@ -1,9 +1,8 @@
 // What a trade log row says about a trade, shared by the table and the CSV.
 import { rOf, plannedR } from '@/domain/metrics/summary';
-import { costBasis } from '@/domain/metrics/context';
+import { costBasis, type MetricContext } from '@/domain/metrics/context';
 import { mistakeTags } from '@/domain/metrics/mistakes';
 import {
-  strategyRules,
   type Account,
   type Strategy,
   type Tag,
@@ -18,6 +17,8 @@ export interface RowEnv {
   strategies: readonly Strategy[];
   tags: readonly Tag[];
   categories: readonly TagCategory[];
+  /** Which rules apply to a trade follows its outcome, read through this. */
+  ctx: Pick<MetricContext, 'pnlBasis' | 'breakevenRange'>;
 }
 
 /** A tag with its category's colour (`#RRGGBB`), which always travels with the name. */
@@ -52,17 +53,13 @@ export function rowFacts(env: RowEnv): RowFacts {
         name: tag.name,
         color: color.get(tag.categoryId) ?? '#6B7280',
       });
-  const ruleText = new Map<string, string>();
-  for (const s of env.strategies)
-    for (const r of strategyRules(s))
-      if (!ruleText.has(r.id)) ruleText.set(r.id, r.text);
   return {
     accountName: (t) => accountName.get(t.accountId) ?? '',
     strategyNames: (t) =>
       t.strategyIds.flatMap((id) => strategyName.get(id) ?? []),
     tagsOf: (t) => t.tagIds.flatMap((id) => tags.get(id) ?? []),
     mistakesOf: (t) => t.tagIds.flatMap((id) => mistakes.get(id) ?? []),
-    rules: (t) => tradeRulesSummary(t, ruleText),
+    rules: (t) => tradeRulesSummary(t, env.strategies, env.ctx),
   };
 }
 

@@ -16,6 +16,7 @@ import {
   ruleScorecard,
   type RuleScore,
 } from '@/domain/metrics/rules';
+import { ruleApplies } from '@/domain/rule-applies';
 import { closedInOrder } from '@/domain/trade-status';
 import {
   strategyRules,
@@ -41,20 +42,31 @@ export interface TradeRulesSummary {
   broken: string[];
 }
 
+/**
+ * A trade's grading against the rules that count for it: those of its own
+ * strategies that apply to its outcome, as the trade page counts them.
+ */
 export function tradeRulesSummary(
   trade: Trade,
-  ruleText: ReadonlyMap<string, string>,
+  strategies: readonly Strategy[],
+  ctx: Pick<MetricContext, 'pnlBasis' | 'breakevenRange'>,
 ): TradeRulesSummary {
+  const ruleText = new Map<string, string>();
+  for (const s of strategies)
+    if (trade.strategyIds.includes(s.id))
+      for (const r of strategyRules(s))
+        if (ruleApplies(r, trade, ctx) && !ruleText.has(r.id))
+          ruleText.set(r.id, r.text);
   let kept = 0;
   const broken: string[] = [];
   let brokenCount = 0;
   for (const c of trade.ruleChecks) {
-    if (c.followed === null) continue;
+    const text = ruleText.get(c.ruleId);
+    if (text === undefined || c.followed === null) continue;
     if (c.followed) kept += 1;
     else {
       brokenCount += 1;
-      const text = ruleText.get(c.ruleId);
-      if (text !== undefined) broken.push(text);
+      broken.push(text);
     }
   }
   const checked = kept + brokenCount;
@@ -125,10 +137,6 @@ export function buildDashboard(
   const { summary } = m;
   const closed = closedInOrder(m.trades);
 
-  const ruleText = new Map<string, string>();
-  for (const s of env.strategies)
-    for (const r of strategyRules(s))
-      if (!ruleText.has(r.id)) ruleText.set(r.id, r.text);
   const strategyName = new Map(env.strategies.map((s) => [s.id, s.name]));
   const mistakeTag = new Map(
     mistakeTags(env.tags, env.tagCategories).map((t) => [t.id, t.name]),
@@ -178,7 +186,7 @@ export function buildDashboard(
         (id) => strategyName.get(id) ?? [],
       ),
       mistakes: trade.tagIds.flatMap((id) => mistakeTag.get(id) ?? []),
-      rules: tradeRulesSummary(trade, ruleText),
+      rules: tradeRulesSummary(trade, env.strategies, env.ctx),
     }));
 
   return {

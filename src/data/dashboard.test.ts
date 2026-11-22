@@ -5,7 +5,12 @@ import {
   defaultMetricContext,
   type MetricContext,
 } from '@/domain/metrics/context';
-import { strategyRules, type RuleCheck } from '@/domain/types';
+import {
+  strategyRules,
+  type RuleCheck,
+  type Strategy,
+  type Trade,
+} from '@/domain/types';
 import {
   buildDashboard,
   pickPartition,
@@ -187,28 +192,55 @@ test('one currency at a time', () => {
 });
 
 test('a trade’s rules column', () => {
-  const text = new Map([
-    ['r1', 'Stop stays where it was placed'],
-    ['r2', 'Max 6 trades a day'],
-  ]);
-  const t = (checks: RuleCheck[]) => makeTrade({ net: 0, ruleChecks: checks });
+  const strategy: Strategy = {
+    id: 's1',
+    workspaceId: 'w',
+    name: 'S',
+    description: '',
+    assetClasses: [],
+    checklist: [],
+    status: 'active',
+    groups: [
+      {
+        id: 'g',
+        title: 'G',
+        rules: [
+          {
+            id: 'r1',
+            text: 'Stop stays where it was placed',
+            showWhen: 'always',
+          },
+          { id: 'r2', text: 'Max 6 trades a day', showWhen: 'always' },
+          { id: 'r4', text: 'Let the winner run', showWhen: 'winner' },
+        ],
+      },
+    ],
+  };
+  const ctx = defaultMetricContext(NY);
+  const t = (checks: RuleCheck[], o: Partial<Trade> = {}) =>
+    makeTrade({
+      net: -5000,
+      status: 'closed',
+      strategyIds: ['s1'],
+      ruleChecks: checks,
+      ...o,
+    });
+  const summary = (tr: Trade) => tradeRulesSummary(tr, [strategy], ctx);
   expect(
-    tradeRulesSummary(
+    summary(
       t([
         { ruleId: 'r1', followed: true },
         { ruleId: 'r2', followed: true },
         { ruleId: 'r3', followed: null },
       ]),
-      text,
     ),
   ).toEqual({ kind: 'kept', kept: 2, checked: 2, broken: [] });
   expect(
-    tradeRulesSummary(
+    summary(
       t([
         { ruleId: 'r1', followed: false },
         { ruleId: 'r2', followed: true },
       ]),
-      text,
     ),
   ).toEqual({
     kind: 'broke',
@@ -216,7 +248,59 @@ test('a trade’s rules column', () => {
     checked: 2,
     broken: ['Stop stays where it was placed'],
   });
-  expect(tradeRulesSummary(t([]), text).kind).toBe('ungraded');
+  expect(summary(t([])).kind).toBe('ungraded');
+});
+
+test('a trade’s rules column leaves out rules that do not apply or are not its strategies’', () => {
+  const strategy: Strategy = {
+    id: 's1',
+    workspaceId: 'w',
+    name: 'S',
+    description: '',
+    assetClasses: [],
+    checklist: [],
+    status: 'active',
+    groups: [
+      {
+        id: 'g',
+        title: 'G',
+        rules: [
+          { id: 'r1', text: 'Always rule', showWhen: 'always' },
+          { id: 'r4', text: 'Let the winner run', showWhen: 'winner' },
+        ],
+      },
+    ],
+  };
+  const ctx = defaultMetricContext(NY);
+  const checks: RuleCheck[] = [
+    { ruleId: 'r1', followed: true },
+    // The trade lost, so this winner rule does not apply to it.
+    { ruleId: 'r4', followed: false },
+    // No strategy of the trade owns this rule.
+    { ruleId: 'gone', followed: false },
+  ];
+  const loser = makeTrade({
+    net: -5000,
+    status: 'closed',
+    strategyIds: ['s1'],
+    ruleChecks: checks,
+  });
+  expect(tradeRulesSummary(loser, [strategy], ctx)).toEqual({
+    kind: 'kept',
+    kept: 1,
+    checked: 1,
+    broken: [],
+  });
+  const winner = { ...loser, net: 5000 };
+  expect(tradeRulesSummary(winner, [strategy], ctx)).toMatchObject({
+    kind: 'broke',
+    checked: 2,
+    broken: ['Let the winner run'],
+  });
+  // A strategy the trade is not in contributes nothing.
+  expect(
+    tradeRulesSummary({ ...winner, strategyIds: [] }, [strategy], ctx).kind,
+  ).toBe('ungraded');
 });
 
 test('the sample at its default view: weekly goal in progress, loss limit kept this week', () => {
