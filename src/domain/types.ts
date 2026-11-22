@@ -18,6 +18,8 @@ export interface Instrument {
   expiry?: string /* YYYY-MM-DD */;
   strike?: number;
   right?: 'call' | 'put';
+  /** What an option is written on, where known; entries without it are read by their root and multiplier. */
+  optionOn?: 'stock' | 'future';
 }
 export interface Execution {
   id: string;

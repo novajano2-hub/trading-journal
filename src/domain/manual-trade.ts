@@ -108,6 +108,7 @@ export function manualInstrument(spec: InstrumentSpec): Instrument {
         tickSize: tick,
         quoteCurrency: quote,
         underlying: symbol,
+        optionOn: spec.type === 'future-option' ? 'future' : 'stock',
       };
       if (spec.expiry) inst.expiry = spec.expiry;
       if (spec.strike !== undefined && spec.strike > 0)
@@ -178,9 +179,11 @@ export function manualInstrument(spec: InstrumentSpec): Instrument {
   }
 }
 
-/** The form's asset type for a stored instrument (an option on a futures root, or one not worth 100, is a future option). */
+/** The form's asset type for a stored instrument (`optionOn` says what an option is on; without it, an option on a futures root, or one not worth 100, is a future option). */
 export function assetTypeOf(inst: Instrument): AssetType {
   if (inst.assetClass !== 'option') return inst.assetClass;
+  if (inst.optionOn !== undefined)
+    return inst.optionOn === 'future' ? 'future-option' : 'option';
   const root = inst.underlying ?? inst.root;
   return FUTURES[root] || inst.pointValue !== OPTION_MULTIPLIER
     ? 'future-option'

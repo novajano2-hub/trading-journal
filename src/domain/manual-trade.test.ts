@@ -1,9 +1,11 @@
 import { describe, expect, test } from 'vitest';
 import type { ManualTradeInput } from '@/data/repository';
 import { resolveInstrument } from './instruments';
+import type { Instrument } from './types';
 import {
   ASSET_TYPES,
   buildManualTrade,
+  assetTypeOf,
   manualInstrument,
   type InstrumentSpec,
 } from './manual-trade';
@@ -216,5 +218,47 @@ describe('manualInstrument', () => {
       'Crypto',
       'CFD',
     ]);
+  });
+});
+
+describe('optionOn', () => {
+  const spec = (type: 'option' | 'future-option'): InstrumentSpec => ({
+    type,
+    symbol: 'ZZ',
+    expiry: '2026-12-18',
+    strike: 10,
+    right: 'call',
+    multiplier: 100,
+  });
+
+  test('manual entry records what the option is on', () => {
+    expect(manualInstrument(spec('option')).optionOn).toBe('stock');
+    expect(manualInstrument(spec('future-option')).optionOn).toBe('future');
+  });
+
+  test('the form reads it, so an option the old guess gets wrong round-trips', () => {
+    // A future option on an unlisted root worth exactly 100.
+    expect(assetTypeOf(manualInstrument(spec('future-option')))).toBe(
+      'future-option',
+    );
+    // A stock option on a ticker that is also a futures root.
+    expect(
+      assetTypeOf({
+        ...manualInstrument({ ...spec('option'), symbol: 'CL' }),
+      }),
+    ).toBe('option');
+  });
+
+  test('data without it is read by root and multiplier, as before', () => {
+    const old = (o: Partial<Instrument>): Instrument => {
+      const inst = { ...manualInstrument(spec('option')), ...o };
+      delete inst.optionOn;
+      return inst;
+    };
+    expect(assetTypeOf(old({}))).toBe('option');
+    expect(assetTypeOf(old({ underlying: 'ES', root: 'ES' }))).toBe(
+      'future-option',
+    );
+    expect(assetTypeOf(old({ pointValue: 50 }))).toBe('future-option');
   });
 });
