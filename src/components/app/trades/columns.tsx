@@ -71,6 +71,36 @@ export const ALIGN: Partial<Record<ColumnId, 'right' | 'center'>> = {
   reviewed: 'center',
 };
 
+/**
+ * Each column's width in px, as comp 01's colgroup has them for the defaults.
+ * The table is fixed-layout, so a cell never pushes a neighbour: its text
+ * truncates inside its own width.
+ */
+export const COLUMN_WIDTHS: Record<ColumnId, number> = {
+  open: 82,
+  close: 82,
+  instrument: 102,
+  account: 110,
+  side: 56,
+  qty: 40,
+  entry: 66,
+  exit: 66,
+  gross: 74,
+  fees: 60,
+  net: 74,
+  roi: 60,
+  realizedR: 54,
+  plannedR: 60,
+  duration: 62,
+  strategies: 132,
+  tags: 118,
+  mistakes: 110,
+  rules: 80,
+  rating: 58,
+  reviewed: 62,
+  status: 72,
+};
+
 /** The columns that open on their largest, then smallest; text ones run A to Z first. */
 const DESC_FIRST = new Set<ColumnId>([
   'open',
@@ -278,7 +308,7 @@ function cellOf(id: ColumnId, t: Trade, env: CellEnv): React.ReactNode {
     case 'strategies':
       return <StrategiesCell names={facts.strategyNames(t)} />;
     case 'tags':
-      return <TagsCell tags={facts.tagsOf(t)} />;
+      return <TagsCell tags={facts.tagsOf(t)} mistakes={facts.mistakesOf(t)} />;
     case 'mistakes':
       return <MistakesCell names={facts.mistakesOf(t)} />;
     case 'rules':

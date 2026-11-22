@@ -6,8 +6,10 @@ import { DropdownMenu, Popover } from 'radix-ui';
 import {
   CaretDown,
   DownloadSimple,
+  Seal,
   SealCheck,
-  Stack,
+  StackMinus,
+  StackPlus,
   Tag as TagIcon,
   Trash,
   X,
@@ -37,7 +39,7 @@ export function splitDeletable(trades: readonly Trade[]): {
 }
 
 const BTN =
-  'inline-flex h-8 flex-none items-center gap-1.5 rounded-[8px] px-2.5 text-[13.5px] font-medium whitespace-nowrap text-text outline-offset-0 hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-45 data-[state=open]:bg-sunken pointer-coarse:h-11';
+  'inline-flex h-8 flex-none items-center gap-1.5 rounded-[8px] px-2.5 max-sm:min-w-11 max-sm:justify-center max-sm:px-0 text-[13.5px] font-medium whitespace-nowrap text-text outline-offset-0 hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-45 data-[state=open]:bg-sunken pointer-coarse:h-11';
 const ICON = 'flex-none text-muted';
 const MENU =
   'z-[60] max-h-(--radix-dropdown-menu-content-available-height) min-w-[220px] max-w-[320px] origin-(--radix-dropdown-menu-content-transform-origin) overflow-y-auto rounded-[12px] border border-line bg-surface-1 p-1.5 text-text shadow-[var(--shadow)] outline-none motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in';
@@ -59,13 +61,13 @@ function StrategyMenu({
 }): React.JSX.Element {
   return (
     <DropdownMenu.Root>
-      <DropdownMenu.Trigger className={BTN}>
+      <DropdownMenu.Trigger className={BTN} title={label}>
         {icon}
-        {label}
+        <span className="max-sm:sr-only">{label}</span>
         <CaretDown
           size={12}
           aria-hidden="true"
-          className="-ml-0.5 flex-none text-faint"
+          className="-ml-0.5 flex-none text-faint max-sm:hidden"
         />
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
@@ -149,7 +151,7 @@ export function BulkBar({
       <div
         role="toolbar"
         aria-label={`${n} selected ${plural(n, 'trade')}`}
-        className="pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto rounded-[12px] border border-line bg-surface-1 py-1.5 pr-1.5 pl-3.5 text-[13.5px] text-text shadow-[var(--shadow),0_2px_6px_rgb(18_22_51/0.06)] motion-safe:animate-pop-in"
+        className="pointer-events-auto flex max-w-full flex-wrap items-center gap-1 rounded-[12px] border border-line bg-surface-1 py-1.5 pr-1.5 pl-3.5 text-[13.5px] text-text shadow-[var(--shadow),0_2px_6px_rgb(18_22_51/0.06)] motion-safe:animate-pop-in"
       >
         <span className="mr-1 inline-flex h-[30px] flex-none items-center gap-2.5 border-r border-line pr-3 font-semibold whitespace-nowrap tabular-nums">
           <span
@@ -168,13 +170,13 @@ export function BulkBar({
             if (!next) setPending([]);
           }}
         >
-          <Popover.Trigger className={BTN}>
+          <Popover.Trigger className={BTN} title="Tag">
             <TagIcon size={16} aria-hidden="true" className={ICON} />
-            Tag
+            <span className="max-sm:sr-only">Tag</span>
             <CaretDown
               size={12}
               aria-hidden="true"
-              className="-ml-0.5 flex-none text-faint"
+              className="-ml-0.5 flex-none text-faint max-sm:hidden"
             />
           </Popover.Trigger>
           <Popover.Portal>
@@ -212,7 +214,7 @@ export function BulkBar({
 
         <StrategyMenu
           label="Add to strategy"
-          icon={<Stack size={16} aria-hidden="true" className={ICON} />}
+          icon={<StackPlus size={16} aria-hidden="true" className={ICON} />}
           strategies={strategies}
           empty="No strategies yet."
           onPick={(s) =>
@@ -224,7 +226,7 @@ export function BulkBar({
         />
         <StrategyMenu
           label="Remove from strategy"
-          icon={<Stack size={16} aria-hidden="true" className={ICON} />}
+          icon={<StackMinus size={16} aria-hidden="true" className={ICON} />}
           strategies={removable}
           empty="None of these trades follows a strategy."
           onPick={(s) => {
@@ -243,26 +245,33 @@ export function BulkBar({
         <button
           type="button"
           className={BTN}
+          title="Mark reviewed"
           onClick={() =>
             void run({ reviewed: true }, `Marked ${noun} reviewed.`)
           }
         >
           <SealCheck size={16} aria-hidden="true" className={ICON} />
-          Mark reviewed
+          <span className="max-sm:sr-only">Mark reviewed</span>
         </button>
         <button
           type="button"
           className={BTN}
+          title="Mark not reviewed"
           onClick={() =>
             void run({ reviewed: false }, `Marked ${noun} not reviewed.`)
           }
         >
-          <SealCheck size={16} aria-hidden="true" className={ICON} />
-          Mark not reviewed
+          <Seal size={16} aria-hidden="true" className={ICON} />
+          <span className="max-sm:sr-only">Mark not reviewed</span>
         </button>
-        <button type="button" className={BTN} onClick={onExport}>
+        <button
+          type="button"
+          className={BTN}
+          title="Export CSV"
+          onClick={onExport}
+        >
           <DownloadSimple size={16} aria-hidden="true" className={ICON} />
-          Export CSV
+          <span className="max-sm:sr-only">Export CSV</span>
         </button>
 
         <span
@@ -272,19 +281,21 @@ export function BulkBar({
         <button
           type="button"
           className={BTN}
+          title="Delete"
           onClick={() => {
             deleted.current = false;
             setConfirming(true);
           }}
         >
           <Trash size={16} aria-hidden="true" className={ICON} />
-          Delete
+          <span className="max-sm:sr-only">Delete</span>
         </button>
         <button
           type="button"
           aria-label="Clear selection"
           onClick={onClear}
           className={`${BTN} w-8 justify-center px-0 pointer-coarse:w-11`}
+          title="Clear selection"
         >
           <X size={16} aria-hidden="true" className={ICON} />
         </button>

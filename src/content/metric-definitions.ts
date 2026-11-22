@@ -16,6 +16,10 @@ export const METRIC_IDS = [
   'expectancy',
   'equity',
   'net-roi',
+  'realized-r',
+  'planned-r',
+  'mae',
+  'mfe',
   'sharpe',
   'sortino',
   'avg-daily-win-rate',
@@ -100,6 +104,26 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Net ROI',
     definition:
       'Net P&L of closed trades divided by the capital they committed (average entry times peak position times point value). Always net.',
+  },
+  'realized-r': {
+    label: 'Realized R',
+    definition:
+      "The trade's {basis} P&L divided by the money it risked at its planned stop. +1R is a profit as large as that risk. None without a planned stop.",
+  },
+  'planned-r': {
+    label: 'Planned R',
+    definition:
+      'The distance from entry to your planned target divided by the distance from entry to your planned stop. It needs both.',
+  },
+  mae: {
+    label: 'MAE',
+    definition:
+      'Maximum adverse excursion: the worst open P&L the trade showed while it was held, so how far it went against you. Shown only when it was recorded.',
+  },
+  mfe: {
+    label: 'MFE',
+    definition:
+      'Maximum favorable excursion: the best open P&L the trade showed while it was held, so how far it went for you. Shown only when it was recorded.',
   },
   sharpe: {
     label: 'Sharpe ratio',

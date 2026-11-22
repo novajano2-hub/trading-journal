@@ -6,12 +6,15 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
+import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
+import { createLocalRepository } from '@/data/local/local-repository';
 import type { SampleWorkspace } from '@/data/seed/generate';
-import { DEFAULT_COLUMNS } from '@/data/trade-columns';
+import { ALL_COLUMNS, DEFAULT_COLUMNS } from '@/data/trade-columns';
 import { makeTrade } from '@/domain/__fixtures__/trades';
+import { everyString } from '../__fixtures__/every-string';
 import { renderApp } from '../__fixtures__/render-app';
 import { TradesView } from './trades-view';
 
@@ -279,4 +282,101 @@ test('Export CSV downloads real values even under Privacy', async () => {
   expect(lines).toHaveLength(121);
   expect(text).toContain(',1200.00,');
   expect(text).not.toContain('•');
+});
+
+test("the default columns are comp 01's, Net ROI in and Mistake off", async () => {
+  renderApp(<TradesView />, { sample: sample(), url: '/app/trades' });
+  const t = await table();
+  const heads = within(t)
+    .getAllByRole('columnheader')
+    .map((h) => h.textContent);
+  expect(heads.slice(1)).toEqual([
+    'Open',
+    'Instrument',
+    'Side',
+    'Qty',
+    'Entry',
+    'Exit',
+    'Net P&L',
+    'Net ROI',
+    'R',
+    'Duration',
+    'Strategy',
+    'Tags',
+    'Rules',
+    'Rating',
+    'Reviewed',
+  ]);
+  expect(DEFAULT_COLUMNS).toContain('roi');
+  expect(DEFAULT_COLUMNS).not.toContain('mistakes');
+  expect(ALL_COLUMNS).toContain('mistakes');
+  fireEvent.click(screen.getByRole('button', { name: 'Columns' }));
+  expect(await screen.findByRole('checkbox', { name: 'Mistake' })).toBeTruthy();
+});
+
+test('every column has a fixed width in the colgroup, one for the selection box too', async () => {
+  renderApp(<TradesView />, { sample: sample(), url: '/app/trades' });
+  const t = await table();
+  expect(t.className).toContain('table-fixed');
+  const cols = [...t.querySelectorAll('colgroup > col')];
+  expect(cols).toHaveLength(1 + DEFAULT_COLUMNS.length);
+  for (const c of cols)
+    expect(`${c.className} ${c.getAttribute('style') ?? ''}`).toMatch(
+      /\bw-8\b|width: \d+px/,
+    );
+});
+
+test('the Net ROI and R headers carry their definitions, and still sort', async () => {
+  renderApp(<TradesView />, { sample: sample(), url: '/app/trades' });
+  const t = await table();
+  const roi = within(t).getByRole('columnheader', { name: /Net ROI/ });
+  const r = within(t).getByRole('columnheader', { name: /^R(\s|$)/ });
+  expect(roi.querySelector('[data-metric-tip="net-roi"]')).not.toBeNull();
+  expect(r.querySelector('[data-metric-tip="realized-r"]')).not.toBeNull();
+  // The tip is not inside the sort button.
+  expect(roi.querySelector('button button')).toBeNull();
+  fireEvent.click(within(roi).getByRole('button', { name: 'Sort by Net ROI' }));
+  expect(roi.getAttribute('aria-sort')).toBe('descending');
+});
+
+test('a mistake shows in the Tags cell in the warn tone, ahead of the other tags', async () => {
+  renderApp(<TradesView />, {
+    sample: async () => {
+      const w = await sample()();
+      return {
+        ...w,
+        trades: w.trades.map((t) =>
+          t.id === 't-7' ? { ...t, tagIds: ['tag-setup', 'tag-fomo'] } : t,
+        ),
+      };
+    },
+    url: '/app/trades',
+  });
+  const t = await table();
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Search trades' }), {
+    target: { value: '#7' },
+  });
+  await waitFor(() =>
+    expect(bodyRows(t).some((r) => idOf(r) === 't-7')).toBe(true),
+  );
+  const row = bodyRows(t).find((r) => idOf(r) === 't-7')!;
+  const warn = within(row).getByText('FOMO');
+  expect(warn.closest('span[class*="warn"]')).not.toBeNull();
+  expect(within(row).getByText('+1')).toBeTruthy();
+});
+
+test('under Privacy no amount survives anywhere in the trade log', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: sample({ open: 2 }),
+  });
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<TradesView />, { repository, url: '/app/trades' });
+  await screen.findByRole('region', { name: 'Summary' });
+  expect(everyString(document.body).filter((s) => /\$\d/.test(s))).toEqual([]);
+  const strip = screen.getByRole('region', { name: 'Summary' });
+  expect(within(strip).getAllByText('hidden amount').length).toBeGreaterThan(0);
+  const t = await table();
+  expect(within(t).getAllByText('hidden amount').length).toBeGreaterThan(0);
 });

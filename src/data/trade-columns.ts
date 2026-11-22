@@ -50,7 +50,10 @@ export const ALL_COLUMNS: readonly ColumnId[] = [
   'status',
 ];
 
-/** 'tags' shows the non-mistake tags with their category colour; 'mistakes' the mistake tags. */
+/**
+ * Comp 01's columns. 'tags' shows the mistakes first, in the warn tone, then the
+ * other tags in their category colour; 'mistakes' is the same mistakes alone, off by default.
+ */
 export const DEFAULT_COLUMNS: ColumnId[] = [
   'open',
   'instrument',
@@ -59,11 +62,11 @@ export const DEFAULT_COLUMNS: ColumnId[] = [
   'entry',
   'exit',
   'net',
+  'roi',
   'realizedR',
   'duration',
   'strategies',
   'tags',
-  'mistakes',
   'rules',
   'rating',
   'reviewed',

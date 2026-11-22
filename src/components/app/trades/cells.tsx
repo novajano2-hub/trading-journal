@@ -38,7 +38,7 @@ export function StrategiesCell({
       title={names.join(', ')}
       className="flex min-w-0 items-center gap-1.5"
     >
-      <span className="max-w-[124px] min-w-0 truncate">{first}</span>
+      <span className="min-w-0 truncate">{first}</span>
       {rest.length > 0 ? <More rest={rest} /> : null}
     </span>
   );
@@ -63,18 +63,42 @@ export function TagChip({ tag }: { tag: TagInfo }): React.JSX.Element {
   );
 }
 
-/** The first non-mistake tag in its category's colour, then "+n". */
+/** A mistake as a chip in the warn tone. */
+function MistakeChip({ name }: { name: string }): React.JSX.Element {
+  return (
+    <Chip tone="warn" className="max-w-[100px] min-w-0">
+      <span title={name} className="truncate">
+        {name}
+      </span>
+    </Chip>
+  );
+}
+
+/**
+ * The first of the trade's mistakes (a warn chip) and other tags (each in its
+ * category's colour), mistakes first, then "+n" for the rest.
+ */
 export function TagsCell({
   tags,
+  mistakes = [],
 }: {
   tags: readonly TagInfo[];
+  mistakes?: readonly string[];
 }): React.JSX.Element | null {
-  const [first, ...rest] = tags;
+  const all = [
+    ...mistakes.map((name) => ({ name, tag: undefined })),
+    ...tags.map((tag) => ({ name: tag.name, tag })),
+  ];
+  const [first, ...rest] = all;
   if (first === undefined) return null;
   const names = rest.map((t) => t.name);
   return (
     <span className="flex min-w-0 items-center gap-1.5">
-      <TagChip tag={first} />
+      {first.tag ? (
+        <TagChip tag={first.tag} />
+      ) : (
+        <MistakeChip name={first.name} />
+      )}
       {rest.length > 0 ? (
         <span title={names.join(', ')} className="flex-none">
           <More rest={names} />

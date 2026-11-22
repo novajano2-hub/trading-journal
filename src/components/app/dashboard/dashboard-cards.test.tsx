@@ -554,6 +554,10 @@ test('every metric carries its definition', async () => {
   const notOnDashboard = new Set<string>([
     'trades',
     'net-roi',
+    'realized-r',
+    'planned-r',
+    'mae',
+    'mfe',
     'sharpe',
     'sortino',
     'avg-daily-win-rate',

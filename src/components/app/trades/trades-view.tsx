@@ -20,7 +20,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { IconTile } from '@/components/ui/icon-tile';
+import { MetricTip } from '@/components/ui/metric-tip';
 import { Segmented } from '@/components/ui/segmented';
+import type { MetricId } from '@/content/metric-definitions';
 import { tradesCsv } from '@/data/csv-export';
 import { EMPTY_FILTERS, resolveRange, serializeFilters } from '@/data/filters';
 import { metricContextOf } from '@/data/metrics';
@@ -59,7 +61,13 @@ import { hasActiveFilters } from '../filter-model';
 import { CARD } from '../dashboard/shared';
 import { BulkBar } from './bulk-bar';
 import { SelectBox } from './select-box';
-import { ALIGN, buildColumns, features, type CellEnv } from './columns';
+import {
+  ALIGN,
+  COLUMN_WIDTHS,
+  buildColumns,
+  features,
+  type CellEnv,
+} from './columns';
 import { ColumnsMenu } from './columns-menu';
 import { SummaryStrip } from './summary-strip';
 
@@ -152,6 +160,43 @@ function Skeleton(): React.JSX.Element {
     </div>
   );
 }
+
+/** The select column's width in px, as the box is drawn. */
+const SELECT_WIDTH = 32;
+
+/** A header's sort button: the column's name, or (beside a metric tip) just the arrow. */
+function SortButton({
+  label,
+  align,
+  sorted,
+  onClick,
+  named = false,
+}: {
+  label: string;
+  align: 'right' | 'center' | undefined;
+  sorted: false | 'asc' | 'desc';
+  onClick: ((event: unknown) => void) | undefined;
+  /** The label is the button's visible text. */
+  named?: boolean;
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={named ? undefined : label}
+      className={`group/sort inline-flex h-7 items-center gap-1 rounded-chip font-medium text-faint outline-offset-0 hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 ${named ? '-mx-1.5 px-1.5' : 'px-1'} ${align === 'right' ? 'flex-row-reverse' : ''}`}
+    >
+      {named ? label : null}
+      <SortMark state={sorted} />
+    </button>
+  );
+}
+
+/** The columns whose header names a metric, and which metric. */
+const HEADER_TIPS: Partial<Record<ColumnId, MetricId>> = {
+  roi: 'net-roi',
+  realizedR: 'realized-r',
+};
 
 function SortMark({
   state,
@@ -661,8 +706,17 @@ export function TradesView(): React.JSX.Element {
             <div className="relative overflow-x-auto px-4">
               <table
                 aria-label="Trades"
-                className="w-full border-collapse text-[13px] whitespace-nowrap [font-stretch:90%]"
+                style={{
+                  minWidth: `${SELECT_WIDTH + columnIds.reduce((n, id) => n + COLUMN_WIDTHS[id], 0)}px`,
+                }}
+                className="w-full table-fixed border-collapse text-[13px] whitespace-nowrap [font-stretch:90%]"
               >
+                <colgroup>
+                  <col className="w-8 pointer-coarse:w-11" />
+                  {columnIds.map((id) => (
+                    <col key={id} style={{ width: COLUMN_WIDTHS[id] }} />
+                  ))}
+                </colgroup>
                 <thead>
                   {table.getHeaderGroups().map((group) => (
                     <tr key={group.id}>
@@ -698,14 +752,33 @@ export function TradesView(): React.JSX.Element {
                             className={`h-10 border-b border-line pr-[7px] align-middle text-xs font-medium text-faint last:pr-0 ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'}`}
                           >
                             {canSort ? (
-                              <button
-                                type="button"
-                                onClick={header.column.getToggleSortingHandler()}
-                                className={`group/sort -mx-1.5 inline-flex h-7 items-center gap-1 rounded-chip px-1.5 font-medium text-faint outline-offset-0 hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 ${align === 'right' ? 'flex-row-reverse' : ''}`}
-                              >
-                                {COLUMN_LABELS[id].label}
-                                <SortMark state={sorted} />
-                              </button>
+                              HEADER_TIPS[id] ? (
+                                <span
+                                  className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}
+                                >
+                                  <MetricTip
+                                    id={HEADER_TIPS[id]}
+                                    basis={ctx.pnlBasis}
+                                    className="text-xs font-medium"
+                                  >
+                                    {COLUMN_LABELS[id].label}
+                                  </MetricTip>
+                                  <SortButton
+                                    label={`Sort by ${COLUMN_LABELS[id].label}`}
+                                    align={align}
+                                    sorted={sorted}
+                                    onClick={header.column.getToggleSortingHandler()}
+                                  />
+                                </span>
+                              ) : (
+                                <SortButton
+                                  label={COLUMN_LABELS[id].label}
+                                  align={align}
+                                  sorted={sorted}
+                                  onClick={header.column.getToggleSortingHandler()}
+                                  named
+                                />
+                              )
                             ) : (
                               COLUMN_LABELS[id].label
                             )}
@@ -735,7 +808,7 @@ export function TradesView(): React.JSX.Element {
                         return (
                           <td
                             key={cell.id}
-                            className={`max-w-[200px] py-1 pr-[7px] last:pr-0 ${align === 'right' ? 'text-right tabular-nums' : align === 'center' ? 'text-center' : 'text-left'}`}
+                            className={`overflow-hidden py-1 pr-[7px] last:pr-0 ${align === 'right' ? 'text-right tabular-nums' : align === 'center' ? 'text-center' : 'text-left'}`}
                           >
                             <table.FlexRender cell={cell} />
                           </td>

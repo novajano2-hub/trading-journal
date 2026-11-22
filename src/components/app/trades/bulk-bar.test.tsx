@@ -94,6 +94,18 @@ test('three selected rows show the bar; the header box selects the page', async 
   expect((await bar()).textContent).toContain('60 selected');
 });
 
+test('on a narrow screen the bar wraps to more rows instead of scrolling, so Delete and Clear stay on screen', async () => {
+  renderApp(<TradesView />, { sample: sample(), url: '/app/trades' });
+  await select(3);
+  const toolbar = await bar();
+  expect(toolbar.className).toContain('flex-wrap');
+  expect(toolbar.className).not.toContain('overflow-x');
+  expect(within(toolbar).getByRole('button', { name: 'Delete' })).toBeTruthy();
+  expect(
+    within(toolbar).getByRole('button', { name: 'Clear selection' }),
+  ).toBeTruthy();
+});
+
 test('selection clears when a filter changes', async () => {
   renderApp(<TradesView />, { sample: sample(), url: '/app/trades' });
   await select(2);
