@@ -1,9 +1,11 @@
 'use client';
 
 import { useMemo, useState, type RefObject } from 'react';
+import { Popover } from 'radix-ui';
 import {
   CheckCircle,
   ListChecks,
+  Tag as TagIcon,
   Warning,
   XCircle,
 } from '@phosphor-icons/react/dist/ssr';
@@ -28,6 +30,7 @@ import { useDisplay } from '@/lib/display';
 import { keepHyphens, plural } from '@/lib/format';
 import { shortTime } from '@/lib/time-format';
 import type { DrillTarget } from './dashboard-view';
+import { TagPicker } from '../tag-picker';
 import { InstrumentName, signTone, TradeTime } from './shared';
 
 /** An amount in the chosen unit: one trade's, a set's by id, or a bare sum (a percentage reads over the account's base, other units in dollars). */
@@ -161,6 +164,7 @@ function TradesTable({
   timeZone,
   strategyName,
   mistakeName,
+  mistakeCategories,
 }: {
   target: DrillTarget;
   rows: readonly Trade[];
@@ -169,6 +173,7 @@ function TradesTable({
   timeZone: string;
   strategyName: ReadonlyMap<string, string>;
   mistakeName: ReadonlyMap<string, string>;
+  mistakeCategories: TagCategory[];
 }): React.JSX.Element {
   const [failed, setFailed] = useState(false);
   const rule = target.kind === 'rule' ? target.ruleId : null;
@@ -303,7 +308,18 @@ function TradesTable({
                           ))}
                         </span>
                       ) : (
-                        <span className="text-faint">None</span>
+                        <span className="inline-flex items-center gap-2">
+                          <span className="text-faint">None</span>
+                          {mistakeCategories.length > 0 ? (
+                            <TagMissing
+                              trade={t}
+                              label={`Tag a mistake on ${t.instrument.symbol} ${time}`}
+                              categories={mistakeCategories}
+                              onSaving={() => setFailed(false)}
+                              onFailed={() => setFailed(true)}
+                            />
+                          ) : null}
+                        </span>
                       )}
                     </td>
                   ) : null}
@@ -314,6 +330,60 @@ function TradesTable({
         </table>
       </div>
     </>
+  );
+}
+
+/**
+ * "Tag" beside a trade that has no mistake: opens the tag picker, scoped to
+ * the mistake categories, and saves each pick on the trade. A failed save
+ * reports in the table's own alert.
+ */
+function TagMissing({
+  trade,
+  label,
+  categories,
+  onSaving,
+  onFailed,
+}: {
+  trade: Trade;
+  label: string;
+  categories: TagCategory[];
+  onSaving(): void;
+  onFailed(): void;
+}): React.JSX.Element {
+  const update = useUpdateTrade();
+  return (
+    <Popover.Root>
+      <Popover.Trigger
+        aria-label={label}
+        className="inline-flex h-6 items-center gap-1 rounded-chip px-1.5 text-xs font-medium text-accent-ink outline-offset-1 hover:bg-accent-soft focus-visible:outline-2 focus-visible:outline-accent data-[state=open]:bg-accent-soft pointer-coarse:h-11 pointer-coarse:px-3"
+      >
+        <TagIcon size={13} aria-hidden="true" />
+        Tag
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="start"
+          sideOffset={6}
+          collisionPadding={12}
+          className="z-[60] w-[280px] max-w-[calc(100vw-24px)] origin-(--radix-popover-content-transform-origin) rounded-[12px] border border-line bg-surface-1 p-3 text-text shadow-[var(--shadow)] outline-none motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in"
+        >
+          <TagPicker
+            label="Mistakes"
+            autoFocus
+            categories={categories}
+            selected={trade.tagIds}
+            onChange={(tagIds) => {
+              onSaving();
+              update.mutate(
+                { id: trade.id, patch: { tagIds } },
+                { onError: onFailed },
+              );
+            }}
+          />
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
@@ -361,6 +431,10 @@ export function Drilldown({
   const mistakeName = useMemo(
     () => new Map(mistakeTags(tags, categories).map((t) => [t.id, t.name])),
     [tags, categories],
+  );
+  const mistakeCategories = useMemo(
+    () => categories.filter((c) => c.role === 'mistake'),
+    [categories],
   );
   const rows = tradeIds.flatMap((id) => byId.get(id) ?? []);
   const currency = model.currency;
@@ -434,6 +508,7 @@ export function Drilldown({
         timeZone={timeZone}
         strategyName={strategyName}
         mistakeName={mistakeName}
+        mistakeCategories={mistakeCategories}
       />
     </MorphDialog>
   );

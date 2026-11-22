@@ -648,3 +648,27 @@ test('under R an aggregate reports how many trades it leaves out, to a screen re
   ];
   expect(heard.some((s) => /\d+ trades? left out/.test(s))).toBe(true);
 });
+
+test("a trade with no mistake in a rule's drill-down can be tagged on the spot (E46)", async () => {
+  const { repo } = renderApp(<DashboardView />, {
+    // The broken trade carries no mistake yet.
+    sample: sampleWith((s) => s.trades.forEach((t) => (t.tagIds = []))),
+  });
+  const count = async () =>
+    (await repo.trades.list('sample')).filter((t) =>
+      t.tagIds.includes('tag-fomo'),
+    ).length;
+  const before = await count();
+  fireEvent.click(await screen.findByRole('button', { name: opener(r1) }));
+  const dialog = await screen.findByRole('dialog', { name: r1Dialog });
+  fireEvent.click(
+    within(dialog).getAllByRole('button', { name: /^Tag a mistake on / })[0]!,
+  );
+  const picker = await screen.findByRole('combobox', { name: 'Mistakes' });
+  // Only the mistake categories are listed.
+  await screen.findByRole('option', { name: fomo });
+  expect(screen.queryByRole('option', { name: 'Breakout' })).toBeNull();
+  fireEvent.change(picker, { target: { value: 'fom' } });
+  fireEvent.keyDown(picker, { key: 'Enter' });
+  await waitFor(async () => expect(await count()).toBe(before + 1));
+});

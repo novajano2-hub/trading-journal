@@ -15,13 +15,14 @@ import {
   Plus,
   Table as TableIcon,
   Warning,
+  X,
 } from '@phosphor-icons/react/dist/ssr';
 import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { IconTile } from '@/components/ui/icon-tile';
 import { Segmented } from '@/components/ui/segmented';
 import { tradesCsv } from '@/data/csv-export';
-import { EMPTY_FILTERS, resolveRange } from '@/data/filters';
+import { EMPTY_FILTERS, resolveRange, serializeFilters } from '@/data/filters';
 import { metricContextOf } from '@/data/metrics';
 import { useGlobalFilters, useTradeSet } from '@/data/query/derived';
 import {
@@ -56,6 +57,8 @@ import { plural } from '@/lib/format';
 import { rangeCaption } from '@/lib/range-label';
 import { hasActiveFilters } from '../filter-model';
 import { CARD } from '../dashboard/shared';
+import { BulkBar } from './bulk-bar';
+import { SelectBox } from './select-box';
 import { ALIGN, buildColumns, features, type CellEnv } from './columns';
 import { ColumnsMenu } from './columns-menu';
 import { SummaryStrip } from './summary-strip';
@@ -211,6 +214,14 @@ export function TradesView(): React.JSX.Element {
     pageIndex: 0,
     pageSize: PAGE_SIZE,
   });
+  // The chosen trades belong to the filters they were chosen under: a changed
+  // filter or search leaves them behind.
+  const selectionKey = `${serializeFilters(filters).toString()}|${search.trim().toLowerCase()}`;
+  const [selection, setSelection] = useState<{
+    key: string;
+    ids: readonly string[];
+  }>({ key: '', ids: [] });
+  const [result, setResult] = useState<React.ReactNode>(null);
 
   // A pending save shows at once, as the Display menu's does.
   const pendingColumns = updatePrefs.isPending
@@ -417,9 +428,29 @@ export function TradesView(): React.JSX.Element {
   const to = Math.min(total, from + page.length - 1);
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const exportCsv = () =>
+  const chosen = new Set(selection.key === selectionKey ? selection.ids : []);
+  const selected = rows.filter((t) => chosen.has(t.id));
+  const pageSelected = page.filter((r) => chosen.has(r.original.id)).length;
+  const setChosen = (ids: readonly string[]) =>
+    setSelection({ key: selectionKey, ids });
+  const togglePage = (on: boolean) => {
+    const pageIds = page.map((r) => r.original.id);
+    setChosen(
+      on
+        ? [...new Set([...selected.map((t) => t.id), ...pageIds])]
+        : selected.map((t) => t.id).filter((id) => !pageIds.includes(id)),
+    );
+  };
+  const toggleRow = (id: string, on: boolean) =>
+    setChosen(
+      on
+        ? [...selected.map((t) => t.id), id]
+        : selected.map((t) => t.id).filter((x) => x !== id),
+    );
+
+  const exportCsv = (list: readonly Trade[] = rows) =>
     download(
-      tradesCsv(rows, columnIds, {
+      tradesCsv(list, columnIds, {
         timeZone,
         accounts,
         strategies: strategies ?? [],
@@ -461,6 +492,24 @@ export function TradesView(): React.JSX.Element {
           onHide={() => savePrefs({ hideTradeSummary: true })}
         />
       )}
+
+      {result ? (
+        <div
+          role="status"
+          aria-label="Result"
+          className="flex items-start gap-3 rounded-control border border-line bg-surface-1 py-2.5 pr-2 pl-4 text-[13.5px] text-text shadow-[var(--shadow-chip)]"
+        >
+          <p className="min-w-0 flex-1 pt-0.5 text-pretty">{result}</p>
+          <button
+            type="button"
+            aria-label="Dismiss"
+            onClick={() => setResult(null)}
+            className="grid size-7 flex-none place-items-center rounded-chip text-muted hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:size-11"
+          >
+            <X size={14} aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
 
       <section
         aria-label="Trade log"
@@ -527,7 +576,7 @@ export function TradesView(): React.JSX.Element {
             />
             <button
               type="button"
-              onClick={exportCsv}
+              onClick={() => exportCsv()}
               disabled={rows.length === 0}
               className="inline-flex h-[34px] items-center gap-1.5 rounded-control border border-line bg-surface-1 px-3 text-[13.5px] font-medium whitespace-nowrap text-muted shadow-[0_1px_1px_rgb(18_22_51/0.04)] transition-[border-color] duration-200 ease-(--ease-glide) hover:border-accent/35 focus-visible:outline-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-50 pointer-coarse:h-11"
             >
@@ -577,6 +626,36 @@ export function TradesView(): React.JSX.Element {
           )
         ) : (
           <>
+            {pageSelected === page.length && total > page.length ? (
+              <p
+                role="status"
+                className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-line bg-accent-soft/60 px-5 py-2 text-[13px] text-text"
+              >
+                {selected.length === total ? (
+                  <>
+                    All {total} matching trades are selected.
+                    <button
+                      type="button"
+                      onClick={() => setChosen([])}
+                      className="font-semibold text-accent-ink underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
+                    >
+                      Clear selection
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    All {page.length} trades on this page are selected.
+                    <button
+                      type="button"
+                      onClick={() => setChosen(rows.map((t) => t.id))}
+                      className="font-semibold text-accent-ink underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
+                    >
+                      Select all {total} matching trades
+                    </button>
+                  </>
+                )}
+              </p>
+            ) : null}
             <div className="relative overflow-x-auto px-4">
               <table
                 aria-label="Trades"
@@ -585,6 +664,17 @@ export function TradesView(): React.JSX.Element {
                 <thead>
                   {table.getHeaderGroups().map((group) => (
                     <tr key={group.id}>
+                      <th
+                        scope="col"
+                        className="h-10 w-8 border-b border-line pr-1 text-left align-middle"
+                      >
+                        <SelectBox
+                          label="Select this page"
+                          checked={pageSelected === page.length}
+                          indeterminate={pageSelected > 0}
+                          onChange={togglePage}
+                        />
+                      </th>
                       {group.headers.map((header) => {
                         const id = header.column.id as ColumnId;
                         const sorted = header.column.getIsSorted();
@@ -627,8 +717,16 @@ export function TradesView(): React.JSX.Element {
                   {page.map((row) => (
                     <tr
                       key={row.id}
-                      className="h-[38px] border-t border-line/70 text-text transition-colors duration-200 ease-(--ease-glide) first:border-t-0 hover:bg-sunken/60"
+                      aria-selected={chosen.has(row.original.id)}
+                      className={`h-[38px] border-t border-line/70 text-text transition-colors duration-200 ease-(--ease-glide) first:border-t-0 ${chosen.has(row.original.id) ? 'bg-accent-soft/70' : 'hover:bg-sunken/60'}`}
                     >
+                      <td className="w-8 py-0 pr-1">
+                        <SelectBox
+                          label={`Select trade ${row.original.serial}`}
+                          checked={chosen.has(row.original.id)}
+                          onChange={(on) => toggleRow(row.original.id, on)}
+                        />
+                      </td>
                       {row.getAllCells().map((cell) => {
                         const id = cell.column.id as ColumnId;
                         const align = ALIGN[id];
@@ -692,6 +790,19 @@ export function TradesView(): React.JSX.Element {
           </>
         )}
       </section>
+
+      {selected.length > 0 ? (
+        // In the flow, so the last row is never under it; it sticks to the viewport's foot.
+        <div className="pointer-events-none sticky bottom-4 z-30 flex justify-center pt-2">
+          <BulkBar
+            trades={selected}
+            strategies={strategies ?? []}
+            onClear={() => setChosen([])}
+            onExport={() => exportCsv(selected)}
+            onResult={setResult}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

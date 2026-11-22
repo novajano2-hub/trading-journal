@@ -153,7 +153,8 @@ test('a column moves up and down in the Columns menu', async () => {
     const names = within(t)
       .getAllByRole('columnheader')
       .map((h) => h.textContent);
-    expect(names.slice(0, 3)).toEqual(['Open', 'Side', 'Instrument']);
+    // The first header is the selection box's, with no text.
+    expect(names.slice(1, 4)).toEqual(['Open', 'Side', 'Instrument']);
   });
   await waitFor(async () =>
     expect((await repo.prefs.get()).tradeColumns?.slice(0, 3)).toEqual([
