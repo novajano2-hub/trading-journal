@@ -349,7 +349,7 @@ Behaviour:
   - Filters, metrics, the rule scorecard, mistake costs (a mistake is a tag whose category has role `mistake`), breakdowns (strategy and tag), the dashboard and the import engine move to `strategyIds`, `categoryId` and `groups`.
   - The strategy breakdown counts a trade under each of its strategies.
   - The tag breakdown groups by category name.
-  - Behaviour must not change for the existing sample, so the dashboard's pinned numbers stay put.
+  - The migration itself changes no figure. The seed's new second strategies may move strategy-level figures on the sample; update those pins and name each one in the commit body.
 - **Removal rules:**
   - `strategies.remove` takes the strategy out of `strategyIds` and drops the rule checks of its rules on its trades.
   - `templates.remove` refuses a built-in template (`new Error('built-in template')`). Removing the default makes the kind's built-in template the default.
@@ -575,7 +575,7 @@ Behaviour:
   - `display-menu.test.tsx`: choosing Privacy saves `displayUnit: 'privacy'`, and the button's accessible name becomes "Display: Privacy".
   - `dashboard-view.test.tsx`: under Privacy, no text node or `aria-label` in the dashboard matches `/\$\d/`.
 - [ ] **Step 2:** `npm test -- src/lib/display src/components/app`. Expected: FAIL.
-- [ ] **Step 3:** Implement. Route every dashboard money figure through `useDisplay`. Aggregate % uses the balance base from the Rulings (`balanceAt`, which Task 18 extends with cash flows). Until then, use the summed starting balances.
+- [ ] **Step 3:** Implement. Route every dashboard money figure through `useDisplay`. Aggregate % divides by the selected accounts' summed starting balances plus their net realized before the range start, through a helper in `display.ts`. Task 18 replaces that helper with `balanceAt`, which adds cash flows.
 - [ ] **Step 4:** `npm test && npm run typecheck && npm run lint`. Expected: PASS.
 - [ ] **Step 5:** Commit: `feat(app): display units: dollar, percentage, privacy, R, ticks, pips and points`.
 
@@ -1329,7 +1329,7 @@ Behaviour:
   - "Forex 100K": 2-step, step 1 = the forex evaluation account, status active.
   - "Futures 50K": 1-step, with an evaluation account whose trades met its target, status passed, and a funded account, active, `phase: 'funded'`.
   - "Futures 100K": 1-step evaluation, status breached, with a failure reason from its finding.
-  - Each new account trades for 25 to 40 weekdays from the futures specs. Choose the stream seeds so each outcome holds, and pin them with a test.
+  - Each new account trades for 25 to 40 weekdays from the futures specs. Choose the stream seeds so each outcome holds, and pin them with a test. Workspace-level sample figures move with the new accounts; update those pins (unit and e2e) and name each one in the commit body.
 
 - [ ] **Step 1: Write the failing tests.**
   - `evaluate.test.ts`:
