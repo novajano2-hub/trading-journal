@@ -47,7 +47,11 @@ export const SLASH_ITEMS: SlashItem[] = [
     hint: 'Things to tick off',
     run: (c) => c.toggleTaskList(),
   },
-  { label: 'Quote', hint: 'Set a line apart', run: (c) => c.toggleBlockquote() },
+  {
+    label: 'Quote',
+    hint: 'Set a line apart',
+    run: (c) => c.toggleBlockquote(),
+  },
   {
     label: 'Collapsible section',
     hint: 'A titled block you can fold away',
@@ -103,7 +107,12 @@ export function createSlashExtension(bridge: SlashBridge) {
           },
           items: ({ query }) => filterSlashItems(query),
           command: ({ editor, range, props }) => {
-            props.run(editor.chain().focus().deleteRange(range as Range));
+            props.run(
+              editor
+                .chain()
+                .focus()
+                .deleteRange(range as Range),
+            );
           },
           render: () => {
             let index = 0;
@@ -135,8 +144,7 @@ export function createSlashExtension(bridge: SlashBridge) {
                 if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                   const n = s.items.length;
                   if (n === 0) return true;
-                  index =
-                    (index + (event.key === 'ArrowDown' ? 1 : n - 1)) % n;
+                  index = (index + (event.key === 'ArrowDown' ? 1 : n - 1)) % n;
                   bridge.set({ ...s, index });
                   return true;
                 }

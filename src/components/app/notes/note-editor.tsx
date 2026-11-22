@@ -11,8 +11,17 @@ import {
   type Editor,
 } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { Details, DetailsContent, DetailsSummary } from '@tiptap/extension-details';
-import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table';
+import {
+  Details,
+  DetailsContent,
+  DetailsSummary,
+} from '@tiptap/extension-details';
+import {
+  Table,
+  TableCell,
+  TableHeader,
+  TableRow,
+} from '@tiptap/extension-table';
 import { TaskItem, TaskList } from '@tiptap/extension-list';
 import { Placeholder } from '@tiptap/extension-placeholder';
 import {
@@ -264,7 +273,10 @@ function Toolbar({ editor }: { editor: Editor }) {
   const state = useEditorState({
     editor,
     selector: ({ editor: e }) => ({
-      active: [...GROUPS.flat(), { name: 'Link', active: (x: Editor) => x.isActive('link') }]
+      active: [
+        ...GROUPS.flat(),
+        { name: 'Link', active: (x: Editor) => x.isActive('link') },
+      ]
         .filter((b) => b.active?.(e))
         .map((b) => b.name),
       canUndo: e.can().undo(),
@@ -285,7 +297,12 @@ function Toolbar({ editor }: { editor: Editor }) {
     e.preventDefault();
     const url = href.trim();
     const chain = editor.chain().focus().extendMarkRange('link');
-    if (url) chain.setLink({ href: /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}` }).run();
+    if (url)
+      chain
+        .setLink({
+          href: /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`,
+        })
+        .run();
     else chain.unsetLink().run();
     setLinkOpen(false);
   };
@@ -300,7 +317,10 @@ function Toolbar({ editor }: { editor: Editor }) {
         {GROUPS.map((group, gi) => (
           <div key={gi} className="flex items-center gap-0.5">
             {gi > 0 ? (
-              <span aria-hidden="true" className="mx-1 h-[18px] w-px bg-line-2" />
+              <span
+                aria-hidden="true"
+                className="mx-1 h-[18px] w-px bg-line-2"
+              />
             ) : null}
             {group.map((b) => (
               <button

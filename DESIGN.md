@@ -339,35 +339,35 @@ Each has a text token, a `-fill` for bars and marks, and a `-soft` for chip and 
 
 The ramp as shipped. Half-pixel sizes are deliberate steps between 15 and 17, not accidents; use only values in this table.
 
-| Role            | Size                                                  | Weight | Leading         | Tracking | Use                                                       |
-| --------------- | ----------------------------------------------------- | ------ | --------------- | -------- | --------------------------------------------------------- |
-| Hero display    | clamp(40px, 3.125vw + 18px, 58px)                     | 600    | 1.04            | -0.032em | Landing hero                                              |
-| Page display    | clamp(36px, 2.6vw + 16px, 52px)                       | 600    | 1.06            | -0.032em | Page and auth h1                                          |
-| Closing display | clamp(38px, 5vw, 52px)                                | 600    | 1.04            | -0.032em | Closing section                                           |
-| Section heading | clamp(2rem, 1.6rem + 1.6vw, 2.625rem)                 | 600    | 1.08            | -0.028em | Landing section heading                                   |
-| Sub-headline    | 26px                                                  | 600    | 1.15            | -0.03em  | Legal and read-page section h2                            |
-| Hero numeral    | 88px, 104px from sm                                   | 600    | 0.82            | -0.05em  | Adherence percentage on the Your plan hero (stretch 88%)  |
-| P&L figure      | 31px                                                  | 600    | 1.15            | -0.04em  | Performance card net P&L                                  |
-| App title       | 24px (20px on phones)                                 | 650    | 1.2             | -0.035em | Top bar page title                                        |
-| Cost figure     | 21px                                                  | 600    | default         | -0.02em  | Cost band on the hero                                     |
-| Goal figure     | 22px                                                  | 600    | 1.25            | -0.03em  | Weekly net on the Goals card                              |
-| KPI figure      | 22px marketing; 20px app, shrinking to fit            | 600    | 1.25            | -0.03em  | Marketing KPI strip; app rolling KPIs via NumberTicker    |
-| Card title      | 15px                                                  | 600    | 1.375 (snug)    | -0.015em | Every dashboard and product card heading                  |
-| Brand           | 19px                                                  | 650    | default         | -0.03em  | Brand mark                                                |
-| Dialog title    | 17px                                                  | 600    | snug            | -0.015em | Morph dialog title                                        |
-| Accordion       | 17px                                                  | 500    | default         | 0        | Accordion headings                                        |
-| Lead            | 17px                                                  | 400    | 1.6             | 0        | Section subhead (56ch)                                    |
-| Reading body    | 16.5px                                                | 400    | 1.7             | 0        | Legal and changelog prose (68ch)                          |
-| Body            | 15.5px                                                | 400    | 1.65            | 0        | Feature and pricing descriptions                          |
-| UI              | 15px                                                  | 500    | 1.6 in accordion | 0       | Buttons, accordion body, state body                       |
-| Nav             | 14.5px                                                | 500    | default         | 0        | Header and menu links                                     |
-| Row             | 13.5px                                                | 500    | default         | 0        | Sidebar rows, filter chips, rule text, tables, detail     |
-| Control         | 13.5px                                                | 500    | default         | 0        | Segmented and tab labels                                  |
-| Figure          | 13px                                                  | 550    | default         | 0        | Row figures in the Rules table, tabular                   |
-| Caption         | 12.5px                                                | 400    | default         | 0        | Card ranges, app window bar, metric tip text, row captions |
-| Label           | 12px (`text-xs`)                                      | 400    | default         | 0        | KPI labels, chips (550), captions, table headers          |
-| Side chip       | 12px                                                  | 600    | default         | 0        | Long and Short                                            |
-| Axis            | 11px (12px from sm)                                   | 400    | 1rem            | 0        | Chart labels, search key hint                             |
+| Role            | Size                                       | Weight | Leading          | Tracking | Use                                                        |
+| --------------- | ------------------------------------------ | ------ | ---------------- | -------- | ---------------------------------------------------------- |
+| Hero display    | clamp(40px, 3.125vw + 18px, 58px)          | 600    | 1.04             | -0.032em | Landing hero                                               |
+| Page display    | clamp(36px, 2.6vw + 16px, 52px)            | 600    | 1.06             | -0.032em | Page and auth h1                                           |
+| Closing display | clamp(38px, 5vw, 52px)                     | 600    | 1.04             | -0.032em | Closing section                                            |
+| Section heading | clamp(2rem, 1.6rem + 1.6vw, 2.625rem)      | 600    | 1.08             | -0.028em | Landing section heading                                    |
+| Sub-headline    | 26px                                       | 600    | 1.15             | -0.03em  | Legal and read-page section h2                             |
+| Hero numeral    | 88px, 104px from sm                        | 600    | 0.82             | -0.05em  | Adherence percentage on the Your plan hero (stretch 88%)   |
+| P&L figure      | 31px                                       | 600    | 1.15             | -0.04em  | Performance card net P&L                                   |
+| App title       | 24px (20px on phones)                      | 650    | 1.2              | -0.035em | Top bar page title                                         |
+| Cost figure     | 21px                                       | 600    | default          | -0.02em  | Cost band on the hero                                      |
+| Goal figure     | 22px                                       | 600    | 1.25             | -0.03em  | Weekly net on the Goals card                               |
+| KPI figure      | 22px marketing; 20px app, shrinking to fit | 600    | 1.25             | -0.03em  | Marketing KPI strip; app rolling KPIs via NumberTicker     |
+| Card title      | 15px                                       | 600    | 1.375 (snug)     | -0.015em | Every dashboard and product card heading                   |
+| Brand           | 19px                                       | 650    | default          | -0.03em  | Brand mark                                                 |
+| Dialog title    | 17px                                       | 600    | snug             | -0.015em | Morph dialog title                                         |
+| Accordion       | 17px                                       | 500    | default          | 0        | Accordion headings                                         |
+| Lead            | 17px                                       | 400    | 1.6              | 0        | Section subhead (56ch)                                     |
+| Reading body    | 16.5px                                     | 400    | 1.7              | 0        | Legal and changelog prose (68ch)                           |
+| Body            | 15.5px                                     | 400    | 1.65             | 0        | Feature and pricing descriptions                           |
+| UI              | 15px                                       | 500    | 1.6 in accordion | 0        | Buttons, accordion body, state body                        |
+| Nav             | 14.5px                                     | 500    | default          | 0        | Header and menu links                                      |
+| Row             | 13.5px                                     | 500    | default          | 0        | Sidebar rows, filter chips, rule text, tables, detail      |
+| Control         | 13.5px                                     | 500    | default          | 0        | Segmented and tab labels                                   |
+| Figure          | 13px                                       | 550    | default          | 0        | Row figures in the Rules table, tabular                    |
+| Caption         | 12.5px                                     | 400    | default          | 0        | Card ranges, app window bar, metric tip text, row captions |
+| Label           | 12px (`text-xs`)                           | 400    | default          | 0        | KPI labels, chips (550), captions, table headers           |
+| Side chip       | 12px                                       | 600    | default          | 0        | Long and Short                                             |
+| Axis            | 11px (12px from sm)                        | 400    | 1rem             | 0        | Chart labels, search key hint                              |
 
 Also in use: 24px (`text-2xl`) for mobile menu links, 16px (`text-base`) default body and the large CTA, 14px (`text-sm`) for small CTAs and rule list rows, 11.5px for the "+n" chip. KPI figures in the app shrink with their tile: `min(20px, max(12px, (100cqi - trend) / chars / 0.56))`, so a long P&L never spills. Marketing KPIs use `clamp(15px, 3.6cqi, 22px)` in a wide strip.
 

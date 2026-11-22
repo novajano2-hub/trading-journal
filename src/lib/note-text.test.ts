@@ -4,8 +4,15 @@ import { docExcerpt, docText } from './note-text';
 const doc = {
   type: 'doc',
   content: [
-    { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Plan' }] },
-    { type: 'paragraph', content: [{ type: 'text', text: 'Wait for the open' }] },
+    {
+      type: 'heading',
+      attrs: { level: 2 },
+      content: [{ type: 'text', text: 'Plan' }],
+    },
+    {
+      type: 'paragraph',
+      content: [{ type: 'text', text: 'Wait for the open' }],
+    },
     {
       type: 'taskList',
       content: [
@@ -13,7 +20,10 @@ const doc = {
           type: 'taskItem',
           attrs: { checked: false },
           content: [
-            { type: 'paragraph', content: [{ type: 'text', text: 'Size down' }] },
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Size down' }],
+            },
           ],
         },
       ],
