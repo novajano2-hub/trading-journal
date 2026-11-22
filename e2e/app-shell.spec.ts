@@ -47,13 +47,22 @@ test('every app route renders its title without overflow; placeholders state it 
     );
     if (path === '/app/trades')
       await expect(page.getByRole('table', { name: 'Trades' })).toBeVisible();
+    if (path === '/app/calendar')
+      await expect(page.getByTestId('calendar-ready')).toBeVisible();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth - innerWidth,
       ),
       path,
     ).toBeLessThanOrEqual(0);
-    if (!['/app/dashboard', '/app/import', '/app/trades'].includes(path)) {
+    if (
+      ![
+        '/app/dashboard',
+        '/app/import',
+        '/app/trades',
+        '/app/calendar',
+      ].includes(path)
+    ) {
       await expect(page.locator('main')).toContainText(
         /isn't (built|live) yet\./,
       );
