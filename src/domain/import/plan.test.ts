@@ -274,6 +274,26 @@ describe('planImport', () => {
       expect(t).not.toHaveProperty('plannedTarget');
       expect(t).not.toHaveProperty('initialRisk');
     });
+
+    test('a merge that flips the direction raises one direction-flipped flag; one that keeps it raises none (E32)', () => {
+      const flipped = later(
+        '2026-11-16 09:30:00,ESZ5,Sell,2,6020\n2026-11-16 09:41:00,ESZ5,Buy,2,6010\n',
+      );
+      expect(
+        flipped.flags.filter((f) => f.code === 'direction-flipped'),
+      ).toEqual([
+        {
+          tradeId: open.id,
+          code: 'direction-flipped',
+          was: 'long',
+          now: 'short',
+        },
+      ]);
+      const kept = later(
+        '2026-11-16 09:30:00,ESZ5,Buy,1,6000\n2026-11-16 09:41:00,ESZ5,Buy,2,6010\n',
+      );
+      expect(kept.flags).toEqual([]);
+    });
   });
 
   test('a merge keeps a user-entered risk and recomputes one derived from the stop (ruling 2)', () => {

@@ -1,4 +1,5 @@
 import type { FillField, TradeRowField } from '@/domain/import/mapping';
+import type { RowIssueCode } from '@/domain/import/rows';
 
 export type FieldKey = FillField | TradeRowField;
 
@@ -67,3 +68,14 @@ export function columnLetter(index: number): string {
   } while (n >= 0);
   return out;
 }
+
+/** What is wrong with a value, to follow "the quantity \"x\"". */
+export const ISSUE_REASON: Record<RowIssueCode, string> = {
+  missing: 'is empty',
+  'time-unparseable':
+    'is not a date and time Keel can read with these settings',
+  'qty-invalid': 'is not a valid quantity',
+  'number-unparseable': 'is not a number with this decimal mark',
+  'side-unrecognised': 'is not a buy or a sell',
+  'close-before-open': 'closes before it opens',
+};

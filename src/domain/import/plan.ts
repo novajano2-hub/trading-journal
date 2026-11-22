@@ -5,7 +5,7 @@ import {
   canonicalSymbol,
   type BuildOptions,
 } from '../trade-builder';
-import type { Cents, Trade } from '../types';
+import type { Cents, Direction, Trade } from '../types';
 import type { ParsedCsv } from './csv';
 import {
   expiryCloseUtc,
@@ -38,7 +38,14 @@ export interface ImportContext {
 export type TradeFlag =
   | { tradeId: string; code: 'unconverted-currency'; currency: string }
   | { tradeId: string; code: 'pnl-mismatch'; file: Cents; keel: Cents }
-  | { tradeId: string; code: 'expired-worthless'; expiry: string };
+  | { tradeId: string; code: 'expired-worthless'; expiry: string }
+  /** An overlapping export rebuilt a stored trade in the other direction. */
+  | {
+      tradeId: string;
+      code: 'direction-flipped';
+      was: Direction;
+      now: Direction;
+    };
 
 export type ImportBlock = 'no-rows' | 'unresolved-symbols' | 'nothing-new';
 
@@ -272,9 +279,19 @@ function tradeFlags(
   accountCurrency: string,
   expired: readonly ExpiredOption[],
   pnlFlags: readonly TradeFlag[],
+  replaced: readonly Trade[],
 ): TradeFlag[] {
   const flags: TradeFlag[] = [...pnlFlags];
+  const before = new Map(replaced.map((t) => [t.id, t]));
   for (const t of trades) {
+    const stored = before.get(t.id);
+    if (stored && stored.direction !== t.direction)
+      flags.push({
+        tradeId: t.id,
+        code: 'direction-flipped',
+        was: stored.direction,
+        now: t.direction,
+      });
     if (t.pnlCurrency !== accountCurrency)
       flags.push({
         tradeId: t.id,
@@ -363,6 +380,7 @@ export function planImport(
           ctx.accountCurrency,
           built.expired,
           built.pnlFlags,
+          built.merged,
         ),
       };
 

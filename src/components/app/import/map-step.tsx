@@ -23,13 +23,13 @@ import { useImportContext, useUpdateUserAccount } from '@/data/query/hooks';
 import { useImportPlan } from '@/data/query/derived';
 import { missingFields, REQUIRED_FIELDS } from '@/domain/import/mapping';
 import { parseDecimal } from '@/domain/import/numbers';
-import type { RowIssueCode } from '@/domain/import/rows';
 import { unknownRoots } from '@/domain/import/unknown-symbols';
 import type { Account } from '@/domain/types';
 import type { ImportFile } from '@/lib/decode';
 import {
   columnLetter,
   FIELD_HINT,
+  ISSUE_REASON,
   FIELD_LABEL,
   FIELD_ORDER,
   type FieldKey,
@@ -49,16 +49,6 @@ import { TimeZoneField } from './time-zone-field';
 
 const ICON = { 'aria-hidden': true } as const;
 const NEW_ACCOUNT = '__new';
-
-const REASON: Record<RowIssueCode, string> = {
-  missing: 'is empty',
-  'time-unparseable':
-    'is not a date and time Keel can read with these settings',
-  'qty-invalid': 'is not a valid quantity',
-  'number-unparseable': 'is not a number with this decimal mark',
-  'side-unrecognised': 'is not a buy or a sell',
-  'close-before-open': 'closes before it opens',
-};
 
 const POINT_TICK = 0.01;
 
@@ -509,7 +499,7 @@ export function MapStep({
                 </b>{' '}
                 with these settings. The first is row {first.rowIndex}: the{' '}
                 {FIELD_LABEL[first.field].toLowerCase()} &quot;{first.value}
-                &quot; {REASON[first.code]}.
+                &quot; {ISSUE_REASON[first.code]}.
                 {first.code === 'time-unparseable'
                   ? ' Check the date order and the time zone.'
                   : ''}

@@ -3,14 +3,16 @@
 import { Check } from '@phosphor-icons/react/dist/ssr';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CARD, CARD_PAD } from '@/components/app/dashboard/shared';
-import { buttonClasses } from '@/components/ui/button-styles';
+import { CARD } from '@/components/app/dashboard/shared';
 import { usePrefs, useUserAccounts } from '@/data/query/hooks';
+import type { ImportJob } from '@/domain/types';
 import { missingFields } from '@/domain/import/mapping';
 import { ImportFileError, readImportFile, type ImportFile } from '@/lib/decode';
 import { clearPendingImport, loadPendingImport } from '@/lib/pending-import';
+import { ImportDone } from './confirm-step';
 import { MapStep } from './map-step';
 import { openMapState, type MapState } from './mapping-state';
+import { PreviewStep } from './preview-step';
 import { UploadStep, fileSummary } from './upload-step';
 import { IconTile } from '@/components/ui/icon-tile';
 import { FileCsv, FileXls } from '@phosphor-icons/react/dist/ssr';
@@ -44,6 +46,8 @@ export function ImportFlow() {
   const [accountId, setAccountId] = useState<string | null>(null);
   const [mapState, setMapState] = useState<MapState | null>(null);
   const [save, setSave] = useState(true);
+  /** The import that was written; Confirm shows it. */
+  const [done, setDone] = useState<ImportJob | null>(null);
 
   const accountsQuery = useUserAccounts();
   const prefs = usePrefs().data;
@@ -75,7 +79,9 @@ export function ImportFlow() {
       ? 'upload'
       : wanted === 'map' || !ready
         ? 'map'
-        : wanted;
+        : wanted === 'confirm' && !done
+          ? 'preview'
+          : wanted;
 
   const go = useCallback(
     (to: Step, how: 'push' | 'replace' = 'push') => {
@@ -100,6 +106,7 @@ export function ImportFlow() {
         const opened = await readImportFile(chosen);
         setFile(opened);
         setMapState(null);
+        setDone(null);
         if (then) go(then, 'replace');
       } catch (e) {
         setFile(null);
@@ -138,6 +145,7 @@ export function ImportFlow() {
     clearPendingImport().catch(() => undefined);
     setFile(null);
     setMapState(null);
+    setDone(null);
     setError(null);
     go('upload', 'replace');
   }
@@ -173,12 +181,24 @@ export function ImportFlow() {
           onBack={() => go('upload')}
           onContinue={() => go('preview')}
         />
-      ) : step === 'map' ? null : (
-        <ComingNext
-          step={step}
-          onBack={() => go(step === 'preview' ? 'map' : 'preview')}
+      ) : step === 'map' ? null : step === 'preview' &&
+        file &&
+        mapState &&
+        account ? (
+        <PreviewStep
+          file={file}
+          mapping={mapState.mapping}
+          account={account}
+          onBack={() => go('map')}
+          onChooseAnother={() => go('upload')}
+          onDone={(job) => {
+            setDone(job);
+            go('confirm');
+          }}
         />
-      )}
+      ) : step === 'confirm' && done && account ? (
+        <ImportDone job={done} account={account} onAnother={remove} />
+      ) : null}
     </div>
   );
 }
@@ -272,27 +292,5 @@ function Stepper({
         </div>
       ) : null}
     </div>
-  );
-}
-
-/** Preview and Confirm arrive with the next release of the import. */
-function ComingNext({ step, onBack }: { step: Step; onBack: () => void }) {
-  return (
-    <section className={`${CARD} ${CARD_PAD} max-w-[640px]`}>
-      <h2 className="text-[15px] font-semibold text-text">
-        {STEP_NAME[step]} comes next
-      </h2>
-      <p className="mt-1 text-[13.5px] leading-snug text-muted">
-        Your columns are mapped. The preview of what Keel will import opens in
-        the next release.
-      </p>
-      <button
-        type="button"
-        onClick={onBack}
-        className={`${buttonClasses('secondary')} mt-4`}
-      >
-        Back
-      </button>
-    </section>
   );
 }
