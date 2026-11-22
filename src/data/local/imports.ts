@@ -190,7 +190,7 @@ export function localImports(ctx: LocalContext): ImportRepo {
           const openTrades = await db.trades
             .where('[workspaceId+accountId]')
             .equals([ws, accountId])
-            .filter((t) => t.status === 'open')
+            .filter((t) => t.status === 'open' && t.source !== 'manual')
             .toArray();
           const jobs = await db.imports
             .where('[workspaceId+accountId]')

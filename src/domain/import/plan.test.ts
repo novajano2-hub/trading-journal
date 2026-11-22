@@ -86,6 +86,24 @@ describe('planImport', () => {
     ).toEqual([2]);
   });
 
+  test('an open manual trade is never merged into an import', () => {
+    const manual: Trade = {
+      ...plan(H + '2026-11-16 09:41:00,AAPL,Buy,10,190\n').trades[0]!,
+      id: 'manual-1',
+      serial: 4,
+      source: 'manual',
+      importId: undefined,
+    };
+    const p = plan(
+      H + '2026-11-17 10:00:00,AAPL,Sell,10,195\n',
+      ctx({ nextSerial: 5, openTrades: [manual] }),
+    );
+    expect(p.replacedTrades).toEqual([]);
+    expect(p.trades.map((t) => t.id)).not.toContain('manual-1');
+    expect(p.trades.every((t) => t.source !== 'manual')).toBe(true);
+    expect(p.trades.map((t) => t.serial)).toEqual([5]);
+  });
+
   test('a position closed by a later import is one trade keeping id, serial and tags (Review Focus 2)', () => {
     const open: Trade = {
       ...plan(H + '2026-11-16 09:41:00,ESZ5,Buy,2,6010\n').trades[0]!,

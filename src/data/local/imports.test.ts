@@ -4,6 +4,7 @@ import { sampleFillsCsv } from '@/content/landing-sample-csv';
 import { parseCsv } from '@/domain/import/csv';
 import { guessMapping, type MappingOptions } from '@/domain/import/mapping';
 import { planImport, type ImportContext } from '@/domain/import/plan';
+import type { Trade } from '@/domain/types';
 import { fixtureSample } from '../__fixtures__/sample';
 import {
   ImportBlockedError,
@@ -118,6 +119,48 @@ describe('imports.context', () => {
       nextSerial: 2,
       openTrades: [],
       fingerprints: [],
+    });
+  });
+});
+
+describe('manual trades and the import context', () => {
+  const MANUAL = (instrument: Trade['instrument'], acc: string) => ({
+    accountId: acc,
+    instrument,
+    fills: [
+      {
+        time: '2026-11-16T14:00:00.000Z',
+        side: 'buy' as const,
+        qty: 1,
+        price: 450,
+        commission: 0,
+        fees: 0,
+      },
+    ],
+  });
+
+  test('open manual trades are left out of the context', async () => {
+    const { repo, acc, commit } = await setup();
+    await commit(OPEN_ES, 'impE');
+    const [imported] = await repo.trades.list(M);
+    await repo.trades.createManual(M, MANUAL(imported!.instrument, acc.id));
+    expect((await repo.imports.context(M, acc.id)).openTrades).toEqual([
+      imported,
+    ]);
+  });
+
+  test('creating or rebuilding a manual trade makes a pending import plan stale', async () => {
+    const { repo, acc, plan } = await setup();
+    const pending = await plan(OPEN_ES, 'imp1');
+    const instrument = pending.trades[0]!.instrument;
+    const made = await repo.trades.createManual(M, MANUAL(instrument, acc.id));
+    await expect(repo.imports.commit(M, pending)).rejects.toMatchObject({
+      reason: 'imports-changed',
+    });
+    const again = await plan(OPEN_ES, 'imp2');
+    await repo.trades.replaceManual(M, made.id, MANUAL(instrument, acc.id));
+    await expect(repo.imports.commit(M, again)).rejects.toMatchObject({
+      reason: 'imports-changed',
     });
   });
 });

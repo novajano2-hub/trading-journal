@@ -11,6 +11,7 @@ import type { LocalContext } from './context';
 import type { KeelDb } from './db';
 import { rwTx } from './tx';
 import { pruneJournalLinks } from './journal';
+import { bumpImportRevision } from './imports';
 
 /**
  * `patch` applied to the stored trades, which must all exist; leaving a
@@ -83,7 +84,7 @@ export function localTrades(ctx: LocalContext): TradesRepo {
     async createManual(ws, input) {
       const db = await ctx.db();
       const id = `manual:${ctx.newId()}`;
-      return rwTx(db, [db.trades, db.accounts], async () => {
+      return rwTx(db, [db.trades, db.accounts, db.meta], async () => {
         const account = await db.accounts.get([ws, input.accountId]);
         if (!account) throw new NotFoundError('account', input.accountId);
         let highest = 0;
@@ -102,13 +103,15 @@ export function localTrades(ctx: LocalContext): TradesRepo {
         if (!built.ok)
           throw new ManualTradeRejected(built.error, built.fillIndex);
         await db.trades.put(built.trade);
+        // A pending import preview took its serial before this trade existed.
+        await bumpImportRevision(db, ws);
         return built.trade;
       });
     },
 
     async replaceManual(ws, id, input) {
       const db = await ctx.db();
-      return rwTx(db, [db.trades, db.accounts], async () => {
+      return rwTx(db, [db.trades, db.accounts, db.meta], async () => {
         const old = await db.trades.get([ws, id]);
         if (!old) throw new NotFoundError('trade', id);
         if (old.source !== 'manual')
@@ -135,6 +138,7 @@ export function localTrades(ctx: LocalContext): TradesRepo {
         for (const k of ['rating', 'noteId', 'reviewed'] as const)
           if (old[k] !== undefined) Object.assign(next, { [k]: old[k] });
         await db.trades.put(next);
+        await bumpImportRevision(db, ws);
         return next;
       });
     },
