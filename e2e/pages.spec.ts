@@ -97,17 +97,20 @@ test('read pages hold a ~68ch measure and use no cards', async ({ page }) => {
 test('/app/import is restyled, same behaviour', async ({ page }) => {
   await page.goto('/app/import?side=short&by=day');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Import');
-  await expect(page.getByText('No file waiting.')).toBeVisible();
-  // The way out stays in the app and keeps the filters.
+  // Step 1 of the import: the upload, with its drop zone and file picker.
   await expect(
-    page.getByRole('link', { name: 'Back to the Dashboard' }),
-  ).toHaveAttribute('href', '/app/dashboard?side=short');
+    page.getByRole('heading', { name: 'Upload your trades' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Choose a file' }),
+  ).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Import steps' })).toBeVisible();
   // A card as the Dashboard's are: a hairline border and the card shadow.
-  await expect(page.locator('main .rounded-card')).not.toHaveCSS(
+  await expect(page.locator('main .rounded-card').first()).not.toHaveCSS(
     'box-shadow',
     'none',
   );
-  // With no file, the way on is the broker export guide.
+  // The way to get a file is the broker export guide.
   await expect(
     page.getByRole('link', { name: 'How to export your CSV' }),
   ).toHaveAttribute('href', '/brokers#export');

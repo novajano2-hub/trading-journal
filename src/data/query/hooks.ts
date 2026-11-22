@@ -79,6 +79,15 @@ export function useAccounts(): UseQueryResult<Account[]> {
   return useWorkspaceQuery(keys.accounts, (r, ws) => r.accounts.list(ws));
 }
 
+/** The accounts of My workspace, whichever workspace is active: imports land only there. */
+export function useUserAccounts(): UseQueryResult<Account[]> {
+  const repo = useRepository();
+  return useQuery({
+    queryKey: keys.accounts(USER_WORKSPACE.id),
+    queryFn: () => repo.accounts.list(USER_WORKSPACE.id),
+  });
+}
+
 export function useTrades(): UseQueryResult<Trade[]> {
   return useWorkspaceQuery(keys.trades, (r, ws) => r.trades.list(ws));
 }
@@ -254,6 +263,32 @@ export function useUpdateAccount(): UseMutationResult<
     'accounts.update',
     (r, ws, v: { id: string; patch: AccountPatch }) =>
       r.accounts.update(ws, v.id, v.patch),
+  );
+}
+
+/** An account in My workspace, where imports land, whichever workspace is active. */
+export function useCreateUserAccount(): UseMutationResult<
+  Account,
+  Error,
+  NewAccount
+> {
+  return useFixedWrite(
+    'accounts.create',
+    USER_WORKSPACE.id,
+    (r, v: NewAccount) => r.accounts.create(USER_WORKSPACE.id, v),
+  );
+}
+
+export function useUpdateUserAccount(): UseMutationResult<
+  Account,
+  Error,
+  { id: string; patch: AccountPatch }
+> {
+  return useFixedWrite(
+    'accounts.update',
+    USER_WORKSPACE.id,
+    (r, v: { id: string; patch: AccountPatch }) =>
+      r.accounts.update(USER_WORKSPACE.id, v.id, v.patch),
   );
 }
 

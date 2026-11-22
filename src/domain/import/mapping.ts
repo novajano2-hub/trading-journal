@@ -33,6 +33,11 @@ export interface MappingOptions {
   decimal: DecimalMark;
   forexQtyUnit: 'lots' | 'units';
   overrides: InstrumentOverrides;
+  /**
+   * The file's header cells when the mapping was saved on an account, so a
+   * later file is matched to it by column name, not by position.
+   */
+  headers?: readonly string[];
 }
 
 export type ImportMapping =
@@ -104,7 +109,7 @@ const FILL_FIELDS: readonly FillField[] = [
   'commission',
   'orderId',
 ];
-const FILL_SYNONYMS: Record<FillField, readonly string[]> = {
+export const FILL_SYNONYMS: Record<FillField, readonly string[]> = {
   date: [],
   time: [
     'time',
@@ -198,6 +203,15 @@ const TRADE_SYNONYMS: Record<TradeRowField, readonly string[]> = {
   commission: COMMISSION,
   pnl: PNL,
 };
+
+/**
+ * What marks a file as closed trades. A bare "exit" only counts as a whole
+ * header: inside "Exit Strategy" it names a note, not a price.
+ */
+const CLOSED_SIGNALS = [
+  ...CLOSE_TIME,
+  ...EXIT_PRICE.filter((s) => s !== 'exit'),
+];
 
 function containsPhrase(header: string, phrase: string): boolean {
   return ` ${header} `.includes(` ${phrase} `);
@@ -293,16 +307,22 @@ function guessDecimal(
 
 export function guessMapping(
   parsed: ParsedCsv,
-  defaults: { sourceTimeZone: string; overrides?: InstrumentOverrides },
+  defaults: {
+    sourceTimeZone: string;
+    overrides?: InstrumentOverrides;
+    /** Read the file as this kind, whatever its headers suggest. */
+    kind?: ImportMapping['kind'];
+  },
 ): ImportMapping {
   const { headers } = parsed;
   const norm = headers.map(normalizeHeader);
-  const closed =
-    norm.some((h) =>
-      [...CLOSE_TIME, ...EXIT_PRICE].some((s) => containsPhrase(h, s)),
-    ) ||
-    indexesOf(norm, 'price').length >= 2 ||
-    indexesOf(norm, 'time').length >= 2;
+  const closed = defaults.kind
+    ? defaults.kind === 'closed-trades'
+    : norm.some(
+        (h) => h === 'exit' || CLOSED_SIGNALS.some((s) => containsPhrase(h, s)),
+      ) ||
+      indexesOf(norm, 'price').length >= 2 ||
+      indexesOf(norm, 'time').length >= 2;
 
   const options = (
     timeColumn: number | undefined,
@@ -351,4 +371,43 @@ export function missingFields(mapping: ImportMapping): string[] {
   const required: readonly string[] = REQUIRED_FIELDS[mapping.kind];
   const columns: Record<string, number | undefined> = mapping.columns;
   return required.filter((f) => columns[f] === undefined);
+}
+
+/**
+ * A mapping saved on an account, brought to this file: its columns are found
+ * again by the header names they were saved with (or, for a mapping saved
+ * without them, by position). Null when a column it needs is not in the file.
+ */
+export function applySavedMapping(
+  saved: ImportMapping,
+  headers: readonly string[],
+): ImportMapping | null {
+  const used = [
+    ...new Set(
+      Object.values(saved.columns).filter((i): i is number => i !== undefined),
+    ),
+  ];
+  if (used.length === 0) return null;
+  const savedHeaders = saved.headers;
+  if (!savedHeaders)
+    return used.every((i) => i < headers.length) ? saved : null;
+
+  const norm = headers.map(normalizeHeader);
+  const taken = new Set<number>();
+  const moved = new Map<number, number>();
+  for (const old of used) {
+    const want = normalizeHeader(savedHeaders[old] ?? '');
+    if (!want) return null;
+    const found =
+      norm[old] === want && !taken.has(old)
+        ? old
+        : norm.findIndex((h, i) => h === want && !taken.has(i));
+    if (found < 0) return null;
+    taken.add(found);
+    moved.set(old, found);
+  }
+  const columns: Record<string, number> = {};
+  for (const [field, i] of Object.entries(saved.columns))
+    if (i !== undefined) columns[field] = moved.get(i)!;
+  return { ...saved, columns, headers: [...headers] } as ImportMapping;
 }

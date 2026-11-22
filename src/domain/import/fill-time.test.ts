@@ -136,3 +136,19 @@ describe('guessDateOrder', () => {
     expect(guessDateOrder(['2026-11-16 10:00', 'x'])).toBe('mdy');
   });
 });
+
+test('year-first slashed dates read as written, and YMD is guessed from them', () => {
+  expect(
+    fillTimeToUtc('2026/11/19 09:30:00', {
+      timeZone: 'UTC',
+      dateOrder: 'ymd',
+    }),
+  ).toBe('2026-11-19T09:30:00.000Z');
+  expect(guessDateOrder(['2026/11/19 09:30:00'])).toBe('ymd');
+  // ISO dates need no order: the guess leaves them month first, as before.
+  expect(guessDateOrder(['2026-11-19 09:30:00'])).toBe('mdy');
+  // ISO dates read the same whatever the order says.
+  expect(
+    fillTimeToUtc('2026-11-19 09:30:00', { timeZone: 'UTC', dateOrder: 'dmy' }),
+  ).toBe('2026-11-19T09:30:00.000Z');
+});
