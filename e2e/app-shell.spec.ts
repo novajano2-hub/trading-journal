@@ -305,10 +305,10 @@ test('an empty workspace shows the chips and the P&L choice unavailable, still i
   const side = filters.getByRole('button', { name: 'Side' });
   await expect(side).toHaveAttribute('aria-disabled', 'true');
   // The Display button stays in the bar; its P&L group reads unavailable inside.
-  await page
+  const display = page
     .getByRole('banner')
-    .getByRole('button', { name: /show as / })
-    .click();
+    .getByRole('button', { name: /show as / });
+  await display.click();
   await expect(page.getByRole('group', { name: 'P&L' })).toHaveAttribute(
     'aria-disabled',
     'true',
@@ -317,7 +317,12 @@ test('an empty workspace shows the chips and the P&L choice unavailable, still i
     page.getByRole('menuitemradio', { name: 'Gross' }),
   ).toHaveAttribute('data-disabled', '');
   await page.keyboard.press('Escape');
-  await filters.getByRole('button', { name: 'Symbol' }).focus();
+  // The menu's exit animation ends with Radix returning focus to its trigger.
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect(display).toBeFocused();
+  const symbol = filters.getByRole('button', { name: 'Symbol' });
+  await symbol.focus();
+  await expect(symbol).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(side).toBeFocused();
   await page.keyboard.press('Enter');

@@ -392,7 +392,11 @@ export function TradeNote({
 }): React.JSX.Element {
   const entryQuery = useJournalEntry(trade.noteId ?? '');
   const waiting = trade.noteId !== undefined && !entryQuery.isSuccess;
-  if (waiting)
+  // Once the body has mounted for this trade it stays: the first edit links a
+  // new note, and that must not swap the live editor for the skeleton.
+  const [mountedFor, setMountedFor] = useState<string | null>(null);
+  if (!waiting && mountedFor !== trade.id) setMountedFor(trade.id);
+  if (waiting && mountedFor !== trade.id)
     return (
       <div
         role="status"

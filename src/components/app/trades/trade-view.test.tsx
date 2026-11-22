@@ -121,6 +121,35 @@ test('Previous and Next stay within ?symbol=ES, by open time, and keep the param
   ).toBe('/app/trades?symbol=ES');
 });
 
+test('trade ids with a slash are encoded in every link', async () => {
+  const base = sample({ source: 'manual' });
+  const rename: Record<string, string> = {
+    't-a': 'acc:EUR/USD:a',
+    't-c': 'acc:EUR/USD:c',
+    't-d': 'acc:EUR/USD:d',
+  };
+  renderApp(<TradeView id="acc:EUR/USD:c" />, {
+    sample: async () => {
+      const w = await base();
+      return {
+        ...w,
+        trades: w.trades.map((t) => ({ ...t, id: rename[t.id] ?? t.id })),
+      };
+    },
+    url: URL_C,
+  });
+  const next = await screen.findByRole('link', { name: /Next trade/ });
+  expect(next.getAttribute('href')).toBe(
+    '/app/trades/acc%3AEUR%2FUSD%3Ad?symbol=ES',
+  );
+  expect(
+    screen.getByRole('link', { name: /Previous trade/ }).getAttribute('href'),
+  ).toBe('/app/trades/acc%3AEUR%2FUSD%3Aa?symbol=ES');
+  expect(
+    screen.getByRole('link', { name: 'Edit fills' }).getAttribute('href'),
+  ).toBe('/app/trades/acc%3AEUR%2FUSD%3Ac/edit?symbol=ES');
+});
+
 test('setting the planned stop saves it and the realized R follows', async () => {
   const { repo } = renderApp(<TradeView id="t-c" />, {
     sample: sample(),
@@ -258,6 +287,42 @@ test('tags are grouped by their category and each has its own picker', async () 
   ).toBeTruthy();
 });
 
+test('two quick tag picks keep both', async () => {
+  const base = sample();
+  const { repo } = renderApp(<TradeView id="t-c" />, {
+    sample: async () => {
+      const w = await base();
+      return {
+        ...w,
+        tags: [
+          ...w.tags,
+          {
+            id: 'tag-pull',
+            workspaceId: WS,
+            name: 'Pullback',
+            categoryId: 'setups',
+          },
+        ],
+      };
+    },
+    url: URL_C,
+  });
+  fireEvent.click(await screen.findByRole('button', { name: 'Add to Setups' }));
+  const first = await screen.findByRole('option', { name: 'Breakout' });
+  const second = screen.getByRole('option', { name: 'Pullback' });
+  // Both picks land before the first save has come back through the props.
+  act(() => {
+    fireEvent.click(first);
+    fireEvent.click(second);
+  });
+  await waitFor(async () =>
+    expect([...(await repo.trades.get(WS, 't-c'))!.tagIds].sort()).toEqual([
+      'tag-pull',
+      'tag-setup',
+    ]),
+  );
+});
+
 test('the fills timeline is labelled with its span and fill count', async () => {
   renderApp(<TradeView id="t-c" />, { sample: sample(), url: URL_C });
   const chart = await screen.findByRole('group', { name: /^Fills from / });
@@ -284,10 +349,13 @@ test('typing in the note creates one trade note and links it, then autosaves', a
   await screen.findByRole('toolbar', { name: 'Formatting' });
   await waitFor(() => expect(handle.current).not.toBeNull());
   act(() => handle.current!.runSlashCommand('Checklist'));
-  await waitFor(async () => {
-    const t = (await repo.trades.get(WS, 't-c'))!;
-    expect(t.noteId).toBeDefined();
-  });
+  await waitFor(
+    async () => {
+      const t = (await repo.trades.get(WS, 't-c'))!;
+      expect(t.noteId).toBeDefined();
+    },
+    { timeout: 3000 },
+  );
   // Still one note after the autosave (600 ms later).
   await waitFor(
     async () => {
@@ -299,7 +367,29 @@ test('typing in the note creates one trade note and links it, then autosaves', a
     },
     { timeout: 3000 },
   );
-  await screen.findByText('Saved');
+  await screen.findByText('Saved', undefined, { timeout: 3000 });
+});
+
+test('the note editor stays mounted and focused across the first change', async () => {
+  const handle: { current: NoteEditorHandle | null } = { current: null };
+  const { repo } = renderApp(<TradeView id="t-c" noteHandleRef={handle} />, {
+    sample: sample(),
+    url: URL_C,
+  });
+  const box = await screen.findByRole('textbox', { name: 'Trade note' });
+  await waitFor(() => expect(handle.current).not.toBeNull());
+  act(() => box.focus());
+  act(() => handle.current!.runSlashCommand('Checklist'));
+  await waitFor(
+    async () =>
+      expect((await repo.trades.get(WS, 't-c'))?.noteId).toBeDefined(),
+    { timeout: 3000 },
+  );
+  // Give the refetch with the new note id time to land.
+  await screen.findByText('Saved', undefined, { timeout: 3000 });
+  expect(screen.getByRole('textbox', { name: 'Trade note' })).toBe(box);
+  expect(box.isConnected).toBe(true);
+  expect(document.activeElement).toBe(box);
 });
 
 test('an archived account makes the trade read-only', async () => {
