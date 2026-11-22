@@ -103,7 +103,6 @@ export function NoteEditor({
       TableCell,
       Details.configure({
         persist: true,
-        openWithoutDelay: true,
         renderToggleButton: ({ element, isOpen }) => {
           element.setAttribute(
             'aria-label',
