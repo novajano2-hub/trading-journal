@@ -253,13 +253,30 @@ function newPlanIdentity(
   };
 }
 
+/** Inputs are the same file and mapping when their fields are: the object may be rebuilt every render. */
+function sameInput(a: ImportInput | null, b: ImportInput | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.parsed === b.parsed &&
+    a.mapping === b.mapping &&
+    a.accountId === b.accountId &&
+    a.fileName === b.fileName
+  );
+}
+
 /**
- * The plan for a file. Its id and time hold while the `input` object and the
- * workspace's import revision stay the same, so re-renders and refetches keep
- * one plan identity. A new input, or an import committed or undone since,
- * makes a new plan with a new id: a commit never reuses an id in the history.
- * Keep `input` one object while the file and mapping are unchanged (state or a
- * memo): a new object on every render would re-plan without end.
+ * The plan for a file. Its id and time hold while the input's fields (`parsed`,
+ * `mapping`, `accountId`, `fileName`, compared by reference, so an inline
+ * object is fine) and the workspace's import revision stay the same, so
+ * re-renders and refetches keep one plan identity. A new input, or an import
+ * committed or undone since, makes a new plan with a new id: a commit never
+ * reuses an id in the history. Keep `parsed` and `mapping` stable (state or a
+ * memo) while the file and mapping are unchanged.
+ *
+ * The plan is made from the stored identity's input, and the status stays
+ * `pending` until that identity matches the current input and revision, so no
+ * render pass reports `success` without data or with a plan for an old input.
  */
 export function useImportPlan(input: ImportInput | null): Derived<ImportPlan> {
   const context = useImportContext(input?.accountId);
@@ -268,22 +285,29 @@ export function useImportPlan(input: ImportInput | null): Derived<ImportPlan> {
     newPlanIdentity(input, revision),
   );
   // Adjusting state while rendering: React re-renders at once with the new identity.
-  const current = identity.input === input && identity.revision === revision;
+  const current =
+    sameInput(identity.input, input) && identity.revision === revision;
   if (!current) setIdentity(newPlanIdentity(input, revision));
+  const planInput = identity.input;
   const data = useMemo(
     () =>
-      current && input && context.data
-        ? planImport(input.parsed, input.mapping, context.data, {
+      current && planInput && context.data
+        ? planImport(planInput.parsed, planInput.mapping, context.data, {
             importId: identity.importId,
             now: identity.now,
-            fileName: input.fileName,
+            fileName: planInput.fileName,
           })
         : undefined,
-    [current, input, context.data, identity],
+    [current, planInput, context.data, identity],
   );
+  // A failure wins even before the identity catches up.
+  const state =
+    current || context.status === 'error'
+      ? context
+      : { status: 'pending' as const, error: null };
   return {
-    status: context.status,
-    error: context.error,
+    status: state.status === 'success' && !data ? 'pending' : state.status,
+    error: state.error,
     data,
   };
 }
