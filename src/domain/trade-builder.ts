@@ -1,5 +1,5 @@
 import { pnlCurrencyFor, quoteToPnl } from './currency';
-import { roundHalfEven, toCents } from './money';
+import { roundHalfAway, roundHalfEven } from './money';
 import type { Direction, Execution, Instrument, Trade } from './types';
 
 export interface BuildOptions {
@@ -58,7 +58,7 @@ interface Draft {
   entryNotional: number;
   exitQty: number;
   exitNotional: number;
-  pnl: number; // quote-currency, per-direction signed, float until toCents
+  pnl: number; // P&L-currency, per-direction signed, each exit converted at its own rate, float until the trade's net is rounded
   maxPosition: number;
   openedAt: string;
   closedAt?: string;
@@ -92,13 +92,11 @@ function finalize(
   const acctCcy = opts.accountCurrency(accountId);
 
   const pnlCurrency = pnlCurrencyFor(inst, acctCcy);
-  // No exits means no realised P&L, so the rate is never needed then.
-  const gross = toCents(
-    avgExit === undefined
-      ? d.pnl
-      : quoteToPnl(d.pnl, inst, pnlCurrency, avgExit),
-  );
   const fees = d.executions.reduce((s, e) => s + e.fees + e.commission, 0);
+  // Each exit was already converted at its own rate. Round once, on the net
+  // (half away from zero, as TradeZella does), then gross = net + fees.
+  const net = roundHalfAway(d.pnl * 100 - fees);
+  const gross = net + fees;
 
   const trade: Trade = {
     id: `${accountId}:${canonicalSymbol(inst.symbol)}:${first.id}`,
@@ -115,7 +113,7 @@ function finalize(
     pnlCurrency,
     gross,
     fees,
-    net: gross - fees,
+    net,
     strategyIds: [],
     tagIds: [],
     ruleChecks: [],
@@ -132,6 +130,7 @@ function buildGroup(
   accountId: string,
   opts: BuildOptions,
 ): Trade[] {
+  const pnlCurrency = pnlCurrencyFor(inst, opts.accountCurrency(accountId));
   const trades: Trade[] = [];
   let position = 0; // signed
   let draft: Draft | null = null;
@@ -197,7 +196,14 @@ function buildGroup(
     }
     d.executions.push(closing);
 
-    d.pnl += matchLots(d.lots, closeQty, f.price, inst.pointValue, sign).pnl;
+    const quotePnl = matchLots(
+      d.lots,
+      closeQty,
+      f.price,
+      inst.pointValue,
+      sign,
+    ).pnl;
+    d.pnl += quoteToPnl(quotePnl, inst, pnlCurrency, f.price);
     d.exitQty += closeQty;
     d.exitNotional += closeQty * f.price;
     position -= sign * closeQty;

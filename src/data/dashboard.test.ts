@@ -311,7 +311,7 @@ test('the sample at its default view: weekly goal in progress, loss limit kept t
   const week = d.goals.weekly!;
   expect(week.window).toEqual({ from: '2026-11-16', to: '2026-11-20' });
   expect(week.reached).toBe(false);
-  expect(week.net).toBe(12919);
+  expect(week.net).toBe(12916);
   expect(week.fraction).toBeCloseTo(0.258, 3);
   const loss = d.goals.dailyLoss!;
   expect(loss.limit).toBe(SAMPLE_GOALS.dailyLossLimit);

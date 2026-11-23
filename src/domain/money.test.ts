@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { roundHalfEven, toCents } from './money';
+import { roundHalfAway, roundHalfEven, toCents } from './money';
 
 describe('money', () => {
   test('toCents rounds half-even with float tolerance', () => {
@@ -18,5 +18,14 @@ describe('money', () => {
   });
   test('never returns negative zero', () => {
     expect(Object.is(toCents(-0.00001), 0)).toBe(true);
+  });
+});
+
+describe('roundHalfAway', () => {
+  test('ties go away from zero, either sign', () => {
+    expect(
+      [2.5, -2.5, 6170.5, 0.4, -0.4, 1.6, -1.6].map(roundHalfAway),
+    ).toEqual([3, -3, 6171, 0, 0, 2, -2]);
+    expect(Object.is(roundHalfAway(-0.2), 0)).toBe(true);
   });
 });

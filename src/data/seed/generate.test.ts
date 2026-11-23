@@ -31,11 +31,40 @@ describe('sample workspace generator', () => {
       own.reduce((sum, t) => sum + f(t), 0);
     expect(own).toHaveLength(1233);
     expect(own.filter((t) => t.status === 'closed')).toHaveLength(1229);
-    expect(total((t) => t.net)).toBe(1_646_299);
-    expect(total((t) => t.gross)).toBe(2_577_717);
+    expect(total((t) => t.net)).toBe(1_646_295);
+    expect(total((t) => t.gross)).toBe(2_577_713);
     expect(total((t) => t.fees)).toBe(931_418);
     expect(total((t) => t.initialRisk ?? 0)).toBe(14_369_935);
     expect(own.filter((t) => t.noteId !== undefined)).toHaveLength(40);
+  });
+
+  test('the net rounds once per trade (E71): the pinned USDJPY trade, the ETHUSD trade and the USDJPY total', () => {
+    const live = generateSampleWorkspace({
+      seed: SAMPLE_SEED,
+      endDate: '2026-11-20',
+    });
+    const jpy = live.trades.filter((t) => t.instrument.symbol === 'USDJPY');
+    const pinned = jpy.find((t) => t.avgEntry === 153.757)!;
+    expect([pinned.gross, pinned.fees, pinned.net]).toEqual([
+      -39593, 1400, -40993,
+    ]);
+    expect(jpy).toHaveLength(45);
+    expect(jpy.reduce((n, t) => n + t.net, 0)).toBe(-128_916);
+    const eth = live.trades.find(
+      (t) =>
+        t.instrument.symbol === 'ETHUSD' &&
+        t.avgEntry === 3380.13 &&
+        t.fees === 467,
+    )!;
+    expect(eth.net).toBe(5704);
+    for (const t of live.trades) expect(t.net).toBe(t.gross - t.fees);
+    const other = (sym: string) =>
+      live.trades
+        .filter((t) => t.instrument.symbol === sym)
+        .reduce((n, t) => n + t.net, 0);
+    expect([other('EURUSD'), other('GBPUSD'), other('AUDUSD')]).toEqual([
+      20900, 287710, 165560,
+    ]);
   });
 
   test('about 70% of trades closed a week or more before the end are reviewed', () => {

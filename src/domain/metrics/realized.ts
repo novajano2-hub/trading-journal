@@ -1,5 +1,5 @@
 import { quoteToPnl } from '../currency';
-import { roundHalfEven, toCents } from '../money';
+import { roundHalfAway, roundHalfEven } from '../money';
 import { matchLots, type Lot } from '../trade-builder';
 import type { Cents, Trade } from '../types';
 
@@ -29,6 +29,7 @@ export function sizedRealizations(trade: Trade): SizedRealization[] {
   const exits: {
     time: string;
     qty: number;
+    /** In the trade's P&L currency, converted at this exit's own price, unrounded. */
     pnl: number;
     ownFees: number;
     entryFees: number;
@@ -58,7 +59,7 @@ export function sizedRealizations(trade: Trade): SizedRealization[] {
     exits.push({
       time: e.time,
       qty: e.qty,
-      pnl,
+      pnl: quoteToPnl(pnl, trade.instrument, trade.pnlCurrency, e.price),
       ownFees: e.fees + e.commission,
       entryFees,
     });
@@ -78,15 +79,12 @@ export function sizedRealizations(trade: Trade): SizedRealization[] {
     ];
   }
 
-  const rate = trade.avgExit ?? trade.avgEntry;
-  const grossOf = (pnl: number) =>
-    toCents(quoteToPnl(pnl, trade.instrument, trade.pnlCurrency, rate));
   const closed = trade.status === 'closed';
   let grossLeft = trade.gross;
   let feesLeft = trade.fees;
   return exits.map((x, i) => {
     const last = closed && i === exits.length - 1;
-    const gross = last ? grossLeft : grossOf(x.pnl);
+    const gross = last ? grossLeft : roundHalfAway(x.pnl * 100);
     const fees = last ? feesLeft : x.ownFees + roundHalfEven(x.entryFees);
     grossLeft -= gross;
     feesLeft -= fees;
