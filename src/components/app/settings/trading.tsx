@@ -100,6 +100,7 @@ function Breakeven(): React.JSX.Element | null {
           inputMode="decimal"
           value={value}
           aria-invalid={error ? true : undefined}
+          aria-describedby={error ? 'breakeven-error' : undefined}
           onChange={(e) => {
             set(e.target.value);
             setError(null);
@@ -169,7 +170,7 @@ function Breakeven(): React.JSX.Element | null {
         )}
       </div>
       {error ? (
-        <FieldError>{error}</FieldError>
+        <FieldError id="breakeven-error">{error}</FieldError>
       ) : (
         <p className={HELP}>
           {range.unit === 'amount'
@@ -292,8 +293,8 @@ export function TradingSettings(): React.JSX.Element {
             Default P&amp;L basis
           </span>
           <p className={HELP}>
-            Net takes fees and commissions out. The Gross and Net switch in the
-            top bar changes the same setting.
+            Net takes fees and commissions out. The P&amp;L choice in the
+            Display menu changes the same setting.
           </p>
           <Segmented<PnlBasis>
             label="Default P&L basis"

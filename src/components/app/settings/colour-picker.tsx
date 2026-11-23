@@ -122,12 +122,12 @@ export function ColourPicker({
             spellCheck={false}
             autoComplete="off"
             aria-invalid={invalid || undefined}
-            aria-describedby={`${hexId}-help`}
+            aria-describedby={`${hexId}-${invalid ? 'err' : 'help'}`}
             onChange={(e) => onChange(e.target.value)}
             className={`${INPUT} w-[120px] font-mono uppercase`}
           />
           {invalid ? (
-            <FieldError id={`${hexId}-help`}>
+            <FieldError id={`${hexId}-err`}>
               Use six digits, like #1693BE.
             </FieldError>
           ) : (

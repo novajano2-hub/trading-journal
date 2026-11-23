@@ -2,7 +2,7 @@
 
 import { DotsThree, X } from '@phosphor-icons/react/dist/ssr';
 import { Dialog, DropdownMenu } from 'radix-ui';
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 
 /** Table header and cell looks shared by the settings tables (the comp's 46px rows). */
 export const TH =
@@ -21,6 +21,8 @@ export interface MenuAction {
   onSelect(): void;
   /** Destructive: loss ink. */
   danger?: boolean;
+  /** Runs once the menu has closed, in place of returning focus to its button (to move it to a card, say). */
+  afterClose?(): void;
 }
 
 /** A row's "..." menu: a 28px button (44px on touch) that opens its actions. */
@@ -32,6 +34,7 @@ export function RowMenu({
   label: string;
   actions: readonly MenuAction[];
 }): React.JSX.Element {
+  const after = useRef<(() => void) | null>(null);
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
@@ -41,12 +44,26 @@ export function RowMenu({
         <DotsThree size={16} weight="bold" aria-hidden="true" />
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content align="end" sideOffset={4} className={MENU}>
+        <DropdownMenu.Content
+          align="end"
+          sideOffset={4}
+          className={MENU}
+          onCloseAutoFocus={(e) => {
+            const run = after.current;
+            after.current = null;
+            if (!run) return;
+            e.preventDefault();
+            run();
+          }}
+        >
           {actions.map((a) => (
             <DropdownMenu.Item
               key={a.label}
               className={`${MENU_ITEM} ${a.danger ? 'text-loss' : ''}`}
-              onSelect={a.onSelect}
+              onSelect={() => {
+                after.current = a.afterClose ?? null;
+                a.onSelect();
+              }}
             >
               {a.label}
             </DropdownMenu.Item>
@@ -115,7 +132,12 @@ export function SettingsDialog({
   );
 }
 
-/** A red line under a field. */
+/** Moves focus to the field with this id: the first invalid one after a refused submit. */
+export function focusField(id: string): void {
+  document.getElementById(id)?.focus();
+}
+
+/** A red line under a field, announced when it appears. Point the field's `aria-describedby` at its `id`. */
 export function FieldError({
   id,
   children,
@@ -124,7 +146,11 @@ export function FieldError({
   children: ReactNode;
 }): React.JSX.Element {
   return (
-    <p id={id} className="mt-1.5 text-[12.5px] font-medium text-loss">
+    <p
+      id={id}
+      role="alert"
+      className="mt-1.5 text-[12.5px] font-medium text-loss"
+    >
       {children}
     </p>
   );

@@ -150,7 +150,7 @@ export function ProfileSettings(): React.JSX.Element {
             autoComplete="off"
             spellCheck={false}
             aria-invalid={currencyError || undefined}
-            aria-describedby={`${currencyId}-help`}
+            aria-describedby={`${currencyId}-${currencyError ? 'err' : 'help'}`}
             onChange={(e) => {
               setCurrencyDraft({
                 base: prefs.baseCurrency,
@@ -168,7 +168,7 @@ export function ProfileSettings(): React.JSX.Element {
             className={`${INPUT} max-w-[120px] uppercase`}
           />
           {currencyError ? (
-            <FieldError id={`${currencyId}-help`}>
+            <FieldError id={`${currencyId}-err`}>
               Use a three-letter currency code, like USD.
             </FieldError>
           ) : (

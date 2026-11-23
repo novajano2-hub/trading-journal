@@ -87,3 +87,16 @@ test('the name and the base currency save when you leave the field', async () =>
     }),
   );
 });
+
+test('a bad base currency is announced as an alert the field points to', async () => {
+  renderApp(<ProfileSettings />, {
+    repository: repo(),
+    url: '/app/settings/profile',
+  });
+  const currency = await screen.findByLabelText('Base currency');
+  fireEvent.change(currency, { target: { value: 'EU' } });
+  fireEvent.blur(currency);
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toBe('Use a three-letter currency code, like USD.');
+  expect(currency.getAttribute('aria-describedby')).toBe(alert.id);
+});

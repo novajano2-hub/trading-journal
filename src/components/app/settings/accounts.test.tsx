@@ -69,35 +69,65 @@ test('the table reads each account with its balance today and its status', async
   expect(cell(old, 'Status').textContent).toContain('Archived');
 });
 
-test('adding a withdrawal of $500 lowers the balance today by $500', async () => {
+const card = () => screen.findByRole('region', { name: 'Balance adjustments' });
+
+test('the Balance adjustments card shows the first active account, whose row is marked', async () => {
+  renderApp(<AccountsSettings />, { repository: repo(), url: URL });
+  const c = await card();
+  expect(within(c).getByText('Futures main, in USD')).toBeTruthy();
+  expect(within(c).getByText('No deposits or withdrawals.')).toBeTruthy();
+  expect((await rowOf('Futures main')).getAttribute('aria-current')).toBe(
+    'true',
+  );
+  expect((await rowOf('Old demo')).getAttribute('aria-current')).toBeNull();
+  expect(c.textContent).toContain('Not profit or loss');
+});
+
+test('the row menu picks the account for the card, marks its row and moves focus to the card', async () => {
+  const r = repo();
+  await r.cashFlows.create('sample', {
+    accountId: 'acc-b',
+    date: '2026-11-03',
+    amount: 25_000,
+    note: 'Demo top up',
+  });
+  renderApp(<AccountsSettings />, { repository: r, url: URL });
+  await card();
+  await openMenu('Old demo');
+  fireEvent.click(
+    await screen.findByRole('menuitem', { name: 'Deposits and withdrawals' }),
+  );
+  const c = await card();
+  await waitFor(() =>
+    expect(within(c).getByText('Old demo, in USD')).toBeTruthy(),
+  );
+  expect(within(c).getByRole('row', { name: /Demo top up/ })).toBeTruthy();
+  expect((await rowOf('Old demo')).getAttribute('aria-current')).toBe('true');
+  expect((await rowOf('Futures main')).getAttribute('aria-current')).toBeNull();
+  await waitFor(() => expect(document.activeElement).toBe(c));
+});
+
+test('adding a withdrawal of $500 in the card lowers the balance today by $500', async () => {
   renderApp(<AccountsSettings />, { repository: repo(), url: URL });
   const futures = await rowOf('Futures main');
   await waitFor(() =>
     expect(cell(futures, 'Balance today').textContent).toBe('$50,116.00'),
   );
-  await openMenu('Futures main');
-  fireEvent.click(
-    await screen.findByRole('menuitem', { name: 'Deposits and withdrawals' }),
-  );
-  const dialog = await screen.findByRole('dialog', {
-    name: 'Deposits and withdrawals',
-  });
-  expect(within(dialog).getByText('No deposits or withdrawals.')).toBeTruthy();
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
-  fireEvent.change(within(dialog).getByLabelText('Date'), {
+  const c = await card();
+  fireEvent.click(within(c).getByRole('button', { name: 'Add adjustment' }));
+  fireEvent.change(within(c).getByLabelText('Date'), {
     target: { value: '2026-11-10' },
   });
-  fireEvent.click(within(dialog).getByRole('radio', { name: 'Withdrawal' }));
-  fireEvent.change(within(dialog).getByLabelText('Amount'), {
+  fireEvent.click(within(c).getByRole('radio', { name: 'Withdrawal' }));
+  fireEvent.change(within(c).getByLabelText('Amount'), {
     target: { value: '500' },
   });
-  fireEvent.change(within(dialog).getByLabelText('Note'), {
+  fireEvent.change(within(c).getByLabelText('Note'), {
     target: { value: 'Payout' },
   });
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
-  const listed = await within(dialog).findByRole('row', { name: /Payout/ });
+  fireEvent.click(within(c).getByRole('button', { name: 'Save' }));
+  const listed = await within(c).findByRole('row', { name: /Payout/ });
   expect(listed.textContent).toContain('−$500.00');
-  fireEvent.keyDown(dialog, { key: 'Escape' });
   await waitFor(() =>
     expect(dollars(cell(futures, 'Balance today').textContent!)).toBe(
       50_116 - 500,
@@ -105,7 +135,7 @@ test('adding a withdrawal of $500 lowers the balance today by $500', async () =>
   );
 });
 
-test('a flow can be edited and removed', async () => {
+test('a flow can be edited, and is removed only after a confirmation', async () => {
   const r = repo();
   await r.cashFlows.create('sample', {
     accountId: 'acc-a',
@@ -114,30 +144,124 @@ test('a flow can be edited and removed', async () => {
     note: 'Top up',
   });
   renderApp(<AccountsSettings />, { repository: r, url: URL });
-  await openMenu('Futures main');
-  fireEvent.click(
-    await screen.findByRole('menuitem', { name: 'Deposits and withdrawals' }),
-  );
-  const dialog = await screen.findByRole('dialog', {
-    name: 'Deposits and withdrawals',
-  });
-  const row = await within(dialog).findByRole('row', { name: /Top up/ });
+  const c = await card();
+  const row = await within(c).findByRole('row', { name: /Top up/ });
   expect(row.textContent).toContain('+$1,000.00');
   fireEvent.click(within(row).getByRole('button', { name: 'Edit Top up' }));
-  fireEvent.change(within(dialog).getByLabelText('Amount'), {
+  fireEvent.change(within(c).getByLabelText('Amount'), {
     target: { value: '1200' },
   });
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+  fireEvent.click(within(c).getByRole('button', { name: 'Save' }));
   await waitFor(() =>
     expect(
-      within(dialog).getByRole('row', { name: /Top up/ }).textContent,
+      within(c).getByRole('row', { name: /Top up/ }).textContent,
     ).toContain('+$1,200.00'),
   );
+  fireEvent.click(within(c).getByRole('button', { name: 'Remove Top up' }));
+  const confirm = await screen.findByRole('dialog', {
+    name: /Remove Top up\?/,
+  });
+  // Asking changes nothing; Cancel keeps it.
+  expect(await r.cashFlows.list('sample')).toHaveLength(1);
+  fireEvent.click(within(confirm).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(await r.cashFlows.list('sample')).toHaveLength(1);
+  fireEvent.click(within(c).getByRole('button', { name: 'Remove Top up' }));
   fireEvent.click(
-    within(dialog).getByRole('button', { name: 'Remove Top up' }),
+    within(await screen.findByRole('dialog')).getByRole('button', {
+      name: 'Remove',
+    }),
   );
-  await within(dialog).findByText('No deposits or withdrawals.');
+  await within(c).findByText('No deposits or withdrawals.');
   expect(await r.cashFlows.list('sample')).toEqual([]);
+});
+
+test('at 390 the actions column and the first column stay in view', async () => {
+  renderApp(<AccountsSettings />, { repository: repo(), url: URL });
+  const row = await rowOf('Futures main');
+  const actions = within(row).getByRole('button', {
+    name: 'Actions for Futures main',
+  });
+  const td = actions.closest('td')!;
+  expect(td.className).toContain('sticky');
+  expect(td.className).toContain('right-0');
+  const th = row.closest('table')!.querySelector('thead th:last-child')!;
+  expect(th.className).toContain('sticky');
+  expect(th.className).toContain('right-0');
+});
+
+test('a failed flows read shows the failure, not a loader', async () => {
+  const r = repo();
+  const broken = {
+    ...r,
+    cashFlows: {
+      ...r.cashFlows,
+      list: async () => {
+        throw new Error('no read');
+      },
+    },
+  };
+  renderApp(<AccountsSettings />, { repository: broken, url: URL });
+  expect((await screen.findByRole('alert')).textContent).toContain(
+    "Keel couldn't read your accounts",
+  );
+  expect(screen.queryByText('Loading your accounts...')).toBeNull();
+});
+
+test('a failed trades read shows the failure, not a loader', async () => {
+  const r = repo();
+  const broken = {
+    ...r,
+    trades: {
+      ...r.trades,
+      list: async () => {
+        throw new Error('no read');
+      },
+    },
+  };
+  renderApp(<AccountsSettings />, { repository: broken, url: URL });
+  expect((await screen.findByRole('alert')).textContent).toContain(
+    "Keel couldn't read your accounts",
+  );
+  expect(screen.queryByText('Loading your accounts...')).toBeNull();
+});
+
+test('an account with no name is refused: the error is an alert tied to the field, and focus goes to it', async () => {
+  renderApp(<AccountsSettings />, { repository: repo(), url: URL });
+  fireEvent.click(await screen.findByRole('button', { name: 'New account' }));
+  const dialog = await screen.findByRole('dialog', { name: 'New account' });
+  const name = within(dialog).getByLabelText('Account name');
+  const balance = within(dialog).getByLabelText('Starting balance');
+  fireEvent.change(balance, { target: { value: 'abc' } });
+  (balance as HTMLElement).focus();
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+  const alerts = await within(dialog).findAllByRole('alert');
+  expect(alerts.map((a) => a.textContent)).toEqual([
+    'Give the account a name.',
+    'Enter an amount of zero or more.',
+  ]);
+  expect(name.getAttribute('aria-describedby')).toBe(alerts[0]!.id);
+  expect(balance.getAttribute('aria-describedby')).toContain(alerts[1]!.id);
+  // The first invalid field takes focus, not the one that was focused.
+  expect(document.activeElement).toBe(name);
+});
+
+test('a deposit with no amount is refused: alert, link and focus on the amount', async () => {
+  renderApp(<AccountsSettings />, { repository: repo(), url: URL });
+  const c = await card();
+  fireEvent.click(within(c).getByRole('button', { name: 'Add adjustment' }));
+  fireEvent.click(within(c).getByRole('button', { name: 'Save' }));
+  const alert = await within(c).findByRole('alert');
+  expect(alert.textContent).toBe('Enter an amount above zero.');
+  const amount = within(c).getByLabelText('Amount');
+  expect(amount.getAttribute('aria-describedby')).toBe(alert.id);
+  expect(document.activeElement).toBe(amount);
+  // A missing date comes first.
+  fireEvent.change(within(c).getByLabelText('Date'), { target: { value: '' } });
+  fireEvent.click(within(c).getByRole('button', { name: 'Save' }));
+  await waitFor(() =>
+    expect(document.activeElement).toBe(within(c).getByLabelText('Date')),
+  );
 });
 
 test('Clear trades needs the account name typed, then removes its trades', async () => {

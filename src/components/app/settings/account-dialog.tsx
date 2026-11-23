@@ -13,7 +13,7 @@ import {
 import { toCents } from '@/domain/money';
 import { isValidTimeZone } from '@/domain/time';
 import type { Account, AccountType } from '@/domain/types';
-import { FieldError, SettingsDialog } from './settings-ui';
+import { FieldError, focusField, SettingsDialog } from './settings-ui';
 
 export const ACCOUNT_TYPES: readonly { value: AccountType; label: string }[] = [
   { value: 'live', label: 'Live' },
@@ -74,7 +74,12 @@ function AccountForm({
       next.balance = 'Enter an amount of zero or more.';
     setErrors(next);
     setFailed(false);
-    if (Object.keys(next).length > 0) return;
+    if (Object.keys(next).length > 0) {
+      focusField(
+        next.name ? `${ids}-name` : next.currency ? `${ids}-cur` : `${ids}-bal`,
+      );
+      return;
+    }
     const fields = {
       name: name.trim(),
       broker: broker.trim(),
@@ -117,9 +122,12 @@ function AccountForm({
           autoFocus
           onChange={(e) => setName(e.target.value)}
           aria-invalid={errors.name ? true : undefined}
+          aria-describedby={errors.name ? `${ids}-name-err` : undefined}
           className={INPUT}
         />
-        {errors.name ? <FieldError>{errors.name}</FieldError> : null}
+        {errors.name ? (
+          <FieldError id={`${ids}-name-err`}>{errors.name}</FieldError>
+        ) : null}
       </div>
       <div>
         <label htmlFor={`${ids}-broker`} className={LABEL}>
@@ -158,7 +166,14 @@ function AccountForm({
             value={currency}
             maxLength={3}
             disabled={hasTrades}
-            aria-describedby={hasTrades ? `${ids}-cur-help` : undefined}
+            aria-describedby={
+              [
+                hasTrades ? `${ids}-cur-help` : null,
+                errors.currency ? `${ids}-cur-err` : null,
+              ]
+                .filter(Boolean)
+                .join(' ') || undefined
+            }
             aria-invalid={errors.currency ? true : undefined}
             onChange={(e) => setCurrency(e.target.value.toUpperCase())}
             className={`${INPUT} uppercase disabled:opacity-60`}
@@ -170,7 +185,9 @@ function AccountForm({
           The currency is fixed once an account has trades.
         </p>
       ) : null}
-      {errors.currency ? <FieldError>{errors.currency}</FieldError> : null}
+      {errors.currency ? (
+        <FieldError id={`${ids}-cur-err`}>{errors.currency}</FieldError>
+      ) : null}
       <div>
         <label htmlFor={`${ids}-bal`} className={LABEL}>
           Starting balance
@@ -181,12 +198,13 @@ function AccountForm({
           value={balance}
           onChange={(e) => setBalance(e.target.value)}
           aria-invalid={errors.balance ? true : undefined}
+          aria-describedby={`${ids}-bal-${errors.balance ? 'err' : 'help'}`}
           className={INPUT}
         />
         {errors.balance ? (
-          <FieldError>{errors.balance}</FieldError>
+          <FieldError id={`${ids}-bal-err`}>{errors.balance}</FieldError>
         ) : (
-          <p className={HELP}>
+          <p id={`${ids}-bal-help`} className={HELP}>
             What the account held before its first trade. Deposits and
             withdrawals are added on their own dates.
           </p>

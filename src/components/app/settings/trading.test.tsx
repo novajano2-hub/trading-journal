@@ -90,6 +90,26 @@ test('a range that runs high to low is refused, with the reason', async () => {
   });
 });
 
+test('the range error is an alert that both fields point to', async () => {
+  show(repo());
+  const from = await screen.findByLabelText('From');
+  fireEvent.change(from, { target: { value: '5' } });
+  fireEvent.blur(from);
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toBe('From must be at most To.');
+  expect(from.getAttribute('aria-describedby')).toBe(alert.id);
+  expect(screen.getByLabelText('To').getAttribute('aria-describedby')).toBe(
+    alert.id,
+  );
+});
+
+test('the basis copy points to the Display menu, not the top bar', async () => {
+  const { container } = show(repo());
+  await screen.findByLabelText('From');
+  expect(container.textContent).toContain('Display menu');
+  expect(container.textContent).not.toContain('top bar');
+});
+
 test('settling expired options and the default basis are saved', async () => {
   const r = repo();
   show(r);

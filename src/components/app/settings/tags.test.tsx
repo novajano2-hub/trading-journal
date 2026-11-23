@@ -191,6 +191,10 @@ test('a bad hex is refused, and a good one is stored upper case', async () => {
   expect(
     within(dialog).getByText('Use six digits, like #1693BE.'),
   ).toBeTruthy();
+  // It is announced, and the field points to it.
+  const alert = within(dialog).getByRole('alert');
+  expect(alert.textContent).toBe('Use six digits, like #1693BE.');
+  expect(hex.getAttribute('aria-describedby')).toBe(alert.id);
   fireEvent.change(hex, { target: { value: '#1a2b3c' } });
   expect(save.disabled).toBe(false);
   fireEvent.click(save);

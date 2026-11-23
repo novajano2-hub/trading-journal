@@ -26,6 +26,7 @@ import { plural } from '@/lib/format';
 import { ColourPicker, SWATCHES, parseHex } from './colour-picker';
 import {
   FieldError,
+  focusField,
   NUM,
   RowMenu,
   SettingsDialog,
@@ -120,6 +121,7 @@ function CategoryForm({
           ? `A category named ${e.duplicate} already exists.`
           : "Couldn't save the category. Try again.",
       );
+      focusField(`${id}-name`);
     }
   }
 
@@ -142,14 +144,14 @@ function CategoryForm({
           value={name}
           autoFocus
           onChange={(e) => setName(e.target.value)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${id}-err` : undefined}
           className={INPUT}
         />
       </div>
       <ColourPicker text={color} onChange={setColor} />
       <div aria-live="polite">
-        {error ? (
-          <p className="text-[12.5px] font-medium text-loss">{error}</p>
-        ) : null}
+        {error ? <FieldError id={`${id}-err`}>{error}</FieldError> : null}
       </div>
       <div className="flex flex-wrap justify-end gap-2">
         <Button variant="secondary" onClick={onClose} disabled={busy}>
@@ -260,6 +262,7 @@ function TagForm({
           ? `A tag named ${e.duplicate} is already in that category.`
           : "Couldn't save the tag. Try again.",
       );
+      focusField(`${id}-name`);
     }
   }
 
@@ -281,6 +284,8 @@ function TagForm({
           value={name}
           autoFocus
           onChange={(e) => setName(e.target.value)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${id}-err` : undefined}
           className={INPUT}
         />
       </div>
@@ -326,7 +331,7 @@ function TagForm({
         </p>
       </div>
       <div aria-live="polite">
-        {error ? <FieldError>{error}</FieldError> : null}
+        {error ? <FieldError id={`${id}-err`}>{error}</FieldError> : null}
       </div>
       <div className="flex flex-wrap justify-end gap-2">
         <Button variant="secondary" onClick={onClose} disabled={busy}>
