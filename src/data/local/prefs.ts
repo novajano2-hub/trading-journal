@@ -51,6 +51,22 @@ export function localPrefs(ctx: LocalContext): PrefsRepo {
       });
       return withDefaults(stored);
     },
+
+    async saved() {
+      const db = await ctx.db();
+      return asPartial((await db.meta.get(META.prefs))?.value);
+    },
+
+    async unset(keys) {
+      const db = await ctx.db();
+      let stored: Partial<UserPrefs> = {};
+      await db.transaction('rw', db.meta, async () => {
+        stored = { ...asPartial((await db.meta.get(META.prefs))?.value) };
+        for (const key of keys) delete stored[key];
+        await db.meta.put({ key: META.prefs, value: stored });
+      });
+      return withDefaults(stored);
+    },
   };
 }
 

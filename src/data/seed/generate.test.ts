@@ -127,11 +127,11 @@ describe('sample workspace generator', () => {
     for (const t of s.tags) expect(ids.has(t.categoryId)).toBe(true);
     const mistakes = mistakeTags(s.tags, s.tagCategories);
     expect(mistakes.map((t) => t.name)).toEqual([
-      'FOMO entry',
-      'Moved stop',
-      'Oversized',
-      'Early exit',
-      'Revenge trade',
+      'fomo entry',
+      'moved stop',
+      'oversized',
+      'early exit',
+      'revenge trade',
     ]);
     for (const t of mistakes) expect(t.description).toMatch(/\.$/);
   });

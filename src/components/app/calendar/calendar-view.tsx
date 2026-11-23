@@ -31,6 +31,7 @@ import { metricContextOf } from '@/data/metrics';
 import { useGlobalFilters, useTradeSet } from '@/data/query/derived';
 import {
   useAccounts,
+  useCashFlows,
   useJournal,
   usePrefs,
   useStrategies,
@@ -288,6 +289,7 @@ export function CalendarView(): React.JSX.Element {
   const notes = useJournal().data;
   const allTrades = useTrades().data;
   const accounts = useAccounts().data;
+  const flows = useCashFlows().data;
   const strategies = useStrategies().data;
   const tags = useTags().data;
   const tagCategories = useTagCategories().data;
@@ -343,9 +345,10 @@ export function CalendarView(): React.JSX.Element {
   const accountIds = set.data?.filters.accountIds;
   const pctBase = useMemo(
     () =>
-      accounts && allTrades && prefs && month
+      accounts && flows && allTrades && prefs && month
         ? pctBaseOf({
             accounts,
+            flows,
             trades: allTrades,
             accountIds: accountIds ?? [],
             currency,
@@ -353,7 +356,7 @@ export function CalendarView(): React.JSX.Element {
             timeZone: prefs.timeZone,
           })
         : null,
-    [accounts, allTrades, prefs, month, currency, accountIds],
+    [accounts, flows, allTrades, prefs, month, currency, accountIds],
   );
 
   const error = set.error ?? null;

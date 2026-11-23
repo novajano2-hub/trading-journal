@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { resolveInstrument } from '@/domain/instruments';
 import { defaultMetricContext } from '@/domain/metrics/context';
-import type { Account, Trade } from '@/domain/types';
+import type { Account, CashFlow, Trade } from '@/domain/types';
 import {
   formatFigure,
   meanFigure,
@@ -192,12 +192,20 @@ describe('pctBaseOf', () => {
     id: string,
     startingBalance: number,
     currency = 'USD',
-  ): Account =>
-    ({ id, startingBalance, currency, status: 'active' }) as Account;
+    status: Account['status'] = 'active',
+  ): Account => ({ id, startingBalance, currency, status }) as Account;
   const t = (accountId: string, closedAt: string, net: number) =>
     trade('ESZ6', 'long', 1, 2, { accountId, closedAt, net });
+  const flow = (accountId: string, date: string, amount: number): CashFlow => ({
+    id: `${accountId}-${date}`,
+    workspaceId: 'w',
+    accountId,
+    date,
+    amount,
+  });
   const args = {
     accounts: [acct('a', 100000), acct('b', 50000), acct('c', 7, 'EUR')],
+    flows: [] as CashFlow[],
     trades: [
       t('a', '2026-10-30T15:00:00Z', 2000),
       t('a', '2026-11-05T15:00:00Z', 9000),
@@ -219,5 +227,24 @@ describe('pctBaseOf', () => {
   });
   test('no accounts, or a base of zero or less, is null', () => {
     expect(pctBaseOf({ ...args, accounts: [], accountIds: [] })).toBeNull();
+  });
+  test('deposits and withdrawals dated before the range start move the base', () => {
+    const flows = [
+      flow('a', '2026-10-15', 10000),
+      flow('a', '2026-10-31', -3000),
+      // On the range's first day: inside the range, not before it.
+      flow('a', '2026-11-01', 777777),
+    ];
+    expect(
+      pctBaseOf({ ...args, flows, accountIds: ['a'], from: '2026-11-01' }),
+    ).toBe(100000 + 2000 + 10000 - 3000);
+  });
+  test('an archived account counts only when it is selected', () => {
+    const accounts = [acct('a', 100000), acct('z', 40000, 'USD', 'archived')];
+    const trades = [t('z', '2026-10-02T15:00:00Z', 1000)];
+    const all = { ...args, accounts, trades, from: '2026-11-01' };
+    expect(pctBaseOf({ ...all, accountIds: [] })).toBe(100000);
+    expect(pctBaseOf({ ...all, accountIds: ['z'] })).toBe(41000);
+    expect(pctBaseOf({ ...all, accountIds: ['a', 'z'] })).toBe(141000);
   });
 });

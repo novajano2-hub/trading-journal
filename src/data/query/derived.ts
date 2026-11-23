@@ -25,6 +25,7 @@ import {
 } from '../metrics';
 import {
   useAccounts,
+  useCashFlows,
   useImportContext,
   usePrefs,
   useStrategies,
@@ -230,12 +231,17 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
 export function useMetrics(filters: GlobalFilters): Derived<CurrencyMetrics[]> {
   const set = useTradeSet(filters);
   const prefs = usePrefs().data;
+  const flows = useCashFlows();
+  const everyTrade = useTrades().data;
+  const state = combine([set, flows]);
   const data = useMemo(
     () =>
-      set.data && prefs
+      set.data && prefs && flows.data
         ? metricsByCurrency(set.data.trades, {
             dayTrades: set.data.dayTrades,
             accounts: set.data.accounts,
+            flows: flows.data,
+            balanceTrades: everyTrade,
             // Day figures count only the exits dated inside the date range.
             ctx: {
               ...metricContextOf(prefs),
@@ -247,9 +253,9 @@ export function useMetrics(filters: GlobalFilters): Derived<CurrencyMetrics[]> {
             baseCurrency: prefs.baseCurrency,
           })
         : undefined,
-    [set.data, prefs],
+    [set.data, prefs, flows.data, everyTrade],
   );
-  return { status: set.status, error: set.error, data };
+  return { ...state, data: state.status === 'success' ? data : undefined };
 }
 
 export interface ImportInput {

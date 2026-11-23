@@ -179,10 +179,10 @@ test('tags group under their categories, by name', async () => {
     'Setups',
   ]);
   expect(
-    within(groups[0]!).getByRole('checkbox', { name: 'FOMO' }),
+    within(groups[0]!).getByRole('checkbox', { name: 'fomo' }),
   ).toBeTruthy();
   expect(
-    within(groups[1]!).getByRole('checkbox', { name: 'Breakout' }),
+    within(groups[1]!).getByRole('checkbox', { name: 'breakout' }),
   ).toBeTruthy();
 });
 
@@ -228,7 +228,7 @@ test('a stale link never shows its unknown ids as chips', async () => {
   renderBar('/app/dashboard?side=long&strategy=gone&tag=ghost&tag=tag-fomo');
   await liveChip('Long');
   expect(screen.getByRole('button', { name: 'Strategy' })).toBeTruthy();
-  expect(screen.getByRole('button', { name: 'FOMO' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'fomo' })).toBeTruthy();
   expect(screen.queryByRole('button', { name: '2 tags' })).toBeNull();
   await waitFor(() =>
     expect(window.location.search).toBe('?side=long&tag=tag-fomo'),

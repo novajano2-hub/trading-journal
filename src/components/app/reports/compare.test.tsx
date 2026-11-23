@@ -124,15 +124,15 @@ test('in R each group reads its trades in R, and a group with no stops falls bac
 });
 
 test('in percent each group is over its own accounts at its own range start', async () => {
-  // A: acc-a from 3 Nov, so the base is $50,000.00 plus the $60.00 made before. B: every account, all time.
+  // A: acc-a from 3 Nov, so the base is $50,000.00 plus the $60.00 made before. B: every active account, all time (the archived one is left out unless picked).
   renderApp(<CompareView />, {
     repository: await inUnit('percent'),
     url: '/app/reports/compare?a=account%3Dacc-a%26from%3D2026-11-03&b=',
   });
   const page = await screen.findByTestId('reports-compare');
   const table = within(page).getByRole('table', { name: 'Comparison' });
-  // A: +$65.00 over $50,060.00 is 0.13%. B: +$125.00 over $75,000.00 is 0.17%.
-  expect(row(table, /^Net P&L/).slice(0, 2)).toEqual(['+0.13%', '+0.17%']);
+  // A: +$65.00 over $50,060.00 is 0.13%. B: +$125.00 over $50,000.00 is 0.25%.
+  expect(row(table, /^Net P&L/).slice(0, 2)).toEqual(['+0.13%', '+0.25%']);
 });
 
 test('the chart names each group, its range and where it ends; Privacy hides the amounts', async () => {

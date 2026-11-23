@@ -281,10 +281,10 @@ test('tags are grouped by their category and each has its own picker', async () 
     url: URL_C,
   });
   const setups = await screen.findByRole('group', { name: 'Setups' });
-  expect(within(setups).getByText('Breakout')).toBeTruthy();
+  expect(within(setups).getByText('breakout')).toBeTruthy();
   expect(screen.getByRole('group', { name: 'Mistakes' })).toBeTruthy();
   expect(
-    within(setups).getByRole('button', { name: 'Remove Breakout' }),
+    within(setups).getByRole('button', { name: 'Remove breakout' }),
   ).toBeTruthy();
 });
 
@@ -300,7 +300,7 @@ test('two quick tag picks keep both', async () => {
           {
             id: 'tag-pull',
             workspaceId: WS,
-            name: 'Pullback',
+            name: 'pullback',
             categoryId: 'setups',
           },
         ],
@@ -309,8 +309,8 @@ test('two quick tag picks keep both', async () => {
     url: URL_C,
   });
   fireEvent.click(await screen.findByRole('button', { name: 'Add to Setups' }));
-  const first = await screen.findByRole('option', { name: 'Breakout' });
-  const second = screen.getByRole('option', { name: 'Pullback' });
+  const first = await screen.findByRole('option', { name: 'breakout' });
+  const second = screen.getByRole('option', { name: 'pullback' });
   // Both picks land before the first save has come back through the props.
   act(() => {
     fireEvent.click(first);

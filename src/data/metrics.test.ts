@@ -113,6 +113,7 @@ describe('performance (spec §10)', () => {
 describe('Sharpe and Sortino inputs', () => {
   const on = (date: string, net: number, fees = 0) =>
     makeTrade({
+      accountId: 'a',
       net,
       fees,
       gross: net + fees,
@@ -178,5 +179,55 @@ describe('Sharpe and Sortino inputs', () => {
     ]);
     expect(usd!.risk).toEqual(riskRatios(days, 2_000_000));
     expect(usd!.risk).not.toEqual(riskRatios(days, 1_000_000));
+  });
+
+  test('deposits and withdrawals dated before the range move the starting balance, those inside it do not', () => {
+    const before = on('2026-11-10', 1_000_000);
+    const inside = [
+      on('2026-11-16', 10_000),
+      on('2026-11-17', -5_000),
+      on('2026-11-18', 20_000),
+    ];
+    const flow = (date: string, amount: number) => ({
+      id: date,
+      workspaceId: 'w',
+      accountId: 'a',
+      date,
+      amount,
+    });
+    const [usd] = metricsByCurrency([before, ...inside], {
+      accounts: [acct('a', 1_000_000)],
+      flows: [
+        flow('2026-11-12', -500_000),
+        flow('2026-11-15', 100_000),
+        flow('2026-11-17', 9_000_000),
+      ],
+      ctx: { ...ctx, range: { from: '2026-11-16', to: '2026-11-20' } },
+      baseCurrency: 'USD',
+      dayTrades: [before, ...inside],
+    });
+    const days = [
+      day('2026-11-16', 10_000),
+      day('2026-11-17', -5_000),
+      day('2026-11-18', 20_000),
+    ];
+    expect(usd!.risk).toEqual(riskRatios(days, 1_600_000));
+  });
+
+  test('the balance is booked from every trade of the accounts, not only the filtered ones', () => {
+    const before = on('2026-11-10', 1_000_000);
+    const inside = [on('2026-11-16', 10_000), on('2026-11-17', -5_000)];
+    const [usd] = metricsByCurrency(inside, {
+      accounts: [acct('a', 1_000_000)],
+      ctx: { ...ctx, range: { from: '2026-11-16' } },
+      baseCurrency: 'USD',
+      balanceTrades: [before, ...inside],
+    });
+    expect(usd!.risk).toEqual(
+      riskRatios(
+        [day('2026-11-16', 10_000), day('2026-11-17', -5_000)],
+        2_000_000,
+      ),
+    );
   });
 });

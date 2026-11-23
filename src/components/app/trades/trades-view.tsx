@@ -30,6 +30,7 @@ import { metricContextOf } from '@/data/metrics';
 import { useGlobalFilters, useTradeSet } from '@/data/query/derived';
 import {
   useAccounts,
+  useCashFlows,
   useJournal,
   usePrefs,
   useStrategies,
@@ -261,6 +262,7 @@ export function TradesView(): React.JSX.Element {
   const allTrades = useTrades().data;
   const prefs = usePrefs().data;
   const accounts = useAccounts().data;
+  const flows = useCashFlows().data;
   const strategies = useStrategies().data;
   const tags = useTags().data;
   const journal = useJournal().data;
@@ -412,6 +414,7 @@ export function TradesView(): React.JSX.Element {
     !allTrades ||
     !prefs ||
     !accounts ||
+    !flows ||
     !ctx ||
     !timeZone ||
     !facts ||
@@ -460,6 +463,7 @@ export function TradesView(): React.JSX.Element {
   const summary = summarize(stripTrades, ctx);
   const pctBase = pctBaseOf({
     accounts,
+    flows,
     trades: allTrades,
     accountIds: set.data?.filters.accountIds ?? [],
     currency: stripCurrency,

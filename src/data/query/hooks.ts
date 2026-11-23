@@ -10,6 +10,7 @@ import {
 import type { ImportContext, ImportPlan } from '@/domain/import/plan';
 import type {
   Account,
+  CashFlow,
   ImportJob,
   JournalEntry,
   NoteFolder,
@@ -23,9 +24,11 @@ import type {
 } from '@/domain/types';
 import type {
   AccountPatch,
+  CashFlowPatch,
   JournalDraft,
   ManualTradeInput,
   NewAccount,
+  NewCashFlow,
   NewStrategy,
   NewTag,
   Repository,
@@ -62,6 +65,15 @@ export function usePrefs(): UseQueryResult<UserPrefs> {
   });
 }
 
+/** The prefs the user has set, apart from the defaults they lie over. */
+export function useSavedPrefs(): UseQueryResult<Partial<UserPrefs>> {
+  const repo = useRepository();
+  return useQuery({
+    queryKey: keys.prefsSaved(),
+    queryFn: () => repo.prefs.saved(),
+  });
+}
+
 /** A query in the active workspace: idle until the workspace is known. */
 function useWorkspaceQuery<T>(
   key: (ws: string) => readonly unknown[],
@@ -87,6 +99,10 @@ export function useUserAccounts(): UseQueryResult<Account[]> {
     queryKey: keys.accounts(USER_WORKSPACE.id),
     queryFn: () => repo.accounts.list(USER_WORKSPACE.id),
   });
+}
+
+export function useCashFlows(): UseQueryResult<CashFlow[]> {
+  return useWorkspaceQuery(keys.cashFlows, (r, ws) => r.cashFlows.list(ws));
 }
 
 export function useTrades(): UseQueryResult<Trade[]> {
@@ -264,6 +280,19 @@ export function useUpdatePrefs(): UseMutationResult<
   );
 }
 
+/** Forgets the saved value of each key, so it follows its default again. */
+export function useUnsetPrefs(): UseMutationResult<
+  UserPrefs,
+  Error,
+  readonly (keyof UserPrefs)[]
+> {
+  return useFixedWrite(
+    'prefs.update',
+    '',
+    (r, keys: readonly (keyof UserPrefs)[]) => r.prefs.unset(keys),
+  );
+}
+
 export function useCreateAccount(): UseMutationResult<
   Account,
   Error,
@@ -326,6 +355,34 @@ export function useClearAccountTrades(): UseMutationResult<
 > {
   return useWorkspaceWrite('accounts.clearTrades', (r, ws, id: string) =>
     r.accounts.clearTrades(ws, id),
+  );
+}
+
+export function useCreateCashFlow(): UseMutationResult<
+  CashFlow,
+  Error,
+  NewCashFlow
+> {
+  return useWorkspaceWrite('cashFlows.create', (r, ws, v: NewCashFlow) =>
+    r.cashFlows.create(ws, v),
+  );
+}
+
+export function useUpdateCashFlow(): UseMutationResult<
+  CashFlow,
+  Error,
+  { id: string; patch: CashFlowPatch }
+> {
+  return useWorkspaceWrite(
+    'cashFlows.update',
+    (r, ws, v: { id: string; patch: CashFlowPatch }) =>
+      r.cashFlows.update(ws, v.id, v.patch),
+  );
+}
+
+export function useRemoveCashFlow(): UseMutationResult<void, Error, string> {
+  return useWorkspaceWrite('cashFlows.remove', (r, ws, id: string) =>
+    r.cashFlows.remove(ws, id),
   );
 }
 

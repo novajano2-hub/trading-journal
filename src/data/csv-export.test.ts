@@ -78,7 +78,7 @@ describe('tradesCsv', () => {
       'Account,Strategies,Tags,Mistakes,Rules,Reviewed,Rating,Duration (seconds)',
     );
     expect(row).toBe(
-      'Futures main,Opening range breakout,Breakout,FOMO,1 of 2,Yes,4,300',
+      'Futures main,Opening range breakout,breakout,fomo,1 of 2,Yes,4,300',
     );
   });
 

@@ -14,10 +14,17 @@ import {
   type Drawdown,
   type EquityPoint,
 } from '../domain/metrics/equity';
+import { balanceAt, dayBefore } from '../domain/metrics/balance';
 import { riskRatios } from '../domain/metrics/risk';
 import { tradeStreaks, type StreakResult } from '../domain/metrics/streaks';
 import { summarize, type Summary } from '../domain/metrics/summary';
-import type { Account, Cents, Trade, UserPrefs } from '../domain/types';
+import type {
+  Account,
+  CashFlow,
+  Cents,
+  Trade,
+  UserPrefs,
+} from '../domain/types';
 
 export function metricContextOf(prefs: UserPrefs): MetricContext {
   return {
@@ -66,6 +73,10 @@ export function metricsByCurrency(
      * Defaults to `trades`.
      */
     dayTrades?: readonly Trade[];
+    /** The deposits and withdrawals of the workspace's accounts; the risk ratios' start balance counts those before the range. */
+    flows?: readonly CashFlow[];
+    /** Every trade of the selected accounts, whatever the other filters: what the balance before the range is booked from. Defaults to `dayTrades`. */
+    balanceTrades?: readonly Trade[];
   },
 ): CurrencyMetrics[] {
   const { accounts, ctx, baseCurrency } = opts;
@@ -76,21 +87,30 @@ export function metricsByCurrency(
     .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   return [baseCurrency, ...others].map((currency) => {
     const own = parts.get(currency) ?? [];
-    const startingBalance = accounts
-      .filter((a) => a.currency === currency)
-      .reduce((sum, a) => sum + a.startingBalance, 0);
+    const currencyAccounts = accounts.filter((a) => a.currency === currency);
+    const startingBalance = currencyAccounts.reduce(
+      (sum, a) => sum + a.startingBalance,
+      0,
+    );
     const dayOwn = dayParts.get(currency) ?? [];
     const days = dailyPnl(dayOwn, ctx);
     const netCtx = { ...ctx, pnlBasis: 'net' as const };
     const netDays = ctx.pnlBasis === 'net' ? days : dailyPnl(dayOwn, netCtx);
-    // The balance at the range start: the starting balances plus the net booked before it.
+    // The balance the day before the range starts: the starting balances,
+    // the flows dated before it and the net booked before it.
     const from = ctx.range?.from;
-    const booked =
+    const riskStart =
       from === undefined
-        ? 0
-        : dailyPnl(dayOwn, { ...netCtx, range: undefined })
-            .filter((d) => d.date < from)
-            .reduce((n, d) => n + d.net, 0);
+        ? startingBalance
+        : balanceAt(
+            currencyAccounts,
+            opts.flows ?? [],
+            (opts.balanceTrades ?? opts.dayTrades ?? trades).filter(
+              (t) => t.pnlCurrency === currency,
+            ),
+            dayBefore(from),
+            ctx,
+          );
     return {
       currency,
       trades: own,
@@ -106,7 +126,7 @@ export function metricsByCurrency(
       dayStreaks: dayStreaks(days, ctx),
       dayDurations: dayDurations(dayOwn, ctx),
       avgDailyWinRate: winRateOfDays(days),
-      risk: riskRatios(netDays, startingBalance + booked),
+      risk: riskRatios(netDays, riskStart),
     };
   });
 }

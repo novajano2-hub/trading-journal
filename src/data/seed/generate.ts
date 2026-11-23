@@ -611,9 +611,9 @@ function markReviewed(
  */
 const LATEST_MIX: readonly { broken: boolean; mistake: string }[] = [
   { broken: false, mistake: '' },
-  { broken: true, mistake: 'Moved stop' },
+  { broken: true, mistake: 'moved stop' },
   { broken: false, mistake: '' },
-  { broken: true, mistake: 'FOMO entry' },
+  { broken: true, mistake: 'fomo entry' },
   { broken: false, mistake: '' },
 ];
 

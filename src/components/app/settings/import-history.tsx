@@ -63,20 +63,7 @@ export function ImportHistory() {
   }
 
   return (
-    <div className="grid w-full grid-cols-[minmax(0,1fr)] gap-4 px-5 pt-6 pb-16">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <h2 className="text-[22px] leading-tight font-semibold tracking-[-0.03em] text-text">
-          Import history
-        </h2>
-        <Link
-          href="/app/import"
-          className={`${buttonClasses('secondary', 'sm')} ml-auto`}
-        >
-          <ArrowLeft aria-hidden="true" size={14} />
-          Back to Import
-        </Link>
-      </div>
-
+    <div className="grid w-full grid-cols-[minmax(0,1fr)] gap-4">
       {blocked ? (
         <p
           role="alert"
@@ -86,13 +73,22 @@ export function ImportHistory() {
         </p>
       ) : null}
 
-      <section className={`${CARD} overflow-hidden pt-[18px] pb-1`}>
+      <section className={`${CARD} overflow-hidden pt-[18px] pb-3`}>
         <CardHeader
           className="px-5"
           icon={ClockCounterClockwise}
           tone="accent"
           headingId="import-history-list"
-          title="Imports"
+          title="Import history"
+          end={
+            <Link
+              href="/app/import"
+              className={buttonClasses('secondary', 'sm')}
+            >
+              <ArrowLeft aria-hidden="true" size={14} />
+              Back to Import
+            </Link>
+          }
         />
         {history.status === 'error' ? (
           <p role="alert" className="px-5 pt-3 text-[13.5px] text-loss">

@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useId, type ReactNode } from 'react';
 import {
+  Archive,
   ClockCounterClockwise,
   FunnelSimple,
   ListChecks,
@@ -196,6 +197,8 @@ function PlanPreview(): React.JSX.Element {
  * Why there is nothing to show, with the way out:
  * - `no-trades`: the workspace is empty, so Import or open the sample.
  * - `no-matches`: trades exist but the filters leave none, so Clear filters.
+ * - `archived`: every account is archived, so their trades are out of view
+ *   until one is unarchived or picked in the account filter.
  * - `no-closed`: every trade shown is still open. When `filtered`, it says
  *   the filters hold none closed and offers Clear filters.
  */
@@ -205,7 +208,7 @@ export function DashboardEmpty({
   onClearFilters,
   onOpenSample,
 }: {
-  variant: 'no-trades' | 'no-matches' | 'no-closed';
+  variant: 'no-trades' | 'no-matches' | 'no-closed' | 'archived';
   /** Any filter is set. */
   filtered?: boolean;
   onClearFilters(): void;
@@ -227,6 +230,22 @@ export function DashboardEmpty({
                 Open the sample workspace
               </Button>
             </>
+          }
+        />
+      );
+    case 'archived':
+      return (
+        <StateBlock
+          visual={<IconTile icon={Archive} />}
+          title="Your trades are in archived accounts."
+          body="Unarchive an account in Settings to see its trades here, or pick it in the account filter to look at them as they are."
+          actions={
+            <Link
+              href="/app/settings/accounts"
+              className={buttonClasses('primary')}
+            >
+              Open Accounts
+            </Link>
           }
         />
       );

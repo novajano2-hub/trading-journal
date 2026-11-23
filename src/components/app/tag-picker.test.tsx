@@ -88,7 +88,7 @@ test('the arrow keys move through the options across categories', async () => {
   renderApp(<Harness onChange={onChange} />, { sample });
   const input = await box();
   await screen.findAllByRole('option');
-  // By category name, then tag name: Mistakes (FOMO, revenge), then Setups (Breakout).
+  // By category name, then tag name: Mistakes (fomo, revenge), then Setups (breakout).
   fireEvent.keyDown(input, { key: 'ArrowDown' });
   fireEvent.keyDown(input, { key: 'Enter' });
   expect(onChange).toHaveBeenLastCalledWith(['tag-revenge']);
@@ -125,8 +125,8 @@ test('a scoped picker lists and creates in its first category only', async () =>
     { sample },
   );
   const input = await box();
-  await screen.findByRole('option', { name: 'FOMO' });
-  expect(screen.queryByRole('option', { name: 'Breakout' })).toBeNull();
+  await screen.findByRole('option', { name: 'fomo' });
+  expect(screen.queryByRole('option', { name: 'breakout' })).toBeNull();
   fireEvent.change(input, { target: { value: 'chased' } });
   fireEvent.keyDown(input, { key: 'Enter' });
   await waitFor(() => expect(onChange).toHaveBeenCalled());

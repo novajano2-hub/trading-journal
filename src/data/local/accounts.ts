@@ -41,21 +41,29 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
 
     async remove(ws, id) {
       const db = await ctx.db();
-      await rwTx(db, [db.accounts, db.trades, db.imports], async () => {
-        if (!(await db.accounts.get([ws, id])))
-          throw new NotFoundError('account', id);
-        const trades = await db.trades
-          .where('[workspaceId+accountId]')
-          .equals([ws, id])
-          .count();
-        if (trades > 0) throw new Error('account has trades');
-        // Undone imports keep their history rows; they go with the account.
-        await db.imports
-          .where('[workspaceId+accountId]')
-          .equals([ws, id])
-          .delete();
-        await db.accounts.delete([ws, id]);
-      });
+      await rwTx(
+        db,
+        [db.accounts, db.trades, db.imports, db.cashflows],
+        async () => {
+          if (!(await db.accounts.get([ws, id])))
+            throw new NotFoundError('account', id);
+          const trades = await db.trades
+            .where('[workspaceId+accountId]')
+            .equals([ws, id])
+            .count();
+          if (trades > 0) throw new Error('account has trades');
+          // Undone imports keep their history rows; they go with the account.
+          await db.imports
+            .where('[workspaceId+accountId]')
+            .equals([ws, id])
+            .delete();
+          await db.cashflows
+            .where('[workspaceId+accountId]')
+            .equals([ws, id])
+            .delete();
+          await db.accounts.delete([ws, id]);
+        },
+      );
     },
 
     async clearTrades(ws, id) {

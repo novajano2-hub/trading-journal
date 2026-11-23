@@ -112,8 +112,8 @@ test('tags have a category select', async () => {
   });
   const page = await screen.findByTestId('reports-tags');
   const table = () => within(page).getByRole('table', { name: 'Tags summary' });
-  expect(rowOf(table(), /^Breakout/)).toBeTruthy();
-  expect(rowOf(table(), /^FOMO/)).toBeTruthy();
+  expect(rowOf(table(), /^breakout/)).toBeTruthy();
+  expect(rowOf(table(), /^fomo/)).toBeTruthy();
   const select = within(page).getByLabelText('Category') as HTMLSelectElement;
   expect([...select.options].map((o) => o.textContent)).toEqual([
     'All categories',
@@ -122,8 +122,8 @@ test('tags have a category select', async () => {
     'Setups',
   ]);
   fireEvent.change(select, { target: { value: 'mistakes' } });
-  expect(within(table()).queryByRole('row', { name: /^Breakout/ })).toBeNull();
-  expect(rowOf(table(), /^FOMO/).getAllByRole('cell')[4]!.textContent).toBe(
+  expect(within(table()).queryByRole('row', { name: /^breakout/ })).toBeNull();
+  expect(rowOf(table(), /^fomo/).getAllByRole('cell')[4]!.textContent).toBe(
     '−$40.00',
   );
   expect(new URLSearchParams(window.location.search).get('cat')).toBe(
@@ -203,7 +203,7 @@ test('in R the matrix cells read in R', async () => {
   expect(es[1]!.textContent).toContain('−1.00R');
 });
 
-/** The breakdown sample, with a second "FOMO" tag in another category on the two NQ trades. */
+/** The breakdown sample, with a second "fomo" tag in another category on the two NQ trades. */
 async function twinTags(): Promise<SampleWorkspace> {
   const s = await breakdownSample();
   s.tags.push({
@@ -226,8 +226,8 @@ test('two tags with one name in different categories stay apart under a category
   });
   const page = await screen.findByTestId('reports-tags');
   const table = within(page).getByRole('table', { name: 'Tags summary' });
-  // Mistakes holds only the first FOMO (b-2, -$40.00), not the Custom tags one.
-  const rows = within(table).getAllByRole('row', { name: /^FOMO/ });
+  // Mistakes holds only the first fomo (b-2, -$40.00), not the Custom tags one.
+  const rows = within(table).getAllByRole('row', { name: /^fomo/ });
   expect(rows).toHaveLength(1);
   expect(within(rows[0]!).getAllByRole('cell')[4]!.textContent).toBe('−$40.00');
   cleanup();
@@ -238,9 +238,9 @@ test('two tags with one name in different categories stay apart under a category
   const all = await screen.findByTestId('reports-tags');
   const matrix = within(all).getByRole('table', { name: 'Tags by side' });
   const text = within(matrix)
-    .getAllByRole('row', { name: /^FOMO/ })
+    .getAllByRole('row', { name: /^fomo/ })
     .map((r) => r.textContent!);
-  // Mistakes FOMO: one short loss. Custom tags FOMO: a long win and a short loss.
+  // Mistakes fomo: one short loss. Custom tags fomo: a long win and a short loss.
   const mistakes = text.find((t) => t.includes('−$40.00'))!;
   const custom = text.find((t) => t.includes('+$70.00'))!;
   expect(mistakes).toBeTruthy();

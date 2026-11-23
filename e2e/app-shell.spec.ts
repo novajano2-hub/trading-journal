@@ -58,6 +58,15 @@ test('every app route renders its title without overflow; placeholders state it 
       await expect(
         page.getByRole('list', { name: 'Notes' }).getByRole('listitem'),
       ).toHaveCount(115, { timeout: 20_000 });
+    // Settings opens on Profile, with its five sections.
+    if (path === '/app/settings') {
+      await expect(page).toHaveURL(/\/app\/settings\/profile$/);
+      await expect(
+        page
+          .getByRole('navigation', { name: 'Settings' })
+          .locator('a[aria-current="page"]'),
+      ).toHaveText('Profile');
+    }
     if (path === '/app/reports')
       await expect(page.getByTestId('reports-overview')).toBeVisible({
         timeout: 20_000,
@@ -77,6 +86,7 @@ test('every app route renders its title without overflow; placeholders state it 
         '/app/reports',
         '/app/strategies',
         '/app/notebook',
+        '/app/settings',
       ].includes(path)
     ) {
       await expect(page.locator('main')).toContainText(
@@ -288,7 +298,7 @@ test('Tab walks the top bar in the order it reads: title, chips, search, Display
       'AUDUSD, BTCUSD',
       'Short',
       'Opening range breakout',
-      'Trend continuation',
+      'trend continuation',
       'More filters',
       'Clear filters',
     ].map(chip),

@@ -469,7 +469,7 @@ test('a trade that broke two rules and carries two mistakes', async () => {
       s.tags.push({
         id: 'tag-size',
         workspaceId: 'sample',
-        name: 'Oversized',
+        name: 'oversized',
         categoryId: 'mistakes',
       });
       const f1 = s.trades.find((t) => t.id === 'f-1')!;
@@ -499,7 +499,7 @@ test('a trade that broke two rules and carries two mistakes', async () => {
   expect(row.textContent).toContain(`Broke: ${r1} and ${r2}`);
   // The first mistake as a chip, then +1 that names the rest.
   expect(row.textContent).toContain(fomo);
-  const more = within(row).getByTitle('Oversized');
+  const more = within(row).getByTitle('oversized');
   expect(more.textContent).toContain('+1');
 });
 

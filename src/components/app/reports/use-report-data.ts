@@ -11,7 +11,12 @@ import {
   useMetrics,
   useTradeSet,
 } from '@/data/query/derived';
-import { useAccounts, usePrefs, useTrades } from '@/data/query/hooks';
+import {
+  useAccounts,
+  useCashFlows,
+  usePrefs,
+  useTrades,
+} from '@/data/query/hooks';
 import { StorageUnavailableError } from '@/data/repository';
 import type { MetricContext } from '@/domain/metrics/context';
 import { localDate } from '@/domain/time';
@@ -73,13 +78,14 @@ export function useReportData(): ReportState {
   const metrics = useMetrics(filters);
   const prefs = usePrefs().data;
   const accounts = useAccounts().data;
+  const flows = useCashFlows().data;
   const allTrades = useTrades().data;
   const queryClient = useQueryClient();
   const chosen = useSearchParams().get('cur') ?? undefined;
 
   const shown = set.data?.filters;
   const view = useMemo(() => {
-    if (!metrics.data || !shown || !prefs || !accounts || !allTrades)
+    if (!metrics.data || !shown || !prefs || !accounts || !flows || !allTrades)
       return undefined;
     const today = localDate(new Date().toISOString(), prefs.timeZone);
     const withClosed = metrics.data.filter((m) => m.summary.closedCount > 0);
@@ -96,6 +102,7 @@ export function useReportData(): ReportState {
       ctx,
       pctBase: pctBaseOf({
         accounts,
+        flows,
         trades: allTrades,
         accountIds: shown.accountIds,
         currency: partition.currency,
@@ -112,7 +119,7 @@ export function useReportData(): ReportState {
       currencies: withClosed.map((m) => m.currency),
       caption: rangeCaption(range, today),
     };
-  }, [metrics.data, shown, prefs, accounts, allTrades, chosen]);
+  }, [metrics.data, shown, prefs, accounts, flows, allTrades, chosen]);
 
   const setCurrency = useCallback((c: string) => writeParam('cur', c), []);
 

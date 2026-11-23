@@ -31,6 +31,7 @@ import { metricContextOf } from '@/data/metrics';
 import { useGlobalFilters } from '@/data/query/derived';
 import {
   useAccounts,
+  useCashFlows,
   usePrefs,
   useStrategies,
   useTagCategories,
@@ -45,6 +46,7 @@ import { localDate } from '@/domain/time';
 import { isClosed } from '@/domain/trade-status';
 import type {
   Account,
+  CashFlow,
   Strategy,
   Tag,
   TagCategory,
@@ -404,6 +406,7 @@ function alignCumulative(
 interface Loaded {
   trades: Trade[];
   accounts: Account[];
+  flows: CashFlow[];
   strategies: Strategy[];
   tags: Tag[];
   categories: TagCategory[];
@@ -413,6 +416,7 @@ interface Loaded {
 function Compared({
   trades,
   accounts,
+  flows,
   strategies,
   tags,
   categories,
@@ -501,6 +505,7 @@ function Compared({
           // Each group's own accounts, at the start of its own range.
           pctBase: pctBaseOf({
             accounts,
+            flows,
             trades,
             accountIds: filters[i]!.accountIds,
             currency,
@@ -509,7 +514,7 @@ function Compared({
           }),
         };
       }),
-    [picked, currency, base, accounts, trades, filters, prefs.timeZone],
+    [picked, currency, base, accounts, flows, trades, filters, prefs.timeZone],
   );
   const lines = useMemo(
     () => alignCumulative(results.map((r) => r.cumulative)),
@@ -524,13 +529,14 @@ function Compared({
       ctx: base,
       pctBase: pctBaseOf({
         accounts,
+        flows,
         trades,
         accountIds: [],
         currency,
         timeZone: prefs.timeZone,
       }),
     }),
-    [trades, currency, base, accounts, prefs.timeZone],
+    [trades, currency, base, accounts, flows, prefs.timeZone],
   );
 
   const symbols = useMemo(() => symbolOptions(trades), [trades]);
@@ -784,6 +790,7 @@ function Compared({
 export function CompareView(): React.JSX.Element {
   const trades = useTrades();
   const accounts = useAccounts();
+  const flows = useCashFlows();
   const strategies = useStrategies();
   const tags = useTags();
   const categories = useTagCategories();
@@ -791,6 +798,7 @@ export function CompareView(): React.JSX.Element {
   const error =
     trades.error ??
     accounts.error ??
+    flows.error ??
     strategies.error ??
     tags.error ??
     categories.error ??
@@ -815,6 +823,7 @@ export function CompareView(): React.JSX.Element {
   if (
     !trades.data ||
     !accounts.data ||
+    !flows.data ||
     !strategies.data ||
     !tags.data ||
     !categories.data ||
@@ -838,6 +847,7 @@ export function CompareView(): React.JSX.Element {
     <Compared
       trades={trades.data}
       accounts={accounts.data}
+      flows={flows.data}
       strategies={strategies.data}
       tags={tags.data}
       categories={categories.data}

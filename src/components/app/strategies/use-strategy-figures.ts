@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { metricContextOf } from '@/data/metrics';
 import {
   useAccounts,
+  useCashFlows,
   usePrefs,
   useStrategies,
   useTrades,
@@ -67,11 +68,22 @@ export function useStrategyData(): {
   const strategies = useStrategies();
   const prefs = usePrefs();
   const accounts = useAccounts();
+  const flows = useCashFlows();
   const error =
-    trades.error ?? strategies.error ?? prefs.error ?? accounts.error;
+    trades.error ??
+    strategies.error ??
+    prefs.error ??
+    accounts.error ??
+    flows.error;
 
   const data = useMemo(() => {
-    if (!trades.data || !strategies.data || !prefs.data || !accounts.data)
+    if (
+      !trades.data ||
+      !strategies.data ||
+      !prefs.data ||
+      !accounts.data ||
+      !flows.data
+    )
       return undefined;
     const ctx = metricContextOf(prefs.data);
     const base = prefs.data.baseCurrency;
@@ -140,6 +152,7 @@ export function useStrategyData(): {
         ctx,
         pctBase: pctBaseOf({
           accounts: accounts.data,
+          flows: flows.data,
           trades: trades.data,
           accountIds: [],
           currency: base,
@@ -153,7 +166,7 @@ export function useStrategyData(): {
       },
       basis: ctx.pnlBasis,
     } satisfies StrategyData;
-  }, [trades.data, strategies.data, prefs.data, accounts.data]);
+  }, [trades.data, strategies.data, prefs.data, accounts.data, flows.data]);
 
   return { data, error };
 }

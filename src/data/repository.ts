@@ -7,6 +7,7 @@ import type { ManualTradeError } from '@/domain/manual-trade';
 import { isValidTimeZone } from '@/domain/time';
 import type {
   Account,
+  CashFlow,
   Cents,
   ImportJob,
   Instrument,
@@ -89,6 +90,10 @@ export interface PrefsRepo {
    * an unknown display unit, or calendar stats that aren't 1 to 3 known ones.
    */
   update(patch: Partial<UserPrefs>): Promise<UserPrefs>;
+  /** Only the prefs the user has set: the rest follow the defaults (the browser's time zone, say). */
+  saved(): Promise<Partial<UserPrefs>>;
+  /** Forgets the saved value of each key, so it follows the default again. Returns the prefs as they are then. */
+  unset(keys: readonly (keyof UserPrefs)[]): Promise<UserPrefs>;
 }
 
 // Workspace-scoped repositories: every call takes the workspace id.
@@ -175,7 +180,7 @@ export interface AccountsRepo {
   list(ws: string): Promise<Account[]>;
   create(ws: string, input: NewAccount): Promise<Account>;
   update(ws: string, id: string, patch: AccountPatch): Promise<Account>;
-  /** Throws `Error('account has trades')` while it has any: clear or archive it first. */
+  /** Also deletes the account's cash flows. Throws `Error('account has trades')` while it has any: clear or archive it first. */
   remove(ws: string, id: string): Promise<void>;
   /** Removes its trades (and their journal links) and import jobs; returns the count of trades. */
   clearTrades(ws: string, id: string): Promise<number>;
@@ -352,11 +357,28 @@ export interface ImportRepo {
   undo(ws: string, jobId: string): Promise<UndoResult>;
 }
 
+export type NewCashFlow = Omit<CashFlow, 'id' | 'workspaceId'>;
+export type CashFlowPatch = Partial<NewCashFlow>;
+export interface CashFlowsRepo {
+  /** Newest date first. */
+  list(ws: string): Promise<CashFlow[]>;
+  /**
+   * The note is trimmed (an empty one is left out). Throws NotFoundError for
+   * an unknown account and RangeError for a date that isn't a real
+   * YYYY-MM-DD or an amount that isn't a nonzero whole number of cents.
+   */
+  create(ws: string, input: NewCashFlow): Promise<CashFlow>;
+  /** As `create` for what it sets; a `note` of undefined keeps it, an empty one clears it. */
+  update(ws: string, id: string, patch: CashFlowPatch): Promise<CashFlow>;
+  remove(ws: string, id: string): Promise<void>;
+}
+
 export interface Repository {
   workspaces: WorkspacesRepo;
   prefs: PrefsRepo;
   trades: TradesRepo;
   accounts: AccountsRepo;
+  cashFlows: CashFlowsRepo;
   strategies: StrategiesRepo;
   tags: TagsRepo;
   tagCategories: TagCategoriesRepo;

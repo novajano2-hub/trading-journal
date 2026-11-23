@@ -14,6 +14,7 @@ import {
 } from '@/data/query/derived';
 import {
   useAccounts,
+  useCashFlows,
   useActiveWorkspace,
   usePrefs,
   useSetActiveWorkspace,
@@ -112,6 +113,7 @@ export function DashboardView(): React.JSX.Element {
   const workspace = useActiveWorkspace();
   const allTrades = useTrades().data;
   const accounts = useAccounts().data;
+  const flows = useCashFlows().data;
   const strategies = useStrategies().data;
   const tags = useTags().data;
   const categories = useTagCategories().data;
@@ -145,6 +147,7 @@ export function DashboardView(): React.JSX.Element {
       !tags ||
       !categories ||
       !accounts ||
+      !flows ||
       !allTrades ||
       today === undefined
     )
@@ -186,6 +189,7 @@ export function DashboardView(): React.JSX.Element {
     // What the display units divide by, and the trades behind each figure.
     const pctBase = pctBaseOf({
       accounts,
+      flows,
       trades: allTrades,
       accountIds: shownFilters.accountIds,
       currency: partition.currency,
@@ -242,6 +246,7 @@ export function DashboardView(): React.JSX.Element {
     tags,
     categories,
     accounts,
+    flows,
     allTrades,
     today,
     currency,
@@ -275,12 +280,20 @@ export function DashboardView(): React.JSX.Element {
   if (allTrades.length === 0 || !view.model) {
     const filtered = hasActiveFilters(shownFilters);
     // No matches only when the filters leave no trade at all; open trades in them are "no closed".
+    // Every account archived and none picked: the trades are there, out of view (E57).
+    const allArchived =
+      accounts !== undefined &&
+      accounts.length > 0 &&
+      accounts.every((a) => a.status === 'archived') &&
+      shownFilters.accountIds.length === 0;
     const variant =
       allTrades.length === 0
         ? 'no-trades'
-        : filtered && set.data?.trades.length === 0
-          ? 'no-matches'
-          : 'no-closed';
+        : allArchived
+          ? 'archived'
+          : filtered && set.data?.trades.length === 0
+            ? 'no-matches'
+            : 'no-closed';
     return (
       <DashboardEmpty
         variant={variant}

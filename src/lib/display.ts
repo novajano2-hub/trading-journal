@@ -3,10 +3,16 @@
 import { createContext, useContext } from 'react';
 import { metricContextOf } from '@/data/metrics';
 import { usePrefs } from '@/data/query/hooks';
+import { balanceAt, dayBefore } from '@/domain/metrics/balance';
 import { costBasis, pnlOf, type MetricContext } from '@/domain/metrics/context';
 import { rOf } from '@/domain/metrics/summary';
-import { localDate } from '@/domain/time';
-import type { Account, Cents, DisplayUnit, Trade } from '@/domain/types';
+import type {
+  Account,
+  CashFlow,
+  Cents,
+  DisplayUnit,
+  Trade,
+} from '@/domain/types';
 import { formatMoney, formatPnl, plural } from './format';
 
 /** The units a figure can carry besides dollars and a percentage. */
@@ -204,36 +210,38 @@ export function formatFigure(
 }
 
 /**
- * What the percentage is measured against: the selected accounts' starting
- * balances plus the net they realized before the range began (the whole
- * history's start when the range is open). Null with no accounts, or no
- * capital. Cash flows are not in it yet.
+ * What the percentage is measured against: the selected accounts' balance the
+ * day before the range began (their starting balances, the deposits and
+ * withdrawals dated before it and the net their exits realized before it; the
+ * starting balances alone when the range is open). Only active accounts
+ * count unless some are picked, and then those, archived or not. Null with
+ * no accounts, or no capital.
  */
 export function pctBaseOf(args: {
   accounts: readonly Account[];
+  flows: readonly CashFlow[];
   trades: readonly Trade[];
-  /** Empty: every account. */
+  /** Empty: every active account. */
   accountIds: readonly string[];
   currency?: string;
   /** The range's first local date; undefined: open. */
   from?: string;
   timeZone?: string;
 }): Cents | null {
+  const picked = new Set(args.accountIds);
   const chosen = args.accounts.filter(
     (a) =>
-      (args.accountIds.length === 0 || args.accountIds.includes(a.id)) &&
+      (picked.size === 0 ? a.status === 'active' : picked.has(a.id)) &&
       (args.currency === undefined || a.currency === args.currency),
   );
   if (chosen.length === 0) return null;
-  const ids = new Set(chosen.map((a) => a.id));
-  let base = chosen.reduce((n, a) => n + a.startingBalance, 0);
   const { from } = args;
-  if (from !== undefined)
-    for (const t of args.trades) {
-      if (!ids.has(t.accountId) || t.status !== 'closed' || !t.closedAt)
-        continue;
-      if (localDate(t.closedAt, args.timeZone ?? 'UTC') < from) base += t.net;
-    }
+  const base =
+    from === undefined
+      ? chosen.reduce((n, a) => n + a.startingBalance, 0)
+      : balanceAt(chosen, args.flows, args.trades, dayBefore(from), {
+          timeZone: args.timeZone ?? 'UTC',
+        });
   return base > 0 ? base : null;
 }
 

@@ -97,8 +97,8 @@ test('lists come back in their documented order', async () => {
   expect((await repo.tags.list(S)).map((t) => t.name)).toEqual([
     'anxious',
     'early',
-    'FOMO',
-    'Breakout',
+    'fomo',
+    'breakout',
   ]);
 });
 
@@ -822,7 +822,7 @@ test('undefined on a required field leaves it unchanged; on propRules it clears'
     name: undefined,
     categoryId: undefined,
   });
-  expect(tag).toMatchObject({ name: 'FOMO', categoryId: 'mistakes' });
+  expect(tag).toMatchObject({ name: 'fomo', categoryId: 'mistakes' });
 });
 
 test('a patch carrying a foreign id or workspaceId still updates the original row', async () => {

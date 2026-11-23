@@ -99,13 +99,13 @@ export function fixtureSample(): SampleWorkspace {
       {
         id: 'tag-setup',
         workspaceId: WS,
-        name: 'Breakout',
+        name: 'breakout',
         categoryId: 'setups',
       },
       {
         id: 'tag-fomo',
         workspaceId: WS,
-        name: 'FOMO',
+        name: 'fomo',
         categoryId: 'mistakes',
         description: 'Entered because the move was running away.',
       },

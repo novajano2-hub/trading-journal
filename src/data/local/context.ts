@@ -66,9 +66,14 @@ export function createLocalContext(opts: LocalContextOptions): LocalContext {
         await writeSample(db, sample, at);
       });
     }
-    await db.transaction('rw', [db.tagCategories, db.templates], async () => {
-      for (const w of WORKSPACES) await writeBuiltIns(db, w.id);
-    });
+    await db.transaction(
+      'rw',
+      [db.tagCategories, db.templates, db.tags],
+      async () => {
+        for (const w of WORKSPACES) await writeBuiltIns(db, w.id);
+        await lowercaseTagNames(db);
+      },
+    );
     return db;
   }
 
@@ -148,4 +153,29 @@ export async function writeBuiltIns(db: KeelDb, ws: string): Promise<void> {
   await db.templates.bulkPut(
     templates.filter((_, i) => haveTemplates[i] === undefined),
   );
+}
+
+/**
+ * Tag names are stored lowercase, as TradeZella stores them. Names written
+ * before that rule (the v1 sample, a v1 import) have their capitals taken
+ * out. A name another tag in the same category already has is left as it
+ * is, so the fix never merges or collides; running it again changes nothing.
+ * Call inside an rw transaction over `tags`.
+ */
+export async function lowercaseTagNames(db: KeelDb): Promise<void> {
+  const rows = await db.tags.toArray();
+  const taken = new Set(
+    rows.map((t) => `${t.workspaceId}\u0000${t.categoryId}\u0000${t.name}`),
+  );
+  const changed = [];
+  for (const t of rows) {
+    const lower = t.name.toLowerCase();
+    if (lower === t.name) continue;
+    const key = `${t.workspaceId}\u0000${t.categoryId}\u0000${lower}`;
+    if (taken.has(key)) continue;
+    taken.delete(`${t.workspaceId}\u0000${t.categoryId}\u0000${t.name}`);
+    taken.add(key);
+    changed.push({ ...t, name: lower });
+  }
+  if (changed.length > 0) await db.tags.bulkPut(changed);
 }

@@ -32,7 +32,7 @@ const START = Date.UTC(2026, 10, 2, 14, 0);
 /**
  * 120 closed trades, serial 1 to 120, opened ten minutes apart. Trade n nets
  * (121 - n) x $10, so the newest open is the smallest net. Even serials follow
- * Opening range breakout; serial 7 carries the Breakout tag.
+ * Opening range breakout; serial 7 carries the breakout tag.
  */
 function sample(opts: { open?: number } = {}) {
   return async (): Promise<SampleWorkspace> => {
@@ -402,7 +402,7 @@ test('a mistake shows in the Tags cell in the warn tone, ahead of the other tags
     expect(bodyRows(t).some((r) => idOf(r) === 't-7')).toBe(true),
   );
   const row = bodyRows(t).find((r) => idOf(r) === 't-7')!;
-  const warn = within(row).getByText('FOMO');
+  const warn = within(row).getByText('fomo');
   expect(warn.closest('span[class*="warn"]')).not.toBeNull();
   expect(within(row).getByText('+1')).toBeTruthy();
 });

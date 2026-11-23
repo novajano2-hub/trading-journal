@@ -7,10 +7,12 @@ export const keys = {
   workspaces: () => ['keel', 'workspaces'] as const,
   activeWorkspace: () => ['keel', 'active-workspace'] as const,
   prefs: () => ['keel', 'prefs'] as const,
+  prefsSaved: () => ['keel', 'prefs', 'saved'] as const,
   workspace: (ws: string) => W(ws),
   trades: (ws: string) => [...W(ws), 'trades'] as const,
   trade: (ws: string, id: string) => [...W(ws), 'trades', id] as const,
   accounts: (ws: string) => [...W(ws), 'accounts'] as const,
+  cashFlows: (ws: string) => [...W(ws), 'cash-flows'] as const,
   strategies: (ws: string) => [...W(ws), 'strategies'] as const,
   strategy: (ws: string, id: string) => [...W(ws), 'strategies', id] as const,
   tags: (ws: string) => [...W(ws), 'tags'] as const,
@@ -41,6 +43,9 @@ export type WriteKind =
   | 'accounts.update'
   | 'accounts.remove'
   | 'accounts.clearTrades'
+  | 'cashFlows.create'
+  | 'cashFlows.update'
+  | 'cashFlows.remove'
   | 'strategies.create'
   | 'strategies.update'
   | 'strategies.remove'
@@ -101,7 +106,12 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
         keys.trades(ws),
         keys.journal(ws),
         keys.imports(ws),
+        keys.cashFlows(ws),
       ];
+    case 'cashFlows.create':
+    case 'cashFlows.update':
+    case 'cashFlows.remove':
+      return [keys.cashFlows(ws)];
     case 'strategies.create':
       return [keys.strategies(ws)];
     case 'strategies.update':
@@ -113,8 +123,10 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
     case 'tags.remove':
       return [keys.tags(ws), keys.trades(ws), keys.imports(ws)];
     case 'tagCategories.create':
-    case 'tagCategories.update':
       return [keys.tagCategories(ws)];
+    // Tags sort by their category's name.
+    case 'tagCategories.update':
+      return [keys.tagCategories(ws), keys.tags(ws)];
     case 'tagCategories.remove':
       return [
         keys.tagCategories(ws),

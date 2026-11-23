@@ -28,7 +28,7 @@ const START = Date.UTC(2026, 10, 2, 14, 0);
 
 /**
  * 60 closed trades (serial 1 to 60, newest open first in the log). Trade 59
- * and 60 carry the Breakout tag; trade 58 follows str-1 with a rule check.
+ * and 60 carry the breakout tag; trade 58 follows str-1 with a rule check.
  * `open` imported open trades, serials 201 up.
  */
 function sample(opts: { openImported?: number } = {}) {
@@ -119,7 +119,7 @@ test('Tag adds a tag to the three trades and keeps their old tags', async () => 
     sample: sample(),
     url: '/app/trades',
   });
-  // Rows newest first: serials 60, 59 (tagged Breakout) and 58.
+  // Rows newest first: serials 60, 59 (tagged breakout) and 58.
   await select(3);
   fireEvent.click(within(await bar()).getByRole('button', { name: /^Tag/ }));
   const input = await screen.findByRole('combobox', { name: 'Tags to add' });

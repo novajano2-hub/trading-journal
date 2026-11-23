@@ -31,7 +31,8 @@ test('Plan 5 writes invalidate what they change', () => {
     names.map((n) => (keys[n] as (w: string) => readonly unknown[])(ws));
   const table: [Parameters<typeof invalidationsFor>[0], unknown[]][] = [
     ['tagCategories.create', k('tagCategories')],
-    ['tagCategories.update', k('tagCategories')],
+    // Tags sort by their category's name.
+    ['tagCategories.update', k('tagCategories', 'tags')],
     ['tagCategories.remove', k('tagCategories', 'tags', 'trades', 'imports')],
     ['folders.create', k('folders')],
     ['folders.rename', k('folders')],
@@ -43,6 +44,13 @@ test('Plan 5 writes invalidate what they change', () => {
     ['trades.replaceManual', k('trades', 'imports')],
     ['trades.updateMany', k('trades', 'imports')],
     ['accounts.clearTrades', k('trades', 'journal', 'imports')],
+    [
+      'accounts.remove',
+      k('accounts', 'trades', 'journal', 'imports', 'cashFlows'),
+    ],
+    ['cashFlows.create', k('cashFlows')],
+    ['cashFlows.update', k('cashFlows')],
+    ['cashFlows.remove', k('cashFlows')],
     ['journal.trash', k('journal')],
     ['journal.restore', k('journal')],
     ['journal.ensureTradeNote', k('journal', 'trades', 'imports')],

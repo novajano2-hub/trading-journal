@@ -80,14 +80,14 @@ test('a strategy result sets the filters on a filter-scoped page, and only adds'
 
 test('a tag result sets the filters in place', async () => {
   const box = renderSearch('/app/trades');
-  await find(box, 'fomo', 'FOMO');
+  await find(box, 'fomo', 'fomo');
   fireEvent.click(screen.getAllByRole('option')[0]!);
   await waitFor(() => expect(window.location.search).toBe('?tag=tag-fomo'));
 });
 
 test('off a filter-scoped page a result opens the dashboard with the filter', async () => {
   const box = renderSearch('/app/import');
-  await find(box, 'fomo', 'FOMO');
+  await find(box, 'fomo', 'fomo');
   fireEvent.click(screen.getAllByRole('option')[0]!);
   expect(push).toHaveBeenCalledWith('/app/dashboard?tag=tag-fomo');
 });

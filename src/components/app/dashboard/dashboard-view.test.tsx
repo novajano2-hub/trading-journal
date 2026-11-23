@@ -318,7 +318,7 @@ test("a mistake's rows list only the trade's other mistakes", async () => {
       s.tags.push({
         id: 'tag-size',
         workspaceId: 'sample',
-        name: 'Oversized',
+        name: 'oversized',
         categoryId: 'mistakes',
       });
       s.trades.find((t) => t.id === 'f-1')!.tagIds = ['tag-fomo', 'tag-size'];
@@ -338,7 +338,7 @@ test("a mistake's rows list only the trade's other mistakes", async () => {
       .map((h) => h.textContent),
   ).toContain('Other mistakes');
   const [f1, f2] = within(dialog).getAllByRole('row').slice(1);
-  expect(f1!.textContent).toContain('Oversized');
+  expect(f1!.textContent).toContain('oversized');
   expect(f1!.textContent).not.toContain(fomo);
   expect(f2!.textContent).not.toContain(fomo);
   expect(f2!.textContent).toContain('None');
@@ -667,8 +667,23 @@ test("a trade with no mistake in a rule's drill-down can be tagged on the spot (
   const picker = await screen.findByRole('combobox', { name: 'Mistakes' });
   // Only the mistake categories are listed.
   await screen.findByRole('option', { name: fomo });
-  expect(screen.queryByRole('option', { name: 'Breakout' })).toBeNull();
+  expect(screen.queryByRole('option', { name: 'breakout' })).toBeNull();
   fireEvent.change(picker, { target: { value: 'fom' } });
   fireEvent.keyDown(picker, { key: 'Enter' });
   await waitFor(async () => expect(await count()).toBe(before + 1));
+});
+
+test('a workspace whose accounts are all archived says where the trades are, with a link to Accounts', async () => {
+  renderApp(<DashboardView />, {
+    sample: sampleWith((s) => {
+      for (const a of s.accounts) a.status = 'archived';
+    }),
+  });
+  expect(
+    await screen.findByText('Your trades are in archived accounts.'),
+  ).toBeTruthy();
+  expect(
+    screen.getByRole('link', { name: 'Open Accounts' }).getAttribute('href'),
+  ).toBe('/app/settings/accounts');
+  expect(screen.queryByText('No trades match these filters.')).toBeNull();
 });

@@ -52,7 +52,7 @@ export const STRATEGY_SEEDS: readonly StrategySeed[] = [
       'No major news in the next 30 minutes',
       'Size set from the stop',
     ],
-    setupTag: 'Opening range',
+    setupTag: 'opening range',
     icon: 'target',
     tone: 'accent',
   },
@@ -75,7 +75,7 @@ export const STRATEGY_SEEDS: readonly StrategySeed[] = [
       'Pullback depth is shallow',
       'Stop and target placed before entry',
     ],
-    setupTag: 'Pullback',
+    setupTag: 'pullback',
     icon: 'trend-up',
     tone: 'gain',
   },
@@ -103,7 +103,7 @@ export const STRATEGY_SEEDS: readonly StrategySeed[] = [
       'Not trading against a trend day',
       'Calm, not chasing',
     ],
-    setupTag: 'Reversal',
+    setupTag: 'reversal',
     icon: 'crosshair',
     tone: 'warn',
   },
@@ -128,7 +128,7 @@ export const STRATEGY_SEEDS: readonly StrategySeed[] = [
       'Spread is normal',
       'Stop distance fits the daily range',
     ],
-    setupTag: 'Trend continuation',
+    setupTag: 'trend continuation',
     icon: 'lightning',
     tone: 'info',
   },
@@ -141,58 +141,58 @@ export interface TagSeed {
 }
 
 export const TAG_SEEDS: readonly TagSeed[] = [
-  { name: 'Opening range', category: 'setups' },
-  { name: 'Pullback', category: 'setups' },
-  { name: 'Reversal', category: 'setups' },
-  { name: 'Trend continuation', category: 'setups' },
+  { name: 'opening range', category: 'setups' },
+  { name: 'pullback', category: 'setups' },
+  { name: 'reversal', category: 'setups' },
+  { name: 'trend continuation', category: 'setups' },
   {
-    name: 'FOMO entry',
+    name: 'fomo entry',
     category: 'mistakes',
     description: 'Entered because the move was leaving without me.',
   },
   {
-    name: 'Moved stop',
+    name: 'moved stop',
     category: 'mistakes',
     description: 'Moved the stop away from price instead of taking the loss.',
   },
   {
-    name: 'Oversized',
+    name: 'oversized',
     category: 'mistakes',
     description: 'Traded more size than the stop allowed.',
   },
   {
-    name: 'Early exit',
+    name: 'early exit',
     category: 'mistakes',
     description: 'Closed a working trade before the plan said to.',
   },
   {
-    name: 'Revenge trade',
+    name: 'revenge trade',
     category: 'mistakes',
     description: 'Traded to win back the last loss.',
   },
-  { name: 'Confident', category: 'emotions' },
-  { name: 'Calm', category: 'emotions' },
-  { name: 'Anxious', category: 'emotions' },
-  { name: 'Frustrated', category: 'emotions' },
-  { name: 'Impatient', category: 'emotions' },
-  { name: 'A+ setup', category: 'custom' },
-  { name: 'News day', category: 'custom' },
-  { name: 'Low volume', category: 'custom' },
+  { name: 'confident', category: 'emotions' },
+  { name: 'calm', category: 'emotions' },
+  { name: 'anxious', category: 'emotions' },
+  { name: 'frustrated', category: 'emotions' },
+  { name: 'impatient', category: 'emotions' },
+  { name: 'a+ setup', category: 'custom' },
+  { name: 'news day', category: 'custom' },
+  { name: 'low volume', category: 'custom' },
 ];
-export const POSITIVE_EMOTIONS = ['Confident', 'Calm'] as const;
+export const POSITIVE_EMOTIONS = ['confident', 'calm'] as const;
 export const NEGATIVE_EMOTIONS = [
-  'Anxious',
-  'Frustrated',
-  'Impatient',
+  'anxious',
+  'frustrated',
+  'impatient',
 ] as const;
 export const MISTAKE_NAMES = [
-  'FOMO entry',
-  'Moved stop',
-  'Oversized',
-  'Early exit',
-  'Revenge trade',
+  'fomo entry',
+  'moved stop',
+  'oversized',
+  'early exit',
+  'revenge trade',
 ] as const;
-export const CUSTOM_NAMES = ['A+ setup', 'News day', 'Low volume'] as const;
+export const CUSTOM_NAMES = ['a+ setup', 'news day', 'low volume'] as const;
 
 /** Phrase banks for journal bodies. */
 export const PHRASES = {
