@@ -3,6 +3,7 @@ import { EMPTY_FILTERS } from '@/data/filters';
 import type { Account } from '@/domain/types';
 import {
   accountSummary,
+  activeFilterCount,
   chipLabel,
   customRange,
   datesOf,
@@ -161,4 +162,21 @@ test('the filters a group has no chip for are listed by name, and can be cleared
   expect(unshownFilters(cleared)).toEqual([]);
   expect(cleared.symbols).toEqual(['ES']);
   expect(cleared.outcomes).toEqual(['win']);
+});
+
+test('activeFilterCount counts the chips in use plus the More filters fields', () => {
+  expect(activeFilterCount(EMPTY_FILTERS)).toBe(0);
+  expect(
+    activeFilterCount({
+      ...EMPTY_FILTERS,
+      range: { preset: 'last-30-days' },
+      symbols: ['ES', 'NQ'],
+      side: 'long',
+      strategyIds: ['s1'],
+      tagIds: ['t1', 't2'],
+      outcomes: ['win'],
+    }),
+  ).toBe(6);
+  // An account is the switcher's, not a filter chip.
+  expect(activeFilterCount({ ...EMPTY_FILTERS, accountIds: ['a'] })).toBe(0);
 });

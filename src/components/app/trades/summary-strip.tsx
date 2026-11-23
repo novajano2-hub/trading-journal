@@ -6,6 +6,7 @@ import { MetricTip } from '@/components/ui/metric-tip';
 import type { MetricId } from '@/content/metric-definitions';
 import type { Summary } from '@/domain/metrics/summary';
 import type { PnlBasis } from '@/domain/types';
+import { usePhone } from '@/lib/use-phone';
 import { formatPct, formatRatio, plural } from '@/lib/format';
 import { CARD, signTone } from '../dashboard/shared';
 
@@ -69,71 +70,99 @@ export function SummaryStrip({
   onHide(): void;
 }): React.JSX.Element {
   const open = openCount;
+  // A phone reads net first and leaves expectancy out: four figures in two rows.
+  const phone = usePhone();
+  const kTrades = (
+    <Kpi
+      id="trades"
+      basis={basis}
+      sub={
+        open > 0
+          ? `closed, ${open} still open`
+          : plural(summary.closedCount, 'closed trade')
+      }
+    >
+      {summary.closedCount}
+    </Kpi>
+  );
+  const kPnl = (
+    <Kpi
+      id="pnl"
+      basis={basis}
+      sub={
+        <>
+          {basis === 'gross' ? 'before ' : 'after '}
+          <FigureText f={fees} /> fees
+        </>
+      }
+    >
+      <span className={signTone(pnl.cents)}>
+        <FigureText f={pnl} />
+      </span>
+    </Kpi>
+  );
+  const kWin = (
+    <Kpi
+      id="win-rate"
+      basis={basis}
+      sub={`${summary.wins} won, ${summary.losses} lost`}
+    >
+      {summary.winRate === null ? (
+        <span className="text-[15px] font-medium text-faint">None</span>
+      ) : (
+        formatPct(summary.winRate, 1)
+      )}
+    </Kpi>
+  );
+  const kPf = (
+    <Kpi
+      id="profit-factor"
+      basis={basis}
+      sub={
+        summary.profitFactor === null
+          ? 'needs a losing trade'
+          : `${formatRatio(summary.profitFactor)} won for every 1 lost`
+      }
+    >
+      {summary.profitFactor === null ? (
+        <span className="text-[15px] font-medium text-faint">None</span>
+      ) : (
+        formatRatio(summary.profitFactor)
+      )}
+    </Kpi>
+  );
+  const kExp = (
+    <Kpi id="expectancy" basis={basis} sub="per closed trade">
+      {expectancy === null ? (
+        <span className="text-[15px] font-medium text-faint">None</span>
+      ) : (
+        <span className={signTone(expectancy.cents)}>
+          <FigureText f={expectancy} />
+        </span>
+      )}
+    </Kpi>
+  );
   return (
     <section
       aria-label="Summary"
-      className={`${CARD} grid grid-cols-2 items-start gap-x-5 gap-y-4 px-5 py-4 sm:grid-cols-3 lg:grid-cols-[repeat(5,minmax(0,1fr))_auto]`}
+      className={`${CARD} grid grid-cols-2 items-start gap-x-5 gap-y-3 px-5 py-4 sm:grid-cols-3 sm:gap-y-4 lg:grid-cols-[repeat(5,minmax(0,1fr))_auto]`}
     >
-      <Kpi
-        id="trades"
-        basis={basis}
-        sub={
-          open > 0
-            ? `closed, ${open} still open`
-            : plural(summary.closedCount, 'closed trade')
-        }
-      >
-        {summary.closedCount}
-      </Kpi>
-      <Kpi
-        id="pnl"
-        basis={basis}
-        sub={
-          <>
-            {basis === 'gross' ? 'before ' : 'after '}
-            <FigureText f={fees} /> fees
-          </>
-        }
-      >
-        <span className={signTone(pnl.cents)}>
-          <FigureText f={pnl} />
-        </span>
-      </Kpi>
-      <Kpi
-        id="win-rate"
-        basis={basis}
-        sub={`${summary.wins} won, ${summary.losses} lost`}
-      >
-        {summary.winRate === null ? (
-          <span className="text-[15px] font-medium text-faint">None</span>
-        ) : (
-          formatPct(summary.winRate, 1)
-        )}
-      </Kpi>
-      <Kpi
-        id="profit-factor"
-        basis={basis}
-        sub={
-          summary.profitFactor === null
-            ? 'needs a losing trade'
-            : `${formatRatio(summary.profitFactor)} won for every 1 lost`
-        }
-      >
-        {summary.profitFactor === null ? (
-          <span className="text-[15px] font-medium text-faint">None</span>
-        ) : (
-          formatRatio(summary.profitFactor)
-        )}
-      </Kpi>
-      <Kpi id="expectancy" basis={basis} sub="per closed trade">
-        {expectancy === null ? (
-          <span className="text-[15px] font-medium text-faint">None</span>
-        ) : (
-          <span className={signTone(expectancy.cents)}>
-            <FigureText f={expectancy} />
-          </span>
-        )}
-      </Kpi>
+      {phone ? (
+        <>
+          {kPnl}
+          {kWin}
+          {kPf}
+          {kTrades}
+        </>
+      ) : (
+        <>
+          {kTrades}
+          {kPnl}
+          {kWin}
+          {kPf}
+          {kExp}
+        </>
+      )}
       <div className="col-span-full flex items-start gap-4 border-line text-[12.5px] leading-[1.5] text-faint lg:col-span-1 lg:w-[236px] lg:border-l lg:pl-5">
         <p className="min-w-0 flex-1">
           Figures cover the closed trades in your filters, {scope}.

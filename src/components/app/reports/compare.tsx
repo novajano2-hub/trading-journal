@@ -83,11 +83,15 @@ import {
   SymbolBody,
   TagBody,
 } from '../filter-popovers';
+import { ScrollFade } from '@/components/ui/scroll-fade';
 import { symbolOptions } from '../search';
 import { CARD, CARD_PAD, CardHeader, signTone } from '../dashboard/shared';
 import { ReportChart, type ChartSeries } from './report-chart';
 import { ReportSkeleton, State } from './report-scope';
 import { writeParam } from './use-report-data';
+
+/** The metric names hold their place below `lg`, where the table scrolls sideways. */
+const STICKY = 'max-lg:sticky max-lg:left-0 max-lg:z-[1] max-lg:bg-surface-1';
 
 const GROUPS = [
   { key: 'a', name: 'Group A', colour: 'var(--accent)' },
@@ -697,14 +701,14 @@ function Compared({
               </span>
             }
           />
-          <div className="mt-2 overflow-x-auto">
+          <ScrollFade className="mt-2">
             <table
               aria-label="Comparison"
               className="w-full min-w-[420px] border-collapse text-[13.5px]"
             >
               <thead>
                 <tr>
-                  <td className="h-9" />
+                  <td className={`h-9 ${STICKY}`} />
                   {[...GROUPS.map((g) => g.name), 'Difference'].map((h) => (
                     <th
                       key={h}
@@ -726,7 +730,7 @@ function Compared({
                     <tr key={r.id} className="border-t border-line/70">
                       <th
                         scope="row"
-                        className="h-10 text-left font-normal text-muted"
+                        className={`h-10 pr-3 text-left font-normal text-muted ${STICKY}`}
                       >
                         <MetricTip id={r.id} basis={base.pnlBasis}>
                           {r.label}
@@ -748,7 +752,7 @@ function Compared({
                 })}
               </tbody>
             </table>
-          </div>
+          </ScrollFade>
         </section>
 
         <section

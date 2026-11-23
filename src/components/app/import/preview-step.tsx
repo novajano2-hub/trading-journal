@@ -25,6 +25,7 @@ import type { ImportFile } from '@/lib/decode';
 import { useDisplay, type Display } from '@/lib/display';
 import { plural } from '@/lib/format';
 import { zoneLabel } from '@/lib/time-zone-label';
+import { ScrollFade } from '@/components/ui/scroll-fade';
 import { ConfirmStep } from './confirm-step';
 import { FIELD_LABEL, ISSUE_REASON, MONEY_FIELDS } from './fields';
 import { HiddenAmount } from './hidden-amount';
@@ -36,6 +37,9 @@ const ROWS_PER_PAGE = 50;
 const TH =
   'h-9 px-2 text-left text-[12px] font-medium whitespace-nowrap text-faint first:pl-5 last:pr-4';
 const TD = 'h-[38px] px-2 align-middle first:pl-5 last:pr-4';
+/** The first column holds its place below `lg`, where the table scrolls sideways. */
+const STICKY =
+  'max-lg:sticky max-lg:left-0 max-lg:z-[1] max-lg:shadow-[inset_-1px_0_0_var(--color-line)]';
 const LINK =
   'cursor-pointer font-semibold text-accent-ink hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent';
 
@@ -528,11 +532,11 @@ function TradesCard({
           ) : undefined
         }
       />
-      <div className="relative mt-2.5 overflow-x-auto">
+      <ScrollFade className="mt-2.5">
         <table className="w-full min-w-[780px] border-collapse text-[13px]">
           <thead>
             <tr className="border-b border-line">
-              <th scope="col" className={TH}>
+              <th scope="col" className={`${TH} ${STICKY} bg-surface-1`}>
                 Row
               </th>
               <th scope="col" className={TH}>
@@ -582,7 +586,7 @@ function TradesCard({
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollFade>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-5 py-3 text-[12.5px] text-faint">
         <span>
           Showing {shown.length.toLocaleString('en-US')} of{' '}
@@ -645,7 +649,11 @@ function TradeRows({
       <tr
         className={`${shade} ${notes.length === 0 ? 'border-b border-line/70' : ''}`}
       >
-        <td className={`${TD} text-faint tabular-nums`}>{row ?? 'None'}</td>
+        <td
+          className={`${TD} ${STICKY} ${highlighted ? 'bg-sunken' : 'bg-surface-1'} text-faint tabular-nums`}
+        >
+          {row ?? 'None'}
+        </td>
         <td className={TD}>
           {t.closedAt ? (
             <TradeTime text={stamp(t.closedAt, tz)} />

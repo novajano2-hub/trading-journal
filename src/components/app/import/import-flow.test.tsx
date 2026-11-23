@@ -88,3 +88,19 @@ test('committing the import clears the file waiting in this browser', async () =
   await screen.findByText('1 trade imported into Futures.');
   await waitFor(() => expect(pending.clear).toHaveBeenCalledTimes(1));
 });
+
+test('the stepper has a one-line phone form: "Step 2 of 4: Map columns" over a progress bar', async () => {
+  pending.load.mockResolvedValue(
+    new File([FILE], 'landing.csv', { type: 'text/csv' }),
+  );
+  await open();
+  await screen.findByRole('heading', { name: 'Match your columns' });
+  const line = screen.getByText('Step 2 of 4: Map columns');
+  expect(line.parentElement!.className).toContain('sm:hidden');
+  const bar = screen.getByRole('progressbar', { name: 'Import progress' });
+  expect(bar.getAttribute('aria-valuenow')).toBe('2');
+  expect(bar.getAttribute('aria-valuemax')).toBe('4');
+  expect(
+    screen.getByRole('list', { name: 'Import steps' }).className,
+  ).toContain('max-sm:hidden');
+});

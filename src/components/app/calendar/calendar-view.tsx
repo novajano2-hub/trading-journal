@@ -225,6 +225,15 @@ function DaySheet({
               forceMount
               aria-labelledby={titleId}
               aria-describedby={undefined}
+              onOpenAutoFocus={(e) => {
+                // Land on the day's heading, which names the sheet: the close
+                // button is a tab away and never wears the ring on opening.
+                const heading = document.getElementById(titleId);
+                if (heading) {
+                  e.preventDefault();
+                  heading.focus();
+                }
+              }}
             >
               <motion.div
                 className="fixed inset-x-0 bottom-0 z-50 max-h-[88dvh] overflow-y-auto rounded-t-[20px] border border-b-0 border-line bg-surface-1 px-5 pt-4 pb-6 shadow-[var(--shadow)] outline-none"

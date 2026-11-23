@@ -20,6 +20,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { IconTile } from '@/components/ui/icon-tile';
+import { MenuSelect, type MenuSelectOption } from '@/components/ui/menu-select';
 import { MetricTip } from '@/components/ui/metric-tip';
 import { Segmented } from '@/components/ui/segmented';
 import type { MetricId } from '@/content/metric-definitions';
@@ -61,9 +62,11 @@ import {
 import { plural } from '@/lib/format';
 import { docText } from '@/lib/note-text';
 import { rangeCaption } from '@/lib/range-label';
+import { usePhone } from '@/lib/use-phone';
 import { hasActiveFilters } from '../filter-model';
 import { CARD } from '../dashboard/shared';
 import { BulkBar } from './bulk-bar';
+import { PhoneRows } from './phone-rows';
 import { SelectBox } from './select-box';
 import {
   ALIGN,
@@ -81,6 +84,24 @@ const NEWEST_OPEN: SortingState = [{ id: 'open', desc: true }];
 
 type Status = 'closed' | 'open';
 type Review = 'all' | 'unreviewed' | 'reviewed';
+
+/** The phone's Sort choices: a column and a direction each, offered when the column is shown. */
+const PHONE_SORTS: readonly {
+  id: ColumnId;
+  desc: boolean;
+  label: string;
+  always?: true;
+}[] = [
+  { id: 'open', desc: true, label: 'Newest first', always: true },
+  { id: 'open', desc: false, label: 'Oldest first' },
+  { id: 'net', desc: true, label: 'Net, best first' },
+  { id: 'net', desc: false, label: 'Net, worst first' },
+  { id: 'realizedR', desc: true, label: 'R, highest first' },
+  { id: 'realizedR', desc: false, label: 'R, lowest first' },
+  { id: 'instrument', desc: false, label: 'Instrument, A to Z' },
+];
+
+const sortKey = (id: string, desc: boolean) => `${id}:${desc ? 'desc' : 'asc'}`;
 
 /** Newest open first: the order the rows keep when no sorted column is shown. */
 function byNewest(a: Trade, b: Trade): number {
@@ -283,6 +304,7 @@ export function TradesView(): React.JSX.Element {
   const updatePrefs = useUpdatePrefs();
   const queryClient = useQueryClient();
   const display = useDisplay();
+  const phone = usePhone();
 
   const [search, setSearch] = useState('');
   const [sorting, setSorting] = useState<SortingState>(NEWEST_OPEN);
@@ -510,6 +532,15 @@ export function TradesView(): React.JSX.Element {
   const to = Math.min(total, from + page.length - 1);
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+  const sortOptions: MenuSelectOption[] = PHONE_SORTS.filter(
+    (o) => o.always || columnIds.includes(o.id),
+  ).map((o) => ({ value: sortKey(o.id, o.desc), label: o.label }));
+  const current = sorting[0];
+  const sortValue = current ? sortKey(current.id, current.desc) : '';
+  // A column sorted at a wider size has no phone choice: say so, rather than name another.
+  if (!sortOptions.some((o) => o.value === sortValue))
+    sortOptions.unshift({ value: sortValue, label: 'Column order' });
+
   const chosen = new Set(selection.key === selectionKey ? selection.ids : []);
   const selected = rows.filter((t) => chosen.has(t.id));
   const pageSelected = page.filter((r) => chosen.has(r.original.id)).length;
@@ -659,11 +690,15 @@ export function TradesView(): React.JSX.Element {
             />
           </label>
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <ColumnsMenu
-              columns={columnIds}
-              onChange={(next) => savePrefs({ tradeColumns: next })}
-              onReset={() => savePrefs({ tradeColumns: [...DEFAULT_COLUMNS] })}
-            />
+            {phone ? null : (
+              <ColumnsMenu
+                columns={columnIds}
+                onChange={(next) => savePrefs({ tradeColumns: next })}
+                onReset={() =>
+                  savePrefs({ tradeColumns: [...DEFAULT_COLUMNS] })
+                }
+              />
+            )}
             <button
               type="button"
               onClick={() => exportCsv()}
@@ -746,122 +781,155 @@ export function TradesView(): React.JSX.Element {
                 )}
               </p>
             ) : null}
-            <div className="relative overflow-x-auto px-3">
-              <table
-                aria-label="Trades"
-                style={{
-                  minWidth: `${SELECT_WIDTH + columnIds.reduce((n, id) => n + COLUMN_WIDTHS[id], 0)}px`,
-                }}
-                className="w-full table-fixed border-collapse text-[13px] whitespace-nowrap [font-stretch:90%]"
-              >
-                <colgroup>
-                  <col className="w-8 pointer-coarse:w-11" />
-                  {columnIds.map((id) => (
-                    <col key={id} style={{ width: COLUMN_WIDTHS[id] }} />
-                  ))}
-                </colgroup>
-                <thead>
-                  {table.getHeaderGroups().map((group) => (
-                    <tr key={group.id}>
-                      <th
-                        scope="col"
-                        className="h-10 w-8 border-b border-line pr-1 text-left align-middle"
-                      >
-                        <SelectBox
-                          label="Select this page"
-                          checked={pageSelected === page.length}
-                          indeterminate={pageSelected > 0}
-                          onChange={togglePage}
-                        />
-                      </th>
-                      {group.headers.map((header) => {
-                        const id = header.column.id as ColumnId;
-                        const sorted = header.column.getIsSorted();
-                        const align = ALIGN[id];
-                        const canSort = header.column.getCanSort();
-                        return (
-                          <th
-                            key={header.id}
-                            scope="col"
-                            aria-sort={
-                              canSort
-                                ? sorted === 'asc'
-                                  ? 'ascending'
-                                  : sorted === 'desc'
-                                    ? 'descending'
-                                    : 'none'
-                                : undefined
-                            }
-                            className={`h-10 border-b border-line pr-1.5 align-middle text-xs font-medium text-faint last:pr-0 ${PAD_LEFT.has(id) ? 'pl-2' : ''} ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'}`}
-                          >
-                            {canSort ? (
-                              HEADER_TIPS[id] ? (
-                                <span
-                                  className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}
-                                >
-                                  <MetricTip
-                                    id={HEADER_TIPS[id]}
-                                    basis={ctx.pnlBasis}
-                                    className="text-xs font-medium"
+            {phone ? (
+              <>
+                <div className="flex items-center justify-between gap-2 border-b border-line py-1 pr-4 pl-2">
+                  <div className="flex min-h-11 items-center gap-0.5 text-[13px] text-muted">
+                    <SelectBox
+                      label="Select this page"
+                      checked={pageSelected === page.length}
+                      indeterminate={pageSelected > 0}
+                      onChange={togglePage}
+                    />
+                    Select page
+                  </div>
+                  <MenuSelect
+                    label="Sort"
+                    align="end"
+                    value={sortValue}
+                    options={sortOptions}
+                    onChange={(v) => {
+                      const [id, dir] = v.split(':');
+                      table.setSorting([{ id: id!, desc: dir === 'desc' }]);
+                      setPagination((p) => ({ ...p, pageIndex: 0 }));
+                    }}
+                  />
+                </div>
+                <PhoneRows
+                  trades={page.map((r) => r.original)}
+                  env={cellEnv}
+                  chosen={chosen}
+                  onToggle={toggleRow}
+                />
+              </>
+            ) : (
+              <div className="relative overflow-x-auto px-3">
+                <table
+                  aria-label="Trades"
+                  style={{
+                    minWidth: `${SELECT_WIDTH + columnIds.reduce((n, id) => n + COLUMN_WIDTHS[id], 0)}px`,
+                  }}
+                  className="w-full table-fixed border-collapse text-[13px] whitespace-nowrap [font-stretch:90%]"
+                >
+                  <colgroup>
+                    <col className="w-8 pointer-coarse:w-11" />
+                    {columnIds.map((id) => (
+                      <col key={id} style={{ width: COLUMN_WIDTHS[id] }} />
+                    ))}
+                  </colgroup>
+                  <thead>
+                    {table.getHeaderGroups().map((group) => (
+                      <tr key={group.id}>
+                        <th
+                          scope="col"
+                          className="h-10 w-8 border-b border-line pr-1 text-left align-middle"
+                        >
+                          <SelectBox
+                            label="Select this page"
+                            checked={pageSelected === page.length}
+                            indeterminate={pageSelected > 0}
+                            onChange={togglePage}
+                          />
+                        </th>
+                        {group.headers.map((header) => {
+                          const id = header.column.id as ColumnId;
+                          const sorted = header.column.getIsSorted();
+                          const align = ALIGN[id];
+                          const canSort = header.column.getCanSort();
+                          return (
+                            <th
+                              key={header.id}
+                              scope="col"
+                              aria-sort={
+                                canSort
+                                  ? sorted === 'asc'
+                                    ? 'ascending'
+                                    : sorted === 'desc'
+                                      ? 'descending'
+                                      : 'none'
+                                  : undefined
+                              }
+                              className={`h-10 border-b border-line pr-1.5 align-middle text-xs font-medium text-faint last:pr-0 ${PAD_LEFT.has(id) ? 'pl-2' : ''} ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'}`}
+                            >
+                              {canSort ? (
+                                HEADER_TIPS[id] ? (
+                                  <span
+                                    className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}
                                   >
-                                    {COLUMN_LABELS[id].label}
-                                  </MetricTip>
+                                    <MetricTip
+                                      id={HEADER_TIPS[id]}
+                                      basis={ctx.pnlBasis}
+                                      className="text-xs font-medium"
+                                    >
+                                      {COLUMN_LABELS[id].label}
+                                    </MetricTip>
+                                    <SortButton
+                                      label={`Sort by ${COLUMN_LABELS[id].label}`}
+                                      align={align}
+                                      sorted={sorted}
+                                      onClick={header.column.getToggleSortingHandler()}
+                                    />
+                                  </span>
+                                ) : (
                                   <SortButton
-                                    label={`Sort by ${COLUMN_LABELS[id].label}`}
+                                    label={COLUMN_LABELS[id].label}
                                     align={align}
                                     sorted={sorted}
                                     onClick={header.column.getToggleSortingHandler()}
+                                    named
                                   />
-                                </span>
+                                )
                               ) : (
-                                <SortButton
-                                  label={COLUMN_LABELS[id].label}
-                                  align={align}
-                                  sorted={sorted}
-                                  onClick={header.column.getToggleSortingHandler()}
-                                  named
-                                />
-                              )
-                            ) : (
-                              COLUMN_LABELS[id].label
-                            )}
-                          </th>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </thead>
-                <tbody>
-                  {page.map((row) => (
-                    <tr
-                      key={row.id}
-                      aria-selected={chosen.has(row.original.id)}
-                      className={`h-[38px] border-t border-line/70 text-text transition-colors duration-200 ease-(--ease-glide) first:border-t-0 ${chosen.has(row.original.id) ? 'bg-accent-soft/70' : 'hover:bg-sunken/60'}`}
-                    >
-                      <td className="w-8 py-0 pr-1">
-                        <SelectBox
-                          label={`Select trade ${row.original.serial}`}
-                          checked={chosen.has(row.original.id)}
-                          onChange={(on) => toggleRow(row.original.id, on)}
-                        />
-                      </td>
-                      {row.getAllCells().map((cell) => {
-                        const id = cell.column.id as ColumnId;
-                        const align = ALIGN[id];
-                        return (
-                          <td
-                            key={cell.id}
-                            className={`overflow-hidden py-1 pr-1.5 last:pr-0 ${PAD_LEFT.has(id) ? 'pl-2' : ''} ${align === 'right' ? 'text-right tabular-nums' : align === 'center' ? 'text-center' : 'text-left'}`}
-                          >
-                            <table.FlexRender cell={cell} />
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                                COLUMN_LABELS[id].label
+                              )}
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </thead>
+                  <tbody>
+                    {page.map((row) => (
+                      <tr
+                        key={row.id}
+                        aria-selected={chosen.has(row.original.id)}
+                        className={`h-[38px] border-t border-line/70 text-text transition-colors duration-200 ease-(--ease-glide) first:border-t-0 ${chosen.has(row.original.id) ? 'bg-accent-soft/70' : 'hover:bg-sunken/60'}`}
+                      >
+                        <td className="w-8 py-0 pr-1">
+                          <SelectBox
+                            label={`Select trade ${row.original.serial}`}
+                            checked={chosen.has(row.original.id)}
+                            onChange={(on) => toggleRow(row.original.id, on)}
+                          />
+                        </td>
+                        {row.getAllCells().map((cell) => {
+                          const id = cell.column.id as ColumnId;
+                          const align = ALIGN[id];
+                          return (
+                            <td
+                              key={cell.id}
+                              className={`overflow-hidden py-1 pr-1.5 last:pr-0 ${PAD_LEFT.has(id) ? 'pl-2' : ''} ${align === 'right' ? 'text-right tabular-nums' : align === 'center' ? 'text-center' : 'text-left'}`}
+                            >
+                              <table.FlexRender cell={cell} />
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-line px-5 py-3 text-[12.5px] text-faint">
               <p>
                 <span className="tabular-nums">

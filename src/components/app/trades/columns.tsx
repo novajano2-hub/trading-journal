@@ -225,7 +225,7 @@ function Ratio({
   );
 }
 
-function cellOf(id: ColumnId, t: Trade, env: CellEnv): React.ReactNode {
+export function cellOf(id: ColumnId, t: Trade, env: CellEnv): React.ReactNode {
   const { display, facts, timeZone } = env;
   const money = (cents: number, basis: 'net' | 'gross' | null) => {
     const fig =

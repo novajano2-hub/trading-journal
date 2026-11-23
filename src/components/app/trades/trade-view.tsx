@@ -761,10 +761,13 @@ function TradePage({
 
   return (
     <div className="flex flex-col gap-4 px-5 pt-1 pb-6 lg:pt-0">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div
+        className={`flex flex-wrap items-center gap-x-4 gap-y-2 ${manual && !readOnly ? '' : 'max-sm:hidden'}`}
+      >
         <Link
           href={backHref}
-          className="inline-flex min-h-8 items-center gap-1.5 rounded-chip text-[13px] font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
+          // On a phone the top bar's "Trades" crumb is the way back.
+          className="max-sm:hidden inline-flex min-h-8 items-center gap-1.5 rounded-chip text-[13px] font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
         >
           <CaretLeft size={14} weight="bold" aria-hidden="true" />
           Back to trades
@@ -816,9 +819,9 @@ function TradePage({
 
       <section
         aria-label={`Trade ${trade.serial}`}
-        className={`${CARD} grid items-center gap-x-0 gap-y-4 px-[22px] py-[18px] lg:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto]`}
+        className={`${CARD} grid items-center gap-x-3 gap-y-4 px-[22px] py-[18px] max-sm:grid-cols-[1.5fr_1fr_1fr] sm:gap-x-0 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto]`}
       >
-        <div className="min-w-0">
+        <div className="min-w-0 max-sm:col-span-3">
           <h2 className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[22px] leading-[1.25] font-semibold tracking-[-0.03em] text-text">
             <InstrumentName
               trade={trade}
@@ -855,12 +858,12 @@ function TradePage({
           </p>
         </div>
 
-        <div className="lg:border-l lg:border-line lg:px-7">
+        <div className="min-w-0 lg:border-l lg:border-line lg:px-7">
           <span className="block text-xs text-faint">
             <MetricTip id="pnl" basis={basis} />
           </span>
           <b
-            className={`block text-[31px] leading-[1.15] font-semibold tracking-[-0.04em] tabular-nums ${money}`}
+            className={`block text-[31px] leading-[1.15] max-sm:text-[22px] font-semibold tracking-[-0.04em] tabular-nums ${money}`}
           >
             <FigureText f={display.figure(fig, true, cur)} />
           </b>
@@ -869,12 +872,12 @@ function TradePage({
             <FigureText f={display.cash(-trade.fees, true, cur)} /> fees
           </small>
         </div>
-        <div className="lg:border-l lg:border-line lg:px-7">
+        <div className="min-w-0 lg:border-l lg:border-line lg:px-7">
           <span className="block text-xs text-faint">
             <MetricTip id="net-roi" basis={basis} />
           </span>
           <b
-            className={`block text-[22px] leading-[1.6] font-semibold tracking-[-0.03em] tabular-nums ${roi === undefined ? '' : tone(roi)}`}
+            className={`block text-[22px] leading-[1.6] font-semibold tracking-[-0.03em] tabular-nums max-sm:text-[18px] ${roi === undefined ? '' : tone(roi)}`}
           >
             {roi === undefined ? (
               <span className="text-[14px] font-normal text-faint">None</span>
@@ -883,12 +886,12 @@ function TradePage({
             )}
           </b>
         </div>
-        <div className="lg:border-l lg:border-line lg:px-7">
+        <div className="min-w-0 lg:border-l lg:border-line lg:px-7">
           <span className="block text-xs text-faint">
             <MetricTip id="realized-r" basis={basis} />
           </span>
           <b
-            className={`block text-[22px] leading-[1.6] font-semibold tracking-[-0.03em] tabular-nums ${r === undefined ? '' : tone(r)}`}
+            className={`block text-[22px] leading-[1.6] font-semibold tracking-[-0.03em] tabular-nums max-sm:text-[18px] ${r === undefined ? '' : tone(r)}`}
           >
             {r === undefined ? (
               <span className="text-[14px] font-normal text-faint">None</span>
@@ -902,7 +905,7 @@ function TradePage({
               : `of ${formatUnitValue('r', planned, { currency: cur, signed: false })} planned`}
           </small>
         </div>
-        <div className="flex flex-col gap-1.5 lg:w-[188px] lg:border-l lg:border-line lg:pl-6">
+        <div className="flex flex-col gap-1.5 max-sm:col-span-3 lg:w-[188px] lg:border-l lg:border-line lg:pl-6">
           <Neighbour
             trade={prev}
             next={false}

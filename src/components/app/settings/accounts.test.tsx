@@ -380,3 +380,14 @@ test('Privacy hides every balance', async () => {
   expect(container.textContent).toContain('$•••');
   expect(container.textContent).not.toMatch(/\$\d/);
 });
+
+test('the Name column holds its place, and the Actions column too, as the table scrolls', async () => {
+  renderApp(<AccountsSettings />, { repository: repo(), url: URL });
+  const futures = await rowOf('Futures main');
+  expect(futures.querySelector('td:first-child')!.className).toContain(
+    'sticky left-0',
+  );
+  expect(futures.querySelector('td:last-child')!.className).toContain(
+    'sticky right-0',
+  );
+});

@@ -24,6 +24,7 @@ import type { Account, Trade } from '@/domain/types';
 import { useDisplay } from '@/lib/display';
 import { plural } from '@/lib/format';
 import { zoneLabel } from '@/lib/time-zone-label';
+import { ScrollFade } from '@/components/ui/scroll-fade';
 import { ACCOUNT_TYPES, AccountDialog } from './account-dialog';
 import { BalanceAdjustments } from './cash-flows';
 import { NUM, RowMenu, TD, TH, type MenuAction } from './settings-ui';
@@ -222,7 +223,7 @@ export function AccountsSettings(): React.JSX.Element {
             No accounts yet. Make one here, or import a file and make it there.
           </p>
         ) : (
-          <div className="relative mt-2 overflow-x-auto">
+          <ScrollFade className="mt-2">
             <table
               aria-labelledby="accounts-heading"
               className="w-full min-w-[960px] border-collapse text-[13.5px]"
@@ -360,7 +361,7 @@ export function AccountsSettings(): React.JSX.Element {
                 })}
               </tbody>
             </table>
-          </div>
+          </ScrollFade>
         )}
 
         <AccountDialog

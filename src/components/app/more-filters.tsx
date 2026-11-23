@@ -1,6 +1,11 @@
 'use client';
 
-import { Plus, SlidersHorizontal, X } from '@phosphor-icons/react/dist/ssr';
+import {
+  CaretRight,
+  Plus,
+  SlidersHorizontal,
+  X,
+} from '@phosphor-icons/react/dist/ssr';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Dialog, Popover } from 'radix-ui';
 import { useId, useState, useSyncExternalStore, type ReactNode } from 'react';
@@ -656,6 +661,36 @@ function Panel({
 const TRIGGER =
   'relative -ml-1 inline-flex size-8 flex-none cursor-pointer items-center justify-center rounded-control border border-line bg-surface-1 text-muted shadow-[var(--shadow-chip)] transition-[border-color,color] duration-200 ease-(--ease-glide) enabled:hover:border-accent/35 enabled:hover:text-text data-[state=open]:border-accent/35 data-[state=open]:text-text disabled:cursor-default pointer-coarse:size-11';
 
+/** In the phone's Filters sheet it is a full row, named in words, like the sheet's other rows. */
+const ROW_TRIGGER =
+  'flex min-h-12 w-full cursor-pointer items-center gap-2 rounded-[10px] px-3 text-left text-[14px] font-semibold text-text hover:bg-sunken data-[state=open]:bg-sunken pointer-coarse:min-h-12';
+
+function RowFace({ count }: { count: number }): React.JSX.Element {
+  return (
+    <>
+      <SlidersHorizontal
+        size={16}
+        aria-hidden="true"
+        className="flex-none text-accent-ink"
+      />
+      <span className="min-w-0 flex-1">More filters</span>
+      {count > 0 ? (
+        <Chip
+          tone="accent"
+          className="h-[18px] min-w-[18px] justify-center px-1 text-[11px]"
+        >
+          {count}
+        </Chip>
+      ) : null}
+      <CaretRight
+        size={14}
+        aria-hidden="true"
+        className="flex-none text-faint"
+      />
+    </>
+  );
+}
+
 function TriggerFace({ count }: { count: number }): React.JSX.Element {
   return (
     <>
@@ -691,17 +726,20 @@ export function MoreFilters({
   onChange,
   disabled = false,
   unavailableNote,
+  row = false,
 }: {
   filters: GlobalFilters;
   options: FilterOptions;
   onChange(next: GlobalFilters): void;
+  /** A full-width row in the phone's Filters sheet, not the bar's icon. Always the bottom sheet. */
+  row?: boolean;
   /** The Suspense fallback: the same button, inert. */
   disabled?: boolean;
   /** The id of a note saying why there is nothing to filter; the button keeps its tab stop and opens nothing. */
   unavailableNote?: string;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
-  const wide = useWide();
+  const wide = useWide() && !row;
   const reduced = useReducedMotion();
   const count = advancedFilterCount(filters);
   const label = count > 0 ? `More filters, ${count} active` : 'More filters';
@@ -720,9 +758,9 @@ export function MoreFilters({
         aria-haspopup="dialog"
         aria-label={label}
         title="More filters"
-        className={`${TRIGGER} ${unavailableNote ? 'cursor-default border-dashed border-line-2 bg-transparent text-faint shadow-none' : ''}`}
+        className={`${row ? ROW_TRIGGER : TRIGGER} ${unavailableNote ? 'cursor-default border-dashed border-line-2 bg-transparent text-faint shadow-none' : ''}`}
       >
-        <TriggerFace count={count} />
+        {row ? <RowFace count={count} /> : <TriggerFace count={count} />}
       </button>
     );
   }
@@ -773,10 +811,10 @@ export function MoreFilters({
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger
         aria-label={label}
-        title="More filters"
-        className={TRIGGER}
+        title={row ? undefined : 'More filters'}
+        className={row ? ROW_TRIGGER : TRIGGER}
       >
-        <TriggerFace count={count} />
+        {row ? <RowFace count={count} /> : <TriggerFace count={count} />}
       </Dialog.Trigger>
       <AnimatePresence>
         {open ? (

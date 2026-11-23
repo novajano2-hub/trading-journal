@@ -382,3 +382,17 @@ test('under Privacy the Off by chip and the fees are masked, and the summary net
   const net = screen.getByText(/^Net P&L of the/).nextElementSibling!;
   expect(net.className).toContain('text-gain');
 });
+
+test('the Row column is sticky below lg, and flagged rows keep an opaque ground', async () => {
+  await toPreview(csv([TRIPS, row('200.00', '09'), row('10.00', '10')]));
+  const table = (await screen.findByText('Trades Keel built'))
+    .closest('section')!
+    .querySelector('table')!;
+  const head = within(table).getByRole('columnheader', { name: 'Row' });
+  expect(head.className).toContain('max-lg:sticky');
+  expect(head.className).toContain('bg-surface-1');
+  const firsts = table.querySelectorAll('tbody tr > td:first-child');
+  expect(firsts.length).toBeGreaterThan(0);
+  for (const td of firsts)
+    expect(td.className).toMatch(/max-lg:sticky[\s\S]*bg-(surface-1|sunken)/);
+});

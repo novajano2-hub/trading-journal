@@ -209,7 +209,9 @@ export function DayPanel({
         <IconTile icon={CalendarBlank} tone="accent" />
         <h2
           id={headingId}
-          className="text-[15px] font-semibold tracking-[-0.015em] text-text"
+          // The sheet opens with focus here, not on its close button.
+          tabIndex={inSheet ? -1 : undefined}
+          className="text-[15px] font-semibold tracking-[-0.015em] text-text outline-none"
         >
           {dayLabel(date)}
         </h2>

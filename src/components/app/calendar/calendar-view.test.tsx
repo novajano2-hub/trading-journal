@@ -352,6 +352,20 @@ test('below 1280px the day panel is a sheet, from 1280px it sits beside the grid
   expect(screen.queryByRole('dialog')).toBeNull();
 });
 
+test('the day sheet opens with focus on its heading, not the close button', async () => {
+  viewport(390);
+  renderApp(<CalendarView />, {
+    sample: withTrades(NOV),
+    url: url('&day=2026-11-19'),
+  });
+  const dialog = await screen.findByRole('dialog', { name: /Thu 19 Nov/ });
+  const heading = within(dialog).getByRole('heading', { name: /Thu 19 Nov/ });
+  await waitFor(() => expect(document.activeElement).toBe(heading));
+  expect(document.activeElement).not.toBe(
+    within(dialog).getByRole('button', { name: 'Close day' }),
+  );
+});
+
 const GRADED = withTrades([
   [
     '2026-11-19',

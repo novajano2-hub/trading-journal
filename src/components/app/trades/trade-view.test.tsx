@@ -590,3 +590,19 @@ test('an absent figure reads None and says what would add it, never a dash', asy
   expect(texts).toContain('None');
   expect(texts.filter((s) => s.trim() === '-')).toEqual([]);
 });
+
+test('at phone width Net, ROI and R share one row of three, and the crumb replaces Back to trades', async () => {
+  renderApp(<TradeView id="t-c" />, {
+    sample: sample({ initialRisk: 15000 }),
+    url: URL_C,
+  });
+  const head = await screen.findByRole('region', { name: 'Trade 1132' });
+  expect(head.className).toContain('max-sm:grid-cols-[1.5fr_1fr_1fr]');
+  // The title and the neighbours take the full width; the three figures one cell each.
+  const cells = [...head.children] as HTMLElement[];
+  const spans = cells.map((c) => c.className.includes('max-sm:col-span-3'));
+  expect(spans).toEqual([true, false, false, false, true]);
+  // Not a button or a chip: the link only hides on a phone, where the top bar's "Trades" crumb leads back.
+  const back = screen.getByRole('link', { name: /Back to trades/ });
+  expect(back.className).toContain('max-sm:hidden');
+});

@@ -90,6 +90,25 @@ export function hasActiveFilters(f: GlobalFilters): boolean {
   );
 }
 
+/**
+ * How many filters are in use: each of the date, symbol, side, strategy and
+ * tags chips that is set, plus the fields "More filters" holds. The sheet
+ * button's count; accounts belong to the switcher and are not counted.
+ */
+export function activeFilterCount(f: GlobalFilters): number {
+  const r = f.range;
+  const date = 'preset' in r || r.from !== undefined || r.to !== undefined;
+  return (
+    [
+      date,
+      f.symbols.length > 0,
+      f.side !== undefined,
+      f.strategyIds.length > 0,
+      f.tagIds.length > 0,
+    ].filter(Boolean).length + advancedFilterCount(f)
+  );
+}
+
 /** Ids never cross workspaces: drop accounts, strategies and tags (included or excluded); keep the rest. */
 export function switchWorkspaceFilters(f: GlobalFilters): GlobalFilters {
   return {

@@ -34,7 +34,9 @@ import {
   SymbolBody,
   TagBody,
 } from './filter-popovers';
+import { FilterSheet } from './filter-sheet';
 import { MoreFilters } from './more-filters';
+import { usePhone } from '@/lib/use-phone';
 import { symbolOptions } from './search';
 import { useShownFilters } from './use-shown-filters';
 
@@ -92,7 +94,7 @@ function fadeMask({ start, end }: { start: boolean; end: boolean }) {
 }
 
 /**
- * The top bar's filter chips: date, symbol, side, strategy and tags, then
+ * Below 640px the chips are one "Filters (n)" button and its sheet. The top bar's filter chips: date, symbol, side, strategy and tags, then
  * "More filters" (which stays put after them, as "Clear filters" does) and "Clear filters" while any filter is set. The chips scroll sideways when the
  * bar is too narrow, fading at an edge with more past it; "Clear filters"
  * stays put after them. On a phone, with nothing after them, the row runs to
@@ -100,14 +102,12 @@ function fadeMask({ start, end }: { start: boolean; end: boolean }) {
  * choice calls `onChange` with the whole next filter set. In a workspace with no trades at all the chips stay in the tab
  * order but open nothing; a filter that matches nothing leaves them live.
  */
-export function FilterBarView({
-  filters: f,
-  options,
-  today,
-  onChange,
-  disabled = false,
-  noTrades = false,
-}: {
+export function FilterBarView(props: FilterBarProps): React.JSX.Element {
+  const phone = usePhone();
+  return phone ? <FilterSheet {...props} /> : <FilterRow {...props} />;
+}
+
+interface FilterBarProps {
   filters: GlobalFilters;
   options: FilterOptions;
   /** The trader's local date, YYYY-MM-DD; empty while unknown. */
@@ -117,7 +117,16 @@ export function FilterBarView({
   disabled?: boolean;
   /** The workspace has no trades to filter. */
   noTrades?: boolean;
-}): React.JSX.Element {
+}
+
+function FilterRow({
+  filters: f,
+  options,
+  today,
+  onChange,
+  disabled = false,
+  noTrades = false,
+}: FilterBarProps): React.JSX.Element {
   const noteId = useId();
   const unavailableNote = noTrades ? noteId : undefined;
   const first = useRef<HTMLButtonElement>(null);

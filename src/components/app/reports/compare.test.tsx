@@ -200,3 +200,23 @@ test('an explicit b= wins over the previous-period default', async () => {
   const table = within(page).getByRole('table', { name: 'Comparison' });
   expect(row(table, /^Net P&L/)[1]).toBe('+$50.00');
 });
+
+test('the metric names are a sticky first column below lg', async () => {
+  renderApp(<CompareView />, {
+    sample: breakdownSample,
+    url: '/app/reports/compare?a=symbol%3DES&b=symbol%3DNQ',
+  });
+  const table = await screen.findByRole('table', { name: 'Comparison' });
+  for (const cell of [
+    table.querySelector('thead td:first-child')!,
+    ...table.querySelectorAll('tbody th[scope="row"]'),
+  ]) {
+    expect(cell.className).toContain('max-lg:sticky');
+    expect(cell.className).toContain('max-lg:left-0');
+  }
+  expect(
+    [...table.querySelectorAll('tbody th[scope="row"]')].every((c) =>
+      c.className.includes('max-lg:bg-surface-1'),
+    ),
+  ).toBe(true);
+});

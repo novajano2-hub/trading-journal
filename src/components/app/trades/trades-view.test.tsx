@@ -8,7 +8,7 @@ import {
 } from '@testing-library/react';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import type { SampleWorkspace } from '@/data/seed/generate';
@@ -491,4 +491,75 @@ test('a failed cashFlows read shows the failure, not a loader or a false empty s
     "Your trades couldn't load.",
   );
   expect(container.textContent).not.toContain('Loading');
+});
+
+describe('at 390px', () => {
+  beforeEach(() => {
+    window.innerWidth = 390;
+  });
+  afterEach(() => {
+    window.innerWidth = 1024;
+  });
+
+  test('the summary is a 2 by 2 grid: net, win rate, profit factor, trades', async () => {
+    renderApp(<TradesView />, { sample: sample(), url: '/app/trades' });
+    const strip = await screen.findByRole('region', { name: 'Summary' });
+    const kpis = [...strip.querySelectorAll('[data-kpi]')].map((k) =>
+      k.getAttribute('data-kpi'),
+    );
+    expect(kpis).toEqual(['pnl', 'win-rate', 'profit-factor', 'trades']);
+    expect(strip.className).toContain('grid-cols-2');
+  });
+
+  test('trades are two-line rows, each one link to the trade page, with the selection box kept', async () => {
+    renderApp(<TradesView />, { sample: sample(), url: '/app/trades' });
+    const list = await screen.findByRole('list', { name: 'Trades' });
+    expect(screen.queryByRole('table')).toBeNull();
+    const items = within(list).getAllByRole('listitem');
+    expect(items).toHaveLength(50);
+    const first = items[0]!;
+    const link = within(first).getByRole('link');
+    expect(link.getAttribute('href')).toBe('/app/trades/t-120');
+    // Line one: the instrument, the time, the signed net. Line two: R, rules, tags.
+    const lines = link.querySelectorAll('[data-line]');
+    expect(lines).toHaveLength(2);
+    expect(lines[0]!.textContent).toContain('+$10.00');
+    expect(within(first).getAllByRole('link')).toHaveLength(1);
+    const box = within(first).getByRole('checkbox', {
+      name: 'Select trade 120',
+    });
+    fireEvent.click(box);
+    expect(
+      (within(first).getByRole('checkbox') as HTMLInputElement).checked,
+    ).toBe(true);
+  });
+
+  test('Sort is a dropdown; Net, best first reorders, and pagination stays', async () => {
+    renderApp(<TradesView />, { sample: sample(), url: '/app/trades' });
+    const list = await screen.findByRole('list', { name: 'Trades' });
+    expect(screen.queryByRole('button', { name: /Sort by/ })).toBeNull();
+    const sort = screen.getByRole('button', { name: 'Sort, Newest first' });
+    fireEvent.keyDown(sort, { key: 'Enter' });
+    fireEvent.click(
+      await screen.findByRole('menuitemradio', { name: 'Net, best first' }),
+    );
+    await waitFor(() =>
+      expect(
+        within(within(list).getAllByRole('listitem')[0]!)
+          .getByRole('link')
+          .getAttribute('href'),
+      ).toBe('/app/trades/t-1'),
+    );
+    expect(
+      screen.getByRole('button', { name: 'Sort, Net, best first' }),
+    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Next page' })).toBeTruthy();
+  });
+});
+
+test('above 640px the log is the table and has no Sort dropdown', async () => {
+  renderApp(<TradesView />, { sample: sample(), url: '/app/trades' });
+  await table();
+  expect(screen.queryByRole('button', { name: /^Sort,/ })).toBeNull();
+  expect(screen.queryByRole('list', { name: 'Trades' })).toBeNull();
 });

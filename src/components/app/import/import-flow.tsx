@@ -237,9 +237,29 @@ function Stepper({
     <div
       className={`${CARD} flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-3`}
     >
+      {/* A phone gets the one line and a bar, not the list. */}
+      <div className="min-w-0 flex-1 sm:hidden">
+        <p className="text-[13.5px] font-semibold text-text">
+          Step {current + 1} of {STEPS.length}: {STEP_NAME[step]}
+        </p>
+        <div
+          role="progressbar"
+          aria-label="Import progress"
+          aria-valuemin={1}
+          aria-valuemax={STEPS.length}
+          aria-valuenow={current + 1}
+          aria-valuetext={`Step ${current + 1} of ${STEPS.length}`}
+          className="mt-2 h-1.5 overflow-hidden rounded-full bg-sunken"
+        >
+          <div
+            className="h-full rounded-full bg-accent"
+            style={{ width: `${((current + 1) / STEPS.length) * 100}%` }}
+          />
+        </div>
+      </div>
       <ol
         aria-label="Import steps"
-        className="flex min-w-0 flex-1 flex-wrap items-center gap-y-2"
+        className="flex min-w-0 flex-1 flex-wrap items-center gap-y-2 max-sm:hidden"
       >
         {STEPS.map((s, i) => {
           const done = i < current;
