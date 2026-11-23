@@ -26,6 +26,8 @@ export const META = {
 } as const;
 
 export interface SeedMeta {
+  /** `SAMPLE_SEED_VERSION` when the sample was written; a record from before versions has none. */
+  version?: number;
   seed: number;
   endDate: string;
   seededAt: string;

@@ -19,6 +19,7 @@ import {
   StorageUnavailableError,
 } from '../repository';
 import type { SampleWorkspace } from '../seed/generate';
+import { SAMPLE_SEED_VERSION } from '../seed/version';
 import { builtInCategories, builtInTemplates } from '../seed/templates';
 import { SAMPLE_WORKSPACE, USER_WORKSPACE, WORKSPACES } from '../workspaces';
 import { KeelDb } from './db';
@@ -155,6 +156,7 @@ test('reset restores the seed; clear empties only My workspace', async () => {
     seed: fixture.seed,
     endDate: fixture.endDate,
     seededAt: '2026-11-23T15:00:00.000Z',
+    version: SAMPLE_SEED_VERSION,
   });
   // My workspace keeps its built-ins (2 categories, 3 templates) and its own rows.
   expect(await mineCounts(db)).toEqual([1, 1, 1, 1, 1, 1, 3, 4, 1, 1, 1]);
@@ -169,6 +171,81 @@ test('reset restores the seed; clear empties only My workspace', async () => {
   ]);
   expect(await db.meta.get('overrides:mine')).toBeUndefined();
   expect(await sampleRows(db)).toEqual(sortedRows(fixture));
+});
+
+/** A store seeded earlier, whose seed record carries `version`. My workspace holds a row in every table. */
+async function seededBefore(version: number | undefined) {
+  const indexedDB = new IDBFactory();
+  await createLocalRepository({
+    indexedDB,
+    IDBKeyRange,
+    sample,
+  }).workspaces.getActive();
+  const db = new KeelDb({ indexedDB, IDBKeyRange });
+  const mine = mineRows();
+  await putMine(db, mine);
+  await db.trades.update(['sample', 'f-1'], { tagIds: ['tag-setup'] });
+  const record = (await db.meta.get('seed:sample'))!;
+  const { version: _drop, ...rest } = record.value as Record<string, unknown>;
+  await db.meta.put({
+    key: 'seed:sample',
+    value: version === undefined ? rest : { ...rest, version },
+  });
+  return { indexedDB, db, mine };
+}
+
+/** The fixture sample plus a challenge, as a newer seed would write it. */
+async function newerSample(): Promise<SampleWorkspace> {
+  const s = fixtureSample();
+  s.challenges.push({ ...rowsIn('sample').challenge, id: 'sample-ch' });
+  return s;
+}
+
+test.each([
+  ['no version (seeded before versions)', undefined],
+  ['an older version', SAMPLE_SEED_VERSION - 1],
+])(
+  'a sample seeded with %s is regenerated on open; My workspace is untouched',
+  async (_name, version) => {
+    const { indexedDB, db, mine } = await seededBefore(version);
+    const before = await mineRowsOf(db, TABLES);
+    const next = vi.fn(newerSample);
+    const repo = createLocalRepository({
+      indexedDB,
+      IDBKeyRange,
+      sample: next,
+    });
+    await repo.workspaces.getActive();
+    expect(next).toHaveBeenCalledTimes(1);
+    expect((await repo.challenges.list('sample')).map((c) => c.id)).toEqual([
+      'sample-ch',
+    ]);
+    // The drift on a sample trade is gone; the version is current.
+    expect(await db.trades.get(['sample', 'f-1'])).toEqual(
+      fixtureSample().trades[0],
+    );
+    expect(
+      ((await db.meta.get('seed:sample'))!.value as { version: number })
+        .version,
+    ).toBe(SAMPLE_SEED_VERSION);
+    expect(await mineRowsOf(db, TABLES)).toEqual(before);
+    expect(await db.trades.get(['mine', mine.trade.id])).toEqual(mine.trade);
+  },
+);
+
+test('a sample at the current version is not regenerated', async () => {
+  const { indexedDB, db } = await seededBefore(SAMPLE_SEED_VERSION);
+  const next = vi.fn(newerSample);
+  await createLocalRepository({
+    indexedDB,
+    IDBKeyRange,
+    sample: next,
+  }).workspaces.getActive();
+  expect(next).not.toHaveBeenCalled();
+  // The drift on a sample trade stays.
+  expect((await db.trades.get(['sample', 'f-1']))?.tagIds).toEqual([
+    'tag-setup',
+  ]);
 });
 
 test('prefs: defaults, persistence, validation', async () => {

@@ -2,12 +2,12 @@ import type { Workspace } from '@/domain/types';
 import { NotFoundError, type WorkspacesRepo } from '../repository';
 import { SAMPLE_WORKSPACE, USER_WORKSPACE, WORKSPACES } from '../workspaces';
 import {
+  deleteWorkspaceRows,
   writeBuiltIns,
   writeSample,
   type LocalContext,
   type SampleSource,
 } from './context';
-import type { KeelDb } from './db';
 import { DATA_TABLES, META } from './schema';
 
 const copy = (w: Workspace): Workspace => ({ ...w });
@@ -54,10 +54,4 @@ export function localWorkspaces(
       });
     },
   };
-}
-
-/** Call inside an rw transaction over the data tables. */
-async function deleteWorkspaceRows(db: KeelDb, ws: string): Promise<void> {
-  for (const name of DATA_TABLES)
-    await db.table(name).where('workspaceId').equals(ws).delete();
 }

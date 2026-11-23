@@ -1,9 +1,10 @@
 import { StorageUnavailableError } from '../repository';
 import type { SampleWorkspace } from '../seed/generate';
+import { SAMPLE_SEED_VERSION } from '../seed/version';
 import { builtInCategories, builtInTemplates } from '../seed/templates';
 import { SAMPLE_WORKSPACE, WORKSPACES } from '../workspaces';
 import type { KeelDb } from './db';
-import { DATA_TABLES, META, type SeedMeta } from './schema';
+import { DATA_TABLES, META, type MetaRecord, type SeedMeta } from './schema';
 
 /** What every local repo module works from. */
 export interface LocalContext {
@@ -56,13 +57,15 @@ export function createLocalContext(opts: LocalContextOptions): LocalContext {
       });
     }
     const db = await openWithin(instance, timeoutMs);
-    if (!(await db.meta.get(META.seed))) {
+    if (!isCurrent(await db.meta.get(META.seed))) {
       const at = now();
       // Generate outside the transaction: awaiting anything but Dexie inside one commits it early.
       const sample = await opts.sample(at);
       await db.transaction('rw', [...DATA_TABLES, 'meta'], async () => {
         // Another tab may have seeded while we generated.
-        if (await db.meta.get(META.seed)) return;
+        if (isCurrent(await db.meta.get(META.seed))) return;
+        // A sample of another version is replaced whole; My workspace is never touched.
+        await deleteWorkspaceRows(db, SAMPLE_WORKSPACE.id);
         await writeSample(db, sample, at);
       });
     }
@@ -91,6 +94,23 @@ export function createLocalContext(opts: LocalContextOptions): LocalContext {
     now,
     newId,
   };
+}
+
+/** The sample is stored, at the version this build writes. */
+function isCurrent(record: MetaRecord | undefined): boolean {
+  return (
+    record !== undefined &&
+    (record.value as SeedMeta).version === SAMPLE_SEED_VERSION
+  );
+}
+
+/** Call inside an rw transaction over the data tables. */
+export async function deleteWorkspaceRows(
+  db: KeelDb,
+  ws: string,
+): Promise<void> {
+  for (const name of DATA_TABLES)
+    await db.table(name).where('workspaceId').equals(ws).delete();
 }
 
 async function openWithin(db: KeelDb, ms: number): Promise<KeelDb> {
@@ -131,6 +151,7 @@ export async function writeSample(
   await db.journal.bulkPut(sample.journal);
   await db.challenges.bulkPut(sample.challenges);
   const seed: SeedMeta = {
+    version: SAMPLE_SEED_VERSION,
     seed: sample.seed,
     endDate: sample.endDate,
     seededAt: at.toISOString(),

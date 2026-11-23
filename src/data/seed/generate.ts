@@ -54,6 +54,7 @@ import { CATEGORIES, categoryIn } from './templates';
 const WS = SAMPLE_WORKSPACE.id;
 
 export const SAMPLE_SEED = 20261120;
+export { SAMPLE_SEED_VERSION } from './version';
 
 export interface SampleWorkspace {
   seed: number;
