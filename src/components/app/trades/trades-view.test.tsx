@@ -287,6 +287,20 @@ test('a workspace with no trades says so', async () => {
   ).toBe('/app/trades/new');
 });
 
+test("each trade link keeps the log's filters, so the trade page can come back to them", async () => {
+  renderApp(<TradesView />, {
+    sample: sample(),
+    url: '/app/trades?symbol=ES&outcome=win',
+  });
+  const table = await screen.findByRole('table');
+  const link = (await within(table).findAllByRole('link', { name: /ES/ })).find(
+    (a) => a.getAttribute('href')?.startsWith('/app/trades/'),
+  )!;
+  expect(link.getAttribute('href')).toMatch(
+    /^\/app\/trades\/[^?]+\?symbol=ES&outcome=win$/,
+  );
+});
+
 test('Reviewed reads as a check or nothing, in words', async () => {
   renderApp(<TradesView />, {
     sample: async () => {

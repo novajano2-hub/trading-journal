@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
 import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { TradeLink } from './cells';
+
+vi.mock('next/navigation', () => import('../__fixtures__/navigation'));
 
 afterEach(cleanup);
 

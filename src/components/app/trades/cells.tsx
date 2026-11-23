@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   CheckCircle,
   SealCheck,
@@ -226,7 +227,7 @@ export function ReviewedCell({
   );
 }
 
-/** The instrument cell's link to the trade. */
+/** The instrument cell's link to the trade, carrying the log's filters (the whole query) so the trade page can return to them. */
 export function TradeLink({
   id,
   children,
@@ -234,9 +235,10 @@ export function TradeLink({
   id: string;
   children: React.ReactNode;
 }): React.JSX.Element {
+  const search = useSearchParams().toString();
   return (
     <Link
-      href={`/app/trades/${encodeURIComponent(id)}`}
+      href={`/app/trades/${encodeURIComponent(id)}${search ? `?${search}` : ''}`}
       className="inline-flex min-w-0 rounded-chip underline-offset-4 outline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-accent"
     >
       {children}
