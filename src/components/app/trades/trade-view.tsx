@@ -819,7 +819,7 @@ function TradePage({
 
       <section
         aria-label={`Trade ${trade.serial}`}
-        className={`${CARD} grid items-center gap-x-3 gap-y-4 px-[22px] py-[18px] max-sm:grid-cols-[1.5fr_1fr_1fr] sm:gap-x-0 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto]`}
+        className={`${CARD} grid items-center gap-x-3 gap-y-4 max-sm:items-start px-[22px] py-[18px] max-sm:grid-cols-[1.5fr_1fr_1fr] sm:gap-x-0 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto]`}
       >
         <div className="min-w-0 max-sm:col-span-3">
           <h2 className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[22px] leading-[1.25] font-semibold tracking-[-0.03em] text-text">
@@ -868,8 +868,12 @@ function TradePage({
             <FigureText f={display.figure(fig, true, cur)} />
           </b>
           <small className="block text-xs text-faint">
-            <FigureText f={display.cash(trade.gross, true, cur)} /> gross,{' '}
-            <FigureText f={display.cash(-trade.fees, true, cur)} /> fees
+            <span className="whitespace-nowrap">
+              <FigureText f={display.cash(trade.gross, true, cur)} /> gross,
+            </span>{' '}
+            <span className="whitespace-nowrap">
+              <FigureText f={display.cash(-trade.fees, true, cur)} /> fees
+            </span>
           </small>
         </div>
         <div className="min-w-0 lg:border-l lg:border-line lg:px-7">

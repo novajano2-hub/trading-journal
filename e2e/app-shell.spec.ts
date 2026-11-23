@@ -29,13 +29,18 @@ const ROUTES = [
 
 test('every app route renders its title without overflow; placeholders state it plainly', async ({
   page,
-}) => {
+}, info) => {
   for (const [path, title] of ROUTES) {
     await page.goto(path);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(title);
     if (path === '/app/dashboard') await ready(page);
     // The chips show only where the filters drive the page.
-    await expect(page.getByRole('group', { name: 'Filters' })).toHaveCount(
+    // Below sm the chips are one "Filters" button.
+    const chips =
+      info.project.name === 'mobile'
+        ? page.getByRole('banner').getByRole('button', { name: /^Filters/ })
+        : page.getByRole('group', { name: 'Filters' });
+    await expect(chips).toHaveCount(
       [
         '/app/dashboard',
         '/app/trades',
@@ -46,7 +51,11 @@ test('every app route renders its title without overflow; placeholders state it 
         : 0,
     );
     if (path === '/app/trades')
-      await expect(page.getByRole('table', { name: 'Trades' })).toBeVisible();
+      await expect(
+        page.getByRole(info.project.name === 'mobile' ? 'list' : 'table', {
+          name: 'Trades',
+        }),
+      ).toBeVisible();
     if (path === '/app/calendar')
       await expect(page.getByTestId('calendar-ready')).toBeVisible();
     if (path === '/app/strategies')
@@ -195,7 +204,7 @@ test('below sm the menu and title stay put; the chips and controls scroll away (
     expect(box.y + box.height).toBeLessThanOrEqual(56);
   }
   for (const gone of [
-    bar.getByRole('group', { name: 'Filters' }),
+    bar.getByRole('button', { name: /^Filters/ }),
     bar.getByRole('link', { name: 'Import' }),
     bar.getByRole('button', { name: 'Switch to dark theme' }),
   ]) {
@@ -280,29 +289,35 @@ test('Tab walks the top bar in the order it reads: title, chips, search, Display
 
   await page.goto('/app/dashboard');
   await ready(page);
+  // Below sm the chips are one Filters button (its sheet is tested in trades.spec).
+  const sheet = bar.getByRole('button', { name: /^Filters/ });
   await walkBar(page, before, [
     ...menu,
-    ...['All time', 'Symbol', 'Side', 'Strategy', 'Tags', 'More filters'].map(
-      chip,
-    ),
+    ...(mobile
+      ? [sheet]
+      : ['All time', 'Symbol', 'Side', 'Strategy', 'Tags', 'More filters'].map(
+          chip,
+        )),
     ...tail,
   ]);
 
   // Busy filters: on desktop the chips take their own row, still read before search.
   await page.goto(`/app/dashboard${BUSY}`);
-  await expect(chip('Short')).toBeEnabled();
+  await expect(mobile ? sheet : chip('Short')).toBeEnabled();
   if (!mobile) await expect(bar).toHaveAttribute('data-chips', 'wrapped');
   await walkBar(page, before, [
     ...menu,
-    ...[
-      '5 Oct-20 Nov 2026',
-      'AUDUSD, BTCUSD',
-      'Short',
-      'Opening range breakout',
-      'trend continuation',
-      'More filters',
-      'Clear filters',
-    ].map(chip),
+    ...(mobile
+      ? [sheet]
+      : [
+          '5 Oct-20 Nov 2026',
+          'AUDUSD, BTCUSD',
+          'Short',
+          'Opening range breakout',
+          'trend continuation',
+          'More filters',
+          'Clear filters',
+        ].map(chip)),
     ...tail,
   ]);
 });

@@ -104,7 +104,13 @@ test('/app/import is restyled, same behaviour', async ({ page }) => {
   await expect(
     page.getByRole('button', { name: 'Choose a file' }),
   ).toBeVisible();
-  await expect(page.getByRole('list', { name: 'Import steps' })).toBeVisible();
+  // Below sm the list is one line and a bar.
+  await expect(
+    page
+      .getByRole('list', { name: 'Import steps' })
+      .or(page.getByRole('progressbar', { name: 'Import progress' }))
+      .filter({ visible: true }),
+  ).toBeVisible();
   // A card as the Dashboard's are: a hairline border and the card shadow.
   await expect(page.locator('main .rounded-card').first()).not.toHaveCSS(
     'box-shadow',

@@ -226,7 +226,7 @@ export function FilterSheet({
                   <Dialog.Title
                     ref={heading}
                     tabIndex={-1}
-                    className="text-[15px] font-semibold outline-none"
+                    className="text-[15px] font-semibold outline-none!"
                   >
                     Filters
                   </Dialog.Title>
