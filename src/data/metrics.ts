@@ -129,7 +129,7 @@ export function metricsByCurrency(
       netDays,
       daySummary: daySummary(days, ctx),
       equity: equityCurve(own, startingBalance, ctx),
-      drawdown: maxDrawdown(own, startingBalance, ctx, ownFlows),
+      drawdown: maxDrawdown(days, riskStart, riskFlows),
       tradeStreaks: tradeStreaks(own, ctx),
       dayStreaks: dayStreaks(days, ctx),
       dayDurations: dayDurations(dayOwn, ctx),

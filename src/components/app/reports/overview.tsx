@@ -16,7 +16,6 @@ import { winsVsLosses } from '@/domain/metrics/breakdowns';
 import { pnlOf } from '@/domain/metrics/context';
 import { timeSeries } from '@/domain/metrics/series';
 import { rExpectancy, summarize } from '@/domain/metrics/summary';
-import { localDate } from '@/domain/time';
 import { isClosed } from '@/domain/trade-status';
 import { formatUnitValue, useDisplay } from '@/lib/display';
 import { formatDuration, formatPct, plural } from '@/lib/format';
@@ -135,23 +134,21 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
   // The max drawdown, from its peak to its low, shaded on the cumulative line.
   const drawdownText =
     drawdown.amount > 0
-      ? `Max drawdown after each trade ${display.cash(-drawdown.amount, true, currency).text}${drawdown.pct === null ? '' : `, ${formatPct(drawdown.pct, 1)}`}`
+      ? `Max drawdown by day ${display.cash(-drawdown.amount, true, currency).text}${drawdown.pct === null ? '' : `, ${formatPct(drawdown.pct, 1)}`}`
       : '';
   const shade = useMemo<Shade | undefined>(
     () =>
-      drawdown.amount > 0 && drawdown.troughAt
+      drawdown.amount > 0 && drawdown.troughDay
         ? {
             name: 'drawdown',
             // A fall from the starting balance has no peak trade: it runs from the first day.
-            from: drawdown.peakAt
-              ? localDate(drawdown.peakAt, ctx.timeZone)
-              : '',
-            to: localDate(drawdown.troughAt, ctx.timeZone),
+            from: drawdown.peakDay ?? '',
+            to: drawdown.troughDay,
             label: drawdownText,
           }
         : undefined,
     // The label is the unit-aware text of the amount: it changes with these.
-    [drawdown, ctx.timeZone, drawdownText],
+    [drawdown, drawdownText],
   );
   const rExp = useMemo(() => rExpectancy(p.trades, ctx), [p.trades, ctx]);
   const r = (v: number, signed: boolean) =>

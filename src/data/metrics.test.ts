@@ -29,6 +29,28 @@ describe('metricsByCurrency', () => {
     expect(usd!.equity[0]!.equity).toBe(7_500_100);
   });
 
+  test('the headline drawdown is the daily curve: a fall inside one day is none, and the % is over the balance at the peak day', () => {
+    const t = (net: number, serial: number, closedAt: string) =>
+      makeTrade({ net, serial, closedAt });
+    const trades = [
+      t(500, 1, '2026-03-02T15:00:00Z'),
+      t(-400, 2, '2026-03-02T16:00:00Z'),
+      t(-300, 3, '2026-03-03T15:00:00Z'),
+    ];
+    const [usd] = metricsByCurrency(trades, {
+      accounts: [acct('a', 10_000)],
+      ctx,
+      baseCurrency: 'USD',
+    });
+    // Days: +100, then -300: peak 10,100, trough 9,800.
+    expect(usd!.drawdown.amount).toBe(300);
+    expect(usd!.drawdown).toMatchObject({
+      peakDay: '2026-03-02',
+      troughDay: '2026-03-03',
+    });
+    expect(usd!.drawdown.pct).toBeCloseTo(300 / 10_100, 6);
+  });
+
   test('base currency first, others follow; each partition is single-currency', () => {
     const out = metricsByCurrency(
       [

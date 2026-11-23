@@ -71,9 +71,18 @@ test('the R distribution tab clamps, counts trades without a stop, and the drawd
   expect(new URLSearchParams(window.location.search).get('tab')).toBe('r');
 });
 
+/** The breakdown sample with Tuesday turned into a losing day: a daily fall of 9,000 after Monday's peak of 6,000. */
+async function lossDaySample() {
+  const s = await breakdownSample();
+  s.trades = s.trades.map((t) =>
+    t.id === 'b-3' ? { ...t, net: -7000, gross: -7000 } : t,
+  );
+  return s;
+}
+
 test('the R distribution and the drawdown chart say the range and their key values; Privacy hides the amounts', async () => {
   const { unmount } = renderApp(<RiskView />, {
-    sample: breakdownSample,
+    sample: lossDaySample,
     url: '/app/reports/risk?tab=dist',
   });
   const page = await screen.findByTestId('reports-risk');
@@ -84,7 +93,7 @@ test('the R distribution and the drawdown chart say the range and their key valu
   ).toBeTruthy();
   expect(
     within(page).getByRole('img', {
-      name: /^Drawdown from the equity peak, by day, all time\. Max drawdown −\$40\.00/,
+      name: /^Drawdown from the daily P&L peak, all time\. Max drawdown −\$90\.00/,
     }),
   ).toBeTruthy();
   unmount();
@@ -94,7 +103,7 @@ test('the R distribution and the drawdown chart say the range and their key valu
   const repository = createLocalRepository({
     indexedDB: new IDBFactory(),
     IDBKeyRange,
-    sample: breakdownSample,
+    sample: lossDaySample,
   });
   await repository.prefs.update({ displayUnit: 'privacy' });
   renderApp(<RiskView />, { repository, url: '/app/reports/risk?tab=dist' });

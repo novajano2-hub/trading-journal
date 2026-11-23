@@ -175,9 +175,18 @@ test('Risk in R shows planned and realized R, trades without a stop, and R expec
     expect(card.querySelector(`[data-metric-tip="${id}"]`), id).not.toBeNull();
 });
 
+/** The breakdown sample with Tuesday turned into a losing day: a daily fall of 9,000 after Monday's peak of 6,000. */
+async function lossDaySample() {
+  const s = await breakdownSample();
+  s.trades = s.trades.map((t) =>
+    t.id === 'b-3' ? { ...t, net: -7000, gross: -7000 } : t,
+  );
+  return s;
+}
+
 test('the cumulative line carries the max drawdown band, and a clean run has none', async () => {
   const { container, unmount } = renderApp(<OverviewView />, {
-    sample: breakdownSample,
+    sample: lossDaySample,
     url: URL,
   });
   await ready();
@@ -255,13 +264,22 @@ test('both charts say the range and their key values, and Privacy hides the amou
   ).toBeTruthy();
 });
 
-test('the drawdown band is labelled as measured after each trade', async () => {
-  const { container } = renderApp(<OverviewView />, {
+test('the drawdown band is labelled as measured by day, and a fall inside a day is none', async () => {
+  const { container, unmount } = renderApp(<OverviewView />, {
+    sample: lossDaySample,
+    url: URL,
+  });
+  await ready();
+  expect(container.textContent).toContain('Max drawdown by day');
+  expect(container.textContent).toContain('−$90.00');
+  unmount();
+  // Every day of the plain sample ends green, though a trade fell inside Monday.
+  const plain = renderApp(<OverviewView />, {
     sample: breakdownSample,
     url: URL,
   });
   await ready();
-  expect(container.textContent).toContain('Max drawdown after each trade');
+  expect(plain.container.querySelector('[data-band="drawdown"]')).toBeNull();
 });
 
 test('the Days card gives the average green day, the average red day and trades per day', async () => {

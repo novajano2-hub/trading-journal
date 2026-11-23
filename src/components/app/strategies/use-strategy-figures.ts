@@ -10,6 +10,7 @@ import {
   useTrades,
 } from '@/data/query/hooks';
 import { classify, pnlOf } from '@/domain/metrics/context';
+import { dailyPnl } from '@/domain/metrics/days';
 import { maxDrawdown } from '@/domain/metrics/equity';
 import { ruleStats, type RuleStat } from '@/domain/metrics/rules';
 import { tradeStreaks, type StreakResult } from '@/domain/metrics/streaks';
@@ -38,7 +39,7 @@ export interface StrategyFigures {
   leftOut: number;
   /** The closed winners, for the average win in any display unit. */
   winIds: string[];
-  /** The closed trades inside the deepest drawdown, from just after the peak to the trough. */
+  /** The closed trades inside the deepest drawdown, closed on the days after the peak day up to the trough day. */
   drawdownIds: string[];
   rules: RuleStat[];
   /** Rule checks kept of those answered, on the trades each rule applies to. */
@@ -103,11 +104,10 @@ export function useStrategyData(): {
       // On the real balance of the accounts it traded in, as the reports read it.
       const accountIds = new Set(read.map((t) => t.accountId));
       const drawdown = maxDrawdown(
-        read,
+        dailyPnl(read, ctx),
         accounts.data
           .filter((a) => accountIds.has(a.id))
           .reduce((n, a) => n + a.startingBalance, 0),
-        ctx,
         flows.data.filter((f) => accountIds.has(f.accountId)),
       );
       figures.set(strategy.id, {
@@ -129,12 +129,14 @@ export function useStrategyData(): {
           drawdown.amount === 0
             ? []
             : closed
-                .filter(
-                  (t) =>
-                    (drawdown.peakAt === undefined ||
-                      Date.parse(t.closedAt) > Date.parse(drawdown.peakAt)) &&
-                    Date.parse(t.closedAt) <= Date.parse(drawdown.troughAt!),
-                )
+                .filter((t) => {
+                  const day = localDate(t.closedAt, prefs.data.timeZone);
+                  return (
+                    (drawdown.peakDay === undefined ||
+                      day > drawdown.peakDay) &&
+                    day <= drawdown.troughDay!
+                  );
+                })
                 .map((t) => t.id),
         rules,
         adherence: answered === 0 ? null : kept / answered,

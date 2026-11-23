@@ -83,13 +83,10 @@ function Distribution({ data }: { data: ReportData }): React.JSX.Element {
 function DrawdownCard({ data }: { data: ReportData }): React.JSX.Element {
   const id = useId();
   const display = useDisplay();
-  const { partition: p, ctx, currency } = data;
-  const points = useMemo(
-    () => drawdownSeries(p.equity, p.startingBalance, ctx.timeZone),
-    [p.equity, p.startingBalance, ctx.timeZone],
-  );
+  const { partition: p, currency } = data;
+  const points = useMemo(() => drawdownSeries(p.days), [p.days]);
   const dd = p.drawdown;
-  const name = `Drawdown from the equity peak, by day, ${data.caption}. Max drawdown ${display.cash(-dd.amount, true, currency).label}.`;
+  const name = `Drawdown from the daily P&L peak, ${data.caption}. Max drawdown ${display.cash(-dd.amount, true, currency).label}.`;
   return (
     <section aria-labelledby={id} className={`${CARD} ${CARD_PAD}`}>
       <CardHeader
@@ -99,7 +96,7 @@ function DrawdownCard({ data }: { data: ReportData }): React.JSX.Element {
         title="Drawdown"
         after={
           <span className="text-[12.5px] text-faint">
-            How far under its peak the equity line sat, deepest each day
+            How far under its peak the cumulative daily P&L sat, day by day
           </span>
         }
         end={

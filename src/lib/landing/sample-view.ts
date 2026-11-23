@@ -236,7 +236,7 @@ export function getSampleView(): SampleView {
     summary: summarize(trades, ctx),
     days,
     // The sample has no deposits or withdrawals.
-    drawdown: maxDrawdown(trades, start, ctx, []),
+    drawdown: maxDrawdown(days, start, []),
     equity: equityCurve(trades, start, ctx),
     prop: evaluateProp({
       startingBalance: start,

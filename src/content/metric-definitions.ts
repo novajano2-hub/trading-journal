@@ -276,7 +276,7 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'max-drawdown': {
     label: 'Max drawdown',
     definition:
-      'The largest fall of the equity line from a peak to a later low, after each closed trade, with that fall as a share of the real balance at the peak: the equity there plus the deposits and withdrawals dated up to it. Equity starts at the starting balances of the selected accounts.',
+      'The largest fall of the running total of your daily {basis} P&L from a peak day to a later low day, as a day-by-day line, with that fall as a share of the real balance on the peak day: the balance there plus the deposits and withdrawals dated up to it. A day books the trades by the day they exit, as the calendar does, and the line starts at the starting balances of the selected accounts. A dip within one day does not count.',
   },
   'win-streak': {
     label: 'Longest win streak',

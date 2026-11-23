@@ -1,7 +1,7 @@
-import { localDate } from '../time';
 import { closedInOrder } from '../trade-status';
 import type { Cents, Trade } from '../types';
 import { pnlOf, type MetricContext } from './context';
+import type { DayStat } from './days';
 
 export interface EquityPoint {
   time: string;
@@ -11,8 +11,9 @@ export interface EquityPoint {
 export interface Drawdown {
   amount: Cents;
   pct: number | null;
-  peakAt?: string;
-  troughAt?: string;
+  /** Local dates (YYYY-MM-DD) of the peak day and the trough day. */
+  peakDay?: string;
+  troughDay?: string;
 }
 
 /** Closed-trade equity on ctx.pnlBasis; the input must be a single-currency set. */
@@ -29,18 +30,18 @@ export function equityCurve(
 }
 
 /**
- * The deepest fall from a running peak. `pct` is that fall over the real balance at
- * the peak: the equity there plus the `flows` (deposits and withdrawals) dated on or
- * before the peak's local day; the starting-balance peak counts those dated before
- * the first closed trade's day.
+ * The deepest fall of the cumulative daily P&L from a running peak, as TradeZella
+ * reads it: days are booked by exit realization (the days the calendar shows), the
+ * peak starts at the starting balance, and `pct` is the fall over the real balance
+ * at the peak: the equity there plus the `flows` (deposits and withdrawals) dated on
+ * or before the peak day; the starting-balance peak counts those dated before the
+ * first day. `peakDay` is absent when the fall starts from the starting balance.
  */
 export function maxDrawdown(
-  trades: readonly Trade[],
+  days: readonly DayStat[],
   startingBalance: Cents,
-  ctx: MetricContext,
   flows: readonly { date: string; amount: Cents }[] = [],
 ): Drawdown {
-  const curve = equityCurve(trades, startingBalance, ctx);
   const flowsTo = (date: string | undefined, inclusive: boolean): Cents =>
     flows.reduce(
       (n, f) =>
@@ -49,24 +50,25 @@ export function maxDrawdown(
           : n,
       0,
     );
-  const firstDay = curve[0] && localDate(curve[0].time, ctx.timeZone);
+  let equity = startingBalance;
   let peak = startingBalance;
-  let peakBase = startingBalance + flowsTo(firstDay, false);
-  let peakAt: string | undefined;
+  let peakBase = startingBalance + flowsTo(days[0]?.date, false);
+  let peakDay: string | undefined;
   let amount = 0;
   let pct: number | null = 0;
   let sawPositivePeak = false;
   let result: Drawdown = { amount: 0, pct: 0 };
-  for (const p of curve) {
-    if (p.equity > peak) {
-      peak = p.equity;
-      peakAt = p.time;
-      peakBase = peak + flowsTo(localDate(p.time, ctx.timeZone), true);
+  for (const d of days) {
+    equity += d.net;
+    if (equity > peak) {
+      peak = equity;
+      peakDay = d.date;
+      peakBase = peak + flowsTo(d.date, true);
     }
-    const dd = peak - p.equity;
+    const dd = peak - equity;
     if (dd > amount) {
       amount = dd;
-      result = { ...result, amount, peakAt, troughAt: p.time };
+      result = { ...result, amount, peakDay, troughDay: d.date };
     }
     if (peakBase > 0) {
       sawPositivePeak = true;
@@ -80,23 +82,18 @@ export function maxDrawdown(
 }
 
 /**
- * How far the equity line sits under its highest point so far, a value per
- * local day: the deepest it reached that day, 0 or below. The peak starts at the
- * starting balance, as `maxDrawdown` reads it, so the curve's low is that figure.
+ * How far the cumulative daily P&L sits under its highest point so far, a value per
+ * day, 0 or below. The peak starts at the starting balance, as `maxDrawdown` reads
+ * it, so the curve's low is that figure.
  */
 export function drawdownSeries(
-  equity: readonly EquityPoint[],
-  startingBalance: Cents,
-  timeZone: string,
+  days: readonly DayStat[],
 ): { key: string; value: number }[] {
-  let peak = startingBalance;
-  const days = new Map<string, number>();
-  for (const p of equity) {
-    if (p.equity > peak) peak = p.equity;
-    const key = localDate(p.time, timeZone);
-    days.set(key, Math.min(days.get(key) ?? 0, p.equity - peak));
-  }
-  return [...days]
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([key, value]) => ({ key, value }));
+  let equity = 0;
+  let peak = 0;
+  return days.map((d) => {
+    equity += d.net;
+    if (equity > peak) peak = equity;
+    return { key: d.date, value: equity - peak };
+  });
 }
