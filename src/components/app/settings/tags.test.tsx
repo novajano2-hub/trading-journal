@@ -268,3 +268,25 @@ test('the Tags tab searches by name, category and description, and counts trades
   );
   expect(within(table).getByRole('row', { name: /^fomo/ })).toBeTruthy();
 });
+
+test('a failed trades read shows the failure, not a loader or a false empty state', async () => {
+  const real = repo();
+  const broken = {
+    ...real,
+    trades: {
+      ...real.trades,
+      list: async () => {
+        throw new Error('no read');
+      },
+    },
+  };
+  const { container } = renderApp(<TagsSettings />, {
+    repository: broken,
+    url: '/app/settings/tags',
+  });
+  await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+  expect(screen.getByRole('alert').textContent).toContain(
+    "couldn't read your tags",
+  );
+  expect(container.textContent).not.toContain('Loading');
+});

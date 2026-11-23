@@ -424,3 +424,29 @@ test('Privacy hides the Mistakes P&L in the panel too', async () => {
   expect(panel.textContent).toContain('Mistakes');
   expect(everyString(container).filter((x) => /\$\d/.test(x))).toEqual([]);
 });
+
+test('a failed cashFlows read shows the failure, not a loader or a false empty state', async () => {
+  const real = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+  const broken = {
+    ...real,
+    cashFlows: {
+      ...real.cashFlows,
+      list: async () => {
+        throw new Error('no read');
+      },
+    },
+  };
+  const { container } = renderApp(<CalendarView />, {
+    repository: broken,
+    url: '/app/calendar',
+  });
+  await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+  expect(screen.getByRole('alert').textContent).toContain(
+    "couldn't load the calendar",
+  );
+  expect(container.textContent).not.toContain('Loading');
+});

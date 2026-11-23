@@ -259,7 +259,8 @@ export function TradesView(): React.JSX.Element {
     status: undefined,
     reviewed: undefined,
   });
-  const allTrades = useTrades().data;
+  const tradesQuery = useTrades();
+  const allTrades = tradesQuery.data;
   const prefs = usePrefs().data;
   const accounts = useAccounts().data;
   const archivedAccountIds = useMemo(
@@ -271,7 +272,8 @@ export function TradesView(): React.JSX.Element {
       ),
     [accounts],
   );
-  const flows = useCashFlows().data;
+  const flowsQuery = useCashFlows();
+  const flows = flowsQuery.data;
   const strategies = useStrategies().data;
   const tags = useTags().data;
   const journal = useJournal().data;
@@ -392,7 +394,8 @@ export function TradesView(): React.JSX.Element {
     getRowId: (t) => t.id,
   });
 
-  const error = set.error;
+  // Every read the page waits on: one failing would leave the skeleton up for good.
+  const error = set.error ?? tradesQuery.error ?? flowsQuery.error;
   if (error) {
     return (
       <StateBlock

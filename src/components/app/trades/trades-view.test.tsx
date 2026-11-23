@@ -422,3 +422,29 @@ test('under Privacy no amount survives anywhere in the trade log', async () => {
   const t = await table();
   expect(within(t).getAllByText('hidden amount').length).toBeGreaterThan(0);
 });
+
+test('a failed cashFlows read shows the failure, not a loader or a false empty state', async () => {
+  const real = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+  const broken = {
+    ...real,
+    cashFlows: {
+      ...real.cashFlows,
+      list: async () => {
+        throw new Error('no read');
+      },
+    },
+  };
+  const { container } = renderApp(<TradesView />, {
+    repository: broken,
+    url: '/app/trades',
+  });
+  await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+  expect(screen.getByRole('alert').textContent).toContain(
+    "Your trades couldn't load.",
+  );
+  expect(container.textContent).not.toContain('Loading');
+});

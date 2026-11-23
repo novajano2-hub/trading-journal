@@ -355,7 +355,8 @@ type Dialog =
 export function TagsSettings(): React.JSX.Element {
   const categories = useTagCategories();
   const tags = useTags();
-  const trades = useTrades().data;
+  const tradesQuery = useTrades();
+  const trades = tradesQuery.data;
   const removeTag = useRemoveTag();
   const removeCategory = useRemoveTagCategory();
   const baseId = useId();
@@ -399,7 +400,7 @@ export function TagsSettings(): React.JSX.Element {
     });
   }, [model, tags.data, query]);
 
-  const error = categories.error ?? tags.error;
+  const error = categories.error ?? tags.error ?? tradesQuery.error;
   const loading = !cats || !tags.data || !model;
 
   const categoryActions = (c: TagCategory): MenuAction[] => [

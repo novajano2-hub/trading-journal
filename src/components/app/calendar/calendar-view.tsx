@@ -287,9 +287,11 @@ export function CalendarView(): React.JSX.Element {
   const set = useTradeSet(filters);
   const prefs = usePrefs().data;
   const notes = useJournal().data;
-  const allTrades = useTrades().data;
+  const tradesQuery = useTrades();
+  const allTrades = tradesQuery.data;
   const accounts = useAccounts().data;
-  const flows = useCashFlows().data;
+  const flowsQuery = useCashFlows();
+  const flows = flowsQuery.data;
   const strategies = useStrategies().data;
   const tags = useTags().data;
   const tagCategories = useTagCategories().data;
@@ -359,7 +361,8 @@ export function CalendarView(): React.JSX.Element {
     [accounts, flows, allTrades, prefs, month, currency, accountIds],
   );
 
-  const error = set.error ?? null;
+  // The % base reads every trade and the flows: a failed read is not a quiet fall back to dollars.
+  const error = set.error ?? tradesQuery.error ?? flowsQuery.error ?? null;
   if (error)
     return (
       <div role="alert" className={`${CARD} mx-5 p-6 text-[14px] text-text`}>
