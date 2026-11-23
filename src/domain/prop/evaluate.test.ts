@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { makeTrade } from '../__fixtures__/trades';
-import type { DrawdownType, Trade } from '../types';
+import type { Cents, DrawdownType, Execution, Trade } from '../types';
 import { evaluateProp } from './evaluate';
 
 interface Opts {
@@ -298,5 +298,80 @@ describe('evaluateProp', () => {
     const s = evaluateProp(base);
     expect(s.dailyLoss.breachedOn).toBe('2026-03-02');
     expect(s.dailyLoss.breachedNet).toBe(-120000);
+  });
+
+  test('a period of 0 or fewer days is no period', () => {
+    const base = S();
+    for (const periodDays of [0, -3]) {
+      const s = evaluateProp({
+        ...base,
+        rules: { ...base.rules, periodDays },
+        now: '2026-04-06T18:00:00Z',
+      });
+      expect(s.period).toBeNull();
+      expect(s.overall).toBe('in-progress');
+    }
+  });
+
+  describe('the daily loss books each exit on its own local day', () => {
+    const fill = (
+      id: string,
+      side: 'buy' | 'sell',
+      price: number,
+      time: string,
+    ): Execution => ({
+      id,
+      accountId: 'a1',
+      symbol: 'ESZ5',
+      side,
+      qty: 1,
+      price,
+      time,
+      fees: 0,
+      commission: 0,
+    });
+    /** A long of 2 contracts opened on the 2nd and closed on the 3rd, one exit each day (ES: $50 a point). */
+    const twoDay = (exit1: number, exit2: number, net: Cents): Trade[] => [
+      makeTrade({
+        net,
+        serial: 1,
+        openedAt: '2026-03-02T15:00:00Z',
+        closedAt: '2026-03-03T15:00:00Z',
+        executions: [
+          fill('e1', 'buy', 4500, '2026-03-02T15:00:00Z'),
+          fill('e2', 'buy', 4500, '2026-03-02T15:01:00Z'),
+          fill('e3', 'sell', exit1, '2026-03-02T16:00:00Z'),
+          fill('e4', 'sell', exit2, '2026-03-03T15:00:00Z'),
+        ],
+      }),
+    ];
+    const run = (trades: Trade[]) =>
+      evaluateProp({
+        ...S(),
+        rules: { ...S().rules, drawdownType: 'static', maxDrawdown: 900000 },
+        trades,
+        now: '2026-03-04T18:00:00Z',
+        today: '2026-03-04',
+      });
+
+    test('a loss exited on day 1 breaches on day 1, though the trade closes on day 2', () => {
+      // Exit 1: -20 points = -$1,000 on the 2nd; exit 2 breaks even on the 3rd.
+      const s = run(twoDay(4480, 4500, -100000));
+      expect(s.dailyLoss.state).toBe('breached');
+      expect(s.dailyLoss.breachedOn).toBe('2026-03-02');
+      expect(s.dailyLoss.breachedNet).toBe(-100000);
+      expect(s.dailyLoss.worstDay).toEqual({
+        date: '2026-03-02',
+        net: -100000,
+      });
+    });
+
+    test('two exits of -$800 on two days break neither day', () => {
+      const s = run(twoDay(4484, 4484, -160000));
+      expect(s.dailyLoss.state).not.toBe('breached');
+      expect(s.dailyLoss.breachedOn).toBeUndefined();
+      // The track and the breach agree: the day's worst is one exit.
+      expect(s.dailyLoss.worstDay?.net).toBe(-80000);
+    });
   });
 });

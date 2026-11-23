@@ -1,6 +1,7 @@
 import { defaultMetricContext } from '../metrics/context';
 import { dailyPnl } from '../metrics/days';
 import { localDate } from '../time';
+import { sizedRealizations } from '../metrics/realized';
 import { closedInOrder, isClosed } from '../trade-status';
 import type { Cents, DrawdownType, PropRuleSet, Trade } from '../types';
 
@@ -96,15 +97,20 @@ export function evaluateProp(input: {
   );
 
   // The period runs from its start to `periodDays` days on; later trades don't count.
+  // A period of 0 or fewer days is no period.
+  const periodDays =
+    rules.periodDays !== undefined && rules.periodDays > 0
+      ? rules.periodDays
+      : undefined;
   const periodStart =
-    rules.periodDays === undefined
+    periodDays === undefined
       ? undefined
       : (input.startDate ??
         (closed[0] ? localDate(closed[0].closedAt, timeZone) : undefined));
   const lastDay =
-    periodStart === undefined || rules.periodDays === undefined
+    periodStart === undefined || periodDays === undefined
       ? undefined
-      : addDays(periodStart, rules.periodDays - 1);
+      : addDays(periodStart, periodDays - 1);
   const trades =
     lastDay === undefined
       ? closed
@@ -127,11 +133,9 @@ export function evaluateProp(input: {
   let breachedNet: Cents | undefined;
   let breachedEquity: Cents | undefined;
   let breachedFloor: Cents | undefined;
-  let dayRunning = 0; // closed-trade net so far on currentDay
 
   for (const t of trades) {
     const day = localDate(t.closedAt, timeZone);
-    if (day !== currentDay) dayRunning = 0;
     if (
       rules.drawdownType === 'eod-trailing' &&
       currentDay !== undefined &&
@@ -141,18 +145,33 @@ export function evaluateProp(input: {
     }
     currentDay = day;
     equity += t.net;
-    dayRunning += t.net;
-    // Daily loss breaches the first time the running day net touches the limit.
-    if (breachedOn === undefined && dayRunning <= -rules.dailyLossLimit) {
-      breachedOn = day;
-      breachedNet = dayRunning;
-    }
     if (breachedAt === undefined && equity <= floorFor(peak)) {
       breachedAt = t.closedAt;
       breachedEquity = equity;
       breachedFloor = floorFor(peak);
     }
     if (rules.drawdownType === 'trailing') peak = Math.max(peak, equity);
+  }
+  // Daily loss breaches the first time a local day's running net, booked by
+  // exit fill as the daily-loss track is, touches the limit.
+  const exits = trades
+    .flatMap((t) =>
+      sizedRealizations(t).map((r) => ({
+        at: Date.parse(r.time),
+        serial: t.serial,
+        net: r.net,
+        day: localDate(r.time, timeZone),
+      })),
+    )
+    .sort((a, b) => a.at - b.at || a.serial - b.serial);
+  const running = new Map<string, Cents>();
+  for (const x of exits) {
+    const sum = (running.get(x.day) ?? 0) + x.net;
+    running.set(x.day, sum);
+    if (breachedOn === undefined && sum <= -rules.dailyLossLimit) {
+      breachedOn = x.day;
+      breachedNet = sum;
+    }
   }
   // eod-trailing: the last trading day's close counts once that day has ended.
   if (
