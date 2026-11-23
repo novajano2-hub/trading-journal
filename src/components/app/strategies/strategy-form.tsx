@@ -232,9 +232,10 @@ function StrategyEditor({
       ? undefined
       : groups.find((g) => g.key === removingGroup);
   const removingRules = removing?.rules.length ?? 0;
+  // Until the trades have loaded the count is unknown, and Delete waits.
   const tradeCount = initial
-    ? (figures?.figures.get(initial.id)?.tradeCount ?? 0)
-    : 0;
+    ? figures?.figures.get(initial.id)?.tradeCount
+    : undefined;
   const back = initial
     ? `/app/strategies/${encodeURIComponent(initial.id)}`
     : '/app/strategies';
@@ -668,8 +669,9 @@ function StrategyEditor({
           {initial ? (
             <button
               type="button"
+              disabled={tradeCount === undefined}
               onClick={() => setDeleting(true)}
-              className={`${TEXT_BTN} ml-auto !text-loss hover:!opacity-80`}
+              className={`${TEXT_BTN} ml-auto !text-loss hover:!opacity-80 disabled:cursor-not-allowed disabled:opacity-50`}
             >
               <Trash size={14} aria-hidden="true" />
               Delete strategy
@@ -697,7 +699,7 @@ function StrategyEditor({
         <ConfirmDialog
           open={deleting}
           title={`Delete ${initial.name}?`}
-          body={deleteBody(tradeCount)}
+          body={deleteBody(tradeCount ?? 0)}
           confirmLabel="Delete"
           danger
           onConfirm={async () => {

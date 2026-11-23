@@ -4,6 +4,7 @@ import { ListChecks, Warning } from '@phosphor-icons/react/dist/ssr';
 import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { IconTile } from '@/components/ui/icon-tile';
+import { plural } from '@/lib/format';
 import { StorageUnavailableError } from '@/data/repository';
 import { CARD } from '../dashboard/shared';
 
@@ -108,5 +109,45 @@ export function NoStrategy(): React.JSX.Element {
         </Link>
       }
     />
+  );
+}
+
+/** Said where a strategy's figures stand, when some of its trades are in another currency. */
+export function LeftOutNote({
+  count,
+  className = '',
+}: {
+  count: number;
+  className?: string;
+}): React.JSX.Element | null {
+  if (count <= 0) return null;
+  return (
+    <p className={`text-[12.5px] leading-[1.45] text-faint ${className}`}>
+      {count} {plural(count, 'trade')} in{' '}
+      {plural(count, 'another currency', 'other currencies')}{' '}
+      {plural(count, 'is', 'are')} left out of these figures.
+    </p>
+  );
+}
+
+/** A failed archive or unarchive: neutral, since nothing here is money. */
+export function ArchiveFailed({
+  name,
+  archiving,
+  className = '',
+}: {
+  name: string;
+  archiving: boolean;
+  className?: string;
+}): React.JSX.Element {
+  return (
+    <p
+      role="alert"
+      className={`flex items-center gap-1.5 text-[13px] text-text ${className}`}
+    >
+      <Warning size={14} aria-hidden="true" className="flex-none text-muted" />
+      {name} couldn&apos;t be {archiving ? 'archived' : 'unarchived'}. Try
+      again.
+    </p>
   );
 }

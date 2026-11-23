@@ -8,11 +8,12 @@ import {
   useStrategies,
   useTrades,
 } from '@/data/query/hooks';
-import { pnlOf } from '@/domain/metrics/context';
+import { classify, pnlOf } from '@/domain/metrics/context';
 import { maxDrawdown } from '@/domain/metrics/equity';
 import { ruleStats, type RuleStat } from '@/domain/metrics/rules';
 import { tradeStreaks, type StreakResult } from '@/domain/metrics/streaks';
 import { summarize, type Summary } from '@/domain/metrics/summary';
+import { localDate } from '@/domain/time';
 import { closedInOrder } from '@/domain/trade-status';
 import type { Cents, Strategy, Trade } from '@/domain/types';
 import { pctBaseOf, type FigureSource } from '@/lib/display';
@@ -30,6 +31,14 @@ export interface StrategyFigures {
   closedIds: string[];
   /** Cumulative basis P&L by close, from 0. */
   equity: number[];
+  /** The trading date (YYYY-MM-DD) each closed trade closed on, in `closedIds` order. */
+  equityDates: string[];
+  /** Trades the figures leave out because their P&L is in another currency. */
+  leftOut: number;
+  /** The closed winners, for the average win in any display unit. */
+  winIds: string[];
+  /** The closed trades inside the deepest drawdown, from just after the peak to the trough. */
+  drawdownIds: string[];
   rules: RuleStat[];
   /** Rule checks kept of those answered, on the trades each rule applies to. */
   adherence: number | null;
@@ -45,7 +54,7 @@ export interface StrategyData {
   source: FigureSource;
   strategies: Strategy[];
   /** Closed trades with no strategy, and their P&L. */
-  unassigned: { count: number; pnl: Cents };
+  unassigned: { count: number; pnl: Cents; ids: string[] };
   basis: 'net' | 'gross';
 }
 
@@ -79,6 +88,7 @@ export function useStrategyData(): {
       const answered = rules.reduce((n, r) => n + r.kept + r.broken, 0);
       const brokenIds = [...new Set(rules.flatMap((r) => r.brokenTradeIds))];
       const brokenSet = new Set(brokenIds);
+      const drawdown = maxDrawdown(read, 0, ctx);
       figures.set(strategy.id, {
         strategy,
         tradeCount: own.length,
@@ -87,6 +97,24 @@ export function useStrategyData(): {
         pnl: closed.reduce((n, t) => n + pnlOf(t, ctx.pnlBasis), 0),
         closedIds: closed.map((t) => t.id),
         equity: [0, ...closed.map((t) => (run += pnlOf(t, ctx.pnlBasis)))],
+        equityDates: closed.map((t) =>
+          localDate(t.closedAt, prefs.data.timeZone),
+        ),
+        leftOut: own.length - read.length,
+        winIds: closed
+          .filter((t) => classify(t, ctx).outcome === 'win')
+          .map((t) => t.id),
+        drawdownIds:
+          drawdown.amount === 0
+            ? []
+            : closed
+                .filter(
+                  (t) =>
+                    (drawdown.peakAt === undefined ||
+                      Date.parse(t.closedAt) > Date.parse(drawdown.peakAt)) &&
+                    Date.parse(t.closedAt) <= Date.parse(drawdown.troughAt!),
+                )
+                .map((t) => t.id),
         rules,
         adherence: answered === 0 ? null : kept / answered,
         broken: {
@@ -95,7 +123,7 @@ export function useStrategyData(): {
             .filter((t) => brokenSet.has(t.id))
             .reduce((n, t) => n + pnlOf(t, ctx.pnlBasis), 0),
         },
-        drawdown: maxDrawdown(read, 0, ctx).amount,
+        drawdown: drawdown.amount,
         streaks: tradeStreaks(read, ctx),
       });
     }
@@ -121,6 +149,7 @@ export function useStrategyData(): {
       unassigned: {
         count: loose.length,
         pnl: loose.reduce((n, t) => n + pnlOf(t, ctx.pnlBasis), 0),
+        ids: loose.map((t) => t.id),
       },
       basis: ctx.pnlBasis,
     } satisfies StrategyData;

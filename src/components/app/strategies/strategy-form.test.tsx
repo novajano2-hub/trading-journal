@@ -8,6 +8,9 @@ import {
 } from '@testing-library/react';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
+import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
+import { fixtureSample } from '@/data/__fixtures__/sample';
+import { createLocalRepository } from '@/data/local/local-repository';
 import { SAMPLE_WORKSPACE } from '@/data/workspaces';
 import { renderApp } from '../__fixtures__/render-app';
 import { StrategyForm } from './strategy-form';
@@ -165,4 +168,29 @@ test('editing keeps the rules ids, so their trade checks survive a rename', asyn
     'r-1',
     'r-2',
   ]);
+});
+
+test("Delete stays disabled until the strategy's trade count has loaded, so the confirm never says 0 trades", async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+  const list = repository.trades.list.bind(repository.trades);
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((r) => (release = r));
+  repository.trades.list = async (...a) => {
+    await gate;
+    return list(...a);
+  };
+  renderApp(<StrategyForm strategyId="str-1" />, {
+    repository,
+    url: '/app/strategies/str-1/edit',
+  });
+  const del = (await screen.findByRole('button', {
+    name: 'Delete strategy',
+  })) as HTMLButtonElement;
+  expect(del.disabled).toBe(true);
+  release();
+  await waitFor(() => expect(del.disabled).toBe(false));
 });

@@ -12,7 +12,6 @@ import {
   Plus,
 } from '@phosphor-icons/react/dist/ssr';
 import { FigureText } from '@/components/product/figure-text';
-import { Sparkline } from '@/components/product/sparkline';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { Chip } from '@/components/ui/chip';
 import { IconTile } from '@/components/ui/icon-tile';
@@ -32,8 +31,19 @@ import {
   pfText,
   toneOf,
 } from './strategy-style';
-import { StateBlock, StrategyError, StrategySkeleton } from './strategy-states';
-import { useStrategyData, type StrategyFigures } from './use-strategy-figures';
+import {
+  ArchiveFailed,
+  LeftOutNote,
+  StateBlock,
+  StrategyError,
+  StrategySkeleton,
+} from './strategy-states';
+import { EquityLine } from './equity-line';
+import {
+  useStrategyData,
+  type StrategyData,
+  type StrategyFigures,
+} from './use-strategy-figures';
 
 type Status = Strategy['status'];
 
@@ -219,7 +229,7 @@ function StrategyCard({
           </DropdownMenu.Root>
         </div>
         {f.equity.length >= 3 ? (
-          <Sparkline series={f.equity} label={`Equity of ${s.name}`} />
+          <EquityLine f={f} />
         ) : (
           <p className="flex h-20 items-center text-[13px] text-faint">
             The line starts with the first closed trade.
@@ -229,7 +239,37 @@ function StrategyCard({
           Cumulative {basis} P&amp;L by close
         </span>
       </div>
+      <LeftOutNote count={f.leftOut} className="col-span-full -mt-1" />
     </article>
+  );
+}
+
+/** Closed trades with no strategy, in the display unit (inside the figure source). */
+function UnassignedNote({
+  unassigned,
+  basis,
+}: {
+  unassigned: StrategyData['unassigned'];
+  basis: 'net' | 'gross';
+}): React.JSX.Element | null {
+  const display = useDisplay();
+  if (unassigned.count === 0) return null;
+  const pnl = display.figure(display.ofTrades(unassigned.ids, unassigned.pnl));
+  return (
+    <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 px-1 text-[12.5px] text-muted">
+      <Info size={15} aria-hidden="true" className="flex-none text-faint" />
+      <span>
+        {unassigned.count} closed{' '}
+        {plural(unassigned.count, 'trade has', 'trades have')} no strategy,{' '}
+        <FigureText f={pnl} /> {basis}.
+      </span>
+      <Link
+        href="/app/trades?nostrat=1"
+        className="font-semibold text-accent-ink hover:text-accent-hover"
+      >
+        Assign them in Trades
+      </Link>
+    </p>
   );
 }
 
@@ -239,7 +279,6 @@ export function StrategiesView(): React.JSX.Element {
   const queryClient = useQueryClient();
   const update = useUpdateStrategy();
   const remove = useRemoveStrategy();
-  const display = useDisplay();
   const [status, setStatus] = useState<Status>('active');
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -290,6 +329,16 @@ export function StrategiesView(): React.JSX.Element {
           </span>
         </div>
 
+        {update.isError ? (
+          <ArchiveFailed
+            name={
+              all.find((x) => x.id === update.variables?.id)?.name ??
+              'The strategy'
+            }
+            archiving={update.variables?.patch.status === 'archived'}
+          />
+        ) : null}
+
         {shown.length === 0 ? (
           <p className="px-1 py-8 text-center text-[14.5px] text-muted">
             {status === 'active'
@@ -315,27 +364,7 @@ export function StrategiesView(): React.JSX.Element {
           ))
         )}
 
-        {unassigned.count > 0 ? (
-          <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 px-1 text-[12.5px] text-muted">
-            <Info
-              size={15}
-              aria-hidden="true"
-              className="flex-none text-faint"
-            />
-            <span>
-              {unassigned.count} closed{' '}
-              {plural(unassigned.count, 'trade has', 'trades have')} no
-              strategy, <FigureText f={display.cash(unassigned.pnl, true)} />{' '}
-              {data.basis}.
-            </span>
-            <Link
-              href="/app/trades?nostrat=1"
-              className="font-semibold text-accent-ink hover:text-accent-hover"
-            >
-              Assign them in Trades
-            </Link>
-          </p>
-        ) : null}
+        <UnassignedNote unassigned={unassigned} basis={data.basis} />
       </div>
 
       <ConfirmDialog

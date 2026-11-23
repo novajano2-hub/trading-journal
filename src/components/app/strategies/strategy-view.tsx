@@ -12,7 +12,6 @@ import {
   PencilSimple,
 } from '@phosphor-icons/react/dist/ssr';
 import { FigureText } from '@/components/product/figure-text';
-import { Sparkline } from '@/components/product/sparkline';
 import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { Chip } from '@/components/ui/chip';
@@ -21,7 +20,7 @@ import { MetricTip } from '@/components/ui/metric-tip';
 import type { MetricId } from '@/content/metric-definitions';
 import { useStrategy, useUpdateStrategy } from '@/data/query/hooks';
 import type { RuleStat } from '@/domain/metrics/rules';
-import type { RuleGroup, Strategy } from '@/domain/types';
+import type { Rule, RuleGroup, Strategy } from '@/domain/types';
 import { FigureSourceContext, useDisplay } from '@/lib/display';
 import { plural } from '@/lib/format';
 import { CARD, CardHeader, Caption, signTone } from '../dashboard/shared';
@@ -33,7 +32,14 @@ import {
   pfText,
   toneOf,
 } from './strategy-style';
-import { NoStrategy, StrategyError, StrategySkeleton } from './strategy-states';
+import { EquityLine } from './equity-line';
+import {
+  ArchiveFailed,
+  LeftOutNote,
+  NoStrategy,
+  StrategyError,
+  StrategySkeleton,
+} from './strategy-states';
 import { useStrategyData, type StrategyFigures } from './use-strategy-figures';
 
 const PAD = 'px-5 pt-[18px] pb-4';
@@ -59,6 +65,118 @@ function Head({
   );
 }
 
+/** One rule's cells, as the table and the stacked card both show them. */
+function ruleCells(
+  st: RuleStat,
+  display: ReturnType<typeof useDisplay>,
+): {
+  rate: React.ReactNode;
+  followed: React.ReactNode;
+  broken: React.ReactNode;
+  winRate: string;
+  pf: string;
+  followedNet: number;
+  brokenNet: number;
+} {
+  const kept = display.figure(
+    display.ofTrades(st.keptTradeIds, st.followedNet),
+  );
+  const broken = display.figure(
+    display.ofTrades(st.brokenTradeIds, st.brokenNet),
+  );
+  const r = st.kept + st.broken === 0 ? null : st.kept / (st.kept + st.broken);
+  return {
+    rate:
+      r === null ? (
+        <span className="text-faint">Not checked yet</span>
+      ) : (
+        <span className="block">
+          <span className="flex items-baseline gap-2 whitespace-nowrap">
+            <b className="font-semibold">{pctText(r)}</b>
+            <span className="text-[12.5px] text-faint">
+              {st.kept} of {st.kept + st.broken}
+            </span>
+          </span>
+          <span
+            aria-hidden="true"
+            className="mt-1 block h-1.5 w-full max-w-[104px] overflow-hidden rounded-full bg-sunken"
+          >
+            <i
+              className="block h-full rounded-full bg-accent"
+              style={{ width: `${r * 100}%` }}
+            />
+          </span>
+        </span>
+      ),
+    followed:
+      st.kept === 0 ? (
+        <span className="text-faint">None yet</span>
+      ) : (
+        <FigureText f={kept} />
+      ),
+    broken:
+      st.broken === 0 ? (
+        <span className="text-faint">Never broken</span>
+      ) : (
+        <FigureText f={broken} />
+      ),
+    winRate: pctText(st.followedWinRate, 1),
+    pf: pfText(st.followedProfitFactor),
+    followedNet: st.followedNet,
+    brokenNet: st.brokenNet,
+  };
+}
+
+function Fig({
+  id,
+  label,
+  basis,
+  children,
+  tone = '',
+}: {
+  id: MetricId;
+  label: string;
+  basis: 'net' | 'gross';
+  children: React.ReactNode;
+  tone?: string;
+}): React.JSX.Element {
+  return (
+    <div className="min-w-0">
+      <span className="block text-[12px] text-faint">
+        <MetricTip id={id} basis={basis}>
+          {label}
+        </MetricTip>
+      </span>
+      <span className={`block text-[14px] tabular-nums ${tone}`}>
+        {children}
+      </span>
+    </div>
+  );
+}
+
+function RuleChips({
+  rule,
+  costly,
+}: {
+  rule: Rule;
+  costly: boolean;
+}): React.JSX.Element {
+  return (
+    <>
+      {rule.showWhen !== 'always' ? (
+        <Chip tone="warn" className="ml-2">
+          {SHOW_WHEN_CHIP[rule.showWhen]}
+        </Chip>
+      ) : null}
+      {costly ? (
+        <Chip tone="warn" className="ml-2">
+          Costliest
+        </Chip>
+      ) : null}
+    </>
+  );
+}
+
 function RuleTable({
   f,
   basis,
@@ -73,46 +191,129 @@ function RuleTable({
     (worst, r) => (r.brokenNet < (worst?.brokenNet ?? 0) ? r : worst),
     undefined,
   );
-  const rate = (r: { kept: number; broken: number }) =>
-    r.kept + r.broken === 0 ? null : r.kept / (r.kept + r.broken);
+  const costly = (rule: Rule) =>
+    costliest?.ruleId === rule.id && f.rules.length > 1;
+  const groupRate = (g: RuleGroup): number | null => {
+    const rows = g.rules.flatMap((r) => byId.get(r.id) ?? []);
+    const kept = rows.reduce((n, r) => n + r.kept, 0);
+    const broken = rows.reduce((n, r) => n + r.broken, 0);
+    return kept + broken === 0 ? null : kept / (kept + broken);
+  };
+  const groupLine = (g: RuleGroup) => {
+    const rate = groupRate(g);
+    return (
+      <>
+        <b className="font-semibold text-text">{g.title}</b> {g.rules.length}{' '}
+        {plural(g.rules.length, 'rule')}
+        {rate !== null ? (
+          <span className="ml-3 tabular-nums">{pctText(rate)} kept</span>
+        ) : null}
+      </>
+    );
+  };
 
   return (
-    <div
-      role="region"
-      aria-label="Rules, scrolls sideways"
-      tabIndex={0}
-      className="mt-2 overflow-x-auto outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent"
-    >
-      <table aria-label="Rules" className="w-full min-w-[600px] text-[13.5px]">
-        <thead>
-          <tr className="border-b border-line">
-            <th scope="col" className={TH}>
-              Rule
-            </th>
-            <Head basis={basis} id="rule-follow-rate">
-              Follow rate
-            </Head>
-            <Head basis={basis} id="rule-followed-pnl">
-              P&amp;L when followed
-            </Head>
-            <Head basis={basis} id="rule-cost-broken">
-              Cost when broken
-            </Head>
-            <Head basis={basis} id="rule-followed-win-rate">
-              Win rate kept
-            </Head>
-            <Head basis={basis} id="rule-followed-pf">
-              PF kept
-            </Head>
-          </tr>
-        </thead>
-        {f.strategy.groups.map((g: RuleGroup) => {
-          const rows = g.rules.flatMap((r) => byId.get(r.id) ?? []);
-          const groupRate = rate({
-            kept: rows.reduce((n, r) => n + r.kept, 0),
-            broken: rows.reduce((n, r) => n + r.broken, 0),
-          });
-          return (
+    <>
+      {/* Under sm there is no room for six columns: one card per rule. */}
+      <ul aria-label="Rules, one card each" className="mt-2 sm:hidden">
+        {f.strategy.groups.map((g) => (
+          <li key={g.id}>
+            <p className="rounded-[8px] bg-sunken/70 px-2.5 py-1.5 text-[12.5px] text-muted">
+              {groupLine(g)}
+            </p>
+            <ul>
+              {g.rules.map((rule) => {
+                const c = ruleCells(byId.get(rule.id)!, display);
+                return (
+                  <li
+                    key={rule.id}
+                    className="flex flex-col gap-2.5 border-b border-line/70 py-3 text-[13.5px]"
+                  >
+                    <span className="font-medium text-text">
+                      {rule.text}
+                      <RuleChips rule={rule} costly={costly(rule)} />
+                    </span>
+                    <div
+                      data-line=""
+                      className="grid grid-cols-[1fr_1fr_1fr] gap-x-3"
+                    >
+                      <Fig
+                        basis={basis}
+                        id="rule-follow-rate"
+                        label="Follow rate"
+                      >
+                        {c.rate}
+                      </Fig>
+                      <Fig
+                        basis={basis}
+                        id="rule-followed-pnl"
+                        label="P&L when followed"
+                        tone={signTone(c.followedNet)}
+                      >
+                        {c.followed}
+                      </Fig>
+                      <Fig
+                        basis={basis}
+                        id="rule-cost-broken"
+                        label="Cost when broken"
+                        tone={signTone(c.brokenNet)}
+                      >
+                        {c.broken}
+                      </Fig>
+                    </div>
+                    <div data-line="" className="grid grid-cols-2 gap-x-3">
+                      <Fig
+                        basis={basis}
+                        id="rule-followed-win-rate"
+                        label="Win rate kept"
+                      >
+                        {c.winRate}
+                      </Fig>
+                      <Fig basis={basis} id="rule-followed-pf" label="PF kept">
+                        {c.pf}
+                      </Fig>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </li>
+        ))}
+      </ul>
+
+      <div
+        role="region"
+        aria-label="Rules, scrolls sideways"
+        tabIndex={0}
+        className="mt-2 overflow-x-auto outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent max-sm:hidden"
+      >
+        <table
+          aria-label="Rules"
+          className="w-full min-w-[600px] text-[13.5px]"
+        >
+          <thead>
+            <tr className="border-b border-line">
+              <th scope="col" className={TH}>
+                Rule
+              </th>
+              <Head basis={basis} id="rule-follow-rate">
+                Follow rate
+              </Head>
+              <Head basis={basis} id="rule-followed-pnl">
+                P&amp;L when followed
+              </Head>
+              <Head basis={basis} id="rule-cost-broken">
+                Cost when broken
+              </Head>
+              <Head basis={basis} id="rule-followed-win-rate">
+                Win rate kept
+              </Head>
+              <Head basis={basis} id="rule-followed-pf">
+                PF kept
+              </Head>
+            </tr>
+          </thead>
+          {f.strategy.groups.map((g: RuleGroup) => (
             <tbody key={g.id}>
               <tr className="bg-sunken/70">
                 <th
@@ -120,94 +321,38 @@ function RuleTable({
                   colSpan={6}
                   className="rounded-[8px] px-2.5 py-1.5 text-left text-[12.5px] font-normal text-muted"
                 >
-                  <b className="font-semibold text-text">{g.title}</b>{' '}
-                  {g.rules.length} {plural(g.rules.length, 'rule')}
-                  {groupRate !== null ? (
-                    <span className="ml-3 tabular-nums">
-                      {pctText(groupRate)} kept
-                    </span>
-                  ) : null}
+                  {groupLine(g)}
                 </th>
               </tr>
               {g.rules.map((rule) => {
-                const st = byId.get(rule.id)!;
-                const kept = display.figure(
-                  display.ofTrades(st.keptTradeIds, st.followedNet),
-                );
-                const broken = display.figure(
-                  display.ofTrades(st.brokenTradeIds, st.brokenNet),
-                );
-                const r = rate(st);
+                const c = ruleCells(byId.get(rule.id)!, display);
                 return (
                   <tr key={rule.id} className="border-b border-line/70">
                     <td className={`${TD} min-w-[190px] font-medium text-text`}>
                       {rule.text}
-                      {rule.showWhen !== 'always' ? (
-                        <Chip tone="warn" className="ml-2">
-                          {SHOW_WHEN_CHIP[rule.showWhen]}
-                        </Chip>
-                      ) : null}
-                      {costliest?.ruleId === rule.id && f.rules.length > 1 ? (
-                        <Chip tone="warn" className="ml-2">
-                          Costliest
-                        </Chip>
-                      ) : null}
+                      <RuleChips rule={rule} costly={costly(rule)} />
                     </td>
-                    <td className={`${TD} tabular-nums`}>
-                      {r === null ? (
-                        <span className="text-faint">Not checked yet</span>
-                      ) : (
-                        <span className="block">
-                          <span className="flex items-baseline gap-2 whitespace-nowrap">
-                            <b className="font-semibold">{pctText(r)}</b>
-                            <span className="text-[12.5px] text-faint">
-                              {st.kept} of {st.kept + st.broken}
-                            </span>
-                          </span>
-                          <span
-                            aria-hidden="true"
-                            className="mt-1 block h-1.5 w-full max-w-[104px] overflow-hidden rounded-full bg-sunken"
-                          >
-                            <i
-                              className="block h-full rounded-full bg-accent"
-                              style={{ width: `${r * 100}%` }}
-                            />
-                          </span>
-                        </span>
-                      )}
+                    <td className={`${TD} tabular-nums`}>{c.rate}</td>
+                    <td
+                      className={`${TD} tabular-nums ${signTone(c.followedNet)}`}
+                    >
+                      {c.followed}
                     </td>
                     <td
-                      className={`${TD} tabular-nums ${signTone(st.followedNet)}`}
+                      className={`${TD} tabular-nums ${signTone(c.brokenNet)}`}
                     >
-                      {st.kept === 0 ? (
-                        <span className="text-faint">None yet</span>
-                      ) : (
-                        <FigureText f={kept} />
-                      )}
+                      {c.broken}
                     </td>
-                    <td
-                      className={`${TD} tabular-nums ${signTone(st.brokenNet)}`}
-                    >
-                      {st.broken === 0 ? (
-                        <span className="text-faint">Never broken</span>
-                      ) : (
-                        <FigureText f={broken} />
-                      )}
-                    </td>
-                    <td className={`${TD} tabular-nums`}>
-                      {pctText(st.followedWinRate, 1)}
-                    </td>
-                    <td className={`${TD} tabular-nums`}>
-                      {pfText(st.followedProfitFactor)}
-                    </td>
+                    <td className={`${TD} tabular-nums`}>{c.winRate}</td>
+                    <td className={`${TD} tabular-nums`}>{c.pf}</td>
                   </tr>
                 );
               })}
             </tbody>
-          );
-        })}
-      </table>
-    </div>
+          ))}
+        </table>
+      </div>
+    </>
   );
 }
 
@@ -238,9 +383,11 @@ function Stat({
 function Header({
   s,
   tradeCount,
+  leftOut,
 }: {
   s: Strategy;
   tradeCount: number;
+  leftOut: number;
 }): React.JSX.Element {
   const update = useUpdateStrategy();
   const Glyph = iconOf(s);
@@ -310,7 +457,226 @@ function Header({
           View {tradeCount} {plural(tradeCount, 'trade')}
         </Link>
       </div>
+      <LeftOutNote count={leftOut} className="basis-full" />
+      {update.isError ? (
+        <ArchiveFailed
+          name={s.name}
+          archiving={update.variables?.patch.status === 'archived'}
+          className="basis-full"
+        />
+      ) : null}
     </section>
+  );
+}
+
+function StrategyBody({
+  s,
+  f,
+  basis,
+}: {
+  s: Strategy;
+  f: StrategyFigures;
+  basis: 'net' | 'gross';
+}): React.JSX.Element {
+  // Read inside the provider, so every figure knows its trades.
+  const display = useDisplay();
+  const { summary } = f;
+  const avgWin =
+    summary.avgWin === null
+      ? null
+      : display.figure(display.meanOfTrades(f.winIds, summary.avgWin));
+  const drawdown = display.figure(display.ofTrades(f.drawdownIds, -f.drawdown));
+  const pnl = display.figure(display.ofTrades(f.closedIds, f.pnl));
+  const expectancy = display.figure(
+    display.meanOfTrades(f.closedIds, summary.expectancy ?? 0),
+  );
+  const broken = display.figure(display.ofTrades(f.broken.ids, f.broken.pnl));
+
+  return (
+    <div className="flex min-w-0 flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0">
+      <Link
+        href="/app/strategies"
+        className="inline-flex min-h-8 w-fit items-center rounded-chip text-[13px] font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11 lg:hidden"
+      >
+        Back to strategies
+      </Link>
+      <Header s={s} tradeCount={f.tradeCount} leftOut={f.leftOut} />
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
+        <div className="flex min-w-0 flex-col gap-4">
+          <section aria-labelledby="rules-h" className={`${CARD} ${PAD}`}>
+            <CardHeader
+              icon={ListChecks}
+              tone="accent"
+              headingId="rules-h"
+              title="Rules"
+              after={
+                <Caption>
+                  Each rule is read on the trades its show-when fits.
+                </Caption>
+              }
+            />
+            {s.groups.every((g) => g.rules.length === 0) ? (
+              <p className="mt-3 text-[14px] text-muted">
+                No rules yet.{' '}
+                <Link
+                  href={`/app/strategies/${encodeURIComponent(s.id)}/edit`}
+                  className="font-semibold text-accent-ink hover:text-accent-hover"
+                >
+                  Add some
+                </Link>{' '}
+                to grade your trades against them.
+              </p>
+            ) : (
+              <RuleTable f={f} basis={basis} />
+            )}
+          </section>
+
+          <section aria-labelledby="equity-h" className={`${CARD} ${PAD}`}>
+            <CardHeader
+              icon={ChartLineUp}
+              tone="accent"
+              headingId="equity-h"
+              title="Equity"
+              after={
+                <Caption>
+                  Cumulative {basis} P&amp;L of this strategy, by close date
+                </Caption>
+              }
+              end={
+                <b
+                  className={`text-[15px] font-semibold tabular-nums ${signTone(f.pnl)}`}
+                >
+                  <FigureText f={pnl} />
+                </b>
+              }
+            />
+            <div className="mt-3">
+              {f.equity.length >= 3 ? (
+                <EquityLine f={f} />
+              ) : (
+                <p className="py-6 text-[14px] text-faint">
+                  The line starts with the first closed trade.
+                </p>
+              )}
+            </div>
+          </section>
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-4">
+          <section aria-labelledby="stats-h" className={`${CARD} ${PAD}`}>
+            <CardHeader
+              icon={ChartBar}
+              tone="accent"
+              headingId="stats-h"
+              title="Stats"
+              end={<Caption>all time</Caption>}
+            />
+            <div className="mt-2 grid grid-cols-2">
+              <Stat
+                label={<MetricTip id="pnl" basis={basis} />}
+                value={<FigureText f={pnl} />}
+                tone={signTone(f.pnl)}
+                sub={`${summary.closedCount} closed, ${summary.openCount} open`}
+              />
+              <Stat
+                label={<MetricTip id="win-rate" basis={basis} />}
+                value={pctText(summary.winRate, 1)}
+                sub={`${summary.wins} won, ${summary.losses} lost`}
+              />
+              <Stat
+                label={<MetricTip id="profit-factor" basis={basis} />}
+                value={pfText(summary.profitFactor)}
+                sub={
+                  avgWin === null ? undefined : (
+                    <>
+                      avg win <FigureText f={avgWin!} />
+                    </>
+                  )
+                }
+              />
+              <Stat
+                label={<MetricTip id="expectancy" basis={basis} />}
+                value={
+                  summary.expectancy === null ? (
+                    'None yet'
+                  ) : (
+                    <FigureText f={expectancy} />
+                  )
+                }
+                tone={signTone(summary.expectancy ?? 0)}
+                sub="per trade"
+              />
+              <Stat
+                label={<MetricTip id="rule-adherence" basis={basis} />}
+                value={pctText(f.adherence, 1)}
+                sub="of rule checks kept"
+              />
+              <Stat
+                label={<MetricTip id="broken-rules-cost" basis={basis} />}
+                value={
+                  f.broken.ids.length === 0 ? 'None' : <FigureText f={broken} />
+                }
+                tone={signTone(f.broken.pnl)}
+                sub={`on ${f.broken.ids.length} ${plural(f.broken.ids.length, 'trade')}`}
+              />
+              <Stat
+                label={<MetricTip id="max-drawdown" basis={basis} />}
+                value={f.drawdown === 0 ? 'None' : <FigureText f={drawdown} />}
+                tone={f.drawdown === 0 ? '' : 'text-loss'}
+                sub="closed-trade equity"
+              />
+              <Stat
+                label={<MetricTip id="win-streak" basis={basis} />}
+                value={`${f.streaks.maxWin} ${plural(f.streaks.maxWin, 'win')}`}
+                sub={`longest losing run ${f.streaks.maxLoss}`}
+              />
+            </div>
+          </section>
+
+          <section aria-labelledby="checklist-h" className={`${CARD} ${PAD}`}>
+            <CardHeader
+              icon={CheckSquare}
+              tone="accent"
+              headingId="checklist-h"
+              title="Checklist"
+              end={
+                <Caption>
+                  {s.checklist.length} {plural(s.checklist.length, 'item')}
+                </Caption>
+              }
+            />
+            <p className="mt-2 text-[12.5px] leading-[1.45] text-faint">
+              Ticked before each entry. Each item is its own yes or no on the
+              trade.
+            </p>
+            {s.checklist.length === 0 ? (
+              <p className="mt-3 text-[14px] text-muted">No checklist items.</p>
+            ) : (
+              <ul className="mt-2">
+                {s.checklist.map((text, i) => (
+                  <li
+                    key={`${i}-${text}`}
+                    className="flex min-h-[42px] items-center gap-3 border-b border-line/70 text-[14px] font-medium last:border-b-0"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="size-[18px] flex-none rounded-[6px] border border-line-2 bg-surface-1 shadow-[var(--shadow-chip)]"
+                    />
+                    {text}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Link
+              href={`/app/strategies/${encodeURIComponent(s.id)}/edit`}
+              className="mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-chip text-[13px] font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
+            >
+              Edit the checklist
+            </Link>
+          </section>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -319,7 +685,6 @@ export function StrategyView({ id }: { id: string }): React.JSX.Element {
   const found = useStrategy(id);
   const { data, error } = useStrategyData();
   const queryClient = useQueryClient();
-  const display = useDisplay();
 
   const failure = error ?? found.error;
   if (failure)
@@ -334,214 +699,9 @@ export function StrategyView({ id }: { id: string }): React.JSX.Element {
   const f = data.figures.get(id);
   if (!found.data || !f) return <NoStrategy />;
 
-  const s = found.data;
-  const { summary } = f;
-  const { basis } = data;
-  const cash = (cents: number) => display.cash(cents, true);
-  const pnl = display.figure(display.ofTrades(f.closedIds, f.pnl));
-  const expectancy = display.figure(
-    display.meanOfTrades(f.closedIds, summary.expectancy ?? 0),
-  );
-  const broken = display.figure(display.ofTrades(f.broken.ids, f.broken.pnl));
-
   return (
     <FigureSourceContext.Provider value={data.source}>
-      <div className="flex min-w-0 flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0">
-        <Link
-          href="/app/strategies"
-          className="inline-flex min-h-8 w-fit items-center rounded-chip text-[13px] font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11 lg:hidden"
-        >
-          Back to strategies
-        </Link>
-        <Header s={s} tradeCount={f.tradeCount} />
-        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
-          <div className="flex min-w-0 flex-col gap-4">
-            <section aria-labelledby="rules-h" className={`${CARD} ${PAD}`}>
-              <CardHeader
-                icon={ListChecks}
-                tone="accent"
-                headingId="rules-h"
-                title="Rules"
-                after={
-                  <Caption>
-                    Each rule is read on the trades its show-when fits.
-                  </Caption>
-                }
-              />
-              {s.groups.every((g) => g.rules.length === 0) ? (
-                <p className="mt-3 text-[14px] text-muted">
-                  No rules yet.{' '}
-                  <Link
-                    href={`/app/strategies/${encodeURIComponent(s.id)}/edit`}
-                    className="font-semibold text-accent-ink hover:text-accent-hover"
-                  >
-                    Add some
-                  </Link>{' '}
-                  to grade your trades against them.
-                </p>
-              ) : (
-                <RuleTable f={f} basis={basis} />
-              )}
-            </section>
-
-            <section aria-labelledby="equity-h" className={`${CARD} ${PAD}`}>
-              <CardHeader
-                icon={ChartLineUp}
-                tone="accent"
-                headingId="equity-h"
-                title="Equity"
-                after={
-                  <Caption>
-                    Cumulative {basis} P&amp;L of this strategy, by close date
-                  </Caption>
-                }
-                end={
-                  <b
-                    className={`text-[15px] font-semibold tabular-nums ${signTone(f.pnl)}`}
-                  >
-                    <FigureText f={pnl} />
-                  </b>
-                }
-              />
-              <div className="mt-3">
-                {f.equity.length >= 3 ? (
-                  <Sparkline series={f.equity} label={`Equity of ${s.name}`} />
-                ) : (
-                  <p className="py-6 text-[14px] text-faint">
-                    The line starts with the first closed trade.
-                  </p>
-                )}
-              </div>
-            </section>
-          </div>
-
-          <div className="flex min-w-0 flex-col gap-4">
-            <section aria-labelledby="stats-h" className={`${CARD} ${PAD}`}>
-              <CardHeader
-                icon={ChartBar}
-                tone="accent"
-                headingId="stats-h"
-                title="Stats"
-                end={<Caption>all time</Caption>}
-              />
-              <div className="mt-2 grid grid-cols-2">
-                <Stat
-                  label={<MetricTip id="pnl" basis={basis} />}
-                  value={<FigureText f={pnl} />}
-                  tone={signTone(f.pnl)}
-                  sub={`${summary.closedCount} closed, ${summary.openCount} open`}
-                />
-                <Stat
-                  label={<MetricTip id="win-rate" basis={basis} />}
-                  value={pctText(summary.winRate, 1)}
-                  sub={`${summary.wins} won, ${summary.losses} lost`}
-                />
-                <Stat
-                  label={<MetricTip id="profit-factor" basis={basis} />}
-                  value={pfText(summary.profitFactor)}
-                  sub={
-                    summary.avgWin === null ? undefined : (
-                      <>
-                        avg win <FigureText f={cash(summary.avgWin)} />
-                      </>
-                    )
-                  }
-                />
-                <Stat
-                  label={<MetricTip id="expectancy" basis={basis} />}
-                  value={
-                    summary.expectancy === null ? (
-                      'None yet'
-                    ) : (
-                      <FigureText f={expectancy} />
-                    )
-                  }
-                  tone={signTone(summary.expectancy ?? 0)}
-                  sub="per trade"
-                />
-                <Stat
-                  label={<MetricTip id="rule-adherence" basis={basis} />}
-                  value={pctText(f.adherence, 1)}
-                  sub="of rule checks kept"
-                />
-                <Stat
-                  label={<MetricTip id="broken-rules-cost" basis={basis} />}
-                  value={
-                    f.broken.ids.length === 0 ? (
-                      'None'
-                    ) : (
-                      <FigureText f={broken} />
-                    )
-                  }
-                  tone={signTone(f.broken.pnl)}
-                  sub={`on ${f.broken.ids.length} ${plural(f.broken.ids.length, 'trade')}`}
-                />
-                <Stat
-                  label={<MetricTip id="max-drawdown" basis={basis} />}
-                  value={
-                    f.drawdown === 0 ? (
-                      'None'
-                    ) : (
-                      <FigureText f={cash(-f.drawdown)} />
-                    )
-                  }
-                  tone={f.drawdown === 0 ? '' : 'text-loss'}
-                  sub="closed-trade equity"
-                />
-                <Stat
-                  label={<MetricTip id="win-streak" basis={basis} />}
-                  value={`${f.streaks.maxWin} ${plural(f.streaks.maxWin, 'win')}`}
-                  sub={`longest losing run ${f.streaks.maxLoss}`}
-                />
-              </div>
-            </section>
-
-            <section aria-labelledby="checklist-h" className={`${CARD} ${PAD}`}>
-              <CardHeader
-                icon={CheckSquare}
-                tone="accent"
-                headingId="checklist-h"
-                title="Checklist"
-                end={
-                  <Caption>
-                    {s.checklist.length} {plural(s.checklist.length, 'item')}
-                  </Caption>
-                }
-              />
-              <p className="mt-2 text-[12.5px] leading-[1.45] text-faint">
-                Ticked before each entry. Each item is its own yes or no on the
-                trade.
-              </p>
-              {s.checklist.length === 0 ? (
-                <p className="mt-3 text-[14px] text-muted">
-                  No checklist items.
-                </p>
-              ) : (
-                <ul className="mt-2">
-                  {s.checklist.map((text, i) => (
-                    <li
-                      key={`${i}-${text}`}
-                      className="flex min-h-[42px] items-center gap-3 border-b border-line/70 text-[14px] font-medium last:border-b-0"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="size-[18px] flex-none rounded-[6px] border border-line-2 bg-surface-1 shadow-[var(--shadow-chip)]"
-                      />
-                      {text}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <Link
-                href={`/app/strategies/${encodeURIComponent(s.id)}/edit`}
-                className="mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-chip text-[13px] font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
-              >
-                Edit the checklist
-              </Link>
-            </section>
-          </div>
-        </div>
-      </div>
+      <StrategyBody s={found.data} f={f} basis={data.basis} />
     </FigureSourceContext.Provider>
   );
 }
