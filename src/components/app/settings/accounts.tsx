@@ -167,7 +167,7 @@ export function AccountsSettings(): React.JSX.Element {
   const open = dialog?.kind === 'edit' ? dialog.account : undefined;
 
   return (
-    <div className="grid gap-4">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
       <section
         aria-labelledby="accounts-heading"
         className={`${CARD} overflow-hidden pt-[18px] pb-2`}
