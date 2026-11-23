@@ -220,7 +220,7 @@ test('default prefs use the browser zone, else New York', () => {
 });
 
 test(
-  'the real generator seeds about 1,200 trades',
+  'the real generator seeds about 1,500 trades',
   { timeout: 30_000 },
   async () => {
     // fake-indexeddb is slow at this size
@@ -231,8 +231,8 @@ test(
       now: () => new Date('2026-11-20T15:00:00Z'),
     }).workspaces.getActive();
     const n = await new KeelDb({ indexedDB, IDBKeyRange }).trades.count();
-    expect(n).toBeGreaterThanOrEqual(1100);
-    expect(n).toBeLessThanOrEqual(1300);
+    expect(n).toBeGreaterThanOrEqual(1400);
+    expect(n).toBeLessThanOrEqual(1650);
   },
 );
 

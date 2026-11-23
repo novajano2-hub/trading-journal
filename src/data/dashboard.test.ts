@@ -65,7 +65,7 @@ test('the dashboard is the engine, sorted by cost', () => {
   expect(d.recent[0]!.trade.closedAt! >= d.recent[1]!.trade.closedAt!).toBe(
     true,
   );
-  expect(d.performance.equity[0]).toBe(17_500_000);
+  expect(d.performance.equity[0]).toBe(37_500_000);
   expect(d.performance.equity).toHaveLength(m.summary.closedCount + 1);
   expect(d.goals.unavailable).toBeNull();
   expect(d.goals.weekly!.window).toEqual({

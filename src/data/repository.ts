@@ -9,6 +9,7 @@ import type {
   Account,
   CashFlow,
   Cents,
+  Challenge,
   ImportJob,
   Instrument,
   JournalEntry,
@@ -387,12 +388,31 @@ export interface CashFlowsRepo {
   remove(ws: string, id: string): Promise<void>;
 }
 
+export type NewChallenge = Omit<Challenge, 'id' | 'workspaceId'>;
+export type ChallengePatch = Partial<NewChallenge>;
+export interface ChallengesRepo {
+  /** By name. */
+  list(ws: string): Promise<Challenge[]>;
+  /**
+   * Throws RangeError for a blank name or firm, phases that aren't `step-1`,
+   * then `step-2` for a two-step challenge, then `funded`, fees that aren't
+   * whole non-negative cents, or a start date that isn't a real YYYY-MM-DD;
+   * NotFoundError for a linked account that isn't in the workspace; and
+   * RangeError for one account linked to two phases.
+   */
+  create(ws: string, input: NewChallenge): Promise<Challenge>;
+  /** As `create` for what it sets; a key set to undefined is left unchanged, except `failureReason` and the fees, which it clears. Throws NotFoundError for an unknown id. */
+  update(ws: string, id: string, patch: ChallengePatch): Promise<Challenge>;
+  remove(ws: string, id: string): Promise<void>;
+}
+
 export interface Repository {
   workspaces: WorkspacesRepo;
   prefs: PrefsRepo;
   trades: TradesRepo;
   accounts: AccountsRepo;
   cashFlows: CashFlowsRepo;
+  challenges: ChallengesRepo;
   strategies: StrategiesRepo;
   tags: TagsRepo;
   tagCategories: TagCategoriesRepo;

@@ -129,6 +129,7 @@ export async function writeSample(
   await db.tags.bulkPut(sample.tags);
   await db.trades.bulkPut(sample.trades);
   await db.journal.bulkPut(sample.journal);
+  await db.challenges.bulkPut(sample.challenges);
   const seed: SeedMeta = {
     seed: sample.seed,
     endDate: sample.endDate,

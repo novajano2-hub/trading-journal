@@ -165,4 +165,92 @@ describe('evaluateProp', () => {
     expect(s.dailyLoss.worstDay).toBeNull();
     expect(s.consistency).toMatchObject({ bestDayShare: null, met: false });
   });
+
+  test('a period of 30 days ends with the target unmet: period-ended on day 31, not before', () => {
+    const rules = { ...S().rules, periodDays: 30 };
+    const input = { ...S(), rules };
+    // The first trade is on 2 Mar, so day 30 is 31 Mar.
+    const onDay30 = evaluateProp({ ...input, now: '2026-03-31T18:00:00Z' });
+    expect(onDay30.overall).toBe('in-progress');
+    expect(onDay30.period).toEqual({
+      start: '2026-03-02',
+      lastDay: '2026-03-31',
+      daysLeft: 0,
+      ended: false,
+    });
+    const onDay31 = evaluateProp({ ...input, now: '2026-04-01T18:00:00Z' });
+    expect(onDay31.overall).toBe('breached');
+    expect(onDay31.period).toMatchObject({
+      lastDay: '2026-03-31',
+      ended: true,
+    });
+    // A target met inside the period stands after it.
+    const loose = S({ consistencyPct: 1 });
+    const met = evaluateProp({
+      ...loose,
+      rules: { ...loose.rules, periodDays: 30 },
+      trades: [
+        ...loose.trades,
+        makeTrade({
+          net: 400000,
+          serial: 30,
+          closedAt: '2026-03-10T15:00:00Z',
+        }),
+      ],
+      now: '2026-04-01T18:00:00Z',
+    });
+    expect(met.overall).toBe('target-reached');
+    // No period: nothing ends.
+    expect(evaluateProp(S({ now: '2026-09-01T18:00:00Z' })).period).toBeNull();
+  });
+
+  test('trades after the period are not counted', () => {
+    const base = S();
+    const late = makeTrade({
+      net: 900000,
+      serial: 40,
+      closedAt: '2026-04-05T15:00:00Z',
+    });
+    const s = evaluateProp({
+      ...base,
+      rules: { ...base.rules, periodDays: 30 },
+      trades: [...base.trades, late],
+      now: '2026-04-06T18:00:00Z',
+    });
+    expect(s.profit.current).toBe(50000);
+    expect(s.overall).toBe('breached');
+  });
+
+  test('a drawdown floor above the trailing limit holds the limit at that level', () => {
+    const base = S({ drawdownType: 'trailing' });
+    const floor = base.startingBalance + 100000;
+    const trades = [
+      makeTrade({ net: 300000, serial: 1, closedAt: '2026-03-02T15:00:00Z' }),
+    ];
+    const s = evaluateProp({
+      ...base,
+      rules: { ...base.rules, drawdownFloor: floor },
+      trades,
+    });
+    // Unfloored, the trailing limit is min(peak - 200000, start) = start.
+    expect(evaluateProp({ ...base, trades }).drawdown.floor).toBe(
+      base.startingBalance,
+    );
+    expect(s.drawdown.floor).toBe(floor);
+    expect(s.drawdown.remaining).toBe(s.equity - floor);
+    // The limit never sits below the floor, at the start of the phase either.
+    const fresh = evaluateProp({
+      ...base,
+      rules: { ...base.rules, drawdownFloor: base.startingBalance - 50000 },
+      trades: [],
+    });
+    expect(fresh.drawdown.floor).toBe(base.startingBalance - 50000);
+  });
+
+  test('the daily loss and drawdown breaches say what the day or the fall came to', () => {
+    const base = S({ day1: [-120000], day2: 0, day3: 0 });
+    const s = evaluateProp(base);
+    expect(s.dailyLoss.breachedOn).toBe('2026-03-02');
+    expect(s.dailyLoss.breachedNet).toBe(-120000);
+  });
 });

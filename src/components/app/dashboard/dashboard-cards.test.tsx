@@ -596,6 +596,13 @@ test('every metric carries its definition', async () => {
     'rule-followed-pnl',
     'rule-followed-win-rate',
     'rule-followed-pf',
+    // On a challenge's card (Task 19).
+    'prop-profit',
+    'prop-profit-funded',
+    'prop-drawdown-left',
+    'prop-daily-loss',
+    'prop-trading-days',
+    'prop-consistency',
   ]);
   expect(new Set(ids)).toEqual(
     new Set(METRIC_IDS.filter((id) => !notOnDashboard.has(id))),

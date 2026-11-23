@@ -53,6 +53,12 @@ export const METRIC_IDS = [
   'no-stop',
   'r-expectancy',
   'avg-trade',
+  'prop-profit',
+  'prop-profit-funded',
+  'prop-drawdown-left',
+  'prop-daily-loss',
+  'prop-trading-days',
+  'prop-consistency',
 ] as const;
 
 export type MetricId = (typeof METRIC_IDS)[number];
@@ -310,6 +316,37 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'R expectancy',
     definition:
       'Win rate times average winning R, plus loss rate times average losing R, over the decided trades that have a stop. What a trade is worth on average, in units of risk.',
+  },
+  // Prop firm rules read closed trades after fees, so they ignore the P&L basis.
+  'prop-profit': {
+    label: 'Profit target',
+    definition:
+      "Net P&L of the phase's closed trades since its start, against the profit target. Always net, after fees. A percentage target is read against the account's starting balance.",
+  },
+  'prop-profit-funded': {
+    label: 'Profit since funded',
+    definition:
+      "Net P&L of the funded account's closed trades since its start. A funded phase has no profit target.",
+  },
+  'prop-drawdown-left': {
+    label: 'Max drawdown left',
+    definition:
+      "How far the equity can fall before it touches the drawdown limit. Static: the limit is the starting balance less the allowance. Trailing: it follows the equity peak up and stops at the floor. End-of-day: it follows each day's closing peak. Closed trades, net.",
+  },
+  'prop-daily-loss': {
+    label: 'Daily loss',
+    definition:
+      "Today's net P&L after fees against the daily loss limit, from the first trade of the day. A day breaks the limit when its net falls to minus the limit. A percentage limit is read against the starting balance.",
+  },
+  'prop-trading-days': {
+    label: 'Trading days',
+    definition:
+      'Days with at least one closed trade, against the minimum the firm asks for. When the phase has a period, the days left count to its last day.',
+  },
+  'prop-consistency': {
+    label: 'Consistency',
+    definition:
+      "The best day's net P&L as a share of the phase's profit. The rule is kept while it stays at or under the limit. It reads only once the phase is in profit.",
   },
 };
 

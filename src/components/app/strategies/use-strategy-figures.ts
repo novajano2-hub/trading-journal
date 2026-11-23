@@ -100,7 +100,16 @@ export function useStrategyData(): {
       const answered = rules.reduce((n, r) => n + r.kept + r.broken, 0);
       const brokenIds = [...new Set(rules.flatMap((r) => r.brokenTradeIds))];
       const brokenSet = new Set(brokenIds);
-      const drawdown = maxDrawdown(read, 0, ctx);
+      // On the real balance of the accounts it traded in, as the reports read it.
+      const accountIds = new Set(read.map((t) => t.accountId));
+      const drawdown = maxDrawdown(
+        read,
+        accounts.data
+          .filter((a) => accountIds.has(a.id))
+          .reduce((n, a) => n + a.startingBalance, 0),
+        ctx,
+        flows.data.filter((f) => accountIds.has(f.accountId)),
+      );
       figures.set(strategy.id, {
         strategy,
         tradeCount: own.length,

@@ -43,7 +43,7 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
       const db = await ctx.db();
       await rwTx(
         db,
-        [db.accounts, db.trades, db.imports, db.cashflows],
+        [db.accounts, db.trades, db.imports, db.cashflows, db.challenges],
         async () => {
           if (!(await db.accounts.get([ws, id])))
             throw new NotFoundError('account', id);
@@ -61,6 +61,20 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
             .where('[workspaceId+accountId]')
             .equals([ws, id])
             .delete();
+          // A phase that was linked to it is left unlinked, with its start date.
+          const linked = await db.challenges
+            .where('workspaceId')
+            .equals(ws)
+            .filter((c) => c.phases.some((p) => p.accountId === id))
+            .toArray();
+          await db.challenges.bulkPut(
+            linked.map((c) => ({
+              ...c,
+              phases: c.phases.map(({ accountId, ...p }) =>
+                accountId === id ? p : { ...p, accountId },
+              ),
+            })),
+          );
           await db.accounts.delete([ws, id]);
         },
       );

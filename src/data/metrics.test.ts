@@ -126,7 +126,7 @@ describe('performance (spec §10)', () => {
       seed: SAMPLE_SEED,
       endDate: '2026-11-19',
     });
-    expect(ws.accounts).toHaveLength(3);
+    expect(ws.accounts).toHaveLength(6);
     const run = () =>
       metricsByCurrency(ws.trades, {
         accounts: ws.accounts,

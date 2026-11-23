@@ -3,6 +3,7 @@ import type { SampleWorkspace } from '../seed/generate';
 import { createLocalContext, defaultSample } from './context';
 import { localAccounts } from './accounts';
 import { localCashFlows } from './cashflows';
+import { localChallenges } from './challenges';
 import { localFolders } from './folders';
 import { localImports } from './imports';
 import { localJournal } from './journal';
@@ -37,6 +38,7 @@ export function createLocalRepository(
     trades: localTrades(ctx),
     accounts: localAccounts(ctx),
     cashFlows: localCashFlows(ctx),
+    challenges: localChallenges(ctx),
     strategies: localStrategies(ctx),
     tags: localTags(ctx),
     tagCategories: localTagCategories(ctx),

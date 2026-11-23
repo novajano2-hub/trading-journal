@@ -86,6 +86,7 @@ test('every app route renders its title without overflow; placeholders state it 
         '/app/reports',
         '/app/strategies',
         '/app/notebook',
+        '/app/prop-firms',
         '/app/settings',
       ].includes(path)
     ) {

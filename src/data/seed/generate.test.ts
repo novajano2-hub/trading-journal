@@ -24,16 +24,18 @@ describe('sample workspace generator', () => {
     s = generateSampleWorkspace({ seed: SAMPLE_SEED, endDate: '2026-11-19' });
   });
 
-  test('the trades and their totals are as Plan 4 pinned them', () => {
+  test("the first three accounts' trades and their totals are as Plan 4 pinned them", () => {
+    const first = new Set(s.accounts.slice(0, 3).map((a) => a.id));
+    const own = s.trades.filter((t) => first.has(t.accountId));
     const total = (f: (t: Trade) => number) =>
-      s.trades.reduce((sum, t) => sum + f(t), 0);
-    expect(s.trades).toHaveLength(1233);
-    expect(s.trades.filter((t) => t.status === 'closed')).toHaveLength(1229);
+      own.reduce((sum, t) => sum + f(t), 0);
+    expect(own).toHaveLength(1233);
+    expect(own.filter((t) => t.status === 'closed')).toHaveLength(1229);
     expect(total((t) => t.net)).toBe(1_646_299);
     expect(total((t) => t.gross)).toBe(2_577_717);
     expect(total((t) => t.fees)).toBe(931_418);
     expect(total((t) => t.initialRisk ?? 0)).toBe(14_369_935);
-    expect(s.trades.filter((t) => t.noteId !== undefined)).toHaveLength(40);
+    expect(own.filter((t) => t.noteId !== undefined)).toHaveLength(40);
   });
 
   test('about 70% of trades closed a week or more before the end are reviewed', () => {
@@ -151,13 +153,13 @@ describe('sample workspace generator', () => {
     expect(sampleEndDate('2026-11-22T03:00:00.000Z')).toBe('2026-11-20');
   });
 
-  test('three accounts; the prop evaluation has rules and is not breached', () => {
-    expect(s.accounts.map((a) => [a.id, a.type])).toEqual([
+  test('the first three accounts; the prop evaluation has rules and is not breached', () => {
+    expect(s.accounts.slice(0, 3).map((a) => [a.id, a.type])).toEqual([
       ['sample-futures', 'live'],
       ['sample-forex-prop', 'prop-evaluation'],
       ['sample-multi', 'live'],
     ]);
-    expect(s.accounts.map((a) => a.startingBalance)).toEqual([
+    expect(s.accounts.slice(0, 3).map((a) => a.startingBalance)).toEqual([
       5_000_000, 10_000_000, 2_500_000,
     ]);
     const prop = s.accounts[1]!;
@@ -268,9 +270,10 @@ describe('sample workspace generator', () => {
     );
   });
 
-  test('about 1,200 trades over about six months, across five asset classes', () => {
-    expect(s.trades.length).toBeGreaterThanOrEqual(1100);
-    expect(s.trades.length).toBeLessThanOrEqual(1300);
+  test('about 1,500 trades over about six months, across five asset classes', () => {
+    // 1,233 on the first three accounts, and the prop accounts' own on top.
+    expect(s.trades.length).toBeGreaterThanOrEqual(1400);
+    expect(s.trades.length).toBeLessThanOrEqual(1650);
     expect(
       differenceInCalendarDays(
         parseISO('2026-11-19'),
@@ -481,5 +484,78 @@ describe('sample workspace generator', () => {
     expect(
       days.filter((d) => d.net < 0).length / days.length,
     ).toBeGreaterThanOrEqual(0.25);
+  });
+
+  describe('prop challenges', () => {
+    const NOW = '2026-11-19T22:00:00.000Z';
+    const accountOf = (id: string) => s.accounts.find((a) => a.id === id)!;
+    const stateOf = (id: string) => {
+      const a = accountOf(id);
+      return evaluateProp({
+        startingBalance: a.startingBalance,
+        rules: a.propRules!,
+        timeZone: NY,
+        now: NOW,
+        trades: s.trades.filter((t) => t.accountId === id),
+      });
+    };
+
+    test('three challenges: active, passed on its funded phase, and breached', () => {
+      expect(
+        s.challenges.map((c) => [c.name, c.steps, c.phase, c.status]),
+      ).toEqual([
+        ['Forex 100K', 2, 'evaluation', 'active'],
+        ['Futures 50K', 1, 'funded', 'passed'],
+        ['Futures 100K', 1, 'evaluation', 'breached'],
+      ]);
+      const [forex, f50, f100] = s.challenges;
+      expect(forex!.phases.map((p) => [p.step, p.accountId])).toEqual([
+        ['step-1', 'sample-forex-prop'],
+        ['step-2', undefined],
+        ['funded', undefined],
+      ]);
+      expect(f50!.phases.map((p) => p.step)).toEqual(['step-1', 'funded']);
+      expect(f50!.phases.every((p) => p.accountId !== undefined)).toBe(true);
+      expect(
+        f100!.phases.map((p) => [p.step, p.accountId !== undefined]),
+      ).toEqual([
+        ['step-1', true],
+        ['funded', false],
+      ]);
+      for (const c of s.challenges)
+        for (const p of c.phases)
+          if (p.accountId) expect(accountOf(p.accountId)).toBeDefined();
+      expect(s.challenges.every((c) => c.evaluationFee! > 0)).toBe(true);
+    });
+
+    test('each outcome holds on its own stream', () => {
+      const [, f50, f100] = s.challenges;
+      const evalId = (c: typeof f50) => c!.phases[0]!.accountId!;
+      expect(stateOf(evalId(f50)).overall).toBe('target-reached');
+      const funded = stateOf(f50!.phases[1]!.accountId!);
+      expect(funded.overall).not.toBe('breached');
+      expect(accountOf(f50!.phases[1]!.accountId!)).toMatchObject({
+        type: 'prop-funded',
+        status: 'active',
+      });
+      const broken = stateOf(evalId(f100));
+      expect(broken.overall).toBe('breached');
+      expect(f100!.failureReason).toMatch(/ broken on \d+ \w{3} \(/);
+      expect(s.challenges.filter((c) => c.failureReason)).toHaveLength(1);
+    });
+
+    test('each new account trades 25 to 40 weekdays, from the futures specs', () => {
+      const added = s.accounts.slice(3);
+      expect(added.length).toBe(3);
+      for (const a of added) {
+        const own = s.trades.filter((t) => t.accountId === a.id);
+        const days = new Set(own.map((t) => localDate(t.openedAt, NY)));
+        expect(days.size).toBeGreaterThanOrEqual(25);
+        expect(days.size).toBeLessThanOrEqual(40);
+        expect(own.every((t) => t.instrument.assetClass === 'future')).toBe(
+          true,
+        );
+      }
+    });
   });
 });

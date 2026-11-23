@@ -11,6 +11,7 @@ import type { ImportContext, ImportPlan } from '@/domain/import/plan';
 import type {
   Account,
   CashFlow,
+  Challenge,
   ImportJob,
   JournalEntry,
   NoteFolder,
@@ -29,6 +30,8 @@ import type {
   ManualTradeInput,
   NewAccount,
   NewCashFlow,
+  NewChallenge,
+  ChallengePatch,
   NewStrategy,
   NewTag,
   Repository,
@@ -103,6 +106,10 @@ export function useUserAccounts(): UseQueryResult<Account[]> {
 
 export function useCashFlows(): UseQueryResult<CashFlow[]> {
   return useWorkspaceQuery(keys.cashFlows, (r, ws) => r.cashFlows.list(ws));
+}
+
+export function useChallenges(): UseQueryResult<Challenge[]> {
+  return useWorkspaceQuery(keys.challenges, (r, ws) => r.challenges.list(ws));
 }
 
 export function useTrades(): UseQueryResult<Trade[]> {
@@ -674,4 +681,32 @@ export function useUndoImport(): UseMutationResult<UndoResult, Error, string> {
       return result;
     },
   });
+}
+
+export function useCreateChallenge(): UseMutationResult<
+  Challenge,
+  Error,
+  NewChallenge
+> {
+  return useWorkspaceWrite('challenges.create', (r, ws, v: NewChallenge) =>
+    r.challenges.create(ws, v),
+  );
+}
+
+export function useUpdateChallenge(): UseMutationResult<
+  Challenge,
+  Error,
+  { id: string; patch: ChallengePatch }
+> {
+  return useWorkspaceWrite(
+    'challenges.update',
+    (r, ws, v: { id: string; patch: ChallengePatch }) =>
+      r.challenges.update(ws, v.id, v.patch),
+  );
+}
+
+export function useRemoveChallenge(): UseMutationResult<void, Error, string> {
+  return useWorkspaceWrite('challenges.remove', (r, ws, id: string) =>
+    r.challenges.remove(ws, id),
+  );
 }

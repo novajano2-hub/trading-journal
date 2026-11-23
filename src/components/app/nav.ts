@@ -139,7 +139,7 @@ export const APP_NAV: readonly NavItem[] = [
     icon: ShieldCheck,
     group: 'modules',
     filterScoped: false,
-    built: false,
+    built: true,
     summary:
       'Your prop accounts against their profit target, loss limits, drawdown and trading days.',
   },

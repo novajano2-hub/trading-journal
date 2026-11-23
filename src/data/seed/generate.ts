@@ -13,6 +13,7 @@ import {
   type JournalEntry,
   type Rule,
   type Side,
+  type Challenge,
   type Strategy,
   type Tag,
   type TagCategory,
@@ -46,6 +47,7 @@ import {
   type InstSpec,
 } from './instruments';
 import { writeDailyNotes, writeJournal } from './journal';
+import { addPropFirms } from './prop';
 import { createRandom, type Random } from './random';
 import { CATEGORIES, categoryIn } from './templates';
 
@@ -62,6 +64,7 @@ export interface SampleWorkspace {
   tags: Tag[];
   trades: Trade[];
   journal: JournalEntry[];
+  challenges: Challenge[];
 }
 
 /** The last weekday strictly before `now`'s New York date. */
@@ -101,7 +104,7 @@ interface Leg {
   price: number;
   at: number; // epoch ms
 }
-interface Plan {
+export interface Plan {
   accountId: string;
   symbol: string;
   cls: AssetClass;
@@ -313,19 +316,83 @@ export function generateSampleWorkspace(opts: {
     ...writeDailyNotes(createRandom(opts.seed + 104), trades, days),
   ];
 
+  // The prop firms' accounts and challenges draw from streams of their own and
+  // come after everything above, so the first three accounts stay as they were.
+  const prop = addPropFirms({
+    endDate,
+    days,
+    firstSerial: trades.length + 1,
+    planTrade,
+    buildPlanTrades,
+    decorate: (rng, t, plan) => decorate(rng, t, plan, strategies, tags),
+  });
+
+  markReviewed(createRandom(opts.seed + 105), prop.trades, endDate);
+
   return {
     seed: opts.seed,
     endDate,
-    accounts,
+    accounts: [...accounts, ...prop.accounts],
     strategies,
     tagCategories,
     tags,
-    trades,
+    trades: [...trades, ...prop.trades],
     journal,
+    challenges: prop.challenges,
   };
 }
 
-function planTrade(
+export type PlanTrade = typeof planTrade;
+export type BuildPlanTrades = typeof buildPlanTrades;
+
+/**
+ * Builds trades from plans, with fills numbered `${idPrefix}-nnnnn` and each
+ * trade handed to `decorate` with its plan. It draws nothing itself. Serials
+ * start at 1; the caller renumbers.
+ */
+export function buildPlanTrades(
+  plans: readonly Plan[],
+  idPrefix: string,
+  decorate: (t: Trade, plan: Plan) => void,
+): Trade[] {
+  const emitted = plans.flatMap((p, planIndex) =>
+    p.legs.map((l, legIndex) => ({ p, l, planIndex, legIndex })),
+  );
+  emitted.sort(
+    (a, b) =>
+      a.l.at - b.l.at || a.planIndex - b.planIndex || a.legIndex - b.legIndex,
+  );
+  const firstFillPlan = new Map<string, Plan>();
+  const fills: Execution[] = emitted.map(({ p, l, legIndex }, i) => {
+    const id = `${idPrefix}-${String(i + 1).padStart(5, '0')}`;
+    if (legIndex === 0) firstFillPlan.set(id, p);
+    return {
+      id,
+      accountId: p.accountId,
+      symbol: p.symbol,
+      side: l.side,
+      qty: l.qty,
+      price: l.price,
+      time: new Date(l.at).toISOString(),
+      ...feesFor(p.cls, l.qty, l.price),
+    };
+  });
+  const built = buildTrades(fills, {
+    workspaceId: WS,
+    startSerial: 1,
+    resolve: (symbol) => resolveInstrument(symbol),
+    accountCurrency: () => 'USD',
+  });
+  if (built.unresolvedSymbols.length > 0)
+    throw new Error(
+      `unresolved sample symbols: ${built.unresolvedSymbols.join(', ')}`,
+    );
+  for (const t of built.trades)
+    decorate(t, firstFillPlan.get(t.executions[0]!.id)!);
+  return built.trades;
+}
+
+export function planTrade(
   rng: Random,
   acct: AccountSpec,
   spec: InstSpec,

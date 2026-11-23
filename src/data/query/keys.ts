@@ -13,6 +13,7 @@ export const keys = {
   trade: (ws: string, id: string) => [...W(ws), 'trades', id] as const,
   accounts: (ws: string) => [...W(ws), 'accounts'] as const,
   cashFlows: (ws: string) => [...W(ws), 'cash-flows'] as const,
+  challenges: (ws: string) => [...W(ws), 'challenges'] as const,
   strategies: (ws: string) => [...W(ws), 'strategies'] as const,
   strategy: (ws: string, id: string) => [...W(ws), 'strategies', id] as const,
   tags: (ws: string) => [...W(ws), 'tags'] as const,
@@ -46,6 +47,9 @@ export type WriteKind =
   | 'cashFlows.create'
   | 'cashFlows.update'
   | 'cashFlows.remove'
+  | 'challenges.create'
+  | 'challenges.update'
+  | 'challenges.remove'
   | 'strategies.create'
   | 'strategies.update'
   | 'strategies.remove'
@@ -107,7 +111,12 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
         keys.journal(ws),
         keys.imports(ws),
         keys.cashFlows(ws),
+        keys.challenges(ws),
       ];
+    case 'challenges.create':
+    case 'challenges.update':
+    case 'challenges.remove':
+      return [keys.challenges(ws)];
     case 'cashFlows.create':
     case 'cashFlows.update':
     case 'cashFlows.remove':

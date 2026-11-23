@@ -157,6 +157,7 @@ export function fixtureSample(): SampleWorkspace {
         net: 5_000,
       }),
     ],
+    challenges: [],
     journal: [
       {
         id: 'j-1',
