@@ -171,6 +171,47 @@ Read before deciding on a paid walkthrough: https://app.tradezella.com/informati
 
 Route: no agent walkthrough of the web app (Section 10). TradeZella's official MCP connector is the AI access route their terms allow (https://mcp.tradezella.com/mcp, read-only by default; sees trades, reports, strategies, notes and stats; cannot add, edit or delete trades; 30 requests a minute, 1,000 a day). The user may connect it read-only to an account holding imported trades; findings from it are recorded below as behaviour and data shape only. Licence scope (Section 11) was flagged to the user, who decides on their own use. Not legal advice.
 
+## Number check against TradeZella (2026-11-23)
+
+Keel's sample futures account (574 trades, 1,232 fills) was exported in TradeZella's execution-based generic CSV, imported into TradeZella by the user, and read back through TradeZella's official connector. Keel's figures come from the same generated trades (time zone America/New_York).
+
+| Figure | TradeZella | Keel |
+|---|---|---|
+| Trades, open | 574, 2 open | 574, 2 open |
+| Wins / losses / breakevens | 289 / 283 / 0 | 289 / 283 / 0 |
+| Net P&L | $11,063.85 | $11,063.85 |
+| Win rate | 50.52% | 50.52% |
+| Profit factor | 1.22969 | 1.22969 |
+| Largest win / loss | +$429.80 / −$390.20 | +$429.80 / −$390.20 |
+| Average win / loss | $204.96 / −$170.21 | $204.96 / −$170.21 |
+| Expectancy | $19.34 | $19.34 |
+| Longest win / loss streak (trades) | 7 / 8 | 7 / 8 |
+| Green / red days | 70 / 49 | 70 / 49 |
+| P&L per day | 119 days | 119 days, every day equal to the cent |
+| Max drawdown | −$2,168.55 (daily buckets) | daily-bucket equivalent −$2,168.55; Keel's headline figure is trade by trade |
+
+What this settles:
+- **Fill grouping (E13):** TradeZella builds the same 574 trades from the fills, so Keel's FIFO grouping and partial-exit handling agree.
+- **Fees and P&L:** agree to the cent.
+- **P&L by exit date:** every day agrees, so the ruling holds.
+- **Breakevens:** none in this file, so the breakeven-in-win-rate rule is not exercised (still to check with a file that has $0.00 trades).
+
+One difference of definition:
+- **Max drawdown:** TradeZella's figure is the drawdown of the daily P&L curve, "max daily drawdown". Keel's headline is measured on closed-trade equity, trade by trade. Per the user's rule (TradeZella's system is the reference), Keel's headline max drawdown should use the daily curve. Scheduled as a follow-up fix after Task 20.
+
+**Forex file (146 trades, imported into the same TradeZella account):**
+- These agree: trades and open count (146, 1 open), wins and losses (71 / 74), win rate (48.97%), streaks (6 / 5), and net P&L for EURUSD (+$209.00), GBPUSD (+$2,877.10) and AUDUSD (+$1,655.60).
+- **USDJPY differs by 6 cents in total:** TradeZella −$1,282.19, Keel −$1,282.13.
+  - The cause shows trade by trade. 11 of 45 trades differ by one cent, and all 11 closed in two or more exit fills.
+  - Both apps convert each exit's yen P&L at that exit's own rate.
+  - Keel rounds each exit's dollar amount to the cent before summing, for example −$221.29 + −$174.65 = −$395.94.
+  - TradeZella sums the unrounded amounts and rounds once: −$395.9335, then −$395.93.
+  - Keel's spec says money is rounded at the trade level, so Keel's per-exit rounding is the bug.
+  - Fix: sum the converted exits unrounded and round once per trade, then share the cents among the exits, with the leftover going to the last one. Scheduled with the drawdown alignment.
+- TradeZella's trade list shows the **last** exit fill's price as "exit price", where Keel shows the average exit. That's a display convention only; P&L doesn't depend on it.
+
+Still to check: the stocks, options and crypto file (option multipliers, expiry). Its import was stuck at 46% when last checked.
+
 ## Sources not fetched or unreachable
 
 - mytradingjourney.com: redirects to a domain broker page; no docs found.
