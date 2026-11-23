@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 for (const path of [
   '/pricing',
@@ -172,5 +172,139 @@ test("today's pages claim no in-browser processing", async ({ page }) => {
     const text = await page.locator('main').innerText();
     expect(text, path).not.toMatch(/runs in your browser/i);
     expect(text, path).not.toMatch(/read in your browser/i);
+  }
+});
+
+// ---- The app's routes (Plan 5), on the sample workspace -------------------
+
+const APP_ROUTES = [
+  '/app/dashboard',
+  '/app/trades',
+  '/app/trades/new',
+  '/app/calendar',
+  '/app/reports',
+  ...[
+    'performance',
+    'day-time',
+    'symbols',
+    'risk',
+    'strategies',
+    'tags',
+    'options',
+    'wins-losses',
+    'compare',
+    'calendar',
+  ].map((r) => `/app/reports/${r}`),
+  '/app/strategies',
+  '/app/strategies/new',
+  '/app/notebook',
+  '/app/import',
+  '/app/prop-firms',
+  '/app/settings/profile',
+  '/app/settings/accounts',
+  '/app/settings/trading',
+  '/app/settings/tags',
+  '/app/settings/import-history',
+];
+
+/** The ids a route needs, read from the lists that link to them. */
+async function sampleIds(page: Page) {
+  await page.goto('/app/trades');
+  const trade = await page
+    .getByRole('table', { name: 'Trades' })
+    .locator('tbody tr')
+    .first()
+    .getByRole('link')
+    .first()
+    .getAttribute('href', { timeout: 30_000 });
+  await page.goto('/app/strategies');
+  const strategy = await page
+    .getByRole('link', { name: 'Opening range breakout' })
+    .first()
+    .getAttribute('href', { timeout: 30_000 });
+  await page.goto('/app/notebook');
+  const note = await page
+    .getByRole('list', { name: 'Notes' })
+    .getByRole('link')
+    .first()
+    .getAttribute('href', { timeout: 30_000 });
+  return { trade: trade!, strategy: strategy!, note: note! };
+}
+
+test('every app route renders without horizontal overflow at 390 and 1440', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop', 'sets both widths itself');
+  test.setTimeout(300_000);
+  await page.clock.setFixedTime(new Date('2026-11-20T15:00:00Z'));
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const ids = await sampleIds(page);
+  const routes = [
+    ...APP_ROUTES,
+    ids.trade,
+    `${ids.trade}/edit`,
+    ids.strategy,
+    `${ids.strategy}/edit`,
+    ids.note,
+    '/app/notebook/daily/2026-11-19',
+  ];
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const route of routes) {
+      await page.goto(route);
+      await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible(
+        {
+          timeout: 30_000,
+        },
+      );
+      // Past the loading skeletons: the overflow that matters is the data's.
+      await expect(page.locator('[aria-label^="Loading"]')).toHaveCount(0, {
+        timeout: 30_000,
+      });
+      await expect
+        .poll(
+          () =>
+            page.evaluate(
+              () => document.documentElement.scrollWidth - innerWidth,
+            ),
+          { message: `${route} at ${width}` },
+        )
+        .toBeLessThanOrEqual(0);
+    }
+  }
+});
+
+test('Privacy hides every dollar figure on Trades, Calendar and Reports', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop', 'one width is enough');
+  await page.clock.setFixedTime(new Date('2026-11-20T15:00:00Z'));
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/app/dashboard');
+  await expect(page.getByTestId('dashboard-ready')).toBeVisible({
+    timeout: 30_000,
+  });
+  await page.getByRole('button', { name: /show as / }).click();
+  await page.getByRole('menuitemradio', { name: 'Privacy' }).click();
+  await page.keyboard.press('Escape');
+  await expect(
+    page.getByRole('button', { name: 'Net, show as Privacy' }),
+  ).toBeVisible();
+
+  const ready = {
+    '/app/trades': () =>
+      expect(page.getByRole('table', { name: 'Trades' })).toBeVisible(),
+    '/app/calendar': () =>
+      expect(page.getByTestId('calendar-ready')).toBeVisible(),
+    '/app/reports': () =>
+      expect(page.getByTestId('reports-overview')).toBeVisible(),
+  };
+  for (const [route, wait] of Object.entries(ready)) {
+    await page.goto(route);
+    await wait();
+    await expect(page.locator('[aria-label^="Loading"]')).toHaveCount(0);
+    // Figures are masked as $•••; no dollar sign is followed by a digit.
+    expect(await page.locator('body').innerText(), route).toContain('$•••');
+    expect(await page.locator('body').innerText(), route).not.toMatch(/\$\d/);
   }
 });
