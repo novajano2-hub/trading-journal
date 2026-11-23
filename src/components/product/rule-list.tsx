@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import type { HTMLAttributes } from 'react';
 import { CheckCircle, XCircle } from '@phosphor-icons/react/dist/ssr';
 
 export interface RuleRow {
@@ -17,11 +17,17 @@ export function RuleList({
   rules,
   label,
   onAccent = false,
+  rowAttrs,
 }: {
   rules: readonly RuleRow[];
   /** Names the list for assistive tech. */
   label?: string;
   onAccent?: boolean;
+  /**
+   * Extra attributes for row `i`. The landing's tick-in animation hooks in here
+   * (see `TickRuleList`), so the app's own lists carry none of it.
+   */
+  rowAttrs?: (i: number) => HTMLAttributes<HTMLLIElement>;
 }) {
   return (
     <ul
@@ -35,8 +41,7 @@ export function RuleList({
       {rules.map((r, i) => (
         <li
           key={r.text}
-          data-tick-row=""
-          style={{ '--i': i } as CSSProperties}
+          {...rowAttrs?.(i)}
           className={`flex items-center gap-2.5 border-t py-[9px] text-sm first:border-t-0 ${onAccent ? 'border-white/12 text-white' : 'border-line'}`}
         >
           {r.ok ? (

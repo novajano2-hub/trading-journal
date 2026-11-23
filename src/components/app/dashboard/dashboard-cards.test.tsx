@@ -591,6 +591,11 @@ test('every metric carries its definition', async () => {
     'avg-green-day',
     'avg-red-day',
     'trades-per-day',
+    // On a strategy's rules (Task 16).
+    'rule-follow-rate',
+    'rule-followed-pnl',
+    'rule-followed-win-rate',
+    'rule-followed-pf',
   ]);
   expect(new Set(ids)).toEqual(
     new Set(METRIC_IDS.filter((id) => !notOnDashboard.has(id))),

@@ -6,7 +6,7 @@ import {
   ShieldCheck,
 } from '@phosphor-icons/react/dist/ssr';
 import { CostBand, PLAN_SURFACE } from '@/components/product/plan-surface';
-import { RuleList } from '@/components/product/rule-list';
+import { TickRuleList } from '@/components/site/landing/tick-rule-list';
 import { Pill } from '@/components/site/pill';
 import { Chip } from '@/components/ui/chip';
 import { IconTile, type TileTone } from '@/components/ui/icon-tile';
@@ -110,7 +110,7 @@ export function PlanBento({ view }: { view: SampleView }) {
           </CellHead>
           <div className="mt-[18px]">
             <TickIn>
-              <RuleList
+              <TickRuleList
                 rules={rules}
                 label={`Rules for trade ${ruled.serial}`}
                 onAccent

@@ -8,7 +8,7 @@ import { AppWindow } from '@/components/product/app-window';
 import { BreakdownChart } from '@/components/product/breakdown-chart';
 import { CostBand, PLAN_SURFACE } from '@/components/product/plan-surface';
 import { CARD, ProductCard } from '@/components/product/product-card';
-import { RuleList } from '@/components/product/rule-list';
+import { TickRuleList } from '@/components/site/landing/tick-rule-list';
 import { TradeDetailCard } from '@/components/product/trade-detail-card';
 import { TradeRows } from '@/components/product/trade-rows';
 import { Chip } from '@/components/ui/chip';
@@ -95,7 +95,7 @@ function Strategies({ view }: { view: SampleView }) {
           Your plan
         </p>
       </div>
-      <RuleList rules={rules} label={`Rules for trade ${FOCUS}`} onAccent />
+      <TickRuleList rules={rules} label={`Rules for trade ${FOCUS}`} onAccent />
       <CostBand label="Broken rules cost" bleed="-mx-5 px-5">
         {formatPnl(graded.net, graded.pnlCurrency)}
       </CostBand>

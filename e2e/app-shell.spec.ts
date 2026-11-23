@@ -49,6 +49,10 @@ test('every app route renders its title without overflow; placeholders state it 
       await expect(page.getByRole('table', { name: 'Trades' })).toBeVisible();
     if (path === '/app/calendar')
       await expect(page.getByTestId('calendar-ready')).toBeVisible();
+    if (path === '/app/strategies')
+      await expect(
+        page.getByRole('link', { name: 'Opening range breakout' }),
+      ).toBeVisible();
     if (path === '/app/reports')
       await expect(page.getByTestId('reports-overview')).toBeVisible({
         timeout: 20_000,
@@ -66,6 +70,7 @@ test('every app route renders its title without overflow; placeholders state it 
         '/app/trades',
         '/app/calendar',
         '/app/reports',
+        '/app/strategies',
       ].includes(path)
     ) {
       await expect(page.locator('main')).toContainText(

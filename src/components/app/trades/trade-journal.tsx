@@ -48,7 +48,7 @@ export function StrategyPicker({
       <p className="text-[13.5px] text-muted">
         No strategies yet.{' '}
         <Link
-          href="/app/strategies"
+          href="/app/strategies/new"
           className="font-semibold text-accent-ink hover:text-accent-hover"
         >
           Create one

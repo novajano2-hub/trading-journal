@@ -194,7 +194,7 @@ export function RuleChecklist({
         </p>
       ) : null}
       <Link
-        href="/app/strategies"
+        href={`/app/strategies/${encodeURIComponent(strategy.id)}`}
         className="mt-2.5 inline-flex min-h-8 items-center gap-1.5 rounded-chip text-[13px] font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
       >
         {strategy.name}

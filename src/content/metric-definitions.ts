@@ -5,6 +5,10 @@ export const METRIC_IDS = [
   'broken-rules-cost',
   'rule-kept',
   'rule-cost-broken',
+  'rule-follow-rate',
+  'rule-followed-pnl',
+  'rule-followed-win-rate',
+  'rule-followed-pf',
   'trade-rule-kept',
   'mistake-cost',
   'weekly-goal',
@@ -74,6 +78,26 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Cost when broken',
     definition:
       'Total {basis} P&L of closed trades that broke this rule. A trade that broke several rules counts in each, so rows can add up to more than the total.',
+  },
+  'rule-follow-rate': {
+    label: 'Follow rate',
+    definition:
+      "Closed trades that kept this rule, divided by those that kept or broke it. Only trades the rule applies to count, and unanswered checks don't.",
+  },
+  'rule-followed-pnl': {
+    label: 'P&L when followed',
+    definition:
+      'Total {basis} P&L of closed trades that kept this rule. Compare it with the cost when broken to see what the rule is worth.',
+  },
+  'rule-followed-win-rate': {
+    label: 'Win rate when followed',
+    definition:
+      'Wins divided by wins plus losses, over the closed trades that kept this rule. Breakeven trades are left out.',
+  },
+  'rule-followed-pf': {
+    label: 'Profit factor when followed',
+    definition:
+      'Total won divided by total lost, on {basis} P&L, over the closed trades that kept this rule. None yet when none of them lost.',
   },
   'trade-rule-kept': {
     label: 'Kept',
