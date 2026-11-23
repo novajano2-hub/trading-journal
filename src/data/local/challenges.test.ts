@@ -82,6 +82,38 @@ test('a challenge that cannot be is refused', async () => {
   expect(await repo.challenges.list(S)).toEqual([]);
 });
 
+test('an account another challenge links is refused, naming that challenge', async () => {
+  const repo = setup();
+  const first = await repo.challenges.create(S, input);
+  const other = {
+    ...input,
+    name: 'Apex 100K',
+    phases: [
+      { step: 'step-1' as const, accountId: 'acc-b' },
+      { step: 'funded' as const },
+    ],
+  };
+  const second = await repo.challenges.create(S, other);
+  // Creating one over a linked account.
+  await expect(
+    repo.challenges.create(S, { ...input, name: 'Third' }),
+  ).rejects.toThrow(/Futures 50K/);
+  await expect(
+    repo.challenges.create(S, { ...input, name: 'Third' }),
+  ).rejects.toBeInstanceOf(RangeError);
+  // Editing one onto the other's account.
+  await expect(
+    repo.challenges.update(S, second.id, {
+      phases: [{ step: 'step-1', accountId: 'acc-a' }, { step: 'funded' }],
+    }),
+  ).rejects.toThrow(/Futures 50K/);
+  // Saving a challenge with its own account is fine.
+  await expect(
+    repo.challenges.update(S, first.id, { status: 'passed' }),
+  ).resolves.toMatchObject({ status: 'passed' });
+  expect(await repo.challenges.list(S)).toHaveLength(2);
+});
+
 test('removing an account unlinks its phase and keeps the challenge', async () => {
   const repo = setup();
   const acc = await repo.accounts.create(S, {

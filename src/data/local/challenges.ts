@@ -34,6 +34,10 @@ async function assertValid(db: KeelDb, c: Challenge): Promise<void> {
   if (!isFee(c.evaluationFee) || !isFee(c.activationFee))
     throw new RangeError('A fee is a whole number of cents, 0 or more');
   const linked = new Set<string>();
+  // The rules live on the account, so another challenge's account can't be shared.
+  const others = (
+    await db.challenges.where('workspaceId').equals(c.workspaceId).toArray()
+  ).filter((o) => o.id !== c.id);
   for (const p of c.phases) {
     if (p.startDate !== undefined && !isDate(p.startDate))
       throw new RangeError(
@@ -43,6 +47,13 @@ async function assertValid(db: KeelDb, c: Challenge): Promise<void> {
     if (linked.has(p.accountId))
       throw new RangeError('One account can be linked to one phase only');
     linked.add(p.accountId);
+    const owner = others.find((o) =>
+      o.phases.some((q) => q.accountId === p.accountId),
+    );
+    if (owner)
+      throw new RangeError(
+        `That account is already linked by the challenge "${owner.name}"`,
+      );
     if (!(await db.accounts.get([c.workspaceId, p.accountId])))
       throw new NotFoundError('account', p.accountId);
   }
