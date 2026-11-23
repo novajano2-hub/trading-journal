@@ -21,3 +21,12 @@ test('a floor still needs a positive number', () => {
     rulesFromDraft(draft({ floorMode: 'fixed', floor: '' }), o),
   ).toMatchObject({ errors: { floor: 'Enter the floor balance.' } });
 });
+
+test('a static drawdown ignores a fixed floor, even an empty one', () => {
+  const r = rulesFromDraft(
+    draft({ drawdownType: 'static', floorMode: 'fixed', floor: '' }),
+    o,
+  );
+  expect(r).toMatchObject({ rules: { drawdownType: 'static' } });
+  expect('rules' in r && 'drawdownFloor' in r.rules).toBe(false);
+});

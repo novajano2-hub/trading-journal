@@ -12,6 +12,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import { SAMPLE_WORKSPACE } from '@/data/workspaces';
+import type { Account, Challenge, PropRuleSet } from '@/domain/types';
 import { renderApp } from '../__fixtures__/render-app';
 import { ChallengeForm } from './challenge-form';
 
@@ -161,4 +162,137 @@ test('a refused save announces each error and focuses the first invalid field', 
   const alert = screen.getAllByRole('alert')[0]!;
   expect(name.getAttribute('aria-describedby')).toBe(alert.id);
   expect(await r.challenges.list(WS)).toEqual([]);
+});
+
+const RULES: PropRuleSet = {
+  firm: 'Apex',
+  phase: 'evaluation',
+  profitTarget: 800_000,
+  dailyLossLimit: 100_000,
+  maxDrawdown: 1_000_000,
+  drawdownType: 'trailing',
+  minTradingDays: 5,
+};
+const account = (id: string, name: string): Account => ({
+  id,
+  workspaceId: WS,
+  name,
+  broker: 'Apex',
+  type: 'prop-evaluation',
+  currency: 'USD',
+  startingBalance: 10_000_000,
+  status: 'active',
+  propRules: RULES,
+});
+const existing: Challenge = {
+  id: 'c-1',
+  workspaceId: WS,
+  name: 'Forex 100K',
+  firm: 'Apex',
+  steps: 1,
+  phases: [{ step: 'step-1', accountId: 'p-forex' }, { step: 'funded' }],
+  phase: 'evaluation',
+  status: 'active',
+};
+
+function repoWith(accounts: Account[], challenges: Challenge[]) {
+  const sample = fixtureSample();
+  sample.accounts.push(...accounts);
+  sample.challenges.push(...challenges);
+  return createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => sample,
+  });
+}
+
+test('the account select disables an account another challenge links, naming that challenge', async () => {
+  const r = repoWith(
+    [account('p-forex', 'Forex evaluation'), account('p-free', 'Free one')],
+    [existing],
+  );
+  renderApp(<ChallengeForm onClose={() => {}} />, { repository: r });
+  await screen.findByRole('dialog');
+  const select = within(group('Step 1')).getByLabelText('Account');
+  const option = (name: RegExp) =>
+    within(select).getByRole('option', { name }) as HTMLOptionElement;
+  await waitFor(() => expect(option(/Forex evaluation/)).toBeTruthy());
+  expect(option(/Forex evaluation/).textContent).toContain('(in Forex 100K)');
+  expect(option(/Forex evaluation/).disabled).toBe(true);
+  expect(option(/Free one/).disabled).toBe(false);
+});
+
+test('editing a challenge keeps its own accounts selectable', async () => {
+  const r = repoWith([account('p-forex', 'Forex evaluation')], [existing]);
+  renderApp(<ChallengeForm challenge={existing} onClose={() => {}} />, {
+    repository: r,
+  });
+  await screen.findByRole('dialog');
+  const select = within(group('Step 1')).getByLabelText('Account');
+  const option = (await within(select).findByRole('option', {
+    name: /Forex evaluation/,
+  })) as HTMLOptionElement;
+  expect(option.disabled).toBe(false);
+  expect(option.textContent).not.toContain('(in ');
+});
+
+test('a static drawdown has no floor fields; a trailing one does', async () => {
+  renderApp(<ChallengeForm onClose={() => {}} />, { repository: repo() });
+  await screen.findByRole('dialog');
+  const step1 = group('Step 1');
+  type('Account', 'new', step1);
+  type('Drawdown type', 'trailing', step1);
+  expect(within(step1).getByLabelText('Drawdown floor')).toBeTruthy();
+  type('Drawdown floor', 'fixed', step1);
+  expect(within(step1).getByLabelText('Floor balance')).toBeTruthy();
+  type('Drawdown type', 'static', step1);
+  expect(within(step1).queryByLabelText('Drawdown floor')).toBeNull();
+  expect(within(step1).queryByLabelText('Floor balance')).toBeNull();
+  type('Drawdown type', 'eod-trailing', step1);
+  expect(within(step1).getByLabelText('Floor balance')).toBeTruthy();
+});
+
+test('a retry after a failed challenge write does not create the account twice', async () => {
+  const r = repo();
+  const create = r.challenges.create.bind(r.challenges);
+  r.challenges.create = vi
+    .fn()
+    .mockRejectedValueOnce(new Error('disk full'))
+    .mockImplementation(create);
+  const onClose = vi.fn();
+  renderApp(<ChallengeForm onClose={onClose} />, { repository: r });
+  await screen.findByRole('dialog');
+  const step1 = basics('100000');
+  type('Profit target', '8000', step1);
+  type('Daily loss limit', '2500', step1);
+  type('Max drawdown', '6000', step1);
+  type('Minimum trading days', '5', step1);
+  fireEvent.click(screen.getByRole('button', { name: 'Create challenge' }));
+  expect(await screen.findByText(/Couldn.t save that/)).toBeTruthy();
+  expect(onClose).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Create challenge' }));
+  await waitFor(() => expect(onClose).toHaveBeenCalled());
+  const made = (await r.accounts.list(WS)).filter(
+    (a) => a.name === 'Apex 100K evaluation',
+  );
+  expect(made).toHaveLength(1);
+  const [saved] = await r.challenges.list(WS);
+  expect(saved!.phases[0]!.accountId).toBe(made[0]!.id);
+});
+
+test('a failed delete keeps the dialog and says so', async () => {
+  const r = repoWith([account('p-forex', 'Forex evaluation')], [existing]);
+  r.challenges.remove = vi.fn().mockRejectedValue(new Error('no'));
+  const onClose = vi.fn();
+  renderApp(<ChallengeForm challenge={existing} onClose={onClose} />, {
+    repository: r,
+  });
+  await screen.findByRole('dialog');
+  fireEvent.click(screen.getByRole('button', { name: 'Delete challenge' }));
+  const confirm = await screen.findByRole('dialog', {
+    name: 'Delete Forex 100K?',
+  });
+  fireEvent.click(within(confirm).getByRole('button', { name: 'Delete' }));
+  expect(await within(confirm).findByRole('alert')).toBeTruthy();
+  expect(onClose).not.toHaveBeenCalled();
 });

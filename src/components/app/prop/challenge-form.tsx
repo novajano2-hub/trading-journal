@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Segmented } from '@/components/ui/segmented';
 import {
   useAccounts,
+  useChallenges,
   useCreateAccount,
   useCreateChallenge,
   usePrefs,
@@ -211,6 +212,7 @@ function PhaseFields({
   draft,
   accounts,
   taken,
+  elsewhere,
   errors,
   onChange,
   onCopy,
@@ -221,6 +223,8 @@ function PhaseFields({
   accounts: readonly Account[];
   /** Account ids linked in the other phases. */
   taken: ReadonlySet<string>;
+  /** Account id to the name of the other challenge that links it. */
+  elsewhere: ReadonlyMap<string, string>;
   errors: Record<string, string>;
   onChange(next: PhaseDraft): void;
   /** Step 2 only. */
@@ -266,9 +270,14 @@ function PhaseFields({
               {accounts
                 .filter((a) => !taken.has(a.id))
                 .map((a) => (
-                  <option key={a.id} value={a.id}>
+                  <option
+                    key={a.id}
+                    value={a.id}
+                    disabled={elsewhere.has(a.id)}
+                  >
                     {a.name}
                     {a.status === 'archived' ? ' (archived)' : ''}
+                    {elsewhere.has(a.id) ? ` (in ${elsewhere.get(a.id)})` : ''}
                   </option>
                 ))}
             </SelectField>
@@ -392,35 +401,43 @@ function PhaseFields({
                 </SelectField>
               )}
             </Field>
-            <Field id={id('floor-mode')} label="Drawdown floor">
-              {(p) => (
-                <SelectField
-                  {...p}
-                  value={draft.rules.floorMode}
-                  onChange={(ev) =>
-                    setRules({
-                      floorMode: ev.target.value as 'start' | 'fixed',
-                    })
-                  }
-                >
-                  <option value="start">The starting balance</option>
-                  <option value="fixed">A fixed level</option>
-                </SelectField>
-              )}
-            </Field>
-            {draft.rules.floorMode === 'fixed' ? (
-              <Field id={id('floor')} label="Floor balance" error={e('floor')}>
-                {(p) => (
-                  <input
-                    {...p}
-                    inputMode="decimal"
-                    value={draft.rules.floor}
-                    onChange={(ev) => setRules({ floor: ev.target.value })}
-                    className={INPUT}
-                  />
-                )}
-              </Field>
-            ) : null}
+            {draft.rules.drawdownType === 'static' ? null : (
+              <>
+                <Field id={id('floor-mode')} label="Drawdown floor">
+                  {(p) => (
+                    <SelectField
+                      {...p}
+                      value={draft.rules.floorMode}
+                      onChange={(ev) =>
+                        setRules({
+                          floorMode: ev.target.value as 'start' | 'fixed',
+                        })
+                      }
+                    >
+                      <option value="start">The starting balance</option>
+                      <option value="fixed">A fixed level</option>
+                    </SelectField>
+                  )}
+                </Field>
+                {draft.rules.floorMode === 'fixed' ? (
+                  <Field
+                    id={id('floor')}
+                    label="Floor balance"
+                    error={e('floor')}
+                  >
+                    {(p) => (
+                      <input
+                        {...p}
+                        inputMode="decimal"
+                        value={draft.rules.floor}
+                        onChange={(ev) => setRules({ floor: ev.target.value })}
+                        className={INPUT}
+                      />
+                    )}
+                  </Field>
+                ) : null}
+              </>
+            )}
             <Field
               id={id('min-days')}
               label="Minimum trading days"
@@ -512,6 +529,7 @@ export function ChallengeForm({
 }): React.JSX.Element {
   const ids = useId();
   const accounts = useAccounts().data ?? [];
+  const challenges = useChallenges().data ?? [];
   const prefs = usePrefs().data;
   const createChallenge = useCreateChallenge();
   const updateChallenge = useUpdateChallenge();
@@ -570,7 +588,10 @@ export function ChallengeForm({
           next.push([pid('new-balance'), 'Enter a balance above zero.']);
         start = balance ?? 0;
       } else {
-        start = accounts.find((a) => a.id === d.link)?.startingBalance ?? 0;
+        start =
+          accounts.find((a) => a.id === d.link)?.startingBalance ??
+          cents(d.newBalance) ??
+          0;
       }
       const result = rulesFromDraft(d.rules, {
         phase: step === 'funded' ? 'funded' : 'evaluation',
@@ -616,6 +637,12 @@ export function ChallengeForm({
             propRules: b.rules.rules,
           });
           phases.push({ ...entry, accountId: created.id });
+          // Written back, so a retry after a later failure links this account
+          // instead of creating a second one.
+          setDraft((all) => ({
+            ...all,
+            [step]: { ...all[step], link: created.id },
+          }));
         } else {
           await updateAccount.mutateAsync({
             id: d.link,
@@ -645,6 +672,13 @@ export function ChallengeForm({
       setBusy(false);
     }
   }
+
+  // Accounts another challenge of the workspace already links: they can't be linked twice.
+  const elsewhere = new Map<string, string>();
+  for (const other of challenges)
+    if (other.id !== challenge?.id)
+      for (const p of other.phases)
+        if (p.accountId) elsewhere.set(p.accountId, other.name);
 
   const taken = (step: ChallengeStep) =>
     new Set(
@@ -794,6 +828,7 @@ export function ChallengeForm({
               draft={draft[step]}
               accounts={accounts}
               taken={taken(step)}
+              elsewhere={elsewhere}
               errors={errors}
               onChange={(next) => setDraft((d) => ({ ...d, [step]: next }))}
               onCopy={

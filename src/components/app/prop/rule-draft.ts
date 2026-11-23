@@ -104,7 +104,8 @@ export function rulesFromDraft(
   if (maxDrawdown === null)
     errors.maxDrawdown = 'Enter a max drawdown above zero.';
   let drawdownFloor: Cents | undefined;
-  if (d.floorMode === 'fixed') {
+  // A static drawdown has no floor: the field is hidden, and a stale one is dropped.
+  if (d.floorMode === 'fixed' && d.drawdownType !== 'static') {
     const n = number(d.floor);
     if (!Number.isFinite(n) || n <= 0)
       errors.floor = 'Enter the floor balance.';
