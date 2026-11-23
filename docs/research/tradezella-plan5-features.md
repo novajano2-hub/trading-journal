@@ -210,7 +210,11 @@ One difference of definition:
   - Fix: sum the converted exits unrounded and round once per trade, then share the cents among the exits, with the leftover going to the last one. Scheduled with the drawdown alignment.
 - TradeZella's trade list shows the **last** exit fill's price as "exit price", where Keel shows the average exit. That's a display convention only; P&L doesn't depend on it.
 
-Still to check: the stocks, options and crypto file (option multipliers, expiry). Its import was stuck at 46% when last checked.
+**Stocks, options and crypto file:** stocks and options match TradeZella exactly per symbol (counts, wins, losses, P&L). Crypto differs by a cent on some trades and a few cents in total (BTCUSD TradeZella -98.2489, Keel -98.22; ETHUSD 327.873 against 327.87). The cause is the same as the USDJPY one: Keel rounded the gross before subtracting fees. The ETHUSD short 0.7 @ 3380.13 exited at 3291.98 with $4.67 fees has an unrounded gross of 61.705, so net 57.035; TradeZella shows 57.04, Keel showed 57.03.
+
+**Fixes (2026-11-23):** the net now rounds once per trade, half away from zero (TradeZella's backend is Ruby), and gross is net plus fees (E71, 49f009c); the headline max drawdown is the daily curve (E70, 26c8a98).
+
+**Known, accepted difference:** Keel stores every trade in whole cents, and TradeZella sums unrounded values, so a sample total on fractional-quantity instruments (crypto, forex) can still differ from TradeZella's by fractions of a cent per trade, a few cents in a total. Per-trade nets agree.
 
 ## Sources not fetched or unreachable
 
