@@ -131,7 +131,116 @@ describe('checkChallenge', () => {
       '2026-11-12',
     );
     expect(check.health).toBe('target-met');
-    expect(check.currentStep).toBe('funded');
+    // The funded phase is the trader's to start, so the met step stays current.
+    expect(check.currentStep).toBe('step-1');
+  });
+
+  describe('the current step follows the stored phase and the links', () => {
+    const MET = [
+      trade('a1', 200_000, '2026-11-09', 1),
+      trade('a1', 150_000, '2026-11-10', 2),
+    ];
+    const at = (
+      c: Challenge,
+      accounts: Account[],
+      trades = MET,
+    ): ReturnType<typeof checkChallenge> =>
+      checkChallenge(c, accounts, trades, ctx, '2026-11-12');
+
+    test('(a) step 1 met with step 2 unlinked: step 1 stays current and on target', () => {
+      const check = at(
+        challenge({
+          phases: [
+            { step: 'step-1', accountId: 'a1' },
+            { step: 'step-2' },
+            { step: 'funded' },
+          ],
+        }),
+        [account('a1')],
+      );
+      expect(check.currentStep).toBe('step-1');
+      expect(check.health).toBe('target-met');
+    });
+
+    test('(b) a funded account linked early does not take over a met evaluation step', () => {
+      const funded = account('a3', {
+        type: 'prop-funded',
+        propRules: { ...RULES, phase: 'funded', profitTarget: 0 },
+      });
+      const breachedFunded = [...MET, trade('a3', -124_000, '2026-11-12', 3)];
+      const check = at(
+        challenge({
+          steps: 1,
+          phases: [
+            { step: 'step-1', accountId: 'a1' },
+            { step: 'funded', accountId: 'a3' },
+          ],
+        }),
+        [account('a1'), funded],
+        breachedFunded,
+      );
+      expect(check.currentStep).toBe('step-1');
+      expect(check.health).toBe('target-met');
+      expect(check.finding).toBeUndefined();
+    });
+
+    test('(b) step 2 unlinked, funded linked: the met step 1 is still current', () => {
+      const check = at(
+        challenge({
+          phases: [
+            { step: 'step-1', accountId: 'a1' },
+            { step: 'step-2' },
+            { step: 'funded', accountId: 'a3' },
+          ],
+        }),
+        [account('a1'), account('a3')],
+      );
+      expect(check.currentStep).toBe('step-1');
+    });
+
+    test('(c) phase funded in Edit: the funded phase is current, and a stale step 1 breach is not offered', () => {
+      const funded = account('a3', {
+        type: 'prop-funded',
+        propRules: { ...RULES, phase: 'funded', profitTarget: 0 },
+      });
+      const check = at(
+        challenge({
+          steps: 1,
+          phase: 'funded',
+          phases: [
+            { step: 'step-1', accountId: 'a1' },
+            { step: 'funded', accountId: 'a3' },
+          ],
+        }),
+        [account('a1'), funded],
+        [trade('a1', -124_000, '2026-11-09', 1)],
+      );
+      expect(check.currentStep).toBe('funded');
+      expect(check.health).toBe('active');
+      expect(check.finding).toBeUndefined();
+    });
+
+    test('(c) a funded phase that breaks its own daily loss is breached, with the finding', () => {
+      const funded = account('a3', {
+        type: 'prop-funded',
+        propRules: { ...RULES, phase: 'funded', profitTarget: 0 },
+      });
+      const check = at(
+        challenge({
+          steps: 1,
+          phase: 'funded',
+          phases: [
+            { step: 'step-1', accountId: 'a1' },
+            { step: 'funded', accountId: 'a3' },
+          ],
+        }),
+        [account('a1'), funded],
+        [trade('a3', -124_000, '2026-11-12', 3)],
+      );
+      expect(check.currentStep).toBe('funded');
+      expect(check.health).toBe('breached');
+      expect(check.finding?.rule).toBe('daily-loss');
+    });
   });
 
   test('a near drawdown reads near; the period counts the days left', () => {
@@ -187,6 +296,30 @@ describe('checkChallenge', () => {
     );
     expect(check.phases[0]!.balance).toBe(5_600_000);
     expect(check.phases[0]!.state!.profit.current).toBe(100_000);
+  });
+});
+
+describe('phase balance (M7)', () => {
+  test('counts trades from before the phase start date, as the account holds them', () => {
+    const check = checkChallenge(
+      challenge({
+        steps: 1,
+        phases: [
+          { step: 'step-1', accountId: 'a1', startDate: '2026-11-10' },
+          { step: 'funded' },
+        ],
+      }),
+      [account('a1')],
+      [
+        trade('a1', 100_000, '2026-11-09', 1), // before the phase
+        trade('a1', 50_000, '2026-11-10', 2),
+      ],
+      ctx,
+      '2026-11-12',
+    );
+    expect(check.phases[0]!.balance).toBe(5_150_000);
+    // The phase's own profit still starts at its start date.
+    expect(check.phases[0]!.state!.profit.current).toBe(50_000);
   });
 });
 

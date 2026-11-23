@@ -141,19 +141,21 @@ function phaseCheck(
 ): ChallengePhaseCheck {
   const account = accounts.find((a) => a.id === phase.accountId);
   if (!account) return { step: phase.step, archived: false };
-  const own = trades.filter(
+  // The account holds every trade of its own, whatever the phase's start date.
+  const all = trades.filter(
+    (t) => t.accountId === account.id && t.pnlCurrency === account.currency,
+  );
+  const own = all.filter(
     (t) =>
-      t.accountId === account.id &&
-      t.pnlCurrency === account.currency &&
-      (phase.startDate === undefined ||
-        localDate(t.closedAt ?? t.openedAt, ctx.timeZone) >= phase.startDate),
+      phase.startDate === undefined ||
+      localDate(t.closedAt ?? t.openedAt, ctx.timeZone) >= phase.startDate,
   );
   return {
     step: phase.step,
     accountId: account.id,
     archived: account.status === 'archived',
     account,
-    balance: balanceAt([account], flows, own, today, ctx),
+    balance: balanceAt([account], flows, all, today, ctx),
     ...(account.propRules && {
       state: evaluateProp({
         startingBalance: account.startingBalance,
@@ -172,8 +174,11 @@ function phaseCheck(
  * Where the challenge stands today, on closed trades and net P&L. It only
  * reads: the stored status is the trader's, and a breach or a met target is a
  * suggestion for the card to offer. `flows` move a phase's balance, not its
- * profit. The current step is the first phase with an account whose evaluation
- * hasn't met its target, or the funded phase.
+ * profit. The current step is the funded phase once the stored phase is
+ * funded; before that, the first evaluation step that is unlinked or hasn't met
+ * its target. When that step is unlinked and the one before it is met, or when
+ * every evaluation step is met, the last met step stays current with health
+ * 'target-met': the funded phase is the trader's to start.
  */
 export function checkChallenge(
   c: Challenge,
@@ -186,24 +191,27 @@ export function checkChallenge(
   const phases = c.phases.map((p) =>
     phaseCheck(p, accounts, trades, flows, ctx, today),
   );
-  const met = (p: ChallengePhaseCheck) =>
-    p.step !== 'funded' && p.state?.overall === 'target-reached';
-  const current = phases.find((p) => p.accountId !== undefined && !met(p));
-  const evalUnlinked = phases.some(
-    (p) => p.step !== 'funded' && p.accountId === undefined,
-  );
-  const funded = phases.find((p) => p.step === 'funded');
-
-  if (!current) {
-    // Every linked evaluation step is on target and the funded phase has no account yet.
-    const reached = !evalUnlinked && phases.some(met);
-    return {
-      currentStep: evalUnlinked ? null : (funded?.step ?? null),
-      health: reached ? 'target-met' : 'active',
-      daysLeft: null,
-      phases,
-    };
+  const met = (p: ChallengePhaseCheck) => p.state?.overall === 'target-reached';
+  const evals = phases.filter((p) => p.step !== 'funded');
+  let current: ChallengePhaseCheck | undefined;
+  let onTarget = false;
+  if (c.phase === 'funded') {
+    current = phases.find((p) => p.step === 'funded');
+  } else {
+    const i = evals.findIndex((p) => p.accountId === undefined || !met(p));
+    if (i === -1) {
+      current = evals[evals.length - 1];
+      onTarget = true;
+    } else if (i > 0 && evals[i]!.accountId === undefined) {
+      // The next step isn't linked yet: the met step before it carries on.
+      current = evals[i - 1];
+      onTarget = true;
+    } else {
+      current = evals[i];
+    }
   }
+  if (!current)
+    return { currentStep: null, health: 'active', daysLeft: null, phases };
   const state = current.state;
   const rules = current.account?.propRules;
   const finding =
@@ -215,8 +223,13 @@ export function checkChallenge(
     (state.dailyLoss.state === 'near' || state.drawdown.state === 'near');
   return {
     currentStep: current.step,
-    health:
-      state?.overall === 'breached' ? 'breached' : near ? 'near' : 'active',
+    health: onTarget
+      ? 'target-met'
+      : state?.overall === 'breached'
+        ? 'breached'
+        : near
+          ? 'near'
+          : 'active',
     ...(finding && { finding }),
     daysLeft: state?.period?.daysLeft ?? null,
     phases,
