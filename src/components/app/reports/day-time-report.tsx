@@ -1,6 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
+import { useMemo } from 'react';
 import { Segmented } from '@/components/ui/segmented';
 import type { BreakdownKey, BreakdownRow } from '@/domain/metrics/breakdowns';
 import { BreakdownCards } from './breakdown-report';
@@ -43,7 +44,10 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
     TABS.find((t) => t.value === params.get('tab'))?.value ?? 'weekday';
   const bucket = BUCKETS.find((b) => String(b) === params.get('bucket')) ?? 30;
   const basis: Basis = params.get('basis') === 'exit' ? 'exit' : 'entry';
-  const options = { timeBasis: basis, bucketMinutes: bucket } as const;
+  const options = useMemo(
+    () => ({ timeBasis: basis, bucketMinutes: bucket }) as const,
+    [basis, bucket],
+  );
 
   const timed = tab !== 'duration';
   const controls = timed ? (

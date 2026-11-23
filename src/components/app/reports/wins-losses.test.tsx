@@ -68,3 +68,27 @@ test('every figure label has a definition, and Privacy hides the amounts', async
     expect(page.querySelector(`[data-metric-tip="${id}"]`), id).not.toBeNull();
   expect(container.textContent).not.toMatch(/\$\d/);
 });
+
+test('in R the P&L and the averages read in R', async () => {
+  const { createLocalRepository } =
+    await import('@/data/local/local-repository');
+  const { IDBFactory, IDBKeyRange } = await import('fake-indexeddb');
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: breakdownSample,
+  });
+  await repository.prefs.update({ displayUnit: 'r' });
+  renderApp(<WinsLossesView />, {
+    repository,
+    url: '/app/reports/wins-losses',
+  });
+  const page = await screen.findByTestId('reports-wins-losses');
+  const wins = within(page).getByRole('region', { name: 'Wins' });
+  const losses = within(page).getByRole('region', { name: 'Losses' });
+  // Only b-1 (+2R) of the winners and b-2 (-1R) of the losers have a stop.
+  expect(stat(wins, 'pnl')).toContain('+2.00R');
+  expect(stat(wins, 'avg-win')).toContain('+2.00R');
+  expect(stat(losses, 'pnl')).toContain('−1.00R');
+  expect(stat(losses, 'avg-loss')).toContain('−1.00R');
+});

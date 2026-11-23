@@ -95,3 +95,64 @@ test('Privacy leaves no dollar amount on the page', async () => {
   expect(container.textContent).toContain('$•••');
   expect(container.textContent).not.toMatch(/\$\d/);
 });
+
+async function inUnit(displayUnit: 'r' | 'percent' | 'privacy') {
+  const { createLocalRepository } =
+    await import('@/data/local/local-repository');
+  const { IDBFactory, IDBKeyRange } = await import('fake-indexeddb');
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: breakdownSample,
+  });
+  await repository.prefs.update({ displayUnit });
+  return repository;
+}
+
+test('in R each group reads its trades in R, and a group with no stops falls back to dollars', async () => {
+  renderApp(<CompareView />, {
+    repository: await inUnit('r'),
+    url: '/app/reports/compare?a=symbol%3DES&b=symbol%3DNQ',
+  });
+  const page = await screen.findByTestId('reports-compare');
+  const table = within(page).getByRole('table', { name: 'Comparison' });
+  // ES: b-1 +2R and b-2 -1R. NQ has no stops.
+  expect(row(table, /^Net P&L/).slice(0, 2)).toEqual(['+1.00R', '+$50.00']);
+  expect(row(table, /^Expectancy/)[0]).toBe('+0.50R');
+  expect(row(table, /^Average win/)[0]).toBe('+2.00R');
+  expect(row(table, /^Average loss/)[0]).toBe('−1.00R');
+});
+
+test('in percent each group is over its own accounts at its own range start', async () => {
+  // A: acc-a from 3 Nov, so the base is $50,000.00 plus the $60.00 made before. B: every account, all time.
+  renderApp(<CompareView />, {
+    repository: await inUnit('percent'),
+    url: '/app/reports/compare?a=account%3Dacc-a%26from%3D2026-11-03&b=',
+  });
+  const page = await screen.findByTestId('reports-compare');
+  const table = within(page).getByRole('table', { name: 'Comparison' });
+  // A: +$65.00 over $50,060.00 is 0.13%. B: +$125.00 over $75,000.00 is 0.17%.
+  expect(row(table, /^Net P&L/).slice(0, 2)).toEqual(['+0.13%', '+0.17%']);
+});
+
+test('the chart names each group, its range and where it ends; Privacy hides the amounts', async () => {
+  const url = '/app/reports/compare?a=symbol%3DES&b=symbol%3DNQ';
+  const { unmount } = renderApp(<CompareView />, {
+    sample: breakdownSample,
+    url,
+  });
+  const page = await screen.findByTestId('reports-compare');
+  expect(
+    within(page).getByRole('img', {
+      name: /Group A, all time, ends at \+\$60\.00.*Group B, all time, ends at \+\$50\.00/,
+    }),
+  ).toBeTruthy();
+  unmount();
+  renderApp(<CompareView />, { repository: await inUnit('privacy'), url });
+  const hidden = await screen.findByTestId('reports-compare');
+  expect(
+    within(hidden).getByRole('img', {
+      name: /Group A, all time, ends at hidden amount.*Group B, all time, ends at hidden amount/,
+    }),
+  ).toBeTruthy();
+});

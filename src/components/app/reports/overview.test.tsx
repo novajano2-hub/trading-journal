@@ -188,3 +188,72 @@ test('the cumulative line carries the max drawdown band, and a clean run has non
   await screen.findAllByTestId('reports-overview');
   expect(again.container.querySelector('[data-band="drawdown"]')).toBeNull();
 });
+
+async function inUnit(unit: 'r' | 'privacy', sample = breakdownSample) {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample,
+  });
+  await repository.prefs.update({ displayUnit: unit });
+  return repository;
+}
+
+test('in R the average win and average loss read in R', async () => {
+  renderApp(<OverviewView />, {
+    repository: await inUnit('r'),
+    url: URL,
+  });
+  const page = await ready();
+  // Only b-1 (+2R) among the winners and b-2 (-1R) among the losers have a stop.
+  expect(page.querySelector('[data-kpi="avg-win"]')!.textContent).toContain(
+    '+2.00R',
+  );
+  expect(page.querySelector('[data-kpi="avg-loss"]')!.textContent).toContain(
+    '−1.00R',
+  );
+});
+
+test('both charts say the range and their key values, and Privacy hides the amounts', async () => {
+  const { unmount } = renderApp(<OverviewView />, {
+    sample: breakdownSample,
+    url: URL,
+  });
+  const page = await ready();
+  expect(
+    within(page).getByRole('img', {
+      name: /^Cumulative net P&L by day, all time\. Ends at \+\$125\.00/,
+    }),
+  ).toBeTruthy();
+  // Best day Mon 2 Nov +$60.00, worst Wed 4 Nov +$15.00.
+  expect(
+    within(page).getByRole('img', {
+      name: /^Daily net P&L bars, 3 days, all time\. Best .*\+\$60\.00, worst .*\+\$15\.00/,
+    }),
+  ).toBeTruthy();
+  unmount();
+  renderApp(<OverviewView />, {
+    repository: await inUnit('privacy'),
+    url: URL,
+  });
+  const hidden = await ready();
+  expect(
+    within(hidden).getByRole('img', {
+      name: /^Cumulative net P&L by day, all time\. Ends at hidden amount/,
+    }),
+  ).toBeTruthy();
+  expect(
+    within(hidden).getByRole('img', {
+      name: /^Daily net P&L bars, 3 days, all time\. Best .*hidden amount, worst .*hidden amount/,
+    }),
+  ).toBeTruthy();
+});
+
+test('the drawdown band is labelled as measured after each trade', async () => {
+  const { container } = renderApp(<OverviewView />, {
+    sample: breakdownSample,
+    url: URL,
+  });
+  await ready();
+  expect(container.textContent).toContain('Max drawdown after each trade');
+});

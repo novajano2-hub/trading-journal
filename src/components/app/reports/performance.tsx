@@ -10,6 +10,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { TaskCheckbox } from '@/components/ui/task-checkbox';
 import type { MetricId } from '@/content/metric-definitions';
 import {
+  type SeriesUnit,
   SERIES_META,
   SERIES_METRICS,
   timeSeries,
@@ -38,7 +39,7 @@ interface Pick {
 /** The metric each picker row's label defines. */
 const TIPS: Record<SeriesMetric, MetricId> = {
   net: 'pnl',
-  'cumulative-net': 'pnl',
+  'cumulative-net': 'cumulative-pnl',
   'win-rate': 'win-rate',
   'profit-factor': 'profit-factor',
   expectancy: 'expectancy',
@@ -130,6 +131,32 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
     points: aligned[i]!,
   }));
   const period = periodOf(bucket);
+  const valueText = (unit: SeriesUnit, v: number): string => {
+    switch (unit) {
+      case 'money':
+        return display.cash(v, true, currency).label;
+      case 'pct':
+        return formatPct(v, 1);
+      case 'ratio':
+        return v.toFixed(2);
+      case 'count':
+        return String(Math.round(v));
+    }
+  };
+  /** Where each metric runs, so the label carries values as well as names. */
+  const ranges = series
+    .map((x) => {
+      const vs = x.points.flatMap((pt) =>
+        pt.value === null ? [] : [pt.value],
+      );
+      if (vs.length === 0) return '';
+      const lo = Math.min(...vs);
+      const hi = Math.max(...vs);
+      return lo === hi
+        ? ` ${x.label} is ${valueText(x.unit, lo)}.`
+        : ` ${x.label} runs from ${valueText(x.unit, lo)} to ${valueText(x.unit, hi)}.`;
+    })
+    .join('');
 
   const rows = useMemo(
     () =>
@@ -277,7 +304,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
             </p>
           ) : (
             <ReportChart
-              label={`${series.map((s) => s.label).join(', ')} by ${bucket}`}
+              label={`${series.map((s) => s.label).join(', ')} by ${bucket}, ${data.caption}.${ranges}`}
               series={series}
               periodLabel={period}
               currency={currency}

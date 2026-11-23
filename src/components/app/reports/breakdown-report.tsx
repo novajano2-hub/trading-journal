@@ -211,7 +211,7 @@ export function BreakdownCards({
   chartVisible?: Visible;
   /** How a row reads in the table and the readout; default its label. */
   labelOf?(row: BreakdownRow): string;
-  /** Only rows whose label is in this set (the tag report's category). */
+  /** Only rows whose key is in this set (the tag report's category, by tag id). */
   rowAllow?: ReadonlySet<string>;
   /** Above the chart, left. */
   controls?: ReactNode;
@@ -237,7 +237,7 @@ export function BreakdownCards({
   const all = useMemo(
     () =>
       breakdown(p.trades, by, merged).filter(
-        (r) => !rowAllow || rowAllow.has(r.label),
+        (r) => !rowAllow || rowAllow.has(r.key),
       ),
     [p.trades, by, merged, rowAllow],
   );
@@ -248,6 +248,21 @@ export function BreakdownCards({
   const tableRows = useMemo(() => visibleRows(all, visible), [all, visible]);
   const best = useMemo(() => ranked(all), [all]);
   const largest = Math.max(1, ...best.map((r) => Math.abs(basisNet(r))));
+
+  /** A group of trades in the chosen unit; `money` is the view's own total. */
+  const sumOf = (r: BreakdownRow) => display.ofTrades(r.tradeIds, basisNet(r));
+  const figureLabel = (r: BreakdownRow) =>
+    display.figure(sumOf(r), true, currency).label;
+  const bestRow = best[0];
+  const worstRow = best.length > 1 ? best[best.length - 1] : undefined;
+  const chartName = [
+    `${chartLabel}, ${data.caption}.`,
+    bestRow ? `Best ${describe(bestRow)} ${figureLabel(bestRow)}` : '',
+    worstRow ? `, worst ${describe(worstRow)} ${figureLabel(worstRow)}.` : '',
+  ]
+    .join(' ')
+    .replace(' ,', ',')
+    .trim();
 
   const names = new Map(chartRows.map((r) => [r.key, describe(r)]));
   const short = new Map(chartRows.map((r) => [r.key, r.label]));
@@ -306,7 +321,7 @@ export function BreakdownCards({
           none
         ) : (
           <span className={`font-[550] ${signTone(basisNet(r))}`}>
-            <FigureText f={display.cash(basisNet(r), true, currency)} />
+            <FigureText f={display.figure(sumOf(r), true, currency)} />
           </span>
         ),
     },
@@ -335,22 +350,28 @@ export function BreakdownCards({
         const avg = roundHalfEven(basisNet(r) / r.summary.closedCount);
         return (
           <span className={signTone(avg)}>
-            <FigureText f={display.cash(avg, true, currency)} />
+            <FigureText
+              f={display.figure(
+                display.meanOfTrades(r.tradeIds, avg),
+                true,
+                currency,
+              )}
+            />
           </span>
         );
       },
     },
   ];
 
-  const matrix = useMemo(() => {
-    if (!cross) return undefined;
-    const shown = breakdown2D(p.trades, merged, by, cross.key, metric);
-    const counts = breakdown2D(p.trades, merged, by, cross.key, 'trades');
-    return { shown, counts };
-  }, [cross, p.trades, merged, by, metric]);
-  const matrixRows = matrix?.shown.rows
-    .map((label, i) => ({ label, i }))
-    .filter((r) => !rowAllow || rowAllow.has(r.label));
+  // One pass serves the metric, the counts and the trades behind each cell.
+  const matrix = useMemo(
+    () =>
+      cross ? breakdown2D(p.trades, merged, by, cross.key, metric) : undefined,
+    [cross, p.trades, merged, by, metric],
+  );
+  const matrixRows = matrix?.rows
+    .map((row, i) => ({ ...row, i }))
+    .filter((r) => !rowAllow || rowAllow.has(r.key));
 
   return (
     <>
@@ -374,7 +395,7 @@ export function BreakdownCards({
           ) : null}
           <div className="mt-3">
             <ReportChart
-              label={chartLabel}
+              label={chartName}
               series={series}
               currency={currency}
               height={chartRows.length > 0 ? 190 : undefined}
@@ -424,7 +445,7 @@ export function BreakdownCards({
                   <span
                     className={`text-right text-[13.5px] font-semibold tabular-nums ${signTone(basisNet(r))}`}
                   >
-                    <FigureText f={display.cash(basisNet(r), true, currency)} />
+                    <FigureText f={display.figure(sumOf(r), true, currency)} />
                   </span>
                   <span className="col-start-2 col-end-4 text-xs text-faint">
                     {r.summary.closedCount}{' '}
@@ -488,17 +509,18 @@ export function BreakdownCards({
             <CrossAnalysis
               label={`${plural_} by ${cross.label.toLowerCase()}`}
               rowTitle={rowTitle}
-              rows={matrixRows.map((r) => ({ key: r.label, label: r.label }))}
-              columns={matrix.shown.cols.map((c) => ({ key: c, label: c }))}
+              rows={matrixRows}
+              columns={matrix.cols}
               currency={currency}
-              cell={(rowLabel, colLabel) => {
-                const r = matrix.shown.rows.indexOf(rowLabel);
-                const c = matrix.shown.cols.indexOf(colLabel);
-                const v = matrix.shown.cells[r]?.[c] ?? null;
+              cell={(rowKey, colKey) => {
+                const r = matrix.rows.findIndex((x) => x.key === rowKey);
+                const c = matrix.cols.findIndex((x) => x.key === colKey);
+                const v = matrix.cells[r]?.[c] ?? null;
                 if (v === null) return undefined;
-                const count = matrix.counts.cells[r]?.[c] ?? 0;
+                const count = matrix.counts[r]?.[c] ?? 0;
+                const tradeIds = matrix.tradeIds[r]?.[c] ?? [];
                 return metric === 'net'
-                  ? { value: v, count }
+                  ? { value: v, count, tradeIds }
                   : {
                       value: v,
                       count,
@@ -578,16 +600,18 @@ export function TagsView(): React.JSX.Element {
   const { options, categories } = useNames();
   const params = useSearchParams();
   const category = categories.find((c) => c.id === params.get('cat'));
+  const tags = useTags().data;
+  // By tag id: two tags may share a name in different categories.
   const allow = useMemo(
     () =>
       category
         ? new Set(
-            Object.entries(options.tagCategoryNames ?? {})
-              .filter(([, name]) => name === category.name)
-              .map(([id]) => options.tagNames?.[id] ?? id),
+            (tags ?? [])
+              .filter((t) => t.categoryId === category.id)
+              .map((t) => t.id),
           )
         : undefined,
-    [category, options],
+    [category, tags],
   );
   return (
     <Plain

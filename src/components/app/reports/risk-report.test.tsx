@@ -70,3 +70,38 @@ test('the R distribution tab clamps, counts trades without a stop, and the drawd
   expect(within(page).getByRole('img', { name: /Drawdown/ })).toBeTruthy();
   expect(new URLSearchParams(window.location.search).get('tab')).toBe('r');
 });
+
+test('the R distribution and the drawdown chart say the range and their key values; Privacy hides the amounts', async () => {
+  const { unmount } = renderApp(<RiskView />, {
+    sample: breakdownSample,
+    url: '/app/reports/risk?tab=dist',
+  });
+  const page = await screen.findByTestId('reports-risk');
+  expect(
+    within(page).getByRole('img', {
+      name: /^R multiples, trades per half R, all time\. 2 trades with a stop, 5 without/,
+    }),
+  ).toBeTruthy();
+  expect(
+    within(page).getByRole('img', {
+      name: /^Drawdown from the equity peak, by day, all time\. Max drawdown −\$40\.00/,
+    }),
+  ).toBeTruthy();
+  unmount();
+  const { createLocalRepository } =
+    await import('@/data/local/local-repository');
+  const { IDBFactory, IDBKeyRange } = await import('fake-indexeddb');
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: breakdownSample,
+  });
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<RiskView />, { repository, url: '/app/reports/risk?tab=dist' });
+  const hidden = await screen.findByTestId('reports-risk');
+  expect(
+    within(hidden).getByRole('img', {
+      name: /Max drawdown hidden amount/,
+    }),
+  ).toBeTruthy();
+});

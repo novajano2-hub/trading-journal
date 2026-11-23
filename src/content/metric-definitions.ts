@@ -11,6 +11,7 @@ export const METRIC_IDS = [
   'daily-loss-limit',
   'trades',
   'pnl',
+  'cumulative-pnl',
   'win-rate',
   'profit-factor',
   'expectancy',
@@ -99,6 +100,11 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: '{Basis} P&L',
     definition:
       'Sum of {basis} P&L of closed trades in your filters. Net is after fees and commissions. Gross is before them.',
+  },
+  'cumulative-pnl': {
+    label: 'Cumulative P&L',
+    definition:
+      'The running total of {basis} P&L by realization date: each period adds the {basis} P&L of the trades closed in it to everything before.',
   },
   'win-rate': {
     label: 'Win rate',

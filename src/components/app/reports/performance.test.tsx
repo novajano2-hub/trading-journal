@@ -9,7 +9,10 @@ import {
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import { renderApp } from '../__fixtures__/render-app';
-import { reportsSample } from '../__fixtures__/reports-sample';
+import {
+  newYorkRepository,
+  reportsSample,
+} from '../__fixtures__/reports-sample';
 import { PerformanceView } from './performance';
 
 vi.mock('next/navigation', () => import('../__fixtures__/navigation'));
@@ -133,4 +136,38 @@ test('the summary table has a column per chosen metric and sorts', async () => {
     within(table).getByRole('button', { name: 'Sort by Net P&L' }),
   );
   expect(first()).toBe('Wed 4 Nov');
+});
+
+test('Cumulative P&L carries its own definition, not the Net P&L one', async () => {
+  renderApp(<PerformanceView />, { sample: reportsSample, url: URL });
+  const metrics = await picker();
+  const row = metrics
+    .getByRole('checkbox', { name: 'Cumulative P&L' })
+    .closest('div.min-h-10')!;
+  expect(
+    row.querySelector('[data-metric-tip="cumulative-pnl"]'),
+  ).not.toBeNull();
+  expect(row.querySelector('[data-metric-tip="pnl"]')).toBeNull();
+});
+
+test('the chart says the range and where each metric runs, and Privacy hides the amounts', async () => {
+  const { unmount } = renderApp(<PerformanceView />, {
+    sample: reportsSample,
+    url: `${URL}?bucket=day`,
+  });
+  // Days: Nov 2 +$60.00, Nov 3 +$100.00, Nov 4 −$80.00, Nov 5 +$45.00.
+  expect(
+    await screen.findByRole('img', {
+      name: /^Net P&L by day, all time\. Net P&L runs from −\$80\.00 to \+\$100\.00/,
+    }),
+  ).toBeTruthy();
+  unmount();
+  const repository = await newYorkRepository();
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<PerformanceView />, { repository, url: `${URL}?bucket=day` });
+  expect(
+    await screen.findByRole('img', {
+      name: /^Net P&L by day, all time\. Net P&L runs from hidden amount to hidden amount/,
+    }),
+  ).toBeTruthy();
 });

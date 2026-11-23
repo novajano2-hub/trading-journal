@@ -31,3 +31,12 @@ test('the basis shows in the label and the definitions that use it', () => {
     'Always net',
   );
 });
+
+test('cumulative P&L has its own definition, apart from the period P&L', () => {
+  const cumulative = metricDefinition('cumulative-pnl', 'net');
+  expect(cumulative.label).toBe('Cumulative P&L');
+  expect(cumulative.definition).toContain('running total');
+  expect(cumulative.definition).not.toBe(
+    metricDefinition('pnl', 'net').definition,
+  );
+});

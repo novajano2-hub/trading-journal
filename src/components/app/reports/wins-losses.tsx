@@ -83,14 +83,28 @@ function Side({
           {side.count}
         </Stat>
         <Stat id="pnl" data={data} tone={win ? 'text-gain' : 'text-loss'}>
-          {cash(side.net, false)}
+          <FigureText
+            f={display.figure(
+              display.ofTrades(side.tradeIds, side.net),
+              true,
+              currency,
+            )}
+          />
         </Stat>
         <Stat
           id={win ? 'avg-win' : 'avg-loss'}
           data={data}
           tone={win ? 'text-gain' : 'text-loss'}
         >
-          {cash(side.avgNet, false)}
+          {side.avgNet === null ? null : (
+            <FigureText
+              f={display.figure(
+                display.meanOfTrades(side.tradeIds, side.avgNet),
+                true,
+                currency,
+              )}
+            />
+          )}
         </Stat>
         <Stat id="avg-duration" data={data}>
           {side.avgDurationMin === null

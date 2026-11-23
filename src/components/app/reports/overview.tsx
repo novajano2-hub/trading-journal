@@ -12,6 +12,7 @@ import { useId, useMemo, type ReactNode } from 'react';
 import { FigureText } from '@/components/product/figure-text';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { MetricId } from '@/content/metric-definitions';
+import { winsVsLosses } from '@/domain/metrics/breakdowns';
 import { pnlOf } from '@/domain/metrics/context';
 import { timeSeries } from '@/domain/metrics/series';
 import { rExpectancy, summarize } from '@/domain/metrics/summary';
@@ -109,6 +110,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
   const net = display.ofAll(gross ? s.grossPnl : s.netPnl);
   const expectancy =
     s.expectancy === null ? null : display.meanOfAll(s.expectancy);
+  const outcomes = useMemo(() => winsVsLosses(p.trades, ctx), [p.trades, ctx]);
   const trade = (cents: number | null) => {
     if (cents === null) return null;
     const t = closed.find((c) => pnlOf(c, basis) === cents);
@@ -132,7 +134,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
   // The max drawdown, from its peak to its low, shaded on the cumulative line.
   const drawdownText =
     drawdown.amount > 0
-      ? `Max drawdown ${display.cash(-drawdown.amount, true, currency).text}${drawdown.pct === null ? '' : `, ${formatPct(drawdown.pct, 1)}`}`
+      ? `Max drawdown after each trade ${display.cash(-drawdown.amount, true, currency).text}${drawdown.pct === null ? '' : `, ${formatPct(drawdown.pct, 1)}`}`
       : '';
   const shade = useMemo<Shade | undefined>(
     () =>
@@ -172,6 +174,27 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
     };
   });
 
+  const cumulativeName = `Cumulative ${basis} P&L by day, ${data.caption}.${
+    ends === undefined || ends === null
+      ? ''
+      : ` Ends at ${display.cash(ends, true, currency).label}.`
+  }`;
+  const extremes = seriesIn.daily.filter(
+    (d): d is { key: string; value: number } => d.value !== null,
+  );
+  const topDay = extremes.reduce<(typeof extremes)[number] | undefined>(
+    (a, d) => (a === undefined || d.value > a.value ? d : a),
+    undefined,
+  );
+  const lowDay = extremes.reduce<(typeof extremes)[number] | undefined>(
+    (a, d) => (a === undefined || d.value < a.value ? d : a),
+    undefined,
+  );
+  const dailyName = `Daily ${basis} P&L bars, ${days.length} ${plural(days.length, 'day')}, ${data.caption}.${
+    topDay && lowDay
+      ? ` Best ${periodText(topDay.key)} ${display.cash(topDay.value, true, currency).label}, worst ${periodText(lowDay.key)} ${display.cash(lowDay.value, true, currency).label}.`
+      : ''
+  }`;
   const cumulativeId = useId();
   const dailyId = useId();
   const durations = p.dayDurations;
@@ -235,7 +258,9 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
             tone="text-gain"
             sub={`${s.wins} winning ${plural(s.wins, 'trade')}`}
           >
-            {s.avgWin === null ? null : fig({ money: s.avgWin })}
+            {s.avgWin === null
+              ? null
+              : fig(display.meanOfTrades(outcomes.wins.tradeIds, s.avgWin))}
           </Kpi>
           <Kpi
             id="avg-loss"
@@ -243,7 +268,9 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
             tone="text-loss"
             sub={`${s.losses} losing ${plural(s.losses, 'trade')}`}
           >
-            {s.avgLoss === null ? null : fig({ money: s.avgLoss })}
+            {s.avgLoss === null
+              ? null
+              : fig(display.meanOfTrades(outcomes.losses.tradeIds, s.avgLoss))}
           </Kpi>
           <Kpi id="largest-win" data={data} tone="text-gain" sub="one trade">
             {fig(largestWin)}
@@ -312,7 +339,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
         />
         <div className="mt-3">
           <ReportChart
-            label={`Cumulative ${basis} P&L by day`}
+            label={cumulativeName}
             currency={currency}
             height={280}
             shade={shade}
@@ -351,7 +378,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
         />
         <div className="mt-3">
           <ReportChart
-            label={`Daily ${basis} P&L bars, ${days.length} ${plural(days.length, 'day')}`}
+            label={dailyName}
             currency={currency}
             height={220}
             series={[

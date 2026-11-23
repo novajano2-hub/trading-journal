@@ -37,6 +37,7 @@ import {
   useTrades,
 } from '@/data/query/hooks';
 import { StorageUnavailableError } from '@/data/repository';
+import { winsVsLosses } from '@/domain/metrics/breakdowns';
 import { timeSeries } from '@/domain/metrics/series';
 import { summarize, type Summary } from '@/domain/metrics/summary';
 import { localDate } from '@/domain/time';
@@ -52,12 +53,16 @@ import type {
 import {
   FigureSourceContext,
   formatUnitValue,
+  meanFigure,
   pctBaseOf,
+  sumFigures,
+  tradeFigure,
   useDisplay,
+  type Figure,
   type FigureSource,
 } from '@/lib/display';
 import { formatPct, plural } from '@/lib/format';
-import { rangeChipLabel } from '@/lib/range-label';
+import { rangeCaption, rangeChipLabel } from '@/lib/range-label';
 import { FilterChip, CheckRows, RadioRows } from '../filter-chip';
 import { accountSummary, chipLabel, datesOf, toggleId } from '../filter-model';
 import {
@@ -292,23 +297,43 @@ function GroupFilters({
 
 type Kind = 'money' | 'count' | 'pct' | 'ratio' | 'r';
 
+/** Which trades a money row is over, and whether it totals or averages them. */
+type Over = { of: 'all' | 'wins' | 'losses'; mean: boolean };
+
 const ROWS: {
   id: MetricId;
   label?: string;
   kind: Kind;
+  over?: Over;
   get(s: Summary): number | null;
 }[] = [
   {
     id: 'pnl',
     kind: 'money',
+    over: { of: 'all', mean: false },
     get: (s) => (s.basis === 'gross' ? s.grossPnl : s.netPnl),
   },
   { id: 'trades', kind: 'count', get: (s) => s.closedCount },
   { id: 'win-rate', kind: 'pct', get: (s) => s.winRate },
   { id: 'profit-factor', kind: 'ratio', get: (s) => s.profitFactor },
-  { id: 'expectancy', kind: 'money', get: (s) => s.expectancy },
-  { id: 'avg-win', kind: 'money', get: (s) => s.avgWin },
-  { id: 'avg-loss', kind: 'money', get: (s) => s.avgLoss },
+  {
+    id: 'expectancy',
+    kind: 'money',
+    over: { of: 'all', mean: true },
+    get: (s) => s.expectancy,
+  },
+  {
+    id: 'avg-win',
+    kind: 'money',
+    over: { of: 'wins', mean: true },
+    get: (s) => s.avgWin,
+  },
+  {
+    id: 'avg-loss',
+    kind: 'money',
+    over: { of: 'losses', mean: true },
+    get: (s) => s.avgLoss,
+  },
   {
     id: 'realized-r',
     label: 'Average R',
@@ -318,6 +343,22 @@ const ROWS: {
 ];
 
 const signOf = (n: number) => (n > 0 ? '+' : n < 0 ? '−' : '');
+
+const UNIT_KEYS = ['pct', 'r', 'ticks', 'pips', 'points'] as const;
+
+/** A minus B in every unit both have; a unit either lacks stays null. */
+function figureDifference(a: Figure, b: Figure): Figure {
+  const out: Figure = { money: a.money - b.money };
+  for (const u of UNIT_KEYS) {
+    const x = a[u];
+    const y = b[u];
+    out[u] =
+      x === null || x === undefined || y === null || y === undefined
+        ? null
+        : Math.round((x - y) * 1e6) / 1e6;
+  }
+  return out;
+}
 
 /** Both groups' cumulative lines on the same days: a day a group has no exit holds its last value. */
 function alignCumulative(
@@ -421,15 +462,28 @@ function Compared({
 
   const results = useMemo(
     () =>
-      picked.map((g) => {
+      picked.map((g, i) => {
         const own = g.trades.filter((t) => t.pnlCurrency === currency);
         const dayOwn = g.dayTrades.filter((t) => t.pnlCurrency === currency);
+        const sides = winsVsLosses(own, base);
         return {
           summary: summarize(own, base),
           cumulative: timeSeries(dayOwn, g.ctx, 'cumulative-net', 'day'),
+          trades: own.filter(isClosed),
+          wins: new Set(sides.wins.tradeIds),
+          losses: new Set(sides.losses.tradeIds),
+          // Each group's own accounts, at the start of its own range.
+          pctBase: pctBaseOf({
+            accounts,
+            trades,
+            accountIds: filters[i]!.accountIds,
+            currency,
+            from: g.ctx.range.from,
+            timeZone: prefs.timeZone,
+          }),
         };
       }),
-    [picked, currency, base],
+    [picked, currency, base, accounts, trades, filters, prefs.timeZone],
   );
   const lines = useMemo(
     () => alignCumulative(results.map((r) => r.cumulative)),
@@ -461,15 +515,38 @@ function Compared({
     points: lines[i]!,
   }));
 
+  /** A group's money row in the chosen unit: its trades summed or averaged, over its own base. */
+  const moneyFigure = (
+    over: Over,
+    i: number,
+    money: number | null,
+  ): Figure | null => {
+    if (money === null) return null;
+    const r = results[i]!;
+    const picked = r.trades.filter(
+      (t) =>
+        over.of === 'all' || (over.of === 'wins' ? r.wins : r.losses).has(t.id),
+    );
+    const figs = picked.map((t) => tradeFigure(t, base));
+    const f = over.mean
+      ? meanFigure(figs, r.pctBase)
+      : sumFigures(figs, r.pctBase);
+    return {
+      ...f,
+      money,
+      pct: r.pctBase !== null && r.pctBase > 0 ? money / r.pctBase : null,
+    };
+  };
+  const figureCell = (f: Figure): ReactNode => (
+    <span className={signTone(f.money)}>
+      <FigureText f={display.figure(f, true, currency)} />
+    </span>
+  );
   const cell = (kind: Kind, v: number | null): ReactNode => {
     if (v === null) return <span className="text-faint">None</span>;
     switch (kind) {
       case 'money':
-        return (
-          <span className={signTone(v)}>
-            <FigureText f={display.cash(v, true, currency)} />
-          </span>
-        );
+        return figureCell({ money: v });
       case 'count':
         return String(v);
       case 'pct':
@@ -506,6 +583,24 @@ function Compared({
     }
   };
 
+  const chartName = `Cumulative P&L, ${GROUPS.map((g, i) => {
+    const line = results[i]!.cumulative;
+    const end = line[line.length - 1]?.value;
+    return `${g.name}, ${rangeCaption(picked[i]!.ctx.range, today)}${
+      end === undefined || end === null
+        ? ''
+        : `, ends at ${
+            display.figure(
+              {
+                money: end,
+                pct: source.pctBase ? end / source.pctBase : null,
+              },
+              true,
+              currency,
+            ).label
+          }`
+    }`;
+  }).join('. ')}.`;
   const nA = results[0]!.summary.closedCount;
   const nB = results[1]!.summary.closedCount;
 
@@ -591,6 +686,8 @@ function Compared({
                 {ROWS.map((r) => {
                   const a = r.get(results[0]!.summary);
                   const b = r.get(results[1]!.summary);
+                  const fa = r.over ? moneyFigure(r.over, 0, a) : null;
+                  const fb = r.over ? moneyFigure(r.over, 1, b) : null;
                   return (
                     <tr key={r.id} className="border-t border-line/70">
                       <th
@@ -602,13 +699,15 @@ function Compared({
                         </MetricTip>
                       </th>
                       <td className="h-10 text-right font-semibold tabular-nums">
-                        {cell(r.kind, a)}
+                        {fa ? figureCell(fa) : cell(r.kind, a)}
                       </td>
                       <td className="h-10 text-right font-semibold tabular-nums">
-                        {cell(r.kind, b)}
+                        {fb ? figureCell(fb) : cell(r.kind, b)}
                       </td>
                       <td className="h-10 text-right font-semibold tabular-nums text-muted">
-                        {difference(r.kind, a, b)}
+                        {fa && fb
+                          ? figureCell(figureDifference(fa, fb))
+                          : difference(r.kind, a, b)}
                       </td>
                     </tr>
                   );
@@ -635,7 +734,7 @@ function Compared({
           />
           <div className="mt-3">
             <ReportChart
-              label="Cumulative P&L, Group A and Group B"
+              label={chartName}
               series={series}
               overlay
               height={300}

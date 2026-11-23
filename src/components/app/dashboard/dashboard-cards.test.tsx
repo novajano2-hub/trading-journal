@@ -572,6 +572,7 @@ test('every metric carries its definition', async () => {
     'gross-pnl',
     'net-pnl',
     // On the reports (Task 14).
+    'cumulative-pnl',
     'avg-win',
     'avg-loss',
     'largest-win',

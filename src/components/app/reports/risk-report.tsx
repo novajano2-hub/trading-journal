@@ -40,6 +40,7 @@ function Distribution({ data }: { data: ReportData }): React.JSX.Element {
   );
   const noStop = p.summary.noRiskCount;
   const labels = new Map(bins.map((b) => [b.label, b.label]));
+  const withStop = bins.reduce((n, b) => n + b.count, 0);
   return (
     <section aria-labelledby={id} className={`${CARD} ${CARD_PAD}`}>
       <CardHeader
@@ -55,7 +56,7 @@ function Distribution({ data }: { data: ReportData }): React.JSX.Element {
       />
       <div className="mt-3">
         <ReportChart
-          label="R multiples, trades per half R"
+          label={`R multiples, trades per half R, ${data.caption}. ${withStop} ${plural(withStop, 'trade')} with a stop, ${noStop} without.`}
           series={[
             {
               label: 'Trades',
@@ -88,6 +89,7 @@ function DrawdownCard({ data }: { data: ReportData }): React.JSX.Element {
     [p.equity, p.startingBalance, ctx.timeZone],
   );
   const dd = p.drawdown;
+  const name = `Drawdown from the equity peak, by day, ${data.caption}. Max drawdown ${display.cash(-dd.amount, true, currency).label}.`;
   return (
     <section aria-labelledby={id} className={`${CARD} ${CARD_PAD}`}>
       <CardHeader
@@ -116,7 +118,7 @@ function DrawdownCard({ data }: { data: ReportData }): React.JSX.Element {
       />
       <div className="mt-3">
         <ReportChart
-          label="Drawdown from the equity peak, by day"
+          label={name}
           currency={currency}
           height={200}
           series={[

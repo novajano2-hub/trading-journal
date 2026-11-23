@@ -8,6 +8,8 @@ import { plural } from '@/lib/format';
 export interface CrossCell {
   value: number;
   count: number;
+  /** The closed trades in the cell: its P&L then reads in the chosen unit. */
+  tradeIds?: readonly string[];
   /**
    * For a metric that is not money (a win rate, a profit factor, a count):
    * what the cell reads. It then shows this, and `tint` says gain or loss.
@@ -97,7 +99,15 @@ export function CrossAnalysis({
                           c.text
                         ) : (
                           <FigureText
-                            f={display.cash(c.value, true, currency)}
+                            f={
+                              c.tradeIds
+                                ? display.figure(
+                                    display.ofTrades(c.tradeIds, c.value),
+                                    true,
+                                    currency,
+                                  )
+                                : display.cash(c.value, true, currency)
+                            }
                           />
                         )}
                       </span>

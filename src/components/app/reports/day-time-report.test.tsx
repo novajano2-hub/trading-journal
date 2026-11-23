@@ -1,12 +1,24 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  screen,
+  within,
+} from '@testing-library/react';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
+import { breakdown } from '@/domain/metrics/breakdowns';
 import { renderApp } from '../__fixtures__/render-app';
 import { newYorkRepository } from '../__fixtures__/reports-sample';
 import { DayTimeView } from './day-time-report';
+import { writeParam } from './use-report-data';
 
 vi.mock('next/navigation', () => import('../__fixtures__/navigation'));
+vi.mock('@/domain/metrics/breakdowns', async (original) => {
+  const real = await original<typeof import('@/domain/metrics/breakdowns')>();
+  return { ...real, breakdown: vi.fn(real.breakdown) };
+});
 MotionGlobalConfig.skipAnimations = true;
 afterEach(cleanup);
 
@@ -78,4 +90,18 @@ test('the URL holds the tab, the bucket and the basis, and the tabs are Weekday,
   expect(nets[0]![3]).toBe('+$60.00');
   // The bucket switch belongs to the time-of-day tab only.
   expect(within(page).queryByRole('radiogroup', { name: 'Bucket' })).toBeNull();
+});
+
+test('a re-render that changes nothing the report reads does not recompute the breakdown', async () => {
+  renderApp(<DayTimeView />, {
+    repository: await newYorkRepository(),
+    url: URL,
+  });
+  const page = await screen.findByTestId('reports-day-time');
+  const calls = vi.mocked(breakdown);
+  expect(labels(page)).toEqual(['10:00 to 10:15']);
+  const before = calls.mock.calls.length;
+  act(() => writeParam('unrelated', '1'));
+  expect(labels(page)).toEqual(['10:00 to 10:15']);
+  expect(calls.mock.calls.length).toBe(before);
 });
