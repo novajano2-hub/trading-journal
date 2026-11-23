@@ -130,6 +130,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
     }),
     [p.dayTrades, ctx],
   );
+  const dayOf = useMemo(() => new Map(days.map((d) => [d.date, d])), [days]);
   const ends = seriesIn.cumulative[seriesIn.cumulative.length - 1]?.value;
   // The max drawdown, from its peak to its low, shaded on the cumulative line.
   const drawdownText =
@@ -343,6 +344,17 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
             currency={currency}
             height={280}
             shade={shade}
+            extra={[
+              {
+                label: 'That day',
+                text: (key) =>
+                  display.cash(dayOf.get(key)?.net ?? 0, true, currency).text,
+              },
+              {
+                label: 'Trades',
+                text: (key) => String(dayOf.get(key)?.tradeCount ?? 0),
+              },
+            ]}
             series={[
               {
                 label: 'Cumulative P&L',
@@ -381,6 +393,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
             label={dailyName}
             currency={currency}
             height={220}
+            labelExtremes
             series={[
               {
                 label: 'Daily P&L',
@@ -504,6 +517,25 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
             title="Days and returns"
           />
           <div className="mt-1">
+            <Stat
+              id="avg-green-day"
+              data={data}
+              tone="text-gain"
+              sub={`${ds.greenDays} ${plural(ds.greenDays, 'day')}`}
+            >
+              {fig(ds.avgGreenDay === null ? null : { money: ds.avgGreenDay })}
+            </Stat>
+            <Stat
+              id="avg-red-day"
+              data={data}
+              tone="text-loss"
+              sub={`${ds.redDays} ${plural(ds.redDays, 'day')}`}
+            >
+              {fig(ds.avgRedDay === null ? null : { money: ds.avgRedDay })}
+            </Stat>
+            <Stat id="trades-per-day" data={data} sub="closed">
+              {ds.tradesPerDay === null ? null : ds.tradesPerDay.toFixed(1)}
+            </Stat>
             <Stat id="avg-daily-win-rate" data={data}>
               {p.avgDailyWinRate === null
                 ? null

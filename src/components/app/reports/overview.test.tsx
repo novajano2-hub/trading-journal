@@ -1,5 +1,11 @@
 // @vitest-environment happy-dom
-import { cleanup, screen, within } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  screen,
+  within,
+} from '@testing-library/react';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -256,4 +262,47 @@ test('the drawdown band is labelled as measured after each trade', async () => {
   });
   await ready();
   expect(container.textContent).toContain('Max drawdown after each trade');
+});
+
+test('the Days card gives the average green day, the average red day and trades per day', async () => {
+  renderApp(<OverviewView />, { sample: reportsSample, url: URL });
+  const page = await ready();
+  const card = within(page).getByRole('region', { name: 'Days' });
+  // Green days +60, +100 and +45; the red day -80; nine trades over four days.
+  expect(stat(card, 'avg-green-day')).toContain('+$68.33');
+  expect(stat(card, 'avg-green-day')).toContain('3 days');
+  expect(stat(card, 'avg-red-day')).toContain('−$80.00');
+  expect(stat(card, 'avg-red-day')).toContain('1 day');
+  expect(stat(card, 'trades-per-day')).toContain('2.3');
+  for (const id of ['avg-green-day', 'avg-red-day', 'trades-per-day'])
+    expect(card.querySelector(`[data-metric-tip="${id}"]`), id).not.toBeNull();
+});
+
+test('the daily bars write their value on the best and the worst day', async () => {
+  const { container } = renderApp(<OverviewView />, {
+    sample: reportsSample,
+    url: URL,
+  });
+  await ready();
+  const best = container.querySelector('[data-extreme="best"]');
+  const worst = container.querySelector('[data-extreme="worst"]');
+  expect(best?.textContent).toBe('+$100');
+  expect(worst?.textContent).toBe('−$80');
+});
+
+test('the cumulative readout gives that day and its trades', async () => {
+  renderApp(<OverviewView />, { sample: reportsSample, url: URL });
+  const page = await ready();
+  const chart = within(page).getByRole('img', {
+    name: /^Cumulative net P&L by day/,
+  });
+  act(() => chart.focus());
+  fireEvent.keyDown(chart, { key: 'ArrowRight' });
+  const readout = within(chart.parentElement!.parentElement!).getByRole(
+    'status',
+  );
+  // Tue 3 Nov: +$100.00 over two trades; the line stands at +$160.00.
+  expect(readout.textContent).toContain('Tue 3 Nov');
+  expect(readout.textContent).toMatch(/That day\s*\+\$100\.00/);
+  expect(readout.textContent).toMatch(/Trades\s*2/);
 });

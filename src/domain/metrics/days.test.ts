@@ -50,6 +50,10 @@ describe('days', () => {
       greenPct: 0.5,
       best: { date: '2026-03-06' },
       worst: { date: '2026-03-09' },
+      // 4000 on the green day, -2000 on the red; four trades over two days.
+      avgGreenDay: 4000,
+      avgRedDay: -2000,
+      tradesPerDay: 2,
     });
     expect(dayStreaks(days, ctx)).toMatchObject({ maxWin: 1, maxLoss: 1 });
   });
@@ -61,6 +65,9 @@ describe('days', () => {
       greenPct: null,
       best: null,
       worst: null,
+      avgGreenDay: null,
+      avgRedDay: null,
+      tradesPerDay: null,
     });
     const d = (date: string, net: number) => ({
       date,

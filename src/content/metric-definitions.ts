@@ -30,6 +30,9 @@ export const METRIC_IDS = [
   'green-days',
   'best-day',
   'worst-day',
+  'avg-green-day',
+  'avg-red-day',
+  'trades-per-day',
   'fees',
   'gross-pnl',
   'net-pnl',
@@ -193,6 +196,21 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'worst-day': {
     label: 'Worst day',
     definition: 'The trading day with the lowest {basis} P&L.',
+  },
+  'avg-green-day': {
+    label: 'Average green day',
+    definition:
+      'The mean {basis} P&L of your green days, those that ended in profit outside your breakeven range.',
+  },
+  'avg-red-day': {
+    label: 'Average red day',
+    definition:
+      'The mean {basis} P&L of your red days, those that ended in loss outside your breakeven range.',
+  },
+  'trades-per-day': {
+    label: 'Trades per day',
+    definition:
+      'Closed trades per trading day. A trade is booked on each date it exits, so one held over two days counts on both.',
   },
   fees: {
     label: 'Fees',

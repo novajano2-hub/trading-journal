@@ -1,3 +1,4 @@
+import { roundHalfEven } from '../money';
 import { outcomeOf } from '../outcome';
 import { localDate } from '../time';
 import type { Cents, Trade } from '../types';
@@ -154,9 +155,21 @@ export function daySummary(
   greenPct: number | null;
   best: DayStat | null;
   worst: DayStat | null;
+  /** The mean P&L of the green days, in cents; null with none. */
+  avgGreenDay: Cents | null;
+  /** The mean P&L of the red days, in cents; null with none. */
+  avgRedDay: Cents | null;
+  /** Trades exited per trading day; a trade counts on each day it exits. Null with no days. */
+  tradesPerDay: number | null;
 } {
-  const greenDays = days.filter((d) => dayOutcome(d, ctx) === 'win').length;
-  const redDays = days.filter((d) => dayOutcome(d, ctx) === 'loss').length;
+  const green = days.filter((d) => dayOutcome(d, ctx) === 'win');
+  const red = days.filter((d) => dayOutcome(d, ctx) === 'loss');
+  const greenDays = green.length;
+  const redDays = red.length;
+  const mean = (list: readonly DayStat[]) =>
+    list.length === 0
+      ? null
+      : roundHalfEven(list.reduce((sum, d) => sum + d.net, 0) / list.length);
   let best: DayStat | null = null;
   let worst: DayStat | null = null;
   for (const d of days) {
@@ -170,6 +183,12 @@ export function daySummary(
     greenPct: days.length === 0 ? null : greenDays / days.length,
     best,
     worst,
+    avgGreenDay: mean(green),
+    avgRedDay: mean(red),
+    tradesPerDay:
+      days.length === 0
+        ? null
+        : days.reduce((sum, d) => sum + d.tradeCount, 0) / days.length,
   };
 }
 
