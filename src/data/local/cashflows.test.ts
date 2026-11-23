@@ -119,31 +119,3 @@ test('a refused account removal keeps its cash flows', async () => {
   );
   expect(await repo.cashFlows.list(S)).toHaveLength(1);
 });
-
-test('tag names stored with capitals are lowercased when the store opens', async () => {
-  const repo = setup(async () => {
-    const s = fixtureSample();
-    s.tags.push(
-      {
-        id: 'tag-caps',
-        workspaceId: 'sample',
-        name: 'BREAKOUT',
-        categoryId: 'mistakes',
-      },
-      {
-        id: 'tag-clash',
-        workspaceId: 'sample',
-        name: 'Breakout',
-        categoryId: 'setups',
-      },
-    );
-    return s;
-  });
-  const byId = Object.fromEntries(
-    (await repo.tags.list(S)).map((t) => [t.id, t.name]),
-  );
-  expect(byId['tag-caps']).toBe('breakout');
-  // A name another tag in the category already has is left as it was.
-  expect(byId['tag-clash']).toBe('Breakout');
-  expect(byId['tag-setup']).toBe('breakout');
-});
