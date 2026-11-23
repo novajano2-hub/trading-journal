@@ -51,9 +51,11 @@ function StrategyMenu({
   icon,
   strategies,
   empty,
+  disabled = false,
   onPick,
 }: {
   label: string;
+  disabled?: boolean;
   icon: React.ReactNode;
   strategies: readonly Strategy[];
   empty: string;
@@ -61,7 +63,7 @@ function StrategyMenu({
 }): React.JSX.Element {
   return (
     <DropdownMenu.Root>
-      <DropdownMenu.Trigger className={BTN} title={label}>
+      <DropdownMenu.Trigger className={BTN} title={label} disabled={disabled}>
         {icon}
         <span className="max-sm:sr-only">{label}</span>
         <CaretDown
@@ -104,6 +106,7 @@ function StrategyMenu({
  */
 export function BulkBar({
   trades,
+  archivedAccountIds,
   strategies,
   onClear,
   onExport,
@@ -111,6 +114,8 @@ export function BulkBar({
 }: {
   /** The selected trades. */
   trades: readonly Trade[];
+  /** Trades of these accounts are read-only: edits and deletes leave them out. */
+  archivedAccountIds: ReadonlySet<string>;
   strategies: readonly Strategy[];
   onClear(): void;
   onExport(): void;
@@ -124,9 +129,14 @@ export function BulkBar({
   // Read by onClose in the same tick the delete settles, so not state.
   const deleted = useRef(false);
 
+  // Archived accounts are read-only: only the other trades are edited.
+  const locked = trades.filter((t) => archivedAccountIds.has(t.accountId));
+  const editable = trades.filter((t) => !archivedAccountIds.has(t.accountId));
+  const lockedCount = locked.length;
+  const lockedSubject = `${lockedCount} ${plural(lockedCount, 'trade')} in ${plural(lockedCount, 'an archived account', 'archived accounts')}`;
   const n = trades.length;
-  const ids = trades.map((t) => t.id);
-  const noun = `${n} ${plural(n, 'trade')}`;
+  const ids = editable.map((t) => t.id);
+  const noun = `${editable.length} ${plural(editable.length, 'trade')}`;
   const FAILED = "Couldn't save that. Try again.";
 
   const run = async (
@@ -134,8 +144,17 @@ export function BulkBar({
     done: string,
   ) => {
     try {
-      await update.mutateAsync({ ids, patch });
-      onResult(done);
+      if (ids.length > 0) await update.mutateAsync({ ids, patch });
+      onResult(
+        lockedCount > 0 ? (
+          <>
+            {ids.length > 0 ? `${done} ` : ''}
+            {lockedSubject} {plural(lockedCount, "wasn't", "weren't")} changed.
+          </>
+        ) : (
+          done
+        ),
+      );
     } catch {
       onResult(FAILED);
     }
@@ -144,7 +163,7 @@ export function BulkBar({
   const onStrategies = new Set(trades.flatMap((t) => t.strategyIds));
   const removable = strategies.filter((s) => onStrategies.has(s.id));
 
-  const { deletable, kept } = splitDeletable(trades);
+  const { deletable, kept } = splitDeletable(editable);
 
   return (
     <>
@@ -170,7 +189,11 @@ export function BulkBar({
             if (!next) setPending([]);
           }}
         >
-          <Popover.Trigger className={BTN} title="Tag">
+          <Popover.Trigger
+            className={BTN}
+            title="Tag"
+            disabled={ids.length === 0}
+          >
             <TagIcon size={16} aria-hidden="true" className={ICON} />
             <span className="max-sm:sr-only">Tag</span>
             <CaretDown
@@ -217,6 +240,7 @@ export function BulkBar({
           icon={<StackPlus size={16} aria-hidden="true" className={ICON} />}
           strategies={strategies}
           empty="No strategies yet."
+          disabled={ids.length === 0}
           onPick={(s) =>
             void run(
               (t) => ({ strategyIds: [...new Set([...t.strategyIds, s.id])] }),
@@ -229,6 +253,7 @@ export function BulkBar({
           icon={<StackMinus size={16} aria-hidden="true" className={ICON} />}
           strategies={removable}
           empty="None of these trades follows a strategy."
+          disabled={ids.length === 0}
           onPick={(s) => {
             const rules = new Set(strategyRules(s).map((r) => r.id));
             void run(
@@ -245,6 +270,7 @@ export function BulkBar({
         <button
           type="button"
           className={BTN}
+          disabled={ids.length === 0}
           title="Mark reviewed"
           onClick={() =>
             void run({ reviewed: true }, `Marked ${noun} reviewed.`)
@@ -256,6 +282,7 @@ export function BulkBar({
         <button
           type="button"
           className={BTN}
+          disabled={ids.length === 0}
           title="Mark not reviewed"
           onClick={() =>
             void run({ reviewed: false }, `Marked ${noun} not reviewed.`)
@@ -281,6 +308,7 @@ export function BulkBar({
         <button
           type="button"
           className={BTN}
+          disabled={ids.length === 0}
           title="Delete"
           onClick={() => {
             deleted.current = false;
@@ -299,6 +327,11 @@ export function BulkBar({
         >
           <X size={16} aria-hidden="true" className={ICON} />
         </button>
+        {lockedCount > 0 ? (
+          <p className="w-full px-0.5 pb-0.5 text-[12.5px] text-muted">
+            {lockedSubject} won't be changed.
+          </p>
+        ) : null}
       </div>
 
       <ConfirmDialog
@@ -345,6 +378,13 @@ export function BulkBar({
                     Import history
                   </Link>{' '}
                   to remove them.
+                </>
+              ) : null}
+              {lockedCount > 0 ? (
+                <>
+                  {k > 0 ? ' ' : ''}
+                  {lockedSubject} {plural(lockedCount, "wasn't", "weren't")}{' '}
+                  changed.
                 </>
               ) : null}
             </>,

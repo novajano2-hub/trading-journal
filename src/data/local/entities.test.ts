@@ -584,17 +584,14 @@ test('dailyNote opens the day, creating it from the default daily template', asy
 
 test('updateMany patches exactly the given trades', async () => {
   const { repo } = setup();
-  const updated = await repo.trades.updateMany(S, ['f-1', 'f-3'], {
+  const updated = await repo.trades.updateMany(S, ['f-1'], {
     reviewed: true,
   });
-  expect(updated.map((t) => [t.id, t.reviewed])).toEqual([
-    ['f-1', true],
-    ['f-3', true],
-  ]);
+  expect(updated.map((t) => [t.id, t.reviewed])).toEqual([['f-1', true]]);
   expect((await repo.trades.list(S)).map((t) => t.reviewed)).toEqual([
     true,
     undefined,
-    true,
+    undefined,
   ]);
   const byTrade = await repo.trades.updateMany(S, ['f-2'], (t) => ({
     rating: t.net < 0 ? 1 : 5,

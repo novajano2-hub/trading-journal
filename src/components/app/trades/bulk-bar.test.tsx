@@ -31,7 +31,7 @@ const START = Date.UTC(2026, 10, 2, 14, 0);
  * and 60 carry the breakout tag; trade 58 follows str-1 with a rule check.
  * `open` imported open trades, serials 201 up.
  */
-function sample(opts: { openImported?: number } = {}) {
+function sample(opts: { openImported?: number; archived?: number } = {}) {
   return async (): Promise<SampleWorkspace> => {
     const fx = fixtureSample();
     const closed = Array.from({ length: 60 }, (_, i) => {
@@ -62,7 +62,21 @@ function sample(opts: { openImported?: number } = {}) {
         net: 0,
       }),
     );
-    return { ...fx, trades: [...closed, ...open] };
+    // Trades of the archived account (acc-b), serials 61 up: newest in the log.
+    const archived = Array.from({ length: opts.archived ?? 0 }, (_, i) => {
+      const n = 61 + i;
+      const at = START + i * 600_000 + 40_000_000;
+      return makeTrade({
+        id: `t-${n}`,
+        serial: n,
+        workspaceId: WS,
+        accountId: 'acc-b',
+        openedAt: new Date(at).toISOString(),
+        closedAt: new Date(at + 300_000).toISOString(),
+        net: 1000,
+      });
+    });
+    return { ...fx, trades: [...closed, ...open, ...archived] };
   };
 }
 
@@ -259,4 +273,68 @@ test('open imported trades are split off a delete, whatever else is chosen', () 
   ]);
   expect(deletable.map((t) => t.id)).toEqual(['c', 'm']);
   expect(kept.map((t) => t.id)).toEqual(['o']);
+});
+
+const BOTH = '/app/trades?account=acc-a&account=acc-b';
+
+test("Mark reviewed leaves an archived account's trades out and says so", async () => {
+  const { repo } = renderApp(<TradesView />, {
+    sample: sample({ archived: 2 }),
+    url: BOTH,
+  });
+  // Newest first: 62 and 61 (archived), then 60.
+  await select(3);
+  const toolbar = await bar();
+  expect(toolbar.textContent).toContain(
+    "2 trades in archived accounts won't be changed.",
+  );
+  fireEvent.click(
+    within(toolbar).getByRole('button', { name: 'Mark reviewed' }),
+  );
+  await waitFor(async () =>
+    expect((await repo.trades.get(WS, 't-60'))?.reviewed).toBe(true),
+  );
+  expect((await repo.trades.get(WS, 't-61'))?.reviewed).toBeUndefined();
+  expect((await repo.trades.get(WS, 't-62'))?.reviewed).toBeUndefined();
+  expect(
+    (await screen.findByRole('status', { name: 'Result' })).textContent,
+  ).toContain("2 trades in archived accounts weren't changed.");
+});
+
+test('with only archived trades selected, nothing is edited or deleted', async () => {
+  const { repo } = renderApp(<TradesView />, {
+    sample: sample({ archived: 1 }),
+    url: BOTH,
+  });
+  await select(1);
+  const toolbar = await bar();
+  expect(toolbar.textContent).toContain(
+    "1 trade in an archived account won't be changed.",
+  );
+  expect(
+    within(toolbar).getByRole('button', { name: 'Mark reviewed' }),
+  ).toHaveProperty('disabled', true);
+  expect(
+    within(toolbar).getByRole('button', { name: 'Delete' }),
+  ).toHaveProperty('disabled', true);
+  expect(await repo.trades.get(WS, 't-61')).toBeTruthy();
+});
+
+test("Delete leaves an archived account's trades in place", async () => {
+  const { repo } = renderApp(<TradesView />, {
+    sample: sample({ archived: 1 }),
+    url: BOTH,
+  });
+  await select(2); // 61 (archived) and 60
+  fireEvent.click(within(await bar()).getByRole('button', { name: 'Delete' }));
+  const dialog = await screen.findByRole('dialog');
+  expect(dialog.textContent).toContain("Delete 1 trade? This can't be undone.");
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+  await waitFor(async () =>
+    expect(await repo.trades.get(WS, 't-60')).toBeUndefined(),
+  );
+  expect(await repo.trades.get(WS, 't-61')).toBeTruthy();
+  expect(
+    (await screen.findByRole('status', { name: 'Result' })).textContent,
+  ).toContain("1 trade in an archived account wasn't changed.");
 });

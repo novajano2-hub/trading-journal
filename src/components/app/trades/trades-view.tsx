@@ -262,6 +262,15 @@ export function TradesView(): React.JSX.Element {
   const allTrades = useTrades().data;
   const prefs = usePrefs().data;
   const accounts = useAccounts().data;
+  const archivedAccountIds = useMemo(
+    () =>
+      new Set(
+        (accounts ?? [])
+          .filter((a) => a.status === 'archived')
+          .map((a) => a.id),
+      ),
+    [accounts],
+  );
   const flows = useCashFlows().data;
   const strategies = useStrategies().data;
   const tags = useTags().data;
@@ -894,6 +903,7 @@ export function TradesView(): React.JSX.Element {
         <div className="pointer-events-none sticky bottom-4 z-30 flex justify-center pt-2">
           <BulkBar
             trades={selected}
+            archivedAccountIds={archivedAccountIds}
             strategies={strategies ?? []}
             onClear={() => setChosen([])}
             onExport={() => exportCsv(selected)}

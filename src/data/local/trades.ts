@@ -1,6 +1,7 @@
 import { buildManualTrade } from '@/domain/manual-trade';
 import { strategyRules, type Trade } from '@/domain/types';
 import {
+  ArchivedAccountError,
   ManualTradeRejected,
   NotFoundError,
   OpenImportedTradeError,
@@ -51,6 +52,27 @@ async function patched(
   }));
 }
 
+/** Throws ArchivedAccountError when any of the trades is in an archived account. Call inside a transaction over `db.accounts`. */
+async function assertEditable(
+  db: KeelDb,
+  ws: string,
+  trades: readonly (Trade | undefined)[],
+): Promise<void> {
+  const held = trades.filter((t): t is Trade => t !== undefined);
+  const accountIds = [...new Set(held.map((t) => t.accountId))];
+  const accounts = await db.accounts.bulkGet(
+    accountIds.map((id): [string, string] => [ws, id]),
+  );
+  const archived = new Set(
+    accounts.flatMap((a) => (a?.status === 'archived' ? [a.id] : [])),
+  );
+  if (archived.size === 0) return;
+  throw new ArchivedAccountError(
+    [...archived],
+    held.filter((t) => archived.has(t.accountId)).map((t) => t.id),
+  );
+}
+
 export function localTrades(ctx: LocalContext): TradesRepo {
   return {
     async list(ws) {
@@ -65,7 +87,8 @@ export function localTrades(ctx: LocalContext): TradesRepo {
 
     async update(ws, id, patch) {
       const db = await ctx.db();
-      return rwTx(db, [db.trades, db.strategies], async () => {
+      return rwTx(db, [db.trades, db.strategies, db.accounts], async () => {
+        await assertEditable(db, ws, [await db.trades.get([ws, id])]);
         const [next] = await patched(db, ws, [id], patch);
         await db.trades.put(next!);
         return next!;
@@ -74,7 +97,12 @@ export function localTrades(ctx: LocalContext): TradesRepo {
 
     async updateMany(ws, ids, patch) {
       const db = await ctx.db();
-      return rwTx(db, [db.trades, db.strategies], async () => {
+      return rwTx(db, [db.trades, db.strategies, db.accounts], async () => {
+        await assertEditable(
+          db,
+          ws,
+          await db.trades.bulkGet(ids.map((id): [string, string] => [ws, id])),
+        );
         const next = await patched(db, ws, ids, patch);
         await db.trades.bulkPut(next);
         return next;
@@ -87,6 +115,8 @@ export function localTrades(ctx: LocalContext): TradesRepo {
       return rwTx(db, [db.trades, db.accounts, db.meta], async () => {
         const account = await db.accounts.get([ws, input.accountId]);
         if (!account) throw new NotFoundError('account', input.accountId);
+        if (account.status === 'archived')
+          throw new ArchivedAccountError([account.id]);
         let highest = 0;
         await db.trades
           .where('workspaceId')
@@ -118,8 +148,11 @@ export function localTrades(ctx: LocalContext): TradesRepo {
           throw new Error(
             `Trade "${id}" was imported; only manual trades can be rebuilt`,
           );
+        await assertEditable(db, ws, [old]);
         const account = await db.accounts.get([ws, input.accountId]);
         if (!account) throw new NotFoundError('account', input.accountId);
+        if (account.status === 'archived')
+          throw new ArchivedAccountError([account.id]);
         const built = buildManualTrade(input, {
           workspaceId: ws,
           serial: old.serial,
@@ -146,7 +179,8 @@ export function localTrades(ctx: LocalContext): TradesRepo {
     async remove(ws, ids) {
       const db = await ctx.db();
       const keys = ids.map((id): [string, string] => [ws, id]);
-      await rwTx(db, [db.trades, db.journal], async () => {
+      await rwTx(db, [db.trades, db.journal, db.accounts], async () => {
+        await assertEditable(db, ws, await db.trades.bulkGet(keys));
         // Later imports' fills would have nothing to close (Plan 5 adds a tombstone flow).
         for (const t of await db.trades.bulkGet(keys))
           if (t?.status === 'open' && t.importId !== undefined)

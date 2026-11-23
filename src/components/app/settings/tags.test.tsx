@@ -31,6 +31,15 @@ function repo() {
   });
 }
 
+/** Puts the Setups tag on all three trades; `f-3` is in an archived account, which is read-only, so it is opened for the write. */
+async function tagEveryTrade(r: ReturnType<typeof repo>) {
+  await r.accounts.update(S, 'acc-b', { status: 'active' });
+  await r.trades.updateMany(S, ['f-1', 'f-2', 'f-3'], {
+    tagIds: ['tag-setup'],
+  });
+  await r.accounts.update(S, 'acc-b', { status: 'archived' });
+}
+
 async function openMenu(label: string) {
   fireEvent.keyDown(await screen.findByRole('button', { name: label }), {
     key: 'Enter',
@@ -194,9 +203,7 @@ test('a bad hex is refused, and a good one is stored upper case', async () => {
 
 test('deleting a tag used on 3 trades says so, and removes it', async () => {
   const r = repo();
-  await r.trades.updateMany(S, ['f-1', 'f-2', 'f-3'], {
-    tagIds: ['tag-setup'],
-  });
+  await tagEveryTrade(r);
   renderApp(<TagsSettings />, { repository: r, url: URL });
   tab('Tags');
   await openMenu('Actions for breakout');
@@ -216,9 +223,7 @@ test('deleting a tag used on 3 trades says so, and removes it', async () => {
 test("deleting a category counts its tags and the trades they're on", async () => {
   const r = repo();
   await r.tags.create(S, { name: 'Range', categoryId: 'setups' });
-  await r.trades.updateMany(S, ['f-1', 'f-2', 'f-3'], {
-    tagIds: ['tag-setup'],
-  });
+  await tagEveryTrade(r);
   renderApp(<TagsSettings />, { repository: r, url: URL });
   await openMenu('Actions for Setups');
   fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));

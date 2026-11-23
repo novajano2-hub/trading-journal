@@ -116,6 +116,20 @@ export class OpenImportedTradeError extends Error {
   }
 }
 
+/**
+ * The trades belong to an archived account, which is read-only: nothing in
+ * `tradeIds` was changed. Unarchive the account to edit them.
+ */
+export class ArchivedAccountError extends Error {
+  override name = 'ArchivedAccountError';
+  constructor(
+    readonly accountIds: readonly string[],
+    readonly tradeIds: readonly string[] = [],
+  ) {
+    super(`Account ${accountIds.join(', ')} is archived and read-only`);
+  }
+}
+
 /** The fills of a manual trade cannot make one trade; `error` says why, `fillIndex` which fill (0-based) when it is one. */
 export class ManualTradeRejected extends Error {
   override name = 'ManualTradeRejected';
