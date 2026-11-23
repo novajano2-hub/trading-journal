@@ -156,3 +156,23 @@ test('the chart names each group, its range and where it ends; Privacy hides the
     }),
   ).toBeTruthy();
 });
+
+test('a group shows "+N more" for inherited filters it has no chip for, with a way to clear them', async () => {
+  renderApp(<CompareView />, {
+    sample: breakdownSample,
+    url: '/app/reports/compare?a=symbol%3DES%26wd%3D1%2C2%26r%3D1_',
+  });
+  const page = await screen.findByTestId('reports-compare');
+  const a = within(page).getByRole('group', { name: 'Group A filters' });
+  expect(within(a).getByText('+2 more')).toBeTruthy();
+  const b = within(page).getByRole('group', { name: 'Group B filters' });
+  expect(within(b).queryByText(/more$/)).toBeNull();
+  fireEvent.click(within(a).getByRole('button', { name: 'Clear Weekdays, R' }));
+  const written = new URLSearchParams(
+    new URLSearchParams(window.location.search).get('a')!,
+  );
+  expect(written.get('symbol')).toBe('ES');
+  expect(written.get('wd')).toBeNull();
+  expect(written.get('r')).toBeNull();
+  expect(within(a).queryByText('+2 more')).toBeNull();
+});

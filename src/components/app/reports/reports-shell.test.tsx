@@ -74,3 +74,36 @@ test('only the known report keys are reports', () => {
   expect(isReportKey('overview')).toBe(false);
   expect(isReportKey('nope')).toBe(false);
 });
+
+test('the Compare link seeds Group A with the current filters and drops the global ones', async () => {
+  renderApp(<ReportsPage report="overview" />, {
+    sample: reportsSample,
+    url: '/app/reports?side=long&symbol=ES&cur=EUR',
+  });
+  const nav = await screen.findByRole('navigation', { name: 'Reports' });
+  const href = within(nav)
+    .getByRole('link', { name: 'Compare' })
+    .getAttribute('href')!;
+  const url = new URL(href, 'http://keel.test');
+  expect(url.pathname).toBe('/app/reports/compare');
+  expect(new URLSearchParams(url.searchParams.get('a')!).toString()).toBe(
+    'symbol=ES&side=long',
+  );
+  expect(url.searchParams.get('side')).toBeNull();
+  expect(url.searchParams.get('symbol')).toBeNull();
+  expect(url.searchParams.get('cur')).toBe('EUR');
+});
+
+test('on Compare its own link keeps both groups', async () => {
+  renderApp(<ReportsPage report="compare" />, {
+    sample: reportsSample,
+    url: '/app/reports/compare?a=symbol%3DES&b=symbol%3DNQ',
+  });
+  const nav = await screen.findByRole('navigation', { name: 'Reports' });
+  const url = new URL(
+    within(nav).getByRole('link', { name: 'Compare' }).getAttribute('href')!,
+    'http://keel.test',
+  );
+  expect(url.searchParams.get('a')).toBe('symbol=ES');
+  expect(url.searchParams.get('b')).toBe('symbol=NQ');
+});

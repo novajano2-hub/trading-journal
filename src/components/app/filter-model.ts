@@ -1,6 +1,7 @@
 // No 'use client': plain rules for the filter chips and the account switcher.
 import {
   advancedFilterCount,
+  EMPTY_FILTERS,
   resolveRange,
   type DateRange,
   type GlobalFilters,
@@ -129,4 +130,48 @@ export function customRange(from: string, to: string): DateRange {
   const [a, b] =
     from !== '' && to !== '' && from > to ? [to, from] : [from, to];
   return { ...(a !== '' ? { from: a } : {}), ...(b !== '' ? { to: b } : {}) };
+}
+
+/**
+ * The filters in `f` that a group's chip row (date, symbol, side, strategy,
+ * tags, outcome, account) has no chip for, by name: Compare's groups can
+ * inherit these from the other reports.
+ */
+export function unshownFilters(f: GlobalFilters): string[] {
+  const set: [boolean, string][] = [
+    [f.excludeSymbols.length > 0, 'Excluded symbols'],
+    [f.excludeStrategyIds.length > 0, 'Excluded strategies'],
+    [f.noStrategy, 'No strategy'],
+    [f.excludeTagIds.length > 0, 'Excluded tags'],
+    [f.status !== undefined, 'Status'],
+    [f.holding !== undefined, 'Holding'],
+    [f.reviewed !== undefined, 'Reviewed'],
+    [f.ratings.length > 0, 'Ratings'],
+    [f.weekdays.length > 0, 'Weekdays'],
+    [f.months.length > 0, 'Months'],
+    [f.entryWindows.length > 0, 'Entry times'],
+    [f.exitWindows.length > 0, 'Exit times'],
+    [f.duration !== undefined, 'Duration'],
+    [f.entryPrice !== undefined, 'Entry price'],
+    [f.exitPrice !== undefined, 'Exit price'],
+    [f.size !== undefined, 'Size'],
+    [f.r !== undefined, 'R'],
+    [f.strategyMatch === 'all', 'Strategies, all'],
+    [f.tagMatch === 'all', 'Tags, all'],
+  ];
+  return set.filter(([on]) => on).map(([, name]) => name);
+}
+
+/** `f` with every filter `unshownFilters` names cleared; the rest is kept. */
+export function withoutUnshown(f: GlobalFilters): GlobalFilters {
+  return {
+    ...EMPTY_FILTERS,
+    range: f.range,
+    accountIds: f.accountIds,
+    symbols: f.symbols,
+    side: f.side,
+    strategyIds: f.strategyIds,
+    tagIds: f.tagIds,
+    outcomes: f.outcomes,
+  };
 }

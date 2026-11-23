@@ -14,7 +14,7 @@ import {
 import { RAISED } from '@/components/ui/button-styles';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useTrade } from '@/data/query/hooks';
-import { filtersApply, pageTitle, tradePageId } from './nav';
+import { filtersApply, isComparePage, pageTitle, tradePageId } from './nav';
 
 /**
  * Where the chips sit from `sm` up: beside the title, or with the controls on
@@ -219,6 +219,11 @@ export function TopBar({
             {filters}
           </div>
         </>
+      ) : null}
+      {isComparePage(pathname) ? (
+        <p className="flex-none text-[13px] text-faint max-sm:pt-3">
+          Each group has its own filters
+        </p>
       ) : null}
       {/* Below sm the last row; from sm its items join the bar's, at its end. */}
       <div className="flex items-center gap-2.5 max-sm:pt-2.5 max-sm:pb-3 sm:contents">

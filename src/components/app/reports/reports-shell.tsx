@@ -30,9 +30,31 @@ const TAB_OFF = 'text-muted hover:text-text';
 const TAB_ON =
   'bg-surface-1 font-semibold text-text shadow-[var(--shadow-chip)] [[data-theme=dark]_&]:bg-line-2';
 
-/** A report's address from this page: its path, the global filters and the currency, nothing page-specific. */
-function hrefOf(key: ReportKey | 'overview', params: URLSearchParams): string {
-  const query = serializeFilters(parseFilters(params));
+/**
+ * A report's address from this page: its path, the global filters and the
+ * currency, nothing page-specific. Compare is the exception: its groups own
+ * their filters, so from another report its link writes the current filters as
+ * Group A (`a=`) and leaves the global ones behind; from Compare itself it keeps
+ * both groups.
+ */
+function hrefOf(
+  key: ReportKey | 'overview',
+  params: URLSearchParams,
+  from: ReportKey | 'overview',
+): string {
+  const query = new URLSearchParams();
+  if (key === 'compare') {
+    if (from === 'compare') {
+      for (const group of ['a', 'b']) {
+        const value = params.get(group);
+        if (value !== null) query.set(group, value);
+      }
+    } else {
+      const current = serializeFilters(parseFilters(params)).toString();
+      if (current) query.set('a', current);
+    }
+  } else
+    serializeFilters(parseFilters(params)).forEach((v, k) => query.set(k, v));
   const cur = params.get('cur');
   if (cur) query.set('cur', cur);
   const qs = query.toString();
@@ -68,7 +90,7 @@ export function ReportsShell({
   const tabLink = (t: (typeof SIMPLE_TABS)[number]) => (
     <Link
       key={t.tab}
-      href={hrefOf(t.key, params)}
+      href={hrefOf(t.key, params, active)}
       aria-current={current === t.tab ? 'page' : undefined}
       className={`${TAB} ${current === t.tab ? TAB_ON : TAB_OFF}`}
     >
@@ -110,7 +132,7 @@ export function ReportsShell({
                 {REPORT_MENU.map((m) => (
                   <DropdownMenu.Item key={m.key} asChild>
                     <Link
-                      href={hrefOf(m.key, params)}
+                      href={hrefOf(m.key, params, active)}
                       className="relative flex min-h-9 cursor-pointer items-center rounded-[8px] py-1.5 pr-3 pl-8 text-[13.5px] text-text no-underline outline-none select-none data-highlighted:bg-sunken pointer-coarse:min-h-11"
                     >
                       {active === m.key ? (

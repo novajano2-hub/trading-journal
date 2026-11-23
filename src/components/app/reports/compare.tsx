@@ -6,6 +6,7 @@ import {
   ClockCounterClockwise,
   Scales,
   Warning,
+  X,
 } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -64,7 +65,14 @@ import {
 import { formatPct, plural } from '@/lib/format';
 import { rangeCaption, rangeChipLabel } from '@/lib/range-label';
 import { FilterChip, CheckRows, RadioRows } from '../filter-chip';
-import { accountSummary, chipLabel, datesOf, toggleId } from '../filter-model';
+import {
+  accountSummary,
+  chipLabel,
+  datesOf,
+  toggleId,
+  unshownFilters,
+  withoutUnshown,
+} from '../filter-model';
 import {
   DateBody,
   SIDE_OPTIONS,
@@ -139,6 +147,8 @@ function GroupFilters({
     }),
     [strategies, tags],
   );
+  // Filters inherited from the other reports that this row has no chip for.
+  const inherited = unshownFilters(f);
   const symbol = chipLabel('symbol', f, names);
   const side = chipLabel('side', f, names);
   const strategy = chipLabel('strategy', f, names);
@@ -290,6 +300,22 @@ function GroupFilters({
             />
           )}
         </FilterChip>
+        {inherited.length > 0 ? (
+          <span
+            title={inherited.join(', ')}
+            className="inline-flex h-8 items-center gap-0.5 rounded-chip bg-accent/10 pr-1 pl-3 text-[13px] font-medium text-accent-ink pointer-coarse:h-11"
+          >
+            +{inherited.length} more
+            <button
+              type="button"
+              aria-label={`Clear ${inherited.join(', ')}`}
+              onClick={() => onChange(withoutUnshown(f))}
+              className="inline-grid size-6 cursor-pointer place-items-center rounded-full hover:bg-accent/15 focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:size-9"
+            >
+              <X size={12} weight="bold" aria-hidden="true" />
+            </button>
+          </span>
+        ) : null}
       </div>
     </section>
   );

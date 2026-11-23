@@ -246,10 +246,19 @@ export function tradePageId(pathname: string): string | undefined {
   }
 }
 
-/** Whether the global filters drive this page: Dashboard, the trade log, Calendar and Reports. Elsewhere the bar shows no chips. */
+/**
+ * Whether the global filters drive this page: Dashboard, the trade log, Calendar
+ * and Reports, except Compare, whose two groups each own their filters.
+ * Elsewhere the bar shows no chips.
+ */
 export function filtersApply(pathname: string): boolean {
   return (
     /^\/app\/(dashboard|trades|calendar)$/.test(pathname) ||
-    /^\/app\/reports(\/|$)/.test(pathname)
+    (/^\/app\/reports(\/|$)/.test(pathname) &&
+      !/^\/app\/reports\/compare\/?$/.test(pathname))
   );
 }
+
+/** The page where each group of trades has its own filters rather than the global ones. */
+export const isComparePage = (pathname: string): boolean =>
+  /^\/app\/reports\/compare\/?$/.test(pathname);

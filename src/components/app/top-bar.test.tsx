@@ -81,6 +81,17 @@ test('the chips show only on the routes the filters drive', () => {
   expect(screen.getByTestId('chips')).toBeTruthy();
 });
 
+test('Compare shows no chips, and says the groups own their filters', () => {
+  layOut({ titleWidth: 115, chipsWidth: 100 });
+  const bar = renderBar('/app/reports/compare');
+  expect(screen.queryByTestId('chips')).toBeNull();
+  expect(bar.dataset.chips).toBeUndefined();
+  expect(within(bar).getByText('Each group has its own filters')).toBeTruthy();
+  cleanup();
+  renderBar('/app/reports/symbols');
+  expect(screen.queryByText('Each group has its own filters')).toBeNull();
+});
+
 // Room beside the title: 900 - 240 - 115 - 12 (title margin) - 2 * 8 (gaps) = 517.
 test('chips that fit beside the title sit there', () => {
   layOut({ titleWidth: 115, chipsWidth: 516 });

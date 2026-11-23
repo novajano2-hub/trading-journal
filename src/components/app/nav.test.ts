@@ -65,6 +65,8 @@ test('filtersApply is true only on the routes the global filters drive', () => {
   ])
     expect(filtersApply(p), p).toBe(true);
   for (const p of [
+    // Compare's groups own their filters.
+    '/app/reports/compare',
     '/app/import',
     '/app/settings/import-history',
     '/app/trades/t-c',
