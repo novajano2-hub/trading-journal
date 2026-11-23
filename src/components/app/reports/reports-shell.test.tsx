@@ -62,9 +62,8 @@ test('the Reports tab stays current while one of its reports is open, and its me
     'Options',
     'Wins vs losses',
   ]);
-  // The page behind says so plainly and shows no figures.
-  expect(screen.getByText('This report arrives next')).toBeTruthy();
-  expect(document.body.textContent).not.toMatch(/\$\d/);
+  // The page behind is the Symbols report itself.
+  expect(await screen.findByTestId('reports-symbols')).toBeTruthy();
 });
 
 test('only the known report keys are reports', () => {

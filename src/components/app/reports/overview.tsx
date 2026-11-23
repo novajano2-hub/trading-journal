@@ -1,10 +1,12 @@
 'use client';
 
 import {
+  ArrowsLeftRight,
   CalendarBlank,
   ChartBar,
   ChartLineUp,
-  ArrowsLeftRight,
+  Receipt,
+  Target,
 } from '@phosphor-icons/react/dist/ssr';
 import { useId, useMemo, type ReactNode } from 'react';
 import { FigureText } from '@/components/product/figure-text';
@@ -12,12 +14,13 @@ import { MetricTip } from '@/components/ui/metric-tip';
 import type { MetricId } from '@/content/metric-definitions';
 import { pnlOf } from '@/domain/metrics/context';
 import { timeSeries } from '@/domain/metrics/series';
-import { summarize } from '@/domain/metrics/summary';
+import { rExpectancy, summarize } from '@/domain/metrics/summary';
+import { localDate } from '@/domain/time';
 import { isClosed } from '@/domain/trade-status';
 import { formatUnitValue, useDisplay } from '@/lib/display';
 import { formatDuration, formatPct, plural } from '@/lib/format';
 import { CARD, CARD_PAD, CardHeader, signTone } from '../dashboard/shared';
-import { periodText, ReportChart } from './report-chart';
+import { periodText, ReportChart, type Shade } from './report-chart';
 import { ReportScope } from './report-scope';
 import type { ReportData } from './use-report-data';
 
@@ -58,12 +61,15 @@ function Kpi({
 
 function Stat({
   id,
+  label,
   data,
   tone = '',
   sub,
   children,
 }: {
   id: MetricId;
+  /** The visible label, where the card words it differently from the definition's. */
+  label?: string;
   data: ReportData;
   tone?: string;
   sub?: ReactNode;
@@ -72,9 +78,14 @@ function Stat({
   return (
     <div className="flex items-baseline justify-between gap-3 border-b border-line/70 py-2.5 last:border-b-0">
       <span className="text-[13.5px] text-muted">
-        <MetricTip id={id} basis={data.basis} />
+        <MetricTip id={id} basis={data.basis}>
+          {label}
+        </MetricTip>
       </span>
-      <span className={`text-right font-semibold tabular-nums ${tone}`}>
+      <span
+        data-stat={id}
+        className={`text-right font-semibold tabular-nums ${tone}`}
+      >
         {children ?? NONE}
         {sub ? (
           <small className="ml-1.5 text-xs font-normal text-faint">{sub}</small>
@@ -118,6 +129,32 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
     [p.dayTrades, ctx],
   );
   const ends = seriesIn.cumulative[seriesIn.cumulative.length - 1]?.value;
+  // The max drawdown, from its peak to its low, shaded on the cumulative line.
+  const drawdownText =
+    drawdown.amount > 0
+      ? `Max drawdown ${display.cash(-drawdown.amount, true, currency).text}${drawdown.pct === null ? '' : `, ${formatPct(drawdown.pct, 1)}`}`
+      : '';
+  const shade = useMemo<Shade | undefined>(
+    () =>
+      drawdown.amount > 0 && drawdown.troughAt
+        ? {
+            name: 'drawdown',
+            // A fall from the starting balance has no peak trade: it runs from the first day.
+            from: drawdown.peakAt
+              ? localDate(drawdown.peakAt, ctx.timeZone)
+              : '',
+            to: localDate(drawdown.troughAt, ctx.timeZone),
+            label: drawdownText,
+          }
+        : undefined,
+    // The label is the unit-aware text of the amount: it changes with these.
+    [drawdown, ctx.timeZone, drawdownText],
+  );
+  const rExp = useMemo(() => rExpectancy(p.trades, ctx), [p.trades, ctx]);
+  const r = (v: number, signed: boolean) =>
+    formatUnitValue('r', v, { currency, signed });
+  const feeShare = s.grossPnl > 0 ? s.fees / s.grossPnl : null;
+  const widest = Math.max(1, Math.abs(s.grossPnl), s.fees, Math.abs(s.netPnl));
 
   const long = closed.filter((t) => t.direction === 'long');
   const short = closed.filter((t) => t.direction === 'short');
@@ -278,6 +315,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
             label={`Cumulative ${basis} P&L by day`}
             currency={currency}
             height={280}
+            shade={shade}
             series={[
               {
                 label: 'Cumulative P&L',
@@ -328,7 +366,153 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
         </div>
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+      <div className="grid gap-4 md:grid-cols-2">
+        <section aria-label="Gross to net" className={`${CARD} ${CARD_PAD}`}>
+          <CardHeader
+            icon={Receipt}
+            tone="neutral"
+            headingId={`${cumulativeId}-gross`}
+            title="Gross to net"
+          />
+          <div className="mt-2">
+            {(
+              [
+                ['gross-pnl', s.grossPnl, 'bg-gain-fill'],
+                ['fees', -s.fees, 'bg-loss-fill'],
+                ['net-pnl', s.netPnl, 'bg-accent'],
+              ] as const
+            ).map(([id, cents, fill]) => (
+              <div
+                key={id}
+                className="grid grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-line/70 py-2.5 last:border-b-0"
+              >
+                <span className="text-[13.5px] text-muted">
+                  <MetricTip id={id} basis={basis} />
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="h-2 overflow-hidden rounded-full bg-sunken"
+                >
+                  <span
+                    className={`block h-full rounded-full ${fill}`}
+                    style={{
+                      width: `${cents === 0 ? 0 : Math.max(2, (Math.abs(cents) / widest) * 100)}%`,
+                    }}
+                  />
+                </span>
+                <span
+                  data-stat={id}
+                  className={`text-right font-semibold tabular-nums ${signTone(cents)}`}
+                >
+                  <FigureText f={display.cash(cents, true, currency)} />
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[13px] leading-[1.5] text-muted">
+            {feeShare !== null && s.fees > 0
+              ? `Fees took ${formatPct(feeShare, 1)} of gross.`
+              : s.fees === 0
+                ? 'No fees on these trades.'
+                : 'Fees came on top of a gross loss.'}
+          </p>
+        </section>
+
+        <section aria-label="Risk in R" className={`${CARD} ${CARD_PAD}`}>
+          <CardHeader
+            icon={Target}
+            tone="accent"
+            headingId={`${cumulativeId}-risk`}
+            title="Risk in R"
+          />
+          <div className="mt-1">
+            <Stat
+              id="planned-r"
+              label="Average planned R"
+              data={data}
+              sub={
+                s.plannedRTradeCount === 0
+                  ? undefined
+                  : `${s.plannedRTradeCount} ${plural(s.plannedRTradeCount, 'trade')}`
+              }
+            >
+              {s.avgPlannedR === null ? null : r(s.avgPlannedR, false)}
+            </Stat>
+            <Stat
+              id="realized-r"
+              label="Average realized R"
+              data={data}
+              tone={signTone(s.avgRealizedR ?? 0)}
+              sub={
+                s.realizedRTradeCount === 0
+                  ? undefined
+                  : `${s.realizedRTradeCount} ${plural(s.realizedRTradeCount, 'trade')}`
+              }
+            >
+              {s.avgRealizedR === null ? null : r(s.avgRealizedR, true)}
+            </Stat>
+            <Stat
+              id="r-expectancy"
+              data={data}
+              tone={signTone(rExp.value ?? 0)}
+              sub={
+                rExp.count === 0
+                  ? undefined
+                  : `${rExp.count} ${plural(rExp.count, 'trade')}`
+              }
+            >
+              {rExp.value === null ? null : r(rExp.value, true)}
+            </Stat>
+            <Stat id="no-stop" data={data} sub={`left out of R`}>
+              {s.noRiskCount}
+            </Stat>
+          </div>
+        </section>
+
+        <section aria-label="Days" className={`${CARD} ${CARD_PAD}`}>
+          <CardHeader
+            icon={CalendarBlank}
+            tone="neutral"
+            headingId={`${dailyId}-days`}
+            title="Days and returns"
+          />
+          <div className="mt-1">
+            <Stat id="avg-daily-win-rate" data={data}>
+              {p.avgDailyWinRate === null
+                ? null
+                : formatPct(p.avgDailyWinRate, 1)}
+            </Stat>
+            <Stat
+              id="day-streaks"
+              data={data}
+              sub={`${p.dayStreaks.maxLoss} red`}
+            >
+              {`${p.dayStreaks.maxWin} green`}
+            </Stat>
+            <Stat
+              id="longest-day"
+              data={data}
+              sub={
+                durations.average === null
+                  ? undefined
+                  : `${formatDuration(durations.average * 60000)} on average`
+              }
+            >
+              {durations.longest === null
+                ? null
+                : formatDuration(durations.longest * 60000)}
+            </Stat>
+            <Stat id="net-roi" data={data}>
+              {s.netRoi === null
+                ? null
+                : formatUnitValue('percent', s.netRoi, {
+                    currency,
+                    signed: true,
+                  })}
+            </Stat>
+          </div>
+        </section>
+
         <section aria-label="Long and short" className={`${CARD} ${CARD_PAD}`}>
           <CardHeader
             icon={ArrowsLeftRight}
@@ -375,50 +559,6 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
               ))}
             </tbody>
           </table>
-        </section>
-
-        <section aria-label="Days" className={`${CARD} ${CARD_PAD}`}>
-          <CardHeader
-            icon={CalendarBlank}
-            tone="neutral"
-            headingId={`${dailyId}-days`}
-            title="Days and returns"
-          />
-          <div className="mt-1">
-            <Stat id="avg-daily-win-rate" data={data}>
-              {p.avgDailyWinRate === null
-                ? null
-                : formatPct(p.avgDailyWinRate, 1)}
-            </Stat>
-            <Stat
-              id="day-streaks"
-              data={data}
-              sub={`${p.dayStreaks.maxLoss} red`}
-            >
-              {`${p.dayStreaks.maxWin} green`}
-            </Stat>
-            <Stat
-              id="longest-day"
-              data={data}
-              sub={
-                durations.average === null
-                  ? undefined
-                  : `${formatDuration(durations.average * 60000)} on average`
-              }
-            >
-              {durations.longest === null
-                ? null
-                : formatDuration(durations.longest * 60000)}
-            </Stat>
-            <Stat id="net-roi" data={data}>
-              {s.netRoi === null
-                ? null
-                : formatUnitValue('percent', s.netRoi, {
-                    currency,
-                    signed: true,
-                  })}
-            </Stat>
-          </div>
         </section>
       </div>
     </>

@@ -105,3 +105,61 @@ test('with Privacy on, the readout, the axis and the hidden table show $••�
   expect(container.textContent).not.toMatch(/\$\d/);
   expect(container.textContent).not.toMatch(/\$[\d,]+[kK]/);
 });
+
+test('named periods label the axis with their own words instead of dates', async () => {
+  const { container } = renderApp(
+    <ReportChart
+      label="Net P&L by weekday"
+      xLabel={(k) => k.toUpperCase()}
+      series={[
+        {
+          label: 'Net P&L',
+          kind: 'bar',
+          unit: 'money',
+          points: [
+            { key: 'mon', value: 100 },
+            { key: 'tue', value: -50 },
+          ],
+        },
+      ]}
+    />,
+  );
+  await screen.findByRole('img', { name: 'Net P&L by weekday' });
+  const axis = [...container.querySelectorAll('svg text')].map(
+    (t) => t.textContent,
+  );
+  expect(axis).toContain('MON');
+  expect(axis).toContain('TUE');
+});
+
+test('overlaid series share one axis, and a shade marks a stretch of it', async () => {
+  const line = (label: string, values: number[]) => ({
+    label,
+    kind: 'line' as const,
+    unit: 'money' as const,
+    points: values.map((v, i) => ({ key: `2026-11-0${i + 2}`, value: v })),
+  });
+  const { container } = renderApp(
+    <ReportChart
+      label="Two lines"
+      overlay
+      series={[line('A', [0, 500, 300]), line('B', [0, -200, 100])]}
+      shade={{
+        name: 'drawdown',
+        from: '2026-11-03',
+        to: '2026-11-04',
+        label: 'Max drawdown',
+      }}
+    />,
+  );
+  await screen.findByRole('img', { name: 'Two lines' });
+  expect(container.querySelectorAll('[data-mark="line"]')).toHaveLength(2);
+  // One set of y ticks, not one per series: $0 appears once.
+  const zeros = [...container.querySelectorAll('svg text')].filter(
+    (t) => t.textContent === '$0',
+  );
+  expect(zeros).toHaveLength(1);
+  const band = container.querySelector('[data-band="drawdown"]');
+  expect(band).not.toBeNull();
+  expect(band!.textContent).toBe('Max drawdown');
+});

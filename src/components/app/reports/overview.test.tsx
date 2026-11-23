@@ -5,6 +5,7 @@ import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import { METRIC_IDS } from '@/content/metric-definitions';
 import { createLocalRepository } from '@/data/local/local-repository';
+import { breakdownSample } from '../__fixtures__/breakdown-sample';
 import { renderApp } from '../__fixtures__/render-app';
 import { reportsSample } from '../__fixtures__/reports-sample';
 import { OverviewView } from './overview';
@@ -128,4 +129,62 @@ test('an empty workspace says so instead of drawing zeros', async () => {
     await screen.findByText(/No trades in this workspace yet/),
   ).toBeTruthy();
   expect(screen.queryByTestId('reports-overview')).toBeNull();
+});
+
+/** The breakdown workspace with $5.00 of fees on its first trade (gross $105.00, net $100.00). */
+async function withFees() {
+  const s = await breakdownSample();
+  s.trades[0] = { ...s.trades[0]!, gross: 10500, fees: 500 };
+  return s;
+}
+
+const stat = (page: HTMLElement, id: string) =>
+  page.querySelector(`[data-stat="${id}"]`)!.textContent;
+
+test('Gross to net shows gross, fees and net, and how much the fees took', async () => {
+  renderApp(<OverviewView />, { sample: withFees, url: URL });
+  const page = await ready();
+  const card = within(page).getByRole('region', { name: 'Gross to net' });
+  expect(stat(card, 'gross-pnl')).toBe('+$130.00');
+  expect(stat(card, 'fees')).toBe('−$5.00');
+  expect(stat(card, 'net-pnl')).toBe('+$125.00');
+  // 500 of 13,000.
+  expect(within(card).getByText(/Fees took 3\.8% of gross/)).toBeTruthy();
+  for (const id of ['gross-pnl', 'fees', 'net-pnl'])
+    expect(page.querySelector(`[data-metric-tip="${id}"]`), id).not.toBeNull();
+});
+
+test('Risk in R shows planned and realized R, trades without a stop, and R expectancy', async () => {
+  renderApp(<OverviewView />, { sample: breakdownSample, url: URL });
+  const page = await ready();
+  const card = within(page).getByRole('region', { name: 'Risk in R' });
+  // One planned R of 2.00 (b-1), two realized R (+2 and -1), five trades with no stop.
+  expect(stat(card, 'planned-r')).toContain('2.00R');
+  expect(stat(card, 'planned-r')).toContain('1 trade');
+  expect(stat(card, 'realized-r')).toContain('+0.50R');
+  expect(stat(card, 'realized-r')).toContain('2 trades');
+  expect(stat(card, 'no-stop')).toContain('5');
+  expect(stat(card, 'r-expectancy')).toContain('+0.50R');
+  for (const id of ['planned-r', 'realized-r', 'no-stop', 'r-expectancy'])
+    expect(card.querySelector(`[data-metric-tip="${id}"]`), id).not.toBeNull();
+});
+
+test('the cumulative line carries the max drawdown band, and a clean run has none', async () => {
+  const { container, unmount } = renderApp(<OverviewView />, {
+    sample: breakdownSample,
+    url: URL,
+  });
+  await ready();
+  const band = container.querySelector('[data-band="drawdown"]');
+  expect(band).not.toBeNull();
+  expect(container.textContent).toContain('Max drawdown');
+  unmount();
+  const up = await breakdownSample();
+  up.trades = up.trades.filter((t) => t.net > 0);
+  const again = renderApp(<OverviewView />, {
+    sample: async () => up,
+    url: URL,
+  });
+  await screen.findAllByTestId('reports-overview');
+  expect(again.container.querySelector('[data-band="drawdown"]')).toBeNull();
 });

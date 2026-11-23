@@ -8,6 +8,13 @@ import { plural } from '@/lib/format';
 export interface CrossCell {
   value: number;
   count: number;
+  /**
+   * For a metric that is not money (a win rate, a profit factor, a count):
+   * what the cell reads. It then shows this, and `tint` says gain or loss.
+   */
+  text?: string;
+  /** Signed strength of the tint: positive gain, negative loss; default `value`. */
+  tint?: number;
 }
 
 /**
@@ -36,7 +43,7 @@ export function CrossAnalysis({
   const cells = rows.map((r) => columns.map((c) => cell(r.key, c.key)));
   const peak = Math.max(
     1,
-    ...cells.flat().map((c) => (c ? Math.abs(c.value) : 0)),
+    ...cells.flat().map((c) => (c ? Math.abs(c.tint ?? c.value) : 0)),
   );
   return (
     <div className="overflow-x-auto">
@@ -74,9 +81,9 @@ export function CrossAnalysis({
                   key={columns[ci]!.key}
                   className="h-11 min-w-[88px] rounded-[7px] px-2 text-center align-middle tabular-nums"
                   style={
-                    c && c.value !== 0
+                    c && (c.tint ?? c.value) !== 0
                       ? {
-                          background: `color-mix(in srgb, ${c.value > 0 ? 'var(--gain-fill)' : 'var(--loss-fill)'} ${Math.round(10 + (Math.abs(c.value) / peak) * 38)}%, transparent)`,
+                          background: `color-mix(in srgb, ${(c.tint ?? c.value) > 0 ? 'var(--gain-fill)' : 'var(--loss-fill)'} ${Math.round(10 + (Math.abs(c.tint ?? c.value) / peak) * 38)}%, transparent)`,
                         }
                       : undefined
                   }
@@ -84,9 +91,15 @@ export function CrossAnalysis({
                   {c ? (
                     <>
                       <span
-                        className={`block font-semibold ${c.value > 0 ? 'text-gain' : c.value < 0 ? 'text-loss' : 'text-text'}`}
+                        className={`block font-semibold ${(c.tint ?? c.value) > 0 ? 'text-gain' : (c.tint ?? c.value) < 0 ? 'text-loss' : 'text-text'}`}
                       >
-                        <FigureText f={display.cash(c.value, true, currency)} />
+                        {c.text !== undefined ? (
+                          c.text
+                        ) : (
+                          <FigureText
+                            f={display.cash(c.value, true, currency)}
+                          />
+                        )}
                       </span>
                       <span className="block text-[11.5px] text-faint">
                         {c.count} {plural(c.count, 'trade')}

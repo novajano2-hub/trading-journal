@@ -2,7 +2,12 @@ import { describe, expect, test } from 'vitest';
 import { makeTrade } from '../__fixtures__/trades';
 import { resolveInstrument } from '../instruments';
 import { defaultMetricContext } from './context';
-import { breakdown, rDistribution } from './breakdowns';
+import {
+  breakdown,
+  breakdown2D,
+  rDistribution,
+  winsVsLosses,
+} from './breakdowns';
 
 const ctx = defaultMetricContext('America/New_York');
 const at = (openedAt: string, extra = {}) =>
@@ -287,5 +292,209 @@ describe('breakdowns', () => {
       ),
     ).toBe(true);
     expect(rDistribution([ghost, noClose])).toEqual([]);
+  });
+});
+
+describe('breakdown2D', () => {
+  const es = resolveInstrument('ESZ5')!;
+  const nq = resolveInstrument('NQZ5')!;
+  const trade = (
+    instrument: typeof es,
+    direction: 'long' | 'short',
+    net: number,
+  ) => makeTrade({ net, instrument, direction });
+
+  test('symbol by side on four trades is a 2 by 2 matrix of nets', () => {
+    const t = [
+      trade(es, 'long', 1000),
+      trade(es, 'short', -400),
+      trade(nq, 'long', 700),
+      trade(nq, 'long', 300),
+    ];
+    const m = breakdown2D(t, ctx, 'symbol', 'side', 'net');
+    // Symbols rank by P&L (NQ 1000, ES 600); the empty Short column of NQ is a null cell.
+    expect(m.rows).toEqual(['NQ', 'ES']);
+    expect(m.cols).toEqual(['Long', 'Short']);
+    expect(m.cells).toEqual([
+      [1000, null],
+      [1000, -400],
+    ]);
+    expect(breakdown2D(t, ctx, 'symbol', 'side', 'trades').cells).toEqual([
+      [2, null],
+      [1, 1],
+    ]);
+    expect(breakdown2D(t, ctx, 'symbol', 'side', 'win-rate').cells).toEqual([
+      [1, null],
+      [1, 0],
+    ]);
+  });
+
+  test('14 symbols fold into 12 columns, the busiest kept and the rest in Other', () => {
+    const roots = Array.from(
+      { length: 14 },
+      (_, i) => `S${String(i).padStart(2, '0')}`,
+    );
+    const t = roots.flatMap((root, i) =>
+      Array.from({ length: i < 2 ? 1 : 2 }, () =>
+        makeTrade({
+          net: 100,
+          instrument: { ...es, root, symbol: root },
+        }),
+      ),
+    );
+    const m = breakdown2D(t, ctx, 'side', 'symbol', 'trades');
+    expect(m.cols).toHaveLength(12);
+    expect(m.cols[11]).toBe('Other');
+    // Three symbols fold (the two one-trade ones and one of the busy ties): 1 + 1 + 2.
+    expect(m.cells[0]![11]).toBe(4);
+    expect(m.cells[0]!.reduce((a, b) => a! + b!, 0)).toBe(26);
+  });
+
+  test('a trade with two strategies counts in each of them', () => {
+    const t = [makeTrade({ net: 500, strategyIds: ['a', 'b'] })];
+    const m = breakdown2D(t, ctx, 'strategy', 'side', 'net', {
+      strategyNames: { a: 'Alpha', b: 'Beta' },
+    });
+    expect(m.rows.sort()).toEqual(['Alpha', 'Beta']);
+    expect(m.cells).toEqual([[500], [500]]);
+  });
+});
+
+describe('new dimensions', () => {
+  test('an 8R trade lands in "+5R or more" and the distribution clamps there', () => {
+    const t = [
+      makeTrade({ net: 8000, initialRisk: 1000 }),
+      makeTrade({ net: -7000, initialRisk: 1000 }),
+      makeTrade({ net: 500, initialRisk: 1000 }),
+    ];
+    const bins = rDistribution(t);
+    expect(bins[bins.length - 1]).toMatchObject({
+      label: '+5R or more',
+      count: 1,
+    });
+    expect(bins[0]).toMatchObject({ label: '−5R or less', count: 1 });
+    expect(bins.reduce((n, b) => n + b.count, 0)).toBe(3);
+    const rows = breakdown(t, 'r', ctx);
+    expect(
+      rows.find((r) => r.label === '+5R or more')!.summary.closedCount,
+    ).toBe(1);
+    expect(rows.find((r) => r.label === '0R to +1R')!.summary.closedCount).toBe(
+      1,
+    );
+  });
+
+  test('a trade without a stop files under No stop', () => {
+    const rows = breakdown([makeTrade({ net: 100 })], 'r', ctx);
+    expect(rows.find((r) => r.label === 'No stop')!.summary.closedCount).toBe(
+      1,
+    );
+  });
+
+  test('size buckets follow the largest position, and months follow the instant', () => {
+    const t = [
+      makeTrade({ net: 1, maxPosition: 1 }),
+      makeTrade({ net: 1, maxPosition: 3 }),
+      makeTrade({
+        net: 1,
+        maxPosition: 40,
+        openedAt: '2026-07-01T15:00:00Z',
+        closedAt: '2026-07-02T15:00:00Z',
+      }),
+    ];
+    const size = breakdown(t, 'size', ctx);
+    expect(
+      size.filter((r) => r.summary.closedCount).map((r) => r.label),
+    ).toEqual(['1', '2-3', '26-100']);
+    const month = breakdown(t, 'month', ctx);
+    expect(month.find((r) => r.label === 'Mar')!.summary.closedCount).toBe(2);
+    expect(month.find((r) => r.label === 'Jul')!.summary.closedCount).toBe(1);
+    // By exit: the same trade is in July again, and a month boundary can move it.
+    expect(
+      breakdown(t, 'month', { ...ctx, timeBasis: 'exit' }).find(
+        (r) => r.label === 'Jul',
+      )!.summary.closedCount,
+    ).toBe(1);
+  });
+
+  test('days to expiry bucket at entry: 0, 1, 2-7, 8-30, 31+, and stock is left out', () => {
+    const opt = (sym: string, openedAt: string) =>
+      makeTrade({
+        net: 100,
+        instrument: resolveInstrument(sym)!,
+        openedAt,
+        closedAt: openedAt,
+      });
+    const t = [
+      opt('SPY260302C00500000', '2026-03-02T15:00:00Z'),
+      opt('SPY260303C00500000', '2026-03-02T15:00:00Z'),
+      opt('SPY260309C00500000', '2026-03-02T15:00:00Z'),
+      opt('SPY260401C00500000', '2026-03-02T15:00:00Z'),
+      opt('SPY260601C00500000', '2026-03-02T15:00:00Z'),
+      makeTrade({ net: 999 }),
+    ];
+    const rows = breakdown(t, 'dte', ctx);
+    expect(rows.map((r) => [r.key, r.summary.closedCount])).toEqual([
+      ['0', 1],
+      ['1', 1],
+      ['2-7', 1],
+      ['8-30', 1],
+      ['31+', 1],
+    ]);
+    expect(rows.reduce((n, r) => n + r.summary.netPnl, 0)).toBe(500);
+  });
+});
+
+describe('winsVsLosses', () => {
+  test('counts and averages follow classify, and breakevens are in neither', () => {
+    const t = [
+      makeTrade({
+        net: 1000,
+        initialRisk: 500,
+        mae: -100,
+        mfe: 1200,
+        maxPosition: 2,
+        openedAt: '2026-03-02T15:00:00Z',
+        closedAt: '2026-03-02T15:10:00Z',
+      }),
+      makeTrade({
+        net: 3000,
+        maxPosition: 4,
+        direction: 'short',
+        openedAt: '2026-03-02T15:00:00Z',
+        closedAt: '2026-03-02T15:30:00Z',
+      }),
+      makeTrade({ net: -500, initialRisk: 500, maxPosition: 1 }),
+      makeTrade({ net: 0 }),
+    ];
+    const r = winsVsLosses(t, ctx);
+    expect(r.wins).toMatchObject({
+      count: 2,
+      net: 4000,
+      avgNet: 2000,
+      avgDurationMin: 20,
+      avgR: 2,
+      avgSize: 3,
+      avgMae: -100,
+      avgMfe: 1200,
+      longShare: 0.5,
+    });
+    expect(r.losses).toMatchObject({
+      count: 1,
+      net: -500,
+      avgNet: -500,
+      avgR: -1,
+      longShare: 1,
+    });
+    // Gross basis reclassifies: a trade whose fees turn it from a win into a loss moves.
+    const fee = makeTrade({ net: -100, gross: 200, fees: 300 });
+    expect(winsVsLosses([fee], ctx).losses.count).toBe(1);
+    expect(winsVsLosses([fee], { ...ctx, pnlBasis: 'gross' }).wins.count).toBe(
+      1,
+    );
+    expect(winsVsLosses([], ctx).wins).toMatchObject({
+      count: 0,
+      avgNet: null,
+      longShare: null,
+    });
   });
 });

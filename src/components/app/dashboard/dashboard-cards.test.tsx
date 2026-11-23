@@ -579,6 +579,13 @@ test('every metric carries its definition', async () => {
     'max-drawdown',
     'win-streak',
     'loss-streak',
+    // On the reports (Task 15).
+    'avg-duration',
+    'avg-size',
+    'long-share',
+    'no-stop',
+    'r-expectancy',
+    'avg-trade',
   ]);
   expect(new Set(ids)).toEqual(
     new Set(METRIC_IDS.filter((id) => !notOnDashboard.has(id))),

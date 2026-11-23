@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { makeTrade } from '../__fixtures__/trades';
 import { defaultMetricContext } from './context';
-import { equityCurve, maxDrawdown } from './equity';
+import { drawdownSeries, equityCurve, maxDrawdown } from './equity';
 
 const ctx = defaultMetricContext('America/New_York');
 
@@ -53,5 +53,27 @@ describe('equity', () => {
     expect(equityCurve(t, 0, g).map((p) => p.equity)).toEqual([1000]);
     expect(maxDrawdown(t, 5000, g).amount).toBe(0);
     expect(maxDrawdown(t, 5000, ctx).amount).toBe(500);
+  });
+});
+
+describe('drawdownSeries', () => {
+  test('is the depth under the running peak, deepest of the day, from the starting balance', () => {
+    const t = [100, -300, 50, 400].map((net, i) =>
+      makeTrade({
+        net,
+        openedAt: `2026-03-0${2 + Math.floor(i / 2)}T14:00:00Z`,
+        closedAt: `2026-03-0${2 + Math.floor(i / 2)}T15:0${i}:00Z`,
+      }),
+    );
+    const eq = equityCurve(t, 1000, ctx);
+    const s = drawdownSeries(eq, 1000, 'America/New_York');
+    // Day 1: peak 1100, then 800 (-300). Day 2: 850 (-250), then 1250 a new peak (0).
+    expect(s).toEqual([
+      { key: '2026-03-02', value: -300 },
+      { key: '2026-03-03', value: -250 },
+    ]);
+    expect(Math.min(...s.map((p) => p.value))).toBe(
+      -maxDrawdown(t, 1000, ctx).amount,
+    );
   });
 });

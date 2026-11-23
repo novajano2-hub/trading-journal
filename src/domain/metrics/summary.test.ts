@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { makeTrade } from '../__fixtures__/trades';
 import { resolveInstrument } from '../instruments';
 import { costBasis, defaultMetricContext, pnlOf } from './context';
-import { plannedR, riskFromStop, summarize } from './summary';
+import { plannedR, riskFromStop, rExpectancy, summarize } from './summary';
 
 const ctx = defaultMetricContext('America/New_York');
 
@@ -243,5 +243,23 @@ describe('netRoi', () => {
       10,
     );
     expect(summarize([], ctx).netRoi).toBeNull();
+  });
+});
+
+describe('rExpectancy', () => {
+  test('is win share times average win R plus loss share times average loss R', () => {
+    const r = (net: number, initialRisk?: number) =>
+      makeTrade({ net, ...(initialRisk ? { initialRisk } : {}) });
+    // 3R, 1R, -1R, a breakeven, and a trade with no stop: 2 wins at 2R on average, 1 loss at -1R.
+    const out = rExpectancy(
+      [r(3000, 1000), r(1000, 1000), r(-1000, 1000), r(0, 1000), r(5000)],
+      defaultMetricContext('America/New_York'),
+    );
+    expect(out.count).toBe(3);
+    expect(out.value).toBeCloseTo((2 / 3) * 2 + (1 / 3) * -1, 10);
+    expect(rExpectancy([r(100)], defaultMetricContext('UTC'))).toEqual({
+      value: null,
+      count: 0,
+    });
   });
 });

@@ -48,12 +48,15 @@ export function Tabs<T extends string>({
   options,
   value,
   onChange,
+  coarseTargets = false,
 }: {
   id: string;
   label: string;
   options: readonly TabOption<T>[];
   value: T;
   onChange: (value: T) => void;
+  /** Tabs 44px high on coarse pointers, for touch. */
+  coarseTargets?: boolean;
 }) {
   const reduced = useReducedMotion();
   const listRef = useRef<HTMLDivElement>(null);
@@ -126,6 +129,8 @@ export function Tabs<T extends string>({
               tabIndex={active ? 0 : -1}
               onClick={() => select(i, false)}
               className={`relative inline-flex h-7 items-center rounded-[8px] px-2.5 text-[13.5px] font-medium whitespace-nowrap transition-colors duration-300 ease-[var(--ease-glide)] sm:px-[13px] ${
+                coarseTargets ? 'pointer-coarse:min-h-11' : ''
+              } ${
                 active
                   ? `text-text ${slot ? '' : 'bg-surface-1 shadow-[var(--shadow-chip)] [[data-theme=dark]_&]:bg-line-2'}`
                   : 'text-muted hover:text-text'

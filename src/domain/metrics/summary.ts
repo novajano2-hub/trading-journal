@@ -150,3 +150,36 @@ export function summarize(
     currencies: [...new Set(closed.map((t) => t.pnlCurrency))].sort(),
   };
 }
+
+/**
+ * Expectancy in R: win rate times the average winning R, plus loss rate times
+ * the average losing R, over the decided trades that have a realized R.
+ * Outcomes come from `classify`, as every other figure's do. `count` is the
+ * trades it read; the value is null with none.
+ */
+export function rExpectancy(
+  trades: readonly Trade[],
+  ctx: MetricContext,
+): { value: number | null; count: number } {
+  const decided = trades
+    .filter(isClosed)
+    .map((t) => ({ r: rOf(t, ctx.pnlBasis), o: classify(t, ctx).outcome }))
+    .filter(
+      (x): x is { r: number; o: 'win' | 'loss' } =>
+        x.r !== undefined && x.o !== 'breakeven',
+    );
+  if (decided.length === 0) return { value: null, count: 0 };
+  const mean = (o: 'win' | 'loss') => {
+    const rs = decided.filter((x) => x.o === o).map((x) => x.r);
+    return {
+      share: rs.length / decided.length,
+      avg: ratio(sum(rs), rs.length),
+    };
+  };
+  const w = mean('win');
+  const l = mean('loss');
+  return {
+    value: w.share * (w.avg ?? 0) + l.share * (l.avg ?? 0),
+    count: decided.length,
+  };
+}

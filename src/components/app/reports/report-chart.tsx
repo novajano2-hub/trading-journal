@@ -82,10 +82,14 @@ export function niceScale(
 function xTicks(
   keys: readonly string[],
   plotW: number,
+  xLabel?: (key: string) => string,
 ): { i: number; text: string }[] {
   const step = plotW / Math.max(1, keys.length);
   let candidates: { i: number; text: string }[];
-  if (step >= 28 && keys.length <= 40) {
+  if (xLabel) {
+    // Named buckets (a weekday, a symbol, 10:30): label each, as many as fit.
+    candidates = keys.map((k, i) => ({ i, text: xLabel(k) }));
+  } else if (step >= 28 && keys.length <= 40) {
     candidates = keys.map((k, i) => ({
       i,
       text:
@@ -109,9 +113,15 @@ function xTicks(
   }
   const out: typeof candidates = [];
   let lastX = -Infinity;
+  const gap = xLabel
+    ? Math.max(
+        MIN_LABEL_GAP,
+        ...candidates.map((c) => c.text.length * 6.4 + 10),
+      )
+    : MIN_LABEL_GAP;
   for (const c of candidates) {
     const x = (c.i + 0.5) * step;
-    if (x - lastX >= MIN_LABEL_GAP) {
+    if (x - lastX >= gap) {
       out.push(c);
       lastX = x;
     }
@@ -177,6 +187,29 @@ function formatterOf(display: Display, currency: string): Formatter {
   };
 }
 
+/** A stretch of the x axis to shade, from one key to another (inclusive). */
+export interface Shade {
+  /** Names the mark: `data-band`. */
+  name: string;
+  from: string;
+  to: string;
+  /** Written in the band; plain text, so under Privacy it has already been hidden. */
+  label: string;
+}
+
+/** The indices of the first key at or after `from` and the last at or before `to`; undefined when none lie between. */
+function spanOf(
+  keys: readonly string[],
+  shade: Shade,
+): { from: number; to: number } | undefined {
+  const from = keys.findIndex((k) => k >= shade.from);
+  let to = -1;
+  keys.forEach((k, i) => {
+    if (k <= shade.to) to = i;
+  });
+  return from === -1 || to < from ? undefined : { from, to };
+}
+
 interface Layout {
   width: number;
   bandH: number;
@@ -193,6 +226,15 @@ const xOf = (l: Layout, i: number) => l.padL + l.step * (i + 0.5);
 interface Band {
   scale: { lo: number; hi: number; ticks: number[] };
   y(v: number): number;
+}
+
+/** The series as one, so a shared band's scale spans all of their values. */
+function together(series: readonly ChartSeries[]): ChartSeries {
+  return {
+    ...series[0]!,
+    kind: series.some((s) => s.kind === 'bar') ? 'bar' : 'line',
+    points: series.flatMap((s) => s.points),
+  };
 }
 
 function bandOf(s: ChartSeries, top: number, bandH: number): Band {
@@ -224,21 +266,58 @@ const Plot = memo(function Plot({
   bands,
   format: fmt,
   gradientId,
+  xLabel,
+  overlay,
+  shade,
 }: {
   series: readonly ChartSeries[];
   layout: Layout;
   bands: readonly Band[];
   format: Formatter;
   gradientId: string;
+  xLabel?: (key: string) => string;
+  overlay: boolean;
+  shade?: Shade;
 }) {
   const keys = series[0]!.points.map((p) => p.key);
   const { padL, plotW, step, bandH } = layout;
   const signed = series.length === 1 && series[0]!.unit === 'money';
   const barW = Math.max(1, Math.min(step * 0.72, 30));
-  const ticks = xTicks(keys, plotW);
+  const ticks = xTicks(keys, plotW, xLabel);
+  const shaded = shade ? spanOf(keys, shade) : undefined;
+  // A label that would run off the plot's right edge hangs from the band's end instead.
+  const nearRight =
+    shaded !== undefined &&
+    xOf(layout, shaded.from) - layout.step / 2 + 170 > padL + plotW;
   const lastBottom = layout.tops[series.length - 1]! + bandH;
   return (
     <>
+      {shade && shaded ? (
+        <g data-band={shade.name} pointerEvents="none">
+          <rect
+            x={xOf(layout, shaded.from) - layout.step / 2}
+            width={(shaded.to - shaded.from + 1) * layout.step}
+            y={layout.tops[0]! + PAD_Y / 2}
+            height={bandH - PAD_Y}
+            fill="var(--loss-fill)"
+            fillOpacity={0.12}
+          />
+          <text
+            x={
+              nearRight
+                ? xOf(layout, shaded.to) + layout.step / 2 - 6
+                : xOf(layout, shaded.from) - layout.step / 2 + 6
+            }
+            textAnchor={nearRight ? 'end' : 'start'}
+            y={layout.tops[0]! + PAD_Y + 10}
+            fontSize={11}
+            fontWeight={600}
+            fill="var(--loss)"
+          >
+            {shade.label}
+          </text>
+        </g>
+      ) : null}
       {series.map((s, si) => {
         const band = bands[si]!;
         const colour = COLOURS[si % COLOURS.length]!;
@@ -247,7 +326,7 @@ const Plot = memo(function Plot({
         const zeroInside = band.scale.lo <= 0 && band.scale.hi >= 0;
         return (
           <g key={s.label} data-series={s.label}>
-            {band.scale.ticks.map((t) => (
+            {(overlay && si > 0 ? [] : band.scale.ticks).map((t) => (
               <g key={t}>
                 <line
                   x1={padL}
@@ -467,9 +546,12 @@ const ValuesTable = memo(function ValuesTable({
 export function ReportChart({
   series,
   label,
-  periodLabel = periodText,
+  periodLabel: periodLabelProp,
   height,
   currency,
+  xLabel,
+  overlay = false,
+  shade,
 }: {
   series: readonly ChartSeries[];
   label: string;
@@ -479,7 +561,18 @@ export function ReportChart({
   height?: number;
   /** The currency of money values; default: the base currency. */
   currency?: string;
+  /**
+   * For named periods (a weekday, a symbol, 10:30) rather than dates: how a key
+   * reads under the axis. Without it keys are dates, days or months.
+   */
+  xLabel?: (key: string) => string;
+  /** Draw every series on one shared axis, rather than a band each. The series should share a unit. */
+  overlay?: boolean;
+  /** A stretch to shade, such as the max drawdown. */
+  shade?: Shade;
 }): React.JSX.Element {
+  // Named periods read as they are named; dated ones as a date.
+  const periodLabel = periodLabelProp ?? xLabel ?? periodText;
   const display = useDisplay();
   const base = usePrefs().data?.baseCurrency ?? 'USD';
   const pctBase = useContext(FigureSourceContext)?.pctBase ?? null;
@@ -513,18 +606,19 @@ export function ReportChart({
     return () => observer.disconnect();
   }, [hasData]);
 
-  const bandH = height ?? (series.length === 1 ? 260 : 150);
+  const stacked = overlay ? 1 : series.length;
+  const bandH = height ?? (stacked === 1 ? 260 : 150);
   const layout = useMemo<Layout | undefined>(() => {
     if (n === 0) return undefined;
     const widest = Math.max(
       ...series.flatMap((s) => {
-        const band = bandOf(s, 0, bandH);
+        const band = bandOf(overlay ? together(series) : s, 0, bandH);
         return band.scale.ticks.map((t) => fmt.tick(s.unit, t).length);
       }),
     );
     const padL = Math.max(36, Math.ceil(widest * 6.4) + 16);
     const plotW = Math.max(40, width - padL - PAD_R);
-    const tops = series.map((_, i) => i * (bandH + BAND_GAP));
+    const tops = series.map((_, i) => (overlay ? 0 : i * (bandH + BAND_GAP)));
     return {
       width,
       bandH,
@@ -532,14 +626,17 @@ export function ReportChart({
       plotW,
       step: plotW / n,
       tops,
-      height: series.length * bandH + (series.length - 1) * BAND_GAP + X_AXIS,
+      height: stacked * bandH + (stacked - 1) * BAND_GAP + X_AXIS,
     };
-  }, [series, width, bandH, n, fmt]);
-  const bands = useMemo(
-    () =>
-      layout ? series.map((s, i) => bandOf(s, layout.tops[i]!, bandH)) : [],
-    [series, layout, bandH],
-  );
+  }, [series, width, bandH, n, fmt, overlay, stacked]);
+  const bands = useMemo(() => {
+    if (!layout) return [];
+    if (!overlay)
+      return series.map((s, i) => bandOf(s, layout.tops[i]!, bandH));
+    // One scale for all, so the lines can be read against each other.
+    const shared = bandOf(together(series), 0, bandH);
+    return series.map(() => shared);
+  }, [series, layout, bandH, overlay]);
 
   if (!layout || n === 0)
     return (
@@ -619,6 +716,9 @@ export function ReportChart({
               bands={bands}
               format={fmt}
               gradientId={gradientId}
+              xLabel={xLabel}
+              overlay={overlay}
+              shade={shade}
             />
             {active !== null ? (
               <g pointerEvents="none">

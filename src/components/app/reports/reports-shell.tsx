@@ -1,18 +1,20 @@
 'use client';
 
-import {
-  CaretDown,
-  Check,
-  ClockCounterClockwise,
-} from '@phosphor-icons/react/dist/ssr';
+import { CaretDown, Check } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { DropdownMenu } from 'radix-ui';
 import { Suspense, type ReactNode } from 'react';
 import { parseFilters, serializeFilters } from '@/data/filters';
-import { CARD } from '../dashboard/shared';
+import { StrategiesView, SymbolsView, TagsView } from './breakdown-report';
+import { CalendarReportView } from './calendar-report';
+import { CompareView } from './compare';
+import { DayTimeView } from './day-time-report';
+import { OptionsView } from './options-report';
 import { OverviewView } from './overview';
 import { PerformanceView } from './performance';
+import { RiskView } from './risk-report';
+import { WinsLossesView } from './wins-losses';
 import { ReportSkeleton } from './report-scope';
 import {
   REPORT_LABELS,
@@ -127,27 +129,36 @@ export function ReportsShell({
   );
 }
 
-/** A report whose page is built next: a panel, no figures. */
-function ComingNext({ report }: { report: ReportKey }): React.JSX.Element {
-  return (
-    <div
-      className={`${CARD} mx-auto flex w-full max-w-[560px] flex-col items-center px-6 py-10 text-center`}
-    >
-      <span
-        aria-hidden="true"
-        className="grid size-10 place-items-center rounded-[11px] bg-sunken text-faint"
-      >
-        <ClockCounterClockwise size={22} />
-      </span>
-      <h2 className="mt-4 text-[17px] leading-snug font-semibold tracking-[-0.015em] text-text">
-        This report arrives next
-      </h2>
-      <p className="mt-2 text-[14.5px] leading-[1.6] text-muted">
-        {REPORT_LABELS[report]} is on its way. Overview and Performance are here
-        now.
-      </p>
-    </div>
-  );
+/** The report a key names. */
+function ReportBody({
+  report,
+}: {
+  report: ReportKey | 'overview';
+}): React.JSX.Element {
+  switch (report) {
+    case 'overview':
+      return <OverviewView />;
+    case 'performance':
+      return <PerformanceView />;
+    case 'day-time':
+      return <DayTimeView />;
+    case 'symbols':
+      return <SymbolsView />;
+    case 'risk':
+      return <RiskView />;
+    case 'strategies':
+      return <StrategiesView />;
+    case 'tags':
+      return <TagsView />;
+    case 'options':
+      return <OptionsView />;
+    case 'wins-losses':
+      return <WinsLossesView />;
+    case 'compare':
+      return <CompareView />;
+    case 'calendar':
+      return <CalendarReportView />;
+  }
 }
 
 /** A reports route: the shell around the report named by `report`. */
@@ -165,13 +176,7 @@ export function ReportsPage({
       }
     >
       <ReportsShell active={report}>
-        {report === 'overview' ? (
-          <OverviewView />
-        ) : report === 'performance' ? (
-          <PerformanceView />
-        ) : (
-          <ComingNext report={report} />
-        )}
+        <ReportBody report={report} />
       </ReportsShell>
     </Suspense>
   );

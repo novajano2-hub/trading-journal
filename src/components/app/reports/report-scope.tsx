@@ -44,7 +44,7 @@ export function ReportSkeleton(): React.JSX.Element {
   );
 }
 
-function State({
+export function State({
   icon,
   title,
   body,

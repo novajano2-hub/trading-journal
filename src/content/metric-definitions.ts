@@ -39,6 +39,12 @@ export const METRIC_IDS = [
   'max-drawdown',
   'win-streak',
   'loss-streak',
+  'avg-duration',
+  'avg-size',
+  'long-share',
+  'no-stop',
+  'r-expectancy',
+  'avg-trade',
 ] as const;
 
 export type MetricId = (typeof METRIC_IDS)[number];
@@ -227,6 +233,35 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Longest loss streak',
     definition:
       'The most losing trades in a row, in the order they closed. A breakeven trade neither extends nor breaks a run.',
+  },
+  'avg-duration': {
+    label: 'Average duration',
+    definition:
+      'How long the trades were held on average, from the first entry to the last exit.',
+  },
+  'avg-size': {
+    label: 'Average size',
+    definition:
+      'The mean of the largest position each trade held, in contracts or shares.',
+  },
+  'long-share': {
+    label: 'Long share',
+    definition: 'The share of these trades that were long rather than short.',
+  },
+  'no-stop': {
+    label: 'Trades without a stop',
+    definition:
+      'Closed trades with no planned stop, so no risk to measure them in R against. They are left out of every R figure.',
+  },
+  'avg-trade': {
+    label: 'Average trade',
+    definition:
+      'Mean {basis} P&L of every closed trade, breakevens included. Expectancy, by contrast, leaves them out.',
+  },
+  'r-expectancy': {
+    label: 'R expectancy',
+    definition:
+      'Win rate times average winning R, plus loss rate times average losing R, over the decided trades that have a stop. What a trade is worth on average, in units of risk.',
   },
 };
 

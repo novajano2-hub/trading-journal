@@ -43,3 +43,19 @@ export async function reportsSample(): Promise<SampleWorkspace> {
   s.journal = [];
   return s;
 }
+
+/** Test-only: a repository over `sample` whose trader is in New York, so clock times read the same everywhere. */
+export async function newYorkRepository(
+  sample: () => Promise<SampleWorkspace> = reportsSample,
+) {
+  const { createLocalRepository } =
+    await import('@/data/local/local-repository');
+  const { IDBFactory, IDBKeyRange } = await import('fake-indexeddb');
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample,
+  });
+  await repository.prefs.update({ timeZone: 'America/New_York' });
+  return repository;
+}
