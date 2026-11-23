@@ -12,6 +12,7 @@ import type {
   Account,
   ImportJob,
   JournalEntry,
+  NoteFolder,
   NoteTemplate,
   Strategy,
   Tag,
@@ -124,8 +125,27 @@ export function useTemplates(): UseQueryResult<NoteTemplate[]> {
   return useWorkspaceQuery(keys.templates, (r, ws) => r.templates.list(ws));
 }
 
+/**
+ * The journal, Trash included. Reading it purges what has waited in Trash for
+ * 30 days, which unlinks the trade notes among them: when a cached trade still
+ * points at a note that is gone, the trades are read again.
+ */
 export function useJournal(): UseQueryResult<JournalEntry[]> {
-  return useWorkspaceQuery(keys.journal, (r, ws) => r.journal.list(ws));
+  const queryClient = useQueryClient();
+  return useWorkspaceQuery(keys.journal, async (r, ws) => {
+    const entries = await r.journal.list(ws);
+    const ids = new Set(entries.map((e) => e.id));
+    const cached = queryClient.getQueryData<Trade[]>(keys.trades(ws));
+    if (cached?.some((t) => t.noteId !== undefined && !ids.has(t.noteId))) {
+      void queryClient.invalidateQueries({ queryKey: keys.trades(ws) });
+      void queryClient.invalidateQueries({ queryKey: keys.imports(ws) });
+    }
+    return entries;
+  });
+}
+
+export function useFolders(): UseQueryResult<NoteFolder[]> {
+  return useWorkspaceQuery(keys.folders, (r, ws) => r.folders.list(ws));
 }
 
 export function useJournalEntry(
@@ -477,6 +497,35 @@ export function useSetDefaultTemplate(): UseMutationResult<
 > {
   return useWorkspaceWrite('templates.setDefault', (r, ws, id: string) =>
     r.templates.setDefault(ws, id),
+  );
+}
+
+export function useCreateFolder(): UseMutationResult<
+  NoteFolder,
+  Error,
+  string
+> {
+  return useWorkspaceWrite('folders.create', (r, ws, name: string) =>
+    r.folders.create(ws, name),
+  );
+}
+
+export function useRenameFolder(): UseMutationResult<
+  NoteFolder,
+  Error,
+  { id: string; name: string }
+> {
+  return useWorkspaceWrite(
+    'folders.rename',
+    (r, ws, v: { id: string; name: string }) =>
+      r.folders.rename(ws, v.id, v.name),
+  );
+}
+
+/** Its notes move to no folder. */
+export function useRemoveFolder(): UseMutationResult<void, Error, string> {
+  return useWorkspaceWrite('folders.remove', (r, ws, id: string) =>
+    r.folders.remove(ws, id),
   );
 }
 

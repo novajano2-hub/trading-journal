@@ -113,7 +113,7 @@ export function localJournal(ctx: LocalContext): JournalRepo {
       const rows = await db.journal
         .where('linkedTradeIds')
         .equals(tradeId)
-        .filter((e) => e.workspaceId === ws)
+        .filter((e) => e.workspaceId === ws && e.deletedAt === undefined)
         .toArray();
       return rows.sort(byRecency);
     },

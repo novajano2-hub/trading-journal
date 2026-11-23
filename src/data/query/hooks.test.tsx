@@ -181,6 +181,35 @@ test('a missing trade reads as null', async () => {
   await waitFor(() => expect(result.current.data).toBeNull());
 });
 
+test('reading the journal refreshes the trades when the purge unlinked a note', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => {
+      const sample = fixtureSample();
+      // In Trash for far longer than 30 days.
+      sample.journal[0]!.deletedAt = '2026-01-01T00:00:00.000Z';
+      return sample;
+    },
+  });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+  });
+  const Wrapper = ({ children }: { children: ReactNode }) => (
+    <DataProvider repository={repository} queryClient={queryClient}>
+      {children}
+    </DataProvider>
+  );
+  const trades = renderHook(() => useTrades(), { wrapper: Wrapper });
+  const noteOf = () => trades.result.current.data?.find((t) => t.id === 'f-1');
+  await waitFor(() => expect(noteOf()).toBeDefined());
+  // Trades loaded first, still holding the id of a note about to be purged.
+  expect(noteOf()?.noteId).toBe('j-1');
+  const journal = renderHook(() => useJournal(), { wrapper: Wrapper });
+  await waitFor(() => expect(journal.result.current.data).toEqual([]));
+  await waitFor(() => expect(noteOf()?.noteId).toBeUndefined());
+});
+
 function commitWrapper(over: {
   commit: () => Promise<ImportJob>;
   setActive?: () => Promise<void>;

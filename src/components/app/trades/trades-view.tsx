@@ -30,6 +30,7 @@ import { metricContextOf } from '@/data/metrics';
 import { useGlobalFilters, useTradeSet } from '@/data/query/derived';
 import {
   useAccounts,
+  useJournal,
   usePrefs,
   useStrategies,
   useTagCategories,
@@ -48,7 +49,7 @@ import { rowFacts, type RowFacts } from '@/data/trade-rows';
 import { summarize } from '@/domain/metrics/summary';
 import { isClosed } from '@/domain/trade-status';
 import { localDate } from '@/domain/time';
-import type { Trade } from '@/domain/types';
+import type { JournalEntry, Trade } from '@/domain/types';
 import {
   meanFigure,
   pctBaseOf,
@@ -57,6 +58,7 @@ import {
   useDisplay,
 } from '@/lib/display';
 import { plural } from '@/lib/format';
+import { docText } from '@/lib/note-text';
 import { rangeCaption } from '@/lib/range-label';
 import { hasActiveFilters } from '../filter-model';
 import { CARD } from '../dashboard/shared';
@@ -83,8 +85,27 @@ function byNewest(a: Trade, b: Trade): number {
   return Date.parse(b.openedAt) - Date.parse(a.openedAt) || b.serial - a.serial;
 }
 
-/** Whether a trade matches the search: symbol, #serial, strategy and tag names. */
-function matches(t: Trade, query: string, facts: RowFacts): boolean {
+/**
+ * The lowercased text of each note by note id (one in Trash is left out), built
+ * once per change of the journal so a keystroke reads strings, not documents.
+ */
+function noteIndex(notes: readonly JournalEntry[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const n of notes) {
+    if (n.deletedAt !== undefined) continue;
+    const text = docText(n.body).toLowerCase();
+    if (text !== '') out.set(n.id, text);
+  }
+  return out;
+}
+
+/** Whether a trade matches the search: symbol, #serial, strategy, tag and note text. */
+function matches(
+  t: Trade,
+  query: string,
+  facts: RowFacts,
+  noteText: ReadonlyMap<string, string>,
+): boolean {
   if (query.startsWith('#')) {
     const serial = query.slice(1);
     return /^\d+$/.test(serial) && t.serial === Number(serial);
@@ -97,7 +118,11 @@ function matches(t: Trade, query: string, facts: RowFacts): boolean {
     ...facts.tagsOf(t).map((x) => x.name),
     ...facts.mistakesOf(t),
   ];
-  return hay.some((h) => h.toLowerCase().includes(query));
+  return (
+    hay.some((h) => h.toLowerCase().includes(query)) ||
+    (t.noteId !== undefined &&
+      (noteText.get(t.noteId)?.includes(query) ?? false))
+  );
 }
 
 /** The pages to show as buttons: the first, the last and the current with its neighbours; `null` is a gap. */
@@ -238,7 +263,9 @@ export function TradesView(): React.JSX.Element {
   const accounts = useAccounts().data;
   const strategies = useStrategies().data;
   const tags = useTags().data;
+  const journal = useJournal().data;
   const categories = useTagCategories().data;
+  const noteText = useMemo(() => noteIndex(journal ?? []), [journal]);
   const updatePrefs = useUpdatePrefs();
   const queryClient = useQueryClient();
   const display = useDisplay();
@@ -315,7 +342,9 @@ export function TradesView(): React.JSX.Element {
     const query = search.trim().toLowerCase();
     const inReview = byReview(inStatus);
     const rows = (
-      query === '' ? inReview : inReview.filter((t) => matches(t, query, facts))
+      query === ''
+        ? inReview
+        : inReview.filter((t) => matches(t, query, facts, noteText))
     )
       .slice()
       .sort(byNewest);
@@ -328,7 +357,7 @@ export function TradesView(): React.JSX.Element {
       stripTrades: byReview(closed),
       rows,
     };
-  }, [set.data?.trades, facts, status, filters.reviewed, search]);
+  }, [set.data?.trades, facts, status, filters.reviewed, search, noteText]);
 
   const rows = model?.rows ?? NO_ROWS;
   const cellEnv: CellEnv | undefined = useMemo(

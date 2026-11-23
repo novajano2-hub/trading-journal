@@ -11,6 +11,7 @@ import type {
   ImportJob,
   Instrument,
   JournalEntry,
+  NoteFolder,
   NoteTemplate,
   Rule,
   RuleGroup,
@@ -260,6 +261,17 @@ export interface TemplatesRepo {
   setDefault(ws: string, id: string): Promise<void>;
 }
 
+export interface FoldersRepo {
+  /** By name. */
+  list(ws: string): Promise<NoteFolder[]>;
+  /** The name is trimmed. Throws RangeError for an empty one and DuplicateNameError for one a folder already has, ignoring case. */
+  create(ws: string, name: string): Promise<NoteFolder>;
+  /** As `create` for the name; a folder keeps its id. Throws NotFoundError for a missing folder. */
+  rename(ws: string, id: string, name: string): Promise<NoteFolder>;
+  /** Moves the folder's notes, Trash included, to no folder (My notes). Throws NotFoundError for a missing folder. */
+  remove(ws: string, id: string): Promise<void>;
+}
+
 export type JournalDraft = Omit<
   JournalEntry,
   'id' | 'workspaceId' | 'updatedAt'
@@ -267,10 +279,12 @@ export type JournalDraft = Omit<
 export interface JournalRepo {
   /**
    * Date descending, undated last, then `updatedAt` descending, Trash
-   * included. Purges entries trashed more than 30 days ago first.
+   * included. Purges entries trashed more than 30 days ago first, clearing
+   * `noteId` on the trades whose trade note it deletes.
    */
   list(ws: string): Promise<JournalEntry[]>;
   get(ws: string, id: string): Promise<JournalEntry | undefined>;
+  /** The entries linked to the trade that are out of Trash. */
   listForTrade(ws: string, tradeId: string): Promise<JournalEntry[]>;
   /** Creates when `id` is absent, otherwise replaces; stamps `updatedAt`. */
   save(ws: string, draft: JournalDraft): Promise<JournalEntry>;
@@ -347,6 +361,7 @@ export interface Repository {
   tags: TagsRepo;
   tagCategories: TagCategoriesRepo;
   templates: TemplatesRepo;
+  folders: FoldersRepo;
   journal: JournalRepo;
   imports: ImportRepo;
 }

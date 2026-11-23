@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, parseISO } from 'date-fns';
+import { differenceInCalendarDays, format, parse, parseISO } from 'date-fns';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { defaultMetricContext } from '@/domain/metrics/context';
 import { dailyPnl } from '@/domain/metrics/days';
@@ -374,7 +374,7 @@ describe('sample workspace generator', () => {
     }
     expect(new Set(s.tags.map((x) => x.categoryId)).size).toBe(4);
     expect(new Set(s.journal.map((j) => j.kind))).toEqual(
-      new Set(['daily-review', 'pre-market', 'weekly-recap', 'note']),
+      new Set(['daily-review', 'pre-market', 'weekly-recap', 'trade-note']),
     );
     expect(
       s.journal.filter((j) => j.kind === 'weekly-recap').length,
@@ -412,7 +412,7 @@ describe('sample workspace generator', () => {
       for (const id of t.tagIds) expect(tags.has(id)).toBe(true);
       if (t.noteId !== undefined) {
         const note = journal.get(t.noteId)!;
-        expect(note.kind).toBe('note');
+        expect(note.kind).toBe('trade-note');
         expect(note.linkedTradeIds).toEqual([t.id]);
       }
     }
@@ -423,7 +423,8 @@ describe('sample workspace generator', () => {
       expect(j.workspaceId).toBe('sample');
       expect((j.body as { type: string }).type).toBe('doc');
     }
-    const notes = s.journal.filter((j) => j.kind === 'note');
+    const notes = s.journal.filter((j) => j.kind === 'trade-note');
+    expect(s.journal.some((j) => j.kind === 'note')).toBe(false);
     expect(s.journal.some((j) => 'folder' in j || 'folderId' in j)).toBe(false);
     expect(notes.length).toBeGreaterThanOrEqual(35);
     expect(notes.length).toBeLessThanOrEqual(45);
@@ -431,6 +432,11 @@ describe('sample workspace generator', () => {
       expect(n.linkedTradeIds).toHaveLength(1);
       const t = s.trades.find((x) => x.id === n.linkedTradeIds[0])!;
       expect(t.noteId).toBe(n.id);
+      // Titled as ensureTradeNote titles one: "{symbol} : {d MMM yyyy}", the day the trade opened.
+      const opened = localDate(t.openedAt, NY);
+      expect(n.title).toBe(
+        `${t.instrument.symbol} : ${format(parse(opened, 'yyyy-MM-dd', new Date(0)), 'd MMM yyyy')}`,
+      );
     }
     expect(s.trades.filter((t) => t.noteId !== undefined)).toHaveLength(
       notes.length,

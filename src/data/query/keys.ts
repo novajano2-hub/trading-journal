@@ -16,6 +16,7 @@ export const keys = {
   tags: (ws: string) => [...W(ws), 'tags'] as const,
   tagCategories: (ws: string) => [...W(ws), 'tag-categories'] as const,
   templates: (ws: string) => [...W(ws), 'templates'] as const,
+  folders: (ws: string) => [...W(ws), 'folders'] as const,
   journal: (ws: string) => [...W(ws), 'journal'] as const,
   journalEntry: (ws: string, id: string) =>
     [...W(ws), 'journal', 'entry', id] as const,
@@ -52,6 +53,9 @@ export type WriteKind =
   | 'templates.save'
   | 'templates.remove'
   | 'templates.setDefault'
+  | 'folders.create'
+  | 'folders.rename'
+  | 'folders.remove'
   | 'journal.save'
   | 'journal.remove'
   | 'journal.trash'
@@ -122,6 +126,12 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
     case 'templates.remove':
     case 'templates.setDefault':
       return [keys.templates(ws)];
+    case 'folders.create':
+    case 'folders.rename':
+      return [keys.folders(ws)];
+    // Its notes move to no folder.
+    case 'folders.remove':
+      return [keys.folders(ws), keys.journal(ws)];
     case 'journal.save':
     case 'journal.trash':
     case 'journal.restore':

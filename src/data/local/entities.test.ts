@@ -501,6 +501,41 @@ test('trash and restore round-trip; Trash is purged after 30 days', async () => 
   );
 });
 
+test('listForTrade leaves out a trade note in Trash', async () => {
+  const { repo } = setup({ newId: () => 'note-f2' });
+  const note = await repo.journal.ensureTradeNote(S, 'f-2');
+  expect((await repo.journal.listForTrade(S, 'f-2')).map((e) => e.id)).toEqual([
+    note.id,
+  ]);
+  await repo.journal.trash(S, note.id);
+  expect(await repo.journal.listForTrade(S, 'f-2')).toEqual([]);
+  await repo.journal.restore(S, note.id);
+  expect((await repo.journal.listForTrade(S, 'f-2')).map((e) => e.id)).toEqual([
+    note.id,
+  ]);
+});
+
+test('the purge deletes an expired trade note and clears noteId on its trade', async () => {
+  const now = new Date('2026-11-20T12:00:00.000Z');
+  const day = 86_400_000;
+  const { repo, make } = setup({ now: () => now, newId: () => 'note-f2' });
+  const note = await repo.journal.ensureTradeNote(S, 'f-2');
+  await repo.journal.trash(S, note.id);
+  // 29 days on it is still waiting in Trash, and still linked.
+  const soon = make({ now: () => new Date(+now + 29 * day) });
+  expect((await soon.journal.list(S)).map((e) => e.id)).toContain(note.id);
+  expect((await soon.trades.get(S, 'f-2'))?.noteId).toBe(note.id);
+  // After 30 days it is gone, and the trade no longer points at it.
+  const after = make({
+    now: () => new Date(+now + 31 * day),
+    newId: () => 'note-again',
+  });
+  expect((await after.journal.list(S)).map((e) => e.id)).not.toContain(note.id);
+  expect(await after.trades.get(S, 'f-2')).not.toHaveProperty('noteId');
+  // The trade gets a fresh note when it is next opened.
+  expect((await after.journal.ensureTradeNote(S, 'f-2')).id).toBe('note-again');
+});
+
 test('ensureTradeNote creates one trade note and links it', async () => {
   const { repo } = setup({ newId: () => 'note-f2' });
   await repo.prefs.update({ timeZone: 'America/New_York' });

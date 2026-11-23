@@ -1,3 +1,4 @@
+import { format, parse } from 'date-fns';
 import { localDate } from '@/domain/time';
 import type { JournalEntry, Trade } from '@/domain/types';
 import { SAMPLE_WORKSPACE } from '../workspaces';
@@ -55,7 +56,7 @@ function daySummary(day: readonly Trade[]): string {
   return `${day.length} trades, ${w} won and ${closed.length - w} did not. Net ${money(net)} after costs.`;
 }
 
-/** Pre-market plans, weekly recaps and trade notes, on the generator's main stream. */
+/** Pre-market plans, weekly recaps and trade notes (kind `trade-note`), on the generator's main stream. */
 export function writeJournal(
   rng: Random,
   trades: readonly Trade[],
@@ -157,9 +158,10 @@ export function writeJournal(
   for (const t of trades.filter((x) => chosen.has(x))) {
     const when = t.closedAt ?? t.openedAt;
     const note = add({
-      kind: 'note',
+      kind: 'trade-note',
       date: localDate(when, NY),
-      title: `${t.instrument.symbol} ${t.direction}, ${money(t.net)}`,
+      // As the repository titles a trade's note: the symbol, then the day it opened.
+      title: `${t.instrument.symbol} : ${format(parse(localDate(t.openedAt, NY), 'yyyy-MM-dd', new Date(0)), 'd MMM yyyy')}`,
       body: doc(
         paragraph(`Thesis: ${rng.pick(PHRASES.thesis)}`),
         paragraph(`Execution: ${rng.pick(PHRASES.execution)}`),

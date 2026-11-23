@@ -185,6 +185,48 @@ test('search matches #serial, strategy and tag names', async () => {
   await waitFor(() => expect(screen.getByText(/1-50 of 61/)).toBeTruthy());
 });
 
+test("search also reads a trade note's text, but not one in Trash", async () => {
+  const base = sample();
+  const note = (id: string, tradeId: string, deletedAt?: string) => ({
+    id,
+    workspaceId: WS,
+    kind: 'trade-note' as const,
+    title: 'ES : 2 Nov 2026',
+    body: {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Chased the Gapfill, late again.' }],
+        },
+      ],
+    },
+    linkedTradeIds: [tradeId],
+    tags: [],
+    updatedAt: '2026-11-03T00:00:00.000Z',
+    ...(deletedAt ? { deletedAt } : {}),
+  });
+  renderApp(<TradesView />, {
+    url: '/app/trades',
+    sample: async () => {
+      const fx = await base();
+      fx.trades.find((t) => t.id === 't-33')!.noteId = 'n-33';
+      fx.trades.find((t) => t.id === 't-44')!.noteId = 'n-44';
+      fx.journal.push(
+        note('n-33', 't-33'),
+        note('n-44', 't-44', '2026-11-10T00:00:00.000Z'),
+      );
+      return fx;
+    },
+  });
+  const t = await table();
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Search trades' }), {
+    target: { value: 'gapfill' },
+  });
+  await waitFor(() => expect(bodyRows(t)).toHaveLength(1));
+  expect(idOf(bodyRows(t)[0]!)).toBe('t-33');
+});
+
 test('Next page shows rows 51 to 100', async () => {
   renderApp(<TradesView />, { sample: sample(), url: '/app/trades' });
   const t = await table();
