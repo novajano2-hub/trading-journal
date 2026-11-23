@@ -326,6 +326,24 @@ test('Export CSV downloads real values even under Privacy', async () => {
   expect(text).not.toContain('•');
 });
 
+test('the summary strip shows its fees in the chosen unit, as it does the P&L', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: sample(),
+  });
+  await repository.prefs.update({ displayUnit: 'percent' });
+  renderApp(<TradesView />, { repository, url: '/app/trades' });
+  await table();
+  const strip = await screen.findByRole('region', { name: 'Summary' });
+  await waitFor(() => {
+    // "fees" sits beside its figure: the percentage, not dollars.
+    const text = strip.textContent ?? '';
+    expect(text).toMatch(/[\d.]+% fees/);
+    expect(text).not.toMatch(/\$[\d,.]+ fees/);
+  });
+});
+
 test("the default columns are comp 01's, Net ROI in and Mistake off", async () => {
   renderApp(<TradesView />, { sample: sample(), url: '/app/trades' });
   const t = await table();

@@ -46,10 +46,13 @@ test('picking Europe/London saves it, and Use browser default forgets it again',
     expect((await r.prefs.get()).timeZone).toBe('Europe/London'),
   );
   expect(await r.prefs.saved()).toMatchObject({ timeZone: 'Europe/London' });
+  // The repository has the zone before the screen refetches it: wait for the
+  // screen, never read it the instant the write lands.
+  const forget = await screen.findByRole('button', {
+    name: /Use browser default/,
+  });
   expect(screen.queryByText(/^Browser default \(/)).toBeNull();
-  fireEvent.click(
-    await screen.findByRole('button', { name: /Use browser default/ }),
-  );
+  fireEvent.click(forget);
   await waitFor(async () =>
     expect((await r.prefs.saved()).timeZone).toBeUndefined(),
   );

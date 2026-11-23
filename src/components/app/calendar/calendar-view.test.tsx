@@ -255,6 +255,28 @@ test('one day is in the tab order; arrows, Home and End move between days', asyn
   expect(tabbable()).toHaveLength(1);
 });
 
+test('modified keys pass through the grid: Alt+Left is the browser back, Ctrl/Cmd+Home is the page', async () => {
+  renderApp(<CalendarView />, {
+    sample: withTrades(NOV),
+    url: url('&day=2026-11-19'),
+  });
+  const thu = await dayButton(/^Thu 19 Nov/);
+  thu.focus();
+  for (const mod of ['altKey', 'ctrlKey', 'metaKey'] as const) {
+    for (const key of ['ArrowLeft', 'ArrowRight', 'Home', 'End']) {
+      // fireEvent returns false when something called preventDefault.
+      expect(
+        fireEvent.keyDown(thu, { key, [mod]: true }),
+        `${mod} ${key}`,
+      ).toBe(true);
+      expect(focused()).toMatch(/^Thu 19 Nov/);
+    }
+  }
+  // Unmodified, and Shift (which only selects text elsewhere), still move.
+  expect(fireEvent.keyDown(thu, { key: 'ArrowRight' })).toBe(false);
+  expect(focused()).toMatch(/^Fri 20 Nov/);
+});
+
 test('the legend explains the journal-entry glyph', async () => {
   renderApp(<CalendarView />, { sample: withTrades(NOV), url: url() });
   expect(await screen.findByText('Journal entry')).toBeTruthy();

@@ -363,6 +363,8 @@ export function MonthGrid({
     return undefined;
   };
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Alt+Left is the browser's back, Ctrl/Cmd+Home the page's: not the grid's.
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
     const from = (e.target as HTMLElement).getAttribute('data-date');
     if (from === null) return;
     const to = target(from, e.key);

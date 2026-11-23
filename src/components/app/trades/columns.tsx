@@ -74,7 +74,7 @@ export const ALIGN: Partial<Record<ColumnId, 'right' | 'center'>> = {
 /**
  * Each column's width in px, as comp 01's colgroup has them for the defaults.
  * The table is fixed-layout, so a cell never pushes a neighbour: its text
- * truncates inside its own width.
+ * truncates inside its own width. Qty holds "999,999" (shares, lots, coins).
  */
 export const COLUMN_WIDTHS: Record<ColumnId, number> = {
   open: 82,
@@ -82,7 +82,7 @@ export const COLUMN_WIDTHS: Record<ColumnId, number> = {
   instrument: 102,
   account: 110,
   side: 56,
-  qty: 40,
+  qty: 56,
   entry: 66,
   exit: 66,
   gross: 74,

@@ -559,7 +559,14 @@ export function TradesView(): React.JSX.Element {
           summary={summary}
           basis={ctx.pnlBasis}
           pnl={pnl}
-          fees={display.cash(summary.fees, false, stripCurrency)}
+          fees={display.figure(
+            {
+              money: summary.fees,
+              pct: pctBase ? summary.fees / pctBase : null,
+            },
+            false,
+            stripCurrency,
+          )}
           expectancy={
             expectancyFigure === null || summary.expectancy === null
               ? null
