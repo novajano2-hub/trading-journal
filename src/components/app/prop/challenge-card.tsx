@@ -486,7 +486,7 @@ export function ChallengeCard({
               size="sm"
               variant="secondary"
               disabled={saving}
-              onClick={() => onSave({ status: 'passed', phase: 'funded' })}
+              onClick={() => onSave({ status: 'active', phase: 'funded' })}
             >
               Mark step passed
             </Button>

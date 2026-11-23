@@ -288,7 +288,7 @@ export function addPropFirms(
         { step: 'funded', accountId: funded50, startDate: firstDay(funded50) },
       ],
       phase: 'funded',
-      status: 'passed',
+      status: 'active',
       evaluationFee: 16_500,
       activationFee: 13_000,
     },

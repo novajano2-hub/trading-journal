@@ -500,12 +500,12 @@ describe('sample workspace generator', () => {
       });
     };
 
-    test('three challenges: active, passed on its funded phase, and breached', () => {
+    test('three challenges: active, funded and active, and breached', () => {
       expect(
         s.challenges.map((c) => [c.name, c.steps, c.phase, c.status]),
       ).toEqual([
         ['Forex 100K', 2, 'evaluation', 'active'],
-        ['Futures 50K', 1, 'funded', 'passed'],
+        ['Futures 50K', 1, 'funded', 'active'],
         ['Futures 100K', 1, 'evaluation', 'breached'],
       ]);
       const [forex, f50, f100] = s.challenges;

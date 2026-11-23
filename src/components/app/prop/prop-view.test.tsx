@@ -146,7 +146,7 @@ test('a broken rule on an active challenge offers Mark as breached, and saves th
   ).toBeNull();
 });
 
-test('a target met on the last evaluation step offers Mark step passed, which moves the challenge to funded', async () => {
+test('a target met on the last evaluation step offers Mark step passed, which moves the challenge to funded and active', async () => {
   const r = repo({
     accounts: [
       prop('p-one', 'Futures 50K evaluation', {
@@ -193,9 +193,10 @@ test('a target met on the last evaluation step offers Mark step passed, which mo
   );
   await waitFor(async () => {
     const [saved] = await r.challenges.list(WS);
-    expect(saved).toMatchObject({ phase: 'funded', status: 'passed' });
+    expect(saved).toMatchObject({ phase: 'funded', status: 'active' });
   });
-  expect(await within(card).findByText('Passed')).toBeTruthy();
+  // The funded phase starts active, as TradeZella stores it.
+  expect(await within(card).findByText('Active')).toBeTruthy();
 });
 
 test('an archived account reads Account archived', async () => {
