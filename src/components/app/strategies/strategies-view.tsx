@@ -229,7 +229,7 @@ function StrategyCard({
           </DropdownMenu.Root>
         </div>
         {f.equity.length >= 3 ? (
-          <EquityLine f={f} />
+          <EquityLine f={f} readoutClassName="min-h-[34px]" />
         ) : (
           <p className="flex h-20 items-center text-[13px] text-faint">
             The line starts with the first closed trade.

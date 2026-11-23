@@ -26,9 +26,12 @@ const day = (date: string): string =>
 export function EquityLine({
   f,
   className = '',
+  readoutClassName = 'min-h-[18px]',
 }: {
   f: StrategyFigures;
   className?: string;
+  /** Reserves the readout's room, so reading a point never moves what is below. */
+  readoutClassName?: string;
 }): React.JSX.Element {
   const display = useDisplay();
   const [active, setActive] = useState<number | null>(null);
@@ -105,7 +108,7 @@ export function EquityLine({
       <div
         role="status"
         aria-label="Equity readout"
-        className="mt-1.5 min-h-[18px] text-[12.5px] text-faint tabular-nums"
+        className={`mt-1.5 text-[12.5px] leading-[17px] text-faint tabular-nums ${readoutClassName}`}
       >
         {active === null ? null : active === 0 ? (
           'Before the first trade'
