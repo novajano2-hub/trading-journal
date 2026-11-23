@@ -18,7 +18,6 @@ import {
   type SeriesMetric,
   type SeriesPoint,
 } from '@/domain/metrics/series';
-import type { PnlBasis } from '@/domain/types';
 import { useDisplay } from '@/lib/display';
 import { formatPct } from '@/lib/format';
 import { CARD, CARD_PAD, CardHeader, signTone } from '../dashboard/shared';

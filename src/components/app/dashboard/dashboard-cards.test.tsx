@@ -587,6 +587,10 @@ test('every metric carries its definition', async () => {
     'no-stop',
     'r-expectancy',
     'avg-trade',
+    // On the Overview's Days card (fix round 1).
+    'avg-green-day',
+    'avg-red-day',
+    'trades-per-day',
   ]);
   expect(new Set(ids)).toEqual(
     new Set(METRIC_IDS.filter((id) => !notOnDashboard.has(id))),
