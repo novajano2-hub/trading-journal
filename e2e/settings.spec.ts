@@ -64,7 +64,7 @@ test('add a withdrawal, archive an account, and read one of its trades read-only
     .locator('tbody tr')
     .first();
   await first.getByRole('link').first().click();
-  await expect(page).toHaveURL(/\/app\/trades\/(?!new)[^/?]+$/);
+  await expect(page).toHaveURL(/\/app\/trades\/(?!new)[^/?]+(\?.*)?$/);
   await expect(
     page.getByText('This account is archived. Its trades are read-only.'),
   ).toBeVisible();

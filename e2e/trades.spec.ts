@@ -63,7 +63,8 @@ test('filter to ES, sort by net, open the top trade, tag and note it, and see th
 
   const first = tradeLog(page).locator('tbody tr').first();
   await first.getByRole('link').first().click();
-  await expect(page).toHaveURL(/\/app\/trades\/[^/?]+$/);
+  // The log's filters travel with the trade.
+  await expect(page).toHaveURL(/\/app\/trades\/[^/?]+\?.*symbol=ES/);
   const tradeSerial = (
     await page.getByRole('heading', { level: 1 }).innerText()
   ).match(/(\d+)\s*$/)![1];
@@ -88,6 +89,7 @@ test('filter to ES, sort by net, open the top trade, tag and note it, and see th
   // Back to the log, and find the trade by its serial: its Tags cell has the tag.
   await page.getByRole('link', { name: 'Trades', exact: true }).last().click();
   await expect(tradeLog(page)).toBeVisible();
+  await expect(page).toHaveURL(/symbol=ES/);
   await page
     .getByRole('searchbox', { name: 'Search trades' })
     .fill(`#${tradeSerial}`);
@@ -155,7 +157,7 @@ async function addTrade(
     await page.getByLabel(`Fill ${n} price`).fill(f.price);
   }
   await page.getByRole('button', { name: 'Save trade' }).click();
-  await expect(page).toHaveURL(/\/app\/trades\/(?!new)[^/?]+$/);
+  await expect(page).toHaveURL(/\/app\/trades\/(?!new)[^/?]+(\?.*)?$/);
   await expect(page.getByRole('heading', { name: 'Add a trade' })).toHaveCount(
     0,
   );
