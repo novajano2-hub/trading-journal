@@ -68,6 +68,8 @@ export interface ImportPlan {
   fingerprints: string[];
   unresolvedKeys: string[];
   flags: TradeFlag[];
+  /** The P&L the file gave each closed-trade row, by trade id, matching Keel's or not. Empty when blocked. */
+  filePnl: Record<string, Cents>;
   blocked: ImportBlock | null;
   /** `ImportContext.importRevision` of the context it was planned from. */
   importRevision: number;
@@ -86,6 +88,7 @@ interface Built {
   merged: Trade[];
   expired: ExpiredOption[];
   pnlFlags: TradeFlag[];
+  filePnl: Record<string, Cents>;
 }
 
 /**
@@ -148,6 +151,7 @@ function buildFills(
     merged,
     expired,
     pnlFlags: [],
+    filePnl: {},
   };
 }
 
@@ -161,6 +165,7 @@ function buildTrips(
   const trades: Trade[] = [];
   const unresolvedSymbols: string[] = [];
   const pnlFlags: TradeFlag[] = [];
+  const filePnl: Record<string, Cents> = {};
   for (const trip of kept) {
     const built = buildTrades([trip.entry, trip.exit], opts);
     unresolvedSymbols.push(...built.unresolvedSymbols);
@@ -169,6 +174,7 @@ function buildTrips(
     trades.push(t);
     const file = trip.filePnl;
     if (file === undefined) continue;
+    filePnl[t.id] = file;
     if (t.pnlCurrency !== ctx.accountCurrency) {
       // A pair without the account currency: the file's figure is the conversion.
       t.gross = file;
@@ -194,6 +200,7 @@ function buildTrips(
     merged: [],
     expired: [],
     pnlFlags,
+    filePnl,
   };
 }
 
@@ -371,8 +378,9 @@ export function planImport(
 
   // A blocked plan is never committed, so it carries nothing to write.
   const writes = blocked
-    ? { trades: [], replacedTrades: [], flags: [] }
+    ? { trades: [], replacedTrades: [], flags: [], filePnl: {} }
     : {
+        filePnl: built.filePnl,
         trades,
         replacedTrades: built.merged,
         flags: tradeFlags(

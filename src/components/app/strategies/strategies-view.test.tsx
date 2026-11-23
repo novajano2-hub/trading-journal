@@ -177,3 +177,60 @@ test('the unassigned-trades note follows the display unit', async () => {
   expect(note.textContent).toMatch(/ticks/);
   expect(note.textContent).not.toMatch(/\$\d/);
 });
+
+/** str-1 with +$245.50 then -$129.50, and str-2 with +$1.00 then -$0.50. */
+async function twoScales(): Promise<SampleWorkspace> {
+  const fx = fixtureSample();
+  fx.trades[1]!.strategyIds = ['str-1'];
+  fx.strategies.push({
+    ...fx.strategies[0]!,
+    id: 'str-2',
+    name: 'Pullback',
+    groups: [{ id: 'g-p', title: 'Entry', rules: [] }],
+  });
+  const base = fx.trades[1]!;
+  fx.trades.push(
+    {
+      ...base,
+      id: 'sm-1',
+      serial: 90,
+      net: 100,
+      gross: 100,
+      fees: 0,
+      strategyIds: ['str-2'],
+      ruleChecks: [],
+      tagIds: [],
+    },
+    {
+      ...base,
+      id: 'sm-2',
+      serial: 91,
+      net: -50,
+      gross: -50,
+      fees: 0,
+      strategyIds: ['str-2'],
+      ruleChecks: [],
+      tagIds: [],
+      closedAt: '2026-11-18T15:30:00.000Z',
+      openedAt: '2026-11-18T15:00:00.000Z',
+    },
+  );
+  return fx;
+}
+
+test('every card draws its line on one scale, so a small strategy reads small beside a big one', async () => {
+  renderApp(<StrategiesView />, { sample: twoScales, url: '/app/strategies' });
+  const extent = async (name: string) => {
+    const card = (await screen.findByText(name)).closest('article')!;
+    const d = card
+      .querySelector('svg path[stroke="var(--accent)"]')!
+      .getAttribute('d')!;
+    const ys = [...d.matchAll(/[ML][\d.]+ ([\d.]+)/g)].map((m) => Number(m[1]));
+    return Math.max(...ys) - Math.min(...ys);
+  };
+  const big = await extent('Opening range breakout');
+  const small = await extent('Pullback');
+  // On their own scales both would span the whole box (67 units).
+  expect(big).toBeGreaterThan(40);
+  expect(small).toBeLessThan(big / 3);
+});

@@ -418,6 +418,13 @@ describe('planImport', () => {
       gross: 12500,
       net: 12500,
     });
+    // Every trade the file gave a P&L for keeps that figure, matching or not.
+    expect(p.filePnl).toEqual({
+      [p.trades[0]!.id]: 20000,
+      [p.trades[1]!.id]: 19500,
+      [p.trades[2]!.id]: 20002,
+      [p.trades[3]!.id]: 12500,
+    });
   });
 
   test('an option left open by an earlier import settles on the next import (E2)', () => {

@@ -142,6 +142,14 @@ const CHART_METRICS: readonly SeriesMetric[] = [
   'trades',
   'fees',
 ];
+/** Breakdowns whose buckets have no order to read along: every bar keeps its label, tilted if need be. */
+const UNORDERED: ReadonlySet<BreakdownKey> = new Set([
+  'symbol',
+  'strategy',
+  'tag',
+  'side',
+]);
+
 const DEFAULT_PICKS: readonly Pick[] = [
   { metric: 'net', kind: 'bar' },
   { metric: 'win-rate', kind: 'line' },
@@ -231,6 +239,7 @@ export function BreakdownCards({
   rowTitle,
   plural: plural_,
   title,
+  chartTitle,
   caption,
   visible = 'all',
   chartVisible = 'ends',
@@ -253,8 +262,10 @@ export function BreakdownCards({
   rowTitle: string;
   /** The rows in the plural: "Symbols". The matrix is "Symbols by side". */
   plural: string;
-  /** The table card's title. */
+  /** The table card's title; the chart card's too, unless `chartTitle` is given. */
   title: string;
+  /** The chart card's own title, when it should not repeat the table's. */
+  chartTitle?: string;
   /** Beside the chart card's title. */
   caption?: ReactNode;
   visible?: Visible;
@@ -334,9 +345,11 @@ export function BreakdownCards({
 
   const names = new Map(chartRows.map((r) => [r.key, describe(r)]));
   const short = new Map(chartRows.map((r) => [r.key, r.label]));
+  // Named buckets are not a sequence: a line across them would join unrelated bars, so rates are markers sized by their trades.
   const series: ChartSeries[] = picks.map((x) => ({
     label: metricLabel(x.metric, basis),
-    kind: x.kind,
+    kind: x.kind === 'bar' ? 'bar' : 'dots',
+    counts: chartRows.map((r) => r.summary.closedCount),
     unit: SERIES_META[x.metric].unit,
     points: chartRows.map((r) => ({
       key: r.key,
@@ -559,7 +572,7 @@ export function BreakdownCards({
             icon={ChartBar}
             tone="accent"
             headingId={chartId}
-            title={title}
+            title={chartTitle ?? title}
             after={
               caption ? (
                 <span className="text-[12.5px] text-faint">{caption}</span>
@@ -582,7 +595,9 @@ export function BreakdownCards({
               label={chartName}
               series={series}
               currency={currency}
-              height={chartRows.length > 0 ? 190 : undefined}
+              height={chartRows.length > 0 ? 230 : undefined}
+              rowRatio={0.4}
+              tiltLabels={UNORDERED.has(by)}
               xLabel={(key) => short.get(key) ?? key}
               periodLabel={(key) => names.get(key) ?? key}
               extra={extra}

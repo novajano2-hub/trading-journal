@@ -216,3 +216,32 @@ test('if archiving fails the header says so, neutrally', async () => {
   expect(alert.textContent).toContain("couldn't be archived");
   expect(screen.getByRole('button', { name: 'Archive' })).toBeTruthy();
 });
+
+/** The losers-only Risk rule broken on the losing trade; the always-on Entry rule kept on both. */
+async function brokenOnLoser(): Promise<SampleWorkspace> {
+  const fx = await sample();
+  fx.trades[1]!.ruleChecks = [
+    { ruleId: 'r-1', followed: true },
+    { ruleId: 'r-2', followed: false },
+  ];
+  return fx;
+}
+
+test('a losers-only rule says so in its kept win rate and profit factor, and is never the costliest', async () => {
+  renderApp(<StrategyView id="str-1" />, {
+    sample: brokenOnLoser,
+    url: '/app/strategies/str-1',
+  });
+  const table = await screen.findByRole('table', { name: 'Rules' });
+  const loserRow = within(table)
+    .getByText('Stop beyond the far side of the range')
+    .closest('tr')!;
+  // Its kept trades can only be losers: a win rate and a profit factor of them mean nothing.
+  expect(within(loserRow).getAllByText('Losers only')).toHaveLength(2);
+  expect(loserRow.textContent).not.toContain('Costliest');
+  expect(table.textContent).not.toContain('Costliest');
+  const alwaysRow = within(table)
+    .getByText('Wait for the 15-minute range to close')
+    .closest('tr')!;
+  expect(within(alwaysRow).queryByText('Losers only')).toBeNull();
+});

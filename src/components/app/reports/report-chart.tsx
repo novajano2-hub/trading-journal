@@ -20,11 +20,14 @@ import { formatPct } from '@/lib/format';
 
 export interface ChartSeries {
   label: string;
-  kind: 'bar' | 'line';
+  /** `dots` is a marker per category, never joined: for series over named buckets (a symbol, a weekday). */
+  kind: 'bar' | 'line' | 'dots';
   /** Every series of one chart has the same keys, in the same order. */
   points: readonly SeriesPoint[];
   /** `money` values are cents: they read in the chosen display unit. */
   unit: SeriesUnit;
+  /** For `dots`: how much stands behind each point (its trades). More is larger and stronger. */
+  counts?: readonly number[];
 }
 
 /** Each series' own colour when a chart holds several. */
@@ -34,6 +37,9 @@ const PAD_R = 12;
 const PAD_Y = 8;
 const BAND_GAP = 18;
 const X_AXIS = 24;
+/** Tilted axis labels: a label's height over sin 45 is the least spacing, and how far they hang. */
+const TILT_STEP = 13;
+const TILT_MAX_CHARS = 14;
 const MIN_LABEL_GAP = 52;
 const DEFAULT_WIDTH = 720;
 
@@ -83,7 +89,8 @@ function xTicks(
   keys: readonly string[],
   plotW: number,
   xLabel?: (key: string) => string,
-): { i: number; text: string }[] {
+  tiltLabels = false,
+): { ticks: { i: number; text: string }[]; tilt: boolean; hang: number } {
   const step = plotW / Math.max(1, keys.length);
   let candidates: { i: number; text: string }[];
   if (xLabel) {
@@ -111,22 +118,44 @@ function xTicks(
       });
     });
   }
-  const out: typeof candidates = [];
-  let lastX = -Infinity;
-  const gap = xLabel
+  const flat = xLabel
     ? Math.max(
         MIN_LABEL_GAP,
         ...candidates.map((c) => c.text.length * 6.4 + 10),
       )
     : MIN_LABEL_GAP;
+  // Named bars that would collide flat are tilted so every one keeps its label.
+  const tilt =
+    tiltLabels &&
+    xLabel !== undefined &&
+    step < flat &&
+    step >= TILT_STEP &&
+    keys.length <= 30;
+  if (tilt) {
+    const shown = candidates.map((c) => ({
+      ...c,
+      text:
+        c.text.length > TILT_MAX_CHARS
+          ? `${c.text.slice(0, TILT_MAX_CHARS - 1)}…`
+          : c.text,
+    }));
+    const longest = Math.max(...shown.map((c) => c.text.length));
+    return {
+      ticks: shown,
+      tilt,
+      hang: Math.ceil(longest * 6.6 * Math.SQRT1_2) + 24,
+    };
+  }
+  const out: typeof candidates = [];
+  let lastX = -Infinity;
   for (const c of candidates) {
     const x = (c.i + 0.5) * step;
-    if (x - lastX >= gap) {
+    if (x - lastX >= flat) {
       out.push(c);
       lastX = x;
     }
   }
-  return out;
+  return { ticks: out, tilt, hang: X_AXIS };
 }
 
 /** Compact dollars for an axis: +$5k, −$1.5k, $0. */
@@ -212,7 +241,11 @@ function spanOf(
 
 interface Layout {
   width: number;
-  bandH: number;
+  /** Each band's height: the first is the chart's, later ones follow `rowRatio`. */
+  bandHs: number[];
+  /** The x axis' height under the last band, more when its labels are tilted. */
+  axisH: number;
+  tilt: boolean;
   padL: number;
   plotW: number;
   step: number;
@@ -224,6 +257,7 @@ interface Layout {
 const xOf = (l: Layout, i: number) => l.padL + l.step * (i + 0.5);
 
 interface Band {
+  height: number;
   scale: { lo: number; hi: number; ticks: number[] };
   y(v: number): number;
 }
@@ -254,6 +288,7 @@ function bandOf(s: ChartSeries, top: number, bandH: number): Band {
   const t = top + PAD_Y;
   const b = top + bandH - PAD_Y;
   return {
+    height: bandH,
     scale,
     y: (v) => b - ((v - scale.lo) / (scale.hi - scale.lo)) * (b - t),
   };
@@ -295,17 +330,19 @@ const Plot = memo(function Plot({
   labelExtremes: boolean;
 }) {
   const keys = series[0]!.points.map((p) => p.key);
-  const { padL, plotW, step, bandH } = layout;
+  const { padL, plotW, step } = layout;
+  const bandH = layout.bandHs[0]!;
   // Gain and loss colours when net is the only money series of the chart.
   const moneyCount = series.filter((s) => s.unit === 'money').length;
   const barW = Math.max(1, Math.min(step * 0.72, 30));
-  const ticks = xTicks(keys, plotW, xLabel);
+  const { ticks } = xTicks(keys, plotW, xLabel, layout.tilt);
   const shaded = shade ? spanOf(keys, shade) : undefined;
   // A label that would run off the plot's right edge hangs from the band's end instead.
   const nearRight =
     shaded !== undefined &&
     xOf(layout, shaded.from) - layout.step / 2 + 170 > padL + plotW;
-  const lastBottom = layout.tops[series.length - 1]! + bandH;
+  const lastBottom =
+    layout.tops[series.length - 1]! + layout.bandHs[series.length - 1]!;
   return (
     <>
       {shade && shaded ? (
@@ -339,10 +376,16 @@ const Plot = memo(function Plot({
         const colour = COLOURS[si % COLOURS.length]!;
         const top = layout.tops[si]!;
         const zero = band.y(0);
+        const counts = s.counts ?? [];
+        const biggest = Math.max(1, ...counts);
         const signed = s.unit === 'money' && moneyCount === 1;
         const zeroInside = band.scale.lo <= 0 && band.scale.hi >= 0;
         return (
-          <g key={s.label} data-series={s.label}>
+          <g
+            key={s.label}
+            data-series={s.label}
+            data-band-height={layout.bandHs[si]}
+          >
             {(overlay && si > 0 ? [] : band.scale.ticks).map((t) => (
               <g key={t}>
                 <line
@@ -387,6 +430,22 @@ const Plot = memo(function Plot({
                           : 'var(--gain-fill)'
                         : colour
                     }
+                  />
+                );
+              })
+            ) : s.kind === 'dots' ? (
+              s.points.map((p, i) => {
+                if (p.value === null) return null;
+                const w = Math.sqrt((counts[i] ?? biggest) / biggest);
+                return (
+                  <circle
+                    key={p.key}
+                    data-mark="dot"
+                    cx={xOf(layout, i)}
+                    cy={band.y(p.value)}
+                    r={2.5 + 3 * w}
+                    fill={colour}
+                    fillOpacity={0.28 + 0.72 * w}
                   />
                 );
               })
@@ -439,10 +498,16 @@ const Plot = memo(function Plot({
       {ticks.map((t) => (
         <text
           key={t.i}
+          data-axis-label=""
           x={xOf(layout, t.i)}
           y={lastBottom + 16}
-          textAnchor="middle"
-          fontSize={11}
+          textAnchor={layout.tilt ? 'end' : 'middle'}
+          transform={
+            layout.tilt
+              ? `rotate(-45 ${xOf(layout, t.i)} ${lastBottom + 16})`
+              : undefined
+          }
+          fontSize={layout.tilt ? 10.5 : 11}
           fill="var(--faint)"
         >
           {t.text}
@@ -488,7 +553,7 @@ function Line({
       .join(' ');
   const floor = Math.min(
     band.y(Math.max(band.scale.lo, 0)),
-    top + layout.bandH - PAD_Y,
+    top + band.height - PAD_Y,
   );
   return (
     <g data-mark="line" fill="none">
@@ -530,6 +595,31 @@ function Line({
             ))
         : null}
     </g>
+  );
+}
+
+/** A legend key: net bars wear the gain and loss pair, markers a dot, anything else its colour. */
+function Swatch({
+  kind,
+  colour,
+}: {
+  kind: 'signed' | 'dot' | 'box';
+  colour: string;
+}): React.JSX.Element {
+  if (kind === 'signed')
+    return (
+      <span aria-hidden="true" className="inline-flex gap-0.5">
+        <i data-swatch="gain" className="size-2.5 rounded-[3px] bg-gain-fill" />
+        <i data-swatch="loss" className="size-2.5 rounded-[3px] bg-loss-fill" />
+      </span>
+    );
+  return (
+    <span
+      aria-hidden="true"
+      data-swatch={kind === 'dot' ? 'dot' : undefined}
+      className={`size-2.5 ${kind === 'dot' ? 'rounded-full' : 'rounded-[3px]'}`}
+      style={{ background: colour }}
+    />
   );
 }
 
@@ -592,6 +682,8 @@ export function ReportChart({
   shade,
   labelExtremes = false,
   extra,
+  rowRatio = 1,
+  tiltLabels = false,
 }: {
   series: readonly ChartSeries[];
   label: string;
@@ -614,6 +706,10 @@ export function ReportChart({
   labelExtremes?: boolean;
   /** More rows for the readout, such as the trades in the period; not drawn. */
   extra?: readonly { label: string; text(key: string): string }[];
+  /** Bands after the first are this share of its height (the win-rate panel under the P&L bars). */
+  rowRatio?: number;
+  /** Named bars with no order (symbols, strategies) tilt their labels rather than skip some, so every bar is named. */
+  tiltLabels?: boolean;
 }): React.JSX.Element {
   // Named periods read as they are named; dated ones as a date.
   const periodLabel = periodLabelProp ?? xLabel ?? periodText;
@@ -664,21 +760,54 @@ export function ReportChart({
     );
     const padL = Math.max(36, Math.ceil(widest * 6.4) + 16);
     const plotW = Math.max(40, width - padL - PAD_R);
-    const tops = series.map((_, i) => (overlay ? 0 : i * (bandH + BAND_GAP)));
+    const bandHs = series.map((_, i) =>
+      i === 0 || overlay ? bandH : Math.round(bandH * rowRatio),
+    );
+    const tops = series.map((_, i) =>
+      overlay
+        ? 0
+        : bandHs.slice(0, i).reduce((sum, h) => sum + h + BAND_GAP, 0),
+    );
+    const axis = xTicks(
+      series[0]!.points.map((p) => p.key),
+      plotW,
+      xLabel,
+      tiltLabels,
+    );
+    const axisH = axis.hang;
     return {
       width,
-      bandH,
+      bandHs,
+      axisH,
+      tilt: axis.tilt,
       padL,
       plotW,
       step: plotW / n,
       tops,
-      height: stacked * bandH + (stacked - 1) * BAND_GAP + X_AXIS,
+      height:
+        (overlay
+          ? bandH
+          : bandHs.reduce((sum, h) => sum + h, 0) + (stacked - 1) * BAND_GAP) +
+        axisH,
     };
-  }, [series, width, bandH, n, fmt, overlay, stacked]);
+  }, [
+    series,
+    width,
+    bandH,
+    n,
+    fmt,
+    overlay,
+    stacked,
+    rowRatio,
+    xLabel,
+    tiltLabels,
+  ]);
   const bands = useMemo(() => {
     if (!layout) return [];
     if (!overlay)
-      return series.map((s, i) => bandOf(s, layout.tops[i]!, bandH));
+      return series.map((s, i) =>
+        bandOf(s, layout.tops[i]!, layout.bandHs[i]!),
+      );
     // One scale for all, so the lines can be read against each other.
     const shared = bandOf(together(series), 0, bandH);
     return series.map(() => shared);
@@ -735,10 +864,15 @@ export function ReportChart({
         <ul className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-muted">
           {series.map((s, i) => (
             <li key={s.label} className="inline-flex items-center gap-1.5">
-              <span
-                aria-hidden="true"
-                className="size-2.5 rounded-[3px]"
-                style={{ background: COLOURS[i % COLOURS.length] }}
+              <Swatch
+                kind={
+                  s.kind === 'bar' && s.unit === 'money' && moneyOnly
+                    ? 'signed'
+                    : s.kind === 'dots'
+                      ? 'dot'
+                      : 'box'
+                }
+                colour={COLOURS[i % COLOURS.length]!}
               />
               {s.label}
             </li>
@@ -788,7 +922,7 @@ export function ReportChart({
                   x1={x}
                   x2={x}
                   y1={layout.tops[0]! + PAD_Y / 2}
-                  y2={layout.height - X_AXIS + 6}
+                  y2={layout.height - layout.axisH + 6}
                   stroke="var(--faint)"
                   strokeWidth={1}
                   strokeDasharray="2 3"

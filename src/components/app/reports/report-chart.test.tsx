@@ -193,3 +193,114 @@ test('overlaid series share one axis, and a shade marks a stretch of it', async 
   expect(band).not.toBeNull();
   expect(band!.textContent).toBe('Max drawdown');
 });
+
+const SYMBOLS = Array.from({ length: 20 }, (_, i) => `SYM${i}`);
+const BY_SYMBOL = [
+  {
+    label: 'Net P&L',
+    kind: 'bar' as const,
+    unit: 'money' as const,
+    points: SYMBOLS.map((key, i) => ({ key, value: (i % 2 ? -1 : 1) * 1000 })),
+  },
+  {
+    label: 'Win rate',
+    kind: 'dots' as const,
+    unit: 'pct' as const,
+    points: SYMBOLS.map((key, i) => ({ key, value: 0.4 + (i % 5) / 20 })),
+    counts: SYMBOLS.map((_, i) => (i === 0 ? 200 : 10)),
+  },
+];
+
+test('the legend pairs gain and loss for net bars, and a dot for the win-rate markers', async () => {
+  const { container } = renderApp(
+    <ReportChart
+      label="By symbol"
+      xLabel={(k) => k}
+      tiltLabels
+      series={BY_SYMBOL}
+    />,
+  );
+  await screen.findByRole('img', { name: 'By symbol' });
+  const [net, win] = [...container.querySelectorAll('ul > li')];
+  expect(
+    [...net!.querySelectorAll('[data-swatch]')].map((s) =>
+      s.getAttribute('data-swatch'),
+    ),
+  ).toEqual(['gain', 'loss']);
+  expect(win!.querySelectorAll('[data-swatch="dot"]')).toHaveLength(1);
+});
+
+test('a dots series draws a marker per value and no line, sized and faded by its counts', async () => {
+  const { container } = renderApp(
+    <ReportChart
+      label="By symbol"
+      xLabel={(k) => k}
+      tiltLabels
+      series={BY_SYMBOL}
+    />,
+  );
+  await screen.findByRole('img', { name: 'By symbol' });
+  expect(container.querySelectorAll('[data-mark="line"]')).toHaveLength(0);
+  const dots = [...container.querySelectorAll('[data-mark="dot"]')];
+  expect(dots).toHaveLength(20);
+  const [big, small] = [dots[0]!, dots[1]!];
+  expect(Number(big.getAttribute('r'))).toBeGreaterThan(
+    Number(small.getAttribute('r')),
+  );
+  expect(Number(big.getAttribute('fill-opacity'))).toBeGreaterThan(
+    Number(small.getAttribute('fill-opacity')),
+  );
+});
+
+test('with rowRatio the later bands are that share of the first band', async () => {
+  const { container } = renderApp(
+    <ReportChart
+      label="By symbol"
+      xLabel={(k) => k}
+      height={200}
+      rowRatio={0.4}
+      series={BY_SYMBOL}
+    />,
+  );
+  await screen.findByRole('img', { name: 'By symbol' });
+  const heights = [...container.querySelectorAll('[data-series]')].map((g) =>
+    Number(g.getAttribute('data-band-height')),
+  );
+  expect(heights).toEqual([200, 80]);
+});
+
+test('every named bar is labelled: the labels tilt when they would collide flat', async () => {
+  const { container } = renderApp(
+    <ReportChart
+      label="By symbol"
+      xLabel={(k) => k}
+      tiltLabels
+      series={BY_SYMBOL}
+    />,
+  );
+  await screen.findByRole('img', { name: 'By symbol' });
+  const labels = [...container.querySelectorAll('[data-axis-label]')];
+  expect(labels.map((l) => l.textContent)).toEqual(SYMBOLS);
+  expect(labels[0]!.getAttribute('transform')).toContain('rotate(-45');
+});
+
+test('few bars keep flat labels', async () => {
+  const { container } = renderApp(
+    <ReportChart
+      label="By weekday"
+      xLabel={(k) => k.toUpperCase()}
+      series={[
+        {
+          label: 'Net P&L',
+          kind: 'bar',
+          unit: 'money',
+          points: ['mon', 'tue', 'wed'].map((key) => ({ key, value: 5 })),
+        },
+      ]}
+    />,
+  );
+  await screen.findByRole('img', { name: 'By weekday' });
+  const labels = [...container.querySelectorAll('[data-axis-label]')];
+  expect(labels).toHaveLength(3);
+  expect(labels[0]!.getAttribute('transform')).toBeNull();
+});

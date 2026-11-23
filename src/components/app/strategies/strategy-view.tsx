@@ -64,16 +64,19 @@ function Head({
   );
 }
 
+const LOSERS_ONLY = <span className="text-faint">Losers only</span>;
+
 /** One rule's cells, as the table and the stacked card both show them. */
 function ruleCells(
   st: RuleStat,
+  rule: Rule,
   display: ReturnType<typeof useDisplay>,
 ): {
   rate: React.ReactNode;
   followed: React.ReactNode;
   broken: React.ReactNode;
-  winRate: string;
-  pf: string;
+  winRate: React.ReactNode;
+  pf: React.ReactNode;
   followedNet: number;
   brokenNet: number;
 } {
@@ -84,6 +87,7 @@ function ruleCells(
     display.ofTrades(st.brokenTradeIds, st.brokenNet),
   );
   const r = st.kept + st.broken === 0 ? null : st.kept / (st.kept + st.broken);
+  const losersOnly = rule.showWhen === 'loser';
   return {
     rate:
       r === null ? (
@@ -119,8 +123,9 @@ function ruleCells(
       ) : (
         <FigureText f={broken} />
       ),
-    winRate: pctText(st.followedWinRate, 1),
-    pf: pfText(st.followedProfitFactor),
+    // A losers-only rule is kept only on losing trades: a win rate or profit factor of them says nothing.
+    winRate: losersOnly ? LOSERS_ONLY : pctText(st.followedWinRate, 1),
+    pf: losersOnly ? LOSERS_ONLY : pfText(st.followedProfitFactor),
     followedNet: st.followedNet,
     brokenNet: st.brokenNet,
   };
@@ -186,8 +191,17 @@ function RuleTable({
   const display = useDisplay();
   const byId = new Map(f.rules.map((r) => [r.ruleId, r]));
   // The costliest rule is the one whose broken trades lost the most, when it lost anything.
+  // A losers-only rule is graded on losers alone, so its broken trades always lost: it never takes the flag.
+  const losersOnly = new Set(
+    f.strategy.groups.flatMap((g) =>
+      g.rules.filter((r) => r.showWhen === 'loser').map((r) => r.id),
+    ),
+  );
   const costliest = f.rules.reduce<RuleStat | undefined>(
-    (worst, r) => (r.brokenNet < (worst?.brokenNet ?? 0) ? r : worst),
+    (worst, r) =>
+      !losersOnly.has(r.ruleId) && r.brokenNet < (worst?.brokenNet ?? 0)
+        ? r
+        : worst,
     undefined,
   );
   const costly = (rule: Rule) =>
@@ -222,7 +236,7 @@ function RuleTable({
             </p>
             <ul>
               {g.rules.map((rule) => {
-                const c = ruleCells(byId.get(rule.id)!, display);
+                const c = ruleCells(byId.get(rule.id)!, rule, display);
                 return (
                   <li
                     key={rule.id}
@@ -324,7 +338,7 @@ function RuleTable({
                 </th>
               </tr>
               {g.rules.map((rule) => {
-                const c = ruleCells(byId.get(rule.id)!, display);
+                const c = ruleCells(byId.get(rule.id)!, rule, display);
                 return (
                   <tr key={rule.id} className="border-b border-line/70">
                     <td className={`${TD} min-w-[190px] font-medium text-text`}>

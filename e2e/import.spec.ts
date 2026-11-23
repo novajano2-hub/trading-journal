@@ -34,17 +34,20 @@ test('import a fills file in My workspace, see it in the log and the calendar, t
   await expect(page.getByText('fills.csv').first()).toBeVisible();
   await page.getByRole('button', { name: 'Map columns' }).click();
 
-  // Map: an account made on the spot, and the columns the file already matches.
+  // Map: with no account yet the New account dialog opens over the columns; making one closes it.
+  const dialog = page.getByRole('dialog', { name: 'New account' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel('Account name').fill('Journey account');
+  await dialog.getByLabel('Broker').fill('Journey broker');
+  await dialog.getByLabel('Starting balance').fill('50000');
+  await dialog.getByRole('button', { name: 'Create account' }).click();
+  await expect(dialog).toBeHidden();
   await expect(
     page.getByRole('heading', { name: 'Match your columns' }),
   ).toBeVisible();
   await expect(
     page.getByText('Required fields are all matched.'),
   ).toBeVisible();
-  await page.getByLabel('Account name').fill('Journey account');
-  await page.getByLabel('Broker').fill('Journey broker');
-  await page.getByLabel('Starting balance').fill('50000');
-  await page.getByRole('button', { name: 'Create account' }).click();
   await page.getByRole('button', { name: /^Preview 12 rows/ }).click();
 
   // Preview: six trades Keel built from twelve fills, nothing skipped.

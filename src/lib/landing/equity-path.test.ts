@@ -25,6 +25,15 @@ describe('equityPath', () => {
     expect(line).toBe('M0 80 L680 80');
   });
 
+  test('a shared range keeps a small series small beside a big one', () => {
+    const box = { xMax: 680, top: 15, bottom: 145, floor: 160 };
+    // Alone, 0 to 100 fills the box; against a 0 to 1000 range it uses a tenth of it.
+    expect(equityPath([0, 100], box).line).toBe('M0 145 L680 15');
+    expect(
+      equityPath([0, 100], { ...box, range: { min: 0, max: 1000 } }).line,
+    ).toBe('M0 145 L680 132');
+  });
+
   test('an empty series yields empty paths', () => {
     const box = { xMax: 680, top: 15, bottom: 145, floor: 160 };
     expect(equityPath([], box)).toEqual({

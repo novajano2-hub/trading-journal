@@ -104,7 +104,9 @@ test('the tiles match the plan, and a P&L mismatch row says what the file says',
   expect(within(tile('Trades built')).getByText('3')).toBeTruthy();
   expect(within(tile('Duplicates skipped')).getByText('0')).toBeTruthy();
   expect(within(tile('Rows with issues')).getByText('1')).toBeTruthy();
-  expect(screen.getByText('File says +$10.00')).toBeTruthy();
+  // The file's figure sits in its own column; the chip says how far it is from Keel's net.
+  expect(screen.getByText('+$10.00')).toBeTruthy();
+  expect(screen.getByText('Off by $185.00')).toBeTruthy();
   // The issue is listed with its row, counted as in the file (the header is row 1).
   expect(screen.getByText('Row 5')).toBeTruthy();
   expect(window.location.search).toContain('step=preview');
@@ -321,4 +323,62 @@ test('a file whose rows are all imported already says so and offers another file
     screen.getByRole('button', { name: 'Choose another file' }),
   ).toBeTruthy();
   expect(await repo.trades.list('mine')).toHaveLength(1);
+});
+
+test('the trades table has the comp columns, and a file P&L within a cent shows a check, not a chip', async () => {
+  await toPreview(
+    csv([TRIPS, row('195.00', '09'), row('195.01', '10'), row('10.00', '11')]),
+  );
+  await screen.findByRole('region', { name: 'What Keel read' });
+  const table = screen.getByRole('table');
+  expect(
+    within(table)
+      .getAllByRole('columnheader')
+      .map((h) => h.textContent),
+  ).toEqual([
+    'Row',
+    'Closed',
+    'Instrument',
+    'Side',
+    'Qty',
+    'Entry',
+    'Exit',
+    'Fees',
+    'Keel net',
+    'File P&L',
+    'Check',
+  ]);
+  const rows = within(table).getAllByRole('row').slice(1);
+  // Row is the file's own row number (the header is row 1).
+  expect(within(rows[0]!).getAllByRole('cell')[0]!.textContent).toBe('2');
+  expect(within(rows[0]!).getByText('$5.00')).toBeTruthy();
+  expect(within(rows[0]!).getByText('Matches the file')).toBeTruthy();
+  // One cent off is still a match; $185 is not.
+  expect(within(rows[1]!).getByText('Matches the file')).toBeTruthy();
+  expect(within(rows[2]!).getByText('Off by $185.00')).toBeTruthy();
+  expect(within(table).queryAllByText('Off by $0.01')).toHaveLength(0);
+});
+
+test('without a P&L column the file P&L cells say Not in file, never a dash', async () => {
+  await toPreview(
+    csv([
+      FILLS,
+      '2026-11-16 09:30:00,ESZ6,Buy,1,6000',
+      '2026-11-16 09:45:00,ESZ6,Sell,1,6004',
+    ]),
+  );
+  await screen.findByRole('region', { name: 'What Keel read' });
+  const table = screen.getByRole('table');
+  expect(within(table).getByText('Not in file')).toBeTruthy();
+  expect(within(table).queryByText('-')).toBeNull();
+});
+
+test('under Privacy the Off by chip and the fees are masked, and the summary net takes its sign colour', async () => {
+  await toPreview(csv([TRIPS, row('10.00')]), { displayUnit: 'privacy' });
+  await screen.findByRole('region', { name: 'What Keel read' });
+  const table = screen.getByRole('table');
+  expect(table.textContent).toMatch(/Off by\s\$•••/);
+  expect(table.textContent).not.toMatch(/\$\d/);
+  const net = screen.getByText(/^Net P&L of the/).nextElementSibling!;
+  expect(net.className).toContain('text-gain');
 });

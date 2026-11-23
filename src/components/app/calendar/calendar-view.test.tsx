@@ -472,3 +472,103 @@ test('a failed cashFlows read shows the failure, not a loader or a false empty s
   );
   expect(container.textContent).not.toContain('Loading');
 });
+
+test('with no ?day the latest trading day of the shown month is picked, and written without a new history entry', async () => {
+  const entries = window.history.length;
+  renderApp(<CalendarView />, { sample: withTrades(NOV), url: url() });
+  expect(
+    await screen.findByRole('complementary', { name: /Thu 19 Nov/ }),
+  ).toBeTruthy();
+  await waitFor(() =>
+    expect(window.location.search).toContain('day=2026-11-19'),
+  );
+  expect(window.location.search).toContain('month=2026-11');
+  expect(window.history.length).toBe(entries);
+  // Clicking the picked day keeps it: the panel is never left empty on a month with trades.
+  fireEvent.click(await dayButton(/^Thu 19 Nov/));
+  expect(window.location.search).toContain('day=2026-11-19');
+  expect(
+    screen.getByRole('complementary', { name: /Thu 19 Nov/ }),
+  ).toBeTruthy();
+  // Another month picks its own latest day.
+  fireEvent.click(screen.getByRole('button', { name: 'Previous month' }));
+  expect(window.location.search).not.toContain('day=2026-11-19');
+});
+
+test('an explicit ?day wins over the default, and a sheet layout is not opened by it', async () => {
+  const explicit = renderApp(<CalendarView />, {
+    sample: withTrades(NOV),
+    url: url('&day=2026-11-03'),
+  });
+  expect(
+    await screen.findByRole('complementary', { name: /Tue 3 Nov/ }),
+  ).toBeTruthy();
+  explicit.unmount();
+  cleanup();
+  viewport(1100);
+  renderApp(<CalendarView />, { sample: withTrades(NOV), url: url() });
+  await screen.findByRole('grid', { name: 'November 2026' });
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(window.location.search).not.toContain('day=');
+});
+
+test('a month with no trades fills the panel with the month: net, trading days, best and worst', async () => {
+  renderApp(<CalendarView />, {
+    sample: withTrades(NOV),
+    url: '/app/calendar?month=2026-09',
+  });
+  const panel = await screen.findByRole('complementary', {
+    name: 'September 2026',
+  });
+  expect(window.location.search).not.toContain('day=');
+  expect(
+    within(panel).getByText(/No trades exited in September 2026/),
+  ).toBeTruthy();
+  for (const label of ['Net P&L', 'Trading days', 'Best day', 'Worst day'])
+    expect(within(panel).getByText(label)).toBeTruthy();
+  // The nearest month that has trades is one step away.
+  fireEvent.click(
+    within(panel).getByRole('button', { name: 'Go to November 2026' }),
+  );
+  expect(window.location.search).not.toContain('month=2026-09');
+  expect(screen.getByRole('grid', { name: 'November 2026' })).toBeTruthy();
+});
+
+test('each day cell carries a compact signed figure for the phone, and Privacy hides it as +$•••', async () => {
+  const wide = renderApp(<CalendarView />, {
+    sample: withTrades([
+      ['2026-11-02', 112_000],
+      ['2026-11-03', -38_800],
+    ]),
+    url: url(),
+  });
+  const up = await screen.findByRole('button', { name: /^Mon 2 Nov/ });
+  expect(within(up).getByTestId('day-compact').textContent).toBe('+1.1k');
+  expect(
+    within(screen.getByRole('button', { name: /^Tue 3 Nov/ })).getByTestId(
+      'day-compact',
+    ).textContent,
+  ).toBe('−388');
+  wide.unmount();
+  cleanup();
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: withTrades([['2026-11-02', 112_000]]),
+  });
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<CalendarView />, { repository, url: url() });
+  const hidden = await screen.findByRole('button', { name: /^Mon 2 Nov/ });
+  expect(within(hidden).getByTestId('day-compact').textContent).toBe('+$•••');
+});
+
+test('the week cell keeps its days and trades on two lines, never wrapped mid-phrase', async () => {
+  renderApp(<CalendarView />, { sample: withTrades(NOV), url: url() });
+  await screen.findByRole('grid', { name: 'November 2026' });
+  const total = screen.getAllByTestId('week-total')[1]!;
+  const lines = within(total).getByText('2 days');
+  expect(lines.className).toContain('whitespace-nowrap');
+  expect(within(total).getByText('2 trades').className).toContain(
+    'whitespace-nowrap',
+  );
+});

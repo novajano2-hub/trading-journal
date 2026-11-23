@@ -71,7 +71,11 @@ async function upload(file: File) {
   const input = await screen.findByLabelText('Import file');
   fireEvent.change(input, { target: { files: [file] } });
   fireEvent.click(await screen.findByRole('button', { name: /^Map columns/ }));
-  await screen.findByRole('heading', { name: 'Match your columns' });
+  // hidden: the New account dialog may already be open over it (no account yet).
+  await screen.findByRole('heading', {
+    name: 'Match your columns',
+    hidden: true,
+  });
 }
 
 const checked = (name: RegExp | string) =>
@@ -214,13 +218,22 @@ test('step=map with no file goes back to upload', async () => {
   await waitFor(() => expect(window.location.search).toContain('step=upload'));
 });
 
-test('a new account is made inline and chosen', async () => {
+test('with no account the New account dialog opens by itself, and a made account is chosen', async () => {
   await open([]);
   await upload(csvFile(ROWS));
-  fireEvent.change(screen.getByLabelText('Account name'), {
+  const dialog = await screen.findByRole('dialog', { name: 'New account' });
+  // The left card holds only the comp's controls: the fields live in the dialog.
+  expect(
+    within(
+      screen.getByText('How to read the file').closest('section')!,
+    ).queryByLabelText('Account name', { selector: 'input' }),
+  ).toBeNull();
+  fireEvent.change(within(dialog).getByLabelText('Account name'), {
     target: { value: 'Prop eval' },
   });
-  fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
+  fireEvent.click(
+    within(dialog).getByRole('button', { name: 'Create account' }),
+  );
   const select = screen.getByLabelText('Account') as HTMLSelectElement;
   await waitFor(() =>
     expect(
@@ -228,8 +241,27 @@ test('a new account is made inline and chosen', async () => {
     ).toBeTruthy(),
   );
   expect(select.selectedOptions[0]?.textContent).toBe('Prop eval');
-  // The form is gone: an account is chosen.
-  expect(screen.queryByRole('group', { name: 'New account' })).toBeNull();
+  // The dialog is gone: an account is chosen.
+  expect(screen.queryByRole('dialog')).toBeNull();
+});
+
+test('choosing New account opens the dialog; Cancel goes back to the account chosen before', async () => {
+  await open([futures]);
+  await upload(csvFile(ROWS));
+  expect(screen.queryByRole('dialog')).toBeNull();
+  fireEvent.change(screen.getByLabelText('Account'), {
+    target: { value: '__new' },
+  });
+  const dialog = await screen.findByRole('dialog', { name: 'New account' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(
+    (screen.getByLabelText('Account') as HTMLSelectElement).value,
+  ).not.toBe('__new');
+  expect(
+    (screen.getByRole('button', { name: /^Preview/ }) as HTMLButtonElement)
+      .disabled,
+  ).toBe(false);
 });
 
 test('Continue saves the mapping on the account', async () => {
@@ -268,21 +300,34 @@ test('Continue does not save the mapping when Save is unticked', async () => {
   expect(account?.importMapping).toBeUndefined();
 });
 
-test('in New account mode Continue waits for the form, then creates the account and continues into it', async () => {
+test('in New account mode Continue waits for the account to be made, then goes on into it', async () => {
   const { repo } = await open([futures]);
   await upload(csvFile(ROWS));
   fireEvent.change(screen.getByLabelText('Account'), {
     target: { value: '__new' },
   });
-  const next = screen.getByRole('button', {
-    name: /^Preview/,
-  }) as HTMLButtonElement;
-  // The form is empty: Continue is off, and nothing flows into Futures.
+  const dialog = await screen.findByRole('dialog', { name: 'New account' });
+  // The dialog is modal, so the page behind it is out of the accessibility tree.
+  const next = screen
+    .getByText(/^Preview 2 rows/)
+    .closest('button') as HTMLButtonElement;
+  // Nothing is made yet: Continue is off, and nothing flows into Futures.
   expect(next.disabled).toBe(true);
-  fireEvent.change(screen.getByLabelText('Account name'), {
+  // An empty name is refused with its reason, and the dialog stays.
+  fireEvent.click(
+    within(dialog).getByRole('button', { name: 'Create account' }),
+  );
+  expect(
+    await within(dialog).findByText('Give the account a name.'),
+  ).toBeTruthy();
+  fireEvent.change(within(dialog).getByLabelText('Account name'), {
     target: { value: 'Prop eval' },
   });
-  expect(next.disabled).toBe(false);
+  fireEvent.click(
+    within(dialog).getByRole('button', { name: 'Create account' }),
+  );
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  await waitFor(() => expect(next.disabled).toBe(false));
   fireEvent.click(next);
   await waitFor(() => expect(window.location.search).toContain('step=preview'));
   expect(

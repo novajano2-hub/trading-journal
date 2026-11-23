@@ -106,6 +106,18 @@ describe('ruleScorecard', () => {
     });
   });
 
+  test('each row says when its rule is graded, so a losers-only rule can be told apart', () => {
+    const only = [
+      strat('s1', 'Range break', [
+        { id: 'r-stop', text: 'Stop stays', showWhen: 'loser' },
+        { id: 'r-size', text: 'Risk no more than 1R', showWhen: 'always' },
+      ]),
+    ];
+    const rows = ruleScorecard(trades, only, ctx);
+    expect(rows.find((r) => r.ruleId === 'r-stop')?.showWhen).toBe('loser');
+    expect(rows.find((r) => r.ruleId === 'r-size')?.showWhen).toBe('always');
+  });
+
   test('unknown rule ids and open trades are ignored', () => {
     expect(ruleScorecard(trades, strategies, ctx).map((r) => r.ruleId)).toEqual(
       ['r-stop', 'r-size', 'r-max'],

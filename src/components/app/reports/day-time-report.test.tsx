@@ -105,3 +105,30 @@ test('a re-render that changes nothing the report reads does not recompute the b
   expect(labels(page)).toEqual(['10:00 to 10:15']);
   expect(calls.mock.calls.length).toBe(before);
 });
+
+test('the chart card and the table card carry different titles', async () => {
+  renderApp(<DayTimeView />, {
+    repository: await newYorkRepository(),
+    url: URL,
+  });
+  const page = await screen.findByTestId('reports-day-time');
+  const titles = within(page)
+    .getAllByRole('heading')
+    .map((h) => h.textContent);
+  expect(titles).toContain('By time of day');
+  expect(titles).toContain('Each 15 minutes');
+  expect(new Set(titles).size).toBe(titles.length);
+});
+
+test('weekday: its chart and table are not both called By weekday', async () => {
+  renderApp(<DayTimeView />, {
+    repository: await newYorkRepository(),
+    url: '/app/reports/day-time?tab=weekday',
+  });
+  const page = await screen.findByTestId('reports-day-time');
+  const titles = within(page)
+    .getAllByRole('heading')
+    .map((h) => h.textContent);
+  expect(titles.filter((t) => t === 'By weekday')).toHaveLength(1);
+  expect(titles).toContain('Each weekday');
+});

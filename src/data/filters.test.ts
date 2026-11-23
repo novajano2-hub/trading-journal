@@ -8,6 +8,7 @@ import {
   EMPTY_FILTERS,
   mergeFilterParams,
   parseFilters,
+  previousRange,
   queryString,
   resolveRange,
   sanitizeFilters,
@@ -530,5 +531,31 @@ describe('the full filter set', () => {
         tagIds: ['t'],
       }),
     ).toBe(0);
+  });
+});
+
+describe('previousRange', () => {
+  test('is the stretch of equal length that ends the day before', () => {
+    expect(
+      previousRange({ from: '2026-11-10', to: '2026-11-16' }, '2026-11-20'),
+    ).toEqual({ from: '2026-11-03', to: '2026-11-09' });
+    expect(previousRange({ preset: 'last-month' }, '2026-11-20')).toEqual({
+      // October is 31 days: the 31 days before it.
+      from: '2026-08-31',
+      to: '2026-09-30',
+    });
+    // A preset that runs to today counts today in its length: Mon to Wed is three days.
+    expect(previousRange({ preset: 'this-week' }, '2026-11-18')).toEqual({
+      from: '2026-11-13',
+      to: '2026-11-15',
+    });
+  });
+  test('an open end runs to today, and no start has no previous period', () => {
+    expect(previousRange({ from: '2026-11-19' }, '2026-11-20')).toEqual({
+      from: '2026-11-17',
+      to: '2026-11-18',
+    });
+    expect(previousRange({}, '2026-11-20')).toBeUndefined();
+    expect(previousRange({ to: '2026-11-10' }, '2026-11-20')).toBeUndefined();
   });
 });

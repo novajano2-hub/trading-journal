@@ -137,6 +137,23 @@ test('your plan: adherence, cost once per trade, rules by cost with the costlies
   ).toBeTruthy();
 });
 
+test('a losers-only rule is never flagged Costliest, though its broken trades lost the most', async () => {
+  renderApp(<DashboardView />, {
+    sample: sampleWith((s) => {
+      strategyRules(s.strategies[0]!).find((r) => r.id === 'r-1')!.showWhen =
+        'loser';
+    }),
+  });
+  const plan = await screen.findByRole('region', {
+    name: 'Your plan, all time',
+  });
+  const rows = within(within(plan).getByRole('table', { name: 'Rules' }))
+    .getAllByRole('row')
+    .slice(1);
+  expect(rows[0]!.textContent).toContain(r1Shown);
+  expect(plan.textContent).not.toContain('Costliest');
+});
+
 test.each([
   [199, 1, '99.5%', /(?<![\d.])100%/],
   [1, 299, '0.3%', /(?<![\d.])0%/],

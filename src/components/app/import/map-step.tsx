@@ -49,7 +49,8 @@ import {
   withOptions,
   type MapState,
 } from './mapping-state';
-import { NewAccountForm, type NewAccountSubmit } from './new-account-form';
+import { SettingsDialog } from '@/components/app/settings/settings-ui';
+import { NewAccountForm } from './new-account-form';
 import { fileSummary } from './upload-step';
 import { SelectField } from './select-field';
 import { HELP, INPUT, LABEL } from './styles';
@@ -115,8 +116,8 @@ export function MapStep({
   const display = useDisplay();
   const hideMoney = display.unit === 'privacy';
   const [creating, setCreating] = useState(false);
-  const newAccount = useRef<NewAccountSubmit | null>(null);
-  const [newValid, setNewValid] = useState(false);
+  // The new-account dialog: null until the visitor chooses, when it opens by itself only if there is no account yet.
+  const [dialog, setDialog] = useState<boolean | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       Object.entries(mapping.overrides).map(([k, v]) => [
@@ -168,12 +169,12 @@ export function MapStep({
           .map((r) => r.cells[index] ?? '')
           .filter((c) => c !== '')
           .slice(0, 3);
-  // Three values when they are short; long ones (timestamps) show two, then one.
+  // Three values when they are short; long ones (timestamps) show one.
   const fit = (values: string[]): string[] => {
     const out: string[] = [];
     let width = 0;
     for (const v of values) {
-      if (out.length > 0 && width + v.length > 40) break;
+      if (out.length > 0 && width + v.length > 34) break;
       out.push(v);
       width += v.length;
     }
@@ -246,27 +247,18 @@ export function MapStep({
     onFocused();
   }, [focusPoint, rootsKnown, onFocused]);
 
-  const canContinue = valid && !saving && (showCreate ? newValid : !!account);
+  // A new account is made in its dialog first; Continue always goes into a real account.
+  const canContinue = valid && !saving && !showCreate && !!account;
 
   async function next() {
     setSaveError(false);
     setSaving(true);
-    let target = account;
-    if (showCreate) {
-      // Continue makes the new account first, and goes on into it, never into the one chosen before.
-      const created = await newAccount.current?.();
-      if (!created) {
-        setSaving(false);
-        return;
-      }
-      target = created;
-    }
     setSaving(false);
-    if (save && target) {
+    if (save && account) {
       setSaving(true);
       try {
         await updateAccount.mutateAsync({
-          id: target.id,
+          id: account.id,
           patch: { importMapping: { ...mapping, headers: [...headers] } },
         });
       } catch {
@@ -304,8 +296,10 @@ export function MapStep({
               id={`${ids}-account`}
               value={showCreate ? NEW_ACCOUNT : (accountId ?? '')}
               onChange={(e) => {
-                if (e.target.value === NEW_ACCOUNT) setCreating(true);
-                else {
+                if (e.target.value === NEW_ACCOUNT) {
+                  setCreating(true);
+                  setDialog(true);
+                } else {
                   setCreating(false);
                   onAccount(e.target.value);
                 }
@@ -322,17 +316,13 @@ export function MapStep({
               Imports always land in My workspace, never in the sample.
             </p>
             {showCreate ? (
-              <NewAccountForm
-                submitRef={newAccount}
-                onValid={setNewValid}
-                onCreated={(a) => {
-                  setCreating(false);
-                  onAccountCreated(a.id);
-                }}
-                onCancel={
-                  accounts.length > 0 ? () => setCreating(false) : undefined
-                }
-              />
+              <button
+                type="button"
+                onClick={() => setDialog(true)}
+                className={`${buttonClasses('secondary', 'sm')} mt-2.5`}
+              >
+                Set up the new account
+              </button>
             ) : null}
           </div>
 
@@ -407,7 +397,7 @@ export function MapStep({
             </p>
           </div>
 
-          {account || showCreate ? (
+          {account && !showCreate ? (
             <label className="flex min-h-9 cursor-pointer items-start gap-2.5 text-[13.5px] leading-snug text-text pointer-coarse:min-h-11">
               <input
                 type="checkbox"
@@ -415,8 +405,7 @@ export function MapStep({
                 onChange={(e) => onSave(e.target.checked)}
                 className="mt-0.5 size-4 shrink-0 accent-accent"
               />
-              Save this mapping for{' '}
-              {showCreate ? 'the new account' : account?.name}
+              Save this mapping for {account.name}
             </label>
           ) : null}
         </div>
@@ -459,8 +448,8 @@ export function MapStep({
         <div className="mt-2 overflow-x-auto">
           <table className="w-full table-fixed border-collapse text-[13.5px]">
             <colgroup>
-              <col className="w-[44%] md:w-[22%]" />
-              <col className="w-[56%] md:w-[28%]" />
+              <col className="w-[44%] md:w-[31%]" />
+              <col className="w-[56%] md:w-[26%]" />
               <col className="hidden md:table-column" />
               <col className="w-[44px] md:w-[92px]" />
             </colgroup>
@@ -496,7 +485,7 @@ export function MapStep({
                   <tr key={field} className="border-t border-line align-middle">
                     <th
                       scope="row"
-                      className="py-2 pr-3 text-left align-middle font-normal"
+                      className="py-1.5 pr-3 text-left align-middle font-normal"
                     >
                       <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                         <b className="font-semibold text-text">{label}</b>
@@ -520,7 +509,7 @@ export function MapStep({
                         </span>
                       ) : null}
                     </th>
-                    <td className="py-2 pr-3">
+                    <td className="py-1.5 pr-3">
                       <SelectField
                         aria-label={`${label} column`}
                         value={index === undefined ? '' : String(index)}
@@ -536,7 +525,7 @@ export function MapStep({
                             ),
                           )
                         }
-                        className={`h-8 text-[13px] ${index === undefined && !isRequired ? 'border-transparent bg-sunken text-faint shadow-none' : ''}`}
+                        className={`!h-8 text-[13px] ${index === undefined && !isRequired ? 'bg-sunken text-faint' : ''}`}
                       >
                         <option value="">
                           {isRequired ? 'Choose a column' : 'Do not import'}
@@ -548,7 +537,7 @@ export function MapStep({
                         ))}
                       </SelectField>
                     </td>
-                    <td className="hidden py-2 pr-3 md:table-cell">
+                    <td className="hidden py-1.5 pr-3 md:table-cell">
                       <span className="flex min-w-0 flex-nowrap gap-1 overflow-hidden">
                         {values.map((v, i) => (
                           <span
@@ -562,7 +551,7 @@ export function MapStep({
                         ))}
                       </span>
                     </td>
-                    <td className="py-2 text-right">
+                    <td className="py-1.5 text-right">
                       <StatusCell
                         state={
                           index === undefined
@@ -738,9 +727,7 @@ export function MapStep({
               </p>
             ) : null}
             {showCreate ? (
-              !newValid ? (
-                <p>Fill in the new account to continue.</p>
-              ) : null
+              <p>Create the new account to continue.</p>
             ) : !account ? (
               <p>Choose or create an account to continue.</p>
             ) : null}
@@ -756,6 +743,29 @@ export function MapStep({
           </button>
         </div>
       </section>
+
+      <SettingsDialog
+        open={dialog ?? accounts.length === 0}
+        onClose={() => {
+          setDialog(false);
+          // Closed without making one: back to the account that was chosen, if there is one.
+          if (accounts.length > 0) setCreating(false);
+        }}
+        title="New account"
+        description="It joins My workspace, and this import goes into it."
+      >
+        <NewAccountForm
+          onCreated={(a) => {
+            setCreating(false);
+            setDialog(false);
+            onAccountCreated(a.id);
+          }}
+          onCancel={() => {
+            setDialog(false);
+            if (accounts.length > 0) setCreating(false);
+          }}
+        />
+      </SettingsDialog>
     </div>
   );
 }

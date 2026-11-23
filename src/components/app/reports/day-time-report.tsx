@@ -105,12 +105,13 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
             duration: 'Durations',
           }[tab]
         }
+        chartTitle={`By ${noun}`}
         title={
           tab === 'time'
             ? bucket === 60
               ? 'Each hour'
               : `Each ${bucket} minutes`
-            : `By ${noun}`
+            : `Each ${noun}`
         }
         caption={
           timed

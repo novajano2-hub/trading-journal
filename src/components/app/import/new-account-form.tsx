@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, type RefObject } from 'react';
+import { useId, useRef, useState } from 'react';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { useCreateUserAccount, usePrefs } from '@/data/query/hooks';
 import { toCents } from '@/domain/money';
@@ -17,23 +17,13 @@ const TYPES: readonly { value: AccountType; label: string }[] = [
   { value: 'prop-funded', label: 'Prop funded' },
 ];
 
-/** Makes the account from what is typed; null, with the errors shown, when it cannot. */
-export type NewAccountSubmit = () => Promise<Account | null>;
-
-/** The fields of a new account, inline in the import's account card. */
+/** The fields of a new account, for the import's New account dialog. */
 export function NewAccountForm({
   onCreated,
   onCancel,
-  submitRef,
-  onValid,
 }: {
   onCreated: (account: Account) => void;
-  /** Lets the page create the account for its own Continue. */
-  submitRef?: RefObject<NewAccountSubmit | null>;
-  /** Whether the fields can make an account, as they are. */
-  onValid?: (valid: boolean) => void;
-  /** Present when the visitor already has an account to go back to. */
-  onCancel?: () => void;
+  onCancel: () => void;
 }) {
   const prefs = usePrefs().data;
   const create = useCreateUserAccount();
@@ -56,13 +46,6 @@ export function NewAccountForm({
   const shownZone = zone ?? prefs?.timeZone ?? 'UTC';
 
   const amount = Number(balance.replace(/,/g, ''));
-  const valid =
-    name.trim() !== '' &&
-    /^[A-Za-z]{3}$/.test(shownCurrency) &&
-    balance.trim() !== '' &&
-    Number.isFinite(amount) &&
-    amount >= 0;
-  useEffect(() => onValid?.(valid), [valid, onValid]);
 
   async function submit(): Promise<Account | null> {
     const next: typeof errors = {};
@@ -95,19 +78,14 @@ export function NewAccountForm({
     }
   }
 
-  useEffect(() => {
-    if (!submitRef) return;
-    submitRef.current = submit;
-    return () => {
-      submitRef.current = null;
-    };
-  });
-
   return (
-    <div
-      role="group"
-      aria-label="New account"
-      className="mt-4 grid gap-3.5 rounded-control bg-sunken p-3.5"
+    <form
+      noValidate
+      onSubmit={(e) => {
+        e.preventDefault();
+        void submit();
+      }}
+      className="grid gap-3.5 px-6 pt-4 pb-6"
     >
       <div>
         <label htmlFor={`${ids}-name`} className={LABEL}>
@@ -216,25 +194,22 @@ export function NewAccountForm({
           </p>
         ) : null}
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
         <button
           type="button"
-          onClick={() => void submit()}
+          onClick={onCancel}
+          className={buttonClasses('secondary')}
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
           disabled={create.isPending}
           className={buttonClasses('primary')}
         >
           Create account
         </button>
-        {onCancel ? (
-          <button
-            type="button"
-            onClick={onCancel}
-            className={buttonClasses('ghost', 'sm')}
-          >
-            Cancel
-          </button>
-        ) : null}
       </div>
-    </div>
+    </form>
   );
 }

@@ -18,6 +18,8 @@ import { onTradingDate, weekdayOf } from '@/lib/time-format';
 export type FormatMoney = (
   money: Cents,
   r?: number | null,
+  /** A short figure for the phone's small cell: `+1.1k`. */
+  compact?: boolean,
 ) => { text: string; label: string };
 
 /** "Thu 19 Nov". */
@@ -193,7 +195,7 @@ function Cell({
             aria-hidden="true"
             size={15}
             weight="duotone"
-            className="absolute top-1.5 right-1 text-muted @[600px]/cal:top-1.5 @[600px]/cal:right-2"
+            className="absolute top-1.5 right-1 hidden text-muted @[600px]/cal:top-1.5 @[600px]/cal:right-2 @[600px]/cal:block"
           />
         ) : null}
         {head ? (
@@ -216,6 +218,15 @@ function Cell({
         ) : isToday ? (
           <span className="mt-auto hidden text-[12px] font-semibold text-accent-ink @[600px]/cal:block">
             Today
+          </span>
+        ) : null}
+        {day.trades > 0 ? (
+          <span
+            data-testid="day-compact"
+            aria-hidden="true"
+            className={`mt-auto block pb-[7px] text-[11.5px] leading-tight font-semibold tracking-[-0.02em] whitespace-nowrap tabular-nums @[600px]/cal:hidden ${TONE_INK[day.tone]}`}
+          >
+            {fmt(day.net, day.r, true).text}
           </span>
         ) : null}
         {day.trades > 0 ? (
@@ -282,9 +293,19 @@ function WeekTotal({
         <FigureText f={fmt(week.net, week.r)} />
       </b>
       <small className="text-[12px] text-muted">
-        {none
-          ? 'No trades'
-          : `${week.tradingDays} ${plural(week.tradingDays, 'day')}, ${week.trades} ${plural(week.trades, 'trade')}`}
+        {none ? (
+          <span className="block whitespace-nowrap">No trades</span>
+        ) : (
+          <>
+            <span className="block whitespace-nowrap">
+              {week.tradingDays} {plural(week.tradingDays, 'day')}
+            </span>
+            <span className="sr-only">, </span>
+            <span className="block whitespace-nowrap">
+              {week.trades} {plural(week.trades, 'trade')}
+            </span>
+          </>
+        )}
       </small>
     </div>
   );

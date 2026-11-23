@@ -41,6 +41,8 @@ export interface FormatOptions {
   currency: string;
   /** `+` on gains and a minus on losses; unsigned for a balance or a target. */
   signed: boolean;
+  /** A short figure for a small cell: `+1.1k`, `−388`. The label keeps the full one. */
+  compact?: boolean;
 }
 
 /** Rounds away binary noise: 0.00205 / 0.0001 is 20.499999999999996. */
@@ -144,6 +146,21 @@ function signed(value: number, digits: number, on: boolean): string {
   return on ? `+${body}` : body;
 }
 
+/** Whole dollars to three figures: 388, 1.1k, 12k, 2.5M. No symbol: the cell's tone and the label carry it. */
+function compactCents(cents: Cents, on: boolean): string {
+  const dollars = Math.abs(cents) / 100;
+  const short = (n: number, unit: string) =>
+    `${n.toFixed(n < 10 ? 1 : 0).replace(/\.0$/, '')}${unit}`;
+  const body =
+    dollars >= 999_500
+      ? short(dollars / 1_000_000, 'M')
+      : dollars >= 999.5
+        ? short(dollars / 1000, 'k')
+        : String(Math.round(dollars));
+  if (body === '0') return '0';
+  return cents < 0 ? `−${body}` : on ? `+${body}` : body;
+}
+
 /** The currency's own symbol, so Privacy hides a euro as it does a dollar. */
 function symbolOf(currency: string): string {
   const part = new Intl.NumberFormat('en-US', {
@@ -166,13 +183,13 @@ function hidden(money: Cents, currency: string, on: boolean): string {
 export function formatUnitValue(
   unit: DisplayUnit,
   value: number,
-  o: { currency: string; signed: boolean },
+  o: { currency: string; signed: boolean; compact?: boolean },
 ): string {
   switch (unit) {
     case 'percent':
-      return `${signed(value * 100, 2, o.signed)}%`;
+      return `${signed(value * 100, o.compact ? 1 : 2, o.signed)}%`;
     case 'r':
-      return `${signed(value, 2, o.signed)}R`;
+      return `${signed(value, o.compact ? 1 : 2, o.signed)}R`;
     case 'ticks':
       return `${signed(value, 1, o.signed)} ticks`;
     case 'pips':
@@ -183,6 +200,7 @@ export function formatUnitValue(
       return hidden(Math.round(value), o.currency, o.signed);
     default: {
       const cents = Math.round(value);
+      if (o.compact) return compactCents(cents, o.signed);
       return o.signed || cents < 0
         ? formatPnl(cents, o.currency)
         : formatMoney(cents, o.currency);
@@ -201,11 +219,12 @@ export function formatFigure(
       label: 'hidden amount',
     };
   const unit = shownUnit(f, o.unit);
-  const text = formatUnitValue(unit, unitValue(f, unit)!, o);
+  const value = unitValue(f, unit)!;
+  const full = formatUnitValue(unit, value, { ...o, compact: false });
   const out = leftOutIn(f, o.unit);
   return {
-    text,
-    label: out > 0 ? `${text}, ${out} ${plural(out, 'trade')} left out` : text,
+    text: o.compact ? formatUnitValue(unit, value, o) : full,
+    label: out > 0 ? `${full}, ${out} ${plural(out, 'trade')} left out` : full,
   };
 }
 
@@ -268,6 +287,8 @@ export interface Display {
     f: Figure,
     signed?: boolean,
     currency?: string,
+    /** A short figure for a small cell: `+1.1k`. Privacy still shows `+$•••`. */
+    compact?: boolean,
   ): { text: string; label: string };
   /** A bare amount: in a percentage it is over the base, elsewhere dollars. */
   cash(
@@ -338,8 +359,12 @@ export function useDisplay(): Display {
           breakevenRange: { unit: 'amount' as const, from: 0, to: 0 },
         });
   const pctBase = source?.pctBase ?? null;
-  const figure: Display['figure'] = (f, signed = true, currency = base) =>
-    formatFigure(f, { unit, currency, signed });
+  const figure: Display['figure'] = (
+    f,
+    signed = true,
+    currency = base,
+    compact = false,
+  ) => formatFigure(f, { unit, currency, signed, compact });
   return {
     unit,
     figure,

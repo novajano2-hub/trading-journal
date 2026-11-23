@@ -93,13 +93,26 @@ function Kpi({
   );
 }
 
+/** The value span of every line drawn: the cards share it, so a small strategy reads small. */
+function sharedRange(
+  figures: readonly StrategyFigures[],
+): { min: number; max: number } | undefined {
+  const lines = figures.filter((f) => f.equity.length >= 3);
+  if (lines.length < 2) return undefined;
+  const all = lines.flatMap((f) => f.equity);
+  return { min: Math.min(...all), max: Math.max(...all) };
+}
+
 function StrategyCard({
   f,
+  range,
   basis,
   onArchive,
   onDelete,
 }: {
   f: StrategyFigures;
+  /** The scale every card's line shares. */
+  range?: { min: number; max: number };
   basis: 'net' | 'gross';
   onArchive(): void;
   onDelete(): void;
@@ -228,7 +241,7 @@ function StrategyCard({
           </DropdownMenu.Root>
         </div>
         {f.equity.length >= 3 ? (
-          <EquityLine f={f} readoutClassName="min-h-[34px]" />
+          <EquityLine f={f} scale={range} readoutClassName="min-h-[34px]" />
         ) : (
           <p className="flex h-20 items-center text-[13px] text-faint">
             The line starts with the first closed trade.
@@ -302,6 +315,7 @@ export function StrategiesView(): React.JSX.Element {
     );
 
   const shown = all.filter((s) => s.status === status);
+  const range = sharedRange(shown.map((s) => data.figures.get(s.id)!));
   const target = deleting ? all.find((s) => s.id === deleting) : undefined;
   const targetTrades = target ? data.figures.get(target.id)!.tradeCount : 0;
   const { unassigned } = data;
@@ -349,6 +363,7 @@ export function StrategiesView(): React.JSX.Element {
             <StrategyCard
               key={s.id}
               f={data.figures.get(s.id)!}
+              range={range}
               basis={data.basis}
               onArchive={() =>
                 update.mutate({

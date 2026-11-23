@@ -54,6 +54,32 @@ function trade(
   };
 }
 
+describe('formatFigure compact', () => {
+  const c = (money: number, unit: Parameters<typeof o>[0] = 'dollar') =>
+    formatFigure(
+      { money, pct: money / 1_000_000, r: money / 10000 },
+      { ...o(unit), compact: true },
+    );
+  test('dollars shorten to a signed figure with no symbol', () => {
+    expect(c(110_000).text).toBe('+1.1k');
+    expect(c(-38_800).text).toBe('−388');
+    expect(c(4_405).text).toBe('+44');
+    expect(c(1_240_000).text).toBe('+12k');
+    expect(c(250_000_000).text).toBe('+2.5M');
+    expect(c(0).text).toBe('0');
+  });
+  test('the label stays the full figure', () => {
+    expect(c(110_000).label).toBe('+$1,100.00');
+  });
+  test('Privacy still hides it as +$•••', () => {
+    expect(c(110_000, 'privacy')).toEqual({
+      text: '+$•••',
+      label: 'hidden amount',
+    });
+    expect(c(-38_800, 'privacy').text).toBe('−$•••');
+  });
+});
+
 describe('formatFigure', () => {
   test('dollar reads as signed P&L', () => {
     expect(formatFigure({ money: 12345 }, o('dollar')).text).toBe('+$123.45');

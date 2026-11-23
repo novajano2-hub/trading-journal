@@ -27,8 +27,11 @@ export function EquityLine({
   f,
   className = '',
   readoutClassName = 'min-h-[18px]',
+  scale,
 }: {
   f: StrategyFigures;
+  /** The scale shared with the lines beside it; default: this line's own. */
+  scale?: { min: number; max: number };
   className?: string;
   /** Reserves the readout's room, so reading a point never moves what is below. */
   readoutClassName?: string;
@@ -46,8 +49,9 @@ export function EquityLine({
   const range = first === final ? first : `${first} to ${final}`;
   const label = `Equity of ${f.strategy.name}, ${range}, ${closedIds.length} closed ${plural(closedIds.length, 'trade')}, ends at ${end.label}`;
 
-  const min = Math.min(...equity);
-  const span = Math.max(...equity) - min;
+  const min = scale ? Math.min(scale.min, ...equity) : Math.min(...equity);
+  const span =
+    (scale ? Math.max(scale.max, ...equity) : Math.max(...equity)) - min;
   const place = (i: number) => ({
     left: `${(i / last) * 100}%`,
     top: `${((span === 0 ? (TOP + BOTTOM) / 2 : BOTTOM - ((equity[i]! - min) / span) * (BOTTOM - TOP)) / H) * 100}%`,
@@ -89,7 +93,7 @@ export function EquityLine({
         }}
         onPointerLeave={() => setActive(null)}
       >
-        <Sparkline series={equity} label={label} />
+        <Sparkline series={equity} label={label} range={scale} />
         {active !== null ? (
           <>
             <span

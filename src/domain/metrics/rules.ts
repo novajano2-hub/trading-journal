@@ -12,6 +12,8 @@ export interface RuleScore {
   group: string;
   strategyId: string;
   strategyName: string;
+  /** When the rule is graded: a `loser` rule's kept trades are all losers, so win rate and profit factor mean nothing for it. */
+  showWhen: Rule['showWhen'];
   kept: number;
   broken: number;
   /** kept / (kept + broken); a row exists only with at least one decisive check. */
@@ -76,6 +78,7 @@ export function ruleScorecard(
           group,
           strategyId: strategy.id,
           strategyName: strategy.name,
+          showWhen: rule.showWhen,
           kept: 0,
           broken: 0,
           adherence: 0,

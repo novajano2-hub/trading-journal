@@ -1,5 +1,6 @@
 import {
   addDays,
+  differenceInCalendarDays,
   endOfMonth,
   format,
   parse,
@@ -430,6 +431,22 @@ export function resolveRange(
     case 'ytd':
       return { from: fmt(startOfYear(t)), to: today };
   }
+}
+
+/**
+ * The stretch of the same length that ends the day before `range` starts, for
+ * "this period against the last". An open end runs to today; with no start
+ * there is no previous period.
+ */
+export function previousRange(
+  range: DateRange,
+  today: string,
+): { from: string; to: string } | undefined {
+  const { from, to = today } = resolveRange(range, today);
+  if (!from || to < from) return undefined;
+  const days = differenceInCalendarDays(toDate(to), toDate(from)) + 1;
+  const start = toDate(from);
+  return { from: fmt(addDays(start, -days)), to: fmt(addDays(start, -1)) };
 }
 
 /** With no account filter only active accounts count; an explicit selection may include archived ones. */

@@ -176,3 +176,27 @@ test('a group shows "+N more" for inherited filters it has no chip for, with a w
   expect(written.get('r')).toBeNull();
   expect(within(a).queryByText('+2 more')).toBeNull();
 });
+
+test('Group B starts as the previous period of the same length, not a copy of A', async () => {
+  renderApp(<CompareView />, {
+    sample: breakdownSample,
+    url: '/app/reports/compare?from=2026-11-04&to=2026-11-05',
+  });
+  const page = await screen.findByTestId('reports-compare');
+  const table = within(page).getByRole('table', { name: 'Comparison' });
+  // A is 4 and 5 Nov: Wednesday's trades. B is 2 and 3 Nov: +$60.00 and +$50.00.
+  expect(row(table, /^Trades/).slice(0, 2)).toEqual(['3', '4']);
+  expect(row(table, /^Net P&L/)[1]).toBe('+$110.00');
+  const b = within(page).getByRole('group', { name: 'Group B filters' });
+  expect(within(b).getByRole('button', { name: /2-3 Nov/ })).toBeTruthy();
+});
+
+test('an explicit b= wins over the previous-period default', async () => {
+  renderApp(<CompareView />, {
+    sample: breakdownSample,
+    url: '/app/reports/compare?from=2026-11-04&to=2026-11-05&b=symbol%3DNQ',
+  });
+  const page = await screen.findByTestId('reports-compare');
+  const table = within(page).getByRole('table', { name: 'Comparison' });
+  expect(row(table, /^Net P&L/)[1]).toBe('+$50.00');
+});

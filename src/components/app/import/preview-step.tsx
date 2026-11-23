@@ -9,6 +9,7 @@ import {
   InstrumentName,
   TradeTime,
 } from '@/components/app/dashboard/shared';
+import { price } from '@/components/app/trades/columns';
 import { clock } from '@/components/app/trades/trade-time';
 import { FigureText } from '@/components/product/figure-text';
 import { buttonClasses } from '@/components/ui/button-styles';
@@ -33,8 +34,8 @@ const ISSUES_SHOWN = 20;
 const ROWS_PER_PAGE = 50;
 
 const TH =
-  'h-9 px-2.5 text-left text-[12px] font-medium whitespace-nowrap text-faint first:pl-5 last:pr-5';
-const TD = 'h-[38px] px-2.5 align-middle first:pl-5 last:pr-5';
+  'h-9 px-2 text-left text-[12px] font-medium whitespace-nowrap text-faint first:pl-5 last:pr-4';
+const TD = 'h-[38px] px-2 align-middle first:pl-5 last:pr-4';
 const LINK =
   'cursor-pointer font-semibold text-accent-ink hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent';
 
@@ -167,8 +168,6 @@ export function PreviewStep({
   const net = closed.reduce((sum, t) => sum + t.net, 0);
   const checks = plan.flags.filter((f) => f.code === 'pnl-mismatch').length;
   const flagged = new Set(plan.flags.map((f) => f.tradeId));
-  const hasPnl =
-    mapping.kind === 'closed-trades' && mapping.columns.pnl !== undefined;
   const duplicates = plan.duplicateRows.length;
 
   return (
@@ -213,7 +212,9 @@ export function PreviewStep({
               Net P&amp;L of the {plan.trades.length}{' '}
               {plural(plan.trades.length, 'trade')}
             </span>
-            <b className="text-[22px] font-semibold tracking-[-0.03em] tabular-nums">
+            <b
+              className={`text-[22px] font-semibold tracking-[-0.03em] tabular-nums ${net < 0 ? 'text-loss' : net > 0 ? 'text-gain' : ''}`}
+            >
               <FigureText f={display.cash(net, true, account.currency)} />
             </b>
           </div>
@@ -235,7 +236,6 @@ export function PreviewStep({
             <TradesCard
               plan={plan}
               account={account}
-              hasPnl={hasPnl}
               flagged={flagged}
               flagsByTrade={flagsByTrade}
               onlyFlagged={onlyFlagged}
@@ -478,7 +478,6 @@ function IssuesCard({
 function TradesCard({
   plan,
   account,
-  hasPnl,
   flagged,
   flagsByTrade,
   onlyFlagged,
@@ -489,7 +488,6 @@ function TradesCard({
 }: {
   plan: ImportPlan;
   account: Account;
-  hasPnl: boolean;
   flagged: ReadonlySet<string>;
   flagsByTrade: ReadonlyMap<string, TradeFlag[]>;
   onlyFlagged: boolean;
@@ -531,29 +529,41 @@ function TradesCard({
         }
       />
       <div className="relative mt-2.5 overflow-x-auto">
-        <table className="w-full min-w-[720px] border-collapse text-[13px]">
+        <table className="w-full min-w-[780px] border-collapse text-[13px]">
           <thead>
             <tr className="border-b border-line">
+              <th scope="col" className={TH}>
+                Row
+              </th>
+              <th scope="col" className={TH}>
+                Closed
+              </th>
               <th scope="col" className={TH}>
                 Instrument
               </th>
               <th scope="col" className={TH}>
                 Side
               </th>
-              <th scope="col" className={TH}>
-                Opened
-              </th>
-              <th scope="col" className={TH}>
-                Closed
-              </th>
               <th scope="col" className={`${TH} text-right`}>
                 Qty
+              </th>
+              <th scope="col" className={`${TH} text-right`}>
+                Entry
+              </th>
+              <th scope="col" className={`${TH} text-right`}>
+                Exit
+              </th>
+              <th scope="col" className={`${TH} text-right`}>
+                Fees
               </th>
               <th scope="col" className={`${TH} text-right`}>
                 Keel net
               </th>
               <th scope="col" className={`${TH} text-right`}>
                 File P&amp;L
+              </th>
+              <th scope="col" className={`${TH} text-center`}>
+                Check
               </th>
             </tr>
           </thead>
@@ -564,7 +574,7 @@ function TradesCard({
                 trade={t}
                 tz={tz}
                 account={account}
-                hasPnl={hasPnl}
+                filePnl={plan.filePnl[t.id]}
                 flags={flagsByTrade.get(t.id) ?? []}
                 highlighted={flagged.has(t.id)}
                 display={display}
@@ -600,11 +610,17 @@ function TradesCard({
   );
 }
 
+/** The file's own row number (the header is row 1): the first execution's id carries it. */
+function fileRow(t: Trade): number | null {
+  const m = /:r(\d+)(?::|$)/.exec(t.executions[0]?.id ?? '');
+  return m ? Number(m[1]) : null;
+}
+
 function TradeRows({
   trade: t,
   tz,
   account,
-  hasPnl,
+  filePnl,
   flags,
   highlighted,
   display,
@@ -612,7 +628,8 @@ function TradeRows({
   trade: Trade;
   tz: string;
   account: Account;
-  hasPnl: boolean;
+  /** What the file says this trade made; undefined when it has no P&L column. */
+  filePnl: number | undefined;
   flags: readonly TradeFlag[];
   highlighted: boolean;
   display: Display;
@@ -621,22 +638,14 @@ function TradeRows({
   const notes = flags.map(flagNote).filter((n): n is string => n !== null);
   const open = t.status === 'open';
   const shade = highlighted ? 'bg-sunken/80' : '';
+  const row = fileRow(t);
+  const tick = t.instrument.tickSize;
   return (
     <>
       <tr
         className={`${shade} ${notes.length === 0 ? 'border-b border-line/70' : ''}`}
       >
-        <td className={TD}>
-          <InstrumentName trade={t} timeZone={tz} />
-        </td>
-        <td className={TD}>
-          <span className="inline-flex h-[22px] items-center rounded-chip bg-sunken px-2 text-[12px] font-medium text-muted">
-            {t.direction === 'long' ? 'Long' : 'Short'}
-          </span>
-        </td>
-        <td className={TD}>
-          <TradeTime text={stamp(t.openedAt, tz)} />
-        </td>
+        <td className={`${TD} text-faint tabular-nums`}>{row ?? 'None'}</td>
         <td className={TD}>
           {t.closedAt ? (
             <TradeTime text={stamp(t.closedAt, tz)} />
@@ -644,8 +653,29 @@ function TradeRows({
             <span className="text-muted">Still open</span>
           )}
         </td>
+        <td className={TD}>
+          <InstrumentName trade={t} timeZone={tz} />
+        </td>
+        <td className={TD}>
+          <span className="inline-flex h-[22px] items-center rounded-chip bg-sunken px-1.5 text-[12px] font-medium text-muted">
+            {t.direction === 'long' ? 'Long' : 'Short'}
+          </span>
+        </td>
         <td className={`${TD} text-right tabular-nums`}>
           {t.maxPosition.toLocaleString('en-US')}
+        </td>
+        <td className={`${TD} text-right tabular-nums`}>
+          {price(t.avgEntry, tick)}
+        </td>
+        <td className={`${TD} text-right tabular-nums`}>
+          {t.avgExit === undefined ? (
+            <span className="text-muted">Open</span>
+          ) : (
+            price(t.avgExit, tick)
+          )}
+        </td>
+        <td className={`${TD} text-right text-muted tabular-nums`}>
+          <FigureText f={display.cash(t.fees, false, t.pnlCurrency)} />
         </td>
         <td
           className={`${TD} text-right font-semibold tabular-nums ${t.net < 0 ? 'text-loss' : t.net > 0 ? 'text-gain' : ''}`}
@@ -657,28 +687,45 @@ function TradeRows({
           )}
         </td>
         <td className={`${TD} text-right tabular-nums`}>
-          {mismatch?.code === 'pnl-mismatch' ? (
+          {filePnl === undefined ? (
+            <span className="text-faint">Not in file</span>
+          ) : mismatch?.code === 'pnl-mismatch' ? (
             <span className="font-semibold text-text underline decoration-faint decoration-dotted underline-offset-[3px]">
-              File says{' '}
               <FigureText
                 f={display.cash(mismatch.file, true, account.currency)}
               />
             </span>
-          ) : hasPnl && !open ? (
+          ) : (
+            <span className="text-muted">
+              <FigureText f={display.cash(filePnl, true, account.currency)} />
+            </span>
+          )}
+        </td>
+        <td className={`${TD} text-center`}>
+          {mismatch?.code === 'pnl-mismatch' ? (
+            <span className="inline-flex h-[22px] items-center rounded-full border border-line-2 bg-surface-1 px-2 text-[12px] font-semibold whitespace-nowrap text-text">
+              Off by&nbsp;
+              <FigureText
+                f={display.cash(
+                  Math.abs(mismatch.file - t.net),
+                  false,
+                  account.currency,
+                )}
+              />
+            </span>
+          ) : filePnl !== undefined && !open ? (
             <span className="inline-grid size-5 place-items-center rounded-full bg-accent-soft text-accent">
               <Check {...ICON} size={12} weight="bold" />
               <span className="sr-only">Matches the file</span>
             </span>
           ) : (
-            <span className="text-faint">
-              -<span className="sr-only"> not in the file</span>
-            </span>
+            <span className="sr-only">Nothing to check</span>
           )}
         </td>
       </tr>
       {notes.length > 0 ? (
         <tr className={`${shade} border-b border-line/70`}>
-          <td colSpan={7} className="px-5 pb-2 text-[12.5px] leading-snug">
+          <td colSpan={11} className="px-5 pb-2 text-[12.5px] leading-snug">
             <Chip tone="warn" className="h-auto min-h-[22px] py-0.5">
               {notes.join('. ')}
             </Chip>

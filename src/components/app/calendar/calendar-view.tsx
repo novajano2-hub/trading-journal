@@ -15,6 +15,7 @@ import { useSearchParams } from 'next/navigation';
 import { Dialog, Popover } from 'radix-ui';
 import {
   Suspense,
+  useEffect,
   useId,
   useMemo,
   useState,
@@ -25,7 +26,12 @@ import { buttonClasses } from '@/components/ui/button-styles';
 import { Segmented } from '@/components/ui/segmented';
 import { MetricTip } from '@/components/ui/metric-tip';
 import { TaskCheckbox } from '@/components/ui/task-checkbox';
-import { calendarMonth, dayExits, dayGrading } from '@/data/calendar';
+import {
+  calendarMonth,
+  dayExits,
+  dayGrading,
+  type CalendarDay,
+} from '@/data/calendar';
 import { resolveRange, serializeFilters } from '@/data/filters';
 import { metricContextOf } from '@/data/metrics';
 import { useGlobalFilters, useTradeSet } from '@/data/query/derived';
@@ -49,6 +55,7 @@ import { enter, exit } from '@/lib/motion';
 import { onTradingDate } from '@/lib/time-format';
 import { CARD } from '../dashboard/shared';
 import { DayPanel } from './day-panel';
+import { MonthPanel } from './month-panel';
 import {
   dayLabel,
   MonthGrid,
@@ -310,6 +317,7 @@ export function CalendarView(): React.JSX.Element {
       : localDate(new Date().toISOString(), timeZone);
   const month = useMemo(() => monthOf(search, today), [search, today]);
   const day = dayOf(search);
+  const hasDayParam = new URLSearchParams(search).has('day');
 
   const dayTrades = set.data?.dayTrades;
   const currencies = useMemo(
@@ -343,6 +351,30 @@ export function CalendarView(): React.JSX.Element {
     const trades = dayTrades.filter((t) => t.pnlCurrency === currency);
     return { ctx, trades, ...calendarMonth(trades, notes, month, ctx) };
   }, [dayTrades, prefs, notes, month, currency, dateRange, today]);
+
+  // With no ?day the panel opens on today if it has trades, else the latest day that has.
+  // Only where the panel sits beside the grid: below xl it is a sheet, and a sheet must not open by itself.
+  const defaultDay = useMemo(() => {
+    if (!model || today === undefined) return undefined;
+    const live = model.weeks
+      .flatMap((w) => w.days)
+      .filter(
+        (d): d is CalendarDay => d !== null && !d.outside && d.trades > 0,
+      );
+    return (
+      live.find((d) => d.date === today)?.date ??
+      live.reduce<string | undefined>(
+        (latest, d) =>
+          latest === undefined || d.date > latest ? d.date : latest,
+        undefined,
+      )
+    );
+  }, [model, today]);
+  useEffect(() => {
+    // replaceState: the default is where the page starts, not a step Back should undo.
+    if (desktop && !hasDayParam && defaultDay !== undefined)
+      writeParams({ day: defaultDay });
+  }, [desktop, hasDayParam, defaultDay]);
 
   const accountIds = set.data?.filters.accountIds;
   const pctBase = useMemo(
@@ -389,11 +421,12 @@ export function CalendarView(): React.JSX.Element {
   )
     return <Skeleton />;
 
-  const fmt: FormatMoney = (money, r) =>
+  const fmt: FormatMoney = (money, r, compact) =>
     display.figure(
       { money, pct: pctBase ? money / pctBase : null, r: r ?? null },
       true,
       currency,
+      compact,
     );
   const stats = prefs.calendarStats;
   const { weeks, summary, trades, ctx } = model;
@@ -451,6 +484,28 @@ export function CalendarView(): React.JSX.Element {
   ) : null;
   const best = summary.best;
   const worst = summary.worst;
+  // The closest month with a trade, for a month that has none: the one before, else the one after.
+  const nearby = (() => {
+    const months = [
+      ...new Set(
+        trades.map((t) =>
+          localDate(t.closedAt ?? t.openedAt, ctx.timeZone).slice(0, 7),
+        ),
+      ),
+    ].sort();
+    const m =
+      months.findLast((x) => x < month) ?? months.find((x) => x > month);
+    return m === undefined
+      ? undefined
+      : {
+          month: m,
+          name: onTradingDate(
+            `${m}-01`,
+            { month: 'long', year: 'numeric' },
+            'en-US',
+          ),
+        };
+  })();
 
   return (
     <div
@@ -597,9 +652,11 @@ export function CalendarView(): React.JSX.Element {
           currency={currency}
           today={today}
           selected={selected?.date}
-          onSelect={(date) =>
-            writeParams({ day: date === selected?.date ? null : date })
-          }
+          onSelect={(date) => {
+            // Beside the grid the panel is never emptied: the picked day stays.
+            if (date === selected?.date && desktop) return;
+            writeParams({ day: date === selected?.date ? null : date });
+          }}
         />
 
         <div className="mt-3.5 flex flex-wrap items-center gap-x-[18px] gap-y-2 text-[12px] text-muted">
@@ -645,16 +702,31 @@ export function CalendarView(): React.JSX.Element {
 
       {desktop ? (
         <aside
-          aria-labelledby={selected ? titleId : undefined}
-          aria-label={selected ? undefined : 'Day'}
+          aria-labelledby={
+            selected || summary.tradingDays === 0 ? titleId : undefined
+          }
+          aria-label={
+            selected ? undefined : summary.tradingDays === 0 ? undefined : 'Day'
+          }
           className={`${CARD} min-w-0 self-start p-5`}
         >
-          {panel ?? (
-            <p className="text-[14px] leading-relaxed text-muted">
-              Pick a day to see the trades that exited on it, its figures and
-              its daily note.
-            </p>
-          )}
+          {panel ??
+            (summary.tradingDays === 0 ? (
+              <MonthPanel
+                headingId={titleId}
+                monthName={monthName}
+                summary={summary}
+                basis={ctx.pnlBasis}
+                fmt={fmt}
+                nearby={nearby}
+                onGo={goMonth}
+              />
+            ) : (
+              <p className="text-[14px] leading-relaxed text-muted">
+                Pick a day to see the trades that exited on it, its figures and
+                its daily note.
+              </p>
+            ))}
         </aside>
       ) : (
         <DaySheet

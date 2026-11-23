@@ -309,6 +309,10 @@ export function PlanCard({
   }
 
   const shown = all ? plan.rules : plan.rules.slice(0, RULES_SHOWN);
+  // Rules come costliest first. A losers-only rule's broken trades are losers by definition, so it never takes the flag.
+  const first = plan.rules.find((r) => r.showWhen !== 'loser');
+  const costliestId =
+    first && first.broken > 0 && first.brokenPnl < 0 ? first.ruleId : undefined;
   const cost = plan.cost.pnl;
   // Each trade once, as the cost counts them.
   const costed = display.figure(
@@ -450,11 +454,11 @@ export function PlanCard({
             </tr>
           </thead>
           <tbody>
-            {shown.map((rule, i) => (
+            {shown.map((rule) => (
               <RuleRow
                 key={rule.ruleId}
                 rule={rule}
-                costliest={i === 0 && rule.broken > 0 && rule.brokenPnl < 0}
+                costliest={rule.ruleId === costliestId}
                 currency={currency}
                 onOpen={(button) => onOpenRule(rule.ruleId, button)}
               />

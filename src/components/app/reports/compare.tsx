@@ -21,6 +21,7 @@ import {
   applyFilters,
   EMPTY_FILTERS,
   parseFilters,
+  previousRange,
   resolveRange,
   sanitizeFilters,
   serializeFilters,
@@ -439,16 +440,17 @@ function Compared({
     }),
     [accounts, strategies, tags],
   );
-  // Group A starts from the global filters; Group B starts empty.
+  // Group A starts from the global filters; Group B from the same filters over the previous period of equal
+  // length (empty when A has no start date). An explicit `a=` or `b=` wins.
   const filters = useMemo(() => {
     const p = new URLSearchParams(search);
-    return [
-      sanitizeFilters(groupFrom(p, 'a', global), known),
-      sanitizeFilters(groupFrom(p, 'b', EMPTY_FILTERS), known),
-    ];
+    const a = sanitizeFilters(groupFrom(p, 'a', global), known);
+    const before = previousRange(a.range, today);
+    const seedB = before ? { ...a, range: before } : EMPTY_FILTERS;
+    return [a, sanitizeFilters(groupFrom(p, 'b', seedB), known)];
     // `global` is the URL's filters as an object; `search` already covers it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, known]);
+  }, [search, known, today]);
 
   const env = useMemo(
     () => ({
@@ -675,9 +677,9 @@ function Compared({
           ))}
         </div>
         <p className="-mt-1 text-[12.5px] text-faint">
-          Group A starts from the filters on the other reports, Group B from
-          none. Each group has its own, and the address holds both, so a
-          comparison can be linked.
+          Group A starts from the filters on the other reports, Group B from the
+          period before it when that has a start date. Each group has its own,
+          and the address holds both, so a comparison can be linked.
         </p>
 
         <section
@@ -783,7 +785,7 @@ function Compared({
  * Reports, Compare: two groups of trades, each with its own filters (date,
  * symbol, side, strategy, tags, outcome, account), their summaries side by side
  * with the differences, and both cumulative lines on one chart. Group A starts
- * from the global filters and Group B from none; both are kept in the address
+ * from the global filters and Group B from the period before it; both are kept in the address
  * (`?a=...&b=...`, the filters' own serialisation), so a comparison is linkable.
  * Render inside `<Suspense>`.
  */

@@ -18,11 +18,14 @@ export function Sparkline({
   label,
   className = '',
   variant = 'area',
+  range,
 }: {
   series: readonly number[];
   label?: string;
   className?: string;
   variant?: 'area' | 'line';
+  /** Lines that sit side by side share one scale: the values the drawing box spans. */
+  range?: { min: number; max: number };
 }): React.JSX.Element | null {
   const gradientId = `eq${useId().replace(/[^\w-]/g, '')}`;
   const a11y = label
@@ -65,6 +68,7 @@ export function Sparkline({
     top: 7,
     bottom: 74,
     floor: H,
+    range,
   });
   if (!line || !first || !last) return null;
   // Fills arrive once the line is mostly drawn.
