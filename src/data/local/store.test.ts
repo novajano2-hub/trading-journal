@@ -186,7 +186,8 @@ async function seededBefore(version: number | undefined) {
   await putMine(db, mine);
   await db.trades.update(['sample', 'f-1'], { tagIds: ['tag-setup'] });
   const record = (await db.meta.get('seed:sample'))!;
-  const { version: _drop, ...rest } = record.value as Record<string, unknown>;
+  const rest = { ...(record.value as Record<string, unknown>) };
+  delete rest.version;
   await db.meta.put({
     key: 'seed:sample',
     value: version === undefined ? rest : { ...rest, version },
