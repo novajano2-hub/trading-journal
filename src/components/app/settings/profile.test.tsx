@@ -5,6 +5,7 @@ import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
+import { zoneLabel } from '@/lib/time-zone-label';
 import { renderApp } from '../__fixtures__/render-app';
 import { ProfileSettings } from './profile';
 
@@ -28,7 +29,9 @@ test('with no time zone saved it reads Browser default and the browser zone', as
     url: '/app/settings/profile',
   });
   const zone = (await r.prefs.get()).timeZone;
-  expect(await screen.findByText(`Browser default (${zone})`)).toBeTruthy();
+  expect(
+    await screen.findByText(`Browser default (${zoneLabel(zone)})`),
+  ).toBeTruthy();
   expect(
     screen.queryByRole('button', { name: /Use browser default/ }),
   ).toBeNull();

@@ -139,7 +139,7 @@ function Kpi({
   const fmt = (v: number) =>
     spec ? spec.format(v) : formatTicker(kind, v, { digits: 1, currency });
   const shown = spec && value !== null ? spec.value : value;
-  const text = shown === null ? 'None yet' : fmt(shown);
+  const text = shown === null ? 'None' : fmt(shown);
   const hasTrend = trend.length >= 2;
   // Says what the line is: a rolling window, not the range's figure beside it.
   const trendLabel = hasTrend
@@ -162,7 +162,7 @@ function Kpi({
           style={{ fontSize: figureSize(text.length) }}
         >
           {shown === null ? (
-            <span className="font-medium text-faint">None yet</span>
+            <span className="font-medium text-faint">None</span>
           ) : (
             <NumberTicker
               value={shown}

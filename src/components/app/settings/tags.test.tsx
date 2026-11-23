@@ -12,7 +12,8 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import { renderApp } from '../__fixtures__/render-app';
-import { SWATCHES } from './colour-picker';
+import { CATEGORIES } from '@/data/seed/templates';
+import { SWATCHES, swatchName } from './colour-picker';
 import { TagsSettings } from './tags';
 
 vi.mock('next/navigation', () => import('../__fixtures__/navigation'));
@@ -54,7 +55,37 @@ test('twelve swatches, each a valid #RRGGBB', () => {
   expect(SWATCHES).toHaveLength(12);
   for (const s of SWATCHES) expect(s.hex).toMatch(/^#[0-9A-F]{6}$/);
   expect(new Set(SWATCHES.map((s) => s.name)).size).toBe(12);
-  expect(SWATCHES.map((s) => s.name)).toContain('Teal');
+  expect(SWATCHES.map((s) => s.name)).toContain('Plum');
+});
+
+test('the palette leaves out the hues that have jobs: gain, loss, accent and cyan', () => {
+  // theme.css fills and the accent, light and dark.
+  const jobs = {
+    gain: [0x19, 0xa6, 0x72],
+    loss: [0xe5, 0x48, 0x4d],
+    accent: [0x2b, 0x35, 0xaf],
+    accentDark: [0x4c, 0x57, 0xdc],
+    cyan: [0x16, 0x93, 0xbe],
+  };
+  const rgb = (hex: string) =>
+    [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const near = (a: number[], b: number[]) =>
+    Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!);
+  for (const s of SWATCHES)
+    for (const [job, c] of Object.entries(jobs))
+      expect(near(rgb(s.hex), c), `${s.name} vs ${job}`).toBeGreaterThan(60);
+  // Mistakes stays marigold.
+  expect(SWATCHES.find((s) => s.name === 'Marigold')!.hex).toBe(
+    CATEGORIES.mistakes.color,
+  );
+  // Every default category is one of the palette's colours.
+  for (const c of Object.values(CATEGORIES))
+    expect(SWATCHES.map((s) => s.hex)).toContain(c.color);
+});
+
+test('a colour is named by its swatch; the hex is the secondary hint', () => {
+  expect(swatchName('#d97706')).toBe('Marigold');
+  expect(swatchName('#123456')).toBe('Custom colour');
 });
 
 test('Categories lists each category with its tag count', async () => {
@@ -87,22 +118,22 @@ test('a built-in category can be renamed and recoloured', async () => {
   fireEvent.change(within(dialog).getByLabelText('Category name'), {
     target: { value: 'Errors' },
   });
-  fireEvent.click(within(dialog).getByRole('radio', { name: 'Teal' }));
+  fireEvent.click(within(dialog).getByRole('radio', { name: 'Plum' }));
   fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
-  const teal = SWATCHES.find((s) => s.name === 'Teal')!.hex;
+  const plum = SWATCHES.find((s) => s.name === 'Plum')!.hex;
   await waitFor(async () =>
     expect(
       (await r.tagCategories.list(S)).find((c) => c.id === 'mistakes'),
     ).toMatchObject({
       name: 'Errors',
-      color: teal,
+      color: plum,
       builtIn: true,
       role: 'mistake',
     }),
   );
 });
 
-test('creating the category Sessions in teal, then the tag London Open in it, stores london open', async () => {
+test('creating the category Sessions in plum, then the tag London Open in it, stores london open', async () => {
   const r = repo();
   renderApp(<TagsSettings />, { repository: r, url: URL });
   fireEvent.click(await screen.findByRole('button', { name: 'New category' }));
@@ -110,13 +141,13 @@ test('creating the category Sessions in teal, then the tag London Open in it, st
   fireEvent.change(within(dialog).getByLabelText('Category name'), {
     target: { value: 'Sessions' },
   });
-  fireEvent.click(within(dialog).getByRole('radio', { name: 'Teal' }));
+  fireEvent.click(within(dialog).getByRole('radio', { name: 'Plum' }));
   fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
-  const teal = SWATCHES.find((s) => s.name === 'Teal')!.hex;
+  const plum = SWATCHES.find((s) => s.name === 'Plum')!.hex;
   await waitFor(async () =>
     expect(
       (await r.tagCategories.list(S)).find((c) => c.name === 'Sessions')?.color,
-    ).toBe(teal),
+    ).toBe(plum),
   );
   const sessions = (await r.tagCategories.list(S)).find(
     (c) => c.name === 'Sessions',

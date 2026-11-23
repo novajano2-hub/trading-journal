@@ -81,7 +81,7 @@ function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         type="submit"
         disabled
         aria-describedby="auth-note"
-        className="mt-2 w-full disabled:cursor-not-allowed"
+        className="mt-2 h-11! w-full text-[15px]! font-medium! disabled:cursor-not-allowed"
       >
         {login ? 'Log in' : 'Create account'}
       </Button>

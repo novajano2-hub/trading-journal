@@ -3,6 +3,7 @@
 import { Globe } from '@phosphor-icons/react/dist/ssr';
 import { useId, useState } from 'react';
 import { isValidTimeZone } from '@/domain/time';
+import { offsetLabel, zoneLabel } from '@/lib/time-zone-label';
 import { INPUT } from './styles';
 
 let zones: string[] | undefined;
@@ -19,20 +20,7 @@ export function timeZoneNames(): string[] {
   return zones;
 }
 
-/** "UTC-06:00" for a zone right now. */
-export function offsetLabel(timeZone: string): string {
-  try {
-    const part = new Intl.DateTimeFormat('en-US', {
-      timeZone,
-      timeZoneName: 'longOffset',
-    })
-      .formatToParts(new Date())
-      .find((p) => p.type === 'timeZoneName')?.value;
-    return part ? part.replace('GMT', 'UTC').replace('−', '-') || 'UTC' : '';
-  } catch {
-    return '';
-  }
-}
+export { offsetLabel };
 
 /**
  * A zone picked by typing: the browser filters its list of every zone as you
@@ -95,7 +83,7 @@ export function TimeZoneField({
       >
         {invalid
           ? "Keel doesn't know that time zone. Pick one from the list, like America/Chicago."
-          : `${offsetLabel(value)} now. Keel stores UTC and shows your own time zone.`}
+          : `${zoneLabel(value)} now. Keel stores UTC and shows your own time zone.`}
       </p>
     </div>
   );

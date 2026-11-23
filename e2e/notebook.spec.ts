@@ -30,10 +30,9 @@ test('make a folder and a note in it, favourite it, trash it and restore it', as
   const title = page.getByRole('textbox', { name: 'Note title' });
   await title.fill('Fade the gap at the open');
   await expect(page.getByText(/^Saved/)).toBeVisible();
-  await expect(page.getByLabel('Move to folder')).toHaveValue(/.+/);
   await expect(
-    page.getByLabel('Move to folder').locator('option:checked'),
-  ).toHaveText('Gap ideas');
+    page.getByRole('button', { name: 'Move to folder, Gap ideas' }),
+  ).toBeVisible();
   const list = page.getByRole('list', { name: 'Notes' });
   await expect(list).toContainText('Fade the gap at the open');
 

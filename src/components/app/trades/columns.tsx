@@ -77,29 +77,32 @@ export const ALIGN: Partial<Record<ColumnId, 'right' | 'center'>> = {
  * truncates inside its own width. Qty holds "999,999" (shares, lots, coins).
  */
 export const COLUMN_WIDTHS: Record<ColumnId, number> = {
-  open: 82,
-  close: 82,
-  instrument: 102,
+  open: 78,
+  close: 78,
+  instrument: 90,
   account: 110,
-  side: 56,
-  qty: 56,
-  entry: 66,
-  exit: 66,
-  gross: 74,
-  fees: 60,
-  net: 74,
-  roi: 60,
-  realizedR: 54,
-  plannedR: 60,
-  duration: 62,
-  strategies: 132,
-  tags: 118,
+  side: 50,
+  qty: 48,
+  entry: 62,
+  exit: 62,
+  gross: 72,
+  fees: 58,
+  net: 72,
+  roi: 58,
+  realizedR: 52,
+  plannedR: 58,
+  duration: 56,
+  strategies: 172,
+  tags: 130,
   mistakes: 110,
-  rules: 80,
-  rating: 58,
-  reviewed: 62,
+  rules: 76,
+  rating: 54,
+  reviewed: 58,
   status: 72,
 };
+
+/** Columns whose text starts after a gap, so a right-aligned neighbour's header never runs into it. */
+export const PAD_LEFT = new Set<ColumnId>(['strategies']);
 
 /** The columns that open on their largest, then smallest; text ones run A to Z first. */
 const DESC_FIRST = new Set<ColumnId>([
@@ -250,6 +253,7 @@ function cellOf(id: ColumnId, t: Trade, env: CellEnv): React.ReactNode {
           <InstrumentName
             trade={t}
             timeZone={timeZone}
+            showExpiry={false}
             className="flex-nowrap!"
           />
         </TradeLink>
@@ -286,7 +290,7 @@ function cellOf(id: ColumnId, t: Trade, env: CellEnv): React.ReactNode {
       if (t.status !== 'closed') return null;
       const r = rOf(t, env.ctx.pnlBasis);
       return r === undefined ? (
-        <span className="text-faint">No risk</span>
+        <span className="text-faint">None</span>
       ) : (
         <Ratio value={r} unit="r" currency={t.pnlCurrency} />
       );

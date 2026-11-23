@@ -16,7 +16,6 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
-import { IconTile } from '@/components/ui/icon-tile';
 import {
   useCreateStrategy,
   useRemoveStrategy,
@@ -30,7 +29,6 @@ import {
   type RuleShowWhen,
   type Strategy,
   type StrategyIcon,
-  type StrategyTone,
 } from '@/domain/types';
 import { plural } from '@/lib/format';
 import { ConfirmDialog } from '../confirm-dialog';
@@ -41,8 +39,6 @@ import {
   ICON_LABEL,
   SHOW_WHEN_LABEL,
   STRATEGY_ICON_GLYPH,
-  TONE_LABEL,
-  TONE_ORDER,
   deleteBody,
 } from './strategy-style';
 import { NoStrategy, StrategySkeleton } from './strategy-states';
@@ -144,7 +140,6 @@ function StrategyEditor({
   const [name, setName] = useState(initial?.name ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [icon, setIcon] = useState<StrategyIcon>(initial?.icon ?? 'target');
-  const [tone, setTone] = useState<StrategyTone>(initial?.tone ?? 'accent');
   const [assets, setAssets] = useState<AssetClass[]>(
     initial?.assetClasses ?? [],
   );
@@ -215,7 +210,6 @@ function StrategyEditor({
       checklist: items.map((i) => i.text.trim()).filter(Boolean),
       status: initial?.status ?? 'active',
       icon,
-      tone,
     };
     try {
       const saved = initial
@@ -318,31 +312,6 @@ function StrategyEditor({
                     </label>
                   );
                 })}
-              </div>
-            </div>
-
-            <div role="radiogroup" aria-label="Colour">
-              <span className={LABEL} aria-hidden="true">
-                Colour
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {TONE_ORDER.map((key) => (
-                  <label key={key} className="relative cursor-pointer">
-                    <input
-                      type="radio"
-                      name="strategy-tone"
-                      value={key}
-                      checked={tone === key}
-                      onChange={() => setTone(key)}
-                      aria-label={TONE_LABEL[key]}
-                      className="peer sr-only"
-                    />
-                    <span className="flex h-10 items-center gap-2.5 rounded-[10px] border border-line bg-surface-1 pr-3 pl-1.5 text-[13px] font-medium text-muted transition-colors peer-checked:border-accent peer-checked:text-text peer-focus-visible:outline-2 peer-focus-visible:outline-accent hover:border-faint pointer-coarse:h-11">
-                      <IconTile icon={STRATEGY_ICON_GLYPH[icon]} tone={key} />
-                      {TONE_LABEL[key]}
-                    </span>
-                  </label>
-                ))}
               </div>
             </div>
 

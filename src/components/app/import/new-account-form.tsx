@@ -221,7 +221,7 @@ export function NewAccountForm({
           type="button"
           onClick={() => void submit()}
           disabled={create.isPending}
-          className={buttonClasses('primary', 'sm')}
+          className={buttonClasses('primary')}
         >
           Create account
         </button>

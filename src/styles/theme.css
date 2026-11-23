@@ -56,6 +56,10 @@
   --r-chip: 6px;
   --r-control: 10px;
   --r-card: 16px;
+  /* The focus ring: ultramarine, 2px, 3px off the element, on a 6px radius where the element has none of its own. */
+  --focus-width: 2px;
+  --focus-offset: 3px;
+  --focus-radius: var(--r-chip);
 
   /* Motion tokens, mirrored from src/lib/motion.ts for CSS-only motion. */
   --ease-enter: cubic-bezier(0.2, 0.8, 0.2, 1);

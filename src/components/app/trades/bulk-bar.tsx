@@ -217,7 +217,6 @@ export function BulkBar({
                 onChange={setPending}
               />
               <Button
-                size="sm"
                 className="mt-3 w-full"
                 disabled={pending.length === 0}
                 onClick={() => {

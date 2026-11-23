@@ -6,9 +6,9 @@ import { useRef, type ReactNode } from 'react';
 
 /** Table header and cell looks shared by the settings tables (the comp's 46px rows). */
 export const TH =
-  'h-10 px-2 text-left text-[12px] font-medium whitespace-nowrap text-faint first:pl-5 last:pr-5';
+  'h-10 px-1.5 text-left text-[12px] font-medium whitespace-nowrap text-faint first:pl-5 last:pr-5';
 export const TD =
-  'h-[46px] px-2 align-middle first:pl-5 last:pr-5 border-t border-line';
+  'h-[46px] px-1.5 align-middle first:pl-5 last:pr-5 border-t border-line';
 export const NUM = 'text-right tabular-nums';
 
 const MENU =

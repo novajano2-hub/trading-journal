@@ -37,10 +37,11 @@ import {
 } from './metric-chips';
 import { ReportChart, type ChartSeries } from './report-chart';
 import { ReportScope } from './report-scope';
+import { MenuSelect } from '@/components/ui/menu-select';
 import { SummaryTable, type SummaryColumn } from './summary-table';
 import { writeParam, type ReportData } from './use-report-data';
 
-/** A labelled native select: the report's small controls, readable by every assistive technology. */
+/** A labelled dropdown: the report's small controls, the app's own menu rather than a native select. */
 export function ReportSelect({
   label,
   value,
@@ -52,24 +53,19 @@ export function ReportSelect({
   value: string;
   onChange(value: string): void;
   options: readonly { value: string; label: string }[];
-  /** The label is for assistive technology only. */
+  /** The label is for assistive technology only: the button's name still starts with it. */
   hideLabel?: boolean;
 }): React.JSX.Element {
   return (
-    <label className="inline-flex items-center gap-2 text-[13px] text-muted">
-      <span className={hideLabel ? 'sr-only' : undefined}>{label}</span>
-      <select
+    <span className="inline-flex items-center gap-2 text-[13px] text-muted">
+      {hideLabel ? null : <span aria-hidden="true">{label}</span>}
+      <MenuSelect
+        label={label}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-8 max-w-48 cursor-pointer rounded-control border border-line bg-surface-1 px-2 text-[13.5px] font-medium text-text outline-offset-2 hover:border-accent/35 focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11"
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
+        onChange={onChange}
+        options={options}
+      />
+    </span>
   );
 }
 

@@ -180,7 +180,7 @@ function DayBody({
         <Kpi label="Trades">{model.trades}</Kpi>
         <Kpi label="Win rate">
           {model.trades === 0
-            ? '-'
+            ? 'None'
             : formatPct(
                 model.wins / model.trades,
                 model.wins % model.trades === 0 ? 0 : 1,
@@ -344,7 +344,7 @@ function StatsBody({
         </Kpi>
         <Kpi label="Net ROI" tone={base === null ? '' : signTone(base)}>
           {base === null || trade.status !== 'closed'
-            ? '-'
+            ? 'None'
             : `${base > 0 ? '+' : ''}${formatPct(base, 2)}`}
         </Kpi>
         <Kpi label="Gross P&L" tone={signTone(trade.gross)}>

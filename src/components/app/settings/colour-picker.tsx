@@ -4,47 +4,32 @@ import { useId } from 'react';
 import { HELP, INPUT, LABEL } from '@/components/app/import/styles';
 import { FieldError } from './settings-ui';
 
-type Rgb = readonly [number, number, number];
-
-/** The app's own colours (theme.css), as the fills they give charts and tiles. */
-const TOKEN = {
-  accent: [0x2b, 0x35, 0xaf],
-  accentDark: [0x4c, 0x57, 0xdc],
-  info: [0x16, 0x93, 0xbe],
-  gain: [0x19, 0xa6, 0x72],
-  warn: [0xe9, 0xa2, 0x1a],
-  loss: [0xe5, 0x48, 0x4d],
-  faint: [0x63, 0x68, 0x89],
-} as const satisfies Record<string, Rgb>;
-
-const hex = ([r, g, b]: Rgb) =>
-  `#${[r, g, b].map((n) => Math.round(n).toString(16).padStart(2, '0')).join('')}`.toUpperCase();
-
-/** `t` of the way from `a` to `b`. */
-const mix = (a: Rgb, b: Rgb, t: number): Rgb => [
-  a[0] + (b[0] - a[0]) * t,
-  a[1] + (b[1] - a[1]) * t,
-  a[2] + (b[2] - a[2]) * t,
-];
-
 /**
- * Twelve colours for a tag category: the theme's accent, gain, warning, loss
- * and info fills, and the steps between neighbours, from blue round to rose.
+ * Twelve colours for a tag category. Each hue has a job elsewhere in Keel, so
+ * the palette leaves them out: gain green, loss red, the ultramarine accent and
+ * info cyan, and the blends that sit beside them (teal, lime, a blue-leaning
+ * rose). Marigold stays in, because Mistakes is marigold.
  */
 export const SWATCHES: readonly { name: string; hex: string }[] = [
-  { name: 'Ultramarine', hex: hex(TOKEN.accent) },
-  { name: 'Periwinkle', hex: hex(TOKEN.accentDark) },
-  { name: 'Cyan', hex: hex(TOKEN.info) },
-  { name: 'Teal', hex: hex(mix(TOKEN.info, TOKEN.gain, 0.5)) },
-  { name: 'Green', hex: hex(TOKEN.gain) },
-  { name: 'Lime', hex: hex(mix(TOKEN.gain, TOKEN.warn, 0.5)) },
-  { name: 'Amber', hex: hex(TOKEN.warn) },
-  { name: 'Orange', hex: hex(mix(TOKEN.warn, TOKEN.loss, 0.5)) },
-  { name: 'Red', hex: hex(TOKEN.loss) },
-  { name: 'Rose', hex: hex(mix(TOKEN.loss, TOKEN.accent, 0.35)) },
-  { name: 'Plum', hex: hex(mix(TOKEN.loss, TOKEN.accent, 0.65)) },
-  { name: 'Slate', hex: hex(TOKEN.faint) },
+  { name: 'Marigold', hex: '#D97706' },
+  { name: 'Clay', hex: '#A5562B' },
+  { name: 'Rose', hex: '#CB4B8A' },
+  { name: 'Orchid', hex: '#B547A8' },
+  { name: 'Plum', hex: '#7E3F9E' },
+  { name: 'Olive', hex: '#7D8A1E' },
+  { name: 'Bronze', hex: '#8E6B21' },
+  { name: 'Umber', hex: '#6E4B3A' },
+  { name: 'Mauve', hex: '#A06A8E' },
+  { name: 'Slate', hex: '#636889' },
+  { name: 'Graphite', hex: '#3B405C' },
+  { name: 'Sand', hex: '#A8946B' },
 ];
+
+/** The swatch's name for a colour, or "Custom colour" for one typed in. */
+export function swatchName(color: string): string {
+  const hex = color.toUpperCase();
+  return SWATCHES.find((s) => s.hex === hex)?.name ?? 'Custom colour';
+}
 
 const HEX = /^#[0-9A-Fa-f]{6}$/;
 
@@ -109,10 +94,13 @@ export function ColourPicker({
         <span
           aria-hidden="true"
           style={{ backgroundColor: current ?? 'transparent' }}
-          className="mt-[3px] size-7 flex-none rounded-[8px] border border-line-2"
+          className="mt-0.5 size-7 flex-none rounded-[8px] border border-line-2"
         />
         <div className="min-w-0">
-          <label htmlFor={hexId} className="sr-only">
+          <p className="text-[13.5px] font-semibold text-text">
+            {current ? swatchName(current) : 'Not a colour yet'}
+          </p>
+          <label htmlFor={hexId} className="mt-1.5 block text-xs text-faint">
             Hex
           </label>
           <input
@@ -124,7 +112,7 @@ export function ColourPicker({
             aria-invalid={invalid || undefined}
             aria-describedby={`${hexId}-${invalid ? 'err' : 'help'}`}
             onChange={(e) => onChange(e.target.value)}
-            className={`${INPUT} w-[120px] font-mono uppercase`}
+            className={`${INPUT} mt-1 w-[120px] font-mono uppercase`}
           />
           {invalid ? (
             <FieldError id={`${hexId}-err`}>

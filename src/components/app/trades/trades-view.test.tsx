@@ -101,6 +101,18 @@ test('Hide summary saves the preference and leaves a way back', async () => {
   await screen.findByRole('region', { name: 'Summary' });
 });
 
+test('Add trade is a secondary button beside the top bar Import, at the one md size; Strategy gets its own gap', async () => {
+  renderApp(<TradesView />, { sample: sample(), url: '/app/trades' });
+  const t = await table();
+  const add = screen.getByRole('link', { name: 'Add trade' });
+  expect(add.className).toContain('border-line-2');
+  expect(add.className).not.toContain('bg-accent');
+  expect(add.className).toContain('h-[34px]');
+  // Duration is right-aligned and Strategy starts after a gap, so the headers never meet.
+  const strategy = within(t).getByRole('columnheader', { name: /Strategy/ });
+  expect(strategy.className).toContain('pl-2');
+});
+
 test('newest open first; sorting by Net puts the largest first', async () => {
   renderApp(<TradesView />, { sample: sample(), url: '/app/trades' });
   const t = await table();

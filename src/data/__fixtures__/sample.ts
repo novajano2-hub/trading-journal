@@ -76,7 +76,7 @@ export function fixtureSample(): SampleWorkspace {
         id: 'setups',
         workspaceId: WS,
         name: 'Setups',
-        color: '#2B35AF',
+        color: '#7E3F9E',
         builtIn: false,
       },
       {
@@ -91,7 +91,7 @@ export function fixtureSample(): SampleWorkspace {
         id: 'custom-tags',
         workspaceId: WS,
         name: 'Custom tags',
-        color: '#16A34A',
+        color: '#636889',
         builtIn: true,
       },
     ],

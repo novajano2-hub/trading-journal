@@ -300,7 +300,7 @@ function Stats({
         }
       >
         {trade.avgExit === undefined ? (
-          <span className="text-[14px] font-normal text-faint">None yet</span>
+          <span className="text-[14px] font-normal text-faint">None</span>
         ) : (
           price(trade.avgExit, tick)
         )}
@@ -393,7 +393,7 @@ function Stats({
         }
       >
         {planned === undefined ? (
-          <span className="text-[14px] font-normal text-faint">Not set</span>
+          <span className="text-[14px] font-normal text-faint">None</span>
         ) : (
           rText(planned, false)
         )}
@@ -414,7 +414,7 @@ function Stats({
         }
       >
         {r === undefined ? (
-          <span className="text-[14px] font-normal text-faint">Not set</span>
+          <span className="text-[14px] font-normal text-faint">None</span>
         ) : (
           rText(r, true)
         )}
@@ -877,9 +877,7 @@ function TradePage({
             className={`block text-[22px] leading-[1.6] font-semibold tracking-[-0.03em] tabular-nums ${roi === undefined ? '' : tone(roi)}`}
           >
             {roi === undefined ? (
-              <span className="text-[14px] font-normal text-faint">
-                Not available
-              </span>
+              <span className="text-[14px] font-normal text-faint">None</span>
             ) : (
               formatUnitValue('percent', roi, { currency: cur, signed: true })
             )}
@@ -893,16 +891,14 @@ function TradePage({
             className={`block text-[22px] leading-[1.6] font-semibold tracking-[-0.03em] tabular-nums ${r === undefined ? '' : tone(r)}`}
           >
             {r === undefined ? (
-              <span className="text-[14px] font-normal text-faint">
-                Not set
-              </span>
+              <span className="text-[14px] font-normal text-faint">None</span>
             ) : (
               formatUnitValue('r', r, { currency: cur, signed: true })
             )}
           </b>
           <small className="block text-xs text-faint">
             {planned === undefined
-              ? 'set a stop and target'
+              ? 'add a target for planned R'
               : `of ${formatUnitValue('r', planned, { currency: cur, signed: false })} planned`}
           </small>
         </div>
@@ -934,16 +930,13 @@ function TradePage({
                 <span className="text-[12.5px] text-faint">
                   {trade.instrument.symbol}
                   {trade.instrument.pointValue !== 1 ? (
+                    // A multiplier on the price move, a plain number: nothing for Privacy to hide.
                     <>
-                      {', '}
-                      <FigureText
-                        f={display.cash(
-                          Math.round(trade.instrument.pointValue * 100),
-                          false,
-                          cur,
-                        )}
-                      />{' '}
-                      per point
+                      , ×
+                      {trade.instrument.pointValue.toLocaleString('en-US', {
+                        maximumFractionDigits: 6,
+                      })}{' '}
+                      multiplier
                     </>
                   ) : null}
                 </span>

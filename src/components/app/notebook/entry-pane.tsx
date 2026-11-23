@@ -8,6 +8,7 @@ import {
   Trash,
   X,
 } from '@phosphor-icons/react/dist/ssr';
+import { MenuSelect } from '@/components/ui/menu-select';
 import { useSaveJournalEntry } from '@/data/query/hooks';
 import type { JournalEntry, NoteFolder } from '@/domain/types';
 import { dayLabel } from '@/data/seed/calendar';
@@ -21,6 +22,10 @@ import { KIND_LABEL } from './notebook-model';
 export const DRAFT_ID = 'draft';
 
 type Status = 'idle' | 'saving' | 'saved' | 'failed';
+
+/** The folder control, a sunken 26px pill among the entry's meta chips. */
+const FOLDER_FIELD =
+  'inline-flex h-[26px] max-w-[180px] min-w-0 cursor-pointer items-center gap-1 rounded-[7px] bg-sunken pr-1.5 pl-2 text-[12.5px] font-medium text-muted hover:text-text disabled:cursor-default disabled:opacity-60 pointer-coarse:h-11';
 
 const BAR_BUTTON =
   'inline-flex h-8 items-center gap-1.5 rounded-[8px] px-2.5 text-[13px] font-medium text-muted outline-offset-0 hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11';
@@ -57,11 +62,6 @@ export function EntryPane({
   const save = useSaveJournalEntry();
   const trashed = entry.deletedAt !== undefined;
   const isDraft = entry.id === DRAFT_ID;
-  const titleBox = useRef<HTMLInputElement>(null);
-  // Opening a note puts the cursor in its title.
-  useEffect(() => {
-    titleBox.current?.focus({ preventScroll: true });
-  }, []);
   const [seed] = useState(entry.body);
   const [title, setTitle] = useState(entry.title);
   const [tagText, setTagText] = useState('');
@@ -159,26 +159,17 @@ export function EntryPane({
           {KIND_LABEL[entry.kind]}
         </span>
         {day ? <span className="max-sm:hidden">{dayLabel(day)}</span> : null}
-        <label className="inline-flex items-center gap-1.5">
-          <span className="sr-only">Move to folder</span>
-          <select
-            aria-label="Move to folder"
-            value={shown.folderId ?? ''}
-            disabled={trashed}
-            onChange={(e) => {
-              const id = e.target.value;
-              commit({ folderId: id === '' ? undefined : id });
-            }}
-            className="h-[26px] max-w-[180px] rounded-[7px] border-0 bg-sunken pr-1 pl-2 text-[12.5px] font-medium text-muted outline-offset-0 focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-60 pointer-coarse:h-11"
-          >
-            <option value="">No folder</option>
-            {folders.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <MenuSelect
+          label="Move to folder"
+          value={shown.folderId ?? ''}
+          disabled={trashed}
+          onChange={(id) => commit({ folderId: id === '' ? undefined : id })}
+          options={[
+            { value: '', label: 'No folder' },
+            ...folders.map((f) => ({ value: f.id, label: f.name })),
+          ]}
+          triggerClassName={FOLDER_FIELD}
+        />
         <span
           aria-live="polite"
           className="ml-auto inline-flex items-center gap-1.5"
@@ -253,7 +244,6 @@ export function EntryPane({
       ) : null}
 
       <input
-        ref={titleBox}
         aria-label="Note title"
         value={title}
         readOnly={trashed}

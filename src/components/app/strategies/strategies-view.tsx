@@ -29,7 +29,6 @@ import {
   iconOf,
   pctText,
   pfText,
-  toneOf,
 } from './strategy-style';
 import {
   ArchiveFailed,
@@ -52,7 +51,7 @@ const MENU =
 const MENU_ITEM =
   'flex min-h-9 cursor-pointer items-center rounded-[8px] px-2.5 text-[13.5px] outline-none data-[highlighted]:bg-sunken pointer-coarse:min-h-11';
 
-const NEW_LINK = buttonClasses('primary', 'sm');
+const NEW_LINK = buttonClasses('primary');
 
 function NewStrategyLink(): React.JSX.Element {
   return (
@@ -117,7 +116,7 @@ function StrategyCard({
     >
       <div className="min-w-0">
         <div className="flex items-center gap-2.5">
-          <IconTile icon={Glyph} tone={toneOf(s)} />
+          <IconTile icon={Glyph} tone="accent" />
           <h2 className="min-w-0 text-[17px] leading-snug font-semibold tracking-[-0.02em] text-text">
             <Link
               href={`/app/strategies/${encodeURIComponent(s.id)}`}

@@ -1,6 +1,7 @@
 import { Dexie } from 'dexie';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { expect, test } from 'vitest';
+import { CATEGORIES } from '@/data/seed/templates';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import { KeelDb } from './db';
 import { DB_NAME } from './schema';
@@ -132,16 +133,16 @@ test('version 2 moves version 1 data onto the new model', async () => {
   });
   expect(byName.get('Custom tags')).toMatchObject({
     builtIn: true,
-    color: '#16A34A',
+    color: CATEGORIES.custom.color,
   });
   expect(byName.get('Custom tags')).not.toHaveProperty('role');
   expect(byName.get('Setups')).toMatchObject({
     builtIn: false,
-    color: '#2B35AF',
+    color: CATEGORIES.setups.color,
   });
   expect(byName.get('Emotions')).toMatchObject({
     builtIn: false,
-    color: '#0A6F94',
+    color: CATEGORIES.emotions.color,
   });
   const tags = await db.tags.where('workspaceId').equals(M).toArray();
   const categoryOf = (id: string) =>

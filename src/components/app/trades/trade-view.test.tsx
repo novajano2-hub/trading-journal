@@ -498,7 +498,7 @@ test('under Privacy no amount survives anywhere on the trade page, and the fills
   expect(everyString(document.body).filter((s) => /\$\d/.test(s))).toEqual([]);
 });
 
-test('the Execution header hides its per point amount from a screen reader under Privacy', async () => {
+test('the Execution header gives a futures point value as a multiplier, with no dollar amount, under Privacy', async () => {
   const repository = createLocalRepository({
     indexedDB: new IDBFactory(),
     IDBKeyRange,
@@ -508,8 +508,8 @@ test('the Execution header hides its per point amount from a screen reader under
   renderApp(<TradeView id="t-c" />, { repository, url: URL_C });
   const exec = await screen.findByRole('region', { name: 'Execution' });
   const head = exec.querySelector('h2')!.parentElement!;
-  expect(head.textContent).toContain('per point');
-  expect(within(head).getByText('hidden amount')).toBeTruthy();
+  expect(head.textContent).toContain('×50 multiplier');
+  expect(head.textContent).not.toMatch(/\$|per point/);
 });
 
 test('the labels of realized R, planned R, MAE and MFE carry their definitions', async () => {
@@ -572,4 +572,21 @@ test('the position strip steps through the running position and ends flat', asyn
     (e) => e.textContent,
   );
   expect(quantities).toEqual(['3', '6', '3']);
+});
+
+test('an absent figure reads None and says what would add it, never a dash', async () => {
+  renderApp(<TradeView id="t-c" />, {
+    sample: sample(),
+    url: URL_C,
+  });
+  const exec = await screen.findByRole('region', { name: 'Execution' });
+  expect(exec.textContent).toContain('Planned RNone');
+  expect(exec.textContent).toContain('Realized RNone');
+  // Under the headline R, with no planned R to compare it with.
+  expect(document.body.textContent).toContain('add a target for planned R');
+  expect(document.body.textContent).not.toContain('set a stop and target');
+  expect(document.body.textContent).not.toContain('Not available');
+  const texts = everyString(document.body);
+  expect(texts).toContain('None');
+  expect(texts.filter((s) => s.trim() === '-')).toEqual([]);
 });

@@ -51,7 +51,8 @@ test('Day & time: time of day in 15 minutes, by exit, cross-analysed by side', a
   ).toBeVisible();
 
   // Cross-analysis: each time bucket against the side of the trade.
-  await page.getByLabel('Cross-analyse by').selectOption({ label: 'Side' });
+  await page.getByRole('button', { name: /^Cross-analyse by/ }).click();
+  await page.getByRole('menuitemradio', { name: 'Side' }).click();
   await expect(page).toHaveURL(/x=side/);
   const cross = page.getByRole('table', { name: 'Times by side' });
   await expect(cross).toBeVisible();

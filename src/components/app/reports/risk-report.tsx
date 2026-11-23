@@ -108,7 +108,7 @@ function DrawdownCard({ data }: { data: ReportData }): React.JSX.Element {
               <FigureText f={display.cash(-dd.amount, true, currency)} />
             </b>
             {dd.pct !== null && dd.amount > 0
-              ? `, ${formatPct(dd.pct, 1)} of peak`
+              ? `, ${formatPct(dd.pct, 1)} of peak balance`
               : ''}
           </span>
         }

@@ -148,14 +148,8 @@ function CategoryRow({
       aria-label={category.name}
       className="grid grid-cols-[100px_minmax(0,1fr)] items-start gap-2.5 border-b border-line/70 py-2.5 last:border-b-0 max-sm:grid-cols-[88px_minmax(0,1fr)]"
     >
-      <span className="flex items-center gap-1.5 pt-1 text-[12.5px] text-faint">
-        <span
-          aria-hidden="true"
-          className="size-2 flex-none rounded-full"
-          // A category's colour is data the user chose.
-          style={{ backgroundColor: category.color }}
-        />
-        <span className="min-w-0 truncate">{category.name}</span>
+      <span className="min-w-0 truncate pt-1 text-[12.5px] text-faint">
+        {category.name}
       </span>
       <div className="flex flex-wrap items-center gap-1.5">
         {mine.map((tag) => (

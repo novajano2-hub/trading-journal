@@ -159,6 +159,7 @@ export interface Strategy {
   checklist: string[];
   status: 'active' | 'archived';
   icon?: StrategyIcon;
+  /** Stored for old data and ignored: every strategy wears the accent tile, its icon tells them apart. */
   tone?: StrategyTone;
 }
 /** A strategy's rules flattened: group order, then rule order. */

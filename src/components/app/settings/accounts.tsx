@@ -23,6 +23,7 @@ import { localDate } from '@/domain/time';
 import type { Account, Trade } from '@/domain/types';
 import { useDisplay } from '@/lib/display';
 import { plural } from '@/lib/format';
+import { zoneLabel } from '@/lib/time-zone-label';
 import { ACCOUNT_TYPES, AccountDialog } from './account-dialog';
 import { BalanceAdjustments } from './cash-flows';
 import { NUM, RowMenu, TD, TH, type MenuAction } from './settings-ui';
@@ -191,7 +192,7 @@ export function AccountsSettings(): React.JSX.Element {
             <button
               type="button"
               onClick={() => setDialog({ kind: 'new' })}
-              className={buttonClasses('primary', 'sm')}
+              className={buttonClasses('primary')}
             >
               <Plus size={14} weight="bold" aria-hidden="true" />
               New account
@@ -224,7 +225,7 @@ export function AccountsSettings(): React.JSX.Element {
           <div className="relative mt-2 overflow-x-auto">
             <table
               aria-labelledby="accounts-heading"
-              className="w-full min-w-[900px] border-collapse text-[13.5px]"
+              className="w-full min-w-[960px] border-collapse text-[13.5px]"
             >
               <thead>
                 <tr>
@@ -255,12 +256,12 @@ export function AccountsSettings(): React.JSX.Element {
                   <th scope="col" className={TH}>
                     Status
                   </th>
-                  <th scope="col" className={TH}>
+                  <th scope="col" className={`${TH} min-w-[110px]`}>
                     Prop rules
                   </th>
                   <th
                     scope="col"
-                    className={`${TH} sticky right-0 z-[1] bg-surface-1 shadow-[inset_1px_0_0_var(--color-line)] lg:shadow-none`}
+                    className={`${TH} sticky right-0 w-16 z-[1] bg-surface-1 shadow-[inset_1px_0_0_var(--color-line)] lg:shadow-none`}
                   >
                     <span className="sr-only">Actions</span>
                   </th>
@@ -293,7 +294,10 @@ export function AccountsSettings(): React.JSX.Element {
                           </small>
                         ) : null}
                       </td>
-                      <td className={`${TD} max-w-[130px] truncate text-muted`}>
+                      <td
+                        className={`${TD} max-w-[124px] truncate text-muted`}
+                        title={a.broker}
+                      >
                         {a.broker}
                       </td>
                       <td className={`${TD} whitespace-nowrap`}>
@@ -319,10 +323,14 @@ export function AccountsSettings(): React.JSX.Element {
                         />
                       </td>
                       <td
-                        className={`${TD} max-w-[130px] truncate text-muted`}
-                        title={a.timeZone ?? 'Read in your own time zone'}
+                        className={`${TD} whitespace-nowrap text-muted`}
+                        title={
+                          a.timeZone
+                            ? zoneLabel(a.timeZone)
+                            : 'Read in your own time zone'
+                        }
                       >
-                        {a.timeZone ?? 'Yours'}
+                        {a.timeZone ? zoneLabel(a.timeZone) : 'Yours'}
                       </td>
                       <td className={TD}>
                         <Chip>
@@ -336,7 +344,7 @@ export function AccountsSettings(): React.JSX.Element {
                           {gone ? 'Archived' : 'Active'}
                         </Chip>
                       </td>
-                      <td className={`${TD} whitespace-nowrap`}>
+                      <td className={`${TD} min-w-[110px] whitespace-nowrap`}>
                         <PropRules account={a} />
                       </td>
                       <td

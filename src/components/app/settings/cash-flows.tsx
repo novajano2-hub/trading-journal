@@ -184,10 +184,10 @@ function FlowForm({
         ) : null}
       </div>
       <div className="flex flex-wrap justify-end gap-2">
-        <Button variant="secondary" size="sm" onClick={onDone} disabled={busy}>
+        <Button variant="secondary" onClick={onDone} disabled={busy}>
           Cancel
         </Button>
-        <Button type="submit" size="sm" disabled={busy}>
+        <Button type="submit" disabled={busy}>
           Save
         </Button>
       </div>

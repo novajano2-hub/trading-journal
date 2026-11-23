@@ -343,9 +343,8 @@ test("a mistake's rows list only the trade's other mistakes", async () => {
   expect(f2!.textContent).not.toContain(fomo);
   expect(f2!.textContent).toContain('None');
   // A trade with no strategy reads as Recent trades does.
-  expect(within(f2!).getByText('No strategy').className).toContain(
-    'text-faint',
-  );
+  for (const none of within(f2!).getAllByText('None'))
+    expect(none.className).toContain('text-faint');
 });
 
 test('a filter that matches nothing offers Clear filters (Review Focus 2)', async () => {

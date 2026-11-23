@@ -416,7 +416,7 @@ test('gross drives the KPIs and the equity line; goals stay net (Review Focus 3)
   expect(table.textContent).toContain('−$395.00');
 });
 
-test('a missing profit factor reads None yet', async () => {
+test('a missing profit factor reads None', async () => {
   await renderDashboard({
     edit: (s) => {
       const f1 = s.trades.find((t) => t.id === 'f-1')!;
@@ -428,7 +428,7 @@ test('a missing profit factor reads None yet', async () => {
   const pf = within(perf)
     .getByRole('button', { name: 'Profit factor' })
     .closest('[data-kpi]')!;
-  expect(pf.textContent).toContain('None yet');
+  expect(pf.textContent).toContain('None');
   expect(perf.textContent).not.toMatch(/NaN|Infinity/);
 });
 
@@ -531,7 +531,7 @@ test('ungraded imports still show performance and trades (Review Focus 1)', asyn
   expect(rows).toHaveLength(2);
   for (const row of rows) {
     expect(row.textContent).toContain('Not graded');
-    expect(row.textContent).toContain('No strategy');
+    expect(row.textContent).toContain('None');
   }
   expect(rows[0]!.textContent).toContain('−$400.00');
   const ready = screen.getByTestId('dashboard-ready');

@@ -35,9 +35,9 @@ test('docText joins blocks with a newline', () => {
   expect(docText(doc)).toBe('Plan\nWait for the open\nSize down');
 });
 
-test('docExcerpt flattens whitespace and trims to max with an ellipsis', () => {
-  expect(docExcerpt(doc, 10)).toBe('Plan Wait…');
-  expect(docExcerpt(doc, 200)).toBe('Plan Wait for the open Size down');
+test('docExcerpt flattens whitespace, ends each block like a sentence so a heading never runs into its body, and trims to max with an ellipsis', () => {
+  expect(docExcerpt(doc, 10)).toBe('Plan. Wai…');
+  expect(docExcerpt(doc, 200)).toBe('Plan. Wait for the open. Size down.');
 });
 
 test('inline marks, hard breaks and empty blocks are handled', () => {

@@ -105,7 +105,7 @@ export function SummaryStrip({
         sub={`${summary.wins} won, ${summary.losses} lost`}
       >
         {summary.winRate === null ? (
-          <span className="text-[15px] font-medium text-faint">None yet</span>
+          <span className="text-[15px] font-medium text-faint">None</span>
         ) : (
           formatPct(summary.winRate, 1)
         )}
@@ -120,14 +120,14 @@ export function SummaryStrip({
         }
       >
         {summary.profitFactor === null ? (
-          <span className="text-[15px] font-medium text-faint">None yet</span>
+          <span className="text-[15px] font-medium text-faint">None</span>
         ) : (
           formatRatio(summary.profitFactor)
         )}
       </Kpi>
       <Kpi id="expectancy" basis={basis} sub="per closed trade">
         {expectancy === null ? (
-          <span className="text-[15px] font-medium text-faint">None yet</span>
+          <span className="text-[15px] font-medium text-faint">None</span>
         ) : (
           <span className={signTone(expectancy.cents)}>
             <FigureText f={expectancy} />

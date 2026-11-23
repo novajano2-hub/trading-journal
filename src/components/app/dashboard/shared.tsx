@@ -118,12 +118,15 @@ export function InstrumentName({
   timeZone,
   className = '',
   detailClassName = '',
+  showExpiry = true,
 }: {
   trade: Trade;
   /** The zone the trade's open day is read in: an option's expiry shows only when it is another day. */
   timeZone?: string;
   className?: string;
   detailClassName?: string;
+  /** False in a tight table cell: the expiry then moves into the tooltip, with the full instrument. */
+  showExpiry?: boolean;
 }): React.JSX.Element {
   const { name, detail } = formatInstrument(
     trade.instrument,
@@ -134,7 +137,11 @@ export function InstrumentName({
   const at = name === trade.instrument.symbol ? -1 : name.indexOf(' ');
   return (
     <span
-      title={trade.instrument.symbol}
+      title={
+        detail !== undefined && !showExpiry
+          ? `${trade.instrument.symbol}, expires ${detail}`
+          : trade.instrument.symbol
+      }
       className={`flex min-w-0 flex-wrap items-baseline gap-x-1.5 ${className}`}
     >
       <span className="whitespace-nowrap">
@@ -153,7 +160,11 @@ export function InstrumentName({
       </span>
       {detail !== undefined ? (
         <span
-          className={`min-w-0 truncate text-xs text-faint ${detailClassName}`}
+          className={
+            showExpiry
+              ? `min-w-0 truncate text-xs text-faint ${detailClassName}`
+              : 'sr-only'
+          }
         >
           <span className="sr-only">expires </span>
           {detail}

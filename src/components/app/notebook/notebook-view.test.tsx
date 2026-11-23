@@ -496,10 +496,14 @@ test('tags: Enter adds a lowercase tag and Backspace takes the last one off', as
 test('Move to folder files the note in a user folder', async () => {
   const { repo } = await openWith('/app/notebook/n-plan');
   const folder = (await repo.folders.list(WS))[0]!;
-  const select = await screen.findByRole('combobox', {
-    name: 'Move to folder',
+  // The app's dropdown: Enter opens it, the arrows move, Enter files the note.
+  const select = await screen.findByRole('button', {
+    name: 'Move to folder, No folder',
   });
-  fireEvent.change(select, { target: { value: folder.id } });
+  fireEvent.keyDown(select, { key: 'Enter' });
+  fireEvent.click(
+    await screen.findByRole('menuitemradio', { name: folder.name }),
+  );
   await waitFor(async () =>
     expect((await repo.journal.get(WS, 'n-plan'))?.folderId).toBe(folder.id),
   );
@@ -538,10 +542,11 @@ test('typing a title and moving to Trash at once leaves the note in Trash with t
   expect(stored?.title).toBe('Retest plan v2');
 });
 
-test('opening a note focuses its title; All notes returns focus to its row', async () => {
+test('opening a note leaves focus alone, not in its title; All notes returns focus to its row', async () => {
   await openWith('/app/notebook/n-plan');
   const title = await screen.findByRole('textbox', { name: 'Note title' });
-  await waitFor(() => expect(document.activeElement).toBe(title));
+  await new Promise((r) => setTimeout(r, 50));
+  expect(document.activeElement).not.toBe(title);
   fireEvent.click(screen.getByRole('link', { name: /All notes/ }));
   // The test router does not follow links; the address bar moves as Next's would.
   act(() => window.history.pushState(null, '', '/app/notebook'));

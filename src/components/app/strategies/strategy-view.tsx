@@ -30,7 +30,6 @@ import {
   iconOf,
   pctText,
   pfText,
-  toneOf,
 } from './strategy-style';
 import { EquityLine } from './equity-line';
 import {
@@ -110,7 +109,7 @@ function ruleCells(
       ),
     followed:
       st.kept === 0 ? (
-        <span className="text-faint">None yet</span>
+        <span className="text-faint">None</span>
       ) : (
         <FigureText f={kept} />
       ),
@@ -399,7 +398,7 @@ function Header({
     >
       <IconTile
         icon={Glyph}
-        tone={toneOf(s)}
+        tone="accent"
         className="!size-9 !rounded-[10px]"
       />
       <div className="min-w-0 flex-[1_1_260px]">
@@ -430,14 +429,13 @@ function Header({
       <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
         <Link
           href={`/app/strategies/${encodeURIComponent(s.id)}/edit`}
-          className={buttonClasses('secondary', 'sm')}
+          className={buttonClasses('secondary')}
         >
           <PencilSimple size={16} aria-hidden="true" />
           Edit strategy
         </Link>
         <Button
           variant="secondary"
-          size="sm"
           disabled={update.isPending}
           onClick={() =>
             update.mutate({
@@ -451,7 +449,7 @@ function Header({
         </Button>
         <Link
           href={`/app/trades?strategy=${encodeURIComponent(s.id)}`}
-          className={buttonClasses('primary', 'sm')}
+          className={buttonClasses('primary')}
         >
           <ListBullets size={16} aria-hidden="true" />
           View {tradeCount} {plural(tradeCount, 'trade')}
@@ -598,7 +596,7 @@ function StrategyBody({
                 label={<MetricTip id="expectancy" basis={basis} />}
                 value={
                   summary.expectancy === null ? (
-                    'None yet'
+                    'None'
                   ) : (
                     <FigureText f={expectancy} />
                   )

@@ -356,7 +356,7 @@ export function NotebookView(): React.JSX.Element {
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
         disabled={today === undefined}
-        className={`${buttonClasses('primary', 'sm')} w-full max-lg:w-auto max-lg:px-3.5`}
+        className={`${buttonClasses('primary')} w-full max-lg:w-auto max-lg:px-3.5`}
       >
         <Plus size={16} weight="bold" aria-hidden="true" />
         New

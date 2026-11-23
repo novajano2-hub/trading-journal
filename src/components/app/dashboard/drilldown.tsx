@@ -289,9 +289,7 @@ function TradesTable({
                     <SideChip side={t.direction} />
                   </td>
                   <td className={`${TD} max-sm:hidden`}>
-                    {strategy ?? (
-                      <span className="text-faint">No strategy</span>
-                    )}
+                    {strategy ?? <span className="text-faint">None</span>}
                   </td>
                   <td className={`${TD} text-right whitespace-nowrap`}>
                     <Money

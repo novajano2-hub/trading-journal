@@ -623,3 +623,25 @@ Tokens in `src/lib/motion.ts`, mirrored as CSS variables. Several patterns are a
 - **Don't** use loss red for an error state, marigold for a warning state, or colour a side (Long or Short) as a result.
 - **Don't** tint a "not live yet" module; its glyph stays an outline.
 - **Don't** reach for a library tooltip, modal or search box that bypasses the HorizonX-adapted ones.
+
+## Empty values
+
+One rule for a value that is not there, in every table, tile and chip. Never a dash, never a blank.
+
+- **"None"**: a count or figure that is absent: no strategy on a trade, no rating, no profit factor because nothing lost, no net ROI, no realized R because no stop was set, an open trade's exit, a rule the plan does not have. Faint ink, the same size as the figures around it.
+- **"Not set"**: a field the user left empty, as a placeholder or a read-only echo of one ("Not set" in the planned stop and target inputs).
+- **"Not graded"**: a rule check that has no verdict yet. Only rule checks use it.
+
+Two variants are retired: "None yet" (a figure that is absent says "None") and the stand-in hyphen "-". Words that explain what would fill the value go beside it, in the small line under it ("add a target for planned R"), not in the value.
+
+### Hue jobs in tag and strategy colour
+
+The tag-category palette is twelve named swatches (Marigold, Clay, Rose, Orchid, Plum, Olive, Bronze, Umber, Mauve, Slate, Graphite, Sand). It leaves out the four hues that have jobs, gain green, loss red, the ultramarine accent and info cyan, and the blends that sit beside them. Mistakes stays marigold. The picker names the colour, the hex is a secondary hint. Strategies carry no colour of their own: every strategy wears the accent tile and its icon tells them apart (the stored `tone` is kept for old data and ignored).
+
+### Focus ring
+
+`--focus-width`, `--focus-offset` and `--focus-radius` (2px, 3px, the 6px chip radius) theme `:focus-visible` everywhere: the ring is the accent colour, and an element with no radius of its own takes the 6px one so the ring is never a hard rectangle. An element with its own radius keeps it.
+
+### Buttons
+
+One `md` size app-wide, the top bar's Import: 34px high, 13.5px at weight 600, 44px on a coarse pointer. `sm` (30px) is for a button inside a card's row. A page shows one primary; "Add trade" beside Import is a secondary.

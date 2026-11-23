@@ -18,7 +18,6 @@ import type {
   RuleShowWhen,
   Strategy,
   StrategyIcon,
-  StrategyTone,
 } from '@/domain/types';
 
 /** The glyph of each strategy icon: the one map the list, the detail and the picker read. */
@@ -52,26 +51,8 @@ export const ICON_LABEL: Record<StrategyIcon, string> = {
   rocket: 'Rocket',
 };
 
-/** Strategy tones are IconTile tones. */
-export const TONE_ORDER: readonly StrategyTone[] = [
-  'accent',
-  'info',
-  'gain',
-  'warn',
-  'neutral',
-];
-export const TONE_LABEL: Record<StrategyTone, string> = {
-  accent: 'Ultramarine',
-  info: 'Blue',
-  gain: 'Green',
-  warn: 'Amber',
-  neutral: 'Grey',
-};
-
 export const iconOf = (s: Pick<Strategy, 'icon'>): Icon =>
   STRATEGY_ICON_GLYPH[s.icon ?? 'target'];
-export const toneOf = (s: Pick<Strategy, 'tone'>): StrategyTone =>
-  s.tone ?? 'accent';
 
 export const ASSET_LABEL: Record<AssetClass, string> = {
   future: 'Futures',
@@ -103,14 +84,14 @@ export const SHOW_WHEN_CHIP: Record<Exclude<RuleShowWhen, 'always'>, string> = {
   breakeven: 'On breakevens',
 };
 
-/** A 0..1 ratio as a percentage; "None yet" when there is nothing to divide. */
+/** A 0..1 ratio as a percentage; "None" when there is nothing to divide. */
 export function pctText(x: number | null, digits = 0): string {
-  return x === null ? 'None yet' : `${(x * 100).toFixed(digits)}%`;
+  return x === null ? 'None' : `${(x * 100).toFixed(digits)}%`;
 }
 
-/** A profit factor to two places; "None yet" with no losing trade. */
+/** A profit factor to two places; "None" with no losing trade. */
 export function pfText(x: number | null): string {
-  return x === null ? 'None yet' : x.toFixed(2);
+  return x === null ? 'None' : x.toFixed(2);
 }
 
 /** The delete confirmation's sentence, for the trades that lose the strategy. */

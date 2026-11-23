@@ -63,6 +63,29 @@ test('a new strategy starts with Entry, Exit, Risk and Management', async () => 
   expect(titles).toEqual(['Entry', 'Exit', 'Risk', 'Management']);
 });
 
+test('the form picks an icon and no colour: every strategy wears the accent tile', async () => {
+  await ready();
+  expect(screen.getByRole('radiogroup', { name: 'Icon' })).toBeTruthy();
+  expect(screen.queryByRole('radiogroup', { name: 'Colour' })).toBeNull();
+  expect(screen.queryByRole('radio', { name: 'Green' })).toBeNull();
+  expect(screen.queryByText('Colour')).toBeNull();
+});
+
+test('saving an edit leaves a stored tone as it was: the field is kept and ignored', async () => {
+  const { repo } = await ready('str-1');
+  await repo.strategies.update(WS, 'str-1', { tone: 'gain' });
+  await waitFor(() =>
+    expect((screen.getByLabelText('Name') as HTMLInputElement).value).toBe(
+      'Opening range breakout',
+    ),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Save strategy' }));
+  await waitFor(async () =>
+    expect((await repo.strategies.get(WS, 'str-1'))!.icon).toBeDefined(),
+  );
+  expect((await repo.strategies.get(WS, 'str-1'))!.tone).toBe('gain');
+});
+
 test('a rule added to Exit with show-when Winner is saved that way', async () => {
   const { repo } = await ready();
   type(screen.getByLabelText('Name'), 'Scalp');

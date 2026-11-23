@@ -103,7 +103,7 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'rule-followed-pf': {
     label: 'Profit factor when followed',
     definition:
-      'Total won divided by total lost, on {basis} P&L, over the closed trades that kept this rule. None yet when none of them lost.',
+      'Total won divided by total lost, on {basis} P&L, over the closed trades that kept this rule. None when none of them lost.',
   },
   'trade-rule-kept': {
     label: 'Kept',
@@ -147,7 +147,7 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'profit-factor': {
     label: 'Profit factor',
     definition:
-      'Total won divided by total lost, on {basis} P&L. None yet when there are no losing trades.',
+      'Total won divided by total lost, on {basis} P&L. None when there are no losing trades.',
   },
   expectancy: {
     label: 'Expectancy',
@@ -192,7 +192,7 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   sortino: {
     label: 'Sortino ratio',
     definition:
-      'Mean daily return divided by the downside deviation, the root of the average squared losing return over all days, times the square root of 252. None yet without a losing day.',
+      'Mean daily return divided by the downside deviation, the root of the average squared losing return over all days, times the square root of 252. None without a losing day.',
   },
   'avg-daily-win-rate': {
     label: 'Average daily win rate',

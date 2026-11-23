@@ -44,6 +44,7 @@ import {
 import { toCents } from '@/domain/money';
 import { localDate } from '@/domain/time';
 import type { Account, Side, Trade } from '@/domain/types';
+import { zoneLabel } from '@/lib/time-zone-label';
 import { clock } from './trade-time';
 
 const INPUT =
@@ -518,7 +519,7 @@ function Form({
                   ))}
                 </Select>
                 <p id="mt-zone" className="mt-1.5 text-xs leading-4 text-faint">
-                  Times in {zone}
+                  Times in {zoneLabel(zone)}
                 </p>
               </>
             )}

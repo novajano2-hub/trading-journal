@@ -68,6 +68,7 @@ import { SelectBox } from './select-box';
 import {
   ALIGN,
   COLUMN_WIDTHS,
+  PAD_LEFT,
   buildColumns,
   features,
   type CellEnv,
@@ -678,7 +679,7 @@ export function TradesView(): React.JSX.Element {
             </button>
             <Link
               href="/app/trades/new"
-              className={`${buttonClasses('primary', 'sm')} gap-1.5 px-3.5 text-[13.5px] pointer-coarse:h-11`}
+              className={`${buttonClasses('secondary')} gap-1.5`}
             >
               <Plus size={14} weight="bold" aria-hidden="true" />
               Add trade
@@ -745,7 +746,7 @@ export function TradesView(): React.JSX.Element {
                 )}
               </p>
             ) : null}
-            <div className="relative overflow-x-auto px-4">
+            <div className="relative overflow-x-auto px-3">
               <table
                 aria-label="Trades"
                 style={{
@@ -791,7 +792,7 @@ export function TradesView(): React.JSX.Element {
                                     : 'none'
                                 : undefined
                             }
-                            className={`h-10 border-b border-line pr-[7px] align-middle text-xs font-medium text-faint last:pr-0 ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'}`}
+                            className={`h-10 border-b border-line pr-1.5 align-middle text-xs font-medium text-faint last:pr-0 ${PAD_LEFT.has(id) ? 'pl-2' : ''} ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'}`}
                           >
                             {canSort ? (
                               HEADER_TIPS[id] ? (
@@ -850,7 +851,7 @@ export function TradesView(): React.JSX.Element {
                         return (
                           <td
                             key={cell.id}
-                            className={`overflow-hidden py-1 pr-[7px] last:pr-0 ${align === 'right' ? 'text-right tabular-nums' : align === 'center' ? 'text-center' : 'text-left'}`}
+                            className={`overflow-hidden py-1 pr-1.5 last:pr-0 ${PAD_LEFT.has(id) ? 'pl-2' : ''} ${align === 'right' ? 'text-right tabular-nums' : align === 'center' ? 'text-center' : 'text-left'}`}
                           >
                             <table.FlexRender cell={cell} />
                           </td>

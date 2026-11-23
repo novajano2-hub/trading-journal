@@ -24,7 +24,7 @@ import { periodText, ReportChart, type Shade } from './report-chart';
 import { ReportScope } from './report-scope';
 import type { ReportData } from './use-report-data';
 
-const NONE = <span className="font-medium text-faint">None yet</span>;
+const NONE = <span className="font-medium text-faint">None</span>;
 
 function Kpi({
   id,
@@ -38,7 +38,7 @@ function Kpi({
   /** Gain or loss ink for the figure. */
   tone?: string;
   sub: ReactNode;
-  /** The figure; null reads "None yet". */
+  /** The figure; null reads "None". */
   children: ReactNode;
 }): React.JSX.Element {
   return (
@@ -285,7 +285,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
                 ? 'no fall from a peak'
                 : drawdown.pct === null
                   ? 'from a peak'
-                  : `${formatPct(drawdown.pct, 1)} of peak`
+                  : `${formatPct(drawdown.pct, 1)} of peak balance`
             }
           >
             <FigureText f={money(-drawdown.amount)} />

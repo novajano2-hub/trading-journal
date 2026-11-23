@@ -23,7 +23,7 @@ import {
 import { DuplicateNameError } from '@/data/repository';
 import type { Tag as TagRow, TagCategory } from '@/domain/types';
 import { plural } from '@/lib/format';
-import { ColourPicker, SWATCHES, parseHex } from './colour-picker';
+import { ColourPicker, SWATCHES, parseHex, swatchName } from './colour-picker';
 import {
   FieldError,
   focusField,
@@ -451,7 +451,7 @@ export function TagsSettings(): React.JSX.Element {
             <button
               type="button"
               onClick={() => setDialog({ kind: 'category' })}
-              className={buttonClasses('primary', 'sm')}
+              className={buttonClasses('primary')}
             >
               <Plus size={14} weight="bold" aria-hidden="true" />
               New category
@@ -460,7 +460,7 @@ export function TagsSettings(): React.JSX.Element {
             <button
               type="button"
               onClick={() => setDialog({ kind: 'tag' })}
-              className={buttonClasses('primary', 'sm')}
+              className={buttonClasses('primary')}
             >
               <Plus size={14} weight="bold" aria-hidden="true" />
               New tag
@@ -553,9 +553,12 @@ export function TagsSettings(): React.JSX.Element {
                       ) : null}
                     </td>
                     <td className={`${TD} whitespace-nowrap`}>
-                      <span className="inline-flex items-center gap-2 font-mono text-[12.5px] text-muted">
+                      <span className="inline-flex items-center gap-2 text-text">
                         <Swatch color={c.color} />
-                        {c.color}
+                        {swatchName(c.color)}
+                        <span className="font-mono text-[12px] text-faint">
+                          {c.color}
+                        </span>
                       </span>
                     </td>
                     <td className={`${TD} ${NUM}`}>

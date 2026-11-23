@@ -35,9 +35,18 @@ export function docText(doc: unknown): string {
   return lines.filter((l) => l.length > 0).join('\n');
 }
 
-/** The doc's text on one line, cut to `max` characters with an ellipsis. */
+/**
+ * The doc's text on one line, cut to `max` characters with an ellipsis. Each
+ * block ends like a sentence, so a heading never runs into the paragraph under
+ * it ("Plan. Wait for the open.", not "Plan Wait for the open").
+ */
 export function docExcerpt(doc: unknown, max: number): string {
-  const flat = docText(doc).replace(/\s+/g, ' ').trim();
+  const flat = docText(doc)
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter((line) => line !== '')
+    .map((line) => (/[.!?:;]$/.test(line) ? line : `${line}.`))
+    .join(' ');
   if (flat.length <= max) return flat;
   return `${flat.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
 }

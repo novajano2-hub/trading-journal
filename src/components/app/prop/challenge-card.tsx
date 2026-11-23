@@ -435,7 +435,7 @@ export function ChallengeCard({
               tip={<MetricTip id="prop-consistency" basis="net" />}
               value={
                 s.consistency.bestDayShare === null
-                  ? 'None yet'
+                  ? 'None'
                   : `${(s.consistency.bestDayShare * 100).toFixed(1)}%`
               }
               tone={
@@ -457,7 +457,7 @@ export function ChallengeCard({
           ) : (
             <Track
               tip={<MetricTip id="prop-consistency" basis="net" />}
-              value={<span className="text-muted">No rule</span>}
+              value={<span className="text-muted">None</span>}
             >
               not part of this plan
             </Track>

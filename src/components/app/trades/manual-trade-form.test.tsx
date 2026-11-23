@@ -73,7 +73,7 @@ function setDate(name: string, value: string) {
 }
 
 async function fillFuture() {
-  await screen.findByText('Times in America/New_York');
+  await screen.findByText(/^Times in New York, UTC-0[45]:00$/);
   set('Asset type', 'future');
   set('Symbol', 'ESZ6');
   setDate('Fill 1 date', '2026-11-19');
@@ -164,7 +164,7 @@ test('errors sit at the field, with focus on the first', async () => {
 
 test('no fills, and the option fields, are refused in place', async () => {
   renderApp(<ManualTradeForm />, { sample: sample(), url: '/app/trades/new' });
-  await screen.findByText('Times in America/New_York');
+  await screen.findByText(/^Times in New York, UTC-0[45]:00$/);
   set('Asset type', 'option');
   set('Symbol', 'AAPL');
   fireEvent.click(screen.getByRole('button', { name: 'Remove fill 1' }));
@@ -182,7 +182,7 @@ test('no fills, and the option fields, are refused in place', async () => {
 
 test('each type shows its own fields', async () => {
   renderApp(<ManualTradeForm />, { sample: sample(), url: '/app/trades/new' });
-  await screen.findByText('Times in America/New_York');
+  await screen.findByText(/^Times in New York, UTC-0[45]:00$/);
   expect(screen.queryByRole('textbox', { name: 'Strike' })).toBeNull();
   set('Asset type', 'future-option');
   for (const n of ['Strike', 'Multiplier', 'Tick size'])
@@ -199,7 +199,7 @@ test('editing a manual trade keeps its tags and rating, and rebuilds the fills',
     sample: sample(true),
     url: '/app/trades/man-1/edit',
   });
-  await screen.findByText('Times in America/New_York');
+  await screen.findByText(/^Times in New York, UTC-0[45]:00$/);
   // The fills come back in the account's zone.
   expect((screen.getByLabelText('Fill 1 time') as HTMLInputElement).value).toBe(
     '09:30',
@@ -258,7 +258,7 @@ test('the links back to a trade encode an id that holds a slash', async () => {
     sample: renamed(true, 'man-1'),
     url: '/app/trades/x/edit',
   });
-  await screen.findByText('Times in America/New_York');
+  await screen.findByText(/^Times in New York, UTC-0[45]:00$/);
   for (const cancel of screen.getAllByRole('link', { name: /Cancel|Back/ }))
     expect(cancel.getAttribute('href')).toBe('/app/trades/acc%3AEUR%2FUSD%3Ax');
 });

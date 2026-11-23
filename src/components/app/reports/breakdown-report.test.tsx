@@ -62,21 +62,24 @@ test('cross-analysed by side the table swaps for a symbol by side matrix', async
   const nq = rowOf(matrix, /^NQ/).getAllByRole('cell');
   expect(nq[0]!.textContent).toContain('+$70.00');
   expect(nq[1]!.textContent).toContain('−$20.00');
-  const select = within(page).getByLabelText(
-    'Cross-analyse by',
-  ) as HTMLSelectElement;
-  expect(select.value).toBe('side');
+  const pick = async (name: RegExp, option: string) => {
+    fireEvent.keyDown(within(page).getByRole('button', { name }), {
+      key: 'Enter',
+    });
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: option }));
+  };
+  expect(
+    within(page).getByRole('button', { name: 'Cross-analyse by, Side' }),
+  ).toBeTruthy();
   // Back to none restores the table and clears the address.
-  fireEvent.change(select, { target: { value: '' } });
+  await pick(/^Cross-analyse by/, 'None');
   expect(
     await within(page).findByRole('table', { name: 'Symbols summary' }),
   ).toBeTruthy();
   expect(new URLSearchParams(window.location.search).get('x')).toBeNull();
   // The matrix can show win rate instead of net.
-  fireEvent.change(select, { target: { value: 'side' } });
-  fireEvent.change(within(page).getByLabelText('Cross-analysis metric'), {
-    target: { value: 'win-rate' },
-  });
+  await pick(/^Cross-analyse by/, 'Side');
+  await pick(/^Cross-analysis metric/, 'Win rate');
   const rate = rowOf(
     within(page).getByRole('table', { name: 'Symbols by side' }),
     /^NQ/,
@@ -114,14 +117,18 @@ test('tags have a category select', async () => {
   const table = () => within(page).getByRole('table', { name: 'Tags summary' });
   expect(rowOf(table(), /^breakout/)).toBeTruthy();
   expect(rowOf(table(), /^fomo/)).toBeTruthy();
-  const select = within(page).getByLabelText('Category') as HTMLSelectElement;
-  expect([...select.options].map((o) => o.textContent)).toEqual([
+  fireEvent.keyDown(
+    within(page).getByRole('button', { name: 'Category, All categories' }),
+    { key: 'Enter' },
+  );
+  const items = await screen.findAllByRole('menuitemradio');
+  expect(items.map((o) => o.textContent)).toEqual([
     'All categories',
     'Custom tags',
     'Mistakes',
     'Setups',
   ]);
-  fireEvent.change(select, { target: { value: 'mistakes' } });
+  fireEvent.click(items[2]!);
   expect(within(table()).queryByRole('row', { name: /^breakout/ })).toBeNull();
   expect(rowOf(table(), /^fomo/).getAllByRole('cell')[4]!.textContent).toBe(
     '−$40.00',

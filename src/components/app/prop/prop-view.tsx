@@ -44,7 +44,7 @@ function urgency(c: Challenge, check: ChallengeCheck): number {
 }
 
 const NewButton = ({ onClick }: { onClick(): void }) => (
-  <Button size="sm" onClick={onClick}>
+  <Button onClick={onClick}>
     <Plus size={16} weight="bold" aria-hidden="true" />
     New challenge
   </Button>

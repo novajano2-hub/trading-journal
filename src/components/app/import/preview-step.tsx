@@ -23,6 +23,7 @@ import type { Account, ImportJob, Trade } from '@/domain/types';
 import type { ImportFile } from '@/lib/decode';
 import { useDisplay, type Display } from '@/lib/display';
 import { plural } from '@/lib/format';
+import { zoneLabel } from '@/lib/time-zone-label';
 import { ConfirmStep } from './confirm-step';
 import { FIELD_LABEL, ISSUE_REASON, MONEY_FIELDS } from './fields';
 import { HiddenAmount } from './hidden-amount';
@@ -575,7 +576,7 @@ function TradesCard({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-5 py-3 text-[12.5px] text-faint">
         <span>
           Showing {shown.length.toLocaleString('en-US')} of{' '}
-          {list.length.toLocaleString('en-US')}. Times in {tz}.
+          {list.length.toLocaleString('en-US')}. Times in {zoneLabel(tz)}.
         </span>
         {shown.length < list.length ? (
           <button type="button" onClick={onMore} className={LINK}>

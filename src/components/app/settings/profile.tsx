@@ -11,6 +11,7 @@ import {
   useUnsetPrefs,
   useUpdatePrefs,
 } from '@/data/query/hooks';
+import { zoneLabel } from '@/lib/time-zone-label';
 import { FieldError } from './settings-ui';
 
 /** A three-letter currency code Intl knows. */
@@ -134,7 +135,7 @@ export function ProfileSettings(): React.JSX.Element {
                 Use browser default
               </button>
             ) : (
-              <span>Browser default ({prefs.timeZone})</span>
+              <span>Browser default ({zoneLabel(prefs.timeZone)})</span>
             )}
           </p>
         </div>

@@ -10,7 +10,8 @@ import type { NoteTemplate, TagCategory } from '@/domain/types';
 
 type CategoryPreset = Omit<TagCategory, 'workspaceId'>;
 
-/** The categories Keel names. Mistakes and Custom tags are built in; Setups and Emotions are the sample's (and version 1's) own. */
+/** The categories Keel names. Their colours come from the tag-category palette (colour-picker.tsx), which leaves out the hues that have jobs: gain, loss, accent and cyan.
+ * Mistakes and Custom tags are built in; Setups and Emotions are the sample's (and version 1's) own. */
 export const CATEGORIES = {
   mistakes: {
     id: 'mistakes',
@@ -22,14 +23,14 @@ export const CATEGORIES = {
   custom: {
     id: 'custom-tags',
     name: 'Custom tags',
-    color: '#16A34A',
+    color: '#636889',
     builtIn: true,
   },
-  setups: { id: 'setups', name: 'Setups', color: '#2B35AF', builtIn: false },
+  setups: { id: 'setups', name: 'Setups', color: '#7E3F9E', builtIn: false },
   emotions: {
     id: 'emotions',
     name: 'Emotions',
-    color: '#0A6F94',
+    color: '#CB4B8A',
     builtIn: false,
   },
 } as const satisfies Record<string, CategoryPreset>;

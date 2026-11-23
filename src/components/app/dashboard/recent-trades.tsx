@@ -113,7 +113,7 @@ function RulesCell({ rules }: { rules: TradeRulesSummary }): React.JSX.Element {
 /** The strategy names: the first, then how many more (all of them in the title and to a screen reader). */
 function StrategyCell({ row }: { row: RecentTrade }): React.JSX.Element {
   if (row.strategyNames.length === 0)
-    return <span className="text-faint">No strategy</span>;
+    return <span className="text-faint">None</span>;
   const [first, ...rest] = row.strategyNames;
   return (
     <span

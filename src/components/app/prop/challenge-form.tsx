@@ -265,7 +265,7 @@ function PhaseFields({
                 });
               }}
             >
-              <option value="none">None yet</option>
+              <option value="none">None</option>
               <option value="new">Create a new account</option>
               {accounts
                 .filter((a) => !taken.has(a.id))
@@ -857,7 +857,6 @@ export function ChallengeForm({
             {challenge ? (
               <Button
                 variant="ghost"
-                size="sm"
                 onClick={() => setDeleting(true)}
                 disabled={busy}
                 className="text-loss!"
@@ -866,15 +865,10 @@ export function ChallengeForm({
               </Button>
             ) : null}
             <span className="ml-auto flex gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={onClose}
-                disabled={busy}
-              >
+              <Button variant="secondary" onClick={onClose} disabled={busy}>
                 Cancel
               </Button>
-              <Button type="submit" size="sm" disabled={busy}>
+              <Button type="submit" disabled={busy}>
                 {challenge ? 'Save challenge' : 'Create challenge'}
               </Button>
             </span>

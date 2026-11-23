@@ -197,3 +197,59 @@ for (const qty of ['2500', '25000']) {
     expect(await cutOffText(cell)).toEqual([]);
   });
 }
+
+test('the log fits the card at 1440: no sideways scroll, Strategy and Tags whole, the expiry out of the instrument', async ({
+  page,
+}) => {
+  await openLog(page, '?range=all');
+  const fit = await tradeLog(page).evaluate((table) => {
+    const box = table.parentElement!;
+    return {
+      table: box.scrollWidth - box.clientWidth,
+      page:
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    };
+  });
+  expect(fit).toEqual({ table: 0, page: 0 });
+  // Strategy keeps room for a name like "Opening range breakout".
+  const strategy = tradeLog(page).getByRole('columnheader', {
+    name: 'Strategy',
+  });
+  expect((await strategy.boundingBox())!.width).toBeGreaterThanOrEqual(165);
+  // An option's expiry is in the tooltip, not beside the name.
+  const option = tradeLog(page)
+    .locator('tbody tr [title*=", expires "]')
+    .first();
+  await expect(option).toHaveAttribute(
+    'title',
+    /^[A-Z]+\d{6}[CP]\d+, expires /,
+  );
+  expect(await cutOffText(tradeLog(page).locator('tbody tr').first())).toEqual(
+    [],
+  );
+});
+
+test('the keyboard ring is themed on a bare link: 2px, 3px off, the chip radius', async ({
+  page,
+}) => {
+  await openLog(page);
+  await page.evaluate(() => {
+    const a = document.createElement('a');
+    a.id = 'bare-link';
+    a.href = '#';
+    a.textContent = 'Bare';
+    document.body.append(a);
+  });
+  await page.keyboard.press('Tab');
+  await page.locator('#bare-link').focus();
+  // Outline and radius can ease in over a frame; read them once they settle.
+  await expect
+    .poll(() =>
+      page.locator('#bare-link').evaluate((el) => {
+        const s = getComputedStyle(el);
+        return [s.outlineWidth, s.outlineOffset, s.borderTopLeftRadius];
+      }),
+    )
+    .toEqual(['2px', '3px', '6px']);
+});

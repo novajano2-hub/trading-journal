@@ -72,3 +72,25 @@ test('add a withdrawal, archive an account, and read one of its trades read-only
     page.getByRole('button', { name: 'Reviewed', exact: true }),
   ).toBeDisabled();
 });
+
+test('Accounts fits the card at 1440: Prop rules whole, clear of the actions', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop', 'checked at desktop width');
+  await page.goto('/app/settings/accounts');
+  const table = page.getByRole('table', { name: /^Accounts/ });
+  await expect(table).toBeVisible({ timeout: 30_000 });
+  const fit = await table.evaluate((t) => ({
+    scroll: t.parentElement!.scrollWidth - t.parentElement!.clientWidth,
+    page:
+      document.documentElement.scrollWidth -
+      document.documentElement.clientWidth,
+  }));
+  expect(fit).toEqual({ scroll: 0, page: 0 });
+  const rules = await table.getByText('Does not apply').first().boundingBox();
+  const actions = await table
+    .getByRole('button', { name: /^Actions for/ })
+    .first()
+    .boundingBox();
+  expect(rules!.x + rules!.width).toBeLessThanOrEqual(actions!.x);
+});
