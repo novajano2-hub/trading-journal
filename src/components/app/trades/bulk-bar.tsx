@@ -329,7 +329,7 @@ export function BulkBar({
         </button>
         {lockedCount > 0 ? (
           <p className="w-full px-0.5 pb-0.5 text-[12.5px] text-muted">
-            {lockedSubject} won't be changed.
+            {lockedSubject} won&apos;t be changed.
           </p>
         ) : null}
       </div>
