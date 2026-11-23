@@ -459,6 +459,8 @@ test('recent trades: newest first, with the rules column', async () => {
   expect(rows[1]!.textContent).toContain('18 Nov 10:00');
   expect(rows[1]!.textContent).toContain('+$600.00');
   expect(rows[1]!.textContent).toContain('2 of 2 kept');
+  // A trade with no mistake says so in its Mistake cell, never a blank.
+  expect(within(rows[1]!).getAllByRole('cell')[4]!.textContent).toBe('None');
   const region = screen.getByRole('region', { name: 'Recent trades' });
   expect(region.textContent).toContain('all time');
 });

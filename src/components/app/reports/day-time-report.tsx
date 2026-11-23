@@ -1,5 +1,6 @@
 'use client';
 
+import { zoneLabel } from '@/lib/time-zone-label';
 import { useSearchParams } from 'next/navigation';
 import { useMemo } from 'react';
 import { Segmented } from '@/components/ui/segmented';
@@ -115,7 +116,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
         }
         caption={
           timed
-            ? `${data.ctx.timeZone}, by ${basis} ${tab === 'time' ? 'time' : 'day'}`
+            ? `${zoneLabel(data.ctx.timeZone)}, by ${basis} ${tab === 'time' ? 'time' : 'day'}`
             : 'From the first fill to the last'
         }
         visible={tab === 'time' ? 'traded' : 'all'}

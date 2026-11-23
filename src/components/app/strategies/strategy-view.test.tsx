@@ -237,11 +237,11 @@ test('a losers-only rule says so in its kept win rate and profit factor, and is 
     .getByText('Stop beyond the far side of the range')
     .closest('tr')!;
   // Its kept trades can only be losers: a win rate and a profit factor of them mean nothing.
-  expect(within(loserRow).getAllByText('Losers only')).toHaveLength(2);
+  expect(within(loserRow).getAllByText('Losers')).toHaveLength(2);
   expect(loserRow.textContent).not.toContain('Costliest');
   expect(table.textContent).not.toContain('Costliest');
   const alwaysRow = within(table)
     .getByText('Wait for the 15-minute range to close')
     .closest('tr')!;
-  expect(within(alwaysRow).queryByText('Losers only')).toBeNull();
+  expect(within(alwaysRow).queryByText('Losers')).toBeNull();
 });

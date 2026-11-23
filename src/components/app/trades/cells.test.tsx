@@ -62,3 +62,8 @@ test('an absent strategy, rating and rule check each say it in words, never a da
     .filter((t) => t === 'None' || t === 'Not graded' || t === '-');
   expect(words).toEqual(['None', 'None', 'Not graded']);
 });
+
+test('a trade with no tags or mistakes says None in the Tags cell', () => {
+  render(<TagsCell tags={[]} mistakes={[]} />);
+  expect(screen.getByText('None').className).toContain('text-faint');
+});

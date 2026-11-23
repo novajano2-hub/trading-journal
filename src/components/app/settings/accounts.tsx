@@ -23,11 +23,23 @@ import { localDate } from '@/domain/time';
 import type { Account, Trade } from '@/domain/types';
 import { useDisplay } from '@/lib/display';
 import { plural } from '@/lib/format';
+import { usePhone } from '@/lib/use-phone';
 import { zoneLabel } from '@/lib/time-zone-label';
 import { ScrollFade } from '@/components/ui/scroll-fade';
 import { ACCOUNT_TYPES, AccountDialog } from './account-dialog';
 import { BalanceAdjustments } from './cash-flows';
-import { NUM, RowMenu, TD, TH, type MenuAction } from './settings-ui';
+import {
+  NUM,
+  RowMenu,
+  TD as TD_BASE,
+  TH as TH_BASE,
+  type MenuAction,
+} from './settings-ui';
+
+// Ten columns in a 982px card: the gap between columns is 8px here (12px in the
+// other settings tables) so the full broker name fits without a sideways scroll.
+const TH = TH_BASE.replace('px-1.5', 'px-1');
+const TD = TD_BASE.replace('px-1.5', 'px-1');
 
 type Dialog =
   | { kind: 'new' }
@@ -87,6 +99,7 @@ export function AccountsSettings(): React.JSX.Element {
   // The account whose deposits and withdrawals the card below shows; none picked: the first active one.
   const [pickedId, setPickedId] = useState<string | null>(null);
   const cardRef = useRef<HTMLElement>(null);
+  const phone = usePhone();
 
   const timeZone = prefs?.timeZone;
   const rows = useMemo(() => {
@@ -222,6 +235,67 @@ export function AccountsSettings(): React.JSX.Element {
           <p className="px-5 pt-3 pb-4 text-[13.5px] text-muted">
             No accounts yet. Make one here, or import a file and make it there.
           </p>
+        ) : phone ? (
+          <ul aria-labelledby="accounts-heading" className="mt-2">
+            {rows.map(({ account: a, tradeCount, balance }) => {
+              const gone = a.status === 'archived';
+              return (
+                <li
+                  key={a.id}
+                  aria-current={a.id === selected?.id ? 'true' : undefined}
+                  className={`flex items-center gap-2 border-t border-line px-5 py-2.5 ${gone ? 'text-faint' : ''} ${a.id === selected?.id ? 'bg-accent-soft' : ''}`}
+                >
+                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                    <span
+                      data-line="1"
+                      className="flex min-w-0 items-baseline justify-between gap-3"
+                    >
+                      <span
+                        className={`min-w-0 truncate text-[14px] ${gone ? 'font-medium text-muted' : 'font-semibold text-text'}`}
+                      >
+                        {a.name}
+                        {gone ? (
+                          <small className="ml-2 text-[12px] font-normal text-faint">
+                            Read-only
+                          </small>
+                        ) : null}
+                      </span>
+                      <span
+                        className={`flex-none text-[14px] tabular-nums ${gone ? '' : 'font-semibold text-text'}`}
+                      >
+                        <FigureText
+                          f={display.cash(balance, false, a.currency)}
+                        />
+                      </span>
+                    </span>
+                    <span
+                      data-line="2"
+                      className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px]"
+                    >
+                      <Chip
+                        tone={a.type.startsWith('prop') ? 'accent' : 'neutral'}
+                      >
+                        {typeLabel(a)}
+                      </Chip>
+                      <Chip
+                        className={a.id === selected?.id ? 'bg-surface-1!' : ''}
+                      >
+                        {gone ? (
+                          <Lock size={13} weight="duotone" aria-hidden="true" />
+                        ) : null}
+                        {gone ? 'Archived' : 'Active'}
+                      </Chip>
+                      <PropRules account={a} />
+                    </span>
+                  </div>
+                  <RowMenu
+                    label={`Actions for ${a.name}`}
+                    actions={actions(a, tradeCount)}
+                  />
+                </li>
+              );
+            })}
+          </ul>
         ) : (
           <ScrollFade className="mt-2">
             <table
@@ -257,12 +331,12 @@ export function AccountsSettings(): React.JSX.Element {
                   <th scope="col" className={TH}>
                     Status
                   </th>
-                  <th scope="col" className={`${TH} min-w-[110px]`}>
+                  <th scope="col" className={`${TH} min-w-[96px]`}>
                     Prop rules
                   </th>
                   <th
                     scope="col"
-                    className={`${TH} sticky right-0 w-16 z-[1] bg-surface-1 shadow-[inset_1px_0_0_var(--color-line)] lg:shadow-none`}
+                    className={`${TH} sticky right-0 z-[1] w-16 bg-surface-1 shadow-[inset_1px_0_0_var(--color-line)] lg:bg-transparent lg:shadow-none`}
                   >
                     <span className="sr-only">Actions</span>
                   </th>
@@ -296,7 +370,7 @@ export function AccountsSettings(): React.JSX.Element {
                         ) : null}
                       </td>
                       <td
-                        className={`${TD} max-w-[124px] truncate text-muted`}
+                        className={`${TD} max-w-[160px] truncate text-muted`}
                         title={a.broker}
                       >
                         {a.broker}
@@ -334,7 +408,11 @@ export function AccountsSettings(): React.JSX.Element {
                         {a.timeZone ? zoneLabel(a.timeZone) : 'Yours'}
                       </td>
                       <td className={TD}>
-                        <Chip>
+                        <Chip
+                          className={
+                            a.id === selected?.id ? 'bg-surface-1!' : ''
+                          }
+                        >
                           {gone ? (
                             <Lock
                               size={13}
@@ -345,7 +423,7 @@ export function AccountsSettings(): React.JSX.Element {
                           {gone ? 'Archived' : 'Active'}
                         </Chip>
                       </td>
-                      <td className={`${TD} min-w-[110px] whitespace-nowrap`}>
+                      <td className={`${TD} min-w-[96px] whitespace-nowrap`}>
                         <PropRules account={a} />
                       </td>
                       <td

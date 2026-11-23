@@ -132,3 +132,13 @@ test('weekday: its chart and table are not both called By weekday', async () => 
   expect(titles.filter((t) => t === 'By weekday')).toHaveLength(1);
   expect(titles).toContain('Each weekday');
 });
+
+test('the subtitle names the zone as a person says it, not the IANA key', async () => {
+  renderApp(<DayTimeView />, {
+    repository: await newYorkRepository(),
+    url: URL,
+  });
+  const page = await screen.findByTestId('reports-day-time');
+  expect(page.textContent).toMatch(/New York, UTC-0[45]:00, by entry time/);
+  expect(page.textContent).not.toContain('America/New_York');
+});

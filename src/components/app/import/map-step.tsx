@@ -248,7 +248,8 @@ export function MapStep({
   }, [focusPoint, rootsKnown, onFocused]);
 
   // A new account is made in its dialog first; Continue always goes into a real account.
-  const canContinue = valid && !saving && !showCreate && !!account;
+  const canContinue =
+    valid && !saving && !showCreate && !!account && unpriced.length === 0;
 
   async function next() {
     setSaveError(false);

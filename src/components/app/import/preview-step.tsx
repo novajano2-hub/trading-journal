@@ -236,7 +236,7 @@ export function PreviewStep({
         />
       ) : (
         <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[minmax(0,1fr)_352px]">
-          <div className="min-w-0 max-lg:order-last">
+          <div className="min-w-0 max-lg:order-last max-sm:order-first">
             <TradesCard
               plan={plan}
               account={account}
@@ -247,9 +247,13 @@ export function PreviewStep({
               limit={limit}
               onMore={() => setLimit((l) => l + ROWS_PER_PAGE)}
               pointValues={mapping.overrides}
+              hasPnl={
+                mapping.kind === 'closed-trades' &&
+                mapping.columns.pnl !== undefined
+              }
             />
           </div>
-          <div className="grid grid-cols-[minmax(0,1fr)] gap-4 max-lg:order-first">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-4 max-lg:order-first max-sm:order-last">
             {plan.issues.length > 0 ? (
               <IssuesCard
                 issues={plan.issues}
@@ -489,6 +493,7 @@ function TradesCard({
   limit,
   onMore,
   pointValues,
+  hasPnl,
 }: {
   plan: ImportPlan;
   account: Account;
@@ -499,6 +504,8 @@ function TradesCard({
   limit: number;
   onMore: () => void;
   pointValues: ImportMapping['overrides'];
+  /** Whether the mapping reads a P&L column; without one there is nothing to check. */
+  hasPnl: boolean;
 }) {
   const display = useDisplay();
   const tz = account.timeZone ?? 'UTC';
@@ -563,12 +570,16 @@ function TradesCard({
               <th scope="col" className={`${TH} text-right`}>
                 Keel net
               </th>
-              <th scope="col" className={`${TH} text-right`}>
-                File P&amp;L
-              </th>
-              <th scope="col" className={`${TH} text-center`}>
-                Check
-              </th>
+              {hasPnl ? (
+                <>
+                  <th scope="col" className={`${TH} text-right`}>
+                    File P&amp;L
+                  </th>
+                  <th scope="col" className={`${TH} text-center`}>
+                    Check
+                  </th>
+                </>
+              ) : null}
             </tr>
           </thead>
           <tbody>
@@ -579,6 +590,7 @@ function TradesCard({
                 tz={tz}
                 account={account}
                 filePnl={plan.filePnl[t.id]}
+                hasPnl={hasPnl}
                 flags={flagsByTrade.get(t.id) ?? []}
                 highlighted={flagged.has(t.id)}
                 display={display}
@@ -592,6 +604,12 @@ function TradesCard({
           Showing {shown.length.toLocaleString('en-US')} of{' '}
           {list.length.toLocaleString('en-US')}. Times in {zoneLabel(tz)}.
         </span>
+        {!hasPnl ? (
+          <span>
+            Your file has no P&amp;L column, so there is nothing to check
+            Keel&apos;s net against.
+          </span>
+        ) : null}
         {shown.length < list.length ? (
           <button type="button" onClick={onMore} className={LINK}>
             Show {Math.min(ROWS_PER_PAGE, list.length - shown.length)} more
@@ -625,6 +643,7 @@ function TradeRows({
   tz,
   account,
   filePnl,
+  hasPnl,
   flags,
   highlighted,
   display,
@@ -634,6 +653,7 @@ function TradeRows({
   account: Account;
   /** What the file says this trade made; undefined when it has no P&L column. */
   filePnl: number | undefined;
+  hasPnl: boolean;
   flags: readonly TradeFlag[];
   highlighted: boolean;
   display: Display;
@@ -694,46 +714,55 @@ function TradeRows({
             <FigureText f={display.cash(t.net, true, t.pnlCurrency)} />
           )}
         </td>
-        <td className={`${TD} text-right tabular-nums`}>
-          {filePnl === undefined ? (
-            <span className="text-faint">Not in file</span>
-          ) : mismatch?.code === 'pnl-mismatch' ? (
-            <span className="font-semibold text-text underline decoration-faint decoration-dotted underline-offset-[3px]">
-              <FigureText
-                f={display.cash(mismatch.file, true, account.currency)}
-              />
-            </span>
-          ) : (
-            <span className="text-muted">
-              <FigureText f={display.cash(filePnl, true, account.currency)} />
-            </span>
-          )}
-        </td>
-        <td className={`${TD} text-center`}>
-          {mismatch?.code === 'pnl-mismatch' ? (
-            <span className="inline-flex h-[22px] items-center rounded-full border border-line-2 bg-surface-1 px-2 text-[12px] font-semibold whitespace-nowrap text-text">
-              Off by&nbsp;
-              <FigureText
-                f={display.cash(
-                  Math.abs(mismatch.file - t.net),
-                  false,
-                  account.currency,
-                )}
-              />
-            </span>
-          ) : filePnl !== undefined && !open ? (
-            <span className="inline-grid size-5 place-items-center rounded-full bg-accent-soft text-accent">
-              <Check {...ICON} size={12} weight="bold" />
-              <span className="sr-only">Matches the file</span>
-            </span>
-          ) : (
-            <span className="sr-only">Nothing to check</span>
-          )}
-        </td>
+        {hasPnl ? (
+          <>
+            <td className={`${TD} text-right tabular-nums`}>
+              {filePnl === undefined ? (
+                <span className="text-faint">None</span>
+              ) : mismatch?.code === 'pnl-mismatch' ? (
+                <span className="font-semibold text-text underline decoration-faint decoration-dotted underline-offset-[3px]">
+                  <FigureText
+                    f={display.cash(mismatch.file, true, account.currency)}
+                  />
+                </span>
+              ) : (
+                <span className="text-muted">
+                  <FigureText
+                    f={display.cash(filePnl, true, account.currency)}
+                  />
+                </span>
+              )}
+            </td>
+            <td className={`${TD} text-center`}>
+              {mismatch?.code === 'pnl-mismatch' ? (
+                <span className="inline-flex h-[22px] items-center rounded-full border border-line-2 bg-surface-1 px-2 text-[12px] font-semibold whitespace-nowrap text-text">
+                  Off by&nbsp;
+                  <FigureText
+                    f={display.cash(
+                      Math.abs(mismatch.file - t.net),
+                      false,
+                      account.currency,
+                    )}
+                  />
+                </span>
+              ) : filePnl !== undefined && !open ? (
+                <span className="inline-grid size-5 place-items-center rounded-full bg-accent-soft text-accent">
+                  <Check {...ICON} size={12} weight="bold" />
+                  <span className="sr-only">Matches the file</span>
+                </span>
+              ) : (
+                <span className="text-faint">None</span>
+              )}
+            </td>
+          </>
+        ) : null}
       </tr>
       {notes.length > 0 ? (
         <tr className={`${shade} border-b border-line/70`}>
-          <td colSpan={11} className="px-5 pb-2 text-[12.5px] leading-snug">
+          <td
+            colSpan={hasPnl ? 11 : 9}
+            className="px-5 pb-2 text-[12.5px] leading-snug"
+          >
             <Chip tone="warn" className="h-auto min-h-[22px] py-0.5">
               {notes.join('. ')}
             </Chip>

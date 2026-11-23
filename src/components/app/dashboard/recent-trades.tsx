@@ -131,10 +131,10 @@ function StrategyCell({ row }: { row: RecentTrade }): React.JSX.Element {
   );
 }
 
-/** The first mistake in a warn chip, then how many more; nothing when the trade has none. */
-function MistakeCell({ row }: { row: RecentTrade }): React.JSX.Element | null {
+/** The first mistake in a warn chip, then how many more; "None" when the trade has none. */
+function MistakeCell({ row }: { row: RecentTrade }): React.JSX.Element {
   const [first, ...rest] = row.mistakes;
-  if (first === undefined) return null;
+  if (first === undefined) return <span className="text-faint">None</span>;
   return (
     <span className="flex min-w-0 items-center gap-1.5">
       <span className="sr-only">Mistakes:</span>

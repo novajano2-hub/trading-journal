@@ -8,7 +8,7 @@ import {
 } from '@testing-library/react';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import { renderApp } from '../__fixtures__/render-app';
@@ -390,4 +390,55 @@ test('the Name column holds its place, and the Actions column too, as the table 
   expect(futures.querySelector('td:last-child')!.className).toContain(
     'sticky right-0',
   );
+});
+
+test('the selected row keeps its status pill fill against the row tint, and the sticky header cell has no ground at lg', async () => {
+  renderApp(<AccountsSettings />, { repository: repo(), url: URL });
+  const row = await rowOf('Futures main');
+  expect(cell(row, 'Status').firstElementChild!.className).toContain(
+    'bg-surface-1!',
+  );
+  const other = await rowOf('Old demo');
+  expect(cell(other, 'Status').firstElementChild!.className).not.toContain(
+    'bg-surface-1!',
+  );
+  const th = row.closest('table')!.querySelector('thead th:last-child')!;
+  expect(th.className).toContain('lg:bg-transparent');
+});
+
+test('the Broker column is wide enough for a full broker name at 1440', async () => {
+  renderApp(<AccountsSettings />, { repository: repo(), url: URL });
+  const row = await rowOf('Futures main');
+  expect(cell(row, 'Broker').className).toContain('max-w-[160px]');
+});
+
+describe('below 640px', () => {
+  beforeEach(() => {
+    window.innerWidth = 390;
+  });
+  afterEach(() => {
+    window.innerWidth = 1024;
+  });
+
+  test('accounts are two-line rows: name and balance, then type, status and prop rules, with the row menu kept', async () => {
+    renderApp(<AccountsSettings />, { repository: repo(), url: URL });
+    const list = await screen.findByRole('list', { name: 'Accounts' });
+    expect(screen.queryByRole('table')).toBeNull();
+    const item = within(list)
+      .getAllByRole('listitem')
+      .find((li) => li.textContent!.startsWith('Futures main'))!;
+    const one = item.querySelector('[data-line="1"]')!;
+    const two = item.querySelector('[data-line="2"]')!;
+    expect(one.textContent).toContain('Futures main');
+    await waitFor(() => expect(one.textContent).toContain('$50,116.00'));
+    expect(two.textContent).toContain('Live');
+    expect(two.textContent).toContain('Active');
+    expect(two.textContent).toContain('Does not apply');
+    expect(item.getAttribute('aria-current')).toBe('true');
+    fireEvent.keyDown(
+      within(item).getByRole('button', { name: 'Actions for Futures main' }),
+      { key: 'Enter' },
+    );
+    expect(await screen.findByRole('menuitem', { name: 'Edit' })).toBeTruthy();
+  });
 });

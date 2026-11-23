@@ -205,6 +205,22 @@ test('an unknown futures root asks for a point value and shows the file symbol b
   ).toBeTruthy();
 });
 
+test('Preview waits until every unknown root has a point value', async () => {
+  await open([futures]);
+  await upload(
+    csvFile([
+      '11/19/2026 09:30:00,HGZ6,Buy,1,4.10',
+      '11/19/2026 09:45:00,HGZ6,Sell,1,4.20',
+    ]),
+  );
+  const go = screen.getByRole('button', { name: /^Preview/ });
+  expect((go as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText('HG point value'), {
+    target: { value: '25000' },
+  });
+  await waitFor(() => expect((go as HTMLButtonElement).disabled).toBe(false));
+});
+
 test('without a file the upload step shows no spinner and no mapping', async () => {
   await open([futures]);
   expect(await screen.findByLabelText('Import file')).toBeTruthy();

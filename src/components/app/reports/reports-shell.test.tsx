@@ -1,5 +1,11 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  screen,
+  within,
+} from '@testing-library/react';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import { renderApp } from '../__fixtures__/render-app';
@@ -106,4 +112,20 @@ test('on Compare its own link keeps both groups', async () => {
   );
   expect(url.searchParams.get('a')).toBe('symbol=ES');
   expect(url.searchParams.get('b')).toBe('symbol=NQ');
+});
+
+test('the tab strip scrolls and shows an edge fade while tabs are cut off', async () => {
+  const { container } = renderApp(<ReportsPage report="overview" />, {
+    sample: reportsSample,
+    url: '/app/reports',
+  });
+  const nav = await screen.findByRole('navigation', { name: 'Reports' });
+  const scroller = nav.closest('.overflow-x-auto') as HTMLElement;
+  expect(scroller).toBeTruthy();
+  Object.defineProperty(scroller, 'scrollWidth', { value: 500 });
+  Object.defineProperty(scroller, 'clientWidth', { value: 350 });
+  act(() => {
+    scroller.dispatchEvent(new Event('scroll'));
+  });
+  expect(container.querySelector('[data-scroll-fade]')).toBeTruthy();
 });

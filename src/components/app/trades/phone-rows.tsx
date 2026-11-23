@@ -72,15 +72,21 @@ export function PhoneRows({
                 data-line="2"
                 className="flex min-h-5 min-w-0 items-center gap-3 text-[12.5px] text-muted"
               >
+                <span className="flex-none">
+                  {t.direction === 'long' ? 'Long' : 'Short'}
+                </span>
                 {t.status === 'closed' ? (
                   <span className="flex-none tabular-nums">
                     {cellOf('realizedR', t, env)}
                   </span>
                 ) : null}
                 <span className="flex-none">{cellOf('rules', t, env)}</span>
-                <span className="min-w-0 overflow-hidden">
-                  {cellOf('tags', t, env)}
-                </span>
+                {env.facts.tagsOf(t).length + env.facts.mistakesOf(t).length >
+                0 ? (
+                  <span className="min-w-0 overflow-hidden">
+                    {cellOf('tags', t, env)}
+                  </span>
+                ) : null}
               </span>
             </Link>
           </li>

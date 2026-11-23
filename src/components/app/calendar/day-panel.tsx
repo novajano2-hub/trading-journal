@@ -195,9 +195,10 @@ export function DayPanel({
         'None'
       ) : (
         <>
-          {mistakes.trades}
+          {mistakes.trades} {plural(mistakes.trades, 'trade')}
           <small className="block truncate text-[12px] font-medium text-muted">
             <FigureText f={fmt(mistakes.pnl)} />
+            {mistakes.pnl < 0 ? ' lost' : mistakes.pnl > 0 ? ' made' : ''}
           </small>
         </>
       ),
@@ -325,16 +326,21 @@ export function DayPanel({
       <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-3">
         <Link
           href={`/app/notebook/daily/${date}`}
-          className={`${buttonClasses('secondary', 'sm')} min-w-0 flex-1 px-2.5!`}
+          className={`${buttonClasses('secondary', 'sm')} min-w-fit flex-1 px-2.5! whitespace-nowrap`}
         >
-          <NotePencil aria-hidden="true" size={16} weight="duotone" />
+          <NotePencil
+            aria-hidden="true"
+            size={16}
+            weight="duotone"
+            className="shrink-0"
+          />
           Open daily note
         </Link>
         <Link
           href={`/app/trades${query ? `?${query}` : ''}`}
-          className={`${buttonClasses('secondary', 'sm')} min-w-0 flex-1 px-2.5!`}
+          className={`${buttonClasses('secondary', 'sm')} min-w-fit flex-1 px-2.5! whitespace-nowrap`}
         >
-          <ListBullets aria-hidden="true" size={16} />
+          <ListBullets aria-hidden="true" size={16} className="shrink-0" />
           Open in Trades
         </Link>
       </div>

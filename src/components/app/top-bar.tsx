@@ -294,7 +294,7 @@ export function TopBar({
         </>
       ) : null}
       {isComparePage(pathname) ? (
-        <p className="flex-none text-[13px] text-faint max-sm:pt-3">
+        <p className="flex-none text-[13px] text-faint max-sm:hidden">
           Each group has its own filters
         </p>
       ) : null}
@@ -327,6 +327,12 @@ export function TopBar({
         {/* The bar's last control: Keel has no signed-in person, so no avatar. */}
         <ThemeToggle className="flex-none max-sm:size-10 max-sm:pointer-coarse:size-11" />
       </div>
+      {/* On a phone the note follows the toolbar row, not the title. */}
+      {isComparePage(pathname) ? (
+        <p className="-mt-1 pb-3 text-[13px] text-faint sm:hidden">
+          Each group has its own filters
+        </p>
+      ) : null}
     </header>
   );
 }

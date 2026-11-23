@@ -149,23 +149,6 @@ test('Confirm commits the plan and says what landed where', async () => {
   ).toBeTruthy();
 });
 
-test('a plan blocked by unpriced symbols names them and goes back to the point values, focused', async () => {
-  await toPreview(
-    csv([
-      FILLS,
-      '11/19/2026 09:30:00,HGZ6,Buy,1,4.10',
-      '11/19/2026 09:45:00,HGZ6,Sell,1,4.20',
-    ]),
-  );
-  expect(await screen.findByText(/HG needs a point value/)).toBeTruthy();
-  expect(screen.queryByRole('button', { name: /^Import \d/ })).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: 'Set point values' }));
-  await waitFor(() => expect(window.location.search).toContain('step=map'));
-  // Map opens with the first point-value input ready to type in.
-  const input = await screen.findByLabelText('HG point value');
-  await waitFor(() => expect(document.activeElement).toBe(input));
-});
-
 test('a symbol Keel cannot place is not offered a point value: it says to check the Symbol column', async () => {
   await toPreview(
     csv([
@@ -190,22 +173,6 @@ test('a symbol Keel cannot place is not offered a point value: it says to check 
   ).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Back to columns' }));
   await waitFor(() => expect(window.location.search).toContain('step=map'));
-});
-
-test('with both kinds, the priceable root is asked for and the other symbol is named apart', async () => {
-  await toPreview(
-    csv([
-      FILLS,
-      '11/19/2026 09:30:00,HGZ6,Buy,1,4.10',
-      '11/19/2026 09:45:00,HGZ6,Sell,1,4.20',
-      '11/19/2026 09:50:00,FUT-01,Buy,1,4.10',
-    ]),
-  );
-  expect(await screen.findByText(/HG needs a point value/)).toBeTruthy();
-  expect(
-    screen.getByText(/Keel doesn't recognise FUT-01, check the Symbol column/),
-  ).toBeTruthy();
-  expect(screen.getByRole('button', { name: 'Set point values' })).toBeTruthy();
 });
 
 const stalePlan =
@@ -359,7 +326,7 @@ test('the trades table has the comp columns, and a file P&L within a cent shows 
   expect(within(table).queryAllByText('Off by $0.01')).toHaveLength(0);
 });
 
-test('without a P&L column the file P&L cells say Not in file, never a dash', async () => {
+test('without a P&L column the table drops File P&L and Check and says why once', async () => {
   await toPreview(
     csv([
       FILLS,
@@ -369,8 +336,29 @@ test('without a P&L column the file P&L cells say Not in file, never a dash', as
   );
   await screen.findByRole('region', { name: 'What Keel read' });
   const table = screen.getByRole('table');
-  expect(within(table).getByText('Not in file')).toBeTruthy();
+  const heads = within(table)
+    .getAllByRole('columnheader')
+    .map((h) => h.textContent);
+  expect(heads).not.toContain('File P&L');
+  expect(heads).not.toContain('Check');
+  expect(within(table).queryByText('Not in file')).toBeNull();
   expect(within(table).queryByText('-')).toBeNull();
+  expect(
+    screen.getAllByText(
+      "Your file has no P&L column, so there is nothing to check Keel's net against.",
+    ),
+  ).toHaveLength(1);
+});
+
+test('with a P&L column a row with no file figure says None, never a blank', async () => {
+  await toPreview(csv([TRIPS, row('195.00', '09'), row('', '10')]));
+  await screen.findByRole('region', { name: 'What Keel read' });
+  const table = screen.getByRole('table');
+  for (const tr of within(table).getAllByRole('row').slice(1)) {
+    const cells = within(tr).getAllByRole('cell');
+    const check = cells[cells.length - 1]!;
+    expect(check.textContent?.trim()).not.toBe('');
+  }
 });
 
 test('under Privacy the Off by chip and the fees are masked, and the summary net takes its sign colour', async () => {
@@ -395,4 +383,15 @@ test('the Row column is sticky below lg, and flagged rows keep an opaque ground'
   expect(firsts.length).toBeGreaterThan(0);
   for (const td of firsts)
     expect(td.className).toMatch(/max-lg:sticky[\s\S]*bg-(surface-1|sunken)/);
+});
+
+test('on a phone the trades table comes before the Confirm card; from sm Confirm leads', async () => {
+  await toPreview(csv([TRIPS, row('200.00')]));
+  const card = (await screen.findByText('Trades Keel built')).closest(
+    'section',
+  )!;
+  const tableSide = card.parentElement!;
+  expect(tableSide.className).toContain('max-sm:order-first');
+  const confirmSide = tableSide.nextElementSibling!;
+  expect(confirmSide.className).toContain('max-sm:order-last');
 });

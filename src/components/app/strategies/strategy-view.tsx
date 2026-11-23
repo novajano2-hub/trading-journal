@@ -64,7 +64,14 @@ function Head({
   );
 }
 
-const LOSERS_ONLY = <span className="text-faint">Losers only</span>;
+const LOSERS_ONLY = (
+  <span
+    className="text-faint"
+    title="Losers only: this rule applies only to losing trades"
+  >
+    Losers
+  </span>
+);
 
 /** One rule's cells, as the table and the stacked card both show them. */
 function ruleCells(

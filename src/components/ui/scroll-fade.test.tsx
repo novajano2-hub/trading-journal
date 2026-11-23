@@ -43,3 +43,20 @@ test('a fade shows while there is more to the right and goes at the end', () => 
   });
   expect(fade(container)).toBeNull();
 });
+
+test('on the page ground the fade takes the ground colour, not the card white', () => {
+  const { container } = render(
+    <ScrollFade tone="bg" rootClassName="-mx-5">
+      <nav />
+    </ScrollFade>,
+  );
+  const scroller = container.querySelector('.overflow-x-auto') as HTMLElement;
+  Object.defineProperty(scroller, 'scrollWidth', { value: 600 });
+  Object.defineProperty(scroller, 'clientWidth', { value: 350 });
+  act(() => {
+    scroller.dispatchEvent(new Event('scroll'));
+  });
+  expect(fade(container)!.className).toContain('from-bg');
+  expect(fade(container)!.className).not.toContain('from-surface-1');
+  expect(container.firstElementChild!.className).toContain('-mx-5');
+});

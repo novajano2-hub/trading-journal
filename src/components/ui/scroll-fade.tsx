@@ -12,10 +12,16 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 export function ScrollFade({
   children,
   className = '',
+  rootClassName = '',
+  tone = 'surface',
 }: {
   children: ReactNode;
   /** Classes for the scrolling box (its margin and padding). */
   className?: string;
+  /** Classes for the box around it, where the fade is laid (a bleed to the page edge). */
+  rootClassName?: string;
+  /** What the fade melts into: a card's white (default) or the page ground. */
+  tone?: 'surface' | 'bg';
 }): React.JSX.Element {
   const scroller = useRef<HTMLDivElement>(null);
   const [more, setMore] = useState(false);
@@ -40,7 +46,7 @@ export function ScrollFade({
     };
   }, []);
   return (
-    <div className="relative">
+    <div className={`relative ${rootClassName}`}>
       <div ref={scroller} className={`overflow-x-auto ${className}`}>
         {children}
       </div>
@@ -48,7 +54,7 @@ export function ScrollFade({
         <div
           data-scroll-fade=""
           aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 right-0 z-[2] w-12 bg-linear-to-l from-surface-1 to-transparent lg:hidden"
+          className={`pointer-events-none absolute inset-y-0 right-0 z-[2] w-12 bg-linear-to-l ${tone === 'bg' ? 'from-bg' : 'from-surface-1'} to-transparent lg:hidden`}
         />
       ) : null}
     </div>

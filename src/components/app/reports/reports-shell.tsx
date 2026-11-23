@@ -12,6 +12,7 @@ import { CompareView } from './compare';
 import { DayTimeView } from './day-time-report';
 import { OptionsView } from './options-report';
 import { OverviewView } from './overview';
+import { ScrollFade } from '@/components/ui/scroll-fade';
 import { PerformanceView } from './performance';
 import { RiskView } from './risk-report';
 import { WinsLossesView } from './wins-losses';
@@ -99,60 +100,63 @@ export function ReportsShell({
   );
   return (
     <div className="flex min-w-0 flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0">
-      <nav
-        aria-label="Reports"
-        className="-mx-5 max-w-[100vw] overflow-x-auto px-5 pb-1 lg:max-w-full"
+      <ScrollFade
+        tone="bg"
+        rootClassName="-mx-5 max-w-[100vw] lg:max-w-full"
+        className="px-5 pb-1 [scrollbar-width:none]"
       >
-        <div className="inline-flex rounded-[11px] bg-accent/8 p-[3px] shadow-[inset_0_1px_2px_rgb(18_22_51/0.07)] [[data-theme=dark]_&]:shadow-[inset_0_1px_2px_rgb(0_0_0/0.35)]">
-          {tabLink(SIMPLE_TABS[0]!)}
-          {tabLink(SIMPLE_TABS[1]!)}
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger
-              aria-current={current === 'reports' ? 'page' : undefined}
-              className={`${TAB} cursor-pointer ${current === 'reports' ? TAB_ON : TAB_OFF}`}
-            >
-              {current === 'reports' ? (
-                <>
-                  <span className="sr-only">Reports: </span>
-                  {REPORT_LABELS[active]}
-                </>
-              ) : (
-                'Reports'
-              )}
-              <CaretDown size={12} weight="bold" aria-hidden="true" />
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Portal>
-              <DropdownMenu.Content
-                align="start"
-                sideOffset={6}
-                collisionPadding={12}
-                aria-label="Reports"
-                className="z-50 min-w-[190px] rounded-control border border-line bg-surface-1 p-1 shadow-[var(--shadow)]"
+        <nav aria-label="Reports">
+          <div className="inline-flex rounded-[11px] bg-accent/8 p-[3px] shadow-[inset_0_1px_2px_rgb(18_22_51/0.07)] [[data-theme=dark]_&]:shadow-[inset_0_1px_2px_rgb(0_0_0/0.35)]">
+            {tabLink(SIMPLE_TABS[0]!)}
+            {tabLink(SIMPLE_TABS[1]!)}
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger
+                aria-current={current === 'reports' ? 'page' : undefined}
+                className={`${TAB} cursor-pointer ${current === 'reports' ? TAB_ON : TAB_OFF}`}
               >
-                {REPORT_MENU.map((m) => (
-                  <DropdownMenu.Item key={m.key} asChild>
-                    <Link
-                      href={hrefOf(m.key, params, active)}
-                      className="relative flex min-h-9 cursor-pointer items-center rounded-[8px] py-1.5 pr-3 pl-8 text-[13.5px] text-text no-underline outline-none select-none data-highlighted:bg-sunken pointer-coarse:min-h-11"
-                    >
-                      {active === m.key ? (
-                        <Check
-                          size={16}
-                          aria-hidden="true"
-                          className="absolute left-2 text-accent-ink"
-                        />
-                      ) : null}
-                      {m.label}
-                    </Link>
-                  </DropdownMenu.Item>
-                ))}
-              </DropdownMenu.Content>
-            </DropdownMenu.Portal>
-          </DropdownMenu.Root>
-          {tabLink(SIMPLE_TABS[2]!)}
-          {tabLink(SIMPLE_TABS[3]!)}
-        </div>
-      </nav>
+                {current === 'reports' ? (
+                  <>
+                    <span className="sr-only">Reports: </span>
+                    {REPORT_LABELS[active]}
+                  </>
+                ) : (
+                  'Reports'
+                )}
+                <CaretDown size={12} weight="bold" aria-hidden="true" />
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content
+                  align="start"
+                  sideOffset={6}
+                  collisionPadding={12}
+                  aria-label="Reports"
+                  className="z-50 min-w-[190px] rounded-control border border-line bg-surface-1 p-1 shadow-[var(--shadow)]"
+                >
+                  {REPORT_MENU.map((m) => (
+                    <DropdownMenu.Item key={m.key} asChild>
+                      <Link
+                        href={hrefOf(m.key, params, active)}
+                        className="relative flex min-h-9 cursor-pointer items-center rounded-[8px] py-1.5 pr-3 pl-8 text-[13.5px] text-text no-underline outline-none select-none data-highlighted:bg-sunken pointer-coarse:min-h-11"
+                      >
+                        {active === m.key ? (
+                          <Check
+                            size={16}
+                            aria-hidden="true"
+                            className="absolute left-2 text-accent-ink"
+                          />
+                        ) : null}
+                        {m.label}
+                      </Link>
+                    </DropdownMenu.Item>
+                  ))}
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+            {tabLink(SIMPLE_TABS[2]!)}
+            {tabLink(SIMPLE_TABS[3]!)}
+          </div>
+        </nav>
+      </ScrollFade>
       {children}
     </div>
   );

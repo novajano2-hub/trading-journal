@@ -859,7 +859,7 @@ export function TradesView(): React.JSX.Element {
                                       : 'none'
                                   : undefined
                               }
-                              className={`h-10 border-b border-line pr-1.5 align-middle text-xs font-medium text-faint last:pr-0 ${PAD_LEFT.has(id) ? 'pl-2' : ''} ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'}`}
+                              className={`h-10 border-b border-line pr-1.5 align-middle text-xs font-medium text-faint last:pr-0 ${PAD_LEFT.has(id) ? 'pl-4' : ''} ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'}`}
                             >
                               {canSort ? (
                                 HEADER_TIPS[id] ? (
@@ -918,7 +918,7 @@ export function TradesView(): React.JSX.Element {
                           return (
                             <td
                               key={cell.id}
-                              className={`overflow-hidden py-1 pr-1.5 last:pr-0 ${PAD_LEFT.has(id) ? 'pl-2' : ''} ${align === 'right' ? 'text-right tabular-nums' : align === 'center' ? 'text-center' : 'text-left'}`}
+                              className={`overflow-hidden py-1 pr-1.5 last:pr-0 ${PAD_LEFT.has(id) ? 'pl-4' : ''} ${align === 'right' ? 'text-right tabular-nums' : align === 'center' ? 'text-center' : 'text-left'}`}
                             >
                               <table.FlexRender cell={cell} />
                             </td>

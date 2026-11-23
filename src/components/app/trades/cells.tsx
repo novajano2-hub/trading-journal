@@ -85,13 +85,13 @@ export function TagsCell({
 }: {
   tags: readonly TagInfo[];
   mistakes?: readonly string[];
-}): React.JSX.Element | null {
+}): React.JSX.Element {
   const all = [
     ...mistakes.map((name) => ({ name, tag: undefined })),
     ...tags.map((tag) => ({ name: tag.name, tag })),
   ];
   const [first, ...rest] = all;
-  if (first === undefined) return null;
+  if (first === undefined) return <span className="text-faint">None</span>;
   const names = rest.map((t) => t.name);
   return (
     <span className="flex min-w-0 items-center gap-1.5">

@@ -110,7 +110,12 @@ test('Add trade is a secondary button beside the top bar Import, at the one md s
   expect(add.className).toContain('h-[34px]');
   // Duration is right-aligned and Strategy starts after a gap, so the headers never meet.
   const strategy = within(t).getByRole('columnheader', { name: /Strategy/ });
-  expect(strategy.className).toContain('pl-2');
+  expect(strategy.className).toContain('pl-4');
+  const cell =
+    bodyRows(t)[0]!.querySelectorAll('td')[
+      [...strategy.parentElement!.children].indexOf(strategy)
+    ]!;
+  expect(cell.className).toContain('pl-4');
 });
 
 test('newest open first; sorting by Net puts the largest first', async () => {
@@ -524,6 +529,11 @@ describe('at 390px', () => {
     const lines = link.querySelectorAll('[data-line]');
     expect(lines).toHaveLength(2);
     expect(lines[0]!.textContent).toContain('+$10.00');
+    // Line two opens with the side, before the R.
+    for (const item of items.slice(0, 10))
+      expect(item.querySelector('[data-line="2"]')!.textContent).toMatch(
+        /^(Long|Short)/,
+      );
     expect(within(first).getAllByRole('link')).toHaveLength(1);
     const box = within(first).getByRole('checkbox', {
       name: 'Select trade 120',
