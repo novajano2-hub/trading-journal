@@ -149,6 +149,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
           <BreakdownCards
             key="r"
             data={data}
+            report="risk"
             by="r"
             chartLabel="Net P&L by R multiple"
             tableName="R multiple summary"
@@ -163,6 +164,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
           <BreakdownCards
             key="size"
             data={data}
+            report="risk"
             by="size"
             chartLabel="Net P&L by position size"
             tableName="Position size summary"

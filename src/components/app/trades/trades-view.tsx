@@ -24,6 +24,7 @@ import { MetricTip } from '@/components/ui/metric-tip';
 import { Segmented } from '@/components/ui/segmented';
 import type { MetricId } from '@/content/metric-definitions';
 import { tradesCsv } from '@/data/csv-export';
+import { downloadCsv } from '@/lib/csv';
 import { EMPTY_FILTERS, resolveRange, serializeFilters } from '@/data/filters';
 import { metricContextOf } from '@/data/metrics';
 import { useGlobalFilters, useTradeSet } from '@/data/query/derived';
@@ -215,19 +216,8 @@ function SortMark({
 }
 
 /** Saves a CSV as a download, named keel-trades-YYYY-MM-DD.csv. */
-function download(csv: string, day: string): void {
-  // The byte order mark makes Excel read it as UTF-8.
-  const url = URL.createObjectURL(
-    new Blob(['﻿', csv], { type: 'text/csv;charset=utf-8' }),
-  );
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `keel-trades-${day}.csv`;
-  document.body.append(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
+const download = (csv: string, day: string): void =>
+  downloadCsv(csv, `keel-trades-${day}.csv`);
 
 /**
  * The trade log on the URL's filters. Render inside `<Suspense>`: it reads the

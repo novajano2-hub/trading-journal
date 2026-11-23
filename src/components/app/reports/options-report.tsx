@@ -42,6 +42,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
   return (
     <BreakdownCards
       data={data}
+      report="options"
       by="dte"
       chartLabel="Net P&L by days to expiry"
       tableName="Days to expiry summary"

@@ -22,20 +22,19 @@ import type { PnlBasis } from '@/domain/types';
 import { useDisplay } from '@/lib/display';
 import { formatPct } from '@/lib/format';
 import { CARD, CARD_PAD, CardHeader, signTone } from '../dashboard/shared';
+import {
+  formatPicks,
+  labelOf,
+  MAX_METRICS,
+  parsePicks,
+  type Pick,
+} from './metric-chips';
 import { periodText, ReportChart, type ChartSeries } from './report-chart';
 import { ReportScope } from './report-scope';
 import { SummaryTable, type SummaryColumn } from './summary-table';
 import { writeParam, type ReportData } from './use-report-data';
 
-const MAX_METRICS = 3;
 const BUCKETS: readonly Bucket[] = ['day', 'week', 'month'];
-const DEFAULT_PICK: Pick = { metric: 'net', kind: 'bar' };
-
-interface Pick {
-  metric: SeriesMetric;
-  kind: 'bar' | 'line';
-}
-
 /** The metric each picker row's label defines. */
 const TIPS: Record<SeriesMetric, MetricId> = {
   net: 'pnl',
@@ -48,31 +47,6 @@ const TIPS: Record<SeriesMetric, MetricId> = {
   trades: 'trades',
   fees: 'fees',
 };
-
-function labelOf(metric: SeriesMetric, basis: PnlBasis): string {
-  return metric === 'net'
-    ? `${basis === 'gross' ? 'Gross' : 'Net'} P&L`
-    : SERIES_META[metric].label;
-}
-
-/** `?m=net:bar,win-rate:line`: absent is Net P&L as bars, empty is none. At most three, none twice. */
-export function parsePicks(param: string | null): Pick[] {
-  if (param === null) return [DEFAULT_PICK];
-  const picks: Pick[] = [];
-  for (const part of param.split(',')) {
-    const [name, kind] = part.split(':');
-    const metric = SERIES_METRICS.find((m) => m === name);
-    if (!metric || picks.some((p) => p.metric === metric)) continue;
-    picks.push({
-      metric,
-      kind: kind === 'bar' || kind === 'line' ? kind : SERIES_META[metric].kind,
-    });
-  }
-  return picks.slice(0, MAX_METRICS);
-}
-
-const formatPicks = (picks: readonly Pick[]) =>
-  picks.map((p) => `${p.metric}:${p.kind}`).join(',');
 
 function bucketOf(param: string | null): Bucket {
   return BUCKETS.find((b) => b === param) ?? 'week';

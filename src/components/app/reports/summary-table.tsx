@@ -41,6 +41,8 @@ export interface SummaryColumn<Row extends object> {
   value(row: Row): string | number | null | undefined;
   /** What the cell shows; default: the sort value. */
   cell?(row: Row): ReactNode;
+  /** The column in an export: its own header and the real value; default the header and the sort value. */
+  csv?: { header?: string; value(row: Row): string | number | null };
   /** A number's first click sorts the largest first; set false to start from the smallest. */
   descFirst?: boolean;
 }

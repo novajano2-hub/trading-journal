@@ -89,6 +89,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
       <BreakdownCards
         key={tab}
         data={data}
+        report="day-time"
         by={BY[tab]}
         options={options}
         chartLabel={`Net P&L by ${noun}${byBasis}`}

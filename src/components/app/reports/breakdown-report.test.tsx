@@ -1,5 +1,11 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  screen,
+  within,
+} from '@testing-library/react';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import type { SampleWorkspace } from '@/data/seed/generate';
@@ -276,4 +282,148 @@ test('the matrix is computed once per view, not once for the metric and again fo
   const page = await screen.findByTestId('reports-symbols');
   within(page).getByRole('table', { name: 'Symbols by side' });
   expect(calls).toHaveBeenCalledTimes(1);
+});
+
+test('the table has Largest win and Largest loss columns', async () => {
+  renderApp(<SymbolsView />, {
+    sample: breakdownSample,
+    url: '/app/reports/symbols',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const table = within(page).getByRole('table', { name: 'Symbols summary' });
+  const heads = within(table)
+    .getAllByRole('columnheader')
+    .map((h) => h.textContent);
+  expect(heads.slice(-2)).toEqual(['Largest win', 'Largest loss']);
+  // ES: b-1 won 100.00 and b-2 lost 40.00.
+  const es = rowOf(table, /^ES/)
+    .getAllByRole('cell')
+    .map((c) => c.textContent);
+  expect(es.slice(-2)).toEqual(['+$100.00', '−$40.00']);
+  // NQ: b-3 won 70.00 and b-4 lost 20.00.
+  const nq = rowOf(table, /^NQ/)
+    .getAllByRole('cell')
+    .map((c) => c.textContent);
+  expect(nq.slice(-2)).toEqual(['+$70.00', '−$20.00']);
+});
+
+function captureDownload() {
+  let blob: Blob | undefined;
+  let name = '';
+  Object.assign(URL, {
+    createObjectURL: vi.fn((b: Blob) => {
+      blob = b;
+      return 'blob:keel';
+    }),
+    revokeObjectURL: vi.fn(),
+  });
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+    this: HTMLAnchorElement,
+  ) {
+    name = this.download;
+  });
+  return {
+    name: () => name,
+    text: async () => (await blob!.text()).replace(/^﻿/, ''),
+  };
+}
+
+test('Export CSV writes the visible columns with real values even under Privacy, on the current filters', async () => {
+  const repository = await repositoryWith({ displayUnit: 'privacy' });
+  renderApp(<SymbolsView />, {
+    repository,
+    url: '/app/reports/symbols?side=short',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const saved = captureDownload();
+  fireEvent.click(
+    await within(page).findByRole('button', { name: 'Export CSV' }),
+  );
+  await vi.waitFor(() => expect(saved.name()).not.toBe(''));
+  expect(saved.name()).toMatch(/^keel-symbols-\d{4}-\d{2}-\d{2}\.csv$/);
+  const lines = (await saved.text()).split('\r\n').filter(Boolean);
+  expect(lines[0]).toBe(
+    'Symbol,Trades,Win rate (%),Net P&L (USD),Profit factor,Average (USD),Largest win (USD),Largest loss (USD)',
+  );
+  // Only the shorts: ES b-2 (-40.00) and NQ b-4 (-20.00).
+  expect(lines.slice(1).sort()).toEqual([
+    'ES,1,0.0,-40.00,0.00,-40.00,,-40.00',
+    'NQ,1,0.0,-20.00,0.00,-20.00,,-20.00',
+  ]);
+  expect(lines.join('')).not.toContain('•');
+});
+
+test('Export CSV of a cross-analysis writes the matrix', async () => {
+  renderApp(<SymbolsView />, {
+    sample: breakdownSample,
+    url: '/app/reports/symbols?x=side',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const saved = captureDownload();
+  fireEvent.click(
+    await within(page).findByRole('button', { name: 'Export CSV' }),
+  );
+  await vi.waitFor(() => expect(saved.name()).not.toBe(''));
+  const lines = (await saved.text()).split('\r\n').filter(Boolean);
+  expect(lines[0]).toBe('Symbol,Long,Short');
+  expect(lines).toContain('NQ,70.00,-20.00');
+});
+
+test('the chart has metric chips: Net P&L and Win rate, removable, with + Metric to add up to three', async () => {
+  renderApp(<SymbolsView />, {
+    sample: breakdownSample,
+    url: '/app/reports/symbols',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const chips = within(
+    await within(page).findByRole('group', { name: 'Chart metrics' }),
+  );
+  expect(chips.getByRole('button', { name: /^Net P&L, bars/ })).toBeTruthy();
+  expect(chips.getByRole('button', { name: /^Win rate, line/ })).toBeTruthy();
+  // A chip's kind toggles.
+  fireEvent.click(chips.getByRole('button', { name: /^Net P&L, bars/ }));
+  expect(new URLSearchParams(window.location.search).get('m')).toBe(
+    'net:line,win-rate:line',
+  );
+  fireEvent.click(chips.getByRole('button', { name: 'Remove Win rate' }));
+  expect(new URLSearchParams(window.location.search).get('m')).toBe('net:line');
+  // Add Trades from the menu.
+  fireEvent.keyDown(chips.getByRole('button', { name: 'Add metric' }), {
+    key: 'Enter',
+  });
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Trades' }));
+  expect(new URLSearchParams(window.location.search).get('m')).toBe(
+    'net:line,trades:bar',
+  );
+  // The chart now holds those two series.
+  const chart = within(page).getByRole('table', { name: /Net P&L by symbol/ });
+  expect(
+    within(chart)
+      .getAllByRole('columnheader')
+      .map((h) => h.textContent),
+  ).toEqual(['Period', 'Net P&L', 'Trades']);
+});
+
+test('at three metrics the menu offers no more', async () => {
+  renderApp(<SymbolsView />, {
+    sample: breakdownSample,
+    url: '/app/reports/symbols?m=net:bar,win-rate:line,trades:bar',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const add = await within(page).findByRole('button', { name: 'Add metric' });
+  expect((add as HTMLButtonElement).disabled).toBe(true);
+});
+
+test('the chart readout gives the trades in the bucket', async () => {
+  renderApp(<SymbolsView />, {
+    sample: breakdownSample,
+    url: '/app/reports/symbols',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const chart = await within(page).findByRole('img', {
+    name: /Net P&L by symbol/,
+  });
+  act(() => chart.focus());
+  const readout = within(page).getAllByRole('status')[0]!;
+  expect(readout.textContent).toMatch(/Trades\s*\d/);
 });

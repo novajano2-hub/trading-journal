@@ -3,6 +3,7 @@
 import {
   ArrowsLeftRight,
   ChartBar,
+  DownloadSimple,
   ListNumbers,
   Table,
 } from '@phosphor-icons/react/dist/ssr';
@@ -17,13 +18,23 @@ import {
   type BreakdownRow,
   type CrossMetric,
 } from '@/domain/metrics/breakdowns';
+import { pnlOf } from '@/domain/metrics/context';
+import { SERIES_META, type SeriesMetric } from '@/domain/metrics/series';
 import { roundHalfEven } from '@/domain/money';
 import { useStrategies, useTagCategories, useTags } from '@/data/query/hooks';
 import type { TagCategory } from '@/domain/types';
 import { useDisplay } from '@/lib/display';
+import { csvText, decimalOf, downloadCsv } from '@/lib/csv';
 import { formatPct, plural } from '@/lib/format';
 import { CARD, CARD_PAD, CardHeader, signTone } from '../dashboard/shared';
 import { CrossAnalysis } from './cross-analysis';
+import {
+  formatPicks,
+  labelOf as metricLabel,
+  MetricChips,
+  parsePicks,
+  type Pick,
+} from './metric-chips';
 import { ReportChart, type ChartSeries } from './report-chart';
 import { ReportScope } from './report-scope';
 import { SummaryTable, type SummaryColumn } from './summary-table';
@@ -124,6 +135,46 @@ function crossText(metric: CrossMetric, v: number): string {
 const tintOf = (metric: CrossMetric, v: number): number =>
   metric === 'win-rate' ? v - 0.5 : metric === 'profit-factor' ? v - 1 : 0;
 
+/** What a breakdown chart can plot for a bucket, and what each reads from its summary. */
+const CHART_METRICS: readonly SeriesMetric[] = [
+  'net',
+  'win-rate',
+  'profit-factor',
+  'expectancy',
+  'avg-win',
+  'avg-loss',
+  'trades',
+  'fees',
+];
+const DEFAULT_PICKS: readonly Pick[] = [
+  { metric: 'net', kind: 'bar' },
+  { metric: 'win-rate', kind: 'line' },
+];
+
+function chartValue(r: BreakdownRow, metric: SeriesMetric): number | null {
+  const s = r.summary;
+  switch (metric) {
+    case 'net':
+      return s.closedCount > 0 ? basisNet(r) : null;
+    case 'win-rate':
+      return s.winRate;
+    case 'profit-factor':
+      return s.profitFactor;
+    case 'expectancy':
+      return s.expectancy;
+    case 'avg-win':
+      return s.avgWin;
+    case 'avg-loss':
+      return s.avgLoss;
+    case 'trades':
+      return s.closedCount;
+    case 'fees':
+      return s.fees;
+    default:
+      return null;
+  }
+}
+
 const basisNet = (r: BreakdownRow) =>
   r.summary.basis === 'gross' ? r.summary.grossPnl : r.summary.netPnl;
 
@@ -176,6 +227,7 @@ function ranked(rows: BreakdownRow[]): BreakdownRow[] {
  */
 export function BreakdownCards({
   data,
+  report,
   by,
   options,
   chartLabel,
@@ -193,6 +245,8 @@ export function BreakdownCards({
   columnsBefore,
 }: {
   data: ReportData;
+  /** Names the export: `keel-{report}-YYYY-MM-DD.csv`. */
+  report: string;
   by: BreakdownKey;
   options?: BreakdownOptions;
   /** The chart's accessible name: "Net P&L by symbol". */
@@ -255,10 +309,28 @@ export function BreakdownCards({
     display.figure(sumOf(r), true, currency).label;
   const bestRow = best[0];
   const worstRow = best.length > 1 ? best[best.length - 1] : undefined;
+  const picks = useMemo(
+    () => parsePicks(params.get('m'), DEFAULT_PICKS, CHART_METRICS),
+    [params],
+  );
+  const setPicks = (next: Pick[]) => writeParam('m', formatPicks(next));
+  // The caller words the label for Net P&L. With Net P&L first it stays, and the other
+  // metrics follow at the end; without it the label names what is plotted.
+  const metricNames = picks.map((x) => metricLabel(x.metric, basis));
+  const netFirst = picks[0]?.metric === 'net';
+  const named = netFirst
+    ? chartLabel
+    : chartLabel.replace(
+        /^Net P&L/,
+        metricNames.length === 0 ? 'No metric' : metricNames.join(' and '),
+      );
   const chartName = [
-    `${chartLabel}, ${data.caption}.`,
+    `${named}, ${data.caption}.`,
     bestRow ? `Best ${describe(bestRow)} ${figureLabel(bestRow)}` : '',
     worstRow ? `, worst ${describe(worstRow)} ${figureLabel(worstRow)}.` : '',
+    netFirst && picks.length > 1
+      ? `Also plotted: ${metricNames.slice(1).join(', ')}.`
+      : '',
   ]
     .join(' ')
     .replace(' ,', ',')
@@ -266,23 +338,47 @@ export function BreakdownCards({
 
   const names = new Map(chartRows.map((r) => [r.key, describe(r)]));
   const short = new Map(chartRows.map((r) => [r.key, r.label]));
-  const series: ChartSeries[] = [
-    {
-      label: `${basis === 'gross' ? 'Gross' : 'Net'} P&L`,
-      kind: 'bar',
-      unit: 'money',
-      points: chartRows.map((r) => ({
-        key: r.key,
-        value: r.summary.closedCount > 0 ? basisNet(r) : null,
-      })),
-    },
-    {
-      label: 'Win rate',
-      kind: 'line',
-      unit: 'pct',
-      points: chartRows.map((r) => ({ key: r.key, value: r.summary.winRate })),
-    },
-  ];
+  const series: ChartSeries[] = picks.map((x) => ({
+    label: metricLabel(x.metric, basis),
+    kind: x.kind,
+    unit: SERIES_META[x.metric].unit,
+    points: chartRows.map((r) => ({
+      key: r.key,
+      value: chartValue(r, x.metric),
+    })),
+  }));
+  const tradesIn = new Map(
+    chartRows.map((r) => [r.key, r.summary.closedCount]),
+  );
+  // The readout gives the trades in a bucket even when they are not plotted.
+  const extra = picks.some((x) => x.metric === 'trades')
+    ? undefined
+    : [
+        {
+          label: 'Trades',
+          text: (key: string) => String(tradesIn.get(key) ?? 0),
+        },
+      ];
+
+  /** The trade behind a bucket's largest win or loss, for the display units. */
+  const tradeById = useMemo(
+    () => new Map(p.trades.map((t) => [t.id, t])),
+    [p.trades],
+  );
+  const largestCell = (r: BreakdownRow, cents: number | null) => {
+    if (cents === null) return none;
+    const trade = r.tradeIds
+      .map((id) => tradeById.get(id))
+      .find((t) => t !== undefined && pnlOf(t, basis) === cents);
+    const f = trade ? display.ofTrade(trade) : display.ofAll(cents);
+    return (
+      <span className={`font-[550] ${signTone(cents)}`}>
+        <FigureText
+          f={display.figure({ ...f, money: cents }, true, currency)}
+        />
+      </span>
+    );
+  };
 
   const none = <span className="text-faint">None</span>;
   const columns: SummaryColumn<BreakdownRow>[] = [
@@ -309,6 +405,13 @@ export function BreakdownCards({
       value: (r) => r.summary.winRate,
       cell: (r) =>
         r.summary.winRate === null ? none : formatPct(r.summary.winRate, 1),
+      csv: {
+        header: 'Win rate (%)',
+        value: (r) =>
+          r.summary.winRate === null
+            ? null
+            : (r.summary.winRate * 100).toFixed(1),
+      },
     },
     {
       id: 'net',
@@ -316,6 +419,11 @@ export function BreakdownCards({
       tip: 'pnl',
       align: 'right',
       value: (r) => (r.summary.closedCount > 0 ? basisNet(r) : null),
+      csv: {
+        header: `${basis === 'gross' ? 'Gross' : 'Net'} P&L (${currency})`,
+        value: (r) =>
+          r.summary.closedCount > 0 ? decimalOf(basisNet(r)) : null,
+      },
       cell: (r) =>
         r.summary.closedCount === 0 ? (
           none
@@ -335,6 +443,9 @@ export function BreakdownCards({
         r.summary.profitFactor === null
           ? none
           : r.summary.profitFactor.toFixed(2),
+      csv: {
+        value: (r) => r.summary.profitFactor?.toFixed(2) ?? null,
+      },
     },
     {
       id: 'average',
@@ -345,6 +456,13 @@ export function BreakdownCards({
         r.summary.closedCount > 0
           ? roundHalfEven(basisNet(r) / r.summary.closedCount)
           : null,
+      csv: {
+        header: `Average (${currency})`,
+        value: (r) =>
+          r.summary.closedCount > 0
+            ? decimalOf(roundHalfEven(basisNet(r) / r.summary.closedCount))
+            : null,
+      },
       cell: (r) => {
         if (r.summary.closedCount === 0) return none;
         const avg = roundHalfEven(basisNet(r) / r.summary.closedCount);
@@ -361,6 +479,38 @@ export function BreakdownCards({
         );
       },
     },
+    {
+      id: 'largest-win',
+      header: 'Largest win',
+      tip: 'largest-win',
+      align: 'right',
+      value: (r) => r.summary.largestWin,
+      cell: (r) => largestCell(r, r.summary.largestWin),
+      csv: {
+        header: `Largest win (${currency})`,
+        value: (r) =>
+          r.summary.largestWin === null
+            ? null
+            : decimalOf(r.summary.largestWin),
+      },
+    },
+    {
+      id: 'largest-loss',
+      header: 'Largest loss',
+      tip: 'largest-loss',
+      align: 'right',
+      value: (r) => r.summary.largestLoss,
+      // The most negative first.
+      descFirst: false,
+      cell: (r) => largestCell(r, r.summary.largestLoss),
+      csv: {
+        header: `Largest loss (${currency})`,
+        value: (r) =>
+          r.summary.largestLoss === null
+            ? null
+            : decimalOf(r.summary.largestLoss),
+      },
+    },
   ];
 
   // One pass serves the metric, the counts and the trades behind each cell.
@@ -372,6 +522,38 @@ export function BreakdownCards({
   const matrixRows = matrix?.rows
     .map((row, i) => ({ ...row, i }))
     .filter((r) => !rowAllow || rowAllow.has(r.key));
+
+  /** The table or the matrix as it shows, with real values: Privacy hides figures on screen, not in a file. */
+  const exportCsv = () => {
+    let csv: string;
+    if (cross && matrix && matrixRows) {
+      const text = (v: number | null): string | null =>
+        v === null
+          ? null
+          : metric === 'net'
+            ? decimalOf(v)
+            : metric === 'win-rate'
+              ? (v * 100).toFixed(1)
+              : metric === 'profit-factor'
+                ? v.toFixed(2)
+                : String(v);
+      csv = csvText(
+        [rowTitle, ...matrix.cols.map((c) => c.label)],
+        matrixRows.map((row) => [
+          row.label,
+          ...matrix.cols.map((_, c) => text(matrix.cells[row.i]?.[c] ?? null)),
+        ]),
+      );
+    } else {
+      csv = csvText(
+        columns.map((c) => c.csv?.header ?? c.header),
+        tableRows.map((r) =>
+          columns.map((c) => (c.csv ? c.csv.value(r) : (c.value(r) ?? null))),
+        ),
+      );
+    }
+    downloadCsv(csv, `keel-${report}-${data.today}.csv`);
+  };
 
   return (
     <>
@@ -388,11 +570,17 @@ export function BreakdownCards({
               ) : undefined
             }
           />
-          {controls ? (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {controls}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {controls}
+            <div className="ml-auto">
+              <MetricChips
+                picks={picks}
+                available={CHART_METRICS}
+                basis={basis}
+                onChange={setPicks}
+              />
             </div>
-          ) : null}
+          </div>
           <div className="mt-3">
             <ReportChart
               label={chartName}
@@ -401,6 +589,7 @@ export function BreakdownCards({
               height={chartRows.length > 0 ? 190 : undefined}
               xLabel={(key) => short.get(key) ?? key}
               periodLabel={(key) => names.get(key) ?? key}
+              extra={extra}
             />
           </div>
         </section>
@@ -500,6 +689,19 @@ export function BreakdownCards({
                   })),
                 ]}
               />
+              <button
+                type="button"
+                onClick={exportCsv}
+                disabled={cross ? !matrixRows?.length : tableRows.length === 0}
+                className="inline-flex h-[30px] items-center gap-1.5 rounded-control border border-line bg-surface-1 px-3 text-[13.5px] font-medium whitespace-nowrap text-muted shadow-[0_1px_1px_rgb(18_22_51/0.04)] transition-[border-color] duration-200 ease-(--ease-glide) hover:border-accent/35 focus-visible:outline-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-50 pointer-coarse:h-11"
+              >
+                <DownloadSimple
+                  size={16}
+                  aria-hidden="true"
+                  className="text-faint"
+                />
+                Export CSV
+              </button>
             </span>
           }
         />
@@ -564,6 +766,7 @@ export function SymbolsView(): React.JSX.Element {
   return (
     <Plain
       testId="reports-symbols"
+      report="symbols"
       by="symbol"
       chartLabel="Net P&L by symbol"
       tableName="Symbols summary"
@@ -580,6 +783,7 @@ export function StrategiesView(): React.JSX.Element {
   return (
     <Plain
       testId="reports-strategies"
+      report="strategies"
       by="strategy"
       options={options}
       chartLabel="Net P&L by strategy"
@@ -616,6 +820,7 @@ export function TagsView(): React.JSX.Element {
   return (
     <Plain
       testId="reports-tags"
+      report="tags"
       by="tag"
       options={options}
       rowAllow={allow}

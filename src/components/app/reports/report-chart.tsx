@@ -259,6 +259,19 @@ function bandOf(s: ChartSeries, top: number, bandH: number): Band {
   };
 }
 
+/** The indices of the largest and the smallest value, when they are two bars with different values. */
+function extremesOf(points: readonly SeriesPoint[]): number[] {
+  let hi = -1;
+  let lo = -1;
+  points.forEach((p, i) => {
+    if (p.value === null) return;
+    if (hi === -1 || p.value > points[hi]!.value!) hi = i;
+    if (lo === -1 || p.value < points[lo]!.value!) lo = i;
+  });
+  if (hi === -1) return [];
+  return hi === lo || points[hi]!.value === points[lo]!.value ? [hi] : [hi, lo];
+}
+
 /** The drawing: axes, bars and lines. Static between hovers, so it is memoised. */
 const Plot = memo(function Plot({
   series,
@@ -269,6 +282,7 @@ const Plot = memo(function Plot({
   xLabel,
   overlay,
   shade,
+  labelExtremes,
 }: {
   series: readonly ChartSeries[];
   layout: Layout;
@@ -278,6 +292,7 @@ const Plot = memo(function Plot({
   xLabel?: (key: string) => string;
   overlay: boolean;
   shade?: Shade;
+  labelExtremes: boolean;
 }) {
   const keys = series[0]!.points.map((p) => p.key);
   const { padL, plotW, step, bandH } = layout;
@@ -386,6 +401,27 @@ const Plot = memo(function Plot({
                 gradientId={`${gradientId}-${si}`}
               />
             )}
+            {labelExtremes && s.kind === 'bar' && si === 0
+              ? extremesOf(s.points).map((i) => {
+                  const v = s.points[i]!.value!;
+                  const up = v >= 0;
+                  return (
+                    <text
+                      key={`x${i}`}
+                      data-extreme={up ? 'best' : 'worst'}
+                      x={xOf(layout, i)}
+                      y={band.y(v) + (up ? -5 : 13)}
+                      textAnchor="middle"
+                      fontSize={11}
+                      fontWeight={600}
+                      fill={up ? 'var(--gain)' : 'var(--loss)'}
+                      className="tabular-nums"
+                    >
+                      {fmt.tick(s.unit, v)}
+                    </text>
+                  );
+                })
+              : null}
             {zeroInside && s.kind === 'bar' ? (
               <line
                 x1={padL}
@@ -554,6 +590,8 @@ export function ReportChart({
   xLabel,
   overlay = false,
   shade,
+  labelExtremes = false,
+  extra,
 }: {
   series: readonly ChartSeries[];
   label: string;
@@ -572,6 +610,10 @@ export function ReportChart({
   overlay?: boolean;
   /** A stretch to shade, such as the max drawdown. */
   shade?: Shade;
+  /** Write the value on the largest and the smallest bar of the first series. */
+  labelExtremes?: boolean;
+  /** More rows for the readout, such as the trades in the period; not drawn. */
+  extra?: readonly { label: string; text(key: string): string }[];
 }): React.JSX.Element {
   // Named periods read as they are named; dated ones as a date.
   const periodLabel = periodLabelProp ?? xLabel ?? periodText;
@@ -738,6 +780,7 @@ export function ReportChart({
               xLabel={xLabel}
               overlay={overlay}
               shade={shade}
+              labelExtremes={labelExtremes}
             />
             {active !== null ? (
               <g pointerEvents="none">
@@ -796,6 +839,14 @@ export function ReportChart({
                   </span>
                   <span className="font-semibold text-text tabular-nums">
                     {fmt.node(s.unit, s.points[active]!.value)}
+                  </span>
+                </div>
+              ))}
+              {extra?.map((row) => (
+                <div key={row.label} className="flex justify-between gap-4">
+                  <span className="pl-3.5">{row.label}</span>
+                  <span className="font-semibold text-text tabular-nums">
+                    {row.text(series[0]!.points[active]!.key)}
                   </span>
                 </div>
               ))}
