@@ -246,6 +246,26 @@ export function tradePageId(pathname: string): string | undefined {
   }
 }
 
+const decoded = (raw: string): string => {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+};
+
+/** The strategy id when `pathname` is one strategy's page (not the list, the new form or the editor), decoded. */
+export function strategyPageId(pathname: string): string | undefined {
+  const m = /^\/app\/strategies\/([^/]+)$/.exec(pathname);
+  return !m || m[1] === 'new' ? undefined : decoded(m[1]!);
+}
+
+/** The strategy id when `pathname` is one strategy's editor, decoded. */
+export function strategyEditId(pathname: string): string | undefined {
+  const m = /^\/app\/strategies\/([^/]+)\/edit$/.exec(pathname);
+  return m ? decoded(m[1]!) : undefined;
+}
+
 /**
  * Whether the global filters drive this page: Dashboard, the trade log, Calendar
  * and Reports, except Compare, whose two groups each own their filters.

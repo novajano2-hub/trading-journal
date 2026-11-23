@@ -4,6 +4,8 @@ import {
   activeItem,
   navHref,
   pageTitle,
+  strategyEditId,
+  strategyPageId,
   tradePageId,
   filtersApply,
   type AppModuleId,
@@ -53,6 +55,21 @@ test('tradePageId reads the id of a trade page, decoded, and nothing else', () =
   expect(tradePageId('/app/trades/new')).toBeUndefined();
   expect(tradePageId('/app/trades/t-c/edit')).toBeUndefined();
   expect(tradePageId('/app/notes/t-c')).toBeUndefined();
+});
+
+test('strategyPageId reads the id of a strategy page, decoded, and not new or edit', () => {
+  expect(strategyPageId('/app/strategies/str-1')).toBe('str-1');
+  expect(strategyPageId('/app/strategies/a%2Fb')).toBe('a/b');
+  expect(strategyPageId('/app/strategies')).toBeUndefined();
+  expect(strategyPageId('/app/strategies/new')).toBeUndefined();
+  expect(strategyPageId('/app/strategies/str-1/edit')).toBeUndefined();
+  expect(strategyPageId('/app/trades/str-1')).toBeUndefined();
+});
+
+test('strategyEditId reads the id of a strategy editor, and nothing else', () => {
+  expect(strategyEditId('/app/strategies/str-1/edit')).toBe('str-1');
+  expect(strategyEditId('/app/strategies/str-1')).toBeUndefined();
+  expect(strategyEditId('/app/strategies/new')).toBeUndefined();
 });
 
 test('filtersApply is true only on the routes the global filters drive', () => {

@@ -193,3 +193,38 @@ test('the trade log keeps its plain title and its chips', () => {
   expect(within(title).queryByRole('link')).toBeNull();
   expect(screen.getByTestId('chips')).toBeTruthy();
 });
+
+test('a strategy page titles the bar "Strategies" then the strategy name, with no chips', async () => {
+  renderApp(
+    <TopBar
+      filters={<div data-testid="chips" />}
+      search={<button data-testid="search">Search</button>}
+    />,
+    { url: '/app/strategies/str-1' },
+  );
+  const title = screen.getByRole('heading', { level: 1 });
+  const back = within(title).getByRole('link', { name: 'Strategies' });
+  expect(back.getAttribute('href')).toBe('/app/strategies');
+  await waitFor(() =>
+    expect(title.textContent).toContain('Opening range breakout'),
+  );
+  expect(screen.queryByTestId('chips')).toBeNull();
+});
+
+test('the strategy editor reads "Strategies > name > Edit", the name linking back to the strategy', async () => {
+  renderApp(<TopBar />, { url: '/app/strategies/str-1/edit' });
+  const title = screen.getByRole('heading', { level: 1 });
+  const name = await within(title).findByRole('link', {
+    name: 'Opening range breakout',
+  });
+  expect(name.getAttribute('href')).toBe('/app/strategies/str-1');
+  expect(within(title).getByRole('link', { name: 'Strategies' })).toBeTruthy();
+  expect(title.textContent).toContain('Edit');
+});
+
+test('the strategy list and the new-strategy form keep their plain titles', () => {
+  renderApp(<TopBar />, { url: '/app/strategies/new' });
+  const title = screen.getByRole('heading', { level: 1 });
+  expect(title.textContent).toBe('Strategies');
+  expect(within(title).queryByRole('link')).toBeNull();
+});

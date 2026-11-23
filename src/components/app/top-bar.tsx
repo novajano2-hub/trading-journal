@@ -13,8 +13,15 @@ import {
 } from 'react';
 import { RAISED } from '@/components/ui/button-styles';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
-import { useTrade } from '@/data/query/hooks';
-import { filtersApply, isComparePage, pageTitle, tradePageId } from './nav';
+import { useStrategy, useTrade } from '@/data/query/hooks';
+import {
+  filtersApply,
+  isComparePage,
+  pageTitle,
+  strategyEditId,
+  strategyPageId,
+  tradePageId,
+} from './nav';
 
 /**
  * Where the chips sit from `sm` up: beside the title, or with the controls on
@@ -135,6 +142,61 @@ function TradeNumber({ id }: { id: string }): React.JSX.Element | null {
   );
 }
 
+const CRUMB_LINK =
+  'rounded-chip text-faint no-underline outline-offset-2 hover:text-text focus-visible:outline-2 focus-visible:outline-accent';
+
+const Caret = (): React.JSX.Element => (
+  <CaretRight
+    size={16}
+    aria-hidden="true"
+    className="mx-1 flex-none text-faint"
+  />
+);
+
+/**
+ * "Strategies > name", and "> Edit" on the editor. The name is the page's own
+ * title on the detail page and a way back to it on the editor; nothing shows
+ * until the strategy loads.
+ */
+function StrategyCrumb({
+  id,
+  edit,
+}: {
+  id: string;
+  edit: boolean;
+}): React.JSX.Element {
+  const strategy = useStrategy(id);
+  const name = strategy.data?.name;
+  return (
+    <>
+      <Link href="/app/strategies" className={CRUMB_LINK}>
+        Strategies
+      </Link>
+      {name ? (
+        <>
+          <Caret />
+          {edit ? (
+            <Link
+              href={`/app/strategies/${encodeURIComponent(id)}`}
+              className={`${CRUMB_LINK} truncate`}
+            >
+              {name}
+            </Link>
+          ) : (
+            <span className="truncate">{name}</span>
+          )}
+          {edit ? (
+            <>
+              <Caret />
+              <span>Edit</span>
+            </>
+          ) : null}
+        </>
+      ) : null}
+    </>
+  );
+}
+
 /**
  * The bar over every app page, on the canvas with no rule under it. Its
  * source order is its reading order at every
@@ -168,6 +230,12 @@ export function TopBar({
   const controls = useRef<HTMLDivElement>(null);
   const chips = useRef<HTMLDivElement>(null);
   const tradeId = tradePageId(pathname);
+  const strategyId = strategyPageId(pathname);
+  const editingId = strategyEditId(pathname);
+  const crumbed =
+    tradeId !== undefined ||
+    strategyId !== undefined ||
+    editingId !== undefined;
   const measured = useChipsFit({ bar, title, tail, controls, chips });
   // The chips show only where the filters drive the page. A trade page's bar
   // carries none (its Previous and Next keep the URL's), nor does Import; those
@@ -189,17 +257,22 @@ export function TopBar({
         >
           <span
             ref={title}
-            className={tradeId === undefined ? 'truncate' : 'flex items-center'}
+            className={crumbed ? 'flex items-center' : 'truncate'}
           >
-            {tradeId === undefined ? (
-              pageTitle(pathname)
-            ) : (
+            {tradeId !== undefined ? (
               <>
                 <Suspense fallback={<span>Trades</span>}>
                   <BackToTrades />
                 </Suspense>
                 <TradeNumber id={tradeId} />
               </>
+            ) : strategyId !== undefined || editingId !== undefined ? (
+              <StrategyCrumb
+                id={(strategyId ?? editingId)!}
+                edit={editingId !== undefined}
+              />
+            ) : (
+              pageTitle(pathname)
             )}
           </span>
         </h1>
