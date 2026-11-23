@@ -313,8 +313,23 @@ describe('breakdown2D', () => {
     ];
     const m = breakdown2D(t, ctx, 'symbol', 'side', 'net');
     // Symbols rank by P&L (NQ 1000, ES 600); the empty Short column of NQ is a null cell.
-    expect(m.rows).toEqual(['NQ', 'ES']);
-    expect(m.cols).toEqual(['Long', 'Short']);
+    expect(m.rows).toEqual([
+      { key: 'NQ', label: 'NQ' },
+      { key: 'ES', label: 'ES' },
+    ]);
+    expect(m.cols).toEqual([
+      { key: 'long', label: 'Long' },
+      { key: 'short', label: 'Short' },
+    ]);
+    expect(m.counts).toEqual([
+      [2, null],
+      [1, 1],
+    ]);
+    expect(m.tradeIds.map((r) => r.map((c) => c.length))).toEqual([
+      [2, 0],
+      [1, 1],
+    ]);
+    expect(m.tradeIds[0]![0]).toEqual([t[2]!.id, t[3]!.id]);
     expect(m.cells).toEqual([
       [1000, null],
       [1000, -400],
@@ -344,7 +359,7 @@ describe('breakdown2D', () => {
     );
     const m = breakdown2D(t, ctx, 'side', 'symbol', 'trades');
     expect(m.cols).toHaveLength(12);
-    expect(m.cols[11]).toBe('Other');
+    expect(m.cols[11]).toEqual({ key: 'Other', label: 'Other' });
     // Three symbols fold (the two one-trade ones and one of the busy ties): 1 + 1 + 2.
     expect(m.cells[0]![11]).toBe(4);
     expect(m.cells[0]!.reduce((a, b) => a! + b!, 0)).toBe(26);
@@ -355,8 +370,35 @@ describe('breakdown2D', () => {
     const m = breakdown2D(t, ctx, 'strategy', 'side', 'net', {
       strategyNames: { a: 'Alpha', b: 'Beta' },
     });
-    expect(m.rows.sort()).toEqual(['Alpha', 'Beta']);
+    expect(m.rows.map((r) => r.label).sort()).toEqual(['Alpha', 'Beta']);
     expect(m.cells).toEqual([[500], [500]]);
+  });
+});
+
+describe('same-named tags in two categories', () => {
+  const t = [
+    makeTrade({ net: 500, tagIds: ['m-fomo'] }),
+    makeTrade({ net: -200, tagIds: ['e-fomo'] }),
+    makeTrade({ net: -300, tagIds: ['e-fomo'] }),
+  ];
+  const tagNames = { 'm-fomo': 'fomo', 'e-fomo': 'fomo' };
+
+  test('rows and columns carry their own keys, and cells follow the key', () => {
+    const m = breakdown2D(t, ctx, 'tag', 'side', 'net', { tagNames });
+    expect(m.rows.map((r) => r.label)).toEqual(['fomo', 'fomo']);
+    expect(m.rows.map((r) => r.key).sort()).toEqual(['e-fomo', 'm-fomo']);
+    const at = (key: string) => m.cells[m.rows.findIndex((r) => r.key === key)];
+    expect(at('m-fomo')).toEqual([500]);
+    expect(at('e-fomo')).toEqual([-500]);
+  });
+
+  test('breakdown rows carry the ids of their trades', () => {
+    const r = breakdown(t, 'tag', { ...ctx, tagNames });
+    expect(r.find((x) => x.key === 'e-fomo')!.tradeIds).toEqual([
+      t[1]!.id,
+      t[2]!.id,
+    ]);
+    expect(r.find((x) => x.key === 'm-fomo')!.tradeIds).toEqual([t[0]!.id]);
   });
 });
 
@@ -445,6 +487,17 @@ describe('new dimensions', () => {
 });
 
 describe('winsVsLosses', () => {
+  test('each side carries the ids of its trades', () => {
+    const t = [
+      makeTrade({ net: 1000 }),
+      makeTrade({ net: -500 }),
+      makeTrade({ net: 0 }),
+    ];
+    const w = winsVsLosses(t, ctx);
+    expect(w.wins.tradeIds).toEqual([t[0]!.id]);
+    expect(w.losses.tradeIds).toEqual([t[1]!.id]);
+  });
+
   test('counts and averages follow classify, and breakevens are in neither', () => {
     const t = [
       makeTrade({

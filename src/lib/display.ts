@@ -269,6 +269,8 @@ export interface Display {
   ): { text: string; label: string };
   /** The figure for a set of closed trades, by id, with `money` as the view reports it. */
   ofTrades(ids: readonly string[], money: Cents): Figure;
+  /** The mean figure of a set of closed trades, by id, with `money` as the view reports the average. */
+  meanOfTrades(ids: readonly string[], money: Cents): Figure;
   /** The figure for one trade. */
   ofTrade(t: Trade): Figure;
   /** The figure for every closed trade the view holds, with `money` as it reports. */
@@ -343,6 +345,14 @@ export function useDisplay(): Display {
       const trades = ids.flatMap((id) => source?.tradesById.get(id) ?? []);
       return withMoney(
         sumFigures(closedFigures(trades, ctx), pctBase),
+        money,
+        pctBase,
+      );
+    },
+    meanOfTrades(ids, money) {
+      const trades = ids.flatMap((id) => source?.tradesById.get(id) ?? []);
+      return withMoney(
+        meanFigure(closedFigures(trades, ctx), pctBase),
         money,
         pctBase,
       );

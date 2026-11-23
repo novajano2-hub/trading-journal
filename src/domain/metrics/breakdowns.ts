@@ -37,6 +37,8 @@ export interface BreakdownRow {
   label: string;
   /** The tag breakdown's category name, when `tagCategoryNames` names one. */
   group?: string;
+  /** The closed trades filed under the row, for the display units. */
+  tradeIds: string[];
   summary: Summary;
 }
 export interface RBin {
@@ -315,6 +317,7 @@ export function breakdown(
     return spec.fixed.map(([key, label]) => ({
       key,
       label,
+      tradeIds: groups.get(key)!.map((t) => t.id),
       summary: summarize(groups.get(key)!, ctx),
     }));
   const rows = [...groups].map(([key, ts]): BreakdownRow => {
@@ -323,6 +326,7 @@ export function breakdown(
       key,
       label: spec.labelOf(key),
       ...(group !== undefined && { group }),
+      tradeIds: ts.map((t) => t.id),
       summary: summarize(ts, ctx),
     };
   });
@@ -342,10 +346,17 @@ export type CrossMetric = 'net' | 'trades' | 'win-rate' | 'profit-factor';
 export const MAX_CROSS_COLUMNS = 12;
 export const OTHER = 'Other';
 
+/** A row or column of the cross-analysis: `key` is unique, `label` is what it reads. */
+export interface CrossAxis {
+  key: string;
+  label: string;
+}
+
 /**
  * Two breakdowns against each other: a row per `rows` entry and a column per
- * `cols` entry, each cell the metric over the trades in both. Names are the
- * labels the breakdown shows. Rows and columns with no trades are left out; past
+ * `cols` entry, each cell the metric over the trades in both. Entries carry a
+ * unique `key` and the label the breakdown shows (two tags may share a label).
+ * `counts` holds the trades in each cell, so one call serves the metric and the count. Rows and columns with no trades are left out; past
  * 12 columns the busiest 11 stay in their order and the rest fold into 'Other'.
  * A pair with no trades is null, as is a win rate with no decided trade. A trade
  * with several strategies or tags counts in each of them. `net` follows the
@@ -358,7 +369,15 @@ export function breakdown2D(
   cols: BreakdownKey,
   metric: CrossMetric,
   opts: BreakdownOptions = {},
-): { rows: string[]; cols: string[]; cells: (number | null)[][] } {
+): {
+  rows: CrossAxis[];
+  cols: CrossAxis[];
+  cells: (number | null)[][];
+  /** Closed trades per cell; null where the pair has none. */
+  counts: (number | null)[][];
+  /** The closed trades in each cell, for the display units. */
+  tradeIds: string[][][];
+} {
   const merged = { ...ctx, ...opts };
   const closed = trades.filter(isClosed);
   const rowSpec = specOf(rows, merged);
@@ -367,7 +386,7 @@ export function breakdown2D(
   const colGroups = grouped(closed, colSpec);
   const order = (by: BreakdownKey) =>
     breakdown(trades, by, merged).filter((r) => r.summary.closedCount > 0);
-  const rowKeys = order(rows).map((r) => r.key);
+  const rowAxis = order(rows).map((r) => ({ key: r.key, label: r.label }));
   let colRows = order(cols);
   const folded = colRows.length > MAX_CROSS_COLUMNS;
   let other = new Set<string>();
@@ -381,11 +400,15 @@ export function breakdown2D(
     other = new Set(colRows.filter((r) => !keep.has(r.key)).map((r) => r.key));
     colRows = colRows.filter((r) => keep.has(r.key));
   }
-  const colSets: { label: string; ids: Set<ClosedTrade> }[] = colRows.map(
-    (r) => ({ label: r.label, ids: new Set(colGroups.get(r.key)) }),
-  );
+  const colSets: { key: string; label: string; ids: Set<ClosedTrade> }[] =
+    colRows.map((r) => ({
+      key: r.key,
+      label: r.label,
+      ids: new Set(colGroups.get(r.key)),
+    }));
   if (folded)
     colSets.push({
+      key: OTHER,
       label: OTHER,
       ids: new Set([...other].flatMap((k) => colGroups.get(k) ?? [])),
     });
@@ -403,13 +426,18 @@ export function breakdown2D(
         return s.profitFactor;
     }
   };
+  const cellTrades = rowAxis.map((r) => {
+    const inRow = rowGroups.get(r.key) ?? [];
+    return colSets.map((c) => inRow.filter((t) => c.ids.has(t)));
+  });
   return {
-    rows: rowKeys.map((k) => rowSpec.labelOf(k)),
-    cols: colSets.map((c) => c.label),
-    cells: rowKeys.map((k) => {
-      const inRow = rowGroups.get(k) ?? [];
-      return colSets.map((c) => value(inRow.filter((t) => c.ids.has(t))));
-    }),
+    rows: rowAxis,
+    cols: colSets.map((c) => ({ key: c.key, label: c.label })),
+    cells: cellTrades.map((r) => r.map(value)),
+    tradeIds: cellTrades.map((r) => r.map((ts) => ts.map((t) => t.id))),
+    counts: cellTrades.map((r) =>
+      r.map((ts) => (ts.length === 0 ? null : ts.length)),
+    ),
   };
 }
 
@@ -467,6 +495,8 @@ export function rDistribution(
 /** One side of "wins vs losses": the trades `classify` calls a win, or a loss. */
 export interface WinLossSide {
   count: number;
+  /** The trades on this side, for the display units. */
+  tradeIds: string[];
   /** The sum of their P&L on the basis. */
   net: Cents;
   avgNet: Cents | null;
@@ -506,6 +536,7 @@ export function winsVsLosses(
       xs.filter((x): x is T => x !== undefined);
     return {
       count: ts.length,
+      tradeIds: ts.map((t) => t.id),
       net: nets.reduce((a, b) => a + b, 0),
       avgNet: rounded(mean(nets)),
       avgDurationMin: mean(
