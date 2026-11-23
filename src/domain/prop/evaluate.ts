@@ -110,17 +110,14 @@ export function evaluateProp(input: {
       ? closed
       : closed.filter((t) => localDate(t.closedAt, timeZone) <= lastDay);
 
-  // Floor in force before a trade, from the peak *before* that trade. A drawdown
-  // floor is a balance the limit never sits below.
-  const floorFor = (peak: Cents): Cents => {
-    const limit =
-      rules.drawdownType === 'static'
-        ? start - rules.maxDrawdown
-        : Math.min(peak - rules.maxDrawdown, start);
-    return rules.drawdownFloor === undefined
-      ? limit
-      : Math.max(limit, rules.drawdownFloor);
-  };
+  // Floor in force before a trade, from the peak *before* that trade. A trailing
+  // drawdown follows the peak up and locks at `drawdownFloor` (the starting
+  // balance unless set); a static one ignores it.
+  const lock = rules.drawdownFloor ?? start;
+  const floorFor = (peak: Cents): Cents =>
+    rules.drawdownType === 'static'
+      ? start - rules.maxDrawdown
+      : Math.min(peak - rules.maxDrawdown, lock);
 
   let equity = start;
   let peak = start; // trailing: peak of equity; eod-trailing: peak of prior days' end-of-day equity

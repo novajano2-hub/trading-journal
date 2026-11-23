@@ -108,8 +108,6 @@ export function rulesFromDraft(
     const n = number(d.floor);
     if (!Number.isFinite(n) || n <= 0)
       errors.floor = 'Enter the floor balance.';
-    else if (toCents(n) > o.start)
-      errors.floor = 'The floor sits at or under the starting balance.';
     else drawdownFloor = toCents(n);
   }
   const minTradingDays = number(d.minDays);

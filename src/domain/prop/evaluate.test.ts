@@ -221,30 +221,76 @@ describe('evaluateProp', () => {
     expect(s.overall).toBe('breached');
   });
 
-  test('a drawdown floor above the trailing limit holds the limit at that level', () => {
+  test('a trailing drawdown trails the peak and locks at the floor', () => {
     const base = S({ drawdownType: 'trailing' });
-    const floor = base.startingBalance + 100000;
-    const trades = [
-      makeTrade({ net: 300000, serial: 1, closedAt: '2026-03-02T15:00:00Z' }),
+    const lock = base.startingBalance + 100000;
+    const win = (net: number) => [
+      makeTrade({ net, serial: 1, closedAt: '2026-03-02T15:00:00Z' }),
     ];
-    const s = evaluateProp({
-      ...base,
-      rules: { ...base.rules, drawdownFloor: floor },
-      trades,
-    });
-    // Unfloored, the trailing limit is min(peak - 200000, start) = start.
-    expect(evaluateProp({ ...base, trades }).drawdown.floor).toBe(
+    const rules = { ...base.rules, drawdownFloor: lock };
+    // Peak start+300000 trails to start+100000, which is the lock.
+    const locked = evaluateProp({ ...base, rules, trades: win(300000) });
+    expect(locked.drawdown.floor).toBe(lock);
+    expect(locked.drawdown.remaining).toBe(locked.equity - lock);
+    // Past the lock the limit stays put.
+    expect(
+      evaluateProp({ ...base, rules, trades: win(500000) }).drawdown.floor,
+    ).toBe(lock);
+    // Before it, the limit is still trailing, not the floor.
+    expect(
+      evaluateProp({ ...base, rules, trades: win(100000) }).drawdown.floor,
+    ).toBe(base.startingBalance - 100000);
+    // Unfloored, the lock is the starting balance.
+    expect(evaluateProp({ ...base, trades: win(500000) }).drawdown.floor).toBe(
       base.startingBalance,
     );
-    expect(s.drawdown.floor).toBe(floor);
-    expect(s.drawdown.remaining).toBe(s.equity - floor);
-    // The limit never sits below the floor, at the start of the phase either.
-    const fresh = evaluateProp({
+  });
+
+  test('a floor above the start does not breach a first loss', () => {
+    const base = S({ drawdownType: 'trailing' });
+    const s = evaluateProp({
       ...base,
-      rules: { ...base.rules, drawdownFloor: base.startingBalance - 50000 },
-      trades: [],
+      rules: { ...base.rules, drawdownFloor: base.startingBalance + 100000 },
+      trades: [
+        makeTrade({ net: -50000, serial: 1, closedAt: '2026-03-02T15:00:00Z' }),
+      ],
     });
-    expect(fresh.drawdown.floor).toBe(base.startingBalance - 50000);
+    expect(s.drawdown.state).toBe('clear');
+    expect(s.drawdown.floor).toBe(base.startingBalance - 200000);
+    // With no trades the limit is the start minus the drawdown, not the floor.
+    expect(
+      evaluateProp({
+        ...base,
+        rules: { ...base.rules, drawdownFloor: base.startingBalance - 50000 },
+        trades: [],
+      }).drawdown.floor,
+    ).toBe(base.startingBalance - 200000);
+  });
+
+  test('a static drawdown ignores the floor', () => {
+    const base = S({ drawdownType: 'static' });
+    const s = evaluateProp({
+      ...base,
+      rules: { ...base.rules, drawdownFloor: base.startingBalance + 100000 },
+      trades: [
+        makeTrade({ net: 300000, serial: 1, closedAt: '2026-03-02T15:00:00Z' }),
+      ],
+    });
+    expect(s.drawdown.floor).toBe(base.startingBalance - 200000);
+  });
+
+  test('an end-of-day trailing drawdown locks at the floor', () => {
+    const base = S({ drawdownType: 'eod-trailing' });
+    const lock = base.startingBalance + 100000;
+    const s = evaluateProp({
+      ...base,
+      rules: { ...base.rules, drawdownFloor: lock },
+      trades: [
+        makeTrade({ net: 400000, serial: 1, closedAt: '2026-03-02T15:00:00Z' }),
+      ],
+      now: '2026-03-03T18:00:00Z', // the day has ended, so its close is the peak
+    });
+    expect(s.drawdown.floor).toBe(lock);
   });
 
   test('the daily loss and drawdown breaches say what the day or the fall came to', () => {
