@@ -30,6 +30,8 @@ export interface ChallengePhaseCheck {
   state?: PropStatus;
   /** What the account holds today: its starting balance, its deposits and withdrawals, and its realized net. */
   balance?: Cents;
+  /** What the account has paid out: the sum of its withdrawals, positive. */
+  paidOut?: Cents;
   account?: Account;
 }
 
@@ -156,6 +158,9 @@ function phaseCheck(
     archived: account.status === 'archived',
     account,
     balance: balanceAt([account], flows, all, today, ctx),
+    paidOut: flows
+      .filter((f) => f.accountId === account.id && f.amount < 0)
+      .reduce((sum, f) => sum - f.amount, 0),
     ...(account.propRules && {
       state: evaluateProp({
         startingBalance: account.startingBalance,

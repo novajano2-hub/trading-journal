@@ -133,7 +133,7 @@ function Track({
 
 const STATUS = {
   active: { tone: 'accent', label: 'Active' },
-  near: { tone: 'warn', label: 'Near a limit' },
+  near: { tone: 'loss', label: 'Near a limit' },
   breached: { tone: 'loss', label: 'Breached' },
   passed: { tone: 'gain', label: 'Passed' },
 } as const;
@@ -144,24 +144,39 @@ function StatusChip({
   kind: keyof typeof STATUS;
 }): React.JSX.Element {
   const { tone, label } = STATUS[kind];
+  // Comp 12: "near" is the loss colour outlined on the surface, not filled.
+  const outlined =
+    kind === 'near' ? 'bg-surface-1! ring-1 ring-loss-fill/45 ring-inset' : '';
   return (
-    <Chip tone={tone} className="h-6 px-2.5 text-[12px] font-semibold">
+    <Chip
+      tone={tone}
+      className={`h-6 px-2.5 text-[12px] font-semibold ${outlined}`}
+    >
       {kind === 'breached' ? (
         <XCircle size={14} weight="fill" aria-hidden="true" />
       ) : kind === 'passed' ? (
         <CheckCircle size={14} weight="fill" aria-hidden="true" />
       ) : (
-        <i aria-hidden="true" className="size-[7px] rounded-full bg-current" />
+        <i
+          aria-hidden="true"
+          className={`size-[7px] rounded-full ${kind === 'near' ? 'bg-loss-fill' : 'bg-current'}`}
+        />
       )}
       {label}
     </Chip>
   );
 }
 
-/** The money in a stored sentence reads "hidden amount" under Privacy: no dollar figure may show there. */
-function maskedReason(text: string, privacy: boolean): string {
+/**
+ * The money in a stored sentence reads "hidden amount" under Privacy: no
+ * amount may show there, in any currency ($, €, £, CA$, or a code such as CHF).
+ */
+export function maskedReason(text: string, privacy: boolean): string {
   return privacy
-    ? text.replace(/[−-]?\$[\d,]+(?:\.\d+)?/g, 'hidden amount')
+    ? text.replace(
+        /[−-]?(?:[A-Z]{1,3}[\s\u00a0]?)?\p{Sc}[\s\u00a0]?\d[\d.,]*|[−-]?\b[A-Z]{3}[\s\u00a0]\d[\d.,]*/gu,
+        'hidden amount',
+      )
     : text;
 }
 
@@ -202,24 +217,35 @@ export function ChallengeCard({
   const text = (cents: Cents) => display.cash(cents, false, currency);
 
   const lastEval: ChallengeStep = c.steps === 2 ? 'step-2' : 'step-1';
-  const active = c.status === 'active';
+  // The stored status is the trader's, but a breached one is settled: every
+  // other status (a stored "passed" too) is still read against the numbers.
+  const open = c.status !== 'breached';
   const finding =
-    active && check.health === 'breached' ? check.finding : undefined;
+    open && check.health === 'breached' ? check.finding : undefined;
   const targetMet =
-    active && c.phase === 'evaluation' && check.health === 'target-met';
+    open && c.phase === 'evaluation' && check.health === 'target-met';
   const lastMet =
     targetMet &&
+    check.currentStep === lastEval &&
     check.phases.find((p) => p.step === lastEval)?.state?.overall ===
       'target-reached';
+  const evalPhases = check.phases.filter((p) => p.step !== 'funded');
+  const passedEval =
+    c.phase === 'evaluation' &&
+    evalPhases.length > 0 &&
+    evalPhases.every((p) => p.state?.overall === 'target-reached') &&
+    !check.phases.some((p) => p.step === 'funded' && p.accountId);
   const chip: keyof typeof STATUS =
-    c.status === 'active'
-      ? check.health === 'near'
+    c.status === 'breached'
+      ? 'breached'
+      : check.health === 'near'
         ? 'near'
-        : 'active'
-      : c.status;
+        : passedEval
+          ? 'passed'
+          : 'active';
   const funded = phase?.step === 'funded';
   const tile: { tone: TileTone; icon: typeof ShieldCheck } =
-    c.status === 'passed'
+    chip === 'passed'
       ? { tone: 'gain', icon: Trophy }
       : {
           tone: c.status === 'breached' ? 'loss' : 'accent',
@@ -323,7 +349,11 @@ export function ChallengeCard({
             }
           >
             {funded ? (
-              'no target once funded'
+              phase?.paidOut ? (
+                <>no target once funded, {money(phase.paidOut)} paid out</>
+              ) : (
+                'no target once funded'
+              )
             ) : s.overall === 'target-reached' ? (
               <>target reached, {money(s.profit.target)}</>
             ) : (
@@ -448,51 +478,59 @@ export function ChallengeCard({
         </div>
       )}
 
-      {sentence || targetMet || saveFailed ? (
-        <div
-          role="status"
-          className="col-span-full flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line bg-loss-soft/60 px-5 py-2.5 text-[13px] data-[kind=met]:bg-gain-soft/60"
-          data-kind={sentence ? 'breach' : 'met'}
-        >
-          <span className="min-w-0 flex-1 font-medium text-text">
-            {sentence ??
-              (lastMet
-                ? 'The profit target is met, with the minimum days and consistency.'
-                : 'This step is on target. Link the next step in Edit to carry on.')}
-            {saveFailed ? (
-              <span role="alert" className="ml-2 text-loss">
-                Couldn&apos;t save that. Try again.
-              </span>
+      {/* The card's one live region: always mounted, so a change in it is announced. */}
+      <div role="status" className="col-span-full empty:hidden">
+        {sentence || targetMet || saveFailed ? (
+          <div
+            className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line bg-loss-soft/60 px-5 py-2.5 text-[13px] data-[kind=met]:bg-gain-soft/60"
+            data-kind={targetMet && !sentence ? 'met' : 'breach'}
+          >
+            <span className="min-w-0 flex-1 font-medium text-text">
+              {sentence ??
+                (targetMet
+                  ? lastMet
+                    ? 'The profit target is met, with the minimum days and consistency.'
+                    : 'This step is on target. Link the next step in Edit to carry on.'
+                  : null)}
+              {saveFailed ? (
+                <span className="ml-2 text-loss">
+                  Couldn&apos;t save that. Try again.
+                </span>
+              ) : null}
+            </span>
+            {sentence && finding ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={saving}
+                onClick={() =>
+                  onSave({
+                    status: 'breached',
+                    failureReason: findingText(finding, (v) =>
+                      plainMoney(v, currency),
+                    ),
+                  })
+                }
+              >
+                Mark as breached
+              </Button>
+            ) : lastMet ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={saving}
+                onClick={() => onSave({ status: 'active', phase: 'funded' })}
+              >
+                Mark step passed
+              </Button>
+            ) : targetMet ? (
+              <Button size="sm" variant="secondary" onClick={onEdit}>
+                Link the next step
+              </Button>
             ) : null}
-          </span>
-          {sentence && finding ? (
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={saving}
-              onClick={() =>
-                onSave({
-                  status: 'breached',
-                  failureReason: findingText(finding, (v) =>
-                    plainMoney(v, currency),
-                  ),
-                })
-              }
-            >
-              Mark as breached
-            </Button>
-          ) : lastMet ? (
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={saving}
-              onClick={() => onSave({ status: 'active', phase: 'funded' })}
-            >
-              Mark step passed
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
+          </div>
+        ) : null}
+      </div>
 
       <div className="col-span-full flex items-center gap-3 border-t border-line bg-sunken/55 px-5 py-1.5 text-[12px] text-faint">
         <span className="min-w-0 flex-1">
