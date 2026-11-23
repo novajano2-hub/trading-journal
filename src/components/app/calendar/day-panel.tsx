@@ -195,11 +195,8 @@ export function DayPanel({
         'None'
       ) : (
         <>
-          {mistakes.trades} {plural(mistakes.trades, 'trade')}
-          <small className="block truncate text-[12px] font-medium text-muted">
-            <FigureText f={fmt(mistakes.pnl)} />
-            {mistakes.pnl < 0 ? ' lost' : mistakes.pnl > 0 ? ' made' : ''}
-          </small>
+          {mistakes.trades} {plural(mistakes.trades, 'trade')}, net{' '}
+          <FigureText f={fmt(mistakes.pnl)} />
         </>
       ),
     ],
@@ -242,9 +239,14 @@ export function DayPanel({
           </p>
           <dl className="mt-3 grid grid-cols-3 gap-x-3 gap-y-2.5 border-t border-line pt-2.5">
             {mini.map(([k, label, v]) => (
-              <div key={k} className="min-w-0">
+              <div
+                key={k}
+                className={`min-w-0 ${k === 'Mistakes' ? 'col-span-full' : ''}`}
+              >
                 <dt className="text-[12px] text-faint">{label}</dt>
-                <dd className="truncate text-[15px] font-semibold tabular-nums text-text">
+                <dd
+                  className={`text-[15px] font-semibold tabular-nums text-text ${k === 'Mistakes' ? '' : 'truncate'}`}
+                >
                   {v}
                 </dd>
               </div>

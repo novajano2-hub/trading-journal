@@ -398,6 +398,12 @@ test('the selected row keeps its status pill fill against the row tint, and the 
   expect(cell(row, 'Status').firstElementChild!.className).toContain(
     'bg-surface-1!',
   );
+  // The Type pill gets the same treatment as the Status pill, with an outline.
+  const pills = ['Type', 'Status'].map(
+    (c) => cell(row, c).firstElementChild!.className,
+  );
+  for (const k of pills) expect(k).toContain('ring-line-2');
+  expect(pills[0]).toContain('bg-surface-1!');
   const other = await rowOf('Old demo');
   expect(cell(other, 'Status').firstElementChild!.className).not.toContain(
     'bg-surface-1!',
@@ -406,10 +412,13 @@ test('the selected row keeps its status pill fill against the row tint, and the 
   expect(th.className).toContain('lg:bg-transparent');
 });
 
-test('the Broker column is wide enough for a full broker name at 1440', async () => {
+test('a long broker name wraps to two lines at 1440 rather than truncating', async () => {
   renderApp(<AccountsSettings />, { repository: repo(), url: URL });
   const row = await rowOf('Futures main');
-  expect(cell(row, 'Broker').className).toContain('max-w-[160px]');
+  expect(cell(row, 'Broker').className).not.toContain('truncate');
+  expect(cell(row, 'Broker').firstElementChild!.className).toContain(
+    'line-clamp-2',
+  );
 });
 
 describe('below 640px', () => {

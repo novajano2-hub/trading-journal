@@ -5,13 +5,14 @@ import { useSearchParams } from 'next/navigation';
 import type { Trade } from '@/domain/types';
 import { shortTime } from '@/lib/time-format';
 import { InstrumentName, TradeTime } from '../dashboard/shared';
+import { TagCountCell } from './cells';
 import { cellOf, type CellEnv } from './columns';
 import { SelectBox } from './select-box';
 
 /**
  * The trade log below 640px: a list of two-line rows. Line one is the
  * instrument and time on the left and the signed net on the right; line two is
- * R, the rules and the tags. The row is one link to the trade (carrying the
+ * the side, R, the rules and a tag count chip. The row is one link to the trade (carrying the
  * log's filters, as the table's instrument link does); the selection box sits
  * beside it, as a link can't hold a control.
  */
@@ -83,8 +84,11 @@ export function PhoneRows({
                 <span className="flex-none">{cellOf('rules', t, env)}</span>
                 {env.facts.tagsOf(t).length + env.facts.mistakesOf(t).length >
                 0 ? (
-                  <span className="min-w-0 overflow-hidden">
-                    {cellOf('tags', t, env)}
+                  <span className="flex-none">
+                    <TagCountCell
+                      tags={env.facts.tagsOf(t)}
+                      mistakes={env.facts.mistakesOf(t)}
+                    />
                   </span>
                 ) : null}
               </span>

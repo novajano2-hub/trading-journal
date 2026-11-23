@@ -5,6 +5,7 @@ import {
   RatingCell,
   RulesCell,
   StrategiesCell,
+  TagCountCell,
   TagsCell,
   TradeLink,
 } from './cells';
@@ -65,5 +66,31 @@ test('an absent strategy, rating and rule check each say it in words, never a da
 
 test('a trade with no tags or mistakes says None in the Tags cell', () => {
   render(<TagsCell tags={[]} mistakes={[]} />);
+  expect(screen.getByText('None').className).toContain('text-faint');
+});
+
+test('the tag count chip says "1 tag" or "n tags" and keeps every name for a screen reader', () => {
+  const { container } = render(
+    <TagCountCell tags={[tag('calm'), tag('news')]} mistakes={[]} />,
+  );
+  expect(container.textContent).toContain('2 tags');
+  expect(container.textContent).toContain('calm and news');
+  const chip = screen.getByText('2 tags').parentElement!;
+  expect(chip.className).toContain('bg-sunken');
+  cleanup();
+  render(<TagCountCell tags={[tag('calm')]} mistakes={[]} />);
+  expect(screen.getByText('1 tag')).toBeTruthy();
+});
+
+test('the tag count chip takes the marigold mistake treatment when any tag is a mistake', () => {
+  render(<TagCountCell tags={[tag('calm')]} mistakes={['fomo entry']} />);
+  const chip = screen.getByText('2 tags').parentElement!;
+  expect(chip.className).toContain('bg-warn-soft');
+  expect(chip.className).not.toContain('bg-sunken');
+  expect(chip.textContent).toContain('fomo entry and calm');
+});
+
+test('the tag count chip is a faint None when the trade has no tags', () => {
+  render(<TagCountCell tags={[]} mistakes={[]} />);
   expect(screen.getByText('None').className).toContain('text-faint');
 });

@@ -416,7 +416,10 @@ test('the day panel shows Rules kept and Mistakes, each with a metric tip', asyn
   // Kept 3 of 5 graded checks (one check is ungraded).
   expect(dd('Rules kept').textContent).toBe('3 of 5');
   // One trade carries the mistake tag; it made -$5.00 that day.
-  expect(dd('Mistakes').textContent).toMatch(/1 trade.*−\$5\.00 lost/);
+  expect(dd('Mistakes').textContent).toBe('1 trade, net −$5.00');
+  // The cell spans the panel and wraps, never clips.
+  expect(dd('Mistakes').className).not.toContain('truncate');
+  expect(dd('Mistakes').closest('div')!.className).toContain('col-span-full');
   expect(
     panel.querySelector('[data-metric-tip="rule-adherence"]'),
   ).not.toBeNull();

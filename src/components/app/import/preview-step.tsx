@@ -213,8 +213,9 @@ export function PreviewStep({
         {!plan.blocked ? (
           <div className="col-span-2 border-line lg:col-span-1 lg:border-l lg:pl-5">
             <span className="block text-[12px] text-faint">
-              Net P&amp;L of the {plan.trades.length}{' '}
-              {plural(plan.trades.length, 'trade')}
+              Net P&amp;L of the {closed.length}{' '}
+              {closed.length === plan.trades.length ? '' : 'closed '}
+              {plural(closed.length, 'trade')}
             </span>
             <b
               className={`text-[22px] font-semibold tracking-[-0.03em] tabular-nums ${net < 0 ? 'text-loss' : net > 0 ? 'text-gain' : ''}`}

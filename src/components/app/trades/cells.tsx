@@ -109,6 +109,36 @@ export function TagsCell({
   );
 }
 
+/**
+ * The tags as one count chip ("1 tag", "3 tags"), in the marigold mistake
+ * treatment when any is a mistake. Every name stays for a screen reader; no tag
+ * is a faint "None".
+ */
+export function TagCountCell({
+  tags,
+  mistakes = [],
+}: {
+  tags: readonly TagInfo[];
+  mistakes?: readonly string[];
+}): React.JSX.Element {
+  const names = [...mistakes, ...tags.map((t) => t.name)];
+  if (names.length === 0) return <span className="text-faint">None</span>;
+  return (
+    <Chip
+      tone={mistakes.length > 0 ? 'warn' : 'neutral'}
+      className="flex-none tabular-nums"
+    >
+      <span aria-hidden="true">
+        {names.length} {names.length === 1 ? 'tag' : 'tags'}
+      </span>
+      <span className="sr-only">
+        {mistakes.length > 0 ? 'Tags, with a mistake: ' : 'Tags: '}
+        {listOf(names)}
+      </span>
+    </Chip>
+  );
+}
+
 /** The first mistake in a warn chip, then "+n". */
 export function MistakesCell({
   names,

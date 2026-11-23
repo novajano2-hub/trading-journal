@@ -717,7 +717,7 @@ export function MapStep({
                 Required fields are all{' '}
                 {matchedCount >= required.size ? 'matched' : 'mapped'}.
                 {unpriced.length > 0
-                  ? ' Unknown symbols must have a point value before you confirm.'
+                  ? ' Unknown symbols must have a point value before you preview.'
                   : ''}
               </p>
             )}

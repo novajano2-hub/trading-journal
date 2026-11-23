@@ -371,6 +371,29 @@ test('under Privacy the Off by chip and the fees are masked, and the summary net
   expect(net.className).toContain('text-gain');
 });
 
+test('the summary net counts only closed trades, and says so when one is open', async () => {
+  await toPreview(
+    csv([
+      FILLS,
+      '2026-11-16 09:30:00,ESZ6,Buy,1,6000',
+      '2026-11-16 09:45:00,ESZ6,Sell,1,6004',
+      '2026-11-16 10:30:00,NQZ6,Buy,1,21000',
+    ]),
+  );
+  await screen.findByRole('region', { name: 'What Keel read' });
+  expect(screen.getByText(/^Net P&L of the/).textContent).toBe(
+    'Net P&L of the 1 closed trade',
+  );
+});
+
+test('the summary net says "trades" when every trade is closed', async () => {
+  await toPreview(csv([TRIPS, row('200.00', '09'), row('10.00', '10')]));
+  await screen.findByRole('region', { name: 'What Keel read' });
+  expect(screen.getByText(/^Net P&L of the/).textContent).toBe(
+    'Net P&L of the 2 trades',
+  );
+});
+
 test('the Row column is sticky below lg, and flagged rows keep an opaque ground', async () => {
   await toPreview(csv([TRIPS, row('200.00', '09'), row('10.00', '10')]));
   const table = (await screen.findByText('Trades Keel built'))

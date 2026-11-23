@@ -39,6 +39,8 @@ import {
 // Ten columns in a 982px card: the gap between columns is 8px here (12px in the
 // other settings tables) so the full broker name fits without a sideways scroll.
 const TH = TH_BASE.replace('px-1.5', 'px-1');
+/** Both pills on the selected row: the accent-soft Type fill would vanish into the row, so each takes a raised ground and an outline. */
+const SELECTED_PILL = 'bg-surface-1! ring-1 ring-inset ring-line-2';
 const TD = TD_BASE.replace('px-1.5', 'px-1');
 
 type Dialog =
@@ -274,11 +276,12 @@ export function AccountsSettings(): React.JSX.Element {
                     >
                       <Chip
                         tone={a.type.startsWith('prop') ? 'accent' : 'neutral'}
+                        className={a.id === selected?.id ? SELECTED_PILL : ''}
                       >
                         {typeLabel(a)}
                       </Chip>
                       <Chip
-                        className={a.id === selected?.id ? 'bg-surface-1!' : ''}
+                        className={a.id === selected?.id ? SELECTED_PILL : ''}
                       >
                         {gone ? (
                           <Lock size={13} weight="duotone" aria-hidden="true" />
@@ -370,16 +373,17 @@ export function AccountsSettings(): React.JSX.Element {
                         ) : null}
                       </td>
                       <td
-                        className={`${TD} max-w-[160px] truncate text-muted`}
+                        className={`${TD} max-w-[160px] text-muted`}
                         title={a.broker}
                       >
-                        {a.broker}
+                        <span className="line-clamp-2">{a.broker}</span>
                       </td>
                       <td className={`${TD} whitespace-nowrap`}>
                         <Chip
                           tone={
                             a.type.startsWith('prop') ? 'accent' : 'neutral'
                           }
+                          className={a.id === selected?.id ? SELECTED_PILL : ''}
                         >
                           {typeLabel(a)}
                         </Chip>
@@ -409,9 +413,7 @@ export function AccountsSettings(): React.JSX.Element {
                       </td>
                       <td className={TD}>
                         <Chip
-                          className={
-                            a.id === selected?.id ? 'bg-surface-1!' : ''
-                          }
+                          className={a.id === selected?.id ? SELECTED_PILL : ''}
                         >
                           {gone ? (
                             <Lock
