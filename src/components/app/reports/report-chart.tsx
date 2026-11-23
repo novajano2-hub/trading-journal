@@ -281,7 +281,8 @@ const Plot = memo(function Plot({
 }) {
   const keys = series[0]!.points.map((p) => p.key);
   const { padL, plotW, step, bandH } = layout;
-  const signed = series.length === 1 && series[0]!.unit === 'money';
+  // Gain and loss colours when net is the only money series of the chart.
+  const moneyCount = series.filter((s) => s.unit === 'money').length;
   const barW = Math.max(1, Math.min(step * 0.72, 30));
   const ticks = xTicks(keys, plotW, xLabel);
   const shaded = shade ? spanOf(keys, shade) : undefined;
@@ -323,6 +324,7 @@ const Plot = memo(function Plot({
         const colour = COLOURS[si % COLOURS.length]!;
         const top = layout.tops[si]!;
         const zero = band.y(0);
+        const signed = s.unit === 'money' && moneyCount === 1;
         const zeroInside = band.scale.lo <= 0 && band.scale.hi >= 0;
         return (
           <g key={s.label} data-series={s.label}>
@@ -589,6 +591,8 @@ export function ReportChart({
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [hover, setHover] = useState<number | null>(null);
   const [focused, setFocused] = useState<number | null>(null);
+  // A press focuses the chart too; that focus must not default to the first period.
+  const pressed = useRef(false);
 
   const n = series[0]?.points.length ?? 0;
   const hasData = n > 0;
@@ -671,6 +675,15 @@ export function ReportChart({
     const i = Math.floor((e.clientX - rect.left - layout.padL) / layout.step);
     setHover(i < 0 || i >= n ? null : i);
   };
+  const onPress = (e: PointerEvent<HTMLDivElement>) => {
+    pressed.current = true;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const i = Math.floor((e.clientX - rect.left - layout.padL) / layout.step);
+    if (i < 0 || i >= n) return;
+    setHover(i);
+    setFocused(i);
+  };
+  const moneyOnly = series.filter((s) => s.unit === 'money').length === 1;
   const x = active === null ? 0 : xOf(layout, active);
   const flip = x > layout.width * 0.55;
 
@@ -697,8 +710,14 @@ export function ReportChart({
           aria-label={label}
           tabIndex={0}
           onKeyDown={onKey}
-          onFocus={() => setFocused((cur) => cur ?? 0)}
+          onFocus={() => {
+            // From the keyboard the readout starts on the first period; after a press it keeps the pressed one.
+            const fromPress = pressed.current;
+            pressed.current = false;
+            if (!fromPress) setFocused((cur) => cur ?? 0);
+          }}
           onBlur={() => setFocused(null)}
+          onPointerDown={onPress}
           onPointerMove={onPointer}
           onPointerLeave={() => setHover(null)}
           className="overflow-hidden rounded-control outline-offset-4 focus-visible:outline-2 focus-visible:outline-accent"
@@ -741,7 +760,7 @@ export function ReportChart({
                       cy={bands[si]!.y(v)}
                       r={4}
                       fill={
-                        s.kind === 'bar' && series.length === 1
+                        s.kind === 'bar' && s.unit === 'money' && moneyOnly
                           ? v < 0
                             ? 'var(--loss-fill)'
                             : 'var(--gain-fill)'
@@ -756,32 +775,33 @@ export function ReportChart({
             ) : null}
           </svg>
         </div>
-        {active !== null ? (
-          <div
-            role="status"
-            className="pointer-events-none absolute top-1 z-10 min-w-[150px] rounded-control border border-line bg-surface-1 px-2.5 py-2 text-[12.5px] whitespace-nowrap text-muted shadow-[var(--shadow)]"
-            style={flip ? { right: layout.width - x + 12 } : { left: x + 12 }}
-          >
-            <b className="block text-[13px] font-semibold text-text">
-              {periodLabel(series[0]!.points[active]!.key)}
-            </b>
-            {series.map((s, i) => (
-              <div key={s.label} className="flex justify-between gap-4">
-                <span className="inline-flex items-center gap-1.5">
-                  <span
-                    aria-hidden="true"
-                    className="size-2 rounded-full"
-                    style={{ background: COLOURS[i % COLOURS.length] }}
-                  />
-                  {s.label}
-                </span>
-                <span className="font-semibold text-text tabular-nums">
-                  {fmt.node(s.unit, s.points[active]!.value)}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : null}
+        <div role="status">
+          {active !== null ? (
+            <div
+              className="pointer-events-none absolute top-1 z-10 min-w-[150px] rounded-control border border-line bg-surface-1 px-2.5 py-2 text-[12.5px] whitespace-nowrap text-muted shadow-[var(--shadow)]"
+              style={flip ? { right: layout.width - x + 12 } : { left: x + 12 }}
+            >
+              <b className="block text-[13px] font-semibold text-text">
+                {periodLabel(series[0]!.points[active]!.key)}
+              </b>
+              {series.map((s, i) => (
+                <div key={s.label} className="flex justify-between gap-4">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span
+                      aria-hidden="true"
+                      className="size-2 rounded-full"
+                      style={{ background: COLOURS[i % COLOURS.length] }}
+                    />
+                    {s.label}
+                  </span>
+                  <span className="font-semibold text-text tabular-nums">
+                    {fmt.node(s.unit, s.points[active]!.value)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </div>
       <ValuesTable
         label={label}

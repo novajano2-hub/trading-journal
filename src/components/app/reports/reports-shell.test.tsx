@@ -42,7 +42,9 @@ test('the Reports tab stays current while one of its reports is open, and its me
     sample: reportsSample,
     url: '/app/reports/symbols',
   });
-  const trigger = await tabs().findByRole('button', { name: 'Symbols' });
+  const trigger = await tabs().findByRole('button', {
+    name: 'Reports: Symbols',
+  });
   expect(trigger.getAttribute('aria-current')).toBe('page');
   expect(
     tabs()

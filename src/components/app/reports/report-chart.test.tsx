@@ -67,7 +67,8 @@ test('the chart is an image with its label, and a hidden table holds the values'
 test('focusing the chart and pressing the right arrow reads out the second period', async () => {
   renderApp(<ReportChart label="By day" series={SERIES} />);
   const chart = await screen.findByRole('img', { name: 'By day' });
-  expect(screen.queryByRole('status')).toBeNull();
+  // The live region is always there, so a screen reader announces its changes.
+  expect(screen.getByRole('status').textContent).toBe('');
   act(() => chart.focus());
   expect(screen.getByRole('status').textContent).toContain('Mon 2 Nov');
   fireEvent.keyDown(chart, { key: 'ArrowRight' });
@@ -80,7 +81,36 @@ test('focusing the chart and pressing the right arrow reads out the second perio
   fireEvent.keyDown(chart, { key: 'End' });
   expect(screen.getByRole('status').textContent).toContain('Wed 4 Nov');
   fireEvent.blur(chart);
-  expect(screen.queryByRole('status')).toBeNull();
+  expect(screen.getByRole('status').textContent).toBe('');
+});
+
+test('a tap reads out the tapped period and keeps it after the pointer leaves', async () => {
+  renderApp(<ReportChart label="By day" series={SERIES} />);
+  const chart = await screen.findByRole('img', { name: 'By day' });
+  // Far right of the plot: the third of three periods.
+  fireEvent.pointerDown(chart, { clientX: 700, clientY: 20 });
+  act(() => chart.focus());
+  expect(screen.getByRole('status').textContent).toContain('Wed 4 Nov');
+  fireEvent.pointerLeave(chart);
+  expect(screen.getByRole('status').textContent).toContain('Wed 4 Nov');
+  // The keyboard continues from the tapped period.
+  fireEvent.keyDown(chart, { key: 'ArrowLeft' });
+  expect(screen.getByRole('status').textContent).toContain('Tue 3 Nov');
+});
+
+test('net bars take gain and loss colours when net is the only money series', async () => {
+  const { container } = renderApp(
+    <ReportChart label="By day" series={SERIES} />,
+  );
+  await screen.findByRole('img', { name: 'By day' });
+  const fills = [...container.querySelectorAll('[data-mark="bar"]')].map((b) =>
+    b.getAttribute('fill'),
+  );
+  expect(fills).toEqual([
+    'var(--gain-fill)',
+    'var(--loss-fill)',
+    'var(--gain-fill)',
+  ]);
 });
 
 test('with Privacy on, the readout, the axis and the hidden table show $•••', async () => {

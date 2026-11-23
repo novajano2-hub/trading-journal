@@ -19,11 +19,13 @@ export function TaskCheckbox({
   children,
   disabled = false,
   'aria-label': ariaLabel,
+  'aria-describedby': describedBy,
 }: {
   checked: boolean;
   onCheckedChange: (next: boolean) => void;
   children?: ReactNode;
   'aria-label'?: string;
+  'aria-describedby'?: string;
   disabled?: boolean;
 }): React.JSX.Element {
   // The ripple belongs to the false-to-true change, not to every checked box:
@@ -46,6 +48,7 @@ export function TaskCheckbox({
         checked={checked}
         disabled={disabled}
         aria-label={ariaLabel}
+        aria-describedby={describedBy}
         onChange={(event) => onCheckedChange(event.currentTarget.checked)}
         className="peer sr-only"
       />

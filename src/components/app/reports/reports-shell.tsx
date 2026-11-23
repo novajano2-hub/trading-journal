@@ -89,7 +89,14 @@ export function ReportsShell({
               aria-current={current === 'reports' ? 'page' : undefined}
               className={`${TAB} cursor-pointer ${current === 'reports' ? TAB_ON : TAB_OFF}`}
             >
-              {current === 'reports' ? REPORT_LABELS[active] : 'Reports'}
+              {current === 'reports' ? (
+                <>
+                  <span className="sr-only">Reports: </span>
+                  {REPORT_LABELS[active]}
+                </>
+              ) : (
+                'Reports'
+              )}
               <CaretDown size={12} weight="bold" aria-hidden="true" />
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>

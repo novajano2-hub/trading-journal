@@ -43,6 +43,13 @@ test('choosing net (bar), win rate (line) and trades (bar) disables the rest', a
     const name = box.getAttribute('aria-label')!;
     expect(box.checked, name).toBe(chosen.includes(name));
     expect(box.disabled, name).toBe(!chosen.includes(name));
+    // A disabled box says why through the limit message.
+    const why = box.getAttribute('aria-describedby');
+    if (chosen.includes(name)) expect(why, name).toBeNull();
+    else
+      expect(document.getElementById(why!)?.textContent, name).toBe(
+        'Three metrics at most',
+      );
   }
   expect(screen.getByText('Three metrics at most')).toBeTruthy();
 

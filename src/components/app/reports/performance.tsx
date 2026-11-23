@@ -253,6 +253,11 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
                   checked={pick !== undefined}
                   disabled={pick === undefined && full}
                   aria-label={label}
+                  aria-describedby={
+                    pick === undefined && full
+                      ? `${metricsId}-limit`
+                      : undefined
+                  }
                   onCheckedChange={(on) => toggle(metric, on)}
                 />
                 <span
