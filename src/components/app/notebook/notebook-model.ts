@@ -51,11 +51,11 @@ export function inFolder(e: JournalEntry, key: FolderKey): boolean {
       return e.favorite === true;
     case 'trade-notes':
       return e.kind === 'trade-note';
+    // A day's plan sits with that day's review.
     case 'daily-journal':
-      return e.kind === 'daily-review';
-    // The plan before a session and the recap after it.
+      return e.kind === 'daily-review' || e.kind === 'pre-market';
     case 'sessions-recap':
-      return e.kind === 'pre-market' || e.kind === 'weekly-recap';
+      return e.kind === 'weekly-recap';
     case 'my-notes':
       return e.kind === 'note' && e.folderId === undefined;
     default:
@@ -69,8 +69,8 @@ export function folderOfKind(kind: JournalKind): FolderKey {
     case 'trade-note':
       return 'trade-notes';
     case 'daily-review':
-      return 'daily-journal';
     case 'pre-market':
+      return 'daily-journal';
     case 'weekly-recap':
       return 'sessions-recap';
     case 'note':

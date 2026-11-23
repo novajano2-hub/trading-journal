@@ -114,12 +114,10 @@ export function EntryList({
                     {e.title || 'Untitled note'}
                   </b>
                   {e.favorite ? (
-                    <Star
-                      size={13}
-                      weight="fill"
-                      aria-label="Favourite"
-                      className="mt-0.5 flex-none text-accent"
-                    />
+                    <span className="mt-0.5 flex-none text-accent">
+                      <Star size={13} weight="fill" aria-hidden="true" />
+                      <span className="sr-only">Favourite</span>
+                    </span>
                   ) : null}
                 </span>
                 {excerpt ? (
@@ -186,6 +184,7 @@ export function EntryList({
                   <Link
                     href={`/app/notebook/${encodeURIComponent(e.id)}`}
                     aria-current={on ? 'page' : undefined}
+                    data-note-id={e.id}
                     className="block rounded-[10px] px-2.5 pt-2.5 pb-2.5 outline-offset-0 focus-visible:outline-2 focus-visible:outline-accent"
                   >
                     {body}

@@ -37,7 +37,7 @@ import { ConfirmDialog } from '../confirm-dialog';
 import { CARD } from '../dashboard/shared';
 import { StateBlock } from '../strategies/strategy-states';
 import { EntryList } from './entry-list';
-import { EntryPane } from './entry-pane';
+import { DRAFT_ID, EntryPane } from './entry-pane';
 import { FolderRail } from './folder-rail';
 import {
   BUILT_IN_FOLDERS,
@@ -72,6 +72,10 @@ function titleFor(kind: JournalKind, today: string): string {
   }
 }
 
+const NOTICE_TEXT = 'Moved to Trash. Notes in Trash are deleted after 30 days.';
+/** The notice stays this long (WCAG 2.2.1 asks for at least 20 s) unless dismissed. */
+const NOTICE_MS = 30_000;
+
 interface Notice {
   /** The note that went to Trash. */
   id: string;
@@ -95,60 +99,49 @@ function Skeleton(): React.JSX.Element {
   );
 }
 
-/** A day's note: opens the day's note, or makes it from the default daily template. */
+/**
+ * A day's note. A day with a note opens it; a day without one opens a draft
+ * from the default daily template, which writes nothing. Its first change
+ * makes the note, and the pane (keyed by the date either way) stays put.
+ */
 function DailyPane({
   date,
   entries,
+  template,
   props,
 }: {
   date: string;
   entries: readonly JournalEntry[];
-  props: Omit<React.ComponentProps<typeof EntryPane>, 'entry'>;
+  template: JournalEntry['body'];
+  props: Omit<React.ComponentProps<typeof EntryPane>, 'entry' | 'ensure'>;
 }): React.JSX.Element {
   const { mutateAsync } = useDailyNote();
-  const [made, setMade] = useState<JournalEntry | null>(null);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    let live = true;
-    mutateAsync(date).then(
-      (e) => {
-        if (live) setMade(e);
-      },
-      () => {
-        if (live) setFailed(true);
-      },
-    );
-    return () => {
-      live = false;
-    };
-  }, [date, mutateAsync]);
-
-  if (failed)
-    return (
-      <StateBlock
-        role="alert"
-        visual={<IconTile icon={Warning} />}
-        title="That day's note couldn't open."
-        actions={
-          <Link href="/app/notebook" className={buttonClasses('secondary')}>
-            Back to the notebook
-          </Link>
-        }
-      />
-    );
-  const current =
-    made && made.date === date
-      ? (entries.find((e) => e.id === made.id) ?? made)
-      : undefined;
-  if (!current)
-    return (
-      <div
-        role="status"
-        aria-label="Opening the day's note"
-        className={`${CARD} min-h-[200px]`}
-      />
-    );
-  return <EntryPane key={current.id} entry={current} {...props} />;
+  const existing = entries.find(
+    (e) =>
+      e.kind === 'daily-review' && e.date === date && e.deletedAt === undefined,
+  );
+  const draft = useMemo(
+    (): JournalEntry => ({
+      id: DRAFT_ID,
+      workspaceId: '',
+      kind: 'daily-review',
+      date,
+      title: `Daily review, ${dayLabel(date)}`,
+      body: structuredClone(template),
+      linkedTradeIds: [],
+      tags: [],
+      updatedAt: '',
+    }),
+    [date, template],
+  );
+  return (
+    <EntryPane
+      key={date}
+      entry={existing ?? draft}
+      ensure={() => mutateAsync(date)}
+      {...props}
+    />
+  );
 }
 
 /**
@@ -175,6 +168,10 @@ export function NotebookView(): React.JSX.Element {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [forever, setForever] = useState<JournalEntry | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  // The note "All notes" just left, whose row takes the focus back.
+  const returnTo = useRef<string | null>(null);
+  const listArea = useRef<HTMLDivElement>(null);
+  const undoButton = useRef<HTMLButtonElement>(null);
 
   const selection = selectionOf(pathname);
   const entries = journal.data;
@@ -184,6 +181,23 @@ export function NotebookView(): React.JSX.Element {
     timeZone === undefined
       ? undefined
       : localDate(new Date().toISOString(), timeZone);
+
+  const browsingNow = selection.type === 'none';
+  useEffect(() => {
+    const id = returnTo.current;
+    if (!browsingNow || id === null) return;
+    const row = [
+      ...(listArea.current?.querySelectorAll<HTMLElement>('[data-note-id]') ??
+        []),
+    ].find((a) => a.dataset.noteId === id);
+    row?.focus();
+    returnTo.current = null;
+  }, [browsingNow]);
+  // Trashing leaves the toolbar's button behind: Undo takes the focus.
+  const noticeId = notice?.id;
+  useEffect(() => {
+    if (noticeId !== undefined) undoButton.current?.focus();
+  }, [noticeId]);
 
   const open: JournalEntry | undefined =
     selection.type === 'entry'
@@ -277,11 +291,11 @@ export function NotebookView(): React.JSX.Element {
     );
   if (!entries || !userFolders || !templates.data) return <Skeleton />;
 
-  const moveToTrash = async (entry: JournalEntry) => {
+  const moveToTrash = async (id: string) => {
     setProblem(null);
     try {
-      await trash.mutateAsync(entry.id);
-      setNotice({ id: entry.id });
+      await trash.mutateAsync(id);
+      setNotice({ id });
       router.push('/app/notebook');
     } catch {
       setProblem("Couldn't move that note to Trash. Try again.");
@@ -304,6 +318,10 @@ export function NotebookView(): React.JSX.Element {
       setProblem("Couldn't restore that note. Try again.");
     }
   };
+
+  const dailyTemplate =
+    templates.data.find((t) => t.kind === 'daily-review' && t.isDefault)
+      ?.body ?? EMPTY_DOC;
 
   const make = async (kind: JournalKind) => {
     if (today === undefined) return;
@@ -369,7 +387,7 @@ export function NotebookView(): React.JSX.Element {
 
   const paneProps = {
     folders: userFolders,
-    onTrash: () => open && void moveToTrash(open),
+    onTrash: (id: string) => void moveToTrash(id),
     onRestore: () => open && void restoreNow(open),
     onDeleteForever: () => open && setForever(open),
   };
@@ -389,6 +407,7 @@ export function NotebookView(): React.JSX.Element {
         key={selection.date}
         date={selection.date}
         entries={entries}
+        template={dailyTemplate}
         props={paneProps}
       />
     ) : (
@@ -426,8 +445,45 @@ export function NotebookView(): React.JSX.Element {
           {problem}
         </p>
       ) : null}
-      <div className="grid min-w-0 gap-3 lg:h-[calc(100dvh-88px)] lg:grid-cols-[200px_300px_minmax(0,1fr)] lg:gap-4">
-        <div className={browsing ? 'contents' : 'contents max-lg:hidden'}>
+      {/* Always mounted, so a screen reader hears it fill. */}
+      <div role="status" aria-label="Notebook notice" className="sr-only">
+        {notice ? NOTICE_TEXT : ''}
+      </div>
+      {notice ? (
+        <div
+          role="group"
+          aria-label="Undo moving to Trash"
+          className="flex w-full max-w-[560px] items-center gap-3 rounded-control border border-line bg-surface-1 py-2 pr-2 pl-4 text-[14px] text-text shadow-[var(--shadow)]"
+        >
+          <NoticeTimer onDone={() => setNotice(null)} />
+          <span aria-hidden="true" className="min-w-0 flex-1">
+            {NOTICE_TEXT}
+          </span>
+          <button
+            ref={undoButton}
+            type="button"
+            onClick={() => void undo(notice.id)}
+            className="rounded-chip px-2.5 text-[13.5px] font-semibold text-accent-ink outline-offset-0 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
+          >
+            Undo
+          </button>
+          <button
+            type="button"
+            aria-label="Dismiss"
+            onClick={() => setNotice(null)}
+            className="grid size-8 place-items-center rounded-[8px] text-faint hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:size-11"
+          >
+            <X size={14} aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
+      <div
+        className={`grid min-w-0 gap-3 ${notice ? 'lg:h-[calc(100dvh-150px)]' : 'lg:h-[calc(100dvh-88px)]'} lg:grid-cols-[200px_300px_minmax(0,1fr)] lg:gap-4`}
+      >
+        <div
+          ref={listArea}
+          className={browsing ? 'contents' : 'contents max-lg:hidden'}
+        >
           <FolderRail
             folders={userFolders}
             counts={counts}
@@ -463,6 +519,11 @@ export function NotebookView(): React.JSX.Element {
         >
           <Link
             href="/app/notebook"
+            onClick={() => {
+              // Keep the folder the note sat in, so its row is there to focus.
+              setChosen(current);
+              returnTo.current = open?.id ?? null;
+            }}
             className="inline-flex items-center gap-1.5 self-start rounded-chip text-[13.5px] font-medium text-muted hover:text-text lg:hidden pointer-coarse:min-h-11"
           >
             <ArrowLeft size={14} aria-hidden="true" />
@@ -477,34 +538,6 @@ export function NotebookView(): React.JSX.Element {
           </div>
         </div>
       </div>
-
-      {notice ? (
-        <div
-          role="status"
-          aria-label="Notebook notice"
-          className="fixed bottom-4 left-1/2 z-40 flex w-[min(460px,calc(100vw-32px))] -translate-x-1/2 items-center gap-3 rounded-control border border-line bg-surface-1 py-2.5 pr-2 pl-4 text-[14px] text-text shadow-[var(--shadow)]"
-        >
-          <NoticeTimer onDone={() => setNotice(null)} />
-          <span className="min-w-0 flex-1">
-            Moved to Trash. Notes in Trash are deleted after 30 days.
-          </span>
-          <button
-            type="button"
-            onClick={() => void undo(notice.id)}
-            className="rounded-chip px-2.5 text-[13.5px] font-semibold text-accent-ink outline-offset-0 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
-          >
-            Undo
-          </button>
-          <button
-            type="button"
-            aria-label="Dismiss"
-            onClick={() => setNotice(null)}
-            className="grid size-8 place-items-center rounded-[8px] text-faint hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:size-11"
-          >
-            <X size={14} aria-hidden="true" />
-          </button>
-        </div>
-      ) : null}
 
       <TemplatesDialog open={templatesOpen} onOpenChange={setTemplatesOpen} />
       <ConfirmDialog
@@ -524,14 +557,14 @@ export function NotebookView(): React.JSX.Element {
   );
 }
 
-/** Takes the notice down after ten seconds. */
+/** Takes the notice down after `NOTICE_MS`. */
 function NoticeTimer({ onDone }: { onDone(): void }): null {
   const latest = useRef(onDone);
   useEffect(() => {
     latest.current = onDone;
   });
   useEffect(() => {
-    const id = setTimeout(() => latest.current(), 10_000);
+    const id = setTimeout(() => latest.current(), NOTICE_MS);
     return () => clearTimeout(id);
   }, []);
   return null;

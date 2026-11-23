@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import {
+  act,
   cleanup,
   fireEvent,
   screen,
@@ -41,7 +42,8 @@ const entry = (
 });
 
 /**
- * The fixture, with 20 daily notes (the 20 weekdays to 2026-11-19), a note
+ * The fixture, with 20 daily notes (the 20 weekdays to 2026-11-19), a
+ * pre-market plan, a weekly recap, a note
  * that says "breakout" only in its body, a user folder "Ideas" with a note in
  * it, and a trade on the 19th: net $380.26, a win.
  */
@@ -63,9 +65,22 @@ function sample() {
           kind: 'daily-review',
           date,
           title: `Daily review, ${date}`,
+          linkedTradeIds: date === '2026-11-19' ? ['t-19'] : [],
         }),
       );
     fx.journal.push(
+      entry({
+        id: 'n-pm',
+        kind: 'pre-market',
+        date: '2026-11-19',
+        title: 'Opening bias',
+      }),
+      entry({
+        id: 'n-wk',
+        kind: 'weekly-recap',
+        date: '2026-11-13',
+        title: 'Week of 9 Nov',
+      }),
       entry({
         id: 'n-plan',
         kind: 'note',
@@ -91,6 +106,11 @@ function sample() {
         openedAt: '2026-11-19T15:00:00.000Z',
         closedAt: '2026-11-19T15:30:00.000Z',
         net: 38_026,
+        strategyIds: ['str-1'],
+        ruleChecks: [
+          { ruleId: 'r-1', followed: true },
+          { ruleId: 'r-2', followed: false },
+        ],
       }),
     );
     return fx;
@@ -125,12 +145,22 @@ const listItems = () =>
   );
 const rail = () => screen.getByRole('navigation', { name: 'Folders' });
 
-test('Daily journal lists the 20 daily notes, and each folder shows its count', async () => {
+test('Daily journal lists the 20 daily reviews and the pre-market plan; Sessions recap the weekly recap only', async () => {
   await openWith('/app/notebook');
-  await waitFor(() => expect(listItems()).toHaveLength(20));
+  await waitFor(() => expect(listItems()).toHaveLength(21));
   const daily = within(rail()).getByRole('button', { name: /Daily journal/ });
   expect(daily.getAttribute('aria-current')).toBe('true');
-  expect(daily.textContent).toContain('20');
+  expect(daily.textContent).toContain('21');
+  expect(
+    listItems().some((li) => li.textContent?.includes('Opening bias')),
+  ).toBe(true);
+  const recap = within(rail()).getByRole('button', { name: /Sessions recap/ });
+  expect(recap.textContent).toContain('1');
+  fireEvent.click(recap);
+  await waitFor(() => expect(listItems()).toHaveLength(1));
+  expect(listItems()[0]!.textContent).toContain('Week of 9 Nov');
+  fireEvent.click(daily);
+  await waitFor(() => expect(listItems()).toHaveLength(21));
   expect(
     within(rail()).getByRole('button', { name: /Trade notes/ }).textContent,
   ).toContain('1');
@@ -148,7 +178,7 @@ test('Daily journal lists the 20 daily notes, and each folder shows its count', 
 
 test('searching "breakout" finds the note whose body says it', async () => {
   await openWith('/app/notebook');
-  await waitFor(() => expect(listItems()).toHaveLength(20));
+  await waitFor(() => expect(listItems()).toHaveLength(21));
   fireEvent.change(screen.getByRole('searchbox', { name: 'Search notes' }), {
     target: { value: 'breakout' },
   });
@@ -181,8 +211,9 @@ test('starring a note adds it to Favourites', async () => {
 
 test('Delete moves the note to Trash with a notice, and Undo brings it back', async () => {
   const { repo } = await openWith('/app/notebook/n-plan');
-  fireEvent.click(await screen.findByRole('button', { name: 'Move to Trash' }));
   const notice = await screen.findByRole('status', { name: 'Notebook notice' });
+  fireEvent.click(await screen.findByRole('button', { name: 'Move to Trash' }));
+  await waitFor(() => expect(notice.textContent).not.toBe(''));
   expect(notice.textContent).toContain(
     'Moved to Trash. Notes in Trash are deleted after 30 days.',
   );
@@ -193,18 +224,21 @@ test('Delete moves the note to Trash with a notice, and Undo brings it back', as
   // The note has left the page it was open on.
   expect(window.location.pathname).toBe('/app/notebook');
 
-  fireEvent.click(within(notice).getByRole('button', { name: 'Undo' }));
+  fireEvent.click(
+    within(
+      screen.getByRole('group', { name: 'Undo moving to Trash' }),
+    ).getByRole('button', { name: 'Undo' }),
+  );
   await waitFor(async () =>
     expect(await repo.journal.get(WS, 'n-plan')).not.toHaveProperty(
       'deletedAt',
     ),
   );
   expect(window.location.pathname).toBe('/app/notebook/n-plan');
-  await waitFor(() =>
-    expect(
-      screen.queryByRole('status', { name: 'Notebook notice' }),
-    ).toBeNull(),
-  );
+  await waitFor(() => expect(notice.textContent).toBe(''));
+  expect(
+    screen.queryByRole('group', { name: 'Undo moving to Trash' }),
+  ).toBeNull();
 });
 
 test('Trash restores, and deletes forever only after a confirmation', async () => {
@@ -323,16 +357,64 @@ test("the daily note route shows the day card with that day's net and trades", a
   ).toBeTruthy();
 });
 
-test('a day with no trades says so, and its note is created from the template', async () => {
+const dailyNotes = async (repo: Repository, date: string) =>
+  (await repo.journal.list(WS)).filter(
+    (e) => e.kind === 'daily-review' && e.date === date,
+  );
+
+test('a day with no trades says so, and visiting it writes nothing until an edit', async () => {
   const { repo } = await openWith('/app/notebook/daily/2026-11-21');
   expect(await screen.findByText('No trades this day.')).toBeTruthy();
-  await waitFor(async () =>
-    expect(
-      (await repo.journal.list(WS)).some(
-        (e) => e.kind === 'daily-review' && e.date === '2026-11-21',
-      ),
-    ).toBe(true),
+  const title = await screen.findByRole('textbox', { name: 'Note title' });
+  expect((title as HTMLInputElement).value).toBe('Daily review, Sat 21 Nov');
+  // Give any stray write time to land.
+  await new Promise((r) => setTimeout(r, 300));
+  expect(await dailyNotes(repo, '2026-11-21')).toHaveLength(0);
+
+  // The first change makes the note, from the template, under the same pane.
+  fireEvent.change(title, { target: { value: 'Quiet Saturday' } });
+  await waitFor(
+    async () => expect(await dailyNotes(repo, '2026-11-21')).toHaveLength(1),
+    { timeout: 3000 },
   );
+  const made = (await dailyNotes(repo, '2026-11-21'))[0]!;
+  expect(made.title).toBe('Quiet Saturday');
+  expect(screen.getByRole('textbox', { name: 'Note title' })).toBe(title);
+  // Further edits go to that one note, not a second.
+  fireEvent.change(title, { target: { value: 'Quiet Saturday, again' } });
+  await waitFor(
+    async () =>
+      expect((await dailyNotes(repo, '2026-11-21'))[0]!.title).toBe(
+        'Quiet Saturday, again',
+      ),
+    { timeout: 3000 },
+  );
+  expect(await dailyNotes(repo, '2026-11-21')).toHaveLength(1);
+  expect(screen.getByRole('textbox', { name: 'Note title' })).toBe(title);
+});
+
+test('a tag on a draft day makes its note too', async () => {
+  const { repo } = await openWith('/app/notebook/daily/2026-11-21');
+  const input = await screen.findByRole('textbox', { name: 'Add a tag' });
+  fireEvent.change(input, { target: { value: 'quiet' } });
+  fireEvent.keyDown(input, { key: 'Enter' });
+  await waitFor(async () =>
+    expect((await dailyNotes(repo, '2026-11-21'))[0]?.tags).toEqual(['quiet']),
+  );
+  expect(await dailyNotes(repo, '2026-11-21')).toHaveLength(1);
+});
+
+test('visiting a future date shows a draft and creates nothing', async () => {
+  const { repo } = await openWith('/app/notebook/daily/2027-03-01');
+  const title = await screen.findByRole('textbox', { name: 'Note title' });
+  expect((title as HTMLInputElement).value).toMatch(/^Daily review, /);
+  await new Promise((r) => setTimeout(r, 300));
+  expect(await dailyNotes(repo, '2027-03-01')).toHaveLength(0);
+  expect(
+    (await repo.journal.list(WS)).filter((e) => e.date === '2027-03-01'),
+  ).toHaveLength(0);
+  // A draft has nothing to move to Trash.
+  expect(screen.queryByRole('button', { name: 'Move to Trash' })).toBeNull();
 });
 
 test('an invalid date is a not-found state, and makes no note', async () => {
@@ -436,4 +518,123 @@ test('New > Note makes a note and opens it', async () => {
     (e) => e.kind === 'note' && e.title === 'Untitled note',
   );
   expect(made).toHaveLength(1);
+});
+
+test('typing a title and moving to Trash at once leaves the note in Trash with the new title', async () => {
+  const { repo } = await openWith('/app/notebook/n-plan');
+  const title = await screen.findByRole('textbox', { name: 'Note title' });
+  fireEvent.change(title, { target: { value: 'Retest plan v2' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Move to Trash' }));
+  await screen.findByRole('status', { name: 'Notebook notice' });
+  await waitFor(async () =>
+    expect((await repo.journal.get(WS, 'n-plan'))?.title).toBe(
+      'Retest plan v2',
+    ),
+  );
+  // Let any late flush land, then check Trash still holds it.
+  await new Promise((r) => setTimeout(r, 900));
+  const stored = await repo.journal.get(WS, 'n-plan');
+  expect(stored?.deletedAt).toBeDefined();
+  expect(stored?.title).toBe('Retest plan v2');
+});
+
+test('opening a note focuses its title; All notes returns focus to its row', async () => {
+  await openWith('/app/notebook/n-plan');
+  const title = await screen.findByRole('textbox', { name: 'Note title' });
+  await waitFor(() => expect(document.activeElement).toBe(title));
+  fireEvent.click(screen.getByRole('link', { name: /All notes/ }));
+  // The test router does not follow links; the address bar moves as Next's would.
+  act(() => window.history.pushState(null, '', '/app/notebook'));
+  await waitFor(() =>
+    expect(document.activeElement?.getAttribute('href')).toBe(
+      '/app/notebook/n-plan',
+    ),
+  );
+});
+
+test('the trash notice: an always-mounted live region, Undo focused, kept at least 20 s', async () => {
+  await openWith('/app/notebook/n-plan');
+  // The live region is there before anything is trashed, and empty.
+  const live = await screen.findByRole('status', { name: 'Notebook notice' });
+  expect(live.textContent).toBe('');
+  const timers = vi.spyOn(window, 'setTimeout');
+  fireEvent.click(await screen.findByRole('button', { name: 'Move to Trash' }));
+  await waitFor(() => expect(live.textContent).toContain('Moved to Trash'));
+  // The same node, filled, not a new one.
+  expect(screen.getByRole('status', { name: 'Notebook notice' })).toBe(live);
+  const group = screen.getByRole('group', { name: 'Undo moving to Trash' });
+  const undo = within(group).getByRole('button', { name: 'Undo' });
+  await waitFor(() => expect(document.activeElement).toBe(undo));
+  // It waits at least 20 s before it goes.
+  const waits = timers.mock.calls.map(([, ms]) => ms as number);
+  expect(waits.some((ms) => ms >= 20_000)).toBe(true);
+  timers.mockRestore();
+  // Dismissing takes it down at once.
+  fireEvent.click(within(group).getByRole('button', { name: 'Dismiss' }));
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('group', { name: 'Undo moving to Trash' }),
+    ).toBeNull(),
+  );
+  expect(live.textContent).toBe('');
+});
+
+test('a favourite note in the list carries the text "Favourite"', async () => {
+  await openWith('/app/notebook', {
+    prepare: async (r) => {
+      await r.journal.save(WS, {
+        ...(await r.journal.get(WS, 'n-plan'))!,
+        favorite: true,
+      });
+    },
+  });
+  await screen.findByRole('navigation', { name: 'Folders' });
+  fireEvent.click(
+    await within(rail()).findByRole('button', { name: /Favourites/ }),
+  );
+  await waitFor(() => expect(listItems()).toHaveLength(1));
+  expect(within(listItems()[0]!).getByText('Favourite').className).toContain(
+    'sr-only',
+  );
+});
+
+test('the day card shows Rules kept with a metric tip', async () => {
+  await openWith('/app/notebook/daily/2026-11-19');
+  const card = await screen.findByRole('region', { name: "The day's stats" });
+  const label = await within(card).findByText('Rules kept');
+  expect(label.closest('[data-metric-tip="rule-adherence"]')).not.toBeNull();
+  expect(label.closest('div')!.textContent).toContain('1 of 2');
+});
+
+test('+ Link picks from the day first, searches all trades, and links and unlinks', async () => {
+  const { repo } = await openWith('/app/notebook/daily/2026-11-19');
+  const card = await screen.findByRole('region', { name: "The day's stats" });
+  fireEvent.click(
+    await within(card).findByRole('button', { name: 'Link a trade' }),
+  );
+  const box = await screen.findByRole('combobox', { name: 'Find a trade' });
+  // That day's trade is listed before any search; another day's is not.
+  const list = screen.getByRole('listbox', { name: 'Find a trade list' });
+  expect(within(list).getAllByRole('option')).toHaveLength(1);
+  expect(within(list).getByRole('option').textContent).toContain('ES');
+  // Search reaches every trade.
+  fireEvent.change(box, { target: { value: 'NQ' } });
+  const nq = await within(list).findByRole('option', { name: /NQ/ });
+  fireEvent.click(nq);
+  // Picking links the trade to the day's note.
+  await waitFor(
+    async () =>
+      expect((await dailyNotes(repo, '2026-11-19'))[0]!.linkedTradeIds).toEqual(
+        ['t-19', 'f-3'],
+      ),
+    { timeout: 3000 },
+  );
+  const unlink = await screen.findByRole('button', { name: /^Unlink NQ/ });
+  fireEvent.click(unlink);
+  await waitFor(async () =>
+    expect((await dailyNotes(repo, '2026-11-19'))[0]!.linkedTradeIds).toEqual([
+      't-19',
+    ]),
+  );
+  expect(screen.queryByRole('button', { name: /^Unlink NQ/ })).toBeNull();
 });

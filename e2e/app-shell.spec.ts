@@ -53,10 +53,11 @@ test('every app route renders its title without overflow; placeholders state it 
       await expect(
         page.getByRole('link', { name: 'Opening range breakout' }),
       ).toBeVisible();
+    // Daily journal: the seed's 20 daily reviews and its 95 pre-market plans.
     if (path === '/app/notebook')
       await expect(
         page.getByRole('list', { name: 'Notes' }).getByRole('listitem'),
-      ).toHaveCount(20, { timeout: 20_000 });
+      ).toHaveCount(115, { timeout: 20_000 });
     if (path === '/app/reports')
       await expect(page.getByTestId('reports-overview')).toBeVisible({
         timeout: 20_000,

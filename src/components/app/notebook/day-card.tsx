@@ -4,10 +4,23 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 import { ArrowSquareOut, CalendarBlank } from '@phosphor-icons/react/dist/ssr';
 import { FigureText } from '@/components/product/figure-text';
-import { calendarMonth, dayExits } from '@/data/calendar';
-import { usePrefs, useTrade, useTrades } from '@/data/query/hooks';
+import { MetricTip } from '@/components/ui/metric-tip';
+import {
+  calendarMonth,
+  dayExits,
+  dayGrading,
+  type DayGrading,
+} from '@/data/calendar';
+import {
+  usePrefs,
+  useStrategies,
+  useTagCategories,
+  useTags,
+  useTrade,
+  useTrades,
+} from '@/data/query/hooks';
 import { localDate } from '@/domain/time';
-import type { Trade } from '@/domain/types';
+import type { PnlBasis, Trade } from '@/domain/types';
 import {
   FigureSourceContext,
   tradeFigure,
@@ -16,6 +29,7 @@ import {
 } from '@/lib/display';
 import { formatPct } from '@/lib/format';
 import { InstrumentName, signTone } from '../dashboard/shared';
+import { LinkedTrades } from './linked-trades';
 import { useFigureSource } from './use-figure-source';
 
 const CARD_BOX = 'mt-3.5 min-w-0 border-y border-line py-3 max-sm:py-2.5';
@@ -26,7 +40,7 @@ function Kpi({
   children,
   tone = '',
 }: {
-  label: string;
+  label: React.ReactNode;
   children: React.ReactNode;
   tone?: string;
 }): React.JSX.Element {
@@ -42,7 +56,7 @@ function Kpi({
   );
 }
 
-/** One of the day's trades, as a chip that links it with what it made that day. */
+/** A linked trade as a chip that links it, with what it made on the note's day. */
 function TradeChip({
   trade,
   value,
@@ -52,7 +66,7 @@ function TradeChip({
   pctBase,
 }: {
   trade: Trade;
-  /** What its exits on the day made; undefined for a trade still open. */
+  /** What its exits on the day made; undefined when it did not exit that day. */
   value: number | undefined;
   r: number | null;
   timeZone: string;
@@ -85,9 +99,9 @@ function TradeChip({
         >
           <FigureText f={figure} />
         </em>
-      ) : (
+      ) : trade.status === 'open' ? (
         <em className="font-medium text-faint not-italic">Open</em>
-      )}
+      ) : null}
     </Link>
   );
 }
@@ -97,25 +111,61 @@ interface DayModel {
   r: number | null;
   trades: number;
   wins: number;
-  chips: { trade: Trade; value: number | undefined; r: number | null }[];
+  rules: DayGrading['rules'];
+  /** What each trade with an exit that day made on it. */
+  made: Map<string, { value: number; r: number | null }>;
+  /** The day's trades: those with an exit that day, and those opened and still open. */
+  dayIds: Set<string>;
 }
 
 function DayBody({
   date,
   model,
+  basis,
   timeZone,
   currency,
   pctBase,
+  linkedTradeIds,
+  readOnly,
+  onLinkedChange,
 }: {
   date: string;
   model: DayModel;
+  basis: PnlBasis;
   timeZone: string;
   currency: string;
   pctBase: number | null;
+  linkedTradeIds: readonly string[];
+  readOnly: boolean;
+  onLinkedChange(ids: string[]): void;
 }): React.JSX.Element {
   const display = useDisplay();
-  if (model.chips.length === 0)
-    return <p className="text-[14px] text-muted">No trades this day.</p>;
+  const linked = (
+    <LinkedTrades
+      linkedIds={linkedTradeIds}
+      date={date}
+      dayIds={model.dayIds}
+      readOnly={readOnly}
+      onChange={onLinkedChange}
+      chip={(t) => (
+        <TradeChip
+          trade={t}
+          value={model.made.get(t.id)?.value}
+          r={model.made.get(t.id)?.r ?? null}
+          timeZone={timeZone}
+          currency={currency}
+          pctBase={pctBase}
+        />
+      )}
+    />
+  );
+  if (model.dayIds.size === 0)
+    return (
+      <>
+        <p className="text-[14px] text-muted">No trades this day.</p>
+        {linked}
+      </>
+    );
   const net = display.figure(
     { money: model.net, pct: pctBase ? model.net / pctBase : null, r: model.r },
     true,
@@ -136,6 +186,21 @@ function DayBody({
                 model.wins % model.trades === 0 ? 0 : 1,
               )}
         </Kpi>
+        <Kpi
+          label={
+            <MetricTip
+              id="rule-adherence"
+              basis={basis}
+              note="Here, the checks on the trades that exited this day, for the rules that apply to each."
+            >
+              Rules kept
+            </MetricTip>
+          }
+        >
+          {model.rules.checked === 0
+            ? 'None graded'
+            : `${model.rules.kept} of ${model.rules.checked}`}
+        </Kpi>
         <Link
           href={`/app/calendar?day=${date}`}
           className="inline-flex items-center gap-1.5 self-center ml-auto rounded-chip text-[12.5px] font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
@@ -144,32 +209,33 @@ function DayBody({
           Open the day
         </Link>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        <span className="mr-1 text-[12.5px] text-faint">Linked trades</span>
-        {model.chips.map((c) => (
-          <TradeChip
-            key={c.trade.id}
-            trade={c.trade}
-            value={c.value}
-            r={c.r}
-            timeZone={timeZone}
-            currency={currency}
-            pctBase={pctBase}
-          />
-        ))}
-      </div>
+      {linked}
     </>
   );
 }
 
 /**
  * The day's figures, booked by realization as the calendar books them: every
- * trade with an exit that day counts, wherever the rest of it stands. Trades
- * still open that opened the day are chips too, without a figure.
+ * trade with an exit that day counts, wherever the rest of it stands. Below
+ * them, the trades the note links to (with what each made that day) and the
+ * way to link more.
  */
-export function DayCard({ date }: { date: string }): React.JSX.Element {
+export function DayCard({
+  date,
+  linkedTradeIds,
+  readOnly,
+  onLinkedChange,
+}: {
+  date: string;
+  linkedTradeIds: readonly string[];
+  readOnly: boolean;
+  onLinkedChange(ids: string[]): void;
+}): React.JSX.Element {
   const prefs = usePrefs().data;
   const all = useTrades().data;
+  const strategies = useStrategies().data;
+  const tags = useTags().data;
+  const categories = useTagCategories().data;
   const currency = prefs?.baseCurrency ?? 'USD';
   const trades = useMemo(
     () => all?.filter((t) => t.pnlCurrency === currency),
@@ -183,38 +249,37 @@ export function DayCard({ date }: { date: string }): React.JSX.Element {
     from: date,
   });
   const model = useMemo((): DayModel | undefined => {
-    if (!source || !trades) return undefined;
+    if (!source || !trades || !strategies || !tags || !categories)
+      return undefined;
     const { ctx } = source;
     const { weeks } = calendarMonth(trades, [], date.slice(0, 7), ctx);
     const day = weeks.flatMap((w) => w.days).find((d) => d?.date === date);
     const exits = dayExits(trades, date, ctx);
-    const byTrade = new Map<string, DayModel['chips'][number]>();
+    const made = new Map<string, { value: number; r: number | null }>();
     for (const e of exits) {
-      const seen = byTrade.get(e.trade.id);
-      byTrade.set(e.trade.id, {
-        trade: e.trade,
+      const seen = made.get(e.trade.id);
+      made.set(e.trade.id, {
         value: (seen?.value ?? 0) + e.value,
         r:
-          e.r === null && seen?.r === undefined
+          e.r === null && seen === undefined
             ? null
             : (seen?.r ?? 0) + (e.r ?? 0),
       });
     }
+    const dayIds = new Set(made.keys());
     for (const t of trades)
-      if (
-        t.status === 'open' &&
-        !byTrade.has(t.id) &&
-        localDate(t.openedAt, ctx.timeZone) === date
-      )
-        byTrade.set(t.id, { trade: t, value: undefined, r: null });
+      if (t.status === 'open' && localDate(t.openedAt, ctx.timeZone) === date)
+        dayIds.add(t.id);
     return {
       net: day?.net ?? 0,
       r: day?.r ?? null,
       trades: day?.trades ?? 0,
       wins: day?.wins ?? 0,
-      chips: [...byTrade.values()],
+      rules: dayGrading(exits, strategies, tags, categories, ctx).rules,
+      made,
+      dayIds,
     };
-  }, [source, trades, date]);
+  }, [source, trades, strategies, tags, categories, date]);
 
   return (
     <section aria-label="The day's stats" className={CARD_BOX}>
@@ -224,6 +289,10 @@ export function DayCard({ date }: { date: string }): React.JSX.Element {
           <DayBody
             date={date}
             model={model}
+            basis={source.ctx.pnlBasis}
+            linkedTradeIds={linkedTradeIds}
+            readOnly={readOnly}
+            onLinkedChange={onLinkedChange}
             timeZone={prefs.timeZone}
             currency={currency}
             pctBase={source.pctBase}

@@ -14,7 +14,11 @@ import { dayLabel } from '@/data/seed/calendar';
 import { NOTE_SAVE_DELAY_MS } from '../trades/trade-journal';
 import { NoteEditor } from '../notes/note-editor';
 import { DayCard, TradeStatsCard } from './day-card';
+import { LinkedTrades } from './linked-trades';
 import { KIND_LABEL } from './notebook-model';
+
+/** The id of a note that is not stored yet: a day's draft. */
+export const DRAFT_ID = 'draft';
 
 type Status = 'idle' | 'saving' | 'saved' | 'failed';
 
@@ -29,23 +33,35 @@ const tagOf = (raw: string): string =>
  * One open note: title, the day's or the trade's figures, tags, the body.
  * The editor is keyed by the note's id by the caller, so the first save of a
  * note never remounts it; it owns the text from the first render. Title and
- * body save 600 ms after typing stops; the star, tags and folder save at once.
+ * body save 600 ms after typing stops; the star, tags, links and folder save at
+ * once. A draft (id `DRAFT_ID`) is a note not stored yet: its first change
+ * asks `ensure` for the stored note and builds on that, under the same pane.
  */
 export function EntryPane({
   entry,
   folders,
+  ensure,
   onTrash,
   onRestore,
   onDeleteForever,
 }: {
   entry: JournalEntry;
   folders: readonly NoteFolder[];
-  onTrash(): void;
+  /** For a draft: the stored note, made if need be. */
+  ensure?(): Promise<JournalEntry>;
+  /** Moves the stored note with this id to Trash, once the pane has written what it held. */
+  onTrash(id: string): void;
   onRestore(): void;
   onDeleteForever(): void;
 }): React.JSX.Element {
   const save = useSaveJournalEntry();
   const trashed = entry.deletedAt !== undefined;
+  const isDraft = entry.id === DRAFT_ID;
+  const titleBox = useRef<HTMLInputElement>(null);
+  // Opening a note puts the cursor in its title.
+  useEffect(() => {
+    titleBox.current?.focus({ preventScroll: true });
+  }, []);
   const [seed] = useState(entry.body);
   const [title, setTitle] = useState(entry.title);
   const [tagText, setTagText] = useState('');
@@ -79,6 +95,10 @@ export function EntryPane({
     if (Object.keys(extra).length > 0) setShown((s) => ({ ...s, ...extra }));
     queue.current = queue.current.then(async () => {
       try {
+        if (base.current.id === DRAFT_ID && ensure) {
+          // The first change of a draft stores the day's note.
+          base.current = await ensure();
+        }
         const next: JournalEntry = { ...base.current, ...patch };
         // An unset field is left out, not stored as undefined.
         for (const k of Object.keys(next) as (keyof JournalEntry)[])
@@ -96,6 +116,17 @@ export function EntryPane({
     setStatus('saving');
     if (timer.current !== undefined) clearTimeout(timer.current);
     timer.current = setTimeout(commit, NOTE_SAVE_DELAY_MS);
+  };
+
+  // Writes what is waiting and everything already on its way, in order.
+  const flush = async () => {
+    if (timer.current !== undefined) commit();
+    await queue.current;
+  };
+  const trashNow = async () => {
+    // Trashing first would let the leave-flush write the old copy back.
+    await flush();
+    onTrash(base.current.id);
   };
 
   // Leaving the note saves what is still waiting.
@@ -185,14 +216,16 @@ export function EntryPane({
                 aria-hidden="true"
               />
             </button>
-            <button
-              type="button"
-              aria-label="Move to Trash"
-              onClick={onTrash}
-              className={`${BAR_BUTTON} px-2 hover:text-loss`}
-            >
-              <Trash size={16} aria-hidden="true" />
-            </button>
+            {isDraft ? null : (
+              <button
+                type="button"
+                aria-label="Move to Trash"
+                onClick={() => void trashNow()}
+                className={`${BAR_BUTTON} px-2 hover:text-loss`}
+              >
+                <Trash size={16} aria-hidden="true" />
+              </button>
+            )}
           </>
         )}
       </div>
@@ -220,6 +253,7 @@ export function EntryPane({
       ) : null}
 
       <input
+        ref={titleBox}
         aria-label="Note title"
         value={title}
         readOnly={trashed}
@@ -232,10 +266,25 @@ export function EntryPane({
         className="mt-3 w-full min-w-0 bg-transparent text-[26px] leading-[1.15] font-semibold tracking-[-0.03em] text-text outline-none placeholder:text-faint focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent max-sm:text-[22px]"
       />
 
-      {entry.kind === 'daily-review' && day ? <DayCard date={day} /> : null}
-      {entry.kind === 'trade-note' && entry.linkedTradeIds[0] ? (
-        <TradeStatsCard tradeId={entry.linkedTradeIds[0]} />
-      ) : null}
+      {entry.kind === 'daily-review' && day ? (
+        <DayCard
+          date={day}
+          linkedTradeIds={shown.linkedTradeIds}
+          readOnly={trashed}
+          onLinkedChange={(ids) => commit({ linkedTradeIds: ids })}
+        />
+      ) : entry.kind === 'trade-note' ? (
+        entry.linkedTradeIds[0] ? (
+          <TradeStatsCard tradeId={entry.linkedTradeIds[0]} />
+        ) : null
+      ) : (
+        <LinkedTrades
+          linkedIds={shown.linkedTradeIds}
+          date={day}
+          readOnly={trashed}
+          onChange={(ids) => commit({ linkedTradeIds: ids })}
+        />
+      )}
 
       <div
         role="group"
