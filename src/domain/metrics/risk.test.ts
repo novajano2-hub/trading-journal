@@ -38,4 +38,21 @@ describe('riskRatios', () => {
     expect(r.sharpe).not.toBeNull();
     expect(r.sortino).toBeNull();
   });
+  test("a flow dated before a day is in that day's base, one dated that day is not", () => {
+    const days = [day('2026-11-16', 10000), day('2026-11-18', 10000)];
+    const withFlow = riskRatios(days, 1_000_000, [
+      { date: '2026-11-17', amount: 9_000_000 },
+    ]);
+    // 10000/1000000 then 10000/(1010000+9000000)
+    const returns = [10000 / 1_000_000, 10000 / 10_010_000];
+    const mean = (returns[0]! + returns[1]!) / 2;
+    const sd = Math.sqrt(
+      ((returns[0]! - mean) ** 2 + (returns[1]! - mean) ** 2) / 1,
+    );
+    expect(withFlow.sharpe).toBeCloseTo((mean / sd) * Math.sqrt(252), 6);
+    const sameDay = riskRatios(days, 1_000_000, [
+      { date: '2026-11-18', amount: 9_000_000 },
+    ]);
+    expect(sameDay).toEqual(riskRatios(days, 1_000_000, []));
+  });
 });

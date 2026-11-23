@@ -270,7 +270,7 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'max-drawdown': {
     label: 'Max drawdown',
     definition:
-      'The largest fall of the equity line from a peak to a later low, after each closed trade, with that fall as a share of the peak. Equity starts at the starting balances of the selected accounts.',
+      'The largest fall of the equity line from a peak to a later low, after each closed trade, with that fall as a share of the real balance at the peak: the equity there plus the deposits and withdrawals dated up to it. Equity starts at the starting balances of the selected accounts.',
   },
   'win-streak': {
     label: 'Longest win streak',

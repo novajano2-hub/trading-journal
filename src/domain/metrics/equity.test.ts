@@ -56,6 +56,32 @@ describe('equity', () => {
   });
 });
 
+describe('maxDrawdown with balance adjustments', () => {
+  const t = [100000, -300000].map((net, i) =>
+    makeTrade({
+      net,
+      serial: i + 1,
+      closedAt: `2026-03-0${i + 2}T15:00:00Z`,
+    }),
+  );
+  test('the % is the drawdown over the real balance at the peak, flows dated up to it included', () => {
+    // Peak 5,100,000 on 2 Mar, plus a 4,900,000 deposit on 1 Mar: 10,000,000.
+    const dd = maxDrawdown(t, 5000000, ctx, [
+      { date: '2026-03-01', amount: 4900000 },
+      { date: '2026-03-03', amount: 7000000 },
+    ]);
+    expect(dd.amount).toBe(300000);
+    expect(dd.pct).toBeCloseTo(0.03, 6);
+  });
+  test('a flow after the peak does not change the base; none keeps the old figure', () => {
+    expect(
+      maxDrawdown(t, 5000000, ctx, [{ date: '2026-03-03', amount: 7000000 }])
+        .pct,
+    ).toBeCloseTo(300000 / 5100000, 6);
+    expect(maxDrawdown(t, 5000000, ctx).pct).toBeCloseTo(300000 / 5100000, 6);
+  });
+});
+
 describe('drawdownSeries', () => {
   test('is the depth under the running peak, deepest of the day, from the starting balance', () => {
     const t = [100, -300, 50, 400].map((net, i) =>

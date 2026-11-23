@@ -4,6 +4,7 @@ import type { Account, UserPrefs } from '../domain/types';
 import { defaultPrefs } from './repository';
 import { riskRatios } from '../domain/metrics/risk';
 import { metricContextOf, metricsByCurrency } from './metrics';
+import { pctBaseOf } from '../lib/display';
 import { generateSampleWorkspace, SAMPLE_SEED } from './seed/generate';
 
 const acct = (id: string, startingBalance: number, currency = 'USD') =>
@@ -86,6 +87,40 @@ test('metricContextOf maps prefs', () => {
 });
 
 describe('performance (spec §10)', () => {
+  test('a filter change with a range recomputes the metrics and the % base in under 50 ms (median of 9)', () => {
+    const ws = generateSampleWorkspace({
+      seed: SAMPLE_SEED,
+      endDate: '2026-11-19',
+    });
+    const range = { from: '2026-10-01' };
+    const run = () => {
+      pctBaseOf({
+        accounts: ws.accounts,
+        flows: [],
+        trades: ws.trades,
+        accountIds: [],
+        from: range.from,
+        timeZone: ctx.timeZone,
+      });
+      metricsByCurrency(ws.trades, {
+        accounts: ws.accounts,
+        flows: [],
+        balanceTrades: ws.trades,
+        ctx: { ...ctx, range },
+        baseCurrency: 'USD',
+      });
+    };
+    run();
+    const times: number[] = [];
+    for (let i = 0; i < 9; i++) {
+      const t0 = performance.now();
+      run();
+      times.push(performance.now() - t0);
+    }
+    times.sort((a, b) => a - b);
+    expect(times[4]!).toBeLessThan(50);
+  });
+
   test('metrics over the sample workspace take under 50 ms (median of 5)', () => {
     const ws = generateSampleWorkspace({
       seed: SAMPLE_SEED,
@@ -181,7 +216,7 @@ describe('Sharpe and Sortino inputs', () => {
     expect(usd!.risk).not.toEqual(riskRatios(days, 1_000_000));
   });
 
-  test('deposits and withdrawals dated before the range move the starting balance, those inside it do not', () => {
+  test('deposits and withdrawals dated before the range move the starting balance, those inside it move the base of later days', () => {
     const before = on('2026-11-10', 1_000_000);
     const inside = [
       on('2026-11-16', 10_000),
@@ -211,7 +246,38 @@ describe('Sharpe and Sortino inputs', () => {
       day('2026-11-17', -5_000),
       day('2026-11-18', 20_000),
     ];
-    expect(usd!.risk).toEqual(riskRatios(days, 1_600_000));
+    // The 17 Nov deposit is in the base of 18 Nov: 1,600,000 + 10,000 - 5,000 + 9,000,000.
+    expect(usd!.risk).toEqual(
+      riskRatios(days, 1_600_000, [{ date: '2026-11-17', amount: 9_000_000 }]),
+    );
+    expect(usd!.risk).not.toEqual(riskRatios(days, 1_600_000));
+  });
+
+  test('an open range starts from the balance the day before its first day', () => {
+    const before = on('2026-11-10', 1_000_000);
+    const inside = [on('2026-11-16', 10_000), on('2026-11-17', -5_000)];
+    const flow = {
+      id: 'f',
+      workspaceId: 'w',
+      accountId: 'a',
+      date: '2026-11-12',
+      amount: 500_000,
+    };
+    // dayTrades are the filtered set (no 10 Nov trade); balanceTrades are all.
+    const [usd] = metricsByCurrency(inside, {
+      accounts: [acct('a', 0)],
+      flows: [flow],
+      ctx,
+      baseCurrency: 'USD',
+      balanceTrades: [before, ...inside],
+    });
+    expect(usd!.risk).toEqual(
+      riskRatios(
+        [day('2026-11-16', 10_000), day('2026-11-17', -5_000)],
+        1_500_000,
+        [],
+      ),
+    );
   });
 
   test('the balance is booked from every trade of the accounts, not only the filtered ones', () => {

@@ -28,30 +28,49 @@ export function equityCurve(
   });
 }
 
+/**
+ * The deepest fall from a running peak. `pct` is that fall over the real balance at
+ * the peak: the equity there plus the `flows` (deposits and withdrawals) dated on or
+ * before the peak's local day; the starting-balance peak counts those dated before
+ * the first closed trade's day.
+ */
 export function maxDrawdown(
   trades: readonly Trade[],
   startingBalance: Cents,
   ctx: MetricContext,
+  flows: readonly { date: string; amount: Cents }[] = [],
 ): Drawdown {
+  const curve = equityCurve(trades, startingBalance, ctx);
+  const flowsTo = (date: string | undefined, inclusive: boolean): Cents =>
+    flows.reduce(
+      (n, f) =>
+        date !== undefined && (inclusive ? f.date <= date : f.date < date)
+          ? n + f.amount
+          : n,
+      0,
+    );
+  const firstDay = curve[0] && localDate(curve[0].time, ctx.timeZone);
   let peak = startingBalance;
+  let peakBase = startingBalance + flowsTo(firstDay, false);
   let peakAt: string | undefined;
   let amount = 0;
   let pct: number | null = 0;
   let sawPositivePeak = false;
   let result: Drawdown = { amount: 0, pct: 0 };
-  for (const p of equityCurve(trades, startingBalance, ctx)) {
+  for (const p of curve) {
     if (p.equity > peak) {
       peak = p.equity;
       peakAt = p.time;
+      peakBase = peak + flowsTo(localDate(p.time, ctx.timeZone), true);
     }
     const dd = peak - p.equity;
     if (dd > amount) {
       amount = dd;
       result = { ...result, amount, peakAt, troughAt: p.time };
     }
-    if (peak > 0) {
+    if (peakBase > 0) {
       sawPositivePeak = true;
-      const r = dd / peak;
+      const r = dd / peakBase;
       if (pct === null || r > pct) pct = r;
     }
   }

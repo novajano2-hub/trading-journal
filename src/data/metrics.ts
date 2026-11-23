@@ -98,19 +98,27 @@ export function metricsByCurrency(
     const netDays = ctx.pnlBasis === 'net' ? days : dailyPnl(dayOwn, netCtx);
     // The balance the day before the range starts: the starting balances,
     // the flows dated before it and the net booked before it.
-    const from = ctx.range?.from;
+    // An open range starts the day before its first day.
+    const startDay = ctx.range?.from ?? netDays[0]?.date;
+    const ownFlows = (opts.flows ?? []).filter((f) =>
+      currencyAccounts.some((a) => a.id === f.accountId),
+    );
     const riskStart =
-      from === undefined
+      startDay === undefined
         ? startingBalance
         : balanceAt(
             currencyAccounts,
-            opts.flows ?? [],
+            ownFlows,
             (opts.balanceTrades ?? opts.dayTrades ?? trades).filter(
               (t) => t.pnlCurrency === currency,
             ),
-            dayBefore(from),
+            dayBefore(startDay),
             ctx,
           );
+    const riskFlows =
+      startDay === undefined
+        ? []
+        : ownFlows.filter((f) => f.date > dayBefore(startDay));
     return {
       currency,
       trades: own,
@@ -121,12 +129,12 @@ export function metricsByCurrency(
       netDays,
       daySummary: daySummary(days, ctx),
       equity: equityCurve(own, startingBalance, ctx),
-      drawdown: maxDrawdown(own, startingBalance, ctx),
+      drawdown: maxDrawdown(own, startingBalance, ctx, ownFlows),
       tradeStreaks: tradeStreaks(own, ctx),
       dayStreaks: dayStreaks(days, ctx),
       dayDurations: dayDurations(dayOwn, ctx),
       avgDailyWinRate: winRateOfDays(days),
-      risk: riskRatios(netDays, riskStart),
+      risk: riskRatios(netDays, riskStart, riskFlows),
     };
   });
 }
