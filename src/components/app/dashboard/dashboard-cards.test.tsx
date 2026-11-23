@@ -571,6 +571,14 @@ test('every metric carries its definition', async () => {
     'fees',
     'gross-pnl',
     'net-pnl',
+    // On the reports (Task 14).
+    'avg-win',
+    'avg-loss',
+    'largest-win',
+    'largest-loss',
+    'max-drawdown',
+    'win-streak',
+    'loss-streak',
   ]);
   expect(new Set(ids)).toEqual(
     new Set(METRIC_IDS.filter((id) => !notOnDashboard.has(id))),

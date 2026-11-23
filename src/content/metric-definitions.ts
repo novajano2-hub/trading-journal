@@ -32,6 +32,13 @@ export const METRIC_IDS = [
   'fees',
   'gross-pnl',
   'net-pnl',
+  'avg-win',
+  'avg-loss',
+  'largest-win',
+  'largest-loss',
+  'max-drawdown',
+  'win-streak',
+  'loss-streak',
 ] as const;
 
 export type MetricId = (typeof METRIC_IDS)[number];
@@ -187,6 +194,39 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'net-pnl': {
     label: 'Net',
     definition: 'P&L after fees and commissions.',
+  },
+  'avg-win': {
+    label: 'Average win',
+    definition:
+      'Mean {basis} P&L of the winning trades. Breakeven trades, inside your breakeven range, are left out.',
+  },
+  'avg-loss': {
+    label: 'Average loss',
+    definition:
+      'Mean {basis} P&L of the losing trades. Breakeven trades, inside your breakeven range, are left out.',
+  },
+  'largest-win': {
+    label: 'Largest win',
+    definition: 'The winning trade with the highest {basis} P&L.',
+  },
+  'largest-loss': {
+    label: 'Largest loss',
+    definition: 'The losing trade with the lowest {basis} P&L.',
+  },
+  'max-drawdown': {
+    label: 'Max drawdown',
+    definition:
+      'The largest fall of the equity line from a peak to a later low, after each closed trade, with that fall as a share of the peak. Equity starts at the starting balances of the selected accounts.',
+  },
+  'win-streak': {
+    label: 'Longest win streak',
+    definition:
+      'The most winning trades in a row, in the order they closed. A breakeven trade neither extends nor breaks a run.',
+  },
+  'loss-streak': {
+    label: 'Longest loss streak',
+    definition:
+      'The most losing trades in a row, in the order they closed. A breakeven trade neither extends nor breaks a run.',
   },
 };
 
