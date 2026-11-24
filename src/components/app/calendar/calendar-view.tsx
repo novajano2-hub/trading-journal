@@ -18,7 +18,6 @@ import {
   useEffect,
   useId,
   useMemo,
-  useState,
   useSyncExternalStore,
 } from 'react';
 import { FigureText } from '@/components/product/figure-text';
@@ -326,7 +325,6 @@ export function CalendarView(): React.JSX.Element {
   const display = useDisplay();
   const desktop = useDesktop();
   const titleId = useId();
-  const [picked, setPicked] = useState<string>();
 
   const timeZone = prefs?.timeZone;
   const today =
@@ -339,6 +337,9 @@ export function CalendarView(): React.JSX.Element {
   const [month, setMonth] = useAddressCopy(addressMonth, addressMonth ?? '');
   const day = dayOf(search);
   const hasDayParam = new URLSearchParams(search).has('day');
+  // The currency is in the address (`?cur`), as on Reports, so a link from
+  // one carries it to the other.
+  const picked = new URLSearchParams(search).get('cur') ?? undefined;
 
   const dayTrades = set.data?.dayTrades;
   const currencies = useMemo(
@@ -489,8 +490,13 @@ export function CalendarView(): React.JSX.Element {
         : `${fmt(range.from).text} to ${fmt(range.to).text}`
       : `${range.from * 100}% to ${range.to * 100}%`;
   const filterQuery = serializeFilters(set.data.filters).toString();
-  const monthHref = monthReportHref(set.data.filters, month);
-  const yearHref = `/app/reports/calendar${filterQuery ? `?${filterQuery}` : ''}`;
+  // With several currencies the links open Reports on the one shown here.
+  const cur = currencies.length > 1 ? currency : undefined;
+  const monthHref = monthReportHref(set.data.filters, month, cur);
+  const yearQuery = [filterQuery, cur ? `cur=${cur}` : '']
+    .filter(Boolean)
+    .join('&');
+  const yearHref = `/app/reports/calendar${yearQuery ? `?${yearQuery}` : ''}`;
   const panel = selected ? (
     <DayPanel
       date={selected.date}
@@ -582,7 +588,7 @@ export function CalendarView(): React.JSX.Element {
                 label="Currency"
                 options={currencies.map((c) => ({ value: c, label: c }))}
                 value={currency}
-                onChange={setPicked}
+                onChange={(c) => writeParams({ cur: c })}
                 coarseTargets
               />
             ) : null}

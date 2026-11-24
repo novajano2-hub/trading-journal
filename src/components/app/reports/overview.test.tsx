@@ -483,3 +483,28 @@ test('in R the cumulative line ends at +1.00R, not at a cent (I2)', async () => 
     }),
   ).toBeTruthy();
 });
+
+test('on one of several currencies the largest-day links open the calendar on it (M4)', async () => {
+  const { container } = renderApp(<OverviewView />, {
+    sample: async () => {
+      const s = await breakdownSample();
+      s.trades.push({
+        ...s.trades[0]!,
+        id: 'b-eur',
+        serial: 99,
+        pnlCurrency: 'EUR',
+      });
+      return s;
+    },
+    url: `${URL}?cur=EUR`,
+  });
+  await ready();
+  const link = container.querySelector(
+    '[data-stat="largest-green-day"] a',
+  ) as HTMLAnchorElement;
+  expect(
+    new globalThis.URL(link.getAttribute('href')!, 'http://x').searchParams.get(
+      'cur',
+    ),
+  ).toBe('EUR');
+});

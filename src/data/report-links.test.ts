@@ -20,6 +20,7 @@ import {
   bucketFilters,
   bucketHref,
   calendarHref,
+  monthReportHref,
   cellHref,
   intersectRanges,
   type BucketOptions,
@@ -573,6 +574,22 @@ describe('a bucket edge belongs to one bucket', () => {
       )!;
       expect(hits(t, 'size', sKeys)).toEqual([row.key]);
     });
+});
+
+describe('the currency rides across pages (M4)', () => {
+  test('calendarHref and monthReportHref carry the currency the page reads, when given', () => {
+    expect(calendarHref(EMPTY_FILTERS, '2026-11-03', 'EUR')).toBe(
+      '/app/calendar?month=2026-11&day=2026-11-03&cur=EUR',
+    );
+    const month = new URL(
+      monthReportHref(EMPTY_FILTERS, '2026-11', 'EUR'),
+      'http://x',
+    );
+    expect(month.pathname).toBe('/app/reports');
+    expect(month.searchParams.get('cur')).toBe('EUR');
+    expect(month.searchParams.get('from')).toBe('2026-11-01');
+    expect(monthReportHref(EMPTY_FILTERS, '2026-11')).not.toContain('cur=');
+  });
 });
 
 describe('calendarHref', () => {

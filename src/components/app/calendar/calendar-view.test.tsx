@@ -151,6 +151,35 @@ test('two quick clicks on Next month before the address catches up move two mont
   );
 });
 
+test('the currency is in the address: ?cur opens it, the switch writes it, and the month report link carries it (M4)', async () => {
+  renderApp(<CalendarView />, {
+    sample: withTrades([
+      ['2026-11-18', 5000],
+      ['2026-11-19', 7000, { pnlCurrency: 'EUR' }],
+    ]),
+    url: url('&cur=EUR'),
+  });
+  const currency = await screen.findByRole('radiogroup', { name: 'Currency' });
+  expect(
+    (within(currency).getByRole('radio', { name: 'EUR' }) as HTMLInputElement)
+      .checked,
+  ).toBe(true);
+  // Only the euro trade's day is booked.
+  expect(
+    screen.getByRole('button', { name: /^Thu 19 Nov/ }).textContent,
+  ).toContain('70');
+  const report = screen.getByRole('link', {
+    name: /Open .*November.* report|report/i,
+  });
+  expect(
+    new URL(report.getAttribute('href')!, 'http://x').searchParams.get('cur'),
+  ).toBe('EUR');
+  fireEvent.click(within(currency).getByRole('radio', { name: 'USD' }));
+  await waitFor(() =>
+    expect(new URLSearchParams(window.location.search).get('cur')).toBe('USD'),
+  );
+});
+
 test('choosing Win rate as a third stat shows it in the cells', async () => {
   renderApp(<CalendarView />, { sample: withTrades(NOV), url: url() });
   const cell = await screen.findByRole('button', { name: /^Thu 19 Nov/ });

@@ -297,20 +297,30 @@ export function cellHref(
 
 /**
  * The calendar's address for one day: its month and the day open, under the
- * page's filters, so the calendar reads the trades the figure did.
+ * page's filters, so the calendar reads the trades the figure did. With
+ * `currency` (a page on one of several currencies) it opens on that one.
  */
-export function calendarHref(base: GlobalFilters, day: string): string {
+export function calendarHref(
+  base: GlobalFilters,
+  day: string,
+  currency?: string,
+): string {
   const params = serializeFilters(base);
   params.set('month', day.slice(0, 7));
   params.set('day', day);
+  if (currency) params.set('cur', currency);
   return `/app/calendar?${queryString(params)}`;
 }
 
 /**
  * Reports > Overview for one month: the page's filters kept, the date range
- * set to the month's first and last day.
+ * set to the month's first and last day, and with `currency` that currency.
  */
-export function monthReportHref(base: GlobalFilters, month: string): string {
+export function monthReportHref(
+  base: GlobalFilters,
+  month: string,
+  currency?: string,
+): string {
   const [y, m] = month.split('-').map(Number) as [number, number];
   const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
   const params = serializeFilters({
@@ -320,5 +330,6 @@ export function monthReportHref(base: GlobalFilters, month: string): string {
       to: `${month}-${String(last).padStart(2, '0')}`,
     },
   });
+  if (currency) params.set('cur', currency);
   return `/app/reports?${queryString(params)}`;
 }

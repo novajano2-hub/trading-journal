@@ -26,6 +26,8 @@ export function OverviewDayFigures({
   const green = ds.largestGreenDay;
   const red = ds.largestRedDay;
   const open = (day: string) => `Open ${periodText(day)} on the calendar`;
+  // With several currencies the calendar opens on the one this page reads.
+  const cur = data.currencies.length > 1 ? data.currency : undefined;
   return (
     <StatCard group="day-figures" title="Day figures" icon={CalendarBlank}>
       <Stat
@@ -54,7 +56,7 @@ export function OverviewDayFigures({
         data={data}
         tone="text-gain"
         sub={green ? periodText(green.date) : undefined}
-        href={green ? calendarHref(data.filters, green.date) : undefined}
+        href={green ? calendarHref(data.filters, green.date, cur) : undefined}
         linkLabel={green ? open(green.date) : undefined}
       >
         {value(green ? dayValue(green, data.ctx) : null)}
@@ -64,7 +66,7 @@ export function OverviewDayFigures({
         data={data}
         tone="text-loss"
         sub={red ? periodText(red.date) : undefined}
-        href={red ? calendarHref(data.filters, red.date) : undefined}
+        href={red ? calendarHref(data.filters, red.date, cur) : undefined}
         linkLabel={red ? open(red.date) : undefined}
       >
         {value(red ? dayValue(red, data.ctx) : null)}
