@@ -11,6 +11,7 @@ import { applyTradePatch, type TradePatch } from '../trade-patch';
 import type { LocalContext } from './context';
 import type { KeelDb } from './db';
 import { rwTx } from './tx';
+import { assertEditable } from './editable';
 import { pruneJournalLinks } from './journal';
 import { bumpImportRevision } from './imports';
 
@@ -50,27 +51,6 @@ async function patched(
     id: t.id,
     workspaceId: ws,
   }));
-}
-
-/** Throws ArchivedAccountError when any of the trades is in an archived account. Call inside a transaction over `db.accounts`. */
-async function assertEditable(
-  db: KeelDb,
-  ws: string,
-  trades: readonly (Trade | undefined)[],
-): Promise<void> {
-  const held = trades.filter((t): t is Trade => t !== undefined);
-  const accountIds = [...new Set(held.map((t) => t.accountId))];
-  const accounts = await db.accounts.bulkGet(
-    accountIds.map((id): [string, string] => [ws, id]),
-  );
-  const archived = new Set(
-    accounts.flatMap((a) => (a?.status === 'archived' ? [a.id] : [])),
-  );
-  if (archived.size === 0) return;
-  throw new ArchivedAccountError(
-    [...archived],
-    held.filter((t) => archived.has(t.accountId)).map((t) => t.id),
-  );
 }
 
 export function localTrades(ctx: LocalContext): TradesRepo {

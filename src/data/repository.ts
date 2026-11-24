@@ -367,7 +367,9 @@ export interface ImportRepo {
    * strategies, rules and notes deleted since. Refused while a later active
    * import in the account rebuilt one of its trades or has trades in the
    * symbol of a trade the undo would restore. Throws NotFoundError for a
-   * missing job; an undone job is left as it is.
+   * missing job, and ArchivedAccountError, changing nothing, when the job's
+   * account (or an account of a trade it would delete or restore) is
+   * archived; an undone job is left as it is.
    */
   undo(ws: string, jobId: string): Promise<UndoResult>;
 }

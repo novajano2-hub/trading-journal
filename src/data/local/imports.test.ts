@@ -7,6 +7,7 @@ import { planImport, type ImportContext } from '@/domain/import/plan';
 import type { Trade } from '@/domain/types';
 import { fixtureSample } from '../__fixtures__/sample';
 import {
+  ArchivedAccountError,
   ImportBlockedError,
   NotFoundError,
   OpenImportedTradeError,
@@ -828,5 +829,25 @@ describe('trades.remove of an imported trade', () => {
     await repo.trades.remove(M, [closed!.id]);
     expect(await repo.trades.list(M)).toEqual([]);
     expect((await repo.journal.get(M, note.id))!.linkedTradeIds).toEqual([]);
+  });
+});
+
+describe('imports.undo on an archived account (M6)', () => {
+  test('is refused, and the trades and the job stay as they are', async () => {
+    const { repo, acc, commit } = await setup();
+    const job = await commit(
+      H +
+        '2026-11-16 09:41:00,ESZ5,Buy,2,6010\n2026-11-16 10:00:00,ESZ5,Sell,2,6015\n',
+      'impArch',
+    );
+    await repo.accounts.update(M, acc.id, { status: 'archived' });
+    const before = await repo.trades.list(M);
+    const refused = repo.imports.undo(M, job.id);
+    await expect(refused).rejects.toBeInstanceOf(ArchivedAccountError);
+    await expect(refused).rejects.toMatchObject({ accountIds: [acc.id] });
+    expect(await repo.trades.list(M)).toEqual(before);
+    expect(
+      (await repo.imports.list(M)).find((j) => j.id === job.id)?.status,
+    ).toBe('active');
   });
 });

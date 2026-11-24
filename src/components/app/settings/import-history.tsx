@@ -16,8 +16,13 @@ import {
   useUndoImport,
   useUserAccounts,
 } from '@/data/query/hooks';
+import { ArchivedAccountError } from '@/data/repository';
 import type { ImportJob } from '@/domain/types';
 import { plural } from '@/lib/format';
+
+/** Why an archived account's import has no Undo (ruling M15: its trades are read-only). */
+const ARCHIVED_UNDO =
+  "Imports into an archived account can't be undone: its trades are read-only. Unarchive the account in Accounts to undo one.";
 
 const TH =
   'h-10 px-3 text-left text-[12px] font-medium whitespace-nowrap text-faint first:pl-5 last:pr-5';
@@ -49,9 +54,24 @@ export function ImportHistory() {
   const jobs = history.data ?? [];
   const accountName = (id: string) =>
     accounts?.find((a) => a.id === id)?.name ?? 'Removed account';
+  const archived = (id: string) =>
+    accounts?.find((a) => a.id === id)?.status === 'archived';
+  const anyArchived = jobs.some(
+    (j) => j.status === 'active' && archived(j.accountId),
+  );
 
   async function run(job: ImportJob) {
-    const result = await undo.mutateAsync(job.id);
+    let result;
+    try {
+      result = await undo.mutateAsync(job.id);
+    } catch (e) {
+      // The repository refuses it too, should the account be archived since the list loaded.
+      if (e instanceof ArchivedAccountError) {
+        setBlocked(ARCHIVED_UNDO);
+        return;
+      }
+      throw e;
+    }
     if (result.ok) {
       setBlocked(null);
       return;
@@ -183,11 +203,17 @@ export function ImportHistory() {
                         <button
                           type="button"
                           aria-label={`Undo ${job.fileName}`}
+                          disabled={archived(job.accountId)}
+                          aria-describedby={
+                            archived(job.accountId)
+                              ? 'import-history-archived'
+                              : undefined
+                          }
                           onClick={() => {
                             setBlocked(null);
                             setAsking(job);
                           }}
-                          className="inline-flex h-8 cursor-pointer items-center rounded-chip px-2.5 text-[12.5px] font-semibold text-accent-ink hover:bg-accent-soft focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11"
+                          className="inline-flex h-8 cursor-pointer items-center rounded-chip px-2.5 text-[12.5px] font-semibold text-accent-ink hover:bg-accent-soft focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-default disabled:text-faint disabled:hover:bg-transparent pointer-coarse:h-11"
                         >
                           Undo
                         </button>
@@ -197,6 +223,14 @@ export function ImportHistory() {
                 ))}
               </tbody>
             </table>
+            {anyArchived ? (
+              <p
+                id="import-history-archived"
+                className="px-5 pt-3 text-[13px] leading-snug text-muted"
+              >
+                {ARCHIVED_UNDO}
+              </p>
+            ) : null}
           </div>
         )}
       </section>

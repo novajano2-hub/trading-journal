@@ -30,7 +30,7 @@ const SECOND =
   H +
   '2026-11-17 09:41:00,NQZ5,Buy,1,21000\n2026-11-17 10:00:00,NQZ5,Sell,1,21010\n';
 
-async function seeded() {
+async function seeded(archive = false) {
   const repo = createLocalRepository({
     indexedDB: new IDBFactory(),
     IDBKeyRange,
@@ -63,6 +63,8 @@ async function seeded() {
     );
     await repo.imports.commit('mine', plan);
   }
+  if (archive)
+    await repo.accounts.update('mine', account.id, { status: 'archived' });
   renderApp(<ImportHistory />, {
     repository: repo,
     url: '/app/settings/import-history',
@@ -132,4 +134,16 @@ test('an empty history says so', async () => {
     url: '/app/settings/import-history',
   });
   expect(await screen.findByText('No imports yet.')).toBeTruthy();
+});
+
+test("an archived account's imports offer no Undo, and say why (M6)", async () => {
+  await seeded(true);
+  const table = await screen.findByRole('table');
+  await within(table).findByText('first.csv');
+  const undo = within(table).getByRole('button', { name: 'Undo first.csv' });
+  expect((undo as HTMLButtonElement).disabled).toBe(true);
+  const why = document.getElementById(undo.getAttribute('aria-describedby')!);
+  expect(why?.textContent).toBe(
+    "Imports into an archived account can't be undone: its trades are read-only. Unarchive the account in Accounts to undo one.",
+  );
 });

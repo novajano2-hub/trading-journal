@@ -3,6 +3,7 @@ import type { ImportPlan } from '@/domain/import/plan';
 import { canonicalSymbol } from '@/domain/trade-builder';
 import { strategyRules, type ImportJob, type Trade } from '@/domain/types';
 import {
+  ArchivedAccountError,
   ImportBlockedError,
   NotFoundError,
   StalePlanError,
@@ -12,6 +13,7 @@ import {
 import { USER_WORKSPACE } from '../workspaces';
 import type { LocalContext } from './context';
 import type { KeelDb } from './db';
+import { assertEditable } from './editable';
 import { META, type ImportJobRecord } from './schema';
 import { pruneJournalLinks } from './journal';
 import { rwTx } from './tx';
@@ -293,11 +295,24 @@ export function localImports(ctx: LocalContext): ImportRepo {
       const db = await ctx.db();
       return rwTx(
         db,
-        [db.imports, db.trades, db.journal, db.tags, db.strategies, db.meta],
+        [
+          db.imports,
+          db.trades,
+          db.journal,
+          db.tags,
+          db.strategies,
+          db.meta,
+          db.accounts,
+        ],
         async (): Promise<UndoResult> => {
           const job = await db.imports.get([ws, jobId]);
           if (!job) throw new NotFoundError('import', jobId);
           if (job.status === 'undone') return { ok: true };
+          // An archived account is read-only: undo would delete and restore its trades.
+          const archived =
+            (await db.accounts.get([ws, job.accountId]))?.status === 'archived';
+          if (archived)
+            throw new ArchivedAccountError([job.accountId], job.tradeIds);
           // Trades the user has deleted since the import are simply not found.
           const built = await db.trades
             .where('[workspaceId+importId]')
@@ -310,6 +325,7 @@ export function localImports(ctx: LocalContext): ImportRepo {
           const restored = job.replacedTrades.filter(
             (t) => !wrote.has(t.id) || remaining.has(t.id),
           );
+          await assertEditable(db, ws, [...built, ...restored]);
           const blocker = await blockingImport(db, ws, job, restored);
           if (blocker)
             return {
