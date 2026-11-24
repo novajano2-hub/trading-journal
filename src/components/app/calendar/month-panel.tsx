@@ -6,7 +6,8 @@ import { IconTile } from '@/components/ui/icon-tile';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { CalendarDay, CalendarSummary } from '@/data/calendar';
 import type { MetricContext } from '@/domain/metrics/context';
-import { formatPct } from '@/lib/format';
+import Link from 'next/link';
+import { formatPct, plural } from '@/lib/format';
 import { dayLabel, type FormatMoney } from './month-grid';
 
 const toneInk = (n: number) =>
@@ -48,6 +49,7 @@ export function MonthPanel({
   basis,
   fmt,
   nearby,
+  reportHref,
   onGo,
 }: {
   headingId: string;
@@ -56,13 +58,15 @@ export function MonthPanel({
   basis: MetricContext['pnlBasis'];
   fmt: FormatMoney;
   nearby?: { month: string; name: string };
+  /** Reports > Overview on this month, under the page's filters. */
+  reportHref: string;
   onGo(month: string): void;
 }): React.JSX.Element {
   const none = summary.tradingDays === 0;
   const day = (d: CalendarDay | null) =>
     d ? (
       <span className={toneInk(d.net)}>
-        <FigureText f={fmt(d.net, d.r)} />
+        <FigureText f={fmt(d.net, d.r, false, d)} />
       </span>
     ) : (
       <span className="text-faint">None</span>
@@ -89,7 +93,7 @@ export function MonthPanel({
           small={`${summary.trades} ${summary.trades === 1 ? 'trade' : 'trades'}`}
         >
           <span className={toneInk(summary.net)}>
-            <FigureText f={fmt(summary.net, summary.r)} />
+            <FigureText f={fmt(summary.net, summary.r, false, summary)} />
           </span>
         </Row>
         <Row
@@ -111,6 +115,16 @@ export function MonthPanel({
             : formatPct(summary.greenDays / summary.tradingDays, 1)}
         </Row>
         <Row
+          label={
+            <MetricTip id="win-rate" basis={basis}>
+              Trade win rate
+            </MetricTip>
+          }
+          small={`${summary.wins} ${plural(summary.wins, 'winner')}, ${summary.losses} ${plural(summary.losses, 'loser')}`}
+        >
+          {summary.winRate === null ? 'None' : formatPct(summary.winRate, 1)}
+        </Row>
+        <Row
           label={<MetricTip id="best-day" basis={basis} />}
           small={summary.best ? dayLabel(summary.best.date) : 'No trades'}
         >
@@ -123,6 +137,12 @@ export function MonthPanel({
           {day(summary.worst)}
         </Row>
       </dl>
+      <Link
+        href={reportHref}
+        className="mt-3 inline-flex min-h-8 items-center rounded-chip text-[13px] font-semibold text-accent-ink outline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
+      >
+        Month in Reports
+      </Link>
       {none && nearby ? (
         <button
           type="button"

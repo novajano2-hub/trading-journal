@@ -8,6 +8,7 @@ import {
   mondayIndex,
   type CalendarDay,
   type CalendarWeek,
+  type UnitSums,
 } from '@/data/calendar';
 import type { CalendarStat, Cents } from '@/domain/types';
 import { formatUnitValue } from '@/lib/display';
@@ -20,6 +21,8 @@ export type FormatMoney = (
   r?: number | null,
   /** A short figure for the phone's small cell: `+1.1k`. */
   compact?: boolean,
+  /** The ticks, pips and points of the day, week or month, so it reads in those display units. */
+  units?: UnitSums,
 ) => { text: string; label: string };
 
 /** "Thu 19 Nov". */
@@ -52,6 +55,9 @@ export const STAT_LABELS: Record<CalendarStat, string> = {
   winRate: 'Win rate',
   r: 'R',
   fees: 'Fees',
+  ticks: 'Ticks',
+  pips: 'Pips',
+  points: 'Points',
 };
 
 interface Line {
@@ -59,6 +65,8 @@ interface Line {
   node: React.ReactNode;
   /** Money and R take the day's tone; counts stay quiet. */
   toned: boolean;
+  /** The short form for the phone's small cell, when the line has one. */
+  compact?: string;
 }
 
 function linesOf(
@@ -74,7 +82,7 @@ function linesOf(
           {
             key,
             toned: true,
-            node: <FigureText f={fmt(day.net, day.r)} />,
+            node: <FigureText f={fmt(day.net, day.r, false, day)} />,
           },
         ];
       case 'trades':
@@ -110,6 +118,26 @@ function linesOf(
                 }),
               },
             ];
+      case 'ticks':
+      case 'pips':
+      case 'points': {
+        const value = day[key];
+        // A day without an eligible trade says None, never a dash.
+        if (value === null)
+          return [{ key, toned: false, node: 'None', compact: 'None' }];
+        return [
+          {
+            key,
+            toned: true,
+            node: formatUnitValue(key, value, { currency, signed: true }),
+            compact: formatUnitValue(key, value, {
+              currency,
+              signed: true,
+              compact: true,
+            }),
+          },
+        ];
+      }
       case 'fees':
         return [
           {
@@ -131,7 +159,7 @@ function dayName(day: CalendarDay, fmt: FormatMoney): string {
   const when = dayLabel(day.date);
   if (day.trades === 0)
     return `${when}, no trades${day.hasNote ? ', daily note' : ''}`;
-  return `${when}, ${fmt(day.net, day.r).label}, ${day.trades} ${plural(day.trades, 'trade')}${day.hasNote ? ', daily note' : ''}`;
+  return `${when}, ${fmt(day.net, day.r, false, day).label}, ${day.trades} ${plural(day.trades, 'trade')}${day.hasNote ? ', daily note' : ''}`;
 }
 
 function Cell({
@@ -226,7 +254,7 @@ function Cell({
             aria-hidden="true"
             className={`mt-auto block pb-[7px] text-[11.5px] leading-tight font-semibold tracking-[-0.02em] whitespace-nowrap tabular-nums @[600px]/cal:hidden ${TONE_INK[day.tone]}`}
           >
-            {fmt(day.net, day.r, true).text}
+            {head?.compact ?? fmt(day.net, day.r, true, day).text}
           </span>
         ) : null}
         {day.trades > 0 ? (
@@ -290,7 +318,7 @@ function WeekTotal({
       <b
         className={`mt-auto text-[14.5px] font-semibold tracking-[-0.02em] tabular-nums xl:text-[15px] ${none ? 'text-faint' : tone}`}
       >
-        <FigureText f={fmt(week.net, week.r)} />
+        <FigureText f={fmt(week.net, week.r, false, week)} />
       </b>
       <small className="text-[12px] text-muted">
         {none ? (
@@ -480,7 +508,7 @@ export function MonthGrid({
             <b
               className={`font-semibold tabular-nums ${week.net < 0 ? 'text-loss' : week.net > 0 ? 'text-gain' : 'text-faint'}`}
             >
-              <FigureText f={fmt(week.net, week.r)} />
+              <FigureText f={fmt(week.net, week.r, false, week)} />
             </b>
           </li>
         ))}

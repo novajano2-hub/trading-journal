@@ -93,6 +93,9 @@ export const METRIC_IDS = [
   'prop-daily-loss',
   'prop-trading-days',
   'prop-consistency',
+  'day-ticks',
+  'day-pips',
+  'day-points',
 ] as const;
 
 export type MetricId = (typeof METRIC_IDS)[number];
@@ -351,7 +354,22 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   volume: {
     label: 'Volume',
     definition:
-      'Contracts, lots or shares traded, each trade counted once by the quantity it opened, not by every fill.',
+      'Contracts, lots or shares traded, each trade counted once by the quantity it opened, not by every fill. On a day, the trades that exited that day.',
+  },
+  'day-ticks': {
+    label: 'Ticks',
+    definition:
+      "The day's futures trades in ticks: the move from average entry to average exit in the trade's direction over the tick size, times the contracts closed. A trade held over several days shares its ticks among them by exited size. None when no futures trade exited.",
+  },
+  'day-pips': {
+    label: 'Pips',
+    definition:
+      "The day's forex trades in pips, per lot: the move from average entry to average exit in the trade's direction over a pip (0.0001, or 0.01 for a yen quote). A trade held over several days shares its pips among them by exited size. None when no forex trade exited.",
+  },
+  'day-points': {
+    label: 'Points',
+    definition:
+      "The day's futures trades in points: the move from average entry to average exit in the trade's direction, times the contracts closed. A trade held over several days shares its points among them by exited size. None when no futures trade exited.",
   },
   'best-month': {
     label: 'Best month',

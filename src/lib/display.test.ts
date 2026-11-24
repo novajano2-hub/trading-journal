@@ -290,3 +290,25 @@ describe('pctBaseOf', () => {
     expect(pctBaseOf({ ...all, accountIds: ['a', 'z'] })).toBe(141000);
   });
 });
+
+describe('compact unit figures', () => {
+  const c = (unit: Parameters<typeof o>[0], value: number) =>
+    formatFigure(
+      { money: 1, ticks: value, pips: value, points: value },
+      { ...o(unit), compact: true },
+    ).text;
+  test('ticks, pips and points shorten to a signed number and a suffix', () => {
+    expect(c('ticks', 64)).toBe('+64t');
+    expect(c('pips', 12.5)).toBe('+12.5p');
+    expect(c('points', 3.5)).toBe('+3.5pt');
+    expect(c('ticks', -8)).toBe('−8t');
+    expect(c('ticks', 1234)).toBe('+1.2kt');
+    expect(c('ticks', 0)).toBe('0t');
+  });
+  test('the label keeps the full figure', () => {
+    expect(
+      formatFigure({ money: 1, ticks: 64 }, { ...o('ticks'), compact: true })
+        .label,
+    ).toBe('+64.0 ticks');
+  });
+});

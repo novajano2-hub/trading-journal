@@ -2,7 +2,9 @@ import { outcomeOf } from '@/domain/outcome';
 import { mistakeTags } from '@/domain/metrics/mistakes';
 import { dailyPnl } from '@/domain/metrics/days';
 import type { MetricContext } from '@/domain/metrics/context';
-import { realizations } from '@/domain/metrics/realized';
+import { realizations, sizedRealizations } from '@/domain/metrics/realized';
+import { tradeVolume } from '@/domain/metrics/summary';
+import { realizedUnits, tradeUnits } from '@/domain/metrics/units';
 import { localDate } from '@/domain/time';
 import type {
   Cents,
@@ -30,6 +32,21 @@ export interface CalendarDay {
   losses: number;
   /** The sum of the day's realized R; trades without risk are left out. Null when none has risk. */
   r: number | null;
+  /**
+   * The day's ticks, pips and points: each eligible trade's value shared among
+   * its exit days by exited size, summed. Null when no trade of the day has
+   * the unit (a forex day has no ticks), so the cell reads "None".
+   */
+  ticks: number | null;
+  pips: number | null;
+  points: number | null;
+  /** Each trade that exited the day, by its quantity counted once. */
+  volume: number;
+  /** What the day's winning trades made and its losing trades lost (a positive amount), on the basis in `ctx`. */
+  won: Cents;
+  lost: Cents;
+  /** `won` over `lost`; null without a loss. */
+  profitFactor: number | null;
   /** `flat` is inside the breakeven range; `none` is a day with no exit. */
   tone: 'gain' | 'loss' | 'flat' | 'none';
   hasNote: boolean;
@@ -37,7 +54,14 @@ export interface CalendarDay {
   outside: boolean;
 }
 
-export interface CalendarWeek {
+/** A day's, a week's or a month's ticks, pips and points; null where nothing has the unit. */
+export interface UnitSums {
+  ticks: number | null;
+  pips: number | null;
+  points: number | null;
+}
+
+export interface CalendarWeek extends UnitSums {
   /** The Monday the week starts on (it can fall in the month before). */
   start: string;
   /** Monday to Sunday; a date outside the month is null. */
@@ -48,7 +72,12 @@ export interface CalendarWeek {
   trades: number;
 }
 
-export interface CalendarSummary {
+export interface CalendarSummary extends UnitSums {
+  /** Trades that won and lost across the month's days, as the days count them. */
+  wins: number;
+  losses: number;
+  /** Wins over wins plus losses; null when none is decided. */
+  winRate: number | null;
   net: Cents;
   r: number | null;
   trades: number;
@@ -80,6 +109,28 @@ function daysInMonth(month: string): number {
   return new Date(Date.UTC(y, m, 0)).getUTCDate();
 }
 
+/** The figures a day without a trade carries. */
+const noFigures = () => ({
+  ticks: null,
+  pips: null,
+  points: null,
+  volume: 0,
+  won: 0,
+  lost: 0,
+  profitFactor: null,
+});
+
+/** The ticks, pips and points of a set of days; null where none of them has the unit. */
+function sumUnits(days: readonly UnitSums[]): UnitSums {
+  const sum = (u: keyof UnitSums) => {
+    const have = days.flatMap((d) => d[u] ?? []);
+    return have.length === 0
+      ? null
+      : Math.round(have.reduce((a, b) => a + b, 0) * 1e6) / 1e6;
+  };
+  return { ticks: sum('ticks'), pips: sum('pips'), points: sum('points') };
+}
+
 const sumR = (values: readonly (number | null)[]): number | null => {
   const have = values.filter((v): v is number => v !== null);
   return have.length === 0 ? null : have.reduce((a, b) => a + b, 0);
@@ -105,6 +156,7 @@ function bookDays(
       wins: s.wins,
       losses: s.losses,
       r: null,
+      ...noFigures(),
       tone: toneOf(s.net, s.costBasis, ctx),
       hasNote: noted.has(s.date),
       outside: false,
@@ -132,7 +184,59 @@ function bookDays(
     }
   }
   for (const [date, r] of rs) out.get(date)!.r = r;
+  bookUnits(trades, ctx, out);
   return out;
+}
+
+/**
+ * Volume, won and lost, and the day's ticks, pips and points. A trade counts
+ * once on each day it exits; its unit values are shared among those days by
+ * exited size, as the day's cost basis and unit P&L are in `dailyPnl`.
+ */
+function bookUnits(
+  trades: readonly Trade[],
+  ctx: MetricContext,
+  out: Map<string, CalendarDay>,
+): void {
+  for (const t of trades) {
+    const parts = new Map<string, { value: Cents; qty: number }>();
+    const realized = sizedRealizations(t);
+    const realizedQty = realized.reduce((n, r) => n + r.qty, 0);
+    for (const r of realized) {
+      const date = localDate(r.time, ctx.timeZone);
+      if (!out.has(date)) continue;
+      const p = parts.get(date) ?? { value: 0, qty: 0 };
+      p.value += ctx.pnlBasis === 'gross' ? r.gross : r.net;
+      p.qty += r.qty;
+      parts.set(date, p);
+    }
+    if (parts.size === 0) continue;
+    const units =
+      t.status === 'closed'
+        ? tradeUnits(t, ctx.pnlBasis)
+        : realizedUnits(t, ctx.pnlBasis);
+    const volume = tradeVolume(t);
+    for (const [date, p] of parts) {
+      const day = out.get(date)!;
+      day.volume += volume;
+      if (p.value > 0) day.won += p.value;
+      else if (p.value < 0) day.lost -= p.value;
+      const share =
+        Number.isFinite(realizedQty) && realizedQty > 0
+          ? p.qty / realizedQty
+          : 1;
+      for (const u of ['ticks', 'pips', 'points'] as const) {
+        const v = units?.[u];
+        if (v !== null && v !== undefined) day[u] = (day[u] ?? 0) + v * share;
+      }
+    }
+  }
+  for (const day of out.values()) {
+    day.volume = Math.round(day.volume * 1e6) / 1e6;
+    for (const u of ['ticks', 'pips', 'points'] as const)
+      if (day[u] !== null) day[u] = Math.round(day[u] * 1e6) / 1e6;
+    day.profitFactor = day.lost > 0 ? day.won / day.lost : null;
+  }
 }
 
 function toneOf(
@@ -161,6 +265,7 @@ const emptyDay = (
   wins: 0,
   losses: 0,
   r: null,
+  ...noFigures(),
   tone: 'none',
   hasNote: notes.has(date),
   outside,
@@ -225,6 +330,7 @@ export function calendarMonth(
       days,
       net: live.reduce((s, d) => s + d.net, 0),
       r: sumR(live.map((d) => d.r)),
+      ...sumUnits(live),
       tradingDays: live.filter((d) => d.trades > 0).length,
       trades: live.reduce((s, d) => s + d.trades, 0),
     });
@@ -238,11 +344,17 @@ export function calendarMonth(
   }
   const tonal = (t: CalendarDay['tone']) =>
     traded.filter((d) => d.tone === t).length;
+  const wins = traded.reduce((s, d) => s + d.wins, 0);
+  const losses = traded.reduce((s, d) => s + d.losses, 0);
   return {
     weeks,
     summary: {
+      wins,
+      losses,
+      winRate: wins + losses === 0 ? null : wins / (wins + losses),
       net: traded.reduce((s, d) => s + d.net, 0),
       r: sumR(traded.map((d) => d.r)),
+      ...sumUnits(traded),
       trades: traded.reduce((s, d) => s + d.trades, 0),
       greenDays: tonal('gain'),
       redDays: tonal('loss'),
@@ -279,7 +391,7 @@ export function calendarYear(
 }
 
 /** One exit on a day, for the day panel. `value` is on the basis in `ctx`. */
-export interface DayExit {
+export interface DayExit extends UnitSums {
   trade: Trade;
   time: string;
   value: Cents;
@@ -301,10 +413,24 @@ export function dayExits(
       trade.initialRisk !== undefined && trade.initialRisk > 0
         ? trade.initialRisk
         : undefined;
-    for (const x of realizations(trade)) {
+    const sized = sizedRealizations(trade);
+    const total = sized.reduce((n, x) => n + x.qty, 0);
+    const units =
+      trade.status === 'closed'
+        ? tradeUnits(trade, ctx.pnlBasis)
+        : realizedUnits(trade, ctx.pnlBasis);
+    for (const x of sized) {
       if (localDate(x.time, ctx.timeZone) !== date) continue;
       const value = ctx.pnlBasis === 'gross' ? x.gross : x.net;
+      const share = Number.isFinite(total) && total > 0 ? x.qty / total : 1;
+      const part = (v: number | null | undefined) =>
+        v === null || v === undefined
+          ? null
+          : Math.round(v * share * 1e6) / 1e6;
       out.push({
+        ticks: part(units?.ticks),
+        pips: part(units?.pips),
+        points: part(units?.points),
         trade,
         time: x.time,
         value,

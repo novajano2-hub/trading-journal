@@ -249,7 +249,8 @@ export type BreakevenRange =
 export type PnlBasis = 'net' | 'gross';
 export type DisplayUnit =
   'dollar' | 'percent' | 'privacy' | 'r' | 'ticks' | 'pips' | 'points';
-export type CalendarStat = 'net' | 'trades' | 'winRate' | 'r' | 'fees';
+export type CalendarStat =
+  'net' | 'trades' | 'winRate' | 'r' | 'fees' | 'ticks' | 'pips' | 'points';
 /** One workspace's goals, in its base currency. A missing field means that goal isn't set. */
 export interface Goals {
   weeklyNet?: Cents;

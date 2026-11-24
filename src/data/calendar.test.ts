@@ -385,3 +385,75 @@ describe('dayGrading (I1)', () => {
     });
   });
 });
+
+describe('the day and month figures (Task 30)', () => {
+  const day = '2026-11-17';
+  const es = (id: string, net: number, avgExit: number, maxPosition: number) =>
+    makeTrade({
+      id,
+      net,
+      gross: net,
+      avgEntry: 5000,
+      avgExit,
+      maxPosition,
+      closedAt: `${day}T16:00:00Z`,
+    });
+  const eur = makeTrade({
+    id: 'fx',
+    net: 1000,
+    gross: 1000,
+    instrument: resolveInstrument('EURUSD')!,
+    avgEntry: 1.1,
+    avgExit: 1.1012,
+    maxPosition: 1.5,
+    closedAt: `${day}T16:00:00Z`,
+  });
+  // +40 ticks x1, -8 ticks (a 1-point loss on two contracts), +12 pips on 1.5 lots.
+  const trades = [es('w', 5000, 5010, 1), es('l', -2000, 4999, 2), eur];
+  const d = () => dayOf(calendarMonth(trades, [], '2026-11', ctx), day)!;
+
+  test('a day sums ticks and points over its futures trades and pips over its forex trades', () => {
+    expect(d()).toMatchObject({ ticks: 32, points: 8, pips: 12 });
+  });
+
+  test('a day with no eligible trade has null, so the cell can say None', () => {
+    const only = calendarMonth([eur], [], '2026-11', ctx);
+    expect(dayOf(only, day)).toMatchObject({
+      ticks: null,
+      points: null,
+      pips: 12,
+    });
+    const fut = calendarMonth([trades[0]!], [], '2026-11', ctx);
+    expect(dayOf(fut, day)).toMatchObject({
+      ticks: 40,
+      points: 10,
+      pips: null,
+    });
+  });
+
+  test('volume counts each trade once and the profit factor is won over lost', () => {
+    expect(d().volume).toBe(4.5);
+    expect(d().profitFactor).toBe(3);
+    expect(d().wins).toBe(2);
+    expect(d().losses).toBe(1);
+  });
+
+  test('a day with no loss has no profit factor', () => {
+    const m = calendarMonth([trades[0]!], [], '2026-11', ctx);
+    expect(dayOf(m, day)!.profitFactor).toBeNull();
+  });
+
+  test('a trade held over two days shares its units by exited size', () => {
+    const m = calendarMonth(heldTwoDays(), [], '2026-11', ctx);
+    // 1 ES contract out each day: avg exit 5015, entry 5000, 2 contracts = 120 ticks.
+    expect(dayOf(m, '2026-11-16')!.ticks).toBe(60);
+    expect(dayOf(m, '2026-11-17')!.ticks).toBe(60);
+  });
+
+  test('the month counts winners and losers and the trade win rate', () => {
+    const { summary } = calendarMonth(trades, [], '2026-11', ctx);
+    expect(summary).toMatchObject({ wins: 2, losses: 1 });
+    expect(summary.winRate).toBeCloseTo(2 / 3, 6);
+    expect(calendarMonth([], [], '2026-11', ctx).summary.winRate).toBeNull();
+  });
+});

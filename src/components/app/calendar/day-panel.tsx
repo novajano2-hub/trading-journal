@@ -16,7 +16,7 @@ import { MetricTip } from '@/components/ui/metric-tip';
 import type { CalendarDay, DayExit, DayGrading } from '@/data/calendar';
 import { serializeFilters, type GlobalFilters } from '@/data/filters';
 import { formatUnitValue } from '@/lib/display';
-import { formatPct, plural } from '@/lib/format';
+import { formatPct, formatQty, formatRatio, plural } from '@/lib/format';
 import { TradeLink } from '../trades/cells';
 import { CARD, InstrumentName } from '../dashboard/shared';
 import { dayLabel, TONE_INK, type FormatMoney } from './month-grid';
@@ -156,9 +156,29 @@ export function DayPanel({
       day.trades,
     ],
     [
+      'Winners',
+      tip('winners', 'Winners', 'Here, trades that exited this day in profit.'),
+      day.wins,
+    ],
+    [
+      'Losers',
+      tip('losers', 'Losers', 'Here, trades that exited this day at a loss.'),
+      day.losses,
+    ],
+    [
       'Win rate',
       tip('win-rate', 'Win rate'),
       decided === 0 ? 'None decided' : formatPct(day.wins / decided, 1),
+    ],
+    ['Volume', tip('volume', 'Volume'), formatQty(day.volume)],
+    [
+      'Profit factor',
+      tip(
+        'profit-factor',
+        'Profit factor',
+        'Here, what the day won over what it lost.',
+      ),
+      day.profitFactor === null ? 'None' : formatRatio(day.profitFactor),
     ],
     ['Fees', tip('fees', 'Fees'), <FigureText key="f" f={fmt(-day.fees)} />],
     [
@@ -173,6 +193,17 @@ export function DayPanel({
       tip('realized-r', 'Realized R'),
       formatUnitValue('r', day.r, { currency, signed: true }),
     ]);
+  for (const [key, id, label] of [
+    ['ticks', 'day-ticks', 'Ticks'],
+    ['pips', 'day-pips', 'Pips'],
+    ['points', 'day-points', 'Points'],
+  ] as const)
+    if (day[key] !== null)
+      mini.push([
+        label,
+        tip(id, label),
+        formatUnitValue(key, day[key], { currency, signed: true }),
+      ]);
   const { rules, mistakes } = grading;
   mini.push(
     [
@@ -231,7 +262,7 @@ export function DayPanel({
             <b
               className={`text-[30px] leading-[1.1] font-semibold tracking-[-0.04em] tabular-nums ${TONE_INK[day.tone]}`}
             >
-              <FigureText f={fmt(day.net, day.r)} />
+              <FigureText f={fmt(day.net, day.r, false, day)} />
             </b>
             <span className="text-[12.5px] text-faint">
               <MetricTip id="pnl" basis={basis} />
@@ -244,9 +275,7 @@ export function DayPanel({
                 className={`min-w-0 ${k === 'Mistakes' ? 'col-span-full' : ''}`}
               >
                 <dt className="text-[12px] text-faint">{label}</dt>
-                <dd
-                  className={`text-[15px] font-semibold tabular-nums text-text ${k === 'Mistakes' ? '' : 'truncate'}`}
-                >
+                <dd className="text-[15px] font-semibold tabular-nums text-text [overflow-wrap:anywhere]">
                   {v}
                 </dd>
               </div>
@@ -260,7 +289,7 @@ export function DayPanel({
               </h3>
               <DayChart
                 exits={exits}
-                label={`Running P&L through ${dayLabel(date)}, ending at ${fmt(day.net, day.r).label}`}
+                label={`Running P&L through ${dayLabel(date)}, ending at ${fmt(day.net, day.r, false, day).label}`}
               />
               <p className="mt-1 flex justify-between text-[12px] text-faint tabular-nums">
                 <span>{clock(exits[0]!.time, timeZone)}</span>
@@ -303,7 +332,7 @@ export function DayPanel({
                   <td
                     className={`text-right font-[550] tabular-nums ${e.value < 0 ? 'text-loss' : e.value > 0 ? 'text-gain' : 'text-text'}`}
                   >
-                    <FigureText f={fmt(e.value, e.r)} />
+                    <FigureText f={fmt(e.value, e.r, false, e)} />
                   </td>
                 </tr>
               ))}

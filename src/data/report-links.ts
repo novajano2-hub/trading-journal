@@ -285,3 +285,20 @@ export function calendarHref(base: GlobalFilters, day: string): string {
   params.set('day', day);
   return `/app/calendar?${queryString(params)}`;
 }
+
+/**
+ * Reports > Overview for one month: the page's filters kept, the date range
+ * set to the month's first and last day.
+ */
+export function monthReportHref(base: GlobalFilters, month: string): string {
+  const [y, m] = month.split('-').map(Number) as [number, number];
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const params = serializeFilters({
+    ...base,
+    range: {
+      from: `${month}-01`,
+      to: `${month}-${String(last).padStart(2, '0')}`,
+    },
+  });
+  return `/app/reports?${queryString(params)}`;
+}

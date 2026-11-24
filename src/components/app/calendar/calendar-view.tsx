@@ -5,6 +5,7 @@ import {
   CalendarBlank,
   CaretLeft,
   CaretRight,
+  ChartLineUp,
   NotePencil,
   SlidersHorizontal,
   X,
@@ -33,6 +34,7 @@ import {
   type CalendarDay,
 } from '@/data/calendar';
 import { resolveRange, serializeFilters } from '@/data/filters';
+import { monthReportHref } from '@/data/report-links';
 import { metricContextOf } from '@/data/metrics';
 import { useGlobalFilters, useTradeSet } from '@/data/query/derived';
 import {
@@ -72,6 +74,9 @@ const STAT_ORDER: readonly CalendarStat[] = [
   'winRate',
   'r',
   'fees',
+  'ticks',
+  'pips',
+  'points',
 ];
 
 const ICON_BUTTON =
@@ -430,9 +435,16 @@ export function CalendarView(): React.JSX.Element {
   )
     return <Skeleton />;
 
-  const fmt: FormatMoney = (money, r, compact) =>
+  const fmt: FormatMoney = (money, r, compact, units) =>
     display.figure(
-      { money, pct: pctBase ? money / pctBase : null, r: r ?? null },
+      {
+        money,
+        pct: pctBase ? money / pctBase : null,
+        r: r ?? null,
+        ticks: units?.ticks ?? null,
+        pips: units?.pips ?? null,
+        points: units?.points ?? null,
+      },
       true,
       currency,
       compact,
@@ -468,6 +480,7 @@ export function CalendarView(): React.JSX.Element {
         : `${fmt(range.from).text} to ${fmt(range.to).text}`
       : `${range.from * 100}% to ${range.to * 100}%`;
   const filterQuery = serializeFilters(set.data.filters).toString();
+  const monthHref = monthReportHref(set.data.filters, month);
   const yearHref = `/app/reports/calendar${filterQuery ? `?${filterQuery}` : ''}`;
   const panel = selected ? (
     <DayPanel
@@ -568,6 +581,14 @@ export function CalendarView(): React.JSX.Element {
               stats={stats}
               onChange={(next) => updatePrefs.mutate({ calendarStats: next })}
             />
+            <Link href={monthHref} className={TEXT_BUTTON}>
+              <ChartLineUp
+                size={15}
+                aria-hidden="true"
+                className="text-faint"
+              />
+              Month in Reports
+            </Link>
             <Link href={yearHref} className={TEXT_BUTTON}>
               <CalendarBlank
                 size={15}
@@ -585,7 +606,7 @@ export function CalendarView(): React.JSX.Element {
             small={`${summary.trades} ${plural(summary.trades, 'trade')}`}
           >
             <span className={toneInk(summary.net)}>
-              <FigureText f={fmt(summary.net, summary.r)} />
+              <FigureText f={fmt(summary.net, summary.r, false, summary)} />
             </span>
           </Kpi>
           <Kpi
@@ -607,12 +628,22 @@ export function CalendarView(): React.JSX.Element {
               : formatPct(summary.greenDays / summary.tradingDays, 1)}
           </Kpi>
           <Kpi
+            label={
+              <MetricTip id="win-rate" basis={ctx.pnlBasis}>
+                Trade win rate
+              </MetricTip>
+            }
+            small={`${summary.wins} ${plural(summary.wins, 'winner')}, ${summary.losses} ${plural(summary.losses, 'loser')}`}
+          >
+            {summary.winRate === null ? 'None' : formatPct(summary.winRate, 1)}
+          </Kpi>
+          <Kpi
             label={<MetricTip id="best-day" basis={ctx.pnlBasis} />}
             small={best ? dayLabel(best.date) : 'No trades'}
           >
             {best ? (
               <span className={toneInk(best.net)}>
-                <FigureText f={fmt(best.net, best.r)} />
+                <FigureText f={fmt(best.net, best.r, false, best)} />
               </span>
             ) : (
               <span className="text-faint">None</span>
@@ -624,7 +655,7 @@ export function CalendarView(): React.JSX.Element {
           >
             {worst ? (
               <span className={toneInk(worst.net)}>
-                <FigureText f={fmt(worst.net, worst.r)} />
+                <FigureText f={fmt(worst.net, worst.r, false, worst)} />
               </span>
             ) : (
               <span className="text-faint">None</span>
@@ -728,6 +759,7 @@ export function CalendarView(): React.JSX.Element {
                 basis={ctx.pnlBasis}
                 fmt={fmt}
                 nearby={nearby}
+                reportHref={monthHref}
                 onGo={goMonth}
               />
             ) : (

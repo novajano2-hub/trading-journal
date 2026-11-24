@@ -617,7 +617,10 @@ test('every metric carries its definition', async () => {
     'short-win-rate',
     'green-day-streak',
     'red-day-streak',
-    // On the calendar (Task 13).
+    // On the calendar (Task 13, Task 30).
+    'day-ticks',
+    'day-pips',
+    'day-points',
     'trading-days',
     'green-days',
     'best-day',

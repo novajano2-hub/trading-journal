@@ -20,6 +20,9 @@ const CALENDAR_STATS: readonly CalendarStat[] = [
   'winRate',
   'r',
   'fees',
+  'ticks',
+  'pips',
+  'points',
 ];
 const MAX_CALENDAR_STATS = 3;
 

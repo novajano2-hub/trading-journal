@@ -12,6 +12,7 @@ import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { createLocalRepository } from '@/data/local/local-repository';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { makeTrade } from '@/domain/__fixtures__/trades';
+import { resolveInstrument } from '@/domain/instruments';
 import { defaultMetricContext } from '@/domain/metrics/context';
 import type { SampleWorkspace } from '@/data/seed/generate';
 import { calendarYear } from '@/data/calendar';
@@ -588,4 +589,172 @@ test('the week cell keeps its days and trades on two lines, never wrapped mid-ph
   expect(within(total).getByText('2 trades').className).toContain(
     'whitespace-nowrap',
   );
+});
+
+/** ES on 2 Nov (+40 ticks), EUR/USD on 3 Nov (+12 pips), and three ES trades on 19 Nov. */
+const UNITS = withTrades(
+  [
+    ['2026-11-02', 5000, { avgEntry: 5000, avgExit: 5010 }],
+    [
+      '2026-11-03',
+      1000,
+      {
+        instrument: resolveInstrument('EURUSD')!,
+        avgEntry: 1.1,
+        avgExit: 1.1012,
+        pnlCurrency: 'USD',
+      },
+    ],
+    ['2026-11-19', 4405],
+    ['2026-11-19', 1000],
+    ['2026-11-19', -500],
+  ].map(([d, n, x]) => [
+    d,
+    n,
+    {
+      executions: [],
+      maxPosition: 1,
+      avgEntry: 5000,
+      avgExit: 5010,
+      ...(x as object),
+    },
+  ]) as [string, number, object][],
+);
+
+test('C1: the day panel adds winners, losers, volume and the profit factor', async () => {
+  renderApp(<CalendarView />, {
+    sample: UNITS,
+    url: url('&day=2026-11-19'),
+  });
+  const panel = await screen.findByRole('complementary', {
+    name: /Thu 19 Nov/,
+  });
+  const read = (label: string) =>
+    within(panel).getByText(label).closest('div')!.textContent;
+  expect(read('Winners')).toContain('2');
+  expect(read('Losers')).toContain('1');
+  expect(read('Volume')).toContain('3');
+  expect(read('Profit factor')).toContain('10.81');
+});
+
+test('C1: a day without a loss shows None for its profit factor', async () => {
+  renderApp(<CalendarView />, {
+    sample: UNITS,
+    url: url('&day=2026-11-02'),
+  });
+  const panel = await screen.findByRole('complementary', { name: /Mon 2 Nov/ });
+  expect(
+    within(panel).getByText('Profit factor').closest('div')!.textContent,
+  ).toContain('None');
+});
+
+test('C1: the new rows are not truncated at 1440', async () => {
+  renderApp(<CalendarView />, {
+    sample: UNITS,
+    url: url('&day=2026-11-19'),
+  });
+  const panel = await screen.findByRole('complementary', {
+    name: /Thu 19 Nov/,
+  });
+  for (const label of ['Winners', 'Losers', 'Volume', 'Profit factor']) {
+    const dd = within(panel)
+      .getByText(label)
+      .closest('div')!
+      .querySelector('dd')!;
+    expect(dd.className).not.toContain('truncate');
+  }
+});
+
+test('C2: the stats menu offers Ticks, Pips and Points within the cap of three', async () => {
+  renderApp(<CalendarView />, { sample: UNITS, url: url() });
+  await screen.findByRole('grid', { name: 'November 2026' });
+  fireEvent.click(screen.getByRole('button', { name: 'Stats shown' }));
+  for (const name of ['Ticks', 'Pips', 'Points'])
+    expect(await screen.findByRole('checkbox', { name })).toBeTruthy();
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Ticks' }));
+  await waitFor(() =>
+    expect(
+      (screen.getByRole('checkbox', { name: 'Pips' }) as HTMLInputElement)
+        .disabled,
+    ).toBe(true),
+  );
+});
+
+test('C2: a cell shows the day sum in the unit, and None on a day without an eligible trade', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: UNITS,
+  });
+  await repository.prefs.update({ calendarStats: ['ticks', 'pips', 'net'] });
+  renderApp(<CalendarView />, { repository, url: url() });
+  const es = await screen.findByRole('button', { name: /^Mon 2 Nov/ });
+  expect(es.textContent).toContain('+40.0 ticks');
+  expect(es.textContent).toContain('None');
+  const fx = screen.getByRole('button', { name: /^Tue 3 Nov/ });
+  expect(fx.textContent).toContain('+12.0 pips');
+  expect(fx.textContent).toContain('None');
+  expect(fx.textContent).not.toMatch(/[–—-]\s*$/);
+});
+
+test('C2: on a phone the lead unit stat is compact, with its suffix', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: UNITS,
+  });
+  await repository.prefs.update({ calendarStats: ['ticks', 'net'] });
+  viewport(390);
+  renderApp(<CalendarView />, { repository, url: url() });
+  const es = await screen.findByRole('button', { name: /^Mon 2 Nov/ });
+  expect(within(es).getByTestId('day-compact').textContent).toBe('+40t');
+  await repository.prefs.update({ calendarStats: ['pips', 'net'] });
+});
+
+test('E65: under the Ticks display unit the day panel reads in ticks, not dollars', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: UNITS,
+  });
+  await repository.prefs.update({ displayUnit: 'ticks' });
+  renderApp(<CalendarView />, { repository, url: url('&day=2026-11-02') });
+  const panel = await screen.findByRole('complementary', { name: /Mon 2 Nov/ });
+  expect(within(panel).getAllByText('+40.0 ticks').length).toBeGreaterThan(0);
+  // The net and the exit row both read in ticks; no signed dollar net is left.
+  expect(panel.textContent).toContain('Green day+40.0 ticksNet P&L');
+});
+
+test('C3: the month shows winners, losers and the trade win rate, and links to Reports for that month', async () => {
+  renderApp(<CalendarView />, {
+    sample: UNITS,
+    url: url('&account=acc-a&day=2026-11-19'),
+  });
+  await screen.findByRole('grid', { name: 'November 2026' });
+  const strip = screen.getByText('Trade win rate').closest('div')!;
+  expect(strip.textContent).toContain('4 winners, 1 loser');
+  expect(strip.textContent).toContain('80.0%');
+  const link = screen.getByRole('link', { name: /Month in Reports/ });
+  const href = new URL(link.getAttribute('href')!, 'http://x');
+  expect(href.pathname).toBe('/app/reports');
+  expect(href.searchParams.get('from')).toBe('2026-11-01');
+  expect(href.searchParams.get('to')).toBe('2026-11-30');
+  expect(href.searchParams.get('account')).toBe('acc-a');
+});
+
+test('C3: a month without trades has the same link and None for the rate', async () => {
+  renderApp(<CalendarView />, {
+    sample: UNITS,
+    url: '/app/calendar?month=2026-12',
+  });
+  const panel = await screen.findByRole('complementary');
+  expect(within(panel).getByText('Trade win rate')).toBeTruthy();
+  expect(
+    within(panel).getByText('Trade win rate').closest('div')!.textContent,
+  ).toContain('None');
+  const href = within(panel)
+    .getByRole('link', { name: /Month in Reports/ })
+    .getAttribute('href')!;
+  expect(href).toContain('from=2026-12-01');
+  expect(href).toContain('to=2026-12-31');
 });

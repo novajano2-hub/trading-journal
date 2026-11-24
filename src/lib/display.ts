@@ -151,6 +151,22 @@ function compactCents(cents: Cents, on: boolean): string {
   return cents < 0 ? `−${body}` : on ? `+${body}` : body;
 }
 
+/**
+ * A tick, pip or point count to three figures for a small cell: 64, 12.5,
+ * 1.2k. The suffix (t, p, pt) goes after it; the full figure stays in the label.
+ */
+function compactUnit(value: number, on: boolean): string {
+  const abs = Math.abs(value);
+  const body =
+    abs >= 999.5
+      ? `${(abs / 1000).toFixed(abs < 9950 ? 1 : 0).replace(/\.0$/, '')}k`
+      : abs >= 100
+        ? String(Math.round(abs))
+        : String(Number(abs.toFixed(1)));
+  if (body === '0') return '0';
+  return value < 0 ? `−${body}` : on ? `+${body}` : body;
+}
+
 /** The currency's own symbol, so Privacy hides a euro as it does a dollar. */
 function symbolOf(currency: string): string {
   const part = new Intl.NumberFormat('en-US', {
@@ -181,11 +197,17 @@ export function formatUnitValue(
     case 'r':
       return `${signed(value, o.compact ? 1 : 2, o.signed)}R`;
     case 'ticks':
-      return `${signed(value, 1, o.signed)} ticks`;
+      return o.compact
+        ? `${compactUnit(value, o.signed)}t`
+        : `${signed(value, 1, o.signed)} ticks`;
     case 'pips':
-      return `${signed(value, 1, o.signed)} pips`;
+      return o.compact
+        ? `${compactUnit(value, o.signed)}p`
+        : `${signed(value, 1, o.signed)} pips`;
     case 'points':
-      return `${signed(value, 1, o.signed)} pts`;
+      return o.compact
+        ? `${compactUnit(value, o.signed)}pt`
+        : `${signed(value, 1, o.signed)} pts`;
     case 'privacy':
       return hidden(Math.round(value), o.currency, o.signed);
     default: {
