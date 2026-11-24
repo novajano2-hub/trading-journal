@@ -6,7 +6,15 @@ import {
   type SeriesMetric,
 } from '../domain/metrics/series';
 import { tradeStreaks } from '../domain/metrics/streaks';
-import { holdTimes, longestHold, summarize } from '../domain/metrics/summary';
+import { classify } from '../domain/metrics/context';
+import {
+  expectancyIn,
+  holdTimes,
+  largestInUnit,
+  longestHold,
+  summarize,
+} from '../domain/metrics/summary';
+import { unitOf } from '../domain/metrics/units';
 import { localDate } from '../domain/time';
 import { isClosed } from '../domain/trade-status';
 import { defaultPrefs } from './repository';
@@ -131,6 +139,33 @@ describe('running values equal a summary of everything so far', () => {
         expect(at('expectancy')).toBe(sum.expectancy);
         expect(at('largest-win')).toBe(sum.largestWin);
         expect(at('largest-loss')).toBe(sum.largestLoss);
+      } else {
+        // In the unit, the same figures from the trades' own values: the
+        // expectancy is the one every page reads, over the decided trades.
+        const so = upTo(key, c);
+        const of = (o: 'win' | 'loss') =>
+          so.flatMap((t) =>
+            classify(t, c).outcome === o
+              ? (unitOf(t, 'ticks', c.pnlBasis) ?? [])
+              : [],
+          );
+        const mean = (xs: number[]) =>
+          xs.length === 0 ? null : xs.reduce((a, b) => a + b, 0) / xs.length;
+        const close = (v: number | null | undefined, want: number | null) =>
+          want === null ? expect(v).toBeNull() : expect(v).toBeCloseTo(want, 9);
+        close(at('expectancy'), expectancyIn(so, c, 'ticks'));
+        close(at('avg-win'), mean(of('win')));
+        close(at('avg-loss'), mean(of('loss')));
+        const best = largestInUnit(so, c, 'win');
+        const worst = largestInUnit(so, c, 'loss');
+        close(
+          at('largest-win'),
+          best ? unitOf(best, 'ticks', c.pnlBasis) : null,
+        );
+        close(
+          at('largest-loss'),
+          worst ? unitOf(worst, 'ticks', c.pnlBasis) : null,
+        );
       }
     }
   });

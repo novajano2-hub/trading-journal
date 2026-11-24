@@ -516,7 +516,7 @@ function StrategyBody({
   const drawdown = display.figure(display.ofTrades(f.drawdownIds, -f.drawdown));
   const pnl = display.figure(display.ofTrades(f.closedIds, f.pnl));
   const expectancy = display.figure(
-    display.meanOfTrades(f.closedIds, summary.expectancy ?? 0),
+    display.expectancy(summary.expectancy ?? 0, f.closedIds),
   );
   const broken = display.figure(display.ofTrades(f.broken.ids, f.broken.pnl));
 

@@ -4,7 +4,13 @@ import { createContext, useContext } from 'react';
 import { metricContextOf } from '@/data/metrics';
 import { usePrefs } from '@/data/query/hooks';
 import { balanceAt, dayBefore } from '@/domain/metrics/balance';
-import { costBasis, pnlOf, type MetricContext } from '@/domain/metrics/context';
+import {
+  classify,
+  costBasis,
+  pnlOf,
+  type MetricContext,
+} from '@/domain/metrics/context';
+import { expectancyOf, type Side } from '@/domain/metrics/summary';
 import {
   TRADE_UNITS,
   tradeUnits,
@@ -103,6 +109,50 @@ export function meanFigure(
     const have = figs.filter((f) => f[u] !== null && f[u] !== undefined).length;
     out[u] = sum[u] == null || have === 0 ? null : clean(sum[u] / have);
   }
+  return out;
+}
+
+/**
+ * Expectancy as a figure, in every unit: `expectancyOf` over the decided
+ * closed trades (wins and losses as `classify` calls them, breakevens left
+ * out), each unit over the decided trades that have it. `money` is the
+ * summary's own expectancy. The one expectancy every page shows, so no page
+ * reads the average trade and calls it expectancy.
+ */
+export function expectancyFigure(
+  trades: readonly Trade[],
+  ctx: MetricContext,
+  pctBase: Cents | null,
+  money: Cents,
+): Figure {
+  const decided = trades.flatMap((t) => {
+    if (t.status !== 'closed') return [];
+    const { outcome } = classify(t, ctx);
+    return outcome === 'breakeven'
+      ? []
+      : [{ win: outcome === 'win', units: tradeUnits(t, ctx.pnlBasis) }];
+  });
+  const out: Figure = {
+    money,
+    pct: pctBase !== null && pctBase > 0 ? money / pctBase : null,
+  };
+  const leftOutBy: Partial<Record<TradeUnit, number>> = {};
+  for (const u of TRADE_UNITS) {
+    const won: Side = { n: 0, sum: 0 };
+    const lost: Side = { n: 0, sum: 0 };
+    for (const d of decided) {
+      const v = d.units[u];
+      if (v === null) continue;
+      const side = d.win ? won : lost;
+      side.n += 1;
+      side.sum += v;
+    }
+    const e = expectancyOf(won, lost);
+    out[u] = e === null ? null : clean(e);
+    leftOutBy[u] = decided.length - won.n - lost.n;
+  }
+  out.leftOutBy = leftOutBy;
+  out.leftOut = leftOutBy.r ?? 0;
   return out;
 }
 
@@ -318,6 +368,11 @@ export interface Display {
   ofAll(money: Cents): Figure;
   /** The mean figure of every closed trade the view holds, with `money` as reported. */
   meanOfAll(money: Cents): Figure;
+  /**
+   * The expectancy of a set of closed trades, by id (every one the view holds
+   * without `ids`), with `money` as the summary reports it: `expectancyFigure`.
+   */
+  expectancy(money: Cents, ids?: readonly string[]): Figure;
   /** The figure as a count-up's number and its formatter. */
   ticker(f: Figure, currency?: string): TickerSpec;
 }
@@ -339,20 +394,20 @@ function withMoney(f: Figure, money: Cents, pctBase: Cents | null): Figure {
 }
 
 /**
- * The average per closed trade in `unit`, for a trend line's windows; null
- * when no trade has the unit. Dollars and Privacy read the summary's own
- * expectancy, so this is for the others.
+ * A trend window's expectancy in `unit` (`expectancyFigure`), from the
+ * window's own summary expectancy; null when it has none or no decided
+ * trade has the unit. Dollars and Privacy read the summary's own, so this is
+ * for the others.
  */
-export function meanInUnit(
+export function expectancyInUnit(
   trades: readonly Trade[],
+  money: Cents | null,
   unit: DisplayUnit,
   ctx: MetricContext,
   pctBase: Cents | null,
 ): number | null {
-  const closed = closedFigures(trades, ctx);
-  return closed.length === 0
-    ? null
-    : unitValue(meanFigure(closed, pctBase), unit);
+  if (money === null) return null;
+  return unitValue(expectancyFigure(trades, ctx, pctBase, money), unit);
 }
 
 /** The chosen unit, and the figures it formats. Reads the prefs and the view's `FigureSourceContext`. */
@@ -414,6 +469,15 @@ export function useDisplay(): Display {
         meanFigure(closedFigures(allOf(source), ctx), pctBase),
         money,
         pctBase,
+      ),
+    expectancy: (money, ids) =>
+      expectancyFigure(
+        ids === undefined
+          ? allOf(source)
+          : ids.flatMap((id) => source?.tradesById.get(id) ?? []),
+        ctx,
+        pctBase,
+        money,
       ),
     ticker(f, currency = base) {
       const shown = shownUnit(f, unit);

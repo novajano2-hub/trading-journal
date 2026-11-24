@@ -13,7 +13,7 @@ import { metricDefinition, type MetricId } from '@/content/metric-definitions';
 import type { DashboardModel } from '@/data/dashboard';
 import type { MetricContext } from '@/domain/metrics/context';
 import type { DayStat } from '@/domain/metrics/days';
-import { summarize } from '@/domain/metrics/summary';
+import { summarize, type Summary } from '@/domain/metrics/summary';
 import { closedInOrder } from '@/domain/trade-status';
 import type { Cents, PnlBasis, Trade } from '@/domain/types';
 import { UNIT_SCOPE } from '@/content/display-units';
@@ -58,8 +58,8 @@ export const trendWindow = (closed: number): number =>
 export function kpiTrends(
   trades: readonly Trade[],
   ctx: MetricContext,
-  /** Reads a window's expectancy in a display unit; default: the summary's, in cents. */
-  expectancyOf?: (window: readonly Trade[]) => number | null,
+  /** Reads a window's expectancy in a display unit, from its trades and its summary; default: the summary's, in cents. */
+  expectancyIn?: (window: readonly Trade[], summary: Summary) => number | null,
 ): KpiTrends {
   const closed = closedInOrder(trades);
   const size = trendWindow(closed.length);
@@ -75,12 +75,11 @@ export function kpiTrends(
   };
   for (let i = 0; i < points; i++) {
     const end = size + Math.round((i * span) / (points - 1));
-    const s = summarize(closed.slice(end - size, end), ctx);
+    const window = closed.slice(end - size, end);
+    const s = summarize(window, ctx);
     if (s.winRate !== null) trends.winRate.push(s.winRate);
     if (s.profitFactor !== null) trends.profitFactor.push(s.profitFactor);
-    const expectancy = expectancyOf
-      ? expectancyOf(closed.slice(end - size, end))
-      : s.expectancy;
+    const expectancy = expectancyIn ? expectancyIn(window, s) : s.expectancy;
     if (expectancy !== null) trends.expectancy.push(expectancy);
   }
   return trends;
@@ -262,7 +261,7 @@ export function PerformanceCard({
   const expectancy =
     performance.expectancy === null
       ? undefined
-      : display.ticker(display.meanOfAll(performance.expectancy), currency);
+      : display.ticker(display.expectancy(performance.expectancy), currency);
 
   // Under a unit the two averages read in it, like the figures above.
   const avgWin =

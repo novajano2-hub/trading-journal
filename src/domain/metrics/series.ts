@@ -14,7 +14,7 @@ import {
 import { drawdownSeries } from './equity';
 import { sizedRealizations } from './realized';
 import { riskRatios } from './risk';
-import { plannedR, rOf, tradeVolume } from './summary';
+import { expectancyOf, plannedR, rOf, tradeVolume } from './summary';
 import { unitOf } from './units';
 
 export type SeriesMetric =
@@ -398,18 +398,12 @@ function accValue(
           ? null
           : ratio(a.winSum, Math.abs(a.lossSum));
     case 'expectancy': {
-      if (unit) {
-        const d = a.winU.n + a.lossU.n;
-        return d === 0
-          ? null
-          : (a.winU.n / d) * (uWin ?? 0) + (a.lossU.n / d) * (uLoss ?? 0);
-      }
-      return decisive === 0
-        ? null
-        : roundHalfEven(
-            (a.wins / decisive) * (avgWin ?? 0) +
-              (a.losses / decisive) * (avgLoss ?? 0),
-          );
+      if (unit) return expectancyOf(a.winU, a.lossU);
+      const e = expectancyOf(
+        { n: a.wins, sum: a.winSum },
+        { n: a.losses, sum: a.lossSum },
+      );
+      return e === null ? null : roundHalfEven(e);
     }
     case 'largest-win':
       return unit ? a.winU.best : a.best;

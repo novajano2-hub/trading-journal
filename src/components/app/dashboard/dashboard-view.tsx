@@ -34,15 +34,13 @@ import { isTradeUnit } from '@/domain/metrics/units';
 import { goalWeek } from '@/domain/metrics/goals';
 import { localDate } from '@/domain/time';
 import {
+  expectancyFigure,
+  expectancyInUnit,
   FigureSourceContext,
-  meanFigure,
-  meanInUnit,
   pctBaseOf,
   shownUnit,
-  tradeFigure,
   type FigureSource,
 } from '@/lib/display';
-import { closedInOrder } from '@/domain/trade-status';
 import { rangeCaption } from '@/lib/range-label';
 import { shortTime } from '@/lib/time-format';
 import type { Account, ImportJob } from '@/domain/types';
@@ -267,18 +265,22 @@ export function DashboardView(): React.JSX.Element {
       pctBase,
     };
     // A KPI trend reads in the unit its figure does; dollars and Privacy keep the summary's own.
-    const closed = closedInOrder(partition.trades);
-    const mean = meanFigure(
-      closed.map((t) => tradeFigure(t, ctx)),
-      pctBase,
+    const trendUnit = shownUnit(
+      expectancyFigure(
+        partition.trades,
+        ctx,
+        pctBase,
+        model.performance.expectancy ?? 0,
+      ),
+      prefs.displayUnit,
     );
-    const trendUnit = shownUnit(mean, prefs.displayUnit);
     const trends = kpiTrends(
       partition.trades,
       ctx,
       trendUnit === 'dollar' || trendUnit === 'privacy'
         ? undefined
-        : (window) => meanInUnit(window, trendUnit, ctx, pctBase),
+        : (window, s) =>
+            expectancyInUnit(window, s.expectancy, trendUnit, ctx, pctBase),
     );
     // The partition's days are on the basis its equity is, so the last close is the last balance.
     // Its days come from the same trades as the equity, so the last close is the last balance.

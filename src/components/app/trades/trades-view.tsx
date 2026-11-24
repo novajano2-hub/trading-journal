@@ -58,6 +58,7 @@ import { isClosed } from '@/domain/trade-status';
 import { localDate } from '@/domain/time';
 import type { JournalEntry, Trade } from '@/domain/types';
 import {
+  expectancyFigure,
   meanFigure,
   pctBaseOf,
   sumFigures,
@@ -617,14 +618,10 @@ export function TradesView(): React.JSX.Element {
     money: basisMoney,
     pct: pctBase ? basisMoney / pctBase : null,
   };
-  const expectancyFigure =
+  const expectancy =
     summary.expectancy === null
       ? null
-      : {
-          ...meanFigure(figures, pctBase),
-          money: summary.expectancy,
-          pct: pctBase ? summary.expectancy / pctBase : null,
-        };
+      : expectancyFigure(stripTrades, ctx, pctBase, summary.expectancy);
   const pnl = {
     ...display.figure(pnlFigure, true, stripCurrency),
     cents: basisMoney,
@@ -724,10 +721,10 @@ export function TradesView(): React.JSX.Element {
             stripCurrency,
           )}
           expectancy={
-            expectancyFigure === null || summary.expectancy === null
+            expectancy === null || summary.expectancy === null
               ? null
               : {
-                  ...display.figure(expectancyFigure, true, stripCurrency),
+                  ...display.figure(expectancy, true, stripCurrency),
                   cents: summary.expectancy,
                 }
           }

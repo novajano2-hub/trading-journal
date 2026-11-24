@@ -4,6 +4,8 @@ import { resolveInstrument } from '../instruments';
 import { costBasis, defaultMetricContext, pnlOf } from './context';
 import {
   costsOf,
+  expectancyIn,
+  expectancyOf,
   holdTimes,
   largestInUnit,
   largestTrade,
@@ -450,5 +452,32 @@ describe('largestTrade', () => {
     expect(largestTrade(all, ctx, 'win')?.id).toBe(b.id);
     expect(largestTrade(all, ctx, 'loss')?.id).toBe(c.id);
     expect(largestTrade([a], ctx, 'loss')).toBeUndefined();
+  });
+});
+
+describe('expectancy: one definition, in money and in every unit', () => {
+  // ES, tick 0.25: a win of 8 ticks, a loss of 4, and a breakeven that moved
+  // 1 tick but netted nothing. Each risked $100.
+  const es = (net: number, avgExit: number) =>
+    makeTrade({ net, avgEntry: 4500, avgExit, initialRisk: 10000 });
+  const set = [es(10000, 4502), es(-5000, 4499), es(0, 4500.25)];
+
+  test('expectancyOf is win rate times average win plus loss rate times average loss', () => {
+    expect(expectancyOf({ n: 2, sum: 300 }, { n: 1, sum: -60 })).toBe(80);
+    expect(expectancyOf({ n: 0, sum: 0 }, { n: 1, sum: -60 })).toBe(-60);
+    expect(expectancyOf({ n: 0, sum: 0 }, { n: 0, sum: 0 })).toBeNull();
+  });
+
+  test('the summary reads it over the decided trades, a breakeven left out', () => {
+    // (100 - 50) / 2, not (100 - 50 + 0) / 3.
+    expect(summarize(set, ctx).expectancy).toBe(2500);
+  });
+
+  test('in a unit it reads the same decided trades: +8 and -4 ticks are +2, never the average trade', () => {
+    expect(expectancyIn(set, ctx, 'ticks')).toBe(2);
+    expect(expectancyIn(set, ctx, 'r')).toBe(0.25);
+    // No forex trade: no pips.
+    expect(expectancyIn(set, ctx, 'pips')).toBeNull();
+    expect(expectancyIn([es(0, 4500.25)], ctx, 'ticks')).toBeNull();
   });
 });

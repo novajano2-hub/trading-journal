@@ -191,7 +191,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
 
   const net = display.ofAll(gross ? s.grossPnl : s.netPnl);
   const expectancy =
-    s.expectancy === null ? null : display.meanOfAll(s.expectancy);
+    s.expectancy === null ? null : display.expectancy(s.expectancy);
   const outcomes = useMemo(() => winsVsLosses(p.trades, ctx), [p.trades, ctx]);
   // The trade that is the figure: its own id is the link, never a P&L match.
   const largest = (outcome: 'win' | 'loss') => {

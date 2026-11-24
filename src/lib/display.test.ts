@@ -3,6 +3,7 @@ import { resolveInstrument } from '@/domain/instruments';
 import { defaultMetricContext } from '@/domain/metrics/context';
 import type { Account, CashFlow, Trade } from '@/domain/types';
 import {
+  expectancyFigure,
   formatFigure,
   meanFigure,
   pctBaseOf,
@@ -227,6 +228,50 @@ test('meanFigure averages each unit over the trades that have it', () => {
   expect(m.money).toBe(200);
   expect(m.r).toBe(3);
   expect(m.pct).toBeCloseTo(0.01);
+});
+
+describe('expectancyFigure', () => {
+  // ES: +8 ticks won, -4 lost, and a breakeven 1 tick up that netted nothing;
+  // a stock win of $40 with no ticks. Each risked $100.
+  const es = (id: string, net: number, avgExit: number) =>
+    trade('ESZ6', 'long', 5000, avgExit, {
+      id,
+      net,
+      gross: net,
+      initialRisk: 10000,
+    });
+  const set = [
+    es('w', 10000, 5002),
+    es('l', -5000, 4999),
+    es('b', 0, 5000.25),
+    trade('AAPL', 'long', 100, 101, {
+      id: 's',
+      net: 4000,
+      gross: 4000,
+      initialRisk: 10000,
+    }),
+  ];
+
+  test('every unit reads the decided trades only, as the money does: never the average trade', () => {
+    const f = expectancyFigure(set, ctx, 1_000_000, 3000);
+    expect(f.money).toBe(3000);
+    expect(f.pct).toBeCloseTo(0.003);
+    // (+8 - 4) / 2; the average trade would be (+8 - 4 + 1) / 3.
+    expect(f.ticks).toBe(2);
+    expect(f.points).toBe(0.5);
+    // (+1 + 0.4 - 0.5) / 3 decided trades with a stop.
+    expect(f.r).toBeCloseTo(0.3, 10);
+    expect(f.pips).toBeNull();
+    // The stock win has no ticks: one decided trade left out, the breakeven never counted.
+    expect(f.leftOutBy?.ticks).toBe(1);
+  });
+
+  test('a unit no decided trade has is null; a breakeven alone has no expectancy', () => {
+    const f = expectancyFigure([es('b', 0, 5000.25)], ctx, null, 0);
+    expect(f.ticks).toBeNull();
+    expect(f.r).toBeNull();
+    expect(f.pct).toBeNull();
+  });
 });
 
 describe('pctBaseOf', () => {

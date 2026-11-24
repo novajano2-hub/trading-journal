@@ -108,6 +108,54 @@ export function profitFactorOf(
   return lost.length === 0 || lostSum >= 0 ? null : sum(won) / -lostSum;
 }
 
+/** A side of a set's decided trades: how many, and their results summed. */
+export interface Side {
+  n: number;
+  sum: number;
+}
+
+/**
+ * Expectancy: win rate times average win, plus loss rate times average loss
+ * (a negative number), over the decided trades, breakevens left out. The one
+ * expectancy, in dollars or in a unit: the wins and losses are the results
+ * `classify` decided, summed in whatever the caller reads them. Null with no
+ * decided trade.
+ */
+export function expectancyOf(won: Side, lost: Side): number | null {
+  const decided = won.n + lost.n;
+  if (decided === 0) return null;
+  return (
+    (won.n / decided) * (won.n === 0 ? 0 : won.sum / won.n) +
+    (lost.n / decided) * (lost.n === 0 ? 0 : lost.sum / lost.n)
+  );
+}
+
+/**
+ * The expectancy of the closed trades in a trade unit: `expectancyOf` over
+ * their values in it, the wins and losses as `classify` calls them on their
+ * P&L. A decided trade without a value in the unit is left out; null with
+ * none left.
+ */
+export function expectancyIn(
+  trades: readonly Trade[],
+  ctx: MetricContext,
+  unit: TradeUnit,
+): number | null {
+  const won: Side = { n: 0, sum: 0 };
+  const lost: Side = { n: 0, sum: 0 };
+  for (const t of trades) {
+    if (!isClosed(t)) continue;
+    const { outcome } = classify(t, ctx);
+    if (outcome === 'breakeven') continue;
+    const v = unitOf(t, unit, ctx.pnlBasis);
+    if (v === null) continue;
+    const side = outcome === 'win' ? won : lost;
+    side.n += 1;
+    side.sum += v;
+  }
+  return expectancyOf(won, lost);
+}
+
 /**
  * Total won over total lost and the average win over the average loss, in a
  * trade unit. Wins and losses are the trades `classify` calls so, on their
@@ -225,12 +273,10 @@ export function summarize(
     .filter((c) => c.followed !== null);
   const followed = checks.filter((c) => c.followed === true).length;
   const decisive = wins + losses;
-  // Win% x Avg Win + Loss% x Avg Loss (avg loss is negative), over decisive trades, unrounded.
-  const expectancy =
-    decisive === 0
-      ? null
-      : (wins / decisive) * (avgWinRaw ?? 0) +
-        (losses / decisive) * (avgLossRaw ?? 0);
+  const expectancy = expectancyOf(
+    { n: wins, sum: winSum },
+    { n: losses, sum: lossSum },
+  );
 
   return {
     closedCount: closed.length,

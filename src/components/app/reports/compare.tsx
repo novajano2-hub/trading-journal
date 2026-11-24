@@ -58,6 +58,7 @@ import type {
 } from '@/domain/types';
 import {
   FigureSourceContext,
+  expectancyFigure,
   formatUnitValue,
   meanFigure,
   pctBaseOf,
@@ -333,8 +334,11 @@ function GroupFilters({
 
 type Kind = 'money' | 'count' | 'pct' | 'ratio' | 'r';
 
-/** Which trades a money row is over, and whether it totals or averages them. */
-type Over = { of: 'all' | 'wins' | 'losses'; mean: boolean };
+/**
+ * Which trades a money row is over, and whether it totals or averages them;
+ * `expectancy` is the one expectancy, over the decided trades.
+ */
+type Over = { of: 'all' | 'wins' | 'losses'; mean: boolean } | 'expectancy';
 
 const ROWS: {
   id: MetricId;
@@ -357,7 +361,7 @@ const ROWS: {
   {
     id: 'expectancy',
     kind: 'money',
-    over: { of: 'all', mean: true },
+    over: 'expectancy',
     get: (s) => s.expectancy,
   },
   {
@@ -581,6 +585,8 @@ function Compared({
   ): Figure | null => {
     if (money === null) return null;
     const r = results[i]!;
+    if (over === 'expectancy')
+      return expectancyFigure(r.trades, base, r.pctBase, money);
     const picked = r.trades.filter(
       (t) =>
         over.of === 'all' || (over.of === 'wins' ? r.wins : r.losses).has(t.id),
