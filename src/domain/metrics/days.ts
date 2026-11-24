@@ -3,7 +3,8 @@ import { outcomeOf } from '../outcome';
 import { localDate } from '../time';
 import type { Cents, JournalEntry, Trade } from '../types';
 import { costBasis, inRange, type MetricContext } from './context';
-import { sizedRealizations } from './realized';
+import { exitShare, sizedRealizations } from './realized';
+import { profitFactorOf } from './summary';
 import { unitOf } from './units';
 import { streaksOf, type StreakResult } from './streaks';
 
@@ -21,6 +22,12 @@ export interface DayStat {
    * exited size, as the cost basis is.
    */
   unit?: number;
+  /**
+   * The day's profit factor, from its trades' parts the way the summary's is:
+   * wins and losses classified on the breakeven range, the amounts in `ctx.unit`
+   * when the context has one. Null without a loss.
+   */
+  profitFactor?: number | null;
 }
 
 /** The day's value as the figures of the Overview read it: in the unit when the context has one. */
@@ -49,6 +56,7 @@ export function dailyPnl(
   ctx: MetricContext,
 ): DayStat[] {
   const byDate = new Map<string, DayStat>();
+  const results = new Map<string, { won: number[]; lost: number[] }>();
   const ordered = [...trades].sort((a, b) => a.serial - b.serial);
   for (const t of ordered) {
     const basis = costBasis(t);
@@ -58,16 +66,20 @@ export function dailyPnl(
       0,
     );
     // One bucket per local date for this trade.
-    const parts = new Map<string, { value: Cents; qty: number }>();
+    const parts = new Map<
+      string,
+      { value: Cents; qty: number; share: number }
+    >();
     const realized = sizedRealizations(t);
     const realizedQty = realized.reduce((n, r) => n + r.qty, 0);
     const tradeUnit = ctx.unit ? unitOf(t, ctx.unit, ctx.pnlBasis) : null;
     for (const r of realized) {
       const date = localDate(r.time, ctx.timeZone);
       if (!inRange(date, ctx.range)) continue;
-      const p = parts.get(date) ?? { value: 0, qty: 0 };
+      const p = parts.get(date) ?? { value: 0, qty: 0, share: 0 };
       p.value += ctx.pnlBasis === 'gross' ? r.gross : r.net;
       p.qty += r.qty;
+      p.share += exitShare(r.qty, realizedQty, realized.length);
       parts.set(date, p);
     }
     for (const [date, p] of parts) {
@@ -82,18 +94,13 @@ export function dailyPnl(
             wins: 0,
             losses: 0,
             costBasis: 0,
+            profitFactor: null,
           }),
         );
       const share = entryQty > 0 ? Math.min(1, p.qty / entryQty) : 1;
       const dayBasis = share === 1 ? basis : Math.round(basis * share);
       d.net += p.value;
-      if (ctx.unit) {
-        const share =
-          Number.isFinite(realizedQty) && realizedQty > 0
-            ? p.qty / realizedQty
-            : 1;
-        d.unit = (d.unit ?? 0) + (tradeUnit ?? 0) * share;
-      }
+      if (ctx.unit) d.unit = (d.unit ?? 0) + (tradeUnit ?? 0) * p.share;
       d.costBasis += dayBasis;
       d.tradeCount += 1;
       const o = outcomeOf(
@@ -101,10 +108,22 @@ export function dailyPnl(
         ctx.breakevenRange,
         dayBasis > 0 ? p.value / dayBasis : undefined,
       );
-      if (o === 'win') d.wins += 1;
-      else if (o === 'loss') d.losses += 1;
+      if (o !== 'breakeven') {
+        const amount = ctx.unit
+          ? tradeUnit === null
+            ? null
+            : tradeUnit * p.share
+          : p.value;
+        const r = results.get(date) ?? { won: [], lost: [] };
+        if (amount !== null) r[o === 'win' ? 'won' : 'lost'].push(amount);
+        results.set(date, r);
+        if (o === 'win') d.wins += 1;
+        else d.losses += 1;
+      }
     }
   }
+  for (const [date, r] of results)
+    byDate.get(date)!.profitFactor = profitFactorOf(r.won, r.lost);
   return [...byDate.values()].sort((a, b) =>
     a.date < b.date ? -1 : a.date > b.date ? 1 : 0,
   );

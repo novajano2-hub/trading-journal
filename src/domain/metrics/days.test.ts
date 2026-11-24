@@ -34,6 +34,7 @@ describe('days', () => {
         wins: 1,
         losses: 1,
         costBasis: 45_000_000,
+        profitFactor: 5,
       },
       {
         date: '2026-03-09',
@@ -42,6 +43,7 @@ describe('days', () => {
         wins: 0,
         losses: 1,
         costBasis: 45_000_000,
+        profitFactor: 0,
       },
     ]);
     expect(daySummary(days, ctx)).toMatchObject({

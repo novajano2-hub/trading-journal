@@ -5,7 +5,6 @@ import {
   CalendarBlank,
   CaretLeft,
   CaretRight,
-  ChartLineUp,
   NotePencil,
   SlidersHorizontal,
   X,
@@ -280,10 +279,13 @@ function Kpi({
   label,
   children,
   small,
+  action,
 }: {
   label: React.ReactNode;
   children: React.ReactNode;
   small: React.ReactNode;
+  /** A link under the figure. */
+  action?: React.ReactNode;
 }): React.JSX.Element {
   return (
     <div className="min-w-0 py-1 sm:shrink-0 sm:border-l sm:border-line sm:px-3 sm:first:border-l-0 sm:first:pl-0 @[760px]/cal:sm:px-5">
@@ -292,6 +294,7 @@ function Kpi({
         {children}
       </b>
       <small className="block truncate text-[12px] text-muted">{small}</small>
+      {action}
     </div>
   );
 }
@@ -581,14 +584,6 @@ export function CalendarView(): React.JSX.Element {
               stats={stats}
               onChange={(next) => updatePrefs.mutate({ calendarStats: next })}
             />
-            <Link href={monthHref} className={TEXT_BUTTON}>
-              <ChartLineUp
-                size={15}
-                aria-hidden="true"
-                className="text-faint"
-              />
-              Month in Reports
-            </Link>
             <Link href={yearHref} className={TEXT_BUTTON}>
               <CalendarBlank
                 size={15}
@@ -634,6 +629,14 @@ export function CalendarView(): React.JSX.Element {
               </MetricTip>
             }
             small={`${summary.wins} ${plural(summary.wins, 'winner')}, ${summary.losses} ${plural(summary.losses, 'loser')}`}
+            action={
+              <Link
+                href={monthHref}
+                className="mt-0.5 inline-flex min-h-6 items-center rounded-chip text-[12.5px] font-semibold text-accent-ink outline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
+              >
+                Month in Reports
+              </Link>
+            }
           >
             {summary.winRate === null ? 'None' : formatPct(summary.winRate, 1)}
           </Kpi>
@@ -759,7 +762,6 @@ export function CalendarView(): React.JSX.Element {
                 basis={ctx.pnlBasis}
                 fmt={fmt}
                 nearby={nearby}
-                reportHref={monthHref}
                 onGo={goMonth}
               />
             ) : (

@@ -10,6 +10,7 @@ import type {
   Tag,
   TagCategory,
 } from '@/domain/types';
+import { exitShare } from '@/domain/metrics/realized';
 import { calendarMonth, calendarYear, dayExits, dayGrading } from './calendar';
 
 const ctx = defaultMetricContext('America/New_York');
@@ -455,5 +456,58 @@ describe('the day and month figures (Task 30)', () => {
     expect(summary).toMatchObject({ wins: 2, losses: 1 });
     expect(summary.winRate).toBeCloseTo(2 / 3, 6);
     expect(calendarMonth([], [], '2026-11', ctx).summary.winRate).toBeNull();
+  });
+});
+
+describe('Task 30 fix round 1', () => {
+  const day = '2026-11-17';
+  const at = (id: string, net: number, avgExit: number, maxPosition = 1) =>
+    makeTrade({
+      id,
+      net,
+      gross: net,
+      avgEntry: 5000,
+      avgExit,
+      maxPosition,
+      closedAt: `${day}T16:00:00Z`,
+    });
+  const pf = (trades: ReturnType<typeof at>[], c = ctx) =>
+    dayOf(calendarMonth(trades, [], '2026-11', c), day)!.profitFactor;
+
+  test('the day profit factor leaves breakeven trades out, as the summary does', () => {
+    const wide = {
+      ...ctx,
+      breakevenRange: { unit: 'amount' as const, from: -1000, to: 1000 },
+    };
+    const t = [at('w', 5000, 5010), at('l', -2000, 4999), at('b', -500, 5000)];
+    // 5000 / 2000, not 5000 / 2500.
+    expect(pf(t, wide)).toBe(2.5);
+  });
+
+  test('under Ticks the day profit factor reads ticks', () => {
+    const t = [at('w', 5000, 5010), at('l', -2000, 4999, 2)];
+    expect(pf(t)).toBe(2.5);
+    expect(pf(t, { ...ctx, unit: 'ticks' })).toBe(5);
+  });
+
+  test('a split exit shares its volume by exited size, so days sum to the quantity', () => {
+    const m = calendarMonth(heldTwoDays(), [], '2026-11', ctx);
+    expect(dayOf(m, '2026-11-16')!.volume).toBe(1);
+    expect(dayOf(m, '2026-11-17')!.volume).toBe(1);
+    const total = m.weeks
+      .flatMap((w) => w.days)
+      .reduce((n, d) => n + (d?.volume ?? 0), 0);
+    expect(total).toBe(2);
+  });
+
+  test('a quantity that is not finite or is zero splits equally, never in full', () => {
+    expect(exitShare(Infinity, Infinity, 2)).toBe(0.5);
+    expect(exitShare(0, 0, 4)).toBe(0.25);
+    expect(exitShare(1, 4, 2)).toBe(0.25);
+  });
+
+  test('the month counts a trade once, by its close, however many days it exited on', () => {
+    const { summary } = calendarMonth(heldTwoDays(), [], '2026-11', ctx);
+    expect(summary).toMatchObject({ wins: 1, losses: 0, winRate: 1 });
   });
 });

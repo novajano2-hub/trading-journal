@@ -12,6 +12,18 @@ export interface Realization {
   net: Cents;
 }
 
+/**
+ * One exit's share of the trade's exited size, for splitting a per-trade
+ * figure among its exit days. A quantity that is not finite or is zero cannot
+ * be weighed, so the trade splits equally across its `count` exits instead of
+ * crediting the whole amount to each.
+ */
+export function exitShare(qty: number, total: number, count: number): number {
+  return Number.isFinite(total) && total > 0 && Number.isFinite(qty)
+    ? qty / total
+    : 1 / Math.max(1, count);
+}
+
 /** A realization with the quantity it exited, for sharing per-trade figures by size (infinite for a trade booked whole at its close). */
 export interface SizedRealization extends Realization {
   qty: number;

@@ -708,7 +708,6 @@ test('C2: on a phone the lead unit stat is compact, with its suffix', async () =
   renderApp(<CalendarView />, { repository, url: url() });
   const es = await screen.findByRole('button', { name: /^Mon 2 Nov/ });
   expect(within(es).getByTestId('day-compact').textContent).toBe('+40t');
-  await repository.prefs.update({ calendarStats: ['pips', 'net'] });
 });
 
 test('E65: under the Ticks display unit the day panel reads in ticks, not dollars', async () => {
@@ -721,8 +720,10 @@ test('E65: under the Ticks display unit the day panel reads in ticks, not dollar
   renderApp(<CalendarView />, { repository, url: url('&day=2026-11-02') });
   const panel = await screen.findByRole('complementary', { name: /Mon 2 Nov/ });
   expect(within(panel).getAllByText('+40.0 ticks').length).toBeGreaterThan(0);
-  // The net and the exit row both read in ticks; no signed dollar net is left.
-  expect(panel.textContent).toContain('Green day+40.0 ticksNet P&L');
+  // The net, the Ticks row and the exit row each read in ticks.
+  expect(
+    within(panel).getAllByText('+40.0 ticks').length,
+  ).toBeGreaterThanOrEqual(3);
 });
 
 test('C3: the month shows winners, losers and the trade win rate, and links to Reports for that month', async () => {
@@ -742,19 +743,48 @@ test('C3: the month shows winners, losers and the trade win rate, and links to R
   expect(href.searchParams.get('account')).toBe('acc-a');
 });
 
-test('C3: a month without trades has the same link and None for the rate', async () => {
+test('C3: a month without trades has the rate row and one link', async () => {
   renderApp(<CalendarView />, {
     sample: UNITS,
     url: '/app/calendar?month=2026-12',
   });
   const panel = await screen.findByRole('complementary');
-  expect(within(panel).getByText('Trade win rate')).toBeTruthy();
   expect(
     within(panel).getByText('Trade win rate').closest('div')!.textContent,
   ).toContain('None');
-  const href = within(panel)
-    .getByRole('link', { name: /Month in Reports/ })
-    .getAttribute('href')!;
+  const links = screen.getAllByRole('link', { name: /Month in Reports/ });
+  expect(links).toHaveLength(1);
+  const href = links[0]!.getAttribute('href')!;
   expect(href).toContain('from=2026-12-01');
   expect(href).toContain('to=2026-12-31');
+});
+
+test('C3: at 390 the link is in the month strip, once, and not hidden', async () => {
+  viewport(390);
+  renderApp(<CalendarView />, { sample: UNITS, url: url() });
+  await screen.findByRole('grid', { name: 'November 2026' });
+  const links = screen.getAllByRole('link', { name: /Month in Reports/ });
+  expect(links).toHaveLength(1);
+  const strip = screen.getByText('Trade win rate').closest('div')!;
+  expect(strip.contains(links[0]!)).toBe(true);
+  expect(links[0]!.className).not.toContain('hidden');
+});
+
+test('Privacy masks money cells but unit cells still read in ticks and pips', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: UNITS,
+  });
+  await repository.prefs.update({
+    displayUnit: 'privacy',
+    calendarStats: ['ticks', 'pips', 'net'],
+  });
+  renderApp(<CalendarView />, { repository, url: url() });
+  const es = await screen.findByRole('button', { name: /^Mon 2 Nov/ });
+  expect(es.textContent).toContain('+40.0 ticks');
+  expect(es.textContent).toContain('+$•••');
+  expect(es.textContent).not.toMatch(/\$\d/);
+  const fx = screen.getByRole('button', { name: /^Tue 3 Nov/ });
+  expect(fx.textContent).toContain('+12.0 pips');
 });

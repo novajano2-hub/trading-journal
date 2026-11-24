@@ -354,7 +354,7 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   volume: {
     label: 'Volume',
     definition:
-      'Contracts, lots or shares traded, each trade counted once by the quantity it opened, not by every fill. On a day, the trades that exited that day.',
+      'Contracts, lots or shares traded, each trade counted once by the quantity it opened, not by every fill. On a day, a trade that exits over several days is shared among them by exited size.',
   },
   'day-ticks': {
     label: 'Ticks',

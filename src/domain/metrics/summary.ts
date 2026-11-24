@@ -96,6 +96,19 @@ export function volumeOf(trades: readonly Trade[]): number {
 }
 
 /**
+ * Total won over total lost: null without a loss, or when the losses do not
+ * total below zero. The one profit factor for a set of results the caller has
+ * already classified, in dollars or in a unit.
+ */
+export function profitFactorOf(
+  won: readonly number[],
+  lost: readonly number[],
+): number | null {
+  const lostSum = sum(lost);
+  return lost.length === 0 || lostSum >= 0 ? null : sum(won) / -lostSum;
+}
+
+/**
  * Total won over total lost and the average win over the average loss, in a
  * trade unit. Wins and losses are the trades `classify` calls so, on their
  * P&L, as for the win rate; their values are read in the unit. A loss total
@@ -115,8 +128,7 @@ function unitRatios(
   const avgWin = ratio(sum(won), won.length);
   const avgLoss = ratio(lostSum, lost.length);
   return {
-    profitFactor:
-      lost.length === 0 || lostSum >= 0 ? null : sum(won) / -lostSum,
+    profitFactor: profitFactorOf(won, lost),
     winLossRatio:
       avgWin === null || avgLoss === null || avgLoss >= 0
         ? null
@@ -233,9 +245,7 @@ export function summarize(
     winRate: ratio(wins, decisive),
     profitFactor: inUnit
       ? inUnit.profitFactor
-      : losses === 0
-        ? null
-        : ratio(winSum, Math.abs(lossSum)),
+      : profitFactorOf(winNets, lossNets),
     avgWin: avgWinRaw === null ? null : roundHalfEven(avgWinRaw),
     avgLoss: avgLossRaw === null ? null : roundHalfEven(avgLossRaw),
     winLossRatio: inUnit

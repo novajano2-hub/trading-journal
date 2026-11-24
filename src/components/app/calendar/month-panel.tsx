@@ -6,7 +6,6 @@ import { IconTile } from '@/components/ui/icon-tile';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { CalendarDay, CalendarSummary } from '@/data/calendar';
 import type { MetricContext } from '@/domain/metrics/context';
-import Link from 'next/link';
 import { formatPct, plural } from '@/lib/format';
 import { dayLabel, type FormatMoney } from './month-grid';
 
@@ -49,7 +48,6 @@ export function MonthPanel({
   basis,
   fmt,
   nearby,
-  reportHref,
   onGo,
 }: {
   headingId: string;
@@ -58,8 +56,6 @@ export function MonthPanel({
   basis: MetricContext['pnlBasis'];
   fmt: FormatMoney;
   nearby?: { month: string; name: string };
-  /** Reports > Overview on this month, under the page's filters. */
-  reportHref: string;
   onGo(month: string): void;
 }): React.JSX.Element {
   const none = summary.tradingDays === 0;
@@ -137,12 +133,6 @@ export function MonthPanel({
           {day(summary.worst)}
         </Row>
       </dl>
-      <Link
-        href={reportHref}
-        className="mt-3 inline-flex min-h-8 items-center rounded-chip text-[13px] font-semibold text-accent-ink outline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
-      >
-        Month in Reports
-      </Link>
       {none && nearby ? (
         <button
           type="button"
