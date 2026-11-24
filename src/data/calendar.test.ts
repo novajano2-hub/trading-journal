@@ -10,7 +10,9 @@ import type {
   Tag,
   TagCategory,
 } from '@/domain/types';
+import { dailyPnl, daySummary } from '@/domain/metrics/days';
 import { exitShare } from '@/domain/metrics/realized';
+import { summarize } from '@/domain/metrics/summary';
 import { calendarMonth, calendarYear, dayExits, dayGrading } from './calendar';
 
 const ctx = defaultMetricContext('America/New_York');
@@ -512,5 +514,36 @@ describe('Task 30 fix round 1', () => {
   test('the month counts a trade once, by its close, however many days it exited on', () => {
     const { summary } = calendarMonth(heldTwoDays(), [], '2026-11', ctx);
     expect(summary).toMatchObject({ wins: 1, losses: 0, winRate: 1 });
+  });
+});
+
+describe('the month reads the shared day and trade figures (M8)', () => {
+  // A win and a breakeven on the 16th (green), a loss on the 17th (red),
+  // a breakeven alone on the 18th (flat).
+  const at = (id: string, net: number, day: string) =>
+    makeTrade({ id, net, gross: net, closedAt: `${day}T16:00:00Z` });
+  const trades = [
+    at('w', 10000, '2026-11-16'),
+    at('b1', 0, '2026-11-16'),
+    at('l', -4000, '2026-11-17'),
+    at('b2', 0, '2026-11-18'),
+  ];
+  test('its day win rate is the one daySummary gives, and its trade win rate the one summarize gives', () => {
+    const { summary } = calendarMonth(trades, [], '2026-11', ctx);
+    const scoped = { ...ctx, range: { from: '2026-11-01', to: '2026-11-30' } };
+    const days = daySummary(dailyPnl(trades, scoped), scoped);
+    const sum = summarize(trades, ctx);
+    expect(summary.dayWinRate).toBe(days.greenPct);
+    expect(summary.dayWinRate).toBeCloseTo(1 / 3, 10);
+    expect([summary.greenDays, summary.redDays, summary.flatDays]).toEqual([
+      days.greenDays,
+      days.redDays,
+      days.flatDays,
+    ]);
+    expect([summary.wins, summary.losses, summary.winRate]).toEqual([
+      sum.wins,
+      sum.losses,
+      sum.winRate,
+    ]);
   });
 });

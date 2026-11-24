@@ -1,7 +1,14 @@
 import { outcomeOf } from '@/domain/outcome';
 import { mistakeTags } from '@/domain/metrics/mistakes';
-import { dailyPnl, dayVolumes } from '@/domain/metrics/days';
-import { classify, type MetricContext } from '@/domain/metrics/context';
+import {
+  dailyPnl,
+  daySummary,
+  dayVolumes,
+  type DayStat,
+} from '@/domain/metrics/days';
+import type { MetricContext } from '@/domain/metrics/context';
+import { summarize } from '@/domain/metrics/summary';
+import { isClosed } from '@/domain/trade-status';
 import { exitUnits } from '@/domain/metrics/units';
 import { localDate } from '@/domain/time';
 import type {
@@ -83,6 +90,8 @@ export interface CalendarSummary extends UnitSums {
   redDays: number;
   flatDays: number;
   tradingDays: number;
+  /** Green days over trading days (`daySummary`'s day win rate); null with none. */
+  dayWinRate: number | null;
   /** Days of the month the global date range leaves out. */
   outsideDays: number;
   best: CalendarDay | null;
@@ -138,11 +147,12 @@ function bookDays(
   notes: readonly JournalEntry[],
   ctx: MetricContext,
   range: { from: string; to: string },
-): Map<string, CalendarDay> {
+): { out: Map<string, CalendarDay>; stats: DayStat[] } {
   const scoped: MetricContext = { ...ctx, range };
   const noted = notedDates(notes);
   const out = new Map<string, CalendarDay>();
-  for (const s of dailyPnl(trades, scoped)) {
+  const stats = dailyPnl(trades, scoped);
+  for (const s of stats) {
     out.set(s.date, {
       date: s.date,
       net: s.net,
@@ -181,7 +191,7 @@ function bookDays(
   for (const day of out.values())
     for (const u of ['ticks', 'pips', 'points'] as const)
       if (day[u] !== null) day[u] = Math.round(day[u] * 1e6) / 1e6;
-  return out;
+  return { out, stats };
 }
 
 function toneOf(
@@ -252,7 +262,7 @@ export function calendarMonth(
       : first;
   const to =
     ctx.range?.to !== undefined && ctx.range.to < last ? ctx.range.to : last;
-  const booked = bookDays(trades, notes, ctx, { from, to });
+  const { out: booked, stats } = bookDays(trades, notes, ctx, { from, to });
   const noted = notedDates(notes);
   const outside = (date: string) => date < from || date > to;
   const weeks: CalendarWeek[] = [];
@@ -287,33 +297,32 @@ export function calendarMonth(
     if (best === null || d.net > best.net) best = d;
     if (worst === null || d.net < worst.net) worst = d;
   }
-  const tonal = (t: CalendarDay['tone']) =>
-    traded.filter((d) => d.tone === t).length;
+  // The day counts and the day win rate, as every page reads them.
+  const days = daySummary(stats, ctx);
   // Trade-level, as Reports counts: a trade is one win or loss, on the date it closed.
-  let wins = 0;
-  let losses = 0;
-  for (const t of trades) {
-    if (t.status !== 'closed' || t.closedAt === undefined) continue;
-    const date = localDate(t.closedAt, ctx.timeZone);
-    if (date < from || date > to) continue;
-    const { outcome } = classify(t, ctx);
-    if (outcome === 'win') wins += 1;
-    else if (outcome === 'loss') losses += 1;
-  }
+  const closed = summarize(
+    trades.filter((t) => {
+      if (!isClosed(t)) return false;
+      const date = localDate(t.closedAt, ctx.timeZone);
+      return date >= from && date <= to;
+    }),
+    ctx,
+  );
   return {
     weeks,
     summary: {
-      wins,
-      losses,
-      winRate: wins + losses === 0 ? null : wins / (wins + losses),
+      wins: closed.wins,
+      losses: closed.losses,
+      winRate: closed.winRate,
       net: traded.reduce((s, d) => s + d.net, 0),
       r: sumR(traded.map((d) => d.r)),
       ...sumUnits(traded),
       trades: traded.reduce((s, d) => s + d.trades, 0),
-      greenDays: tonal('gain'),
-      redDays: tonal('loss'),
-      flatDays: tonal('flat'),
+      greenDays: days.greenDays,
+      redDays: days.redDays,
+      flatDays: days.flatDays,
       tradingDays: traded.length,
+      dayWinRate: days.greenPct,
       outsideDays: Array.from({ length: count }, (_, i) =>
         outside(`${month}-${pad(i + 1)}`),
       ).filter(Boolean).length,
@@ -337,7 +346,7 @@ export function calendarYear(
   year: number,
   ctx: MetricContext,
 ): CalendarYearMonth[] {
-  const booked = bookDays(trades, [], ctx, {
+  const { out: booked } = bookDays(trades, [], ctx, {
     from: `${year}-01-01`,
     to: `${year}-12-31`,
   });

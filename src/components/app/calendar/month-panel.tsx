@@ -106,9 +106,9 @@ export function MonthPanel({
           label={<MetricTip id="green-days" basis={basis} />}
           small={`${summary.greenDays} of ${summary.tradingDays} green days`}
         >
-          {none
+          {summary.dayWinRate === null
             ? 'None'
-            : formatPct(summary.greenDays / summary.tradingDays, 1)}
+            : formatPct(summary.dayWinRate, 1)}
         </Row>
         <Row
           label={
