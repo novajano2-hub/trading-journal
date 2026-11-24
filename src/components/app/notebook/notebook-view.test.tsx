@@ -550,14 +550,18 @@ test('Move to folder files the note in a user folder', async () => {
   );
 });
 
-/** The first day of this week under Sunday-first (0) or Monday-first (1) weeks, from the real clock. */
-function weekFirst(weekStartsOn: 0 | 1): string {
-  const d = new Date();
-  const back = (d.getDay() - weekStartsOn + 7) % 7;
-  d.setDate(d.getDate() - back);
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
+/**
+ * Fixed clocks, 10:00 in New York (the prefs' zone below), so the week is the
+ * same on any machine: [name, now, Sunday week start, the Monday inside that week].
+ */
+const CLOCKS = [
+  ['a Saturday', '2026-11-21T15:00:00Z', '2026-11-15', '2026-11-16'],
+  ['a Sunday', '2026-11-22T15:00:00Z', '2026-11-22', '2026-11-23'],
+  ['a Monday', '2026-11-23T15:00:00Z', '2026-11-22', '2026-11-23'],
+] as const;
+const NEW_YORK = { timeZone: 'America/New_York' };
+
+afterEach(() => vi.useRealTimers());
 
 async function newWeeklyRecap() {
   fireEvent.keyDown(await screen.findByRole('button', { name: 'New' }), {
@@ -568,49 +572,60 @@ async function newWeeklyRecap() {
   );
 }
 
-test('New > Weekly recap keys a new note on the Sunday week start by default', async () => {
-  const { repo } = await openWith('/app/notebook');
-  const before = (await repo.journal.list(WS)).filter(
-    (e) => e.kind === 'weekly-recap',
-  ).length;
-  await newWeeklyRecap();
-  await waitFor(() =>
-    expect(window.location.pathname).toMatch(/^\/app\/notebook\/[^/]+$/),
-  );
-  const made = (await repo.journal.list(WS)).filter(
-    (e) => e.kind === 'weekly-recap',
-  );
-  expect(made).toHaveLength(before + 1);
-  const fresh = made.find((e) => e.date === weekFirst(0))!;
-  expect(fresh).toBeTruthy();
-  expect(fresh.title).toMatch(/^Week of /);
-});
+test.each(CLOCKS)(
+  'New > Weekly recap keys a new note on the Sunday week start by default, on %s',
+  async (_name, now, sunday) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(now));
+    const { repo } = await openWith('/app/notebook', { prefs: NEW_YORK });
+    const before = (await repo.journal.list(WS)).filter(
+      (e) => e.kind === 'weekly-recap',
+    ).length;
+    await newWeeklyRecap();
+    await waitFor(() =>
+      expect(window.location.pathname).toMatch(/^\/app\/notebook\/[^/]+$/),
+    );
+    const made = (await repo.journal.list(WS)).filter(
+      (e) => e.kind === 'weekly-recap',
+    );
+    expect(made).toHaveLength(before + 1);
+    const fresh = made.find((e) => e.date === sunday)!;
+    expect(fresh).toBeTruthy();
+    expect(fresh.title).toMatch(/^Week of /);
+  },
+);
 
-test("New > Weekly recap opens the week's Monday-keyed note under Sunday weeks, and makes no second one", async () => {
-  const { repo } = await openWith('/app/notebook', {
-    prepare: async (r) => {
-      await r.journal.save(WS, {
-        kind: 'weekly-recap',
-        date: weekFirst(1),
-        title: 'Legacy week',
-        body: { type: 'doc', content: [{ type: 'paragraph' }] },
-        linkedTradeIds: [],
-        tags: [],
-      });
-    },
-  });
-  const before = (await repo.journal.list(WS)).filter(
-    (e) => e.kind === 'weekly-recap',
-  );
-  await newWeeklyRecap();
-  const legacy = before.find((e) => e.title === 'Legacy week')!;
-  await waitFor(() =>
-    expect(window.location.pathname).toBe(`/app/notebook/${legacy.id}`),
-  );
-  expect(
-    (await repo.journal.list(WS)).filter((e) => e.kind === 'weekly-recap'),
-  ).toHaveLength(before.length);
-});
+test.each(CLOCKS)(
+  "New > Weekly recap opens the week's Monday-keyed note under Sunday weeks, and makes no second one, on %s",
+  async (_name, now, _sunday, monday) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(now));
+    const { repo } = await openWith('/app/notebook', {
+      prefs: NEW_YORK,
+      prepare: async (r) => {
+        await r.journal.save(WS, {
+          kind: 'weekly-recap',
+          date: monday,
+          title: 'Legacy week',
+          body: { type: 'doc', content: [{ type: 'paragraph' }] },
+          linkedTradeIds: [],
+          tags: [],
+        });
+      },
+    });
+    const before = (await repo.journal.list(WS)).filter(
+      (e) => e.kind === 'weekly-recap',
+    );
+    await newWeeklyRecap();
+    const legacy = before.find((e) => e.title === 'Legacy week')!;
+    await waitFor(() =>
+      expect(window.location.pathname).toBe(`/app/notebook/${legacy.id}`),
+    );
+    expect(
+      (await repo.journal.list(WS)).filter((e) => e.kind === 'weekly-recap'),
+    ).toHaveLength(before.length);
+  },
+);
 
 test('New > Note makes a note and opens it', async () => {
   const { repo } = await openWith('/app/notebook');
