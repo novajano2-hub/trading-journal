@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { cutOffText } from './figures';
 
 test.use({ timezoneId: 'America/New_York' });
 
