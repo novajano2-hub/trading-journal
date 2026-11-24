@@ -1177,29 +1177,48 @@ function FilledChart({
         seen.current = size;
         passes.current = 0;
       }
+      // Everything is read from the DOM at this instant (the plot height drawn,
+      // the svg's height, the wrapper's), so the pass is right whatever render
+      // it lands on.
+      const svg = el.querySelector('svg');
+      const drawn = Number(
+        el
+          .querySelector('[data-band-height]')
+          ?.getAttribute('data-band-height'),
+      );
+      if (!svg || !drawn) return;
       const diff = room - el.offsetHeight;
       if (room <= 0 || Math.abs(diff) < 2 || passes.current >= 4) return;
       passes.current += 1;
-      // From the height this pass measured, so a repeat of it lands on the same value.
-      setH(Math.max(120, Math.round(h + diff / bands)));
+      setH(Math.max(120, Math.round(drawn + diff / bands)));
     };
-    // After the frame, so the height the chart was just given is laid out.
-    let raf = requestAnimationFrame(fit);
+    // Once at once, so the first frame is already the right size; again from a
+    // timer (a frame callback never runs in a tab that is not showing) and on
+    // every resize, so it tracks the dialog's final size.
+    fit();
+    let timer = setTimeout(fit, 0);
     const observer =
       typeof ResizeObserver === 'undefined'
         ? null
         : new ResizeObserver(() => {
-            cancelAnimationFrame(raf);
-            raf = requestAnimationFrame(fit);
+            clearTimeout(timer);
+            timer = setTimeout(fit, 0);
           });
     observer?.observe(scroller);
     return () => {
-      cancelAnimationFrame(raf);
+      clearTimeout(timer);
       observer?.disconnect();
     };
   }, [h, bands]);
   return (
-    <div ref={wrap} data-expanded-chart="">
+    // Reduced motion gives every element a 0.01ms transition on all properties,
+    // so a size changed in this commit still reads as the old one until the next
+    // frame; the plot's sizes must not transition, or the fit measures stale boxes.
+    <div
+      ref={wrap}
+      data-expanded-chart=""
+      className="!transition-none [&_*]:!transition-none"
+    >
       <ChartBody {...props} height={h} />
     </div>
   );

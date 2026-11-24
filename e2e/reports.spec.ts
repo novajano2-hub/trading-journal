@@ -35,6 +35,30 @@ test('the Overview at 1440 ends at its last card: no blank tail under it', async
   expect(gap).toBeLessThanOrEqual(120);
 });
 
+test('the expanded chart fills its dialog: the plot reaches the bottom padding, reduced motion on', async ({
+  page,
+}) => {
+  await page.goto('/app/reports/performance');
+  await expect(page.getByTestId('reports-performance')).toBeVisible({
+    timeout: 30_000,
+  });
+  await page.getByRole('button', { name: 'Expand chart' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.locator('[data-expanded-chart] svg')).toBeVisible();
+  // Read at once, with no settling wait: the first frame must already fit.
+  const gap = await page.evaluate(() => {
+    const d = document.querySelector('[role="dialog"]')!;
+    const svg = d.querySelector('[data-expanded-chart] svg')!;
+    const body = document
+      .querySelector('[data-expanded-chart]')!
+      .parentElement!.getBoundingClientRect();
+    // The body's bottom padding edge is its bottom less 16px.
+    return body.bottom - 16 - svg.getBoundingClientRect().bottom;
+  });
+  expect(gap).toBeLessThanOrEqual(40);
+  expect(gap).toBeGreaterThanOrEqual(-4);
+});
+
 test('Day & time: time of day in 15 minutes, by exit, cross-analysed by side', async ({
   page,
 }) => {

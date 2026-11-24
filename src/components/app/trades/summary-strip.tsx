@@ -129,7 +129,16 @@ export function SummaryStrip({
     <Kpi
       id="win-rate"
       basis={basis}
-      sub={`${summary.wins} won, ${summary.breakevens} breakeven, ${summary.losses} lost`}
+      sub={
+        // Each count keeps its word: the line breaks only between the counts.
+        <>
+          <span className="whitespace-nowrap">{summary.wins} won</span>,{' '}
+          <span className="whitespace-nowrap">
+            {summary.breakevens} breakeven
+          </span>
+          , <span className="whitespace-nowrap">{summary.losses} lost</span>
+        </>
+      }
     >
       {summary.winRate === null ? (
         <span className="text-[15px] font-medium text-faint">None</span>

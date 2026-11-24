@@ -122,6 +122,19 @@ test('a signed amount never breaks between its sign and its digits, and the note
   expect(strip.className).toContain('min-[1360px]:grid-cols-');
 });
 
+test('each count in the win-rate line keeps its word, so it breaks only between the counts', async () => {
+  renderApp(<TradesView />, { sample: sample(), url: '/app/trades' });
+  const strip = await screen.findByRole('region', { name: 'Summary' });
+  for (const part of [/^\d+ won$/, /^\d+ breakeven$/, /^\d+ lost$/]) {
+    const el = [...strip.querySelectorAll('span')].find((s) =>
+      part.test(s.textContent ?? ''),
+    );
+    expect(el, String(part)).toBeTruthy();
+    expect(el!.className).toContain('whitespace-nowrap');
+  }
+  expect(strip.textContent).toMatch(/\d+ won, \d+ breakeven, \d+ lost/);
+});
+
 test('Hide summary saves the preference and leaves a way back', async () => {
   const { repo } = renderApp(<TradesView />, {
     sample: sample(),
