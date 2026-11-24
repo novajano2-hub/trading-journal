@@ -62,13 +62,20 @@ export type ReportState =
     }
   | { state: 'ready'; data: ReportData };
 
-/** Writes one parameter, keeping the others (the filters). */
-export function writeParam(key: string, value: string | null): void {
+/**
+ * Writes one parameter, keeping the others (the filters). It replaces the
+ * history entry; `push` adds one instead, for a change Back should undo.
+ */
+export function writeParam(
+  key: string,
+  value: string | null,
+  push = false,
+): void {
   const params = new URLSearchParams(window.location.search);
   if (value === null) params.delete(key);
   else params.set(key, value);
   const qs = params.toString();
-  window.history.replaceState(
+  window.history[push ? 'pushState' : 'replaceState'](
     null,
     '',
     window.location.pathname + (qs ? `?${qs}` : ''),

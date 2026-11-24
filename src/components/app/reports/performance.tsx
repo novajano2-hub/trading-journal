@@ -223,6 +223,12 @@ function useSlot(data: ReportData, n: SlotNumber, active: boolean): Slot {
   };
 }
 
+/** Why a metric has no value in a period, where it is not simply that nothing happened. */
+const GAP_REASONS: Partial<Record<SeriesMetric, string>> = {
+  'avg-daily-win-loss':
+    'shows only for periods with both a green and a red day.',
+};
+
 const GHOST =
   'inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-control px-2 text-[12.5px] font-medium text-muted transition-colors duration-200 ease-(--ease-glide) hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 pointer-coarse:px-3';
 
@@ -270,6 +276,14 @@ function ChartSlot({
   })).filter((g) => g.metrics.length > 0);
 
   const period = periodOf(bucket);
+  const gapNote = (x: ChartSeries, pick: Pick) =>
+    `${x.label} ${GAP_REASONS[pick.metric] ?? 'has no value in some periods.'}`;
+  const gaps = series.flatMap((x, i) =>
+    x.points.some((pt) => pt.value === null) ? [gapNote(x, picks[i]!)] : [],
+  );
+  const empty =
+    series.length > 0 &&
+    series.every((x) => x.points.every((pt) => pt.value === null));
   /** Where each metric runs, so the label carries values as well as names. */
   const ranges = series
     .map((x) => {
@@ -482,14 +496,26 @@ function ChartSlot({
           <p className="py-10 text-center text-[13.5px] text-faint">
             Pick a metric to chart it.
           </p>
+        ) : empty ? (
+          <p
+            role="status"
+            className="flex min-h-40 items-center justify-center py-10 text-center text-[13.5px] text-faint"
+          >
+            {gaps.join(' ')}
+          </p>
         ) : (
-          <ReportChart
-            expandSlot={expandSlot}
-            label={`${series.map((s) => s.label).join(', ')} by ${bucket}, ${data.caption}.${ranges}`}
-            series={series}
-            periodLabel={period}
-            currency={currency}
-          />
+          <>
+            <ReportChart
+              expandSlot={expandSlot}
+              label={`${series.map((s) => s.label).join(', ')} by ${bucket}, ${data.caption}.${ranges}`}
+              series={series}
+              periodLabel={period}
+              currency={currency}
+            />
+            {gaps.length > 0 ? (
+              <p className="mt-2 text-[12.5px] text-faint">{gaps.join(' ')}</p>
+            ) : null}
+          </>
         )}
       </div>
     </section>
@@ -526,7 +552,8 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
   };
   const setOff = (next: SlotNumber[]) => {
     setLocalOff(next);
-    writeParam(OFF_PARAM, next.length === 0 ? null : next.join(','));
+    // A history entry of its own, so Back brings a removed chart back.
+    writeParam(OFF_PARAM, next.length === 0 ? null : next.join(','), true);
   };
   const tableId = useId();
   // The table follows the first chart that is still there.
@@ -600,7 +627,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
         />
         <div className="mt-2">
           <SummaryTable
-            key={`${bucket}-${picks.map((x) => `${x.metric}${modeOf(x)}`).join()}`}
+            key={`${lead.n}-${bucket}-${picks.map((x) => `${x.metric}${modeOf(x)}`).join()}`}
             label={`Summary by ${bucket}`}
             rows={rows}
             columns={columns}

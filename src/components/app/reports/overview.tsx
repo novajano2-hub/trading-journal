@@ -628,10 +628,10 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
       />
       {keyFigures}
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-2 xl:grid-rows-[auto_1fr] xl:gap-y-0">
         <section
           aria-labelledby={cumulativeId}
-          className={`${CARD} ${CARD_PAD} min-w-0`}
+          className={`${CARD} ${CARD_PAD} min-w-0 xl:row-span-2 xl:grid xl:grid-cols-[minmax(0,1fr)] xl:grid-rows-subgrid xl:gap-y-0`}
         >
           <CardHeader
             headingId={cumulativeId}
@@ -690,7 +690,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
 
         <section
           aria-labelledby={dailyId}
-          className={`${CARD} ${CARD_PAD} min-w-0`}
+          className={`${CARD} ${CARD_PAD} min-w-0 xl:row-span-2 xl:grid xl:grid-cols-[minmax(0,1fr)] xl:grid-rows-subgrid xl:gap-y-0`}
         >
           <CardHeader
             headingId={dailyId}

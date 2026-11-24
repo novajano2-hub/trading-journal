@@ -113,3 +113,27 @@ test('Performance at 390: the two chart slots stack, each the full width', async
   expect(Math.abs(a!.width - b!.width)).toBeLessThanOrEqual(1);
   expect(await noOverflow(page)).toBeLessThanOrEqual(0);
 });
+
+test('Performance at 390: Remove and Add chart work, and Back restores the chart', async ({
+  page,
+}) => {
+  await page.goto('/app/reports/performance');
+  await expect(page.getByTestId('reports-performance')).toBeVisible({
+    timeout: 30_000,
+  });
+  const remove = page.getByRole('button', { name: 'Remove chart 2' });
+  await remove.click();
+  await expect(
+    page.getByRole('region', { name: 'Chart 2', exact: true }),
+  ).toHaveCount(0);
+  const add = page.getByRole('button', { name: 'Add chart' });
+  expect(await noOverflow(page)).toBeLessThanOrEqual(0);
+  await add.click();
+  await expect(
+    page.getByRole('region', { name: 'Chart 2', exact: true }),
+  ).toBeVisible();
+  await page.goBack();
+  await expect(
+    page.getByRole('region', { name: 'Chart 2', exact: true }),
+  ).toHaveCount(0);
+});

@@ -103,6 +103,18 @@ test('Performance at 1440: two charts side by side, no sideways scroll, and Expa
     page.getByRole('region', { name: 'Chart 2', exact: true }),
   ).toBeVisible();
   await expect(page).not.toHaveURL(/off=/);
+
+  // Back undoes the Add (the slot goes), and again undoes the Remove (it returns).
+  await page.goBack();
+  await expect(page).toHaveURL(/off=2/);
+  await expect(
+    page.getByRole('region', { name: 'Chart 2', exact: true }),
+  ).toHaveCount(0);
+  await page.goBack();
+  await expect(page).not.toHaveURL(/off=/);
+  await expect(
+    page.getByRole('region', { name: 'Chart 2', exact: true }),
+  ).toBeVisible();
 });
 
 test('the Overview at 1440 puts the two P&L charts side by side', async ({
@@ -120,6 +132,12 @@ test('the Overview at 1440 puts the two P&L charts side by side', async ({
   expect(Math.abs(a!.y - b!.y)).toBeLessThanOrEqual(1);
   expect(b!.x).toBeGreaterThan(a!.x + a!.width - 1);
   expect(Math.abs(a!.width - b!.width)).toBeLessThanOrEqual(2);
+  // The plots start level, whatever the headers do.
+  const [pa, pb] = await Promise.all([
+    cumulative.getByRole('img').first().boundingBox(),
+    daily.getByRole('img').first().boundingBox(),
+  ]);
+  expect(Math.abs(pa!.y - pb!.y)).toBeLessThanOrEqual(2);
 });
 
 test('Day & time: time of day in 15 minutes, by exit, cross-analysed by side', async ({

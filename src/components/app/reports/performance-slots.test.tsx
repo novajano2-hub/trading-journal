@@ -308,3 +308,80 @@ test('Expand on slot 2 opens that chart, and Remove sits beside it in the header
   const dialog = await screen.findByRole('dialog');
   expect(dialog.textContent).toContain('Net P&L by day');
 });
+
+test('removing and adding a chart each make a history entry, so Back undoes them; other changes replace', async () => {
+  renderApp(<PerformanceView />, { sample: reportsSample, url: URL });
+  const push = vi.spyOn(window.history, 'pushState');
+  const replace = vi.spyOn(window.history, 'replaceState');
+  const two = await chart(2);
+  const metrics = await picker(two);
+  fireEvent.click(metrics.getByRole('checkbox', { name: 'Trades' }));
+  fireEvent.click(
+    within(two.getByRole('radiogroup', { name: 'Group by' })).getByRole(
+      'radio',
+      { name: 'Day' },
+    ),
+  );
+  expect(push).not.toHaveBeenCalled();
+  expect(replace).toHaveBeenCalledTimes(2);
+  fireEvent.click(screen.getByRole('button', { name: 'Remove chart 2' }));
+  expect(push).toHaveBeenCalledTimes(1);
+  expect(String(push.mock.calls[0]![2])).toContain('off=2');
+  fireEvent.click(screen.getByRole('button', { name: 'Add chart' }));
+  expect(push).toHaveBeenCalledTimes(2);
+  expect(String(push.mock.calls[1]![2])).not.toContain('off=');
+  push.mockRestore();
+  replace.mockRestore();
+});
+
+test('a slot whose series has no value in some periods says why', async () => {
+  renderApp(<PerformanceView />, {
+    sample: reportsSample,
+    // Running by day: Mon and Tue are only green, Wed on has a red day.
+    url: `${URL}?m2=avg-daily-win-loss:line:running&bucket2=day`,
+  });
+  const two = await chart(2);
+  await two.findByRole('img', { name: /Average daily win\/loss/ });
+  expect(
+    two.getByText(
+      'Average daily win/loss (running) shows only for periods with both a green and a red day.',
+    ),
+  ).toBeTruthy();
+  // Chart 1 has a value everywhere, so no note.
+  expect((await chart(1)).queryByText(/shows only for/)).toBeNull();
+});
+
+test('a slot with no value in any period shows the reason in place of an empty chart', async () => {
+  renderApp(<PerformanceView />, {
+    sample: reportsSample,
+    // A single day is only green or red, never both.
+    url: `${URL}?bucket2=day`,
+  });
+  const two = await chart(2);
+  expect(
+    await two.findByText(
+      'Average daily win/loss shows only for periods with both a green and a red day.',
+    ),
+  ).toBeTruthy();
+  expect(two.queryByRole('img')).toBeNull();
+  // The default (Week) has values, so the chart is there.
+});
+
+test('the table starts afresh when the chart it follows changes', async () => {
+  renderApp(<PerformanceView />, {
+    sample: reportsSample,
+    url: `${URL}?m=trades:bar&bucket=day&m2=trades:bar&bucket2=day`,
+  });
+  const table = await screen.findByRole('table', { name: 'Summary by day' });
+  fireEvent.click(
+    within(table).getByRole('button', { name: 'Sort by Trades' }),
+  );
+  expect(
+    within(table).getAllByRole('columnheader')[1]!.getAttribute('aria-sort'),
+  ).toBe('descending');
+  fireEvent.click(screen.getByRole('button', { name: 'Remove chart 1' }));
+  const next = await screen.findByRole('table', { name: 'Summary by day' });
+  expect(
+    within(next).getAllByRole('columnheader')[1]!.getAttribute('aria-sort'),
+  ).toBe('none');
+});
