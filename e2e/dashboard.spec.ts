@@ -40,7 +40,7 @@ test('filters change the numbers and the URL', async ({ page }, info) => {
   // The sheet is a modal: close it to read the page behind.
   if (mobile) await page.keyboard.press('Escape');
   await expect(
-    page.getByRole('heading', { name: 'Your plan, 9-15 Nov' }),
+    page.getByRole('heading', { name: 'Your plan, 8-14 Nov' }),
   ).toBeVisible();
 });
 
