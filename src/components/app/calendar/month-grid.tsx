@@ -236,7 +236,7 @@ function Cell({
             {rest.map((l) => (
               <span
                 key={l.key}
-                className="mt-px block truncate text-[11.5px] whitespace-nowrap text-muted tabular-nums @[700px]/cal:text-[12px]"
+                className="mt-px block text-[11.5px] break-words text-muted tabular-nums @[700px]/cal:text-[12px]"
               >
                 {l.node}
               </span>

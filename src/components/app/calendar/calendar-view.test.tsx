@@ -212,11 +212,47 @@ test('choosing Win rate as a third stat shows it in the cells', async () => {
       screen.getByRole('button', { name: /^Thu 19 Nov/ }).textContent,
     ).toContain('67% win rate'),
   );
-  // Three is the most: the others are now disabled.
-  expect(
-    (screen.getByRole('checkbox', { name: 'Fees' }) as HTMLInputElement)
-      .disabled,
-  ).toBe(true);
+  // There is no cap: Fees is still free to tick, and it stacks under the others.
+  const fees = screen.getByRole('checkbox', { name: 'Fees' });
+  expect((fees as HTMLInputElement).disabled).toBe(false);
+  fireEvent.click(fees);
+  await waitFor(() =>
+    expect(
+      screen.getByRole('button', { name: /^Thu 19 Nov/ }).textContent,
+    ).toContain('fees'),
+  );
+});
+
+test('with every stat ticked a cell stacks every line in the chosen order, and the day panel shows them all', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: UNITS,
+  });
+  await repository.prefs.update({
+    calendarStats: [
+      'winRate',
+      'net',
+      'trades',
+      'r',
+      'fees',
+      'ticks',
+      'pips',
+      'points',
+    ],
+  });
+  renderApp(<CalendarView />, { repository, url: url('&day=2026-11-19') });
+  const cell = await screen.findByRole('button', { name: /^Thu 19 Nov/ });
+  const text = cell.textContent ?? '';
+  const at = (s: string) => text.indexOf(s);
+  expect(at('win rate')).toBeGreaterThan(-1);
+  expect(at('win rate')).toBeLessThan(at('3 trades'));
+  expect(at('3 trades')).toBeLessThan(at(' fees'));
+  const panel = await screen.findByRole('complementary', {
+    name: /Thu 19 Nov/,
+  });
+  for (const term of ['Win rate', 'Trades', 'Fees', 'Ticks'])
+    expect(panel.textContent, term).toContain(term);
 });
 
 test('with Privacy on, the cells show $••• and no digit follows a $', async () => {
@@ -760,7 +796,7 @@ test('C1: the new rows are not truncated at 1440', async () => {
   }
 });
 
-test('C2: the stats menu offers Ticks, Pips and Points within the cap of three', async () => {
+test('C2: the stats menu offers Ticks, Pips and Points with no cap', async () => {
   renderApp(<CalendarView />, { sample: UNITS, url: url() });
   await screen.findByRole('grid', { name: 'November 2026' });
   fireEvent.click(screen.getByRole('button', { name: 'Stats shown' }));
@@ -771,7 +807,7 @@ test('C2: the stats menu offers Ticks, Pips and Points within the cap of three',
     expect(
       (screen.getByRole('checkbox', { name: 'Pips' }) as HTMLInputElement)
         .disabled,
-    ).toBe(true),
+    ).toBe(false),
   );
 });
 

@@ -109,7 +109,6 @@ test('display prefs persist', async () => {
 test.each([
   { displayUnit: 'yen' },
   { calendarStats: [] },
-  { calendarStats: ['net', 'trades', 'fees', 'r'] },
   { calendarStats: ['net', 'net'] },
   { calendarStats: ['volume'] },
 ])('invalid display pref %j is refused with RangeError', async (p) => {
@@ -118,6 +117,32 @@ test.each([
     repo.prefs.update(p as Partial<UserPrefs>),
   ).rejects.toBeInstanceOf(RangeError);
   expect(await repo.prefs.get()).toEqual(defaultPrefs());
+});
+
+test('any number of the calendar stats is kept, in the order chosen', async () => {
+  const all = [
+    'pips',
+    'net',
+    'trades',
+    'winRate',
+    'r',
+    'fees',
+    'ticks',
+    'points',
+  ] as const;
+  const repo = open(new IDBFactory());
+  await repo.prefs.update({ calendarStats: [...all] });
+  expect((await repo.prefs.get()).calendarStats).toEqual(all);
+});
+
+test('weekStart saves Sunday or Monday and refuses anything else', async () => {
+  const repo = open(new IDBFactory());
+  expect((await repo.prefs.get()).weekStart).toBeUndefined();
+  await repo.prefs.update({ weekStart: 'monday' });
+  expect((await repo.prefs.get()).weekStart).toBe('monday');
+  await expect(
+    repo.prefs.update({ weekStart: 'friday' as never }),
+  ).rejects.toBeInstanceOf(RangeError);
 });
 
 test('the hidden Overview figures persist, and only a list of strings is stored', async () => {

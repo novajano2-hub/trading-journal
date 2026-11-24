@@ -66,7 +66,6 @@ import {
 
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DAY = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
-const MAX_STATS = 3;
 const STAT_ORDER: readonly CalendarStat[] = [
   'net',
   'trades',
@@ -168,7 +167,8 @@ function StatsMenu({
           className="z-[60] w-[240px] origin-(--radix-popover-content-transform-origin) rounded-[12px] border border-line bg-surface-1 p-3 text-text shadow-[var(--shadow)] outline-none motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in"
         >
           <p className="text-[12.5px] leading-snug text-muted">
-            Up to {MAX_STATS} figures in each day. The first one leads.
+            Any figures in each day, stacked in the order you tick them. The
+            first one leads.
           </p>
           <ul aria-label="Stats shown" className="mt-2 flex flex-col gap-0.5">
             {STAT_ORDER.map((key) => {
@@ -177,9 +177,7 @@ function StatsMenu({
                 <li key={key} className="flex min-h-9 items-center">
                   <TaskCheckbox
                     checked={on}
-                    disabled={
-                      on ? stats.length === 1 : stats.length >= MAX_STATS
-                    }
+                    disabled={on && stats.length === 1}
                     onCheckedChange={(next) =>
                       onChange(
                         next ? [...stats, key] : stats.filter((s) => s !== key),

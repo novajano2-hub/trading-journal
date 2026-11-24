@@ -24,7 +24,6 @@ const CALENDAR_STATS: readonly CalendarStat[] = [
   'pips',
   'points',
 ];
-const MAX_CALENDAR_STATS = 3;
 
 /** The prefs as stored, over the defaults. Works inside a transaction that includes `db.meta`. */
 export async function readPrefs(db: KeelDb): Promise<UserPrefs> {
@@ -100,12 +99,11 @@ function validate(p: Partial<UserPrefs>): void {
   if (
     stats &&
     (stats.length === 0 ||
-      stats.length > MAX_CALENDAR_STATS ||
       new Set(stats).size !== stats.length ||
       !stats.every((x) => CALENDAR_STATS.includes(x)))
   )
     throw new RangeError(
-      `Calendar stats must be 1 to ${MAX_CALENDAR_STATS} of ${CALENDAR_STATS.join(', ')}, got ${stats.join(', ')}`,
+      `Calendar stats must be one or more of ${CALENDAR_STATS.join(', ')}, each once, got ${stats.join(', ')}`,
     );
   for (const [id, g] of Object.entries(p.goals ?? {})) {
     if (typeof g !== 'object' || g === null)

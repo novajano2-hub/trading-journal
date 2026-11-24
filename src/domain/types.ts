@@ -275,7 +275,7 @@ export interface UserPrefs {
   hideTradeSummary: boolean;
   /** The day weeks start on, in the calendar, the weekly buckets, the week presets and the weekday order; undefined: Sunday. */
   weekStart?: WeekStart;
-  /** What a calendar day shows: any number of the stats, in the order chosen. */
+  /** What a calendar day shows: one or more of the stats, in the order chosen. */
   calendarStats: CalendarStat[];
   instrumentsTraded: AssetClass[];
   settleExpiredOptions: boolean;
