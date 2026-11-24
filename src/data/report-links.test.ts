@@ -64,6 +64,13 @@ const ALL: BreakdownKey[] = [
   'r',
   'month',
   'dte',
+  'instrument',
+  'account',
+  'entry-price',
+  'exit-price',
+  'exit-hour',
+  'symbol-top',
+  'symbol-bottom',
 ];
 /** Buckets that have no filter, by design. */
 const NO_LINK = (by: BreakdownKey, key: string) =>
@@ -125,6 +132,128 @@ describe('a bucket opens exactly the trades it counted', () => {
         [...row.tradeIds].sort(),
       );
     }
+  });
+});
+
+describe('the Task 29 buckets link to exactly their trades', () => {
+  const closedIds = (f: GlobalFilters) =>
+    applyFilters(ws.trades, f, env)
+      .filter(isClosed)
+      .map((t) => t.id)
+      .sort();
+
+  test('instrument sets the asset class filter and round-trips through the address', () => {
+    const rows = breakdown(ws.trades, 'instrument', ctxOf());
+    expect(rows.length).toBeGreaterThan(2);
+    for (const row of rows) {
+      const href = bucketHref(EMPTY_FILTERS, 'instrument', row.key)!;
+      expect(new URL(href, 'http://x').searchParams.get('inst')).toBe(row.key);
+      expect(logIds(href)).toEqual([...row.tradeIds].sort());
+    }
+  });
+
+  test('price buckets include their lower edge and exclude the upper', () => {
+    for (const by of ['entry-price', 'exit-price'] as const) {
+      const rows = breakdown(ws.trades, by, ctxOf());
+      for (const row of rows) {
+        if (row.tradeIds.length === 0) continue;
+        const f = bucketFilters(EMPTY_FILTERS, by, row.key)!;
+        const r = by === 'entry-price' ? f.entryPrice : f.exitPrice;
+        expect(r?.minExclusive).toBeUndefined();
+        expect(r?.maxExclusive).toBe(true);
+        expect(closedIds(f)).toEqual([...row.tradeIds].sort());
+      }
+    }
+  });
+
+  test('a price bucket inside a page price range is intersected', () => {
+    const rows = breakdown(ws.trades, 'entry-price', ctxOf()).filter(
+      (r) => r.tradeIds.length > 0,
+    );
+    const mid = rows[Math.floor(rows.length / 2)]!;
+    const [from] = mid.key.split('_').map(Number) as [number, number];
+    const base: GlobalFilters = { ...EMPTY_FILTERS, entryPrice: { min: from } };
+    const set = applyFilters(ws.trades, base, env);
+    for (const row of breakdown(set, 'entry-price', ctxOf())) {
+      const f = bucketFilters(base, 'entry-price', row.key);
+      if (!f) {
+        expect(row.tradeIds).toEqual([]);
+        continue;
+      }
+      expect(closedIds(f)).toEqual([...row.tradeIds].sort());
+    }
+  });
+
+  test('account follows the page choice', () => {
+    const [a, b] = ws.accounts;
+    const only: GlobalFilters = { ...EMPTY_FILTERS, accountIds: [a!.id] };
+    expect(bucketFilters(only, 'account', b!.id)).toBeNull();
+    expect(bucketFilters(only, 'account', a!.id)?.accountIds).toEqual([a!.id]);
+    const any = bucketFilters(EMPTY_FILTERS, 'account', b!.id);
+    expect(any?.accountIds).toEqual([b!.id]);
+  });
+
+  test('exit hour reads the exit window even when the report buckets by entry', () => {
+    const f = bucketFilters(EMPTY_FILTERS, 'exit-hour', '10', {
+      timeBasis: 'entry',
+    });
+    expect(f?.exitWindows).toEqual([{ from: '10:00', to: '10:59' }]);
+    expect(f?.entryWindows).toEqual([]);
+  });
+
+  test('top and bottom 10 symbols link by symbol', () => {
+    expect(bucketFilters(EMPTY_FILTERS, 'symbol-top', 'ES')?.symbols).toEqual([
+      'ES',
+    ]);
+    expect(
+      bucketFilters(
+        { ...EMPTY_FILTERS, symbols: ['NQ'] },
+        'symbol-bottom',
+        'ES',
+      ),
+    ).toBeNull();
+  });
+
+  test('cross cells with the new dimensions agree with the log', () => {
+    const pairs: [BreakdownKey, BreakdownKey][] = [
+      ['symbol', 'instrument'],
+      ['account', 'entry-price'],
+      ['exit-hour', 'size'],
+      ['symbol-top', 'exit-price'],
+      ['instrument', 'r'],
+    ];
+    for (const [rowBy, colBy] of pairs) {
+      const m = breakdown2D(ws.trades, ctxOf(), rowBy, colBy, 'trades');
+      let linked = 0;
+      m.rows.forEach((row, r) =>
+        m.cols.forEach((col, c) => {
+          const href = cellHref(
+            EMPTY_FILTERS,
+            { by: rowBy, key: row.key },
+            { by: colBy, key: col.key },
+          );
+          if (m.counts[r]![c] === null) return;
+          if (href === undefined) return;
+          linked += 1;
+          expect(
+            logIds(href),
+            `${rowBy} ${row.key} x ${colBy} ${col.key}`,
+          ).toEqual([...m.tradeIds[r]![c]!].sort());
+        }),
+      );
+      expect(linked, `${rowBy} x ${colBy}`).toBeGreaterThan(0);
+    }
+  });
+
+  test('with two currencies the link names one and the counts still agree', () => {
+    const rows = breakdown(ws.trades, 'instrument', ctxOf());
+    const first = rows[0]!;
+    const href = bucketHref(
+      { ...EMPTY_FILTERS, currency: 'USD' },
+      'instrument',
+      first.key,
+    )!;
+    expect(new URL(href, 'http://x').searchParams.get('ccy')).toBe('USD');
   });
 });
 

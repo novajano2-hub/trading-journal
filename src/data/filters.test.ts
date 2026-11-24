@@ -579,6 +579,31 @@ describe('the full filter set', () => {
     expect(advancedFilterCount({ ...EMPTY_FILTERS, currency: 'EUR' })).toBe(1);
   });
 
+  test('the instrument filter keeps the asset classes, round-trips and counts', () => {
+    const es = trade({ instrument: resolveInstrument('ESZ5')! });
+    const fx = trade({ instrument: resolveInstrument('EURUSD')! });
+    expect(run([es, fx], { assetClasses: ['forex'] })).toEqual([fx]);
+    expect(run([es, fx], { assetClasses: ['forex', 'future'] })).toEqual([
+      es,
+      fx,
+    ]);
+    const f = parseFilters(new URLSearchParams('inst=forex,future,bogus'));
+    expect(f.assetClasses).toEqual(['future', 'forex']);
+    expect(
+      serializeFilters({ ...EMPTY_FILTERS, assetClasses: ['forex'] }).get(
+        'inst',
+      ),
+    ).toBe('forex');
+    expect(
+      queryString(
+        serializeFilters(parseFilters(new URLSearchParams('inst=crypto'))),
+      ),
+    ).toBe('inst=crypto');
+    expect(
+      advancedFilterCount({ ...EMPTY_FILTERS, assetClasses: ['forex'] }),
+    ).toBe(1);
+  });
+
   test('the advanced count includes the exit day fields', () => {
     expect(
       advancedFilterCount({

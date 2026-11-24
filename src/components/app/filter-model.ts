@@ -8,6 +8,7 @@ import {
   type NumRange,
   type TimeWindow,
 } from '@/data/filters';
+import { ASSET_CLASSES, ASSET_CLASS_LABELS } from '@/domain/asset-class';
 import type { Account, Strategy, Tag, TagCategory } from '@/domain/types';
 import { plural } from '@/lib/format';
 
@@ -180,6 +181,7 @@ export function unshownFilters(f: GlobalFilters): string[] {
     [f.size !== undefined, 'Size'],
     [f.r !== undefined, 'R'],
     [f.currency !== undefined, 'Currency'],
+    [f.assetClasses.length > 0, 'Instrument'],
     [f.strategyMatch === 'all', 'Strategies, all'],
     [f.tagMatch === 'all', 'Tags, all'],
   ];
@@ -265,6 +267,15 @@ export function detailChips(f: GlobalFilters): DetailChip[] {
     currency: undefined,
   });
   add(f.noStrategy, 'noStrategy', () => 'No strategy', { noStrategy: false });
+  add(
+    f.assetClasses.length > 0,
+    'assetClasses',
+    () =>
+      `Instrument: ${ASSET_CLASSES.filter((c) => f.assetClasses.includes(c))
+        .map((c) => ASSET_CLASS_LABELS[c])
+        .join(', ')}`,
+    { assetClasses: [] },
+  );
   add(
     f.weekdays.length > 0,
     'weekdays',

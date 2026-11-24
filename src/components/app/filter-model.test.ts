@@ -208,10 +208,12 @@ test('a filter with no chip of its own gets one in the log, and the chip clears 
     size: { min: 100, minExclusive: true },
     r: { min: -1, max: 0, maxExclusive: true },
     noStrategy: true,
+    assetClasses: ['future', 'cfd'],
   };
   const chips = detailChips(f);
   expect(chips.map((c) => c.label)).toEqual([
     'No strategy',
+    'Instrument: Futures, CFDs',
     'Entry weekday: Mon, Wed',
     'Exit weekday: Sat',
     'Exit month: Dec',

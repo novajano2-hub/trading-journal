@@ -1,9 +1,11 @@
-import { localParts } from '../time';
+import { ASSET_CLASS_LABELS } from '../asset-class';
+import { localDate, localParts } from '../time';
 import { isClosed, type ClosedTrade } from '../trade-status';
 import { roundHalfEven } from '../money';
-import type { Cents, Trade } from '../types';
+import type { AssetClass, Cents, Trade } from '../types';
 import { classify, type MetricContext, type PnlBasis } from './context';
-import { rOf, summarize, type Summary } from './summary';
+import { priceBuckets, priceKeyOf } from './price-ranges';
+import { rOf, summarize, volumeOf, type Summary } from './summary';
 
 /** R multiples at or past this clamp into the tails of the R reports. */
 export const R_CLAMP = 5;
@@ -21,12 +23,30 @@ export type BreakdownKey =
   | 'size'
   | 'r'
   | 'month'
-  | 'dte';
+  | 'dte'
+  | 'instrument'
+  | 'account'
+  | 'entry-price'
+  | 'exit-price'
+  | 'exit-hour'
+  | 'symbol-top'
+  | 'symbol-bottom';
+
+/** How many symbols the top and bottom views keep. */
+export const SYMBOL_LIMIT = 10;
+/** The breakdowns that file trades by symbol: a cross-analysis offers only one of them. */
+export const SYMBOL_KEYS: readonly BreakdownKey[] = [
+  'symbol',
+  'symbol-top',
+  'symbol-bottom',
+];
 export interface BreakdownOptions {
   strategyNames?: Record<string, string>;
   tagNames?: Record<string, string>;
   /** Each tag's category name: the tag breakdown groups its rows by them. */
   tagCategoryNames?: Record<string, string>;
+  /** Account names by id: the account breakdown labels its rows with them. */
+  accountNames?: Record<string, string>;
   /** Which instant the time reports (weekday, hour, time-of-day, session) bucket by. Default 'entry'. */
   timeBasis?: 'entry' | 'exit';
   /** Time-of-day bucket width in minutes. Default 30. */
@@ -40,6 +60,10 @@ export interface BreakdownRow {
   /** The closed trades filed under the row, for the display units. */
   tradeIds: string[];
   summary: Summary;
+  /** The quantity of the closed trades, each counted once. */
+  volume: number;
+  /** The distinct days (in the user's time zone) the closed trades closed on. */
+  tradingDays: number;
 }
 export interface RBin {
   /** The first R in the bin; -Infinity for the low tail. */
@@ -284,7 +308,11 @@ interface Spec {
   groupOf?(key: string): string | undefined;
 }
 
-function specOf(by: BreakdownKey, ctx: MetricContext & BreakdownOptions): Spec {
+function specOf(
+  by: BreakdownKey,
+  ctx: MetricContext & BreakdownOptions,
+  closed: readonly ClosedTrade[],
+): Spec {
   const instant = (t: ClosedTrade) =>
     ctx.timeBasis === 'exit' ? t.closedAt : t.openedAt;
   const local = (t: ClosedTrade) => localParts(instant(t), ctx.timeZone);
@@ -327,10 +355,42 @@ function specOf(by: BreakdownKey, ctx: MetricContext & BreakdownOptions): Spec {
         labelOf: (k) => DTES.find(([key]) => key === k)?.[1] ?? k,
       };
     case 'symbol':
+    case 'symbol-top':
+    case 'symbol-bottom':
       return {
         keysOf: one((t) => t.instrument.root),
         labelOf: (k) => k,
       };
+    case 'instrument':
+      return {
+        keysOf: one((t) => t.instrument.assetClass),
+        labelOf: (k) => ASSET_CLASS_LABELS[k as AssetClass] ?? k,
+      };
+    case 'account':
+      return {
+        keysOf: one((t) => t.accountId),
+        labelOf: (k) => ctx.accountNames?.[k] ?? k,
+      };
+    case 'exit-hour':
+      return fixed(HOURS, (t) =>
+        String(localParts(t.closedAt, ctx.timeZone).hour),
+      );
+    case 'entry-price':
+    case 'exit-price': {
+      // The ranges are cut to the prices in the set, so they come from the trades.
+      const price = (t: ClosedTrade) =>
+        by === 'entry-price' ? t.avgEntry : t.avgExit;
+      const buckets = priceBuckets(closed.flatMap((t) => price(t) ?? []));
+      return {
+        fixed: buckets.map((b): Bucket => [b.key, b.label]),
+        keysOf: (t) => {
+          const p = price(t);
+          const key = p === undefined ? undefined : priceKeyOf(p, buckets);
+          return key === undefined ? [] : [key];
+        },
+        labelOf: (k) => buckets.find((b) => b.key === k)?.label ?? k,
+      };
+    }
     case 'strategy':
       return {
         // A trade counts under each of its strategies.
@@ -373,33 +433,73 @@ export function breakdown(
   by: BreakdownKey,
   ctx: MetricContext & BreakdownOptions,
 ): BreakdownRow[] {
-  const spec = specOf(by, ctx);
-  const groups = grouped(trades.filter(isClosed), spec);
+  const closed = trades.filter(isClosed);
+  const spec = specOf(by, ctx, closed);
+  const groups = grouped(closed, spec);
+  const rowOf = (key: string, label: string, ts: ClosedTrade[]) => ({
+    key,
+    label,
+    tradeIds: ts.map((t) => t.id),
+    summary: summarize(ts, ctx),
+    volume: volumeOf(ts),
+    tradingDays: new Set(ts.map((t) => localDate(t.closedAt, ctx.timeZone)))
+      .size,
+  });
   if (spec.fixed)
-    return spec.fixed.map(([key, label]) => ({
-      key,
-      label,
-      tradeIds: groups.get(key)!.map((t) => t.id),
-      summary: summarize(groups.get(key)!, ctx),
-    }));
+    return spec.fixed.map(([key, label]) =>
+      rowOf(key, label, groups.get(key)!),
+    );
   const rows = [...groups].map(([key, ts]): BreakdownRow => {
     const group = key === NONE ? undefined : spec.groupOf?.(key);
     return {
-      key,
-      label: spec.labelOf(key),
+      ...rowOf(key, spec.labelOf(key), ts),
       ...(group !== undefined && { group }),
-      tradeIds: ts.map((t) => t.id),
-      summary: summarize(ts, ctx),
     };
   });
   // Array.prototype.sort is stable, so ties keep first-appearance order.
-  return rows.sort((a, b) => {
+  const sorted = rows.sort((a, b) => {
     if (a.key === NONE) return b.key === NONE ? 0 : 1;
     if (b.key === NONE) return -1;
     if (spec.groupOf && a.group !== b.group)
       return (a.group ?? '').localeCompare(b.group ?? '');
     return basisPnl(b.summary) - basisPnl(a.summary);
   });
+  // The best ten by net, or the worst ten with the worst first.
+  if (by === 'symbol-top') return sorted.slice(0, SYMBOL_LIMIT);
+  if (by === 'symbol-bottom') return sorted.slice(-SYMBOL_LIMIT).reverse();
+  return sorted;
+}
+
+/** What a breakdown singles out besides its best and worst by net. */
+export interface Highlights {
+  /** The bucket with the most closed trades. */
+  mostActive: BreakdownRow | null;
+  /** The bucket with the highest win rate; the busier one when they tie. */
+  bestWinRate: BreakdownRow | null;
+}
+
+/**
+ * The most active bucket and the best win-rate bucket of `rows`. A bucket with
+ * no decided trade has no win rate and cannot win it; ties on either go to the
+ * bucket with more trades, then to the one first in `rows`.
+ */
+export function highlights(rows: readonly BreakdownRow[]): Highlights {
+  const traded = rows.filter((r) => r.summary.closedCount > 0);
+  const busier = (a: BreakdownRow, b: BreakdownRow) =>
+    b.summary.closedCount > a.summary.closedCount ? b : a;
+  const mostActive = traded.reduce<BreakdownRow | null>(
+    (best, r) => (best === null ? r : busier(best, r)),
+    null,
+  );
+  const bestWinRate = traded.reduce<BreakdownRow | null>((best, r) => {
+    const rate = r.summary.winRate;
+    if (rate === null) return best;
+    if (best === null) return r;
+    const top = best.summary.winRate!;
+    if (rate > top) return r;
+    return rate === top ? busier(best, r) : best;
+  }, null);
+  return { mostActive, bestWinRate };
 }
 
 export type CrossMetric = 'net' | 'trades' | 'win-rate' | 'profit-factor';
@@ -442,8 +542,8 @@ export function breakdown2D(
 } {
   const merged = { ...ctx, ...opts };
   const closed = trades.filter(isClosed);
-  const rowSpec = specOf(rows, merged);
-  const colSpec = specOf(cols, merged);
+  const rowSpec = specOf(rows, merged, closed);
+  const colSpec = specOf(cols, merged, closed);
   const rowGroups = grouped(closed, rowSpec);
   const colGroups = grouped(closed, colSpec);
   const order = (by: BreakdownKey) =>

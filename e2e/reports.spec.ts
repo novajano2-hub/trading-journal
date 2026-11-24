@@ -149,3 +149,34 @@ test('a weekday bar opens the log with exactly the trades it counted', async ({
   // The weekday shows as a chip the user can clear.
   await expect(page.getByText(`Entry weekday: ${busiest.name}`)).toBeVisible();
 });
+
+test('an instrument row opens the log with exactly its trades and a chip, and the column choice rides the address', async ({
+  page,
+}) => {
+  await openReports(page);
+  await page.goto('/app/reports/symbols?view=instrument');
+  await expect(page.getByTestId('reports-symbols')).toBeVisible({
+    timeout: 30_000,
+  });
+  const table = page.getByRole('table', { name: 'Instruments summary' });
+  const first = table.getByRole('row').nth(1);
+  const name = (await first.getByRole('cell').nth(0).textContent()) ?? '';
+  const trades = Number(await first.getByRole('cell').nth(1).textContent());
+  expect(trades).toBeGreaterThan(0);
+
+  // Hiding a column writes cols and takes the column out.
+  await page.getByRole('button', { name: 'Columns' }).click();
+  await page.getByRole('checkbox', { name: 'Largest loss' }).uncheck();
+  await expect(page).toHaveURL(/cols=/);
+  await expect(
+    table.getByRole('columnheader', { name: /Largest loss/ }),
+  ).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  await first.getByRole('link').click();
+  await expect(page).toHaveURL(/\/app\/trades\?.*inst=/);
+  await expect(
+    page.getByRole('radio', { name: `Closed ${trades}` }),
+  ).toBeChecked();
+  await expect(page.getByText(`Instrument: ${name}`)).toBeVisible();
+});

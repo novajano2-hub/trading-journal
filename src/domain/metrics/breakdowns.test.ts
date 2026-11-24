@@ -5,6 +5,7 @@ import { defaultMetricContext } from './context';
 import {
   breakdown,
   breakdown2D,
+  highlights,
   rDistribution,
   winsVsLosses,
 } from './breakdowns';
@@ -549,5 +550,145 @@ describe('winsVsLosses', () => {
       avgNet: null,
       longShare: null,
     });
+  });
+});
+
+describe('the Task 29 dimensions', () => {
+  const fx = (accountId: string, symbol: string, net: number, extra = {}) =>
+    makeTrade({
+      net,
+      accountId,
+      instrument: resolveInstrument(symbol)!,
+      openedAt: '2026-03-09T14:10:00Z',
+      closedAt: '2026-03-09T15:40:00Z',
+      ...extra,
+    });
+
+  test('instrument buckets by asset class, richest first', () => {
+    const t = [
+      fx('a1', 'ESZ5', 500),
+      fx('a1', 'NQZ5', 700),
+      fx('a1', 'SPY261109C00500000', -100),
+      fx('a1', 'EURUSD', 50),
+    ];
+    const rows = breakdown(t, 'instrument', ctx);
+    expect(rows.map((r) => [r.key, r.label, r.summary.closedCount])).toEqual([
+      ['future', 'Futures', 2],
+      ['forex', 'Forex', 1],
+      ['option', 'Options', 1],
+    ]);
+  });
+
+  test('account buckets by account id, named by the options', () => {
+    const t = [fx('a1', 'ESZ5', 500), fx('a2', 'ESZ5', -200)];
+    const rows = breakdown(t, 'account', {
+      ...ctx,
+      accountNames: { a1: 'Live', a2: 'Sim' },
+    });
+    expect(rows.map((r) => [r.key, r.label])).toEqual([
+      ['a1', 'Live'],
+      ['a2', 'Sim'],
+    ]);
+    // Unknown ids read as the id.
+    expect(breakdown(t, 'account', ctx)[0]!.label).toBe('a1');
+  });
+
+  test('exit hour is the hour the trade closed, whatever the time basis', () => {
+    const t = [fx('a1', 'ESZ5', 500)];
+    const rows = breakdown(t, 'exit-hour', { ...ctx, timeBasis: 'entry' });
+    expect(rows).toHaveLength(24);
+    expect(rows.find((r) => r.summary.closedCount)!.key).toBe('11');
+    expect(rows[11]!.label).toBe('11:00');
+  });
+
+  test('entry and exit price buckets are chosen from the set and are ascending', () => {
+    const t = [
+      fx('a1', 'ESZ5', 1, { avgEntry: 4410, avgExit: 4420 }),
+      fx('a1', 'ESZ5', 1, { avgEntry: 4990, avgExit: 5010 }),
+      fx('a1', 'ESZ5', 1, { avgEntry: 5300, avgExit: 5290 }),
+    ];
+    const entry = breakdown(t, 'entry-price', ctx);
+    expect(entry.filter((r) => r.summary.closedCount > 0)).toHaveLength(3);
+    const froms = entry.map((r) => Number(r.key.split('_')[0]));
+    expect(froms).toEqual([...froms].sort((a, b) => a - b));
+    const exit = breakdown(t, 'exit-price', ctx);
+    expect(exit.reduce((n, r) => n + r.summary.closedCount, 0)).toBe(3);
+    // Each trade sits in the bucket whose span holds its price.
+    for (const r of entry)
+      for (const id of r.tradeIds) {
+        const p = t.find((x) => x.id === id)!.avgEntry;
+        const [from, to] = r.key.split('_').map(Number) as [number, number];
+        expect(p >= from && p < to).toBe(true);
+      }
+  });
+
+  test('top and bottom 10 symbols keep ten by net, the worst first at the bottom', () => {
+    const roots = [
+      'ESZ5',
+      'NQZ5',
+      'CLZ5',
+      'GCZ5',
+      'YMZ5',
+      'RTYZ5',
+      'ZNZ5',
+      'MESZ5',
+      'MNQZ5',
+      'SIZ5',
+      '6EZ5',
+      'NGZ5',
+    ];
+    const t = roots.map((s, i) => fx('a1', s, (i - 5) * 100));
+    const all = breakdown(t, 'symbol', ctx);
+    expect(all).toHaveLength(12);
+    const top = breakdown(t, 'symbol-top', ctx);
+    expect(top).toHaveLength(10);
+    expect(top.map((r) => r.key)).toEqual(all.slice(0, 10).map((r) => r.key));
+    const bottom = breakdown(t, 'symbol-bottom', ctx);
+    expect(bottom).toHaveLength(10);
+    expect(bottom[0]!.key).toBe(all[11]!.key);
+    expect(new Set(bottom.map((r) => r.key))).toEqual(
+      new Set(all.slice(2).map((r) => r.key)),
+    );
+    // A cross-analysis against the top 10 has only those rows.
+    const m = breakdown2D(t, ctx, 'symbol-top', 'side', 'net');
+    expect(m.rows.map((r) => r.key)).toEqual(top.map((r) => r.key));
+  });
+
+  test('a row carries its volume and trading days', () => {
+    const t = [
+      fx('a1', 'ESZ5', 500, { maxPosition: 2 }),
+      fx('a1', 'ESZ5', 500, {
+        maxPosition: 4,
+        openedAt: '2026-03-10T14:10:00Z',
+        closedAt: '2026-03-10T14:40:00Z',
+      }),
+      fx('a1', 'ESZ5', 500, {
+        maxPosition: 1,
+        openedAt: '2026-03-10T15:10:00Z',
+        closedAt: '2026-03-10T15:40:00Z',
+      }),
+    ];
+    const row = breakdown(t, 'symbol', ctx)[0]!;
+    expect(row.volume).toBe(7);
+    expect(row.tradingDays).toBe(2);
+  });
+
+  test('highlights: the most active bucket and the best win rate, ties to the busier', () => {
+    const t = [
+      fx('a1', 'ESZ5', 100),
+      fx('a1', 'ESZ5', -100),
+      fx('a1', 'ESZ5', -100),
+      fx('a1', 'NQZ5', 100),
+      fx('a1', 'NQZ5', 100),
+      fx('a1', 'CLZ5', 100),
+    ];
+    const rows = breakdown(t, 'symbol', ctx);
+    const h = highlights(rows);
+    expect(h.mostActive?.key).toBe('ES');
+    // NQ and CL both win every trade; NQ has more.
+    expect(h.bestWinRate?.key).toBe('NQ');
+    expect(highlights([])).toEqual({ mostActive: null, bestWinRate: null });
+    const noDecided = breakdown([fx('a1', 'ESZ5', 0)], 'symbol', ctx);
+    expect(highlights(noDecided).bestWinRate).toBeNull();
   });
 });

@@ -14,23 +14,31 @@ import { FigureText } from '@/components/product/figure-text';
 import {
   breakdown,
   breakdown2D,
+  highlights,
+  SYMBOL_KEYS,
   type BreakdownKey,
   type BreakdownOptions,
   type BreakdownRow,
   type CrossMetric,
 } from '@/domain/metrics/breakdowns';
-import { pnlOf } from '@/domain/metrics/context';
+import { classify, pnlOf } from '@/domain/metrics/context';
 import { SERIES_META, type SeriesMetric } from '@/domain/metrics/series';
 import { largestInUnit } from '@/domain/metrics/summary';
 import { unitOf } from '@/domain/metrics/units';
 import { roundHalfEven } from '@/domain/money';
 import { bucketHref, cellHref, type BucketOptions } from '@/data/report-links';
-import { useStrategies, useTagCategories, useTags } from '@/data/query/hooks';
+import {
+  useAccounts,
+  useStrategies,
+  useTagCategories,
+  useTags,
+} from '@/data/query/hooks';
 import type { TagCategory } from '@/domain/types';
 import { useDisplay } from '@/lib/display';
 import { csvText, decimalOf, downloadCsv } from '@/lib/csv';
-import { formatPct, plural } from '@/lib/format';
+import { formatPct, formatQty, plural } from '@/lib/format';
 import { CARD, CARD_PAD, CardHeader, signTone } from '../dashboard/shared';
+import { ColumnsChooser } from './columns-chooser';
 import { CrossAnalysis } from './cross-analysis';
 import {
   formatPicks,
@@ -40,7 +48,14 @@ import {
   type Pick,
 } from './metric-chips';
 import { ReportChart, type ChartSeries } from './report-chart';
+import {
+  COLUMNS_PARAM,
+  formatColumns,
+  parseColumns,
+  REPORT_COLUMNS,
+} from './report-columns';
 import { ReportScope } from './report-scope';
+import { SubTabs } from './sub-tabs';
 import { MenuSelect } from '@/components/ui/menu-select';
 import { SummaryTable, type SummaryColumn } from './summary-table';
 import { writeParam, type ReportData } from './use-report-data';
@@ -111,7 +126,20 @@ const CROSS_DIMS: { key: BreakdownKey; label: string }[] = [
   { key: 'session', label: 'Session' },
   { key: 'strategy', label: 'Strategy' },
   { key: 'tag', label: 'Tag' },
+  { key: 'account', label: 'Account' },
+  { key: 'instrument', label: 'Instrument' },
+  { key: 'entry-price', label: 'Entry price' },
+  { key: 'exit-price', label: 'Exit price' },
+  { key: 'exit-hour', label: 'Exit hour' },
+  { key: 'size', label: 'Position size' },
+  { key: 'r', label: 'R-multiple' },
+  { key: 'symbol-top', label: 'Top 10 symbols' },
+  { key: 'symbol-bottom', label: 'Bottom 10 symbols' },
 ];
+
+/** Whether two breakdowns file trades the same way: the symbol and its top and bottom 10 are one. */
+const sameDimension = (a: BreakdownKey, b: BreakdownKey) =>
+  a === b || (SYMBOL_KEYS.includes(a) && SYMBOL_KEYS.includes(b));
 
 const CROSS_METRICS: { value: CrossMetric; label: string }[] = [
   { value: 'net', label: 'Net P&L' },
@@ -149,9 +177,13 @@ const CHART_METRICS: readonly SeriesMetric[] = [
 /** Breakdowns whose buckets have no order to read along: every bar keeps its label, tilted if need be. */
 const UNORDERED: ReadonlySet<BreakdownKey> = new Set([
   'symbol',
+  'symbol-top',
+  'symbol-bottom',
   'strategy',
   'tag',
   'side',
+  'instrument',
+  'account',
 ]);
 
 const DEFAULT_PICKS: readonly Pick[] = [
@@ -323,11 +355,21 @@ export function BreakdownCards({
   const rankId = useId();
   const tableId = useId();
   const cross = CROSS_DIMS.find(
-    (d) => d.key === params.get('x') && d.key !== by,
+    (d) => d.key === params.get('x') && !sameDimension(d.key, by),
   );
   const metric =
     CROSS_METRICS.find((m) => m.value === params.get('xm'))?.value ?? 'net';
-  const merged = useMemo(() => ({ ...ctx, ...options }), [ctx, options]);
+  const accounts = useAccounts().data;
+  const merged = useMemo(
+    () => ({
+      ...ctx,
+      accountNames: Object.fromEntries(
+        (accounts ?? []).map((a) => [a.id, a.name]),
+      ),
+      ...options,
+    }),
+    [ctx, options, accounts],
+  );
   const describe = labelOf ?? ((r: BreakdownRow) => r.label);
   // A bucket's link adds its filter to the page's, on the date the breakdown buckets by.
   const linkOpts: BucketOptions = {
@@ -352,6 +394,7 @@ export function BreakdownCards({
   );
   const tableRows = useMemo(() => visibleRows(all, visible), [all, visible]);
   const best = useMemo(() => ranked(all), [all]);
+  const picked = useMemo(() => highlights(all), [all]);
   const largest = Math.max(1, ...best.map((r) => Math.abs(basisNet(r))));
 
   /** A group of trades in the chosen unit; `money` is the view's own total. */
@@ -424,6 +467,60 @@ export function BreakdownCards({
     () => new Map(p.trades.map((t) => [t.id, t])),
     [p.trades],
   );
+  /** The trades `classify` calls a win, and those it calls a loss, in each bucket. */
+  const outcomes = useMemo(
+    () =>
+      new Map(
+        all.map((r) => {
+          const wins: string[] = [];
+          const losses: string[] = [];
+          for (const id of r.tradeIds) {
+            const t = tradeById.get(id);
+            if (!t) continue;
+            const o = classify(t, merged).outcome;
+            if (o === 'win') wins.push(id);
+            else if (o === 'loss') losses.push(id);
+          }
+          return [r.key, { wins, losses }] as const;
+        }),
+      ),
+    [all, tradeById, merged],
+  );
+  /** A bucket's average win or loss: the mean in the unit over its winners (or losers). */
+  const meanOf = (r: BreakdownRow, outcome: 'win' | 'loss') => {
+    const cents = outcome === 'win' ? r.summary.avgWin : r.summary.avgLoss;
+    if (cents === null) return null;
+    const own = outcomes.get(r.key);
+    const ids = (outcome === 'win' ? own?.wins : own?.losses) ?? [];
+    const sort = (() => {
+      if (!merged.unit) return cents;
+      const values = ids.flatMap((id) => {
+        const t = tradeById.get(id);
+        return t ? (unitOf(t, merged.unit!, basis) ?? []) : [];
+      });
+      return values.length === 0
+        ? cents
+        : values.reduce((a, b) => a + b, 0) / values.length;
+    })();
+    return { cents, ids, sort };
+  };
+  const meanCell = (r: BreakdownRow, outcome: 'win' | 'loss') => {
+    const m = meanOf(r, outcome);
+    if (m === null) return none;
+    return (
+      <span className={signTone(m.cents)}>
+        <FigureText
+          f={display.figure(
+            display.meanOfTrades(m.ids, m.cents),
+            true,
+            currency,
+          )}
+        />
+      </span>
+    );
+  };
+  const dailyVolume = (r: BreakdownRow) =>
+    r.tradingDays > 0 ? Number((r.volume / r.tradingDays).toFixed(2)) : null;
   /**
    * A bucket's largest win or loss: in a unit, the trade largest in it, and
    * the column sorts on its value there; in money, the trade with that amount.
@@ -570,6 +667,38 @@ export function BreakdownCards({
       },
     },
     {
+      id: 'avg-win',
+      header: 'Average win',
+      tip: 'avg-win',
+      align: 'right',
+      value: (r) => meanOf(r, 'win')?.sort ?? null,
+      cell: (r) => meanCell(r, 'win'),
+      csv: {
+        header: `Average win (${currency})`,
+        value: (r) => {
+          const c = r.summary.avgWin;
+          return c === null ? null : decimalOf(c);
+        },
+      },
+    },
+    {
+      id: 'avg-loss',
+      header: 'Average loss',
+      tip: 'avg-loss',
+      align: 'right',
+      value: (r) => meanOf(r, 'loss')?.sort ?? null,
+      // The most negative first.
+      descFirst: false,
+      cell: (r) => meanCell(r, 'loss'),
+      csv: {
+        header: `Average loss (${currency})`,
+        value: (r) => {
+          const c = r.summary.avgLoss;
+          return c === null ? null : decimalOf(c);
+        },
+      },
+    },
+    {
       id: 'largest-win',
       header: 'Largest win',
       tip: 'largest-win',
@@ -601,7 +730,29 @@ export function BreakdownCards({
             : decimalOf(r.summary.largestLoss),
       },
     },
+    {
+      id: 'avg-daily-volume',
+      header: 'Average daily volume',
+      tip: 'avg-daily-volume',
+      align: 'right',
+      value: (r) => dailyVolume(r),
+      cell: (r) => {
+        const v = dailyVolume(r);
+        return v === null ? none : formatQty(v);
+      },
+      csv: { value: (r) => dailyVolume(r) },
+    },
   ];
+  // The name (and the tag's category) always show; the others follow the address.
+  const shownIds = useMemo(
+    () => parseColumns(params.get(COLUMNS_PARAM)),
+    [params],
+  );
+  const chosen = new Set<string>(shownIds);
+  const choosable = new Set<string>(REPORT_COLUMNS.map((c) => c.id));
+  const visibleColumns = columns.filter(
+    (c) => !choosable.has(c.id) || chosen.has(c.id),
+  );
 
   // One pass serves the metric, the counts and the trades behind each cell.
   const matrix = useMemo(
@@ -636,9 +787,11 @@ export function BreakdownCards({
       );
     } else {
       csv = csvText(
-        columns.map((c) => c.csv?.header ?? c.header),
+        visibleColumns.map((c) => c.csv?.header ?? c.header),
         tableRows.map((r) =>
-          columns.map((c) => (c.csv ? c.csv.value(r) : (c.value(r) ?? null))),
+          visibleColumns.map((c) =>
+            c.csv ? c.csv.value(r) : (c.value(r) ?? null),
+          ),
         ),
       );
     }
@@ -740,6 +893,34 @@ export function BreakdownCards({
               ))}
             </ol>
           )}
+          {picked.mostActive && picked.bestWinRate ? (
+            <ul
+              aria-label="Highlights"
+              className="mt-2 border-t border-line pt-2"
+            >
+              <li className="flex flex-wrap items-baseline gap-x-2 py-1 text-[13px]">
+                <span className="text-faint">Most active</span>
+                <b className="font-semibold text-text">
+                  {describe(picked.mostActive)}
+                </b>
+                <span className="text-muted tabular-nums">
+                  {picked.mostActive.summary.closedCount}{' '}
+                  {plural(picked.mostActive.summary.closedCount, 'trade')}
+                </span>
+              </li>
+              <li className="flex flex-wrap items-baseline gap-x-2 py-1 text-[13px]">
+                <span className="text-faint">Best win rate</span>
+                <b className="font-semibold text-text">
+                  {describe(picked.bestWinRate)}
+                </b>
+                <span className="text-muted tabular-nums">
+                  {formatPct(picked.bestWinRate.summary.winRate ?? 0, 0)} won,{' '}
+                  {picked.bestWinRate.summary.closedCount}{' '}
+                  {plural(picked.bestWinRate.summary.closedCount, 'trade')}
+                </span>
+              </li>
+            </ul>
+          ) : null}
         </section>
       </div>
 
@@ -776,12 +957,28 @@ export function BreakdownCards({
                 onChange={(v) => writeParam('x', v === '' ? null : v)}
                 options={[
                   { value: '', label: 'None' },
-                  ...CROSS_DIMS.filter((d) => d.key !== by).map((d) => ({
-                    value: d.key,
-                    label: d.label,
-                  })),
+                  ...CROSS_DIMS.filter((d) => !sameDimension(d.key, by)).map(
+                    (d) => ({
+                      value: d.key,
+                      label: d.label,
+                    }),
+                  ),
                 ]}
               />
+              {cross ? null : (
+                <ColumnsChooser
+                  shown={shownIds}
+                  labelOf={(id, fallback) =>
+                    id === 'net'
+                      ? `${basis === 'gross' ? 'Gross' : 'Net'} P&L`
+                      : fallback
+                  }
+                  onChange={(next) =>
+                    writeParam(COLUMNS_PARAM, formatColumns(next))
+                  }
+                  onReset={() => writeParam(COLUMNS_PARAM, null)}
+                />
+              )}
               <button
                 type="button"
                 onClick={exportCsv}
@@ -836,7 +1033,7 @@ export function BreakdownCards({
               key={`${by}-${rowAllow ? [...rowAllow].join() : ''}`}
               label={tableName}
               rows={tableRows}
-              columns={columns}
+              columns={visibleColumns}
               basis={basis}
             />
           )}
@@ -861,19 +1058,103 @@ function Plain({
   );
 }
 
-/** Reports, Symbols: every symbol traded, by root. */
+type SymbolsTab = 'symbol' | 'instrument' | 'price';
+const SYMBOL_TABS: { value: SymbolsTab; label: string }[] = [
+  { value: 'symbol', label: 'By symbol' },
+  { value: 'instrument', label: 'By instrument' },
+  { value: 'price', label: 'By entry price' },
+];
+type Limit = 'all' | 'top' | 'bottom';
+const LIMITS: { value: Limit; label: string }[] = [
+  { value: 'all', label: 'All symbols' },
+  { value: 'top', label: 'Top 10' },
+  { value: 'bottom', label: 'Bottom 10' },
+];
+
+/** Symbols' three views, by symbol (limited to the top or bottom 10 by net if asked), by instrument, by entry price. */
+function SymbolsBody({ data }: { data: ReportData }): React.JSX.Element {
+  const params = useSearchParams();
+  const tab =
+    SYMBOL_TABS.find((t) => t.value === params.get('view'))?.value ?? 'symbol';
+  const limit =
+    LIMITS.find((l) => l.value === params.get('lim'))?.value ?? 'all';
+  const views = {
+    symbol: {
+      by:
+        limit === 'top'
+          ? ('symbol-top' as const)
+          : limit === 'bottom'
+            ? ('symbol-bottom' as const)
+            : ('symbol' as const),
+      chartLabel: 'Net P&L by symbol',
+      tableName: 'Symbols summary',
+      rowTitle: 'Symbol',
+      plural: 'Symbols',
+      title: 'By symbol',
+      caption: undefined,
+    },
+    instrument: {
+      by: 'instrument' as const,
+      chartLabel: 'Net P&L by instrument',
+      tableName: 'Instruments summary',
+      rowTitle: 'Instrument',
+      plural: 'Instruments',
+      title: 'By instrument',
+      caption: 'The asset class: stocks, options, futures, forex, crypto, CFDs',
+    },
+    price: {
+      by: 'entry-price' as const,
+      chartLabel: 'Net P&L by entry price',
+      tableName: 'Entry prices summary',
+      rowTitle: 'Entry price',
+      plural: 'Entry prices',
+      title: 'By entry price',
+      caption: 'Ranges cut to the prices in this set',
+    },
+  }[tab];
+  const controls =
+    tab === 'symbol' ? (
+      <ReportSelect
+        label="Show"
+        value={limit}
+        onChange={(v) => writeParam('lim', v === 'all' ? null : v)}
+        options={LIMITS}
+      />
+    ) : undefined;
+  return (
+    <SubTabs
+      label="Symbols view"
+      param="view"
+      options={SYMBOL_TABS}
+      value={tab}
+    >
+      <BreakdownCards
+        key={views.by}
+        data={data}
+        report="symbols"
+        by={views.by}
+        chartLabel={views.chartLabel}
+        tableName={views.tableName}
+        rowTitle={views.rowTitle}
+        plural={views.plural}
+        title={views.title}
+        {...(views.caption ? { caption: views.caption } : {})}
+        controls={controls}
+      />
+    </SubTabs>
+  );
+}
+
+/**
+ * Reports, Symbols: every symbol traded, by root; or by instrument (asset
+ * class); or by entry-price range. `?view=instrument`, `?view=price`, and for
+ * symbols `?lim=top` or `?lim=bottom` for the best or worst ten by net.
+ */
 export function SymbolsView(): React.JSX.Element {
   return (
-    <Plain
-      testId="reports-symbols"
-      report="symbols"
-      by="symbol"
-      chartLabel="Net P&L by symbol"
-      tableName="Symbols summary"
-      rowTitle="Symbol"
-      plural="Symbols"
-      title="By symbol"
-    />
+    <ReportScope testId="reports-symbols">
+      {(data) => <SymbolsBody data={data} />}
+    </ReportScope>
   );
 }
 

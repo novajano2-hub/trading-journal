@@ -48,6 +48,18 @@ test('choosing Losses and Wednesday, then Apply, writes both and the button coun
   expect(button.textContent).toContain('2');
 });
 
+test('the Instrument toggles write the asset classes as inst', async () => {
+  const panel = await openPanel();
+  check(panel, 'Futures');
+  check(panel, 'Forex');
+  fireEvent.click(within(panel).getByRole('button', { name: 'Apply' }));
+  expect(window.location.search).toBe('?inst=future,forex');
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(
+    await screen.findByRole('button', { name: 'More filters, 1 active' }),
+  ).toBeTruthy();
+});
+
 test('Cancel and Escape write nothing', async () => {
   let panel = await openPanel();
   check(panel, 'Losses');

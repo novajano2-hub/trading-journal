@@ -301,17 +301,18 @@ test('the table has Largest win and Largest loss columns', async () => {
   const heads = within(table)
     .getAllByRole('columnheader')
     .map((h) => h.textContent);
-  expect(heads.slice(-2)).toEqual(['Largest win', 'Largest loss']);
+  const at = heads.indexOf('Largest win');
+  expect(heads.slice(at, at + 2)).toEqual(['Largest win', 'Largest loss']);
   // ES: b-1 won 100.00 and b-2 lost 40.00.
   const es = rowOf(table, /^ES/)
     .getAllByRole('cell')
     .map((c) => c.textContent);
-  expect(es.slice(-2)).toEqual(['+$100.00', '−$40.00']);
+  expect(es.slice(at, at + 2)).toEqual(['+$100.00', '−$40.00']);
   // NQ: b-3 won 70.00 and b-4 lost 20.00.
   const nq = rowOf(table, /^NQ/)
     .getAllByRole('cell')
     .map((c) => c.textContent);
-  expect(nq.slice(-2)).toEqual(['+$70.00', '−$20.00']);
+  expect(nq.slice(at, at + 2)).toEqual(['+$70.00', '−$20.00']);
 });
 
 function captureDownload() {
@@ -350,12 +351,12 @@ test('Export CSV writes the visible columns with real values even under Privacy,
   expect(saved.name()).toMatch(/^keel-symbols-\d{4}-\d{2}-\d{2}\.csv$/);
   const lines = (await saved.text()).split('\r\n').filter(Boolean);
   expect(lines[0]).toBe(
-    'Symbol,Trades,Win rate (%),Net P&L (USD),Profit factor,Average (USD),Largest win (USD),Largest loss (USD)',
+    'Symbol,Trades,Win rate (%),Net P&L (USD),Profit factor,Average (USD),Average win (USD),Average loss (USD),Largest win (USD),Largest loss (USD),Average daily volume',
   );
-  // Only the shorts: ES b-2 (-40.00) and NQ b-4 (-20.00).
+  // Only the shorts: ES b-2 (-40.00) and NQ b-4 (-20.00), a lot each, one day each.
   expect(lines.slice(1).sort()).toEqual([
-    'ES,1,0.0,-40.00,0.00,-40.00,,-40.00',
-    'NQ,1,0.0,-20.00,0.00,-20.00,,-20.00',
+    'ES,1,0.0,-40.00,0.00,-40.00,,-40.00,,-40.00,1',
+    'NQ,1,0.0,-20.00,0.00,-20.00,,-20.00,,-20.00,1',
   ]);
   expect(lines.join('')).not.toContain('•');
 });
@@ -563,4 +564,318 @@ test('a running mode in a breakdown link is dropped, so its URLs stay clean', as
   expect(new URLSearchParams(window.location.search).get('m')).toBe(
     'net:line,win-rate:line',
   );
+});
+
+const headsOf = (table: HTMLElement) =>
+  within(table)
+    .getAllByRole('columnheader')
+    .map((h) => h.textContent);
+
+test('the table has Average win, Average loss and Average daily volume columns', async () => {
+  renderApp(<SymbolsView />, {
+    sample: breakdownSample,
+    url: '/app/reports/symbols',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const table = within(page).getByRole('table', { name: 'Symbols summary' });
+  const heads = headsOf(table);
+  for (const name of ['Average win', 'Average loss', 'Average daily volume'])
+    expect(heads).toContain(name);
+  const cell = (row: RegExp, head: string) =>
+    rowOf(table, row).getAllByRole('cell')[heads.indexOf(head)]!.textContent;
+  // ES: one win of 100.00 and one loss of 40.00; 3 lots (2 and 1) on one day.
+  expect(cell(/^ES/, 'Average win')).toBe('+$100.00');
+  expect(cell(/^ES/, 'Average loss')).toBe('−$40.00');
+  expect(cell(/^ES/, 'Average daily volume')).toBe('3');
+  // SPY has one win (30.00) and two losses (10.00, 5.00): average loss 7.50.
+  expect(cell(/^SPY/, 'Average win')).toBe('+$30.00');
+  expect(cell(/^SPY/, 'Average loss')).toBe('−$7.50');
+  // A bucket with no win shows None.
+  cleanup();
+  renderApp(<SymbolsView />, {
+    sample: breakdownSample,
+    url: '/app/reports/symbols?side=short',
+  });
+  const shorts = within(
+    await screen.findByRole('table', { name: 'Symbols summary' }),
+  );
+  expect(shorts.getAllByText('None').length).toBeGreaterThan(0);
+});
+
+test('Average win and Average loss read in the display unit', async () => {
+  const repository = await repositoryWith({ displayUnit: 'r' });
+  renderApp(<SymbolsView />, { repository, url: '/app/reports/symbols' });
+  const page = await screen.findByTestId('reports-symbols');
+  const table = within(page).getByRole('table', { name: 'Symbols summary' });
+  const heads = headsOf(table);
+  // ES: b-1 is +2R and b-2 is -1R.
+  const es = rowOf(table, /^ES/).getAllByRole('cell');
+  expect(es[heads.indexOf('Average win')]!.textContent).toContain('+2.00R');
+  expect(es[heads.indexOf('Average loss')]!.textContent).toContain('−1.00R');
+});
+
+test('the column chooser: toggles write cols to the address and Reset clears it', async () => {
+  renderApp(<SymbolsView />, {
+    sample: breakdownSample,
+    url: '/app/reports/symbols',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const table = () =>
+    within(page).getByRole('table', { name: 'Symbols summary' });
+  expect(headsOf(table())).toContain('Largest loss');
+  fireEvent.click(within(page).getByRole('button', { name: 'Columns' }));
+  const loss = await screen.findByRole('checkbox', { name: 'Largest loss' });
+  expect((loss as HTMLInputElement).checked).toBe(true);
+  fireEvent.click(loss);
+  expect(headsOf(table())).not.toContain('Largest loss');
+  expect(new URLSearchParams(window.location.search).get('cols')).toBe(
+    'trades,win-rate,net,profit-factor,average,avg-win,avg-loss,largest-win,avg-daily-volume',
+  );
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Reset to default' }),
+  );
+  expect(headsOf(table())).toContain('Largest loss');
+  expect(new URLSearchParams(window.location.search).get('cols')).toBeNull();
+});
+
+test('a link with cols shows just those columns, and the export writes the same', async () => {
+  renderApp(<SymbolsView />, {
+    sample: breakdownSample,
+    url: '/app/reports/symbols?cols=trades,avg-win',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const table = within(page).getByRole('table', { name: 'Symbols summary' });
+  expect(headsOf(table)).toEqual(['Symbol', 'Trades', 'Average win']);
+  const saved = captureDownload();
+  fireEvent.click(
+    await within(page).findByRole('button', { name: 'Export CSV' }),
+  );
+  await vi.waitFor(() => expect(saved.name()).not.toBe(''));
+  const lines = (await saved.text()).split('\r\n').filter(Boolean);
+  expect(lines[0]).toBe('Symbol,Trades,Average win (USD)');
+});
+
+test('the last column cannot be switched off', async () => {
+  renderApp(<SymbolsView />, {
+    sample: breakdownSample,
+    url: '/app/reports/symbols?cols=net',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  fireEvent.click(within(page).getByRole('button', { name: 'Columns' }));
+  const net = (await screen.findByRole('checkbox', {
+    name: /Net P&L/,
+  })) as HTMLInputElement;
+  expect(net.disabled).toBe(true);
+});
+
+test('highlights add the most active bucket and the best win rate beside best and worst', async () => {
+  renderApp(<SymbolsView />, {
+    sample: breakdownSample,
+    url: '/app/reports/symbols',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const h = within(within(page).getByRole('list', { name: 'Highlights' }));
+  // SPY has three trades, the most.
+  expect(h.getByText(/Most active/).closest('li')!.textContent).toMatch(
+    /SPY.*3 trades/,
+  );
+  // ES and NQ both won 1 of 2; the first of them leads.
+  expect(h.getByText(/Best win rate/).closest('li')!.textContent).toMatch(
+    /ES.*50%.*2 trades/,
+  );
+});
+
+test('the cross-analysis offers account, instrument, prices, exit hour, size, R and the top and bottom symbols', async () => {
+  const menuNames = async (page: HTMLElement) => {
+    fireEvent.keyDown(
+      within(page).getByRole('button', { name: /^Cross-analyse by/ }),
+      { key: 'Enter' },
+    );
+    return (await screen.findAllByRole('menuitemradio')).map(
+      (o) => o.textContent,
+    );
+  };
+  renderApp(<StrategiesView />, {
+    sample: breakdownSample,
+    url: '/app/reports/strategies',
+  });
+  const names = await menuNames(
+    await screen.findByTestId('reports-strategies'),
+  );
+  for (const n of [
+    'Account',
+    'Instrument',
+    'Entry price',
+    'Exit price',
+    'Exit hour',
+    'Position size',
+    'R-multiple',
+    'Top 10 symbols',
+    'Bottom 10 symbols',
+  ])
+    expect(names).toContain(n);
+  cleanup();
+  // The symbol report does not offer itself back, nor its own top and bottom 10.
+  renderApp(<SymbolsView />, {
+    sample: breakdownSample,
+    url: '/app/reports/symbols',
+  });
+  const own = await menuNames(await screen.findByTestId('reports-symbols'));
+  expect(own).toContain('Instrument');
+  for (const n of ['Symbol', 'Top 10 symbols', 'Bottom 10 symbols'])
+    expect(own).not.toContain(n);
+});
+
+test('a cross-analysis by instrument links its cells with the instrument filter', async () => {
+  renderApp(<SymbolsView />, {
+    sample: breakdownSample,
+    url: '/app/reports/symbols?x=instrument',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const matrix = within(page).getByRole('table', {
+    name: 'Symbols by instrument',
+  });
+  const link = within(matrix).getAllByRole('link')[0]!;
+  const url = hrefOf(link);
+  expect(url.searchParams.get('inst')).toMatch(/^(future|option)$/);
+  expect(url.searchParams.get('symbol')).toMatch(/^(ES|NQ|SPY)$/);
+});
+
+test('Symbols has a by symbol, by instrument and by entry price view in the address', async () => {
+  renderApp(<SymbolsView />, {
+    sample: breakdownSample,
+    url: '/app/reports/symbols',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const tabs = within(page).getByRole('tablist', { name: 'Symbols view' });
+  expect(
+    within(tabs)
+      .getAllByRole('tab')
+      .map((t) => t.textContent),
+  ).toEqual(['By symbol', 'By instrument', 'By entry price']);
+  fireEvent.click(within(tabs).getByRole('tab', { name: 'By instrument' }));
+  expect(new URLSearchParams(window.location.search).get('view')).toBe(
+    'instrument',
+  );
+});
+
+test('by instrument: a row per asset class with the trades it holds, linking by instrument', async () => {
+  renderApp(<SymbolsView />, {
+    sample: breakdownSample,
+    url: '/app/reports/symbols?view=instrument',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const table = within(page).getByRole('table', {
+    name: 'Instruments summary',
+  });
+  // ES and NQ are futures (4 trades); the SPY options are 3.
+  expect(rowOf(table, /^Futures/).getAllByRole('cell')[1]!.textContent).toBe(
+    '4',
+  );
+  expect(rowOf(table, /^Options/).getAllByRole('cell')[1]!.textContent).toBe(
+    '3',
+  );
+  const link = within(table).getByRole('link', {
+    name: /^Futures, open 4 trades/,
+  });
+  expect(hrefOf(link).searchParams.get('inst')).toBe('future');
+});
+
+/** The breakdown sample with real-looking prices: SPY options near 5, ES near 4,500, NQ near 21,000. */
+async function pricedSample(): Promise<SampleWorkspace> {
+  const s = await breakdownSample();
+  const price: Record<string, number> = { ES: 4500, NQ: 21000, SPY: 5 };
+  s.trades = s.trades.map((t) => ({
+    ...t,
+    avgEntry: price[t.instrument.root] ?? t.avgEntry,
+  }));
+  return s;
+}
+
+test('by entry price: ranges cut to the prices in the set, each linking to its trades', async () => {
+  renderApp(<SymbolsView />, {
+    sample: pricedSample,
+    url: '/app/reports/symbols?view=price',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const table = within(page).getByRole('table', {
+    name: 'Entry prices summary',
+  });
+  const rows = within(table).getAllByRole('row').slice(1);
+  // Prices from 5 to 21,000 span too much for one linear step: log-scale ranges.
+  expect(rows.length).toBeGreaterThanOrEqual(5);
+  expect(rows.length).toBeLessThanOrEqual(8);
+  const counts = rows.map((r) =>
+    Number(within(r).getAllByRole('cell')[1]!.textContent),
+  );
+  expect(counts.reduce((a, b) => a + b, 0)).toBe(7);
+  // Each range holds a symbol's prices apart from the others'.
+  expect(counts.filter((n) => n > 0)).toHaveLength(3);
+  const link = within(table).getAllByRole('link')[0]!;
+  expect(hrefOf(link).searchParams.get('ep')).toMatch(/^[\d.]+_<[\d.]+$/);
+});
+
+/** Twelve futures symbols, the n-th netting (n - 5) hundred dollars. */
+async function twelveSymbols(): Promise<SampleWorkspace> {
+  const s = await breakdownSample();
+  const { resolveInstrument } = await import('@/domain/instruments');
+  const roots = [
+    'ESZ5',
+    'NQZ5',
+    'CLZ5',
+    'GCZ5',
+    'YMZ5',
+    'RTYZ5',
+    'ZNZ5',
+    'MESZ5',
+    'MNQZ5',
+    'SIZ5',
+    '6EZ5',
+    'NGZ5',
+  ];
+  s.trades = roots.map((r, i) => ({
+    ...s.trades[0]!,
+    id: `x-${i}`,
+    instrument: resolveInstrument(r)!,
+    net: (i - 5) * 10000,
+    gross: (i - 5) * 10000,
+    strategyIds: [],
+    tagIds: [],
+  }));
+  return s;
+}
+
+test('the limiter shows all, the top 10 or the bottom 10 symbols by net', async () => {
+  renderApp(<SymbolsView />, {
+    sample: twelveSymbols,
+    url: '/app/reports/symbols',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const rows = () =>
+    within(within(page).getByRole('table', { name: 'Symbols summary' }))
+      .getAllByRole('row')
+      .slice(1);
+  expect(rows()).toHaveLength(12);
+  fireEvent.keyDown(within(page).getByRole('button', { name: /^Show/ }), {
+    key: 'Enter',
+  });
+  fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Top 10' }));
+  expect(new URLSearchParams(window.location.search).get('lim')).toBe('top');
+  await vi.waitFor(() => expect(rows()).toHaveLength(10));
+  // The best symbol leads, the two worst are out.
+  expect(rows()[0]!.textContent).toMatch(/^NG/);
+  cleanup();
+  renderApp(<SymbolsView />, {
+    sample: twelveSymbols,
+    url: '/app/reports/symbols?lim=bottom',
+  });
+  const again = await screen.findByTestId('reports-symbols');
+  const bottom = within(
+    within(again).getByRole('table', { name: 'Symbols summary' }),
+  )
+    .getAllByRole('row')
+    .slice(1);
+  expect(bottom).toHaveLength(10);
+  // The worst first.
+  expect(bottom[0]!.textContent).toMatch(/^ES/);
 });

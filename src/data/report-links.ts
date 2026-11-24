@@ -1,4 +1,7 @@
+import { ASSET_CLASSES } from '../domain/asset-class';
 import { bucketRange, type BreakdownKey } from '../domain/metrics/breakdowns';
+import { priceSpan } from '../domain/metrics/price-ranges';
+import type { AssetClass } from '../domain/types';
 import {
   queryString,
   serializeFilters,
@@ -149,7 +152,9 @@ export function bucketFilters(
         ? { ...base, side: key }
         : null;
     }
-    case 'symbol': {
+    case 'symbol':
+    case 'symbol-top':
+    case 'symbol-bottom': {
       const symbols = oneOf(base.symbols, key);
       return symbols ? { ...base, symbols } : null;
     }
@@ -190,11 +195,13 @@ export function bucketFilters(
       return months ? { ...base, [field]: months } : null;
     }
     case 'hour':
+    case 'exit-hour':
     case 'time-of-day': {
-      const width = by === 'hour' ? 60 : (opts.bucketMinutes ?? 30);
-      const start = by === 'hour' ? Number(key) * 60 : minutesOf(key);
+      const width = by === 'time-of-day' ? (opts.bucketMinutes ?? 30) : 60;
+      const start = by === 'time-of-day' ? minutesOf(key) : Number(key) * 60;
       if (!Number.isFinite(start)) return null;
-      const field = exit ? 'exitWindows' : 'entryWindows';
+      // The exit hour is always the exit's, whatever the report's time basis.
+      const field = exit || by === 'exit-hour' ? 'exitWindows' : 'entryWindows';
       const windows = cutWindows(base[field], start, start + width - 1);
       return windows ? { ...base, [field]: windows } : null;
     }
@@ -212,6 +219,25 @@ export function bucketFilters(
       const range = bucketRange('r', key);
       const next = range && intersectRanges(base.r, range);
       return next ? { ...base, r: next } : null;
+    }
+    case 'instrument': {
+      if (!(ASSET_CLASSES as readonly string[]).includes(key)) return null;
+      const classes = oneOf(base.assetClasses, key as AssetClass);
+      return classes ? { ...base, assetClasses: classes } : null;
+    }
+    case 'account': {
+      const accountIds = oneOf(base.accountIds, key);
+      return accountIds ? { ...base, accountIds } : null;
+    }
+    case 'entry-price':
+    case 'exit-price': {
+      const span = priceSpan(key);
+      if (!span) return null;
+      // A range of prices: the lower edge is in, the upper is the next range's.
+      const range = { min: span.from, max: span.to, maxExclusive: true };
+      const field = by === 'entry-price' ? 'entryPrice' : 'exitPrice';
+      const next = intersectRanges(base[field], range);
+      return next ? { ...base, [field]: next } : null;
     }
     // Sessions are cut in New York time and days to expiry have no filter.
     case 'session':

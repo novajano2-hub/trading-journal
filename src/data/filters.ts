@@ -10,11 +10,13 @@ import {
   startOfYear,
   subMonths,
 } from 'date-fns';
+import { ASSET_CLASSES } from '../domain/asset-class';
 import { classify } from '../domain/metrics/context';
 import { rOf, unitKeeps } from '../domain/metrics/units';
 import { localDate, localParts } from '../domain/time';
 import type {
   Account,
+  AssetClass,
   BreakevenRange,
   Direction,
   DisplayUnit,
@@ -92,6 +94,8 @@ export interface GlobalFilters {
   r?: NumRange;
   /** One P&L currency: what a report that reads one currency links to. */
   currency?: string;
+  /** The instrument: the asset classes to keep. Empty keeps every class. */
+  assetClasses: AssetClass[];
 }
 
 export const EMPTY_FILTERS: GlobalFilters = {
@@ -114,6 +118,7 @@ export const EMPTY_FILTERS: GlobalFilters = {
   exitMonths: [],
   entryWindows: [],
   exitWindows: [],
+  assetClasses: [],
 };
 
 export const FILTER_PARAMS = [
@@ -148,6 +153,7 @@ export const FILTER_PARAMS = [
   'size',
   'r',
   'ccy',
+  'inst',
 ] as const;
 
 const OUTCOMES: readonly Outcome[] = ['win', 'loss', 'breakeven'];
@@ -176,6 +182,7 @@ export function advancedFilterCount(f: GlobalFilters): number {
     f.size !== undefined,
     f.r !== undefined,
     f.currency !== undefined,
+    f.assetClasses.length > 0,
   ];
   return used.filter(Boolean).length;
 }
@@ -315,6 +322,7 @@ export function parseFilters(
   const exitPrice = rangeOf(params, 'xp');
   const size = rangeOf(params, 'size');
   const r = rangeOf(params, 'r');
+  const classSet = new Set(listOf(params, 'inst'));
   const ccy = params.get('ccy')?.trim().toUpperCase();
   const currency = ccy && /^[A-Z0-9]{2,10}$/.test(ccy) ? ccy : undefined;
   return {
@@ -350,6 +358,7 @@ export function parseFilters(
     ...optional('size', size),
     ...optional('r', r),
     ...optional('currency', currency),
+    assetClasses: ASSET_CLASSES.filter((c) => classSet.has(c)),
   };
 }
 
@@ -425,6 +434,10 @@ export function serializeFilters(f: GlobalFilters): URLSearchParams {
   range('size', f.size);
   range('r', f.r);
   if (f.currency) p.set('ccy', f.currency);
+  list(
+    'inst',
+    ASSET_CLASSES.filter((c) => f.assetClasses.includes(c)),
+  );
   return p;
 }
 
@@ -565,6 +578,7 @@ export function applyFilters(
   const months = new Set(f.months);
   const exitWeekdays = new Set(f.exitWeekdays);
   const exitMonths = new Set(f.exitMonths);
+  const assetClasses = new Set<AssetClass>(f.assetClasses);
   const breakeven = env.breakevenRange ?? NO_RANGE;
   const tz = env.timeZone;
 
@@ -579,6 +593,8 @@ export function applyFilters(
     if (symbols.size > 0 && !symbols.has(root)) return false;
     if (exSymbols.has(root)) return false;
     if (f.side !== undefined && t.direction !== f.side) return false;
+    if (assetClasses.size > 0 && !assetClasses.has(t.instrument.assetClass))
+      return false;
 
     if (t.strategyIds.some((id) => exStrategies.has(id))) return false;
     if (strategies.size > 0 || f.noStrategy) {
