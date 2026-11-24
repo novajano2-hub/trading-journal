@@ -112,6 +112,7 @@ interface DayModel {
   r: number | null;
   trades: number;
   wins: number;
+  losses: number;
   rules: DayGrading['rules'];
   /** What each trade with an exit that day made on it. */
   made: Map<string, { value: number; r: number | null }>;
@@ -172,19 +173,42 @@ function DayBody({
     true,
     currency,
   );
+  // Wins over the decided trades, as every other win rate reads it.
+  const decided = model.wins + model.losses;
   return (
     <>
       <div className={KPIS}>
-        <Kpi label="Net P&L" tone={signTone(model.net)}>
+        <Kpi
+          label={
+            <MetricTip
+              id="pnl"
+              basis={basis}
+              note="Here, what the exits of this day made."
+            />
+          }
+          tone={signTone(model.net)}
+        >
           <FigureText f={net} />
         </Kpi>
-        <Kpi label="Trades">{model.trades}</Kpi>
-        <Kpi label="Win rate">
-          {model.trades === 0
-            ? 'None'
+        <Kpi
+          label={
+            <MetricTip
+              id="trades"
+              basis={basis}
+              note="Here, trades with an exit on this day."
+            >
+              Trades
+            </MetricTip>
+          }
+        >
+          {model.trades}
+        </Kpi>
+        <Kpi label={<MetricTip id="win-rate" basis={basis} />}>
+          {decided === 0
+            ? 'None decided'
             : formatPct(
-                model.wins / model.trades,
-                model.wins % model.trades === 0 ? 0 : 1,
+                model.wins / decided,
+                model.wins % decided === 0 ? 0 : 1,
               )}
         </Kpi>
         <Kpi
@@ -276,6 +300,7 @@ export function DayCard({
       r: day?.r ?? null,
       trades: day?.trades ?? 0,
       wins: day?.wins ?? 0,
+      losses: day?.losses ?? 0,
       rules: dayGrading(exits, strategies, tags, categories, ctx).rules,
       made,
       dayIds,

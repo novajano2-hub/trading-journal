@@ -340,11 +340,11 @@ test("the daily note route shows the day card with that day's net and trades", a
   const { repo } = await openWith('/app/notebook/daily/2026-11-19');
   const card = await screen.findByRole('region', { name: "The day's stats" });
   expect((await within(card).findAllByText('+$380.26')).length).toBe(2);
-  expect(within(card).getByText('Win rate').nextSibling?.textContent).toBe(
-    '100%',
-  );
-  const trades = within(card).getByText('Trades');
-  expect(trades.nextSibling?.textContent).toBe('1');
+  const kpi = (label: string) =>
+    within(card).getByText(label).closest('div')!.querySelector('b')!
+      .textContent;
+  expect(kpi('Win rate')).toBe('100%');
+  expect(kpi('Trades')).toBe('1');
   // A chip links the day's trade.
   expect(
     within(card).getByRole('link', { name: /^ES/ }).getAttribute('href'),
@@ -641,6 +641,44 @@ test('a favourite note in the list carries the text "Favourite"', async () => {
   await waitFor(() => expect(listItems()).toHaveLength(1));
   expect(within(listItems()[0]!).getByText('Favourite').className).toContain(
     'sr-only',
+  );
+});
+
+test('the day card win rate is wins over the decided trades, as the Calendar reads it (I4)', async () => {
+  await openWith('/app/notebook/daily/2026-11-19', {
+    edit: (fx) =>
+      fx.trades.push(
+        makeTrade({
+          id: 't-19-be',
+          serial: 10,
+          workspaceId: WS,
+          accountId: 'acc-a',
+          openedAt: '2026-11-19T16:00:00.000Z',
+          closedAt: '2026-11-19T16:30:00.000Z',
+          net: 0,
+        }),
+      ),
+  });
+  const card = await screen.findByRole('region', { name: "The day's stats" });
+  // One win and one breakeven: 100%, not 50%.
+  const rate = await within(card).findByText('Win rate');
+  expect(rate.closest('div')!.querySelector('b')!.textContent).toBe('100%');
+  // Every figure's label carries its definition.
+  for (const id of ['pnl', 'trades', 'win-rate', 'rule-adherence'])
+    expect(card.querySelector(`[data-metric-tip="${id}"]`), id).not.toBeNull();
+});
+
+test('a day with only breakevens says None decided (I4)', async () => {
+  await openWith('/app/notebook/daily/2026-11-19', {
+    edit: (fx) => {
+      fx.trades.find((t) => t.id === 't-19')!.net = 0;
+      fx.trades.find((t) => t.id === 't-19')!.gross = 0;
+    },
+  });
+  const card = await screen.findByRole('region', { name: "The day's stats" });
+  const rate = await within(card).findByText('Win rate');
+  expect(rate.closest('div')!.querySelector('b')!.textContent).toBe(
+    'None decided',
   );
 });
 
