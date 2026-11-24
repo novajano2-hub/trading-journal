@@ -30,6 +30,59 @@ test('auth forms are honest', async ({ page }) => {
 const CLOSED =
   'Accounts open with the app release. Until then, sign-up is closed.';
 
+for (const path of ['/login', '/signup'])
+  test(`${path} is a focused, centred page: the mark, one column, no site navigation`, async ({
+    page,
+  }) => {
+    await page.goto(path);
+    const width = page.viewportSize()!.width;
+    const centre = (b: { x: number; width: number }) => b.x + b.width / 2;
+    // No marketing header nav and no marketing footer.
+    await expect(page.getByRole('navigation', { name: 'Primary' })).toHaveCount(
+      0,
+    );
+    await expect(page.getByRole('button', { name: 'Menu' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Pricing' })).toHaveCount(0);
+    // The Keel mark, centred at the top.
+    const mark = (await page
+      .getByRole('banner')
+      .getByRole('link', { name: 'Keel' })
+      .boundingBox())!;
+    expect(Math.abs(centre(mark) - width / 2)).toBeLessThanOrEqual(2);
+    expect(mark.y).toBeLessThan(80);
+    // One centred column of about 400px holding the title, the note, the form and its two actions.
+    const title = page.getByRole('heading', { level: 1 });
+    const column = (await page
+      .locator('main > div')
+      .filter({ has: title })
+      .boundingBox())!;
+    expect(Math.abs(centre(column) - width / 2)).toBeLessThanOrEqual(2);
+    expect(column.width).toBeLessThanOrEqual(400);
+    expect(column.width).toBeGreaterThanOrEqual(Math.min(400, width - 40));
+    for (const part of [
+      title,
+      page.getByText(CLOSED),
+      page.getByLabel('Email', { exact: true }),
+      page.getByRole('link', { name: 'Open the sample workspace' }),
+    ]) {
+      const b = (await part.boundingBox())!;
+      expect(b.x).toBeGreaterThanOrEqual(column.x);
+      expect(b.x + b.width).toBeLessThanOrEqual(column.x + column.width);
+    }
+    await expect(title).toHaveCSS('text-align', 'center');
+    // The switch link, centred under the form.
+    const swap = (await page
+      .getByRole('main')
+      .getByRole('link', { name: path === '/login' ? 'Sign up' : 'Log in' })
+      .locator('..')
+      .boundingBox())!;
+    expect(swap.y).toBeGreaterThan(column.y + column.height);
+    expect(Math.abs(centre(swap) - width / 2)).toBeLessThanOrEqual(2);
+    // Only a minimal footer line.
+    const foot = page.getByRole('contentinfo');
+    await expect(foot.getByRole('link')).toHaveText(['Privacy', 'Terms']);
+  });
+
 for (const [path, name] of [
   ['/login', 'Log in'],
   ['/signup', 'Create account'],

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { buttonClasses } from '@/components/ui/button-styles';
 
 export const AUTH_CLOSED =
   'Accounts open with the app release. Until then, sign-up is closed.';
@@ -55,13 +56,7 @@ function Field({
 function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   const login = mode === 'login';
   return (
-    <form
-      className="mt-9 flex max-w-[448px] flex-col gap-3 rounded-card bg-surface-1 p-6 shadow-[var(--shadow-card)] sm:p-8"
-      noValidate
-    >
-      <p id="auth-note" className="text-sm leading-[1.55] text-muted">
-        {AUTH_CLOSED}
-      </p>
+    <form className="mt-7 flex flex-col gap-3" noValidate>
       <Field
         id="email"
         label="Email"
@@ -81,13 +76,13 @@ function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         type="submit"
         disabled
         aria-describedby="auth-note"
-        className="mt-2 h-11! w-full text-[15px]! font-medium! disabled:cursor-not-allowed"
+        className="mt-1 h-11! w-full text-[15px]! disabled:cursor-not-allowed"
       >
         {login ? 'Log in' : 'Create account'}
       </Button>
       <Link
         href="/app/dashboard"
-        className="inline-flex min-h-11 items-center self-start text-[15px] font-medium text-accent-ink"
+        className={`${buttonClasses('secondary')} h-11! w-full text-[15px]! no-underline`}
       >
         Open the sample workspace
       </Link>
@@ -95,20 +90,32 @@ function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   );
 }
 
-/** The whole login or signup page: headline, form, and the way to the other one. */
+/**
+ * The whole login or signup page: one centred column, about 400px, holding
+ * the title, the one-line note, the form and its two actions, then the way to
+ * the other page centred under it.
+ */
 export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
   const login = mode === 'login';
   return (
-    <main className="mx-auto max-w-[1280px] px-5 pt-16 pb-28 sm:px-10">
-      <h1 className="text-[clamp(36px,calc(2.6vw+16px),52px)] leading-[1.06] font-semibold tracking-[-0.032em] motion-safe:animate-rise">
-        {login ? 'Log in' : 'Sign up'}
-      </h1>
-      <AuthForm mode={mode} />
-      <p className="mt-9 text-[15px] text-muted">
+    <main className="flex flex-1 flex-col items-center px-5 pt-2 pb-10 sm:pt-6">
+      <div className="w-full max-w-[400px] rounded-card border border-line bg-surface-1 px-6 pt-8 pb-7 shadow-[var(--shadow-card)] sm:px-8 motion-safe:animate-rise">
+        <h1 className="text-center text-[26px] leading-[1.15] font-semibold tracking-[-0.03em] text-balance">
+          {login ? 'Log in to Keel' : 'Create your Keel account'}
+        </h1>
+        <p
+          id="auth-note"
+          className="mx-auto mt-2.5 max-w-[34ch] text-center text-[14px] leading-[1.55] text-muted"
+        >
+          {AUTH_CLOSED}
+        </p>
+        <AuthForm mode={mode} />
+      </div>
+      <p className="mt-6 text-center text-[14.5px] text-muted">
         {login ? 'New to Keel? ' : 'Already have an account? '}
         <Link
           href={login ? '/signup' : '/login'}
-          className="font-medium text-accent-ink"
+          className="inline-flex min-h-11 items-center font-semibold text-accent-ink"
         >
           {login ? 'Sign up' : 'Log in'}
         </Link>
