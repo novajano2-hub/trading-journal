@@ -212,8 +212,10 @@ function uniqueValues(
 }
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
-const NUMBER_LO = /^>?-?\d+(\.\d+)?$/;
-const NUMBER_HI = /^<?-?\d+(\.\d+)?$/;
+// A bound as `${number}` writes it, exponent included (1e-7, 1e+21), so a
+// micro price or a huge size round-trips instead of being dropped.
+const NUMBER_LO = /^>?-?\d+(\.\d+)?(e[-+]?\d+)?$/i;
+const NUMBER_HI = /^<?-?\d+(\.\d+)?(e[-+]?\d+)?$/i;
 
 /** A list param: comma-separated, and repeated keys from older links add to it. */
 function listOf(

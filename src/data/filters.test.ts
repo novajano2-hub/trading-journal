@@ -460,6 +460,19 @@ describe('the full filter set', () => {
     expect(run(ts, { r: { min: 2 } })).toEqual([]);
   });
 
+  test('a bound in exponent notation round-trips: a micro price bucket is not dropped (M7)', () => {
+    const f: GlobalFilters = {
+      ...EMPTY_FILTERS,
+      entryPrice: { min: 1e-7, max: 5e-7, maxExclusive: true },
+      exitPrice: { min: -2.5e-8 },
+      size: { max: 1e21 },
+    };
+    const back = parseFilters(serializeFilters(f));
+    expect(back.entryPrice).toEqual(f.entryPrice);
+    expect(back.exitPrice).toEqual(f.exitPrice);
+    expect(back.size).toEqual(f.size);
+  });
+
   test('every new param survives a round trip', () => {
     for (const qs of [
       'xsym=NQ,YM',
