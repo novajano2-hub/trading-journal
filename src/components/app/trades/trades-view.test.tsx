@@ -13,6 +13,7 @@ import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import type { SampleWorkspace } from '@/data/seed/generate';
 import { ALL_COLUMNS, DEFAULT_COLUMNS } from '@/data/trade-columns';
+import { equityPath } from '@/lib/landing/equity-path';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import type { Trade } from '@/domain/types';
 import { everyString } from '../__fixtures__/every-string';
@@ -512,21 +513,14 @@ describe('at 390px', () => {
     window.innerWidth = 1024;
   });
 
-  test('the summary is a two-across grid, now three rows with the win/loss card', async () => {
+  test('the summary is a 2 by 2 grid: net, win rate, profit factor, trades', async () => {
     renderApp(<TradesView />, { sample: sample(), url: '/app/trades' });
     const strip = await screen.findByRole('region', { name: 'Summary' });
     const kpis = [...strip.querySelectorAll('[data-kpi]')].map((k) =>
       k.getAttribute('data-kpi'),
     );
-    // Six figures, two across: net, win rate, profit factor, average win to loss, expectancy, trades.
-    expect(kpis).toEqual([
-      'pnl',
-      'win-rate',
-      'profit-factor',
-      'avg-win-loss',
-      'expectancy',
-      'trades',
-    ]);
+    // Four figures, two across: net, win rate, profit factor, trades.
+    expect(kpis).toEqual(['pnl', 'win-rate', 'profit-factor', 'trades']);
     expect(strip.className).toContain('grid-cols-2');
   });
 
@@ -645,28 +639,30 @@ describe('the summary strip, win/loss and running P&L', () => {
     expect(strip.textContent).toContain('2 won, 1 breakeven, 1 lost');
   });
 
-  test('an average win to loss card gives the ratio and both amounts', async () => {
+  test('the profit-factor card carries the average win to loss and both amounts; there is no sixth card', async () => {
     renderApp(<TradesView />, { sample: mixed(), url: '/app/trades' });
     const strip = await screen.findByRole('region', { name: 'Summary' });
+    expect(strip.querySelector('[data-kpi="avg-win-loss"]')).toBeNull();
+    // Desktop: trades, net, win rate, profit factor, expectancy.
+    expect(strip.querySelectorAll('[data-kpi]')).toHaveLength(5);
     const card = strip.querySelector(
-      '[data-kpi="avg-win-loss"]',
+      '[data-kpi="profit-factor"]',
     ) as HTMLElement;
-    expect(card).toBeTruthy();
     expect(
-      within(card).getByRole('button', { name: 'Average win to loss' }),
+      within(card).getByRole('button', { name: 'Avg win/loss' }),
     ).toBeTruthy();
     expect(card.textContent).toContain('2.00');
     expect(card.textContent).toContain('+$20.00');
     expect(card.textContent).toMatch(/[-\u2212]\$10\.00/);
   });
 
-  test('with no losing trade the card says None', async () => {
+  test('with no losing trade the ratio says None', async () => {
     renderApp(<TradesView />, { sample: sample(), url: '/app/trades' });
     const strip = await screen.findByRole('region', { name: 'Summary' });
     const card = strip.querySelector(
-      '[data-kpi="avg-win-loss"]',
+      '[data-kpi="profit-factor"]',
     ) as HTMLElement;
-    expect(card.textContent).toContain('None');
+    expect(card.textContent).toContain('Avg win/loss None');
   });
 
   test('the net card carries a running P&L line by exit date, labelled without amounts', async () => {
@@ -690,10 +686,75 @@ describe('the summary strip, win/loss and running P&L', () => {
     const strip = await screen.findByRole('region', { name: 'Summary' });
     await waitFor(() => {
       const card = strip.querySelector(
-        '[data-kpi="avg-win-loss"]',
+        '[data-kpi="profit-factor"]',
       ) as HTMLElement;
       expect(card.textContent).toContain('%');
       expect(card.textContent).not.toContain('$');
+    });
+  });
+
+  describe('under a unit that narrows the set', () => {
+    /** Three ES trades on three days: +40 and +16 ticks, then -12; money nets chosen so the money line has another shape. */
+    function unitSample() {
+      return async (): Promise<SampleWorkspace> => {
+        const fx = fixtureSample();
+        const mk = (n: number, net: number, exit: number) =>
+          makeTrade({
+            id: `u-${n}`,
+            serial: n,
+            workspaceId: WS,
+            accountId: 'acc-a',
+            openedAt: new Date(Date.UTC(2026, 10, n, 15, 0)).toISOString(),
+            closedAt: new Date(Date.UTC(2026, 10, n, 15, 5)).toISOString(),
+            avgEntry: 4500,
+            avgExit: exit,
+            initialRisk: 1000,
+            net,
+          });
+        return {
+          ...fx,
+          trades: [mk(2, 3000, 4510), mk(3, 1000, 4504), mk(4, -500, 4497)],
+        };
+      };
+    }
+    async function strip(unit: 'ticks' | 'r') {
+      const repository = createLocalRepository({
+        indexedDB: new IDBFactory(),
+        IDBKeyRange,
+        sample: unitSample(),
+      });
+      await repository.prefs.update({ displayUnit: unit });
+      renderApp(<TradesView />, { repository, url: '/app/trades' });
+      return screen.findByRole('region', { name: 'Summary' });
+    }
+    const lineOf = (series: number[]) =>
+      equityPath(series, { xMax: 56, top: 2.5, bottom: 21.5, floor: 24 }).line;
+
+    test('Ticks: the ratio, the amounts and the running line are in ticks', async () => {
+      const el = await strip('ticks');
+      await waitFor(() => {
+        const card = el.querySelector('[data-kpi="profit-factor"]')!;
+        // Average win (40 + 16) / 2 = 28 ticks, average loss -12 ticks.
+        expect(card.textContent).toContain('2.33');
+        expect(card.textContent).toMatch(/28/);
+        expect(card.textContent).toMatch(/12/);
+        expect(card.textContent).not.toContain('$');
+      });
+      const path = el.querySelector('[data-kpi="pnl"] svg path')!;
+      expect(path.getAttribute('d')).toBe(lineOf([40, 56, 44]));
+    });
+
+    test('R: the ratio, the amounts and the running line are in R', async () => {
+      const el = await strip('r');
+      await waitFor(() => {
+        const card = el.querySelector('[data-kpi="profit-factor"]')!;
+        // Average win (3R + 1R) / 2 = 2R, average loss -0.5R.
+        expect(card.textContent).toContain('4.00');
+        expect(card.textContent).toMatch(/2(\.00)?R/);
+        expect(card.textContent).not.toContain('$');
+      });
+      const path = el.querySelector('[data-kpi="pnl"] svg path')!;
+      expect(path.getAttribute('d')).toBe(lineOf([3, 4, 3.5]));
     });
   });
 });
@@ -827,10 +888,28 @@ describe('paging in the URL', () => {
     await table();
     const jump = screen.getByRole('spinbutton', { name: 'Go to page' });
     fireEvent.change(jump, { target: { value: '40' } });
-    fireEvent.blur(jump);
+    fireEvent.keyDown(jump, { key: 'Enter' });
     await waitFor(() =>
       expect(screen.getByText(/101-120 of 120/)).toBeTruthy(),
     );
+  });
+
+  test('a typed page number is not applied when the next click follows it', async () => {
+    renderApp(<TradesView />, { sample: sample(), url: at('') });
+    await table();
+    const jump = screen.getByRole('spinbutton', { name: 'Go to page' });
+    fireEvent.change(jump, { target: { value: '3' } });
+    fireEvent.blur(jump);
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
+    await waitFor(() => expect(screen.getByText(/51-100 of 120/)).toBeTruthy());
+    expect(window.location.search).toContain('page=2');
+    expect(
+      (
+        screen.getByRole('spinbutton', {
+          name: 'Go to page',
+        }) as HTMLInputElement
+      ).value,
+    ).toBe('2');
   });
 
   test('changing a filter sends the log back to page 1', async () => {

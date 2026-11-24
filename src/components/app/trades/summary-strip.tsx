@@ -31,7 +31,7 @@ function Kpi({
   return (
     <div
       data-kpi={id}
-      className="min-w-0 py-1 not-first:xl:border-l not-first:xl:border-line not-first:xl:pl-5"
+      className="min-w-0 py-1 not-first:lg:border-l not-first:lg:border-line not-first:lg:pl-5"
     >
       <div className="flex items-center justify-between gap-2 text-[12.5px] leading-4 text-faint pointer-coarse:-my-3">
         <MetricTip id={id} basis={basis} />
@@ -46,9 +46,9 @@ function Kpi({
 }
 
 /**
- * Six figures over the closed trades in the filters: how many, the P&L (with
- * its running line by exit date), win rate, profit factor, the average win to
- * loss and expectancy. Money goes through the display unit, so
+ * Five figures over the closed trades in the filters: how many, the P&L (with
+ * its running line by exit date), win rate, profit factor (its second line the
+ * average win to loss and both amounts) and expectancy. Money goes through the display unit, so
  * Privacy hides it; the profit factor's words carry no currency sign.
  */
 export function SummaryStrip({
@@ -84,7 +84,7 @@ export function SummaryStrip({
   onHide(): void;
 }): React.JSX.Element {
   const open = openCount;
-  // A phone reads net first, then the rest: six figures, two across in three rows.
+  // A phone reads net first and leaves expectancy out: four figures in two rows.
   const phone = usePhone();
   const kTrades = (
     <Kpi
@@ -109,7 +109,7 @@ export function SummaryStrip({
             variant="line"
             series={running}
             label={`Running P&L by exit date, over ${running.length} trading days`}
-            className="h-5 w-12 flex-none"
+            className="h-4 w-8 flex-none"
           />
         ) : null
       }
@@ -143,41 +143,31 @@ export function SummaryStrip({
       id="profit-factor"
       basis={basis}
       sub={
-        summary.profitFactor === null
-          ? 'needs a losing trade'
-          : `${formatRatio(summary.profitFactor)} won for every 1 lost`
+        // The sentence "won for every 1 lost" gives way: the card's room goes to the
+        // average win to loss, which wraps to a second line holding both amounts.
+        <>
+          <MetricTip id="avg-win-loss" basis={basis}>
+            Avg win/loss
+          </MetricTip>{' '}
+          {summary.winLossRatio === null ? (
+            'None'
+          ) : (
+            <span className="tabular-nums">
+              {formatRatio(summary.winLossRatio)}
+            </span>
+          )}
+          {avgWin !== null && avgLoss !== null ? (
+            <span className="block tabular-nums">
+              <FigureText f={avgWin} /> / <FigureText f={avgLoss} />
+            </span>
+          ) : null}
+        </>
       }
     >
       {summary.profitFactor === null ? (
         <span className="text-[15px] font-medium text-faint">None</span>
       ) : (
         formatRatio(summary.profitFactor)
-      )}
-    </Kpi>
-  );
-  const kRatio = (
-    <Kpi
-      id="avg-win-loss"
-      basis={basis}
-      sub={
-        avgWin === null || avgLoss === null ? (
-          'needs a win and a loss'
-        ) : (
-          <>
-            <span className="block">
-              <FigureText f={avgWin} /> avg win
-            </span>
-            <span className="block">
-              <FigureText f={avgLoss} /> avg loss
-            </span>
-          </>
-        )
-      }
-    >
-      {summary.winLossRatio === null ? (
-        <span className="text-[15px] font-medium text-faint">None</span>
-      ) : (
-        formatRatio(summary.winLossRatio)
       )}
     </Kpi>
   );
@@ -195,15 +185,13 @@ export function SummaryStrip({
   return (
     <section
       aria-label="Summary"
-      className={`${CARD} grid grid-cols-2 items-start gap-x-5 gap-y-3 px-5 py-4 sm:grid-cols-3 sm:gap-y-4 xl:grid-cols-[repeat(6,minmax(0,1fr))_auto]`}
+      className={`${CARD} grid grid-cols-2 items-start gap-x-5 gap-y-3 px-5 py-4 sm:grid-cols-3 sm:gap-y-4 lg:grid-cols-[repeat(5,minmax(0,1fr))_auto]`}
     >
       {phone ? (
         <>
           {kPnl}
           {kWin}
           {kPf}
-          {kRatio}
-          {kExp}
           {kTrades}
         </>
       ) : (
@@ -212,11 +200,10 @@ export function SummaryStrip({
           {kPnl}
           {kWin}
           {kPf}
-          {kRatio}
           {kExp}
         </>
       )}
-      <div className="col-span-full flex items-start gap-4 border-line text-[12.5px] leading-[1.5] text-faint xl:col-span-1 xl:w-[236px] xl:border-l xl:pl-5">
+      <div className="col-span-full flex items-start gap-4 border-line text-[12.5px] leading-[1.5] text-faint lg:col-span-1 lg:w-[236px] lg:border-l lg:pl-5">
         <p className="min-w-0 flex-1">
           Figures cover the closed trades in your filters, {scope}.
           {otherCurrencies > 0

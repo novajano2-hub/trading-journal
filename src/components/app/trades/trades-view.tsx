@@ -483,6 +483,36 @@ export function TradesView(): React.JSX.Element {
     getRowId: (t) => t.id,
   });
 
+  // The strip's trades and what is read off them, once per change of their inputs.
+  const displayUnit = prefs?.displayUnit;
+  const baseCurrency = prefs?.baseCurrency;
+  const strip = useMemo(() => {
+    if (!model || !ctx || !timeZone || !displayUnit || !baseCurrency)
+      return undefined;
+    // The base currency's closed trades, or the first one with any.
+    const currencies = [
+      ...new Set(model.stripTrades.map((t) => t.pnlCurrency)),
+    ];
+    const stripCurrency = currencies.includes(baseCurrency)
+      ? baseCurrency
+      : (currencies[0] ?? baseCurrency);
+    const stripTrades = model.stripTrades.filter(
+      (t) => t.pnlCurrency === stripCurrency,
+    );
+    const figures = stripTrades.map((t) => tradeFigure(t, ctx));
+    const outcomes = stripTrades.map((t) => classify(t, ctx).outcome);
+    // The running line reads the display unit as the figures do; other units read the money.
+    const running = runningByExit(
+      stripTrades,
+      (t) => {
+        const f = tradeFigure(t, ctx);
+        return isTradeUnit(displayUnit) ? (f[displayUnit] ?? 0) : f.money;
+      },
+      timeZone,
+    );
+    return { stripCurrency, stripTrades, figures, outcomes, running };
+  }, [model, ctx, timeZone, displayUnit, baseCurrency]);
+
   // Every read the page waits on: one failing would leave the skeleton up for good.
   const error = set.error ?? tradesQuery.error ?? flowsQuery.error;
   if (error) {
@@ -519,7 +549,8 @@ export function TradesView(): React.JSX.Element {
     !ctx ||
     !timeZone ||
     !facts ||
-    !cellEnv
+    !cellEnv ||
+    !strip
   )
     return <Skeleton />;
 
@@ -568,14 +599,7 @@ export function TradesView(): React.JSX.Element {
   const savePrefs = (patch: Parameters<typeof updatePrefs.mutate>[0]) =>
     updatePrefs.mutate(patch);
 
-  // The strip: the base currency's closed trades, or the first one with any.
-  const currencies = [...new Set(model.stripTrades.map((t) => t.pnlCurrency))];
-  const stripCurrency = currencies.includes(prefs.baseCurrency)
-    ? prefs.baseCurrency
-    : (currencies[0] ?? prefs.baseCurrency);
-  const stripTrades = model.stripTrades.filter(
-    (t) => t.pnlCurrency === stripCurrency,
-  );
+  const { stripCurrency, stripTrades, figures, outcomes, running } = strip;
   const summary = summarize(stripTrades, ctx);
   const pctBase = pctBaseOf({
     accounts,
@@ -586,7 +610,6 @@ export function TradesView(): React.JSX.Element {
     from: range.from,
     timeZone,
   });
-  const figures = stripTrades.map((t) => tradeFigure(t, ctx));
   const basisMoney =
     ctx.pnlBasis === 'gross' ? summary.grossPnl : summary.netPnl;
   const pnlFigure = {
@@ -607,7 +630,6 @@ export function TradesView(): React.JSX.Element {
     cents: basisMoney,
   };
   // The average win and loss: the winners' (losers') mean figure, with the summary's own money.
-  const outcomes = stripTrades.map((t) => classify(t, ctx).outcome);
   const averageOf = (
     outcome: 'win' | 'loss',
     money: number | null,
@@ -628,17 +650,6 @@ export function TradesView(): React.JSX.Element {
   };
   const avgWin = averageOf('win', summary.avgWin);
   const avgLoss = averageOf('loss', summary.avgLoss);
-  // The running line reads the display unit as the figures do; other units read the money.
-  const running = runningByExit(
-    stripTrades,
-    (t) => {
-      const f = tradeFigure(t, ctx);
-      return isTradeUnit(prefs.displayUnit)
-        ? (f[prefs.displayUnit] ?? 0)
-        : f.money;
-    },
-    timeZone,
-  );
 
   const page = table.getRowModel().rows;
   const total = rows.length;
@@ -1131,8 +1142,9 @@ const NO_ROWS: Trade[] = [];
 
 /**
  * "Page [n] of N": a number field in the app's field look. Enter or leaving
- * the field goes to the page; a number past either end lands on the nearest
- * page, and a field left empty puts the current page back.
+ * goes to the page (a number past either end lands on the nearest page).
+ * Leaving the field puts the current page back, so a typed number never
+ * applies twice, as when the next click follows it.
  */
 function PageJump({
   pageIndex,
@@ -1165,7 +1177,7 @@ function PageJump({
         aria-label="Go to page"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        onBlur={go}
+        onBlur={() => setDraft(String(pageIndex + 1))}
         onKeyDown={(e) => {
           if (e.key === 'Enter') go();
         }}

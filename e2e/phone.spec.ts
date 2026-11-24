@@ -11,7 +11,7 @@ test.beforeEach(async ({ page }, info) => {
 const noOverflow = (page: import('@playwright/test').Page) =>
   page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
 
-test('Trades at 390: a Filters button and sheet, a two-column summary, two-line rows, a Sort dropdown', async ({
+test('Trades at 390: a Filters button and sheet, a 2 by 2 summary, two-line rows, a Sort dropdown', async ({
   page,
 }) => {
   await page.goto('/app/trades?side=short');
@@ -34,10 +34,10 @@ test('Trades at 390: a Filters button and sheet, a two-column summary, two-line 
   await expect(sheet).toBeHidden();
   await expect(filters).toBeFocused();
 
-  // The summary: six figures, two columns, three rows.
+  // The summary: four figures, two columns.
   const strip = page.getByRole('region', { name: 'Summary' });
   const kpis = strip.locator('[data-kpi]');
-  await expect(kpis).toHaveCount(6);
+  await expect(kpis).toHaveCount(4);
   const boxes = await kpis.evaluateAll((els) =>
     els.map((e) => {
       const r = e.getBoundingClientRect();
@@ -45,7 +45,7 @@ test('Trades at 390: a Filters button and sheet, a two-column summary, two-line 
     }),
   );
   expect(new Set(boxes.map((b) => b.x)).size).toBe(2);
-  expect(new Set(boxes.map((b) => b.y)).size).toBe(3);
+  expect(new Set(boxes.map((b) => b.y)).size).toBe(2);
 
   // A row is one link; line two sits under line one.
   const first = list.getByRole('listitem').first();
