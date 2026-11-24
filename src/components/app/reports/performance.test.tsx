@@ -194,6 +194,56 @@ test('the chart says the range and where each metric runs, and Privacy hides the
   ).toBeTruthy();
 });
 
+test('the added metrics read in the address: counts as numbers, balance and averages as money, and Privacy hides the money', async () => {
+  const address = `${URL}?m=green-day-count:bar,avg-trade:bar,net-balance:line&bucket=day`;
+  const { unmount } = renderApp(<PerformanceView />, {
+    sample: reportsSample,
+    url: address,
+  });
+  const chart = await screen.findByRole('img', {
+    name: /Green days, Average trade P&L, Net account balance by day/,
+  });
+  // Days Nov 2 to Nov 5: three green days of four, and a count has no sign or unit.
+  expect(chart.getAttribute('aria-label')).toMatch(
+    /Green days runs from 0 to 1\./,
+  );
+  expect(chart.getAttribute('aria-label')).toMatch(
+    /Average trade P&L runs from −\$\d/,
+  );
+  expect(chart.getAttribute('aria-label')).toMatch(
+    /Net account balance runs from \$50,060\.00 to \$50,160\.00\./,
+  );
+  unmount();
+  const repository = await newYorkRepository();
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<PerformanceView />, { repository, url: address });
+  const hidden = await screen.findByRole('img', {
+    name: /Green days, Average trade P&L, Net account balance by day/,
+  });
+  const label = hidden.getAttribute('aria-label')!;
+  expect(label).toMatch(/Green days runs from 0 to 1\./);
+  expect(label).toMatch(
+    /Average trade P&L runs from hidden amount to hidden amount/,
+  );
+  expect(label).toMatch(
+    /Net account balance runs from hidden amount to hidden amount/,
+  );
+});
+
+test('under a unit the balance has no value and the averages read the unit', async () => {
+  const repository = await newYorkRepository();
+  await repository.prefs.update({ displayUnit: 'ticks' });
+  renderApp(<PerformanceView />, {
+    repository,
+    url: `${URL}?m=net-balance:line&bucket=day`,
+  });
+  expect(
+    await screen.findByText(
+      /Net account balance has no value in R, ticks, pips or points\./,
+    ),
+  ).toBeTruthy();
+});
+
 test('the picker holds five groups, each with its metrics and their definitions', async () => {
   renderApp(<PerformanceView />, { sample: reportsSample, url: URL });
   const metrics = await picker();
@@ -219,7 +269,7 @@ test('the search narrows every group, hides the empty ones and says when nothing
   fireEvent.change(search, { target: { value: 'DRAWDOWN' } });
   expect(
     metrics.getAllByRole('checkbox').map((b) => b.getAttribute('aria-label')),
-  ).toEqual(['Max drawdown', 'Average drawdown']);
+  ).toEqual(['Max drawdown', 'Average drawdown', 'Daily drawdown']);
   expect(metrics.queryByRole('group', { name: 'Profitability' })).toBeNull();
   expect(metrics.getByRole('group', { name: 'Risk' })).toBeTruthy();
   // Matches across groups.

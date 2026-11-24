@@ -257,3 +257,41 @@ test('a currency filter has a chip that clears it', () => {
   expect(chip!.label).toBe('Currency: EUR');
   expect(chip!.clear(f).currency).toBeUndefined();
 });
+
+test('the filters the bucket links write each have a chip that clears only them', () => {
+  const f: GlobalFilters = {
+    ...EMPTY_FILTERS,
+    excludeSymbols: ['ES', 'NQ'],
+    noTags: true,
+    noInitialRisk: true,
+    sessions: ['new-york', 'asia'],
+    exitSessions: ['london'],
+    daysToExpiry: { min: 2, max: 7 },
+  };
+  const chips = detailChips(f);
+  expect(chips.map((c) => c.label)).toEqual([
+    'Excluded symbols: ES, NQ',
+    'No tags',
+    'No initial risk',
+    'Entry session: Asia, New York',
+    'Exit session: London',
+    'Days to expiry: 2 to 7',
+  ]);
+  // The chip row never lists a filter the log cannot show: they all are listed by name too.
+  expect(unshownFilters(f)).toEqual([
+    'Excluded symbols',
+    'No tags',
+    'No initial risk',
+    'Days to expiry',
+    'Entry sessions',
+    'Exit sessions',
+  ]);
+  for (const c of chips) {
+    const next = c.clear(f);
+    expect(detailChips(next).map((x) => x.id)).not.toContain(c.id);
+    expect(detailChips(next)).toHaveLength(chips.length - 1);
+  }
+  let rest = f;
+  for (const c of chips) rest = c.clear(rest);
+  expect(rest).toEqual(EMPTY_FILTERS);
+});

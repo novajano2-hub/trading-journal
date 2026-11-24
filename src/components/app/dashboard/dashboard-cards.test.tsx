@@ -686,6 +686,17 @@ test('every metric carries its definition', async () => {
     'hold-time-breakevens',
     'commissions',
     'fill-fees',
+    // In the Performance picker only (completion round A).
+    'daily-drawdown',
+    'account-balance',
+    'long-winners',
+    'long-losers',
+    'long-breakevens',
+    'long-open-trades',
+    'short-winners',
+    'short-losers',
+    'short-breakevens',
+    'short-open-trades',
     // On a strategy's rules (Task 16).
     'rule-follow-rate',
     'rule-followed-pnl',

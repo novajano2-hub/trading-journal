@@ -140,3 +140,52 @@ test('ranges, windows, strategy match and no strategy write their params', async
   expect(params.get('stratmatch')).toBe('all');
   expect(params.get('entry')).not.toContain(',');
 });
+
+test('no tags, no initial risk, sessions and days to expiry write their params', async () => {
+  const panel = await openPanel();
+  check(panel, 'No tags');
+  check(panel, 'No initial risk');
+  check(panel, 'New York, entry');
+  check(panel, 'London, exit');
+  fireEvent.change(
+    within(panel).getByRole('textbox', {
+      name: 'Days to expiry, min (options)',
+    }),
+    { target: { value: '2' } },
+  );
+  fireEvent.change(
+    within(panel).getByRole('textbox', {
+      name: 'Days to expiry, max (options)',
+    }),
+    { target: { value: '7' } },
+  );
+  fireEvent.click(within(panel).getByRole('button', { name: 'Apply' }));
+  const params = new URLSearchParams(window.location.search);
+  expect(params.get('notag')).toBe('1');
+  expect(params.get('norisk')).toBe('1');
+  expect(params.get('sess')).toBe('new-york');
+  expect(params.get('xsess')).toBe('london');
+  expect(params.get('dte')).toBe('2_7');
+  expect(
+    await screen.findByRole('button', { name: 'More filters, 5 active' }),
+  ).toBeTruthy();
+});
+
+test('the panel opens on the filters a link brought', async () => {
+  const panel = await openPanel(
+    '/app/dashboard?notag=1&norisk=1&sess=asia&dte=_0',
+  );
+  const on = (name: string) =>
+    (within(panel).getByRole('checkbox', { name }) as HTMLInputElement).checked;
+  expect(on('No tags')).toBe(true);
+  expect(on('No initial risk')).toBe(true);
+  expect(on('Asia, entry')).toBe(true);
+  expect(on('London, entry')).toBe(false);
+  expect(
+    (
+      within(panel).getByRole('textbox', {
+        name: 'Days to expiry, max (options)',
+      }) as HTMLInputElement
+    ).value,
+  ).toBe('0');
+});

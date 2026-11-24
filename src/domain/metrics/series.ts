@@ -32,12 +32,15 @@ export type SeriesMetric =
   | 'largest-win'
   | 'largest-loss'
   | 'profit-factor'
+  | 'avg-trade'
   | 'fees'
   // Risk
   | 'avg-planned-r'
   | 'avg-realized-r'
   | 'max-drawdown'
   | 'avg-drawdown'
+  | 'red-day-count'
+  | 'flat-day-count'
   // Time
   | 'avg-hold-time'
   | 'longest-trade'
@@ -53,11 +56,23 @@ export type SeriesMetric =
   | 'short-trades'
   | 'volume'
   | 'avg-daily-volume'
+  | 'daily-drawdown'
+  | 'net-balance'
+  | 'logged-days'
+  | 'long-wins'
+  | 'long-losses'
+  | 'long-breakevens'
+  | 'long-open'
+  | 'short-wins'
+  | 'short-losses'
+  | 'short-breakevens'
+  | 'short-open'
   // Consistency
   | 'win-rate'
   | 'long-win-rate'
   | 'short-win-rate'
   | 'green-days'
+  | 'green-day-count'
   | 'win-streak'
   | 'loss-streak'
   | 'green-day-streak'
@@ -71,13 +86,15 @@ export type Bucket = 'day' | 'week' | 'month';
 export type SeriesMode = 'period' | 'running';
 
 /**
- * How a metric's values read: cents (`money`), a number in the display unit
+ * How a metric's values read: cents (`money`, signed), cents held rather than
+ * won or lost (`balance`, unsigned), a number in the display unit
  * (`tradeunit`: ticks, pips, points or R, when one narrows the trades), a 0..1
  * share, a plain ratio, a ratio of money amounts (`moneyratio`: profit factor and
  * average win to loss, which Privacy hides), a multiple of risk, a count, a quantity or minutes.
  */
 export type SeriesUnit =
   | 'money'
+  | 'balance'
   | 'tradeunit'
   | 'pct'
   | 'ratio'
@@ -103,7 +120,7 @@ export interface SeriesMeta {
   group: SeriesGroup;
   /** Money that reads in the display unit when one narrows the trades (sums and averages; costs and drawdown stay money). */
   inUnit?: true;
-  /** Always a running value: the metric is a total from the range start. */
+  /** Always a running value: a total from the range start, or a reading taken where the period closes. */
   running?: true;
 }
 
@@ -152,11 +169,16 @@ export const SERIES_META: Record<SeriesMetric, SeriesMeta> = {
     inUnit: true,
   }),
   'profit-factor': meta('Profitability', 'Profit factor', 'moneyratio', 'line'),
+  'avg-trade': meta('Profitability', 'Average trade P&L', 'money', 'bar', {
+    inUnit: true,
+  }),
   fees: meta('Profitability', 'Fees', 'money', 'bar'),
   'avg-planned-r': meta('Risk', 'Average planned R', 'multiple', 'line'),
   'avg-realized-r': meta('Risk', 'Average realized R', 'multiple', 'line'),
   'max-drawdown': meta('Risk', 'Max drawdown', 'money', 'bar'),
   'avg-drawdown': meta('Risk', 'Average drawdown', 'money', 'bar'),
+  'red-day-count': meta('Risk', 'Red days', 'count', 'bar'),
+  'flat-day-count': meta('Risk', 'Flat days', 'count', 'bar'),
   'avg-hold-time': meta('Time', 'Average hold time', 'minutes', 'line'),
   'longest-trade': meta('Time', 'Longest trade', 'minutes', 'bar'),
   'avg-day-length': meta('Time', 'Average day length', 'minutes', 'line'),
@@ -170,10 +192,31 @@ export const SERIES_META: Record<SeriesMetric, SeriesMeta> = {
   'short-trades': meta('Activity', 'Short trades', 'count', 'bar'),
   volume: meta('Activity', 'Volume', 'qty', 'bar'),
   'avg-daily-volume': meta('Activity', 'Average daily volume', 'qty', 'line'),
+  'daily-drawdown': meta('Activity', 'Daily drawdown', 'money', 'line', {
+    running: true,
+  }),
+  'net-balance': meta('Activity', 'Net account balance', 'balance', 'line', {
+    running: true,
+  }),
+  'logged-days': meta('Activity', 'Logged days', 'count', 'bar'),
+  'long-wins': meta('Activity', 'Long winning trades', 'count', 'bar'),
+  'long-losses': meta('Activity', 'Long losing trades', 'count', 'bar'),
+  'long-breakevens': meta('Activity', 'Long breakeven trades', 'count', 'bar'),
+  'long-open': meta('Activity', 'Long open trades', 'count', 'bar'),
+  'short-wins': meta('Activity', 'Short winning trades', 'count', 'bar'),
+  'short-losses': meta('Activity', 'Short losing trades', 'count', 'bar'),
+  'short-breakevens': meta(
+    'Activity',
+    'Short breakeven trades',
+    'count',
+    'bar',
+  ),
+  'short-open': meta('Activity', 'Short open trades', 'count', 'bar'),
   'win-rate': meta('Consistency', 'Win rate', 'pct', 'line'),
   'long-win-rate': meta('Consistency', 'Long win rate', 'pct', 'line'),
   'short-win-rate': meta('Consistency', 'Short win rate', 'pct', 'line'),
   'green-days': meta('Consistency', 'Day win rate', 'pct', 'line'),
+  'green-day-count': meta('Consistency', 'Green days', 'count', 'bar'),
   'win-streak': meta('Consistency', 'Longest win streak', 'count', 'bar'),
   'loss-streak': meta('Consistency', 'Longest loss streak', 'count', 'bar'),
   'green-day-streak': meta(
@@ -251,6 +294,11 @@ export interface SeriesOptions {
    * Without it they have no value.
    */
   balance?: { start: Cents; flows: readonly { date: string; amount: Cents }[] };
+  /**
+   * The local dates that have a daily journal entry (`loggedDates` of the
+   * entries). Without them Logged days has no value.
+   */
+  loggedDates?: readonly string[];
 }
 
 const mean = (xs: readonly number[]): number | null =>
@@ -275,6 +323,10 @@ interface Fact {
 /** The sums a running figure is read from, carried from bucket to bucket. */
 interface Acc {
   n: number;
+  /** Every closed trade's P&L, and its value in the unit where it has one. */
+  sum: number;
+  uSum: number;
+  uN: number;
   wins: number;
   losses: number;
   winSum: number;
@@ -306,6 +358,9 @@ interface Side {
 
 const emptyAcc = (): Acc => ({
   n: 0,
+  sum: 0,
+  uSum: 0,
+  uN: 0,
   wins: 0,
   losses: 0,
   winSum: 0,
@@ -327,6 +382,11 @@ const emptyAcc = (): Acc => ({
 
 function add(acc: Acc, f: Fact): void {
   acc.n += 1;
+  acc.sum += f.value;
+  if (f.unit !== null) {
+    acc.uSum += f.unit;
+    acc.uN += 1;
+  }
   const side = f.trade.direction === 'long' ? acc.long : acc.short;
   side.n += 1;
   if (f.outcome === 'win') {
@@ -388,6 +448,12 @@ function accValue(
   const uWin = ratio(a.winU.sum, a.winU.n);
   const uLoss = ratio(a.lossU.sum, a.lossU.n);
   switch (metric) {
+    case 'avg-trade':
+      return unit
+        ? ratio(a.uSum, a.uN)
+        : a.n === 0
+          ? null
+          : roundHalfEven(a.sum / a.n);
     case 'avg-win':
       return unit ? uWin : avgWin === null ? null : roundHalfEven(avgWin);
     case 'avg-loss':
@@ -440,6 +506,18 @@ function accValue(
       return a.long.n;
     case 'short-trades':
       return a.short.n;
+    case 'long-wins':
+      return a.long.wins;
+    case 'long-losses':
+      return a.long.losses;
+    case 'long-breakevens':
+      return a.long.n - a.long.wins - a.long.losses;
+    case 'short-wins':
+      return a.short.wins;
+    case 'short-losses':
+      return a.short.losses;
+    case 'short-breakevens':
+      return a.short.n - a.short.wins - a.short.losses;
     case 'win-rate':
       return ratio(a.wins, decisive);
     case 'long-win-rate':
@@ -549,9 +627,12 @@ export function timeSeries(
       }
   // Open trades are dated by their open, and only their own metric shows them.
   const opened: { date: string; key: string; trade: Trade }[] = [];
-  if (metric === 'open-trades')
+  const openSide =
+    metric === 'long-open' ? 'long' : metric === 'short-open' ? 'short' : null;
+  if (metric === 'open-trades' || openSide !== null)
     for (const t of trades) {
-      if (isClosed(t)) continue;
+      if (isClosed(t) || (openSide !== null && t.direction !== openSide))
+        continue;
       const date = localDate(t.openedAt, ctx.timeZone);
       if (inRange(date, ctx.range))
         opened.push({ date, key: keyOf(date), trade: t });
@@ -564,6 +645,15 @@ export function timeSeries(
   if (wantsVolume && !base.volume) base.volume = dayVolumes(trades, ctx);
   const volumeItems = wantsVolume ? (base.volume ?? []) : [];
 
+  // The days with a daily note, inside the range, each once.
+  const logged =
+    metric === 'logged-days' && opts.loggedDates
+      ? [...new Set(opts.loggedDates)]
+          .filter((date) => inRange(date, ctx.range))
+          .sort()
+          .map((date) => ({ date }))
+      : null;
+
   const keys = [
     ...new Set([
       ...days.map((d) => keyOf(d.date)),
@@ -571,12 +661,14 @@ export function timeSeries(
       ...facts.map((f) => f.key),
       ...opened.map((o) => o.key),
       ...volumeItems.map((v) => keyOf(v.date)),
+      ...(logged ?? []).map((l) => keyOf(l.date)),
     ]),
   ].sort();
 
   const needsLengths = metric === 'avg-day-length' || metric === 'longest-day';
   if (needsLengths && !base.lengths) base.lengths = dayLengths(trades, ctx);
-  const needsNet = metric === 'sharpe' || metric === 'sortino';
+  const needsNet =
+    metric === 'sharpe' || metric === 'sortino' || metric === 'net-balance';
   if (needsNet && !base.netDays)
     base.netDays =
       ctx.pnlBasis === 'net'
@@ -601,6 +693,7 @@ export function timeSeries(
   const factAt = cursor(facts);
   const volAt = cursor(volumeItems);
   const openAt = cursor(opened);
+  const loggedAt = cursor(logged ?? []);
 
   const acc = emptyAcc();
   let added = 0;
@@ -636,6 +729,33 @@ export function timeSeries(
           return scopeDays.reduce((n, d) => n + dayValue(d, ctx), 0);
         case 'avg-daily-net':
           return daySummary(scopeDays, ctx).avgDailyPnl;
+        case 'green-day-count':
+          return daySummary(scopeDays, ctx).greenDays;
+        case 'red-day-count':
+          return daySummary(scopeDays, ctx).redDays;
+        case 'flat-day-count':
+          return daySummary(scopeDays, ctx).flatDays;
+        case 'daily-drawdown':
+          // Where the period's last day closed, against the peak so far.
+          return scopeDays.length === 0 ? null : negative(-base.under[d1 - 1]!);
+        case 'net-balance': {
+          if (ctx.unit || !opts.balance) return null;
+          const [, n1] = netAt(span);
+          const flows = opts.balance.flows.reduce(
+            (n, f) => (f.date <= span.to ? n + f.amount : n),
+            0,
+          );
+          return (
+            opts.balance.start +
+            flows +
+            netDays.slice(0, n1).reduce((n, d) => n + d.net, 0)
+          );
+        }
+        case 'logged-days': {
+          if (!logged) return null;
+          const [a, b] = loggedAt(span);
+          return b - a;
+        }
         case 'avg-daily-win-loss':
           return daySummary(scopeDays, ctx).avgWinLoss;
         case 'fees':
@@ -657,7 +777,9 @@ export function timeSeries(
           const m = lengths.slice(...lenAt(span)).map((l) => l.minutes);
           return m.length === 0 ? null : Math.max(...m);
         }
-        case 'open-trades': {
+        case 'open-trades':
+        case 'long-open':
+        case 'short-open': {
           const [a, b] = openAt(span);
           return b - a;
         }

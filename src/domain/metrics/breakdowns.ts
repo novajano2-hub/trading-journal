@@ -94,12 +94,22 @@ const HOURS: Bucket[] = Array.from({ length: 24 }, (_, h) => [
   String(h),
   `${String(h).padStart(2, '0')}:00`,
 ]);
-const SESSIONS: Bucket[] = [
-  ['asia', 'Asia'],
-  ['london', 'London'],
-  ['new-york', 'New York'],
-  ['after-hours', 'After hours'],
-];
+/** The trading sessions the sessions report files trades under, cut in New York time. */
+export const SESSION_KEYS = [
+  'asia',
+  'london',
+  'new-york',
+  'after-hours',
+] as const;
+export type Session = (typeof SESSION_KEYS)[number];
+
+export const SESSION_LABELS: Record<Session, string> = {
+  asia: 'Asia',
+  london: 'London',
+  'new-york': 'New York',
+  'after-hours': 'After hours',
+};
+const SESSIONS: Bucket[] = SESSION_KEYS.map((k) => [k, SESSION_LABELS[k]]);
 /** Numeric ranges read "a to b" (DESIGN.md); the keys keep their hyphens, and the links read the keys. */
 const DURATIONS: Bucket[] = [
   ['lt-1m', '<1m'],
@@ -140,8 +150,9 @@ function durationKey(ms: number): string {
   return edgeKey(DURATION_EDGES, ms / MIN);
 }
 
-function sessionKey(openedAt: string): string {
-  const p = localParts(openedAt, 'America/New_York');
+/** The session an instant falls in, read in New York time as the sessions report reads it. */
+export function sessionOf(instant: string): Session {
+  const p = localParts(instant, 'America/New_York');
   const mins = p.hour * 60 + p.minute;
   if (mins >= 18 * 60 || mins < 3 * 60) return 'asia';
   if (mins < 9 * 60 + 30) return 'london';
@@ -269,12 +280,30 @@ export interface BucketRange {
 /**
  * The span of values a duration (minutes), size or R bucket holds, read from the
  * same edges the buckets are cut by, so a link and its bucket cannot disagree.
- * Null for a key that holds no span (R's "No stop").
+ * Null for a key that holds no span (R's "No stop"). Days to expiry are whole
+ * days, so its spans are closed.
  */
 export function bucketRange(
-  by: 'duration' | 'size' | 'r',
+  by: 'duration' | 'size' | 'r' | 'dte',
   key: string,
 ): BucketRange | null {
+  if (by === 'dte') {
+    // Whole days: the first bucket holds every expiry today or earlier.
+    switch (key) {
+      case '0':
+        return { max: 0 };
+      case '1':
+        return { min: 1, max: 1 };
+      case '2-7':
+        return { min: 2, max: 7 };
+      case '8-30':
+        return { min: 8, max: 30 };
+      case '31+':
+        return { min: 31 };
+      default:
+        return null;
+    }
+  }
   if (by === 'r') {
     if (key === `le-${R_CLAMP}`) return { max: -R_CLAMP };
     // rKey files -5 under le-5 and 5 under ge5, so those are the tails' alone.
@@ -339,7 +368,7 @@ function specOf(
     case 'time-of-day':
       return fixed(timeBuckets(width), (t) => timeKey(local(t), width));
     case 'session':
-      return fixed(SESSIONS, (t) => sessionKey(instant(t)));
+      return fixed(SESSIONS, (t) => sessionOf(instant(t)));
     case 'duration':
       return fixed(DURATIONS, (t) =>
         durationKey(Date.parse(t.closedAt) - Date.parse(t.openedAt)),
@@ -552,6 +581,8 @@ export function breakdown2D(
   counts: (number | null)[][];
   /** The closed trades in each cell, for the display units. */
   tradeIds: string[][][];
+  /** When the columns were folded: the keys that kept a column and the keys inside 'Other'. */
+  folded?: { kept: string[]; others: string[] };
 } {
   const merged = { ...ctx, ...opts };
   const closed = trades.filter(isClosed);
@@ -613,6 +644,9 @@ export function breakdown2D(
     counts: cellTrades.map((r) =>
       r.map((ts) => (ts.length === 0 ? null : ts.length)),
     ),
+    ...(folded
+      ? { folded: { kept: colRows.map((r) => r.key), others: [...other] } }
+      : {}),
   };
 }
 

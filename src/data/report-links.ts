@@ -1,5 +1,10 @@
 import { ASSET_CLASSES } from '../domain/asset-class';
-import { bucketRange, type BreakdownKey } from '../domain/metrics/breakdowns';
+import {
+  bucketRange,
+  SESSION_KEYS,
+  type BreakdownKey,
+  type Session,
+} from '../domain/metrics/breakdowns';
 import { priceSpan } from '../domain/metrics/price-ranges';
 import type { AssetClass } from '../domain/types';
 import {
@@ -128,9 +133,9 @@ function withId(
 /**
  * The filters that show the trades one bucket of a breakdown counted: the
  * page's own `base` with the bucket's filter on top. Null when the bucket has
- * no filter that says it (days to expiry, sessions, trades with no stop, no
- * tag, or the cross-analysis's "Other" column), or when the page's filters
- * leave the bucket empty or cannot be combined with it.
+ * no filter that says it (the cross-analysis's "Other" column: see
+ * `otherFilters`), or when the page's filters leave the bucket empty or cannot
+ * be combined with it.
  *
  * Each filter reads the date its breakdown buckets by: the weekday and month
  * of the entry, or of the exit when the report is set to exit time.
@@ -175,10 +180,15 @@ export function bucketFilters(
         : null;
     }
     case 'tag': {
-      // There is no filter for "no tag".
-      if (key === NONE) return null;
+      if (key === NONE) {
+        if (base.tagIds.length > 0 && !base.noTags) return null;
+        return { ...base, tagIds: [], noTags: true };
+      }
+      if (base.tagIds.length === 0 && base.noTags) return null;
       const next = withId(base.tagIds, base.tagMatch, key);
-      return next ? { ...base, tagIds: next.ids, tagMatch: next.match } : null;
+      return next
+        ? { ...base, tagIds: next.ids, tagMatch: next.match, noTags: false }
+        : null;
     }
     case 'weekday': {
       const day = WEEKDAY_NUMBER[key];
@@ -216,6 +226,11 @@ export function bucketFilters(
       return next ? { ...base, size: next } : null;
     }
     case 'r': {
+      if (key === NONE) {
+        // Trades with no stop have no R: a page asking for an R range has none of them.
+        return base.r === undefined ? { ...base, noInitialRisk: true } : null;
+      }
+      if (base.noInitialRisk) return null;
       const range = bucketRange('r', key);
       const next = range && intersectRanges(base.r, range);
       return next ? { ...base, r: next } : null;
@@ -239,9 +254,145 @@ export function bucketFilters(
       const next = intersectRanges(base[field], range);
       return next ? { ...base, [field]: next } : null;
     }
-    // Sessions are cut in New York time and days to expiry have no filter.
-    case 'session':
-    case 'dte':
+    case 'session': {
+      if (!(SESSION_KEYS as readonly string[]).includes(key)) return null;
+      const field = exit ? 'exitSessions' : 'sessions';
+      const sessions = oneOf<Session>(base[field], key as Session);
+      return sessions ? { ...base, [field]: sessions } : null;
+    }
+    case 'dte': {
+      const range = bucketRange('dte', key);
+      const next = range && intersectRanges(base.daysToExpiry, range);
+      return next ? { ...base, daysToExpiry: next } : null;
+    }
+  }
+}
+
+/** The keys a folded "Other" column holds, and the keys that kept a column of their own. */
+export interface Folded {
+  kept: readonly string[];
+  others: readonly string[];
+}
+
+/** Windows that touch or overlap run together as one. */
+function mergeWindows(windows: readonly TimeWindow[]): TimeWindow[] {
+  const spans = windows
+    .map((w) => [minutesOf(w.from!), minutesOf(w.to!)] as const)
+    .sort((a, b) => a[0] - b[0]);
+  const out: [number, number][] = [];
+  for (const [from, to] of spans) {
+    const last = out[out.length - 1];
+    if (last && from <= last[1] + 1) last[1] = Math.max(last[1], to);
+    else out.push([from, to]);
+  }
+  return out.map(([from, to]) => ({ from: hhmm(from), to: hhmm(to) }));
+}
+
+/** The values of `base` that `values` keep; all of `values` when `base` asks for none. Null when nothing is left. */
+function within<T>(base: readonly T[], values: readonly T[]): T[] | null {
+  const kept =
+    base.length === 0 ? [...values] : values.filter((v) => base.includes(v));
+  return kept.length === 0 ? null : kept;
+}
+
+/**
+ * The filters that show what a cross-analysis "Other" column counted: the
+ * trades in none of the columns that kept one. Symbols say it as "every
+ * symbol except these"; the dimensions that file a trade under one value
+ * (weekday, month, hour, account, instrument) as the list of the folded values;
+ * strategies and tags as "any of the folded ones". Null for a dimension whose
+ * folded buckets are ranges (prices, R, size, duration: no one range says
+ * them), or where the page's own filter on the dimension cannot be combined
+ * with it.
+ */
+export function otherFilters(
+  base: GlobalFilters,
+  by: BreakdownKey,
+  folded: Folded,
+  opts: BucketOptions = {},
+): GlobalFilters | null {
+  if (base.status === 'open') return null;
+  const exit = opts.timeBasis === 'exit';
+  const { kept, others } = folded;
+  if (others.length === 0) return null;
+  switch (by) {
+    case 'symbol':
+    case 'symbol-top':
+    case 'symbol-bottom': {
+      return {
+        ...base,
+        excludeSymbols: [...new Set([...base.excludeSymbols, ...kept])].sort(),
+      };
+    }
+    case 'strategy': {
+      // Where the page asks for strategies too, one filter cannot say both.
+      if (base.strategyIds.length > 0 || base.noStrategy) return null;
+      const ids = others.filter((k) => k !== NONE);
+      return {
+        ...base,
+        strategyIds: ids.sort(),
+        strategyMatch: 'any',
+        noStrategy: others.includes(NONE),
+      };
+    }
+    case 'tag': {
+      if (base.tagIds.length > 0 || base.noTags) return null;
+      const ids = others.filter((k) => k !== NONE);
+      return {
+        ...base,
+        tagIds: ids.sort(),
+        tagMatch: 'any',
+        noTags: others.includes(NONE),
+      };
+    }
+    case 'weekday': {
+      const days = others
+        .map((k) => WEEKDAY_NUMBER[k])
+        .filter((d) => d !== undefined);
+      const field = exit ? 'exitWeekdays' : 'weekdays';
+      const next = within(base[field], days);
+      return next ? { ...base, [field]: next.sort((a, b) => a - b) } : null;
+    }
+    case 'month': {
+      const months = others.map(Number);
+      const field = exit ? 'exitMonths' : 'months';
+      const next = within(base[field], months);
+      return next ? { ...base, [field]: next.sort((a, b) => a - b) } : null;
+    }
+    case 'account': {
+      const next = within(base.accountIds, others);
+      return next ? { ...base, accountIds: next.sort() } : null;
+    }
+    case 'instrument': {
+      const classes = others.filter((k): k is AssetClass =>
+        (ASSET_CLASSES as readonly string[]).includes(k),
+      );
+      const next = within(base.assetClasses, classes);
+      return next ? { ...base, assetClasses: next } : null;
+    }
+    case 'session': {
+      const sessions = others.filter((k): k is Session =>
+        (SESSION_KEYS as readonly string[]).includes(k),
+      );
+      const field = exit ? 'exitSessions' : 'sessions';
+      const next = within(base[field], sessions);
+      return next ? { ...base, [field]: next } : null;
+    }
+    case 'hour':
+    case 'exit-hour':
+    case 'time-of-day': {
+      const width = by === 'time-of-day' ? (opts.bucketMinutes ?? 30) : 60;
+      const field = exit || by === 'exit-hour' ? 'exitWindows' : 'entryWindows';
+      const cut: TimeWindow[] = [];
+      for (const key of others) {
+        const start = by === 'time-of-day' ? minutesOf(key) : Number(key) * 60;
+        if (!Number.isFinite(start)) return null;
+        cut.push(...(cutWindows(base[field], start, start + width - 1) ?? []));
+      }
+      return cut.length === 0 ? null : { ...base, [field]: mergeWindows(cut) };
+    }
+    // Ranges: the folded buckets are not one range.
+    default:
       return null;
   }
 }
@@ -287,11 +438,16 @@ export function bucketHref(
 export function cellHref(
   base: GlobalFilters,
   rows: { by: BreakdownKey; key: string },
-  cols: { by: BreakdownKey; key: string },
+  cols: { by: BreakdownKey; key: string; folded?: Folded },
   opts?: BucketOptions,
 ): string | undefined {
   const first = bucketFilters(base, rows.by, rows.key, opts);
-  const f = first && bucketFilters(first, cols.by, cols.key, opts);
+  if (!first) return undefined;
+  // The "Other" column is the keys that were folded into it.
+  const f =
+    cols.key === FOLDED && cols.folded
+      ? otherFilters(first, cols.by, cols.folded, opts)
+      : bucketFilters(first, cols.by, cols.key, opts);
   return f ? tradeLogHref(f) : undefined;
 }
 

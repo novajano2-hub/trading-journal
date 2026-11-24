@@ -374,6 +374,19 @@ export function monthSummary(
 }
 
 /**
+ * The local dates that have a daily journal entry, each once and ascending:
+ * entries in the trash left out. What Logged days counts, over any range.
+ */
+export function loggedDates(entries: readonly JournalEntry[]): string[] {
+  const dates = new Set<string>();
+  for (const e of entries) {
+    if (e.kind !== 'daily-review' || e.deletedAt !== undefined) continue;
+    if (e.date !== undefined) dates.add(e.date);
+  }
+  return [...dates].sort();
+}
+
+/**
  * The days inside `range` with a daily journal entry: one per date however many
  * notes it holds, entries in the trash left out.
  */
@@ -381,11 +394,5 @@ export function loggedDays(
   entries: readonly JournalEntry[],
   range: MetricContext['range'],
 ): number {
-  const dates = new Set<string>();
-  for (const e of entries) {
-    if (e.kind !== 'daily-review' || e.deletedAt !== undefined) continue;
-    if (e.date === undefined || !inRange(e.date, range)) continue;
-    dates.add(e.date);
-  }
-  return dates.size;
+  return loggedDates(entries).filter((date) => inRange(date, range)).length;
 }

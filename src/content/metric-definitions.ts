@@ -64,6 +64,16 @@ export const METRIC_IDS = [
   'red-day-count',
   'flat-day-count',
   'logged-days',
+  'daily-drawdown',
+  'account-balance',
+  'long-winners',
+  'long-losers',
+  'long-breakevens',
+  'long-open-trades',
+  'short-winners',
+  'short-losers',
+  'short-breakevens',
+  'short-open-trades',
   'avg-daily-pnl',
   'avg-daily-win-loss',
   'largest-green-day',
@@ -423,6 +433,56 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Logged days',
     definition:
       'Days in the date range that have a daily journal entry. Two entries on one day count once, and entries in the trash do not count.',
+  },
+  'daily-drawdown': {
+    label: 'Daily drawdown',
+    definition:
+      'How far the close of a trading day sat under its running peak, as the {basis} P&L day by day has it: 0 on a day that closed at a new peak, below 0 otherwise. A period reads where its last trading day closed. The peak starts at the starting balances of the selected accounts. It stays in money under ticks, pips, points and R.',
+  },
+  'account-balance': {
+    label: 'Net account balance',
+    definition:
+      'What the selected accounts hold at the end of the period: their balance the day before the date range starts, the deposits and withdrawals after it, and the net P&L of the trades in your filters booked up to then. It has no value in R, ticks, pips or points.',
+  },
+  'long-winners': {
+    label: 'Long winners',
+    definition:
+      'Closed long trades that ended in profit, outside your breakeven range.',
+  },
+  'long-losers': {
+    label: 'Long losers',
+    definition:
+      'Closed long trades that ended in loss, outside your breakeven range.',
+  },
+  'long-breakevens': {
+    label: 'Long breakevens',
+    definition:
+      'Closed long trades whose result fell inside your breakeven range.',
+  },
+  'long-open-trades': {
+    label: 'Long open trades',
+    definition:
+      'Long trades with no close yet, counted on the day they opened.',
+  },
+  'short-winners': {
+    label: 'Short winners',
+    definition:
+      'Closed short trades that ended in profit, outside your breakeven range.',
+  },
+  'short-losers': {
+    label: 'Short losers',
+    definition:
+      'Closed short trades that ended in loss, outside your breakeven range.',
+  },
+  'short-breakevens': {
+    label: 'Short breakevens',
+    definition:
+      'Closed short trades whose result fell inside your breakeven range.',
+  },
+  'short-open-trades': {
+    label: 'Short open trades',
+    definition:
+      'Short trades with no close yet, counted on the day they opened.',
   },
   'avg-daily-pnl': {
     label: 'Average daily P&L',

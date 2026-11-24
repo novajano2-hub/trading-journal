@@ -1063,7 +1063,11 @@ export function BreakdownCards({
                 const href = cellHref(
                   filters,
                   { by, key: rowKey },
-                  { by: cross.key, key: colKey },
+                  {
+                    by: cross.key,
+                    key: colKey,
+                    ...(matrix.folded && { folded: matrix.folded }),
+                  },
                   linkOpts,
                 );
                 return metric === 'net'

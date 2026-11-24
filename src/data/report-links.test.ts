@@ -73,11 +73,6 @@ const ALL: BreakdownKey[] = [
   'symbol-top',
   'symbol-bottom',
 ];
-/** Buckets that have no filter, by design. */
-const NO_LINK = (by: BreakdownKey, key: string) =>
-  by === 'session' ||
-  by === 'dte' ||
-  (key === '__none__' && (by === 'r' || by === 'tag'));
 
 describe('a bucket opens exactly the trades it counted', () => {
   const variants: { name: string; opts: BucketOptions }[] = [
@@ -108,19 +103,18 @@ describe('a bucket opens exactly the trades it counted', () => {
           let linked = 0;
           for (const row of rows) {
             const href = bucketHref(base, by, row.key, opts);
-            if (NO_LINK(by, row.key)) {
-              expect(href).toBeUndefined();
-              continue;
-            }
             // The page's own filters can leave a bucket empty: nothing to open.
             if (href === undefined && row.tradeIds.length === 0) continue;
             expect(href, `${by} ${row.key}`).toBeDefined();
-            linked += 1;
+            if (row.tradeIds.length > 0) linked += 1;
             expect(logIds(href!), `${by} ${row.key}`).toEqual(
               [...row.tradeIds].sort(),
             );
           }
-          if (!NO_LINK(by, 'x')) expect(linked).toBeGreaterThan(0);
+          // Every bucket with trades is a link: none is left without a filter.
+          expect(linked, by).toBe(
+            rows.filter((r) => r.tradeIds.length > 0).length,
+          );
         });
 
   test('the R buckets agree under the gross basis too', () => {
@@ -128,7 +122,6 @@ describe('a bucket opens exactly the trades it counted', () => {
     const rows = breakdown(ws.trades, 'r', ctxOf('gross'));
     for (const row of rows) {
       const href = bucketHref(base, 'r', row.key);
-      if (row.key === '__none__') continue;
       expect(logIds(href!, ws.trades, 'gross')).toEqual(
         [...row.tradeIds].sort(),
       );
@@ -377,12 +370,50 @@ describe('the page filters stay in force', () => {
     ).toBeNull();
   });
 
-  test('buckets with no filter are not links', () => {
-    expect(bucketHref(EMPTY_FILTERS, 'dte', '2-7')).toBeUndefined();
-    expect(bucketHref(EMPTY_FILTERS, 'session', 'london')).toBeUndefined();
-    expect(bucketHref(EMPTY_FILTERS, 'r', '__none__')).toBeUndefined();
-    expect(bucketHref(EMPTY_FILTERS, 'tag', '__none__')).toBeUndefined();
+  test('the buckets that once had no filter now say theirs', () => {
+    const p = (by: BreakdownKey, key: string, opts?: BucketOptions) =>
+      new URL(bucketHref(EMPTY_FILTERS, by, key, opts)!, 'http://x')
+        .searchParams;
+    expect(p('dte', '2-7').get('dte')).toBe('2_7');
+    expect(p('dte', '31+').get('dte')).toBe('31_');
+    expect(p('dte', '0').get('dte')).toBe('_0');
+    expect(p('session', 'london').get('sess')).toBe('london');
+    expect(p('session', 'london', { timeBasis: 'exit' }).get('xsess')).toBe(
+      'london',
+    );
+    expect(p('r', '__none__').get('norisk')).toBe('1');
+    expect(p('tag', '__none__').get('notag')).toBe('1');
+    // The cross-analysis's Other column has no one bucket: it needs the folded keys.
     expect(bucketHref(EMPTY_FILTERS, 'symbol', 'Other')).toBeUndefined();
+  });
+
+  test('a page that asks for R, or for tags, cannot also ask for none of them', () => {
+    expect(
+      bucketFilters({ ...EMPTY_FILTERS, r: { min: 1 } }, 'r', '__none__'),
+    ).toBeNull();
+    expect(
+      bucketFilters({ ...EMPTY_FILTERS, noInitialRisk: true }, 'r', '1'),
+    ).toBeNull();
+    expect(
+      bucketFilters({ ...EMPTY_FILTERS, tagIds: ['t1'] }, 'tag', '__none__'),
+    ).toBeNull();
+    expect(
+      bucketFilters({ ...EMPTY_FILTERS, noTags: true }, 'tag', 't1'),
+    ).toBeNull();
+    expect(
+      bucketFilters(
+        { ...EMPTY_FILTERS, sessions: ['asia'] },
+        'session',
+        'london',
+      ),
+    ).toBeNull();
+    expect(
+      bucketFilters(
+        { ...EMPTY_FILTERS, daysToExpiry: { max: 1 } },
+        'dte',
+        '8-30',
+      ),
+    ).toBeNull();
   });
 
   test('the address keeps the page filters and the date range', () => {
@@ -444,7 +475,7 @@ describe('a cross-analysis cell opens the trades in both buckets', () => {
         expect(linked).toBeGreaterThan(0);
       });
 
-  test('a folded column or a bucket with no filter is not a link', () => {
+  test('a folded column with no folded keys to name, or a range dimension, is not a link', () => {
     expect(
       cellHref(
         EMPTY_FILTERS,
@@ -455,8 +486,143 @@ describe('a cross-analysis cell opens the trades in both buckets', () => {
     expect(
       cellHref(
         EMPTY_FILTERS,
-        { by: 'symbol', key: 'ES' },
-        { by: 'session', key: 'asia' },
+        { by: 'side', key: 'long' },
+        {
+          by: 'entry-price',
+          key: 'Other',
+          folded: { kept: ['1_2'], others: ['3_4'] },
+        },
+      ),
+    ).toBeUndefined();
+  });
+
+  test('the new buckets cross with each other and agree with the log', () => {
+    const pairs: [BreakdownKey, BreakdownKey][] = [
+      ['session', 'dte'],
+      ['dte', 'session'],
+      ['r', 'tag'],
+      ['tag', 'r'],
+      ['session', 'r'],
+    ];
+    for (const [rows, cols] of pairs) {
+      const m = breakdown2D(ws.trades, ctxOf(), rows, cols, 'trades');
+      let linked = 0;
+      m.rows.forEach((r, ri) =>
+        m.cols.forEach((c, ci) => {
+          const ids = m.tradeIds[ri]?.[ci] ?? [];
+          if (ids.length === 0) return;
+          const href = cellHref(
+            EMPTY_FILTERS,
+            { by: rows, key: r.key },
+            { by: cols, key: c.key, ...(m.folded && { folded: m.folded }) },
+          );
+          expect(href, `${rows} ${r.key} x ${cols} ${c.key}`).toBeDefined();
+          linked += 1;
+          expect(logIds(href!), `${r.key} x ${c.key}`).toEqual([...ids].sort());
+        }),
+      );
+      expect(linked, `${rows} x ${cols}`).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('the cross-analysis Other column opens the trades it folded', () => {
+  const account = ws.accounts[0]!.id;
+  /** Fourteen symbols, so the busiest eleven keep a column and three fold. */
+  const manySymbols = Array.from({ length: 14 }, (_, i) =>
+    Array.from({ length: 14 - i }, (_, j) =>
+      makeTrade({
+        net: (j % 3) * 100 - 100,
+        accountId: account,
+        instrument: {
+          ...makeTrade({ net: 0 }).instrument,
+          root: `S${String(i).padStart(2, '0')}`,
+        },
+        openedAt: `2026-11-${String(2 + (j % 5)).padStart(2, '0')}T15:00:00Z`,
+        closedAt: `2026-11-${String(2 + (j % 5)).padStart(2, '0')}T15:30:00Z`,
+      }),
+    ),
+  ).flat();
+
+  /** Every cell of the matrix, Other included, opens exactly its trades. */
+  const checkAll = (
+    trades: Trade[],
+    rows: BreakdownKey,
+    cols: BreakdownKey,
+    base: GlobalFilters = EMPTY_FILTERS,
+    opts: BucketOptions = {},
+  ) => {
+    const set = applyFilters(trades, base, env);
+    const m = breakdown2D(set, { ...ctxOf(), ...opts }, rows, cols, 'trades');
+    expect(m.folded, `${cols} folds`).toBeDefined();
+    const other = m.cols.findIndex((c) => c.key === 'Other');
+    expect(other).toBeGreaterThanOrEqual(0);
+    let others = 0;
+    m.rows.forEach((r, ri) =>
+      m.cols.forEach((c, ci) => {
+        const ids = m.tradeIds[ri]?.[ci] ?? [];
+        if (ids.length === 0) return;
+        const href = cellHref(
+          base,
+          { by: rows, key: r.key },
+          {
+            by: cols,
+            key: c.key,
+            ...(m.folded && { folded: m.folded }),
+          },
+          opts,
+        );
+        expect(href, `${r.key} x ${c.key}`).toBeDefined();
+        if (ci === other) others += 1;
+        expect(logIds(href!, trades), `${r.key} x ${c.key}`).toEqual(
+          [...ids].sort(),
+        );
+      }),
+    );
+    expect(others).toBeGreaterThan(0);
+  };
+
+  test('symbols: every symbol except the ones that kept a column', () => {
+    checkAll(manySymbols, 'weekday', 'symbol');
+    const m = breakdown2D(manySymbols, ctxOf(), 'weekday', 'symbol', 'trades');
+    const href = cellHref(
+      EMPTY_FILTERS,
+      { by: 'weekday', key: 'mon' },
+      { by: 'symbol', key: 'Other', folded: m.folded! },
+    )!;
+    const p = new URL(href, 'http://x').searchParams;
+    expect(p.get('xsym')!.split(',').sort()).toEqual(
+      [...m.folded!.kept].sort(),
+    );
+    expect(p.get('symbol')).toBeNull();
+  });
+
+  test('symbols: the page filters stay in force', () => {
+    checkAll(manySymbols, 'side', 'symbol', {
+      ...EMPTY_FILTERS,
+      excludeSymbols: ['S00'],
+    });
+  });
+
+  test('tags and times of day fold in the sample workspace too', () => {
+    checkAll(ws.trades, 'weekday', 'tag');
+    checkAll(ws.trades, 'side', 'time-of-day', EMPTY_FILTERS, {
+      bucketMinutes: 5,
+    });
+    checkAll(ws.trades, 'side', 'time-of-day', EMPTY_FILTERS, {
+      bucketMinutes: 5,
+      timeBasis: 'exit',
+    });
+    checkAll(ws.trades, 'side', 'exit-hour');
+  });
+
+  test('a page that asks for tags cannot be combined with the folded tags', () => {
+    const m = breakdown2D(ws.trades, ctxOf(), 'weekday', 'tag', 'trades');
+    expect(
+      cellHref(
+        { ...EMPTY_FILTERS, tagIds: [ws.tags[0]!.id] },
+        { by: 'weekday', key: 'mon' },
+        { by: 'tag', key: 'Other', folded: m.folded! },
       ),
     ).toBeUndefined();
   });

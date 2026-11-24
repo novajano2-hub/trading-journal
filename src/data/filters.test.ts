@@ -658,6 +658,106 @@ describe('the full filter set', () => {
     ).toEqual(EMPTY_FILTERS);
   });
 
+  test('tag: no tags ORs with the selection, as no strategy does', () => {
+    const none = trade({ tagIds: [] });
+    const x = trade({ tagIds: ['x'] });
+    const xy = trade({ tagIds: ['x', 'y'] });
+    expect(run([none, x, xy], { noTags: true })).toEqual([none]);
+    expect(run([none, x, xy], { noTags: true, tagIds: ['y'] })).toEqual([
+      none,
+      xy,
+    ]);
+    expect(run([none, x, xy], { noTags: true, excludeTagIds: ['y'] })).toEqual([
+      none,
+    ]);
+  });
+
+  test('no initial risk keeps the trades with no R, on either basis', () => {
+    const stop = trade({ initialRisk: 100 });
+    const free = trade({});
+    const zero = trade({ initialRisk: 0 });
+    expect(run([stop, free, zero], { noInitialRisk: true })).toEqual([
+      free,
+      zero,
+    ]);
+    // With an R range asked too, nothing has both.
+    expect(
+      run([stop, free, zero], { noInitialRisk: true, r: { min: -9 } }),
+    ).toEqual([]);
+  });
+
+  test('sessions are cut in New York time, from the entry or the exit', () => {
+    // November, so New York is UTC-5: 08:00 NY (london), 11:00 (new-york),
+    // 17:00 (after hours), 20:00 (asia).
+    const london = trade({
+      openedAt: at('13:00'),
+      closedAt: at('13:30'),
+    });
+    const ny = trade({ openedAt: at('16:00'), closedAt: at('16:30') });
+    const after = trade({ openedAt: at('22:00'), closedAt: at('22:30') });
+    const asia = trade({
+      openedAt: '2026-11-19T01:00:00Z',
+      closedAt: '2026-11-19T01:30:00Z',
+    });
+    const all = [london, ny, after, asia];
+    expect(run(all, { sessions: ['london'] })).toEqual([london]);
+    expect(run(all, { sessions: ['new-york', 'asia'] })).toEqual([ny, asia]);
+    // Opened in the New York session, closed after hours.
+    const long = trade({ openedAt: at('20:30'), closedAt: at('22:30') });
+    expect(run([long], { sessions: ['new-york'] })).toEqual([long]);
+    expect(run([long], { exitSessions: ['new-york'] })).toEqual([]);
+    expect(run([long], { exitSessions: ['after-hours'] })).toEqual([long]);
+    // An open trade has no exit.
+    const open = trade({ status: 'open', openedAt: at('16:00') });
+    expect(run([open], { exitSessions: ['new-york'] })).toEqual([]);
+    expect(run([open], { sessions: ['new-york'] })).toEqual([open]);
+  });
+
+  test('days to expiry counts whole days from the day the trade opened, and only options have it', () => {
+    const option = (day: string, expiry: string) =>
+      trade({
+        openedAt: `${day}T15:00:00Z`,
+        closedAt: `${day}T16:00:00Z`,
+        instrument: {
+          ...resolveInstrument('ESZ5')!,
+          assetClass: 'option',
+          expiry,
+        },
+      });
+    const zero = option('2026-11-18', '2026-11-18');
+    const week = option('2026-11-18', '2026-11-25');
+    const far = option('2026-11-18', '2027-01-15');
+    const future = trade({});
+    const all = [zero, week, far, future];
+    expect(run(all, { daysToExpiry: { max: 0 } })).toEqual([zero]);
+    expect(run(all, { daysToExpiry: { min: 2, max: 7 } })).toEqual([week]);
+    expect(run(all, { daysToExpiry: { min: 31 } })).toEqual([far]);
+  });
+
+  test('every new param survives a round trip, and the advanced count includes them', () => {
+    const f: GlobalFilters = {
+      ...EMPTY_FILTERS,
+      noTags: true,
+      noInitialRisk: true,
+      sessions: ['new-york', 'asia'],
+      exitSessions: ['london'],
+      daysToExpiry: { min: 2, max: 7 },
+    };
+    const qs = queryString(serializeFilters(f));
+    expect(qs).toBe('notag=1&norisk=1&dte=2_7&sess=asia,new-york&xsess=london');
+    expect(parseFilters(new URLSearchParams(qs))).toEqual({
+      ...f,
+      sessions: ['asia', 'new-york'],
+    });
+    expect(advancedFilterCount(f)).toBe(5);
+    // Nothing but the right value is read.
+    expect(
+      parseFilters(
+        new URLSearchParams('notag=0&norisk=yes&sess=mars,asia&dte=x'),
+      ),
+    ).toEqual({ ...EMPTY_FILTERS, sessions: ['asia'] });
+  });
+
   test('the advanced count is one per group in use', () => {
     expect(advancedFilterCount(EMPTY_FILTERS)).toBe(0);
     expect(

@@ -12,6 +12,12 @@ import {
 } from 'date-fns';
 import { ASSET_CLASSES } from '../domain/asset-class';
 import { weekStartsOn as weekStartsOnOf } from '../domain/week';
+import {
+  daysToExpiry,
+  SESSION_KEYS,
+  sessionOf,
+  type Session,
+} from '../domain/metrics/breakdowns';
 import { classify } from '../domain/metrics/context';
 import { rOf, unitKeeps } from '../domain/metrics/units';
 import { localDate, localParts } from '../domain/time';
@@ -70,6 +76,8 @@ export interface GlobalFilters {
   noStrategy: boolean;
   strategyMatch: 'any' | 'all';
   excludeTagIds: string[];
+  /** Matches trades with no tags; ORs with `tagIds`. */
+  noTags: boolean;
   tagMatch: 'any' | 'all';
   outcomes: Outcome[];
   status?: 'open' | 'closed';
@@ -94,6 +102,14 @@ export interface GlobalFilters {
   size?: NumRange;
   /** Realized R. */
   r?: NumRange;
+  /** Matches trades with no initial risk (no stop), which have no R. */
+  noInitialRisk: boolean;
+  /** Whole days from the day the trade opened to its option's expiry; other trades have none. */
+  daysToExpiry?: NumRange;
+  /** The trading sessions (New York time) the trade opened in. Empty keeps every session. */
+  sessions: Session[];
+  /** The trading sessions (New York time) the trade closed in. */
+  exitSessions: Session[];
   /** One P&L currency: what a report that reads one currency links to. */
   currency?: string;
   /** The instrument: the asset classes to keep. Empty keeps every class. */
@@ -111,6 +127,7 @@ export const EMPTY_FILTERS: GlobalFilters = {
   noStrategy: false,
   strategyMatch: 'any',
   excludeTagIds: [],
+  noTags: false,
   tagMatch: 'any',
   outcomes: [],
   ratings: [],
@@ -120,6 +137,9 @@ export const EMPTY_FILTERS: GlobalFilters = {
   exitMonths: [],
   entryWindows: [],
   exitWindows: [],
+  noInitialRisk: false,
+  sessions: [],
+  exitSessions: [],
   assetClasses: [],
 };
 
@@ -156,6 +176,11 @@ export const FILTER_PARAMS = [
   'r',
   'ccy',
   'inst',
+  'notag',
+  'norisk',
+  'dte',
+  'sess',
+  'xsess',
 ] as const;
 
 const OUTCOMES: readonly Outcome[] = ['win', 'loss', 'breakeven'];
@@ -167,6 +192,7 @@ export function advancedFilterCount(f: GlobalFilters): number {
     f.excludeStrategyIds.length > 0,
     f.noStrategy,
     f.excludeTagIds.length > 0,
+    f.noTags,
     f.outcomes.length > 0,
     f.status !== undefined,
     f.holding !== undefined,
@@ -183,6 +209,10 @@ export function advancedFilterCount(f: GlobalFilters): number {
     f.exitPrice !== undefined,
     f.size !== undefined,
     f.r !== undefined,
+    f.noInitialRisk,
+    f.daysToExpiry !== undefined,
+    f.sessions.length > 0,
+    f.exitSessions.length > 0,
     f.currency !== undefined,
     f.assetClasses.length > 0,
   ];
@@ -326,6 +356,9 @@ export function parseFilters(
   const exitPrice = rangeOf(params, 'xp');
   const size = rangeOf(params, 'size');
   const r = rangeOf(params, 'r');
+  const dte = rangeOf(params, 'dte');
+  const sessionSet = new Set(listOf(params, 'sess'));
+  const exitSessionSet = new Set(listOf(params, 'xsess'));
   const classSet = new Set(listOf(params, 'inst'));
   const ccy = params.get('ccy')?.trim().toUpperCase();
   const currency = ccy && /^[A-Z0-9]{2,10}$/.test(ccy) ? ccy : undefined;
@@ -343,6 +376,7 @@ export function parseFilters(
     noStrategy: params.get('nostrat') === '1',
     strategyMatch: params.get('stratmatch') === 'all' ? 'all' : 'any',
     excludeTagIds: uniqueValues(listOf(params, 'xtag')),
+    noTags: params.get('notag') === '1',
     tagMatch: params.get('tagmatch') === 'all' ? 'all' : 'any',
     outcomes: OUTCOMES.filter((o) => outcomeSet.has(o)),
     ...(status === 'open' || status === 'closed' ? { status } : {}),
@@ -361,6 +395,10 @@ export function parseFilters(
     ...optional('exitPrice', exitPrice),
     ...optional('size', size),
     ...optional('r', r),
+    noInitialRisk: params.get('norisk') === '1',
+    ...optional('daysToExpiry', dte),
+    sessions: SESSION_KEYS.filter((k) => sessionSet.has(k)),
+    exitSessions: SESSION_KEYS.filter((k) => exitSessionSet.has(k)),
     ...optional('currency', currency),
     assetClasses: ASSET_CLASSES.filter((c) => classSet.has(c)),
   };
@@ -405,6 +443,7 @@ export function serializeFilters(f: GlobalFilters): URLSearchParams {
   if (f.noStrategy) p.set('nostrat', '1');
   if (f.strategyMatch === 'all') p.set('stratmatch', 'all');
   list('xtag', sorted(f.excludeTagIds));
+  if (f.noTags) p.set('notag', '1');
   if (f.tagMatch === 'all') p.set('tagmatch', 'all');
   list(
     'outcome',
@@ -437,6 +476,16 @@ export function serializeFilters(f: GlobalFilters): URLSearchParams {
   range('xp', f.exitPrice);
   range('size', f.size);
   range('r', f.r);
+  if (f.noInitialRisk) p.set('norisk', '1');
+  range('dte', f.daysToExpiry);
+  list(
+    'sess',
+    SESSION_KEYS.filter((k) => f.sessions.includes(k)),
+  );
+  list(
+    'xsess',
+    SESSION_KEYS.filter((k) => f.exitSessions.includes(k)),
+  );
   if (f.currency) p.set('ccy', f.currency);
   list(
     'inst',
@@ -581,6 +630,8 @@ export function applyFilters(
   const exStrategies = new Set(f.excludeStrategyIds);
   const tags = new Set(f.tagIds);
   const exTags = new Set(f.excludeTagIds);
+  const sessions = new Set<Session>(f.sessions);
+  const exitSessions = new Set<Session>(f.exitSessions);
   const outcomes = new Set<Outcome>(f.outcomes);
   const ratings = new Set<number>(f.ratings);
   const weekdays = new Set(f.weekdays);
@@ -616,12 +667,14 @@ export function applyFilters(
       if (!none && !picked) return false;
     }
     if (t.tagIds.some((id) => exTags.has(id))) return false;
-    if (tags.size > 0) {
-      const ok =
-        f.tagMatch === 'all'
+    if (tags.size > 0 || f.noTags) {
+      const none = f.noTags && t.tagIds.length === 0;
+      const picked =
+        tags.size > 0 &&
+        (f.tagMatch === 'all'
           ? [...tags].every((id) => t.tagIds.includes(id))
-          : t.tagIds.some((id) => tags.has(id));
-      if (!ok) return false;
+          : t.tagIds.some((id) => tags.has(id)));
+      if (!none && !picked) return false;
     }
 
     const closed = t.status === 'closed' && t.closedAt !== undefined;
@@ -669,6 +722,10 @@ export function applyFilters(
       const out = localParts(t.closedAt!, tz);
       if (!inWindows(out.hour * 60 + out.minute, f.exitWindows)) return false;
     }
+    if (sessions.size > 0 && !sessions.has(sessionOf(t.openedAt))) return false;
+    if (exitSessions.size > 0) {
+      if (!closed || !exitSessions.has(sessionOf(t.closedAt!))) return false;
+    }
     if (f.duration !== undefined) {
       if (!closed) return false;
       const minutes =
@@ -686,6 +743,12 @@ export function applyFilters(
       // The same R every report buckets by: on the basis the figures read.
       const r = rOf(t, env.pnlBasis ?? 'net');
       if (!closed || r === undefined || !within(r, f.r)) return false;
+    }
+    if (f.noInitialRisk && rOf(t, env.pnlBasis ?? 'net') !== undefined)
+      return false;
+    if (f.daysToExpiry !== undefined) {
+      const days = daysToExpiry(t, tz);
+      if (days === null || !within(days, f.daysToExpiry)) return false;
     }
     return true;
   });

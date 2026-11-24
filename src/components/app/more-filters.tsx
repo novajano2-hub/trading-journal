@@ -22,6 +22,11 @@ import {
   type TimeWindow,
 } from '@/data/filters';
 import { ASSET_CLASSES, ASSET_CLASS_LABELS } from '@/domain/asset-class';
+import {
+  SESSION_KEYS,
+  SESSION_LABELS,
+  type Session,
+} from '@/domain/metrics/breakdowns';
 import { usePrefs } from '@/data/query/hooks';
 import { rotateFromWeekStart } from '@/domain/week';
 import type { AssetClass, WeekStart } from '@/domain/types';
@@ -540,6 +545,32 @@ function Panel({
             windows={draft.exitWindows}
             onChange={(exitWindows) => patch({ exitWindows })}
           />
+          <Toggles
+            legend="Entry session (New York time)"
+            items={SESSION_KEYS.map((k) => ({
+              id: k,
+              label: SESSION_LABELS[k],
+              name: `${SESSION_LABELS[k]}, entry`,
+            }))}
+            selected={draft.sessions}
+            onToggle={(id) =>
+              patch({ sessions: toggleId(draft.sessions, id) as Session[] })
+            }
+          />
+          <Toggles
+            legend="Exit session (New York time)"
+            items={SESSION_KEYS.map((k) => ({
+              id: k,
+              label: SESSION_LABELS[k],
+              name: `${SESSION_LABELS[k]}, exit`,
+            }))}
+            selected={draft.exitSessions}
+            onToggle={(id) =>
+              patch({
+                exitSessions: toggleId(draft.exitSessions, id) as Session[],
+              })
+            }
+          />
           <RangeField
             key={`dur${round}`}
             legend="Duration"
@@ -603,6 +634,15 @@ function Panel({
         </Section>
 
         <Section title="Tags">
+          <label className={`${TOGGLE} self-start`}>
+            <input
+              type="checkbox"
+              checked={draft.noTags}
+              onChange={(e) => patch({ noTags: e.target.checked })}
+              className="sr-only"
+            />
+            No tags
+          </label>
           {options.tags.length === 0 ? (
             <p className="text-[13px] text-muted">No tags yet.</p>
           ) : (
@@ -668,7 +708,23 @@ function Panel({
               range={draft.r}
               onChange={(r) => patch({ r })}
             />
+            <RangeField
+              key={`dte${round}`}
+              legend="Days to expiry"
+              unit="options"
+              range={draft.daysToExpiry}
+              onChange={(daysToExpiry) => patch({ daysToExpiry })}
+            />
           </div>
+          <label className={`${TOGGLE} self-start`}>
+            <input
+              type="checkbox"
+              checked={draft.noInitialRisk}
+              onChange={(e) => patch({ noInitialRisk: e.target.checked })}
+              className="sr-only"
+            />
+            No initial risk
+          </label>
         </Section>
       </div>
       <div className="flex flex-none items-center gap-2 border-t border-line px-4 py-3">

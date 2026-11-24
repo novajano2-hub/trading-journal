@@ -9,6 +9,7 @@ import {
   type TimeWindow,
 } from '@/data/filters';
 import { ASSET_CLASSES, ASSET_CLASS_LABELS } from '@/domain/asset-class';
+import { SESSION_KEYS, SESSION_LABELS } from '@/domain/metrics/breakdowns';
 import type {
   Account,
   Strategy,
@@ -173,6 +174,7 @@ export function unshownFilters(f: GlobalFilters): string[] {
     [f.excludeStrategyIds.length > 0, 'Excluded strategies'],
     [f.noStrategy, 'No strategy'],
     [f.excludeTagIds.length > 0, 'Excluded tags'],
+    [f.noTags, 'No tags'],
     [f.status !== undefined, 'Status'],
     [f.holding !== undefined, 'Holding'],
     [f.reviewed !== undefined, 'Reviewed'],
@@ -188,6 +190,10 @@ export function unshownFilters(f: GlobalFilters): string[] {
     [f.exitPrice !== undefined, 'Exit price'],
     [f.size !== undefined, 'Size'],
     [f.r !== undefined, 'R'],
+    [f.noInitialRisk, 'No initial risk'],
+    [f.daysToExpiry !== undefined, 'Days to expiry'],
+    [f.sessions.length > 0, 'Entry sessions'],
+    [f.exitSessions.length > 0, 'Exit sessions'],
     [f.currency !== undefined, 'Currency'],
     [f.assetClasses.length > 0, 'Instrument'],
     [f.strategyMatch === 'all', 'Strategies, all'],
@@ -251,8 +257,9 @@ const windowText = (w: TimeWindow) => `${w.from ?? 'start'}-${w.to ?? 'end'}`;
 
 /**
  * The filters a bucket link adds (and the rest of "More filters") as chips the
- * trade log shows: the weekday, month, entry and exit time, duration, size, R
- * and price ranges, and trades with no strategy. Status and review have their
+ * trade log shows: the weekday, month, entry and exit time, session, duration,
+ * size, R, days to expiry and price ranges, excluded symbols, and trades with
+ * no strategy, no tags or no initial risk. Status and review have their
  * own switches in the log, and the date, symbol, side, strategy and tags have
  * chips in the top bar.
  */
@@ -282,7 +289,33 @@ export function detailChips(
   add(f.currency !== undefined, 'currency', () => `Currency: ${f.currency}`, {
     currency: undefined,
   });
+  add(
+    f.excludeSymbols.length > 0,
+    'excludeSymbols',
+    () => `Excluded symbols: ${f.excludeSymbols.join(', ')}`,
+    { excludeSymbols: [] },
+  );
   add(f.noStrategy, 'noStrategy', () => 'No strategy', { noStrategy: false });
+  add(f.noTags, 'noTags', () => 'No tags', { noTags: false });
+  add(f.noInitialRisk, 'noInitialRisk', () => 'No initial risk', {
+    noInitialRisk: false,
+  });
+  const sessionNames = (xs: readonly string[]) =>
+    SESSION_KEYS.filter((k) => xs.includes(k))
+      .map((k) => SESSION_LABELS[k])
+      .join(', ');
+  add(
+    f.sessions.length > 0,
+    'sessions',
+    () => `Entry session: ${sessionNames(f.sessions)}`,
+    { sessions: [] },
+  );
+  add(
+    f.exitSessions.length > 0,
+    'exitSessions',
+    () => `Exit session: ${sessionNames(f.exitSessions)}`,
+    { exitSessions: [] },
+  );
   add(
     f.assetClasses.length > 0,
     'assetClasses',
@@ -343,6 +376,12 @@ export function detailChips(
     'entryPrice',
     () => `Entry price: ${rangeText(entryPrice!)}`,
     { entryPrice: undefined },
+  );
+  add(
+    f.daysToExpiry !== undefined,
+    'daysToExpiry',
+    () => `Days to expiry: ${rangeText(f.daysToExpiry!)}`,
+    { daysToExpiry: undefined },
   );
   add(
     exitPrice !== undefined,

@@ -199,8 +199,8 @@ function xTicks(
   return { ticks: out, tilt, hang: X_AXIS };
 }
 
-/** Compact dollars for an axis: +$5k, −$1.5k, $0. */
-function compactMoney(cents: number, currency: string): string {
+/** Compact dollars for an axis: +$5k, −$1.5k, $0; a balance reads $5k, with no plus. */
+function compactMoney(cents: number, currency: string, signed = true): string {
   if (cents === 0)
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -215,7 +215,7 @@ function compactMoney(cents: number, currency: string): string {
   })
     .format(Math.abs(cents) / 100)
     .replace(/([KMBT])$/, (m) => m.toLowerCase());
-  return `${cents < 0 ? '−' : '+'}${body}`;
+  return `${cents < 0 ? '−' : signed ? '+' : ''}${body}`;
 }
 
 export interface Formatter {
@@ -244,6 +244,8 @@ export function formatterOf(display: Display, currency: string): Formatter {
     switch (unit) {
       case 'money':
         return display.cash(v, true, currency).label;
+      case 'balance':
+        return display.cash(v, false, currency).label;
       case 'tradeunit':
         return unitText(v, false, true);
       case 'pct':
@@ -267,6 +269,8 @@ export function formatterOf(display: Display, currency: string): Formatter {
       if (v === null) return 'None';
       if (unit === 'money')
         return <FigureText f={display.cash(v, true, currency)} />;
+      if (unit === 'balance')
+        return <FigureText f={display.cash(v, false, currency)} />;
       if (unit === 'moneyratio') return <FigureText f={display.ratio(v)} />;
       return text(unit, v);
     },
@@ -277,6 +281,10 @@ export function formatterOf(display: Display, currency: string): Formatter {
           return display.unit === 'dollar'
             ? compactMoney(v, currency)
             : display.cash(v, v !== 0, currency).text;
+        case 'balance':
+          return display.unit === 'dollar'
+            ? compactMoney(v, currency, false)
+            : display.cash(v, false, currency).text;
         case 'tradeunit':
           return unitText(v, true, v !== 0);
         case 'pct':

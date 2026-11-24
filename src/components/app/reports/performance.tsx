@@ -19,6 +19,8 @@ import {
   type SeriesMetric,
   type SeriesPoint,
 } from '@/domain/metrics/series';
+import { useJournal } from '@/data/query/hooks';
+import { loggedDates } from '@/domain/metrics/days';
 import { useAddressCopy } from '@/lib/use-address-copy';
 import { useDisplay } from '@/lib/display';
 import { CARD, CARD_PAD, CardHeader, signTone } from '../dashboard/shared';
@@ -55,7 +57,10 @@ const TIPS: Record<SeriesMetric, MetricId> = {
   'largest-win': 'largest-win',
   'largest-loss': 'largest-loss',
   'profit-factor': 'profit-factor',
+  'avg-trade': 'avg-trade',
   fees: 'fees',
+  'red-day-count': 'red-day-count',
+  'flat-day-count': 'flat-day-count',
   'avg-planned-r': 'planned-r',
   'avg-realized-r': 'realized-r',
   'max-drawdown': 'max-drawdown',
@@ -73,10 +78,22 @@ const TIPS: Record<SeriesMetric, MetricId> = {
   'short-trades': 'short-trades',
   volume: 'volume',
   'avg-daily-volume': 'avg-daily-volume',
+  'daily-drawdown': 'daily-drawdown',
+  'net-balance': 'account-balance',
+  'logged-days': 'logged-days',
+  'long-wins': 'long-winners',
+  'long-losses': 'long-losers',
+  'long-breakevens': 'long-breakevens',
+  'long-open': 'long-open-trades',
+  'short-wins': 'short-winners',
+  'short-losses': 'short-losers',
+  'short-breakevens': 'short-breakevens',
+  'short-open': 'short-open-trades',
   'win-rate': 'win-rate',
   'long-win-rate': 'long-win-rate',
   'short-win-rate': 'short-win-rate',
   'green-days': 'daily-win-rate',
+  'green-day-count': 'green-day-count',
   'win-streak': 'win-streak',
   'loss-streak': 'loss-streak',
   'green-day-streak': 'green-day-streak',
@@ -170,6 +187,12 @@ interface Slot {
 function useSlot(data: ReportData, n: SlotNumber, active: boolean): Slot {
   const { partition: p, ctx, basis } = data;
   const params = useSearchParams();
+  const entries = useJournal().data;
+  // The days with a daily note, for Logged days; none until the journal loads.
+  const noted = useMemo(
+    () => (entries ? loggedDates(entries) : undefined),
+    [entries],
+  );
   const names = SLOT_PARAMS[n];
   const picksParam = params.get(names.picks);
   const bucketParam = params.get(names.bucket);
@@ -194,10 +217,11 @@ function useSlot(data: ReportData, n: SlotNumber, active: boolean): Slot {
           timeSeries(p.dayTrades, ctx, x.metric, bucket, {
             mode: modeOf(x),
             balance: { start: p.riskStart, flows: p.riskFlows },
+            ...(noted ? { loggedDates: noted } : {}),
           }),
         ),
       ),
-    [plotted, p.dayTrades, p.riskStart, p.riskFlows, ctx, bucket],
+    [plotted, p.dayTrades, p.riskStart, p.riskFlows, ctx, bucket, noted],
   );
   const series: ChartSeries[] = plotted.map((x, i) => ({
     label: seriesLabel(x, basis),
@@ -227,6 +251,8 @@ function useSlot(data: ReportData, n: SlotNumber, active: boolean): Slot {
 const GAP_REASONS: Partial<Record<SeriesMetric, string>> = {
   'avg-daily-win-loss':
     'shows only for periods with both a green and a red day.',
+  'net-balance': 'has no value in R, ticks, pips or points.',
+  'logged-days': 'waits for your journal to load.',
 };
 
 const GHOST =

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { makeTrade } from '../__fixtures__/trades';
 import type { Execution, Trade } from '../types';
 import { defaultMetricContext } from './context';
-import { dailyPnl } from './days';
+import { dailyPnl, daySummary } from './days';
 import { riskRatios } from './risk';
 import {
   SERIES_GROUPS,
@@ -106,11 +106,266 @@ describe('the catalogue', () => {
     }
     const inGroup = (g: string) =>
       SERIES_METRICS.filter((m) => SERIES_META[m].group === g);
-    expect(inGroup('Profitability')).toHaveLength(12);
-    expect(inGroup('Risk')).toHaveLength(4);
+    expect(inGroup('Profitability')).toHaveLength(13);
+    expect(inGroup('Risk')).toHaveLength(6);
     expect(inGroup('Time')).toHaveLength(4);
-    expect(inGroup('Activity')).toHaveLength(9);
-    expect(inGroup('Consistency')).toHaveLength(10);
+    expect(inGroup('Activity')).toHaveLength(20);
+    expect(inGroup('Consistency')).toHaveLength(11);
+  });
+
+  /**
+   * TradeZella's 55 picker entries (inventory-2, S33) against Keel's ids, each
+   * in the group TradeZella files it under. Only the two averages of the price
+   * path inside a trade (MAE and MFE) are not here: they need market data
+   * (backlog 14).
+   */
+  const TRADEZELLA: Record<string, [SeriesMetric, string]> = {
+    // Profitability
+    'Avg daily net P&L': ['avg-daily-net', 'Profitability'],
+    'Avg daily win/loss': ['avg-daily-win-loss', 'Profitability'],
+    'Avg loss': ['avg-loss', 'Profitability'],
+    'Avg net trade P&L': ['avg-trade', 'Profitability'],
+    'Avg trade win/loss': ['win-loss-ratio', 'Profitability'],
+    'Avg win': ['avg-win', 'Profitability'],
+    'Daily net P&L': ['net', 'Profitability'],
+    'Largest losing trade': ['largest-loss', 'Profitability'],
+    'Largest profitable trade': ['largest-win', 'Profitability'],
+    'Net P&L': ['cumulative-net', 'Profitability'],
+    'Profit factor': ['profit-factor', 'Profitability'],
+    'Trade expectancy': ['expectancy', 'Profitability'],
+    // Risk & Drawdown
+    'Avg daily net drawdown': ['avg-drawdown', 'Risk'],
+    'Avg planned R-multiple': ['avg-planned-r', 'Risk'],
+    'Avg realized R-multiple': ['avg-realized-r', 'Risk'],
+    'Breakeven days': ['flat-day-count', 'Risk'],
+    'Breakeven trades': ['breakevens', 'Activity'],
+    'Losing days': ['red-day-count', 'Risk'],
+    'Max daily net drawdown': ['max-drawdown', 'Risk'],
+    // Time Analysis
+    'Average trading days duration': ['avg-day-length', 'Time'],
+    'Avg hold time': ['avg-hold-time', 'Time'],
+    'Longest trade duration': ['longest-trade', 'Time'],
+    'Max trading days duration': ['longest-day', 'Time'],
+    // Trading Activity & Volume
+    'Avg daily volume': ['avg-daily-volume', 'Activity'],
+    'Daily net drawdown': ['daily-drawdown', 'Activity'],
+    'Logged days': ['logged-days', 'Activity'],
+    'Longs # of breakeven trades': ['long-breakevens', 'Activity'],
+    'Longs # of losing trades': ['long-losses', 'Activity'],
+    'Longs # of open trades': ['long-open', 'Activity'],
+    'Longs # of trades': ['long-trades', 'Activity'],
+    'Longs # of winning trades': ['long-wins', 'Activity'],
+    'Loss # of trades': ['losses', 'Activity'],
+    'Net account balance': ['net-balance', 'Activity'],
+    'Open trades': ['open-trades', 'Activity'],
+    'Shorts # of breakeven trades': ['short-breakevens', 'Activity'],
+    'Shorts # of losing trades': ['short-losses', 'Activity'],
+    'Shorts # of open trades': ['short-open', 'Activity'],
+    'Shorts # of trades': ['short-trades', 'Activity'],
+    'Shorts # of winning trades': ['short-wins', 'Activity'],
+    'Trade count': ['trades', 'Activity'],
+    Volume: ['volume', 'Activity'],
+    'Win # of trades': ['wins', 'Activity'],
+    // Streaks & Consistency
+    'Avg daily win %': ['green-days', 'Consistency'],
+    'Longs win %': ['long-win-rate', 'Consistency'],
+    'Max consecutive losing days': ['red-day-streak', 'Consistency'],
+    'Max consecutive losses': ['loss-streak', 'Consistency'],
+    'Max consecutive winning days': ['green-day-streak', 'Consistency'],
+    'Max consecutive wins': ['win-streak', 'Consistency'],
+    'Sharpe ratio': ['sharpe', 'Consistency'],
+    'Shorts win %': ['short-win-rate', 'Consistency'],
+    'Sortino ratio': ['sortino', 'Consistency'],
+    'Win %': ['win-rate', 'Consistency'],
+    'Winning days': ['green-day-count', 'Consistency'],
+  };
+
+  test('the catalogue holds every TradeZella metric but the two that need market data', () => {
+    // 55 entries, less Avg max trade profit and Avg max trade loss.
+    expect(Object.keys(TRADEZELLA)).toHaveLength(53);
+    const ids = Object.values(TRADEZELLA).map(([id]) => id);
+    expect(new Set(ids).size).toBe(53);
+    for (const [name, [id, group]] of Object.entries(TRADEZELLA)) {
+      expect(SERIES_METRICS, name).toContain(id);
+      // Breakeven trades sit with Keel's trade counts; the rest follow TradeZella's groups.
+      expect(SERIES_META[id].group, name).toBe(group);
+    }
+    // Keel keeps one of its own: the fees.
+    expect(SERIES_METRICS.filter((m) => !ids.includes(m)).sort()).toEqual([
+      'fees',
+    ]);
+  });
+
+  test('balance and drawdown stay in money under a unit, and the sums and averages follow it', () => {
+    const t = { ...ctx, unit: 'ticks' as const };
+    // Balances and drawdowns stay in money; a balance reads without a sign.
+    expect(seriesUnit('net-balance', t)).toBe('balance');
+    expect(seriesUnit('daily-drawdown', t)).toBe('money');
+    expect(seriesUnit('avg-trade', t)).toBe('tradeunit');
+    expect(seriesUnit('avg-trade', ctx)).toBe('money');
+    expect(seriesUnit('green-day-count', t)).toBe('count');
+    expect(seriesUnit('logged-days', t)).toBe('count');
+  });
+});
+
+describe('the new metrics', () => {
+  test('average trade P&L is the mean of every closed trade, breakevens included', () => {
+    expect(values(all, 'avg-trade')).toEqual([2500, 0, 20000, -15000, -5000]);
+    expect(values(all, 'avg-trade', 'day', 'running')).toEqual([
+      2500, 1250, 5000, 1667, 714,
+    ]);
+    const flat = makeTrade({
+      net: 0,
+      closedAt: '2026-11-02T18:00:00Z',
+      serial: 99,
+    });
+    expect(values([...all, flat], 'avg-trade')[0]).toBe(1667);
+    // The Overview's number: the basis P&L over the closed trades.
+    expect(values(all, 'avg-trade', 'month')[0]).toBe(Math.round(5000 / 7));
+  });
+
+  test('in a unit it is the mean of the trades own ticks', () => {
+    const ticks = { ...ctx, unit: 'ticks' as const };
+    // Day 1: A +8 ticks, B -4 ticks.
+    expect(values(all, 'avg-trade', 'day', 'period', ticks)[0]).toBe(2);
+  });
+
+  test('winning, losing and breakeven days are counts of the days', () => {
+    expect(values(all, 'green-day-count')).toEqual([1, 0, 1, 0, 0]);
+    expect(values(all, 'red-day-count')).toEqual([0, 0, 0, 1, 1]);
+    expect(values(all, 'flat-day-count')).toEqual([0, 1, 0, 0, 0]);
+    expect(values(all, 'green-day-count', 'week')).toEqual([1, 1, 0]);
+    expect(values(all, 'red-day-count', 'week', 'running')).toEqual([0, 1, 2]);
+    expect(values(all, 'flat-day-count', 'week', 'running')).toEqual([1, 1, 1]);
+    // They are the Overview's counts.
+    const s = daySummary(dailyPnl(all, ctx), ctx);
+    expect(values(all, 'green-day-count', 'month')[0]).toBe(s.greenDays);
+    expect(values(all, 'red-day-count', 'month')[0]).toBe(s.redDays);
+    expect(values(all, 'flat-day-count', 'month')[0]).toBe(s.flatDays);
+  });
+
+  test('the daily drawdown is where the period closes, against the peak so far', () => {
+    expect(values(all, 'daily-drawdown')).toEqual([0, 0, 0, -15000, -20000]);
+    expect(values(all, 'daily-drawdown', 'week')).toEqual([0, -15000, -20000]);
+    expect(values(all, 'daily-drawdown', 'month')).toEqual([-20000]);
+    expect(SERIES_META['daily-drawdown'].running).toBe(true);
+  });
+
+  test('long and short trades by outcome and open', () => {
+    expect(values(all, 'long-wins')).toEqual([1, 1, 1, 0, 0]);
+    expect(values(all, 'long-losses')).toEqual([1, 0, 0, 1, 1]);
+    expect(values(all, 'short-losses')).toEqual([0, 1, 0, 0, 0]);
+    expect(values(all, 'short-wins')).toEqual([0, 0, 0, 0, 0]);
+    expect(values(all, 'long-wins', 'day', 'running')).toEqual([1, 2, 3, 3, 3]);
+    expect(values(all, 'long-breakevens')).toEqual([0, 0, 0, 0, 0]);
+    const flat = makeTrade({
+      net: 0,
+      direction: 'short',
+      closedAt: '2026-11-02T18:00:00Z',
+      serial: 98,
+    });
+    expect(values([...all, flat], 'short-breakevens')[0]).toBe(1);
+    expect(values([...all, flat], 'long-breakevens')[0]).toBe(0);
+    // Each long and short count adds to the trades.
+    for (const key of ['wins', 'losses', 'breakevens'] as const) {
+      const long = values(all, `long-${key}` as SeriesMetric);
+      const short = values(all, `short-${key}` as SeriesMetric);
+      const total = values(all, key);
+      expect(long.map((v, i) => v! + short[i]!)).toEqual(total);
+    }
+  });
+
+  test('open trades split by side, on the day they opened', () => {
+    const open = (direction: 'long' | 'short', id: string) =>
+      makeTrade({
+        id,
+        net: 0,
+        status: 'open',
+        direction,
+        openedAt: '2026-11-17T15:00:00Z',
+      });
+    const set = [
+      ...all,
+      open('long', 'o1'),
+      open('short', 'o2'),
+      open('short', 'o3'),
+    ];
+    expect(timeSeries(set, ctx, 'long-open', 'day').at(-1)).toEqual({
+      key: '2026-11-17',
+      value: 1,
+    });
+    expect(timeSeries(set, ctx, 'short-open', 'day').at(-1)).toEqual({
+      key: '2026-11-17',
+      value: 2,
+    });
+    expect(timeSeries(set, ctx, 'open-trades', 'day').at(-1)!.value).toBe(3);
+  });
+
+  test('the net account balance is the opening balance, the flows and the net so far', () => {
+    const balance = { start: 1_000_000, flows: [] };
+    const at = (opts: Parameters<typeof timeSeries>[4], c = ctx) =>
+      timeSeries(all, c, 'net-balance', 'day', opts).map((p) => p.value);
+    expect(at({ balance })).toEqual([
+      1_005_000, 1_005_000, 1_025_000, 1_010_000, 1_005_000,
+    ]);
+    expect(
+      at({
+        balance: {
+          start: 1_000_000,
+          flows: [{ date: '2026-11-03', amount: 100_000 }],
+        },
+      }),
+    ).toEqual([1_005_000, 1_105_000, 1_125_000, 1_110_000, 1_105_000]);
+    // The close of a week, and always the running value.
+    expect(
+      timeSeries(all, ctx, 'net-balance', 'week', { balance }).map(
+        (p) => p.value,
+      ),
+    ).toEqual([1_005_000, 1_010_000, 1_005_000]);
+    expect(SERIES_META['net-balance'].running).toBe(true);
+    // No balance to read it on, or a unit: no value.
+    expect(at({})).toEqual([null, null, null, null, null]);
+    expect(at({ balance }, { ...ctx, unit: 'ticks' })).toEqual([
+      null,
+      null,
+      null,
+      null,
+      null,
+    ]);
+  });
+
+  test('logged days count the days with a daily note, per period or running', () => {
+    const loggedDates = ['2026-11-02', '2026-11-10', '2026-11-12'];
+    const series = (
+      mode: 'period' | 'running',
+      bucket: 'day' | 'week' = 'day',
+    ) => timeSeries(all, ctx, 'logged-days', bucket, { mode, loggedDates });
+    // A day with a note and no trade has its own period.
+    expect(series('period').map((p) => [p.key, p.value])).toEqual([
+      ['2026-11-02', 1],
+      ['2026-11-03', 0],
+      ['2026-11-10', 1],
+      ['2026-11-12', 1],
+      ['2026-11-13', 0],
+      ['2026-11-16', 0],
+    ]);
+    expect(series('running').map((p) => p.value)).toEqual([1, 1, 2, 3, 3, 3]);
+    expect(series('period', 'week').map((p) => p.value)).toEqual([1, 2, 0]);
+    // The date range clips them, and with no journal there is nothing to count.
+    expect(
+      timeSeries(
+        all,
+        { ...ctx, range: { from: '2026-11-11' } },
+        'logged-days',
+        'day',
+        {
+          loggedDates,
+        },
+      ).map((p) => p.value),
+    ).toEqual([1, 0, 0]);
+    expect(
+      timeSeries(all, ctx, 'logged-days', 'day').every((p) => p.value === null),
+    ).toBe(true);
   });
 });
 

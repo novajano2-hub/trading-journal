@@ -98,6 +98,63 @@ describe('the last running value is the figure of the whole range', () => {
   });
 });
 
+describe('the added metrics are the Overview figures', () => {
+  test('day counts, the average trade and the side splits', () => {
+    expect(last('green-day-count')).toBe(m.daySummary.greenDays);
+    expect(last('red-day-count')).toBe(m.daySummary.redDays);
+    expect(last('flat-day-count')).toBe(m.daySummary.flatDays);
+    expect(last('green-day-count')).toBe(70);
+    expect(last('avg-trade')).toBe(
+      Math.round(m.summary.netPnl / m.summary.closedCount),
+    );
+    for (const key of ['wins', 'losses', 'breakevens'] as const)
+      expect(
+        (last(`long-${key}` as SeriesMetric) ?? 0) +
+          (last(`short-${key}` as SeriesMetric) ?? 0),
+      ).toBe(m.summary[key]);
+    expect((last('long-open') ?? 0) + (last('short-open') ?? 0)).toBe(
+      m.summary.openCount,
+    );
+    expect(last('long-trades')).toBe(
+      timeSeries(trades, ctx, 'long-trades', 'week', { mode: 'running' }).at(
+        -1,
+      )!.value,
+    );
+  });
+
+  test('the daily drawdown closes where the average and the maximum are read', () => {
+    const daily = timeSeries(trades, ctx, 'daily-drawdown', 'day').map(
+      (p) => p.value!,
+    );
+    expect(Math.min(...daily)).toBe(-216855);
+    const under = daily.filter((v) => v < 0);
+    expect(Math.round(under.reduce((a, b) => a + b, 0) / under.length)).toBe(
+      -58081,
+    );
+  });
+
+  test('the balance ends on the opening balance, the flows and the net', () => {
+    expect(last('net-balance')).toBe(
+      m.riskStart +
+        m.riskFlows.reduce((n, f) => n + f.amount, 0) +
+        m.summary.netPnl,
+    );
+  });
+
+  test('in ticks, the average trade is the total over the trades', () => {
+    const tctx = metricContextOf({
+      ...defaultPrefs(),
+      timeZone: 'America/New_York',
+      displayUnit: 'ticks',
+    });
+    const set = narrowToUnit(trades, 'ticks');
+    const at = (metric: SeriesMetric) =>
+      timeSeries(set, tctx, metric, 'week', { mode: 'running' }).at(-1)!.value;
+    expect(at('avg-trade')).toBeCloseTo(at('net')! / at('trades')!, 6);
+    expect(at('net-balance')).toBeNull();
+  });
+});
+
 describe('running values equal a summary of everything so far', () => {
   const closed = trades.filter(isClosed);
   const weeks = timeSeries(trades, ctx, 'trades', 'week').map((p) => p.key);

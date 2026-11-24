@@ -49,7 +49,7 @@ test('a workspace with no options says so', async () => {
   ).toBeTruthy();
 });
 
-test('days to expiry has no filter, so its buckets are not links', async () => {
+test('each days to expiry bucket with trades opens exactly them in the log', async () => {
   renderApp(<OptionsView />, {
     sample: breakdownSample,
     url: '/app/reports/options',
@@ -58,10 +58,16 @@ test('days to expiry has no filter, so its buckets are not links', async () => {
   const table = within(page).getByRole('table', {
     name: 'Days to expiry summary',
   });
-  expect(within(table).queryAllByRole('link')).toEqual([]);
+  // Two buckets hold a trade: 0 and 2 to 7. Empty ones have nothing to open.
+  const hrefs = within(table)
+    .getAllByRole('link')
+    .map((a) => a.getAttribute('href'));
+  expect(hrefs).toHaveLength(2);
+  expect(hrefs[0]).toContain('dte=_0');
+  expect(hrefs[1]).toContain('dte=2_7');
   expect(
     within(page)
       .getByRole('img', { name: /Net P&L by days to expiry/ })
       .querySelectorAll('a'),
-  ).toHaveLength(0);
+  ).toHaveLength(2);
 });
