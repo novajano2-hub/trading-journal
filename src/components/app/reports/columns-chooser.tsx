@@ -2,6 +2,7 @@
 
 import { Columns } from '@phosphor-icons/react/dist/ssr';
 import { Popover } from 'radix-ui';
+import { useState } from 'react';
 import {
   REPORT_COLUMNS,
   toggleColumn,
@@ -25,6 +26,12 @@ export function ColumnsChooser({
   onChange(next: ReportColumnId[]): void;
   onReset(): void;
 }): React.JSX.Element {
+  // The address carries the choice but updates a beat after the click, so the
+  // ticks keep their own copy: it flips at once and follows `shown` when that changes.
+  const key = shown.join(',');
+  const [local, setLocal] = useState({ key, shown });
+  if (local.key !== key) setLocal({ key, shown });
+  const current = local.shown;
   return (
     <Popover.Root>
       <Popover.Trigger className="inline-flex h-[30px] items-center gap-1.5 rounded-control border border-line bg-surface-1 px-3 text-[13.5px] font-medium whitespace-nowrap text-muted shadow-[0_1px_1px_rgb(18_22_51/0.04)] transition-[border-color] duration-200 ease-(--ease-glide) hover:border-accent/35 focus-visible:outline-2 focus-visible:outline-accent data-[state=open]:border-accent/35 pointer-coarse:h-11">
@@ -40,7 +47,7 @@ export function ColumnsChooser({
         >
           <ul aria-label="Table columns">
             {REPORT_COLUMNS.map(({ id, label }) => {
-              const on = shown.includes(id);
+              const on = current.includes(id);
               const name = labelOf(id, label);
               return (
                 <li key={id} className="rounded-[8px] pl-2 hover:bg-sunken">
@@ -50,8 +57,12 @@ export function ColumnsChooser({
                     <input
                       type="checkbox"
                       checked={on}
-                      disabled={on && shown.length === 1}
-                      onChange={() => onChange(toggleColumn(shown, id))}
+                      disabled={on && current.length === 1}
+                      onChange={() => {
+                        const next = toggleColumn(current, id);
+                        setLocal({ key: local.key, shown: next });
+                        onChange(next);
+                      }}
                       className="size-4 flex-none accent-[var(--accent)]"
                     />
                     <span className="truncate">{name}</span>

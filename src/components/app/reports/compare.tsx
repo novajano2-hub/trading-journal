@@ -98,7 +98,7 @@ const STICKY = 'max-lg:sticky max-lg:left-0 max-lg:z-[1] max-lg:bg-surface-1';
 
 const GROUPS = [
   { key: 'a', name: 'Group A', colour: 'var(--accent)' },
-  { key: 'b', name: 'Group B', colour: 'var(--info-fill)' },
+  { key: 'b', name: 'Group B', colour: 'var(--muted)' },
 ] as const;
 
 const OUTCOMES: { id: Outcome; label: string }[] = [
