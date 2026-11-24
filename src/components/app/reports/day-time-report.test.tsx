@@ -142,3 +142,27 @@ test('the subtitle names the zone as a person says it, not the IANA key', async 
   expect(page.textContent).toMatch(/New York, UTC-0[45]:00, by entry time/);
   expect(page.textContent).not.toContain('America/New_York');
 });
+
+test('a weekday link reads the day the report buckets by: entry day, or exit day under Exit time', async () => {
+  renderApp(<DayTimeView />, {
+    repository: await newYorkRepository(),
+    url: '/app/reports/day-time?tab=weekday',
+  });
+  const page = await screen.findByTestId('reports-day-time');
+  const table = () =>
+    within(page).getByRole('table', { name: 'Weekday summary' });
+  const monday = () =>
+    new globalThis.URL(
+      within(table())
+        .getAllByRole('link')
+        .find((a) => a.getAttribute('aria-label')?.startsWith('Mon,'))!
+        .getAttribute('href')!,
+      'http://k',
+    ).searchParams;
+  expect(monday().get('wd')).toBe('1');
+  expect(monday().get('xwd')).toBeNull();
+  act(() => writeParam('basis', 'exit'));
+  await within(page).findByRole('link', { name: /^Mon, open/ });
+  expect(monday().get('xwd')).toBe('1');
+  expect(monday().get('wd')).toBeNull();
+});

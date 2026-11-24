@@ -1,0 +1,286 @@
+import type { BreakdownKey } from '../domain/metrics/breakdowns';
+import {
+  queryString,
+  serializeFilters,
+  type GlobalFilters,
+  type NumRange,
+  type TimeWindow,
+} from './filters';
+
+/** The key a breakdown gives trades that have no value to file under. */
+const NONE = '__none__';
+/** The cross-analysis column that folds the quietest columns together. */
+const FOLDED = 'Other';
+/** The breakdown's R clamp: the tails read "-5R or less" and "+5R or more". */
+const R_CLAMP = 5;
+
+/** What the time reports were set to when the bucket was drawn. */
+export interface BucketOptions {
+  timeBasis?: 'entry' | 'exit';
+  bucketMinutes?: 5 | 15 | 30 | 60;
+}
+
+const WEEKDAY_NUMBER: Record<string, number> = {
+  mon: 1,
+  tue: 2,
+  wed: 3,
+  thu: 4,
+  fri: 5,
+  sat: 6,
+  sun: 7,
+};
+
+/**
+ * Duration buckets as minutes. A bucket's upper edge belongs to the next one,
+ * so it is out of this one (`maxExclusive`).
+ */
+const DURATION: Record<string, NumRange> = {
+  'lt-1m': { max: 1, maxExclusive: true },
+  '1-5m': { min: 1, max: 5, maxExclusive: true },
+  '5-15m': { min: 5, max: 15, maxExclusive: true },
+  '15-60m': { min: 15, max: 60, maxExclusive: true },
+  '1-4h': { min: 60, max: 240, maxExclusive: true },
+  '4h-1d': { min: 240, max: 1440, maxExclusive: true },
+  'gt-1d': { min: 1440 },
+};
+
+/** Size buckets, as the breakdown's `sizeKey` cuts them (a size of exactly 100 is still 26-100). */
+const SIZE: Record<string, NumRange> = {
+  'lt-1': { max: 1, maxExclusive: true },
+  '1': { min: 1, max: 2, maxExclusive: true },
+  '2-3': { min: 2, max: 4, maxExclusive: true },
+  '4-5': { min: 4, max: 6, maxExclusive: true },
+  '6-10': { min: 6, max: 11, maxExclusive: true },
+  '11-25': { min: 11, max: 26, maxExclusive: true },
+  '26-100': { min: 26, max: 100 },
+  'gt-100': { min: 100, minExclusive: true },
+};
+
+function rRange(key: string): NumRange | null {
+  if (key === `le-${R_CLAMP}`) return { max: -R_CLAMP };
+  if (key === `ge${R_CLAMP}`) return { min: R_CLAMP };
+  if (!/^-?\d+$/.test(key)) return null;
+  const k = Number(key);
+  return { min: k, max: k + 1, maxExclusive: true };
+}
+
+/** The overlap of two ranges, or null when they share no value. */
+export function intersectRanges(
+  a: NumRange | undefined,
+  b: NumRange,
+): NumRange | null {
+  if (a === undefined) return b;
+  let min = a.min;
+  let minExclusive = a.minExclusive === true;
+  if (b.min !== undefined && (min === undefined || b.min >= min)) {
+    minExclusive =
+      b.min === min
+        ? minExclusive || b.minExclusive === true
+        : b.minExclusive === true;
+    min = b.min;
+  }
+  let max = a.max;
+  let maxExclusive = a.maxExclusive === true;
+  if (b.max !== undefined && (max === undefined || b.max <= max)) {
+    maxExclusive =
+      b.max === max
+        ? maxExclusive || b.maxExclusive === true
+        : b.maxExclusive === true;
+    max = b.max;
+  }
+  if (min !== undefined && max !== undefined) {
+    if (min > max) return null;
+    if (min === max && (minExclusive || maxExclusive)) return null;
+  }
+  return {
+    ...(min !== undefined ? { min } : {}),
+    ...(max !== undefined ? { max } : {}),
+    ...(min !== undefined && minExclusive ? { minExclusive: true } : {}),
+    ...(max !== undefined && maxExclusive ? { maxExclusive: true } : {}),
+  };
+}
+
+const minutesOf = (hhmm: string) =>
+  Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+const hhmm = (mins: number) =>
+  `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
+
+/** The windows of `base` cut to [from, to] minutes of the day; null when nothing is left. */
+function cutWindows(
+  base: readonly TimeWindow[],
+  from: number,
+  to: number,
+): TimeWindow[] | null {
+  if (base.length === 0) return [{ from: hhmm(from), to: hhmm(to) }];
+  const out: TimeWindow[] = [];
+  for (const w of base) {
+    const lo = w.from === undefined ? 0 : minutesOf(w.from);
+    const hi = w.to === undefined ? 24 * 60 - 1 : minutesOf(w.to);
+    // A window that wraps past midnight is two spans of the day.
+    const spans: [number, number][] =
+      lo <= hi
+        ? [[lo, hi]]
+        : [
+            [lo, 24 * 60 - 1],
+            [0, hi],
+          ];
+    for (const [a, b] of spans) {
+      const x = Math.max(a, from);
+      const y = Math.min(b, to);
+      if (x <= y) out.push({ from: hhmm(x), to: hhmm(y) });
+    }
+  }
+  return out.length === 0 ? null : out;
+}
+
+/** `base` narrowed to one of its own values; null when the bucket lies outside it. */
+function oneOf<T>(base: readonly T[], value: T): T[] | null {
+  return base.length === 0 || base.includes(value) ? [value] : null;
+}
+
+/**
+ * The strategies (or tags) a bucket asks for, on top of what the page already
+ * asks for. The page's choice stays in force, so the log holds only trades
+ * the bucket counted; where one filter cannot say both, there is no link.
+ */
+function withId(
+  ids: readonly string[],
+  match: 'any' | 'all',
+  id: string,
+): { ids: string[]; match: 'any' | 'all' } | null {
+  if (ids.length === 0) return { ids: [id], match };
+  if (match === 'all') return { ids: [...new Set([...ids, id])].sort(), match };
+  // "Any of" the page's choice: a bucket inside it is just that one.
+  if (ids.includes(id)) return { ids: [id], match };
+  // One strategy on the page and one in the bucket: the trade has both.
+  if (ids.length === 1)
+    return { ids: [...ids, id].sort(), match: 'all' as const };
+  return null;
+}
+
+/**
+ * The filters that show the trades one bucket of a breakdown counted: the
+ * page's own `base` with the bucket's filter on top. Null when the bucket has
+ * no filter that says it (days to expiry, sessions, trades with no stop, no
+ * tag, or the cross-analysis's "Other" column), or when the page's filters
+ * leave the bucket empty or cannot be combined with it.
+ *
+ * Each filter reads the date its breakdown buckets by: the weekday and month
+ * of the entry, or of the exit when the report is set to exit time.
+ */
+export function bucketFilters(
+  base: GlobalFilters,
+  by: BreakdownKey,
+  key: string,
+  opts: BucketOptions = {},
+): GlobalFilters | null {
+  if (key === FOLDED) return null;
+  // The log lists closed trades unless told otherwise; a breakdown counts closed ones.
+  if (base.status === 'open') return null;
+  const exit = opts.timeBasis === 'exit';
+  switch (by) {
+    case 'side': {
+      if (key !== 'long' && key !== 'short') return null;
+      return base.side === undefined || base.side === key
+        ? { ...base, side: key }
+        : null;
+    }
+    case 'symbol': {
+      const symbols = oneOf(base.symbols, key);
+      return symbols ? { ...base, symbols } : null;
+    }
+    case 'strategy': {
+      if (key === NONE) {
+        if (base.strategyIds.length > 0 && !base.noStrategy) return null;
+        return { ...base, strategyIds: [], noStrategy: true };
+      }
+      if (base.strategyIds.length === 0 && base.noStrategy) return null;
+      const next = withId(base.strategyIds, base.strategyMatch, key);
+      return next
+        ? {
+            ...base,
+            strategyIds: next.ids,
+            strategyMatch: next.match,
+            noStrategy: false,
+          }
+        : null;
+    }
+    case 'tag': {
+      // There is no filter for "no tag".
+      if (key === NONE) return null;
+      const next = withId(base.tagIds, base.tagMatch, key);
+      return next ? { ...base, tagIds: next.ids, tagMatch: next.match } : null;
+    }
+    case 'weekday': {
+      const day = WEEKDAY_NUMBER[key];
+      if (day === undefined) return null;
+      const field = exit ? 'exitWeekdays' : 'weekdays';
+      const days = oneOf(base[field], day);
+      return days ? { ...base, [field]: days } : null;
+    }
+    case 'month': {
+      const month = Number(key);
+      if (!Number.isInteger(month) || month < 1 || month > 12) return null;
+      const field = exit ? 'exitMonths' : 'months';
+      const months = oneOf(base[field], month);
+      return months ? { ...base, [field]: months } : null;
+    }
+    case 'hour':
+    case 'time-of-day': {
+      const width = by === 'hour' ? 60 : (opts.bucketMinutes ?? 30);
+      const start = by === 'hour' ? Number(key) * 60 : minutesOf(key);
+      if (!Number.isFinite(start)) return null;
+      const field = exit ? 'exitWindows' : 'entryWindows';
+      const windows = cutWindows(base[field], start, start + width - 1);
+      return windows ? { ...base, [field]: windows } : null;
+    }
+    case 'duration': {
+      const range = DURATION[key];
+      const next = range && intersectRanges(base.duration, range);
+      return next ? { ...base, duration: next } : null;
+    }
+    case 'size': {
+      const range = SIZE[key];
+      const next = range && intersectRanges(base.size, range);
+      return next ? { ...base, size: next } : null;
+    }
+    case 'r': {
+      const range = rRange(key);
+      const next = range && intersectRanges(base.r, range);
+      return next ? { ...base, r: next } : null;
+    }
+    // Sessions are cut in New York time and days to expiry have no filter.
+    case 'session':
+    case 'dte':
+      return null;
+  }
+}
+
+/** The log's address for a set of filters. */
+export function tradeLogHref(f: GlobalFilters): string {
+  const qs = queryString(serializeFilters(f));
+  return qs === '' ? '/app/trades' : `/app/trades?${qs}`;
+}
+
+/** The log's address for one bucket, or undefined when the bucket is not a link. */
+export function bucketHref(
+  base: GlobalFilters,
+  by: BreakdownKey,
+  key: string,
+  opts?: BucketOptions,
+): string | undefined {
+  const f = bucketFilters(base, by, key, opts);
+  return f ? tradeLogHref(f) : undefined;
+}
+
+/** The log's address for a cell of two breakdowns: both buckets' filters on the page's. */
+export function cellHref(
+  base: GlobalFilters,
+  rows: { by: BreakdownKey; key: string },
+  cols: { by: BreakdownKey; key: string },
+  opts?: BucketOptions,
+): string | undefined {
+  const first = bucketFilters(base, rows.by, rows.key, opts);
+  const f = first && bucketFilters(first, cols.by, cols.key, opts);
+  return f ? tradeLogHref(f) : undefined;
+}

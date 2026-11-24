@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { EMPTY_FILTERS } from '@/data/filters';
+import { EMPTY_FILTERS, type GlobalFilters } from '@/data/filters';
 import type { Account } from '@/domain/types';
 import {
   accountSummary,
@@ -7,6 +7,8 @@ import {
   chipLabel,
   customRange,
   datesOf,
+  detailChips,
+  rangeText,
   hasActiveFilters,
   switchWorkspaceFilters,
   unshownFilters,
@@ -179,4 +181,54 @@ test('activeFilterCount counts the chips in use plus the More filters fields', (
   ).toBe(6);
   // An account is the switcher's, not a filter chip.
   expect(activeFilterCount({ ...EMPTY_FILTERS, accountIds: ['a'] })).toBe(0);
+});
+
+test('ranges read in words, with an excluded bound as over or under', () => {
+  expect(rangeText({ min: 5, max: 15, maxExclusive: true }, 'min')).toBe(
+    '5 to under 15 min',
+  );
+  expect(rangeText({ min: 100, minExclusive: true })).toBe('over 100');
+  expect(rangeText({ min: 2 })).toBe('at least 2');
+  expect(rangeText({ max: 1, maxExclusive: true })).toBe('under 1');
+  expect(rangeText({ max: 3 })).toBe('at most 3');
+  expect(rangeText({ min: -2, max: -1 })).toBe('-2 to -1');
+});
+
+test('a filter with no chip of its own gets one in the log, and the chip clears it alone', () => {
+  expect(detailChips(EMPTY_FILTERS)).toEqual([]);
+  const f: GlobalFilters = {
+    ...EMPTY_FILTERS,
+    symbols: ['ES'],
+    status: 'closed',
+    weekdays: [1, 3],
+    exitWeekdays: [6],
+    exitMonths: [12],
+    entryWindows: [{ from: '09:00', to: '09:59' }],
+    duration: { min: 1, max: 5, maxExclusive: true },
+    size: { min: 100, minExclusive: true },
+    r: { min: -1, max: 0, maxExclusive: true },
+    noStrategy: true,
+  };
+  const chips = detailChips(f);
+  expect(chips.map((c) => c.label)).toEqual([
+    'No strategy',
+    'Entry weekday: Mon, Wed',
+    'Exit weekday: Sat',
+    'Exit month: Dec',
+    'Entry time: 09:00-09:59',
+    'Duration: 1 to under 5 min',
+    'Size: over 100',
+    'Realized R: -1 to under 0',
+  ]);
+  const weekday = chips.find((c) => c.id === 'weekdays')!;
+  const next = weekday.clear(f);
+  expect(next.weekdays).toEqual([]);
+  expect(next.exitWeekdays).toEqual([6]);
+  expect(detailChips(next).map((c) => c.id)).not.toContain('weekdays');
+  // Every chip clears exactly its own filter.
+  let rest = f;
+  for (const c of chips) rest = c.clear(rest);
+  expect(detailChips(rest)).toEqual([]);
+  expect(rest.symbols).toEqual(['ES']);
+  expect(rest.status).toBe('closed');
 });

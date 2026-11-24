@@ -7,6 +7,7 @@ import {
   ListNumbers,
   Table,
 } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useId, useMemo, type ReactNode } from 'react';
 import { FigureText } from '@/components/product/figure-text';
@@ -23,6 +24,7 @@ import { SERIES_META, type SeriesMetric } from '@/domain/metrics/series';
 import { largestInUnit } from '@/domain/metrics/summary';
 import { unitOf } from '@/domain/metrics/units';
 import { roundHalfEven } from '@/domain/money';
+import { bucketHref, cellHref, type BucketOptions } from '@/data/report-links';
 import { useStrategies, useTagCategories, useTags } from '@/data/query/hooks';
 import type { TagCategory } from '@/domain/types';
 import { useDisplay } from '@/lib/display';
@@ -196,6 +198,28 @@ function RowName({ text }: { text: string }): React.JSX.Element {
   );
 }
 
+/** A bucket's name as a link to its trades in the log; plain text where the bucket has no link. */
+function BucketName({
+  text,
+  href,
+  count,
+}: {
+  text: string;
+  href: string | undefined;
+  count: number;
+}): React.JSX.Element {
+  if (href === undefined) return <RowName text={text} />;
+  return (
+    <Link
+      href={href}
+      aria-label={`${text}, open ${count} ${plural(count, 'trade')} in the trade log`}
+      className="rounded-chip outline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center"
+    >
+      <RowName text={text} />
+    </Link>
+  );
+}
+
 /** Rows to show: all, only those with trades, or all between the first and last with trades. */
 export type Visible = 'all' | 'traded' | 'ends';
 
@@ -283,7 +307,7 @@ export function BreakdownCards({
   /** A column between the name and Trades: the tag's category. */
   columnsBefore?: SummaryColumn<BreakdownRow>[];
 }): React.JSX.Element {
-  const { partition: p, ctx, basis, currency } = data;
+  const { partition: p, ctx, basis, currency, filters } = data;
   const params = useSearchParams();
   const display = useDisplay();
   const chartId = useId();
@@ -296,6 +320,15 @@ export function BreakdownCards({
     CROSS_METRICS.find((m) => m.value === params.get('xm'))?.value ?? 'net';
   const merged = useMemo(() => ({ ...ctx, ...options }), [ctx, options]);
   const describe = labelOf ?? ((r: BreakdownRow) => r.label);
+  // A bucket's link adds its filter to the page's, on the date the breakdown buckets by.
+  const linkOpts: BucketOptions = {
+    ...(options?.timeBasis ? { timeBasis: options.timeBasis } : {}),
+    ...(options?.bucketMinutes ? { bucketMinutes: options.bucketMinutes } : {}),
+  };
+  const hrefOfRow = (r: BreakdownRow) =>
+    r.summary.closedCount > 0
+      ? bucketHref(filters, by, r.key, linkOpts)
+      : undefined;
 
   const all = useMemo(
     () =>
@@ -358,6 +391,7 @@ export function BreakdownCards({
       value: chartValue(r, x.metric),
     })),
   }));
+  const barHref = new Map(chartRows.map((r) => [r.key, hrefOfRow(r)]));
   const tradesIn = new Map(
     chartRows.map((r) => [r.key, r.summary.closedCount]),
   );
@@ -422,7 +456,13 @@ export function BreakdownCards({
       id: 'name',
       header: rowTitle,
       value: (r) => describe(r),
-      cell: (r) => <RowName text={describe(r)} />,
+      cell: (r) => (
+        <BucketName
+          text={describe(r)}
+          href={hrefOfRow(r)}
+          count={r.summary.closedCount}
+        />
+      ),
       descFirst: false,
     },
     ...(columnsBefore ?? []),
@@ -628,6 +668,7 @@ export function BreakdownCards({
               xLabel={(key) => short.get(key) ?? key}
               periodLabel={(key) => names.get(key) ?? key}
               extra={extra}
+              hrefOf={(key) => barHref.get(key)}
             />
           </div>
         </section>
@@ -759,13 +800,20 @@ export function BreakdownCards({
                 if (v === null) return undefined;
                 const count = matrix.counts[r]?.[c] ?? 0;
                 const tradeIds = matrix.tradeIds[r]?.[c] ?? [];
+                const href = cellHref(
+                  filters,
+                  { by, key: rowKey },
+                  { by: cross.key, key: colKey },
+                  linkOpts,
+                );
                 return metric === 'net'
-                  ? { value: v, count, tradeIds }
+                  ? { value: v, count, tradeIds, ...(href && { href }) }
                   : {
                       value: v,
                       count,
                       text: crossText(metric, v),
                       tint: tintOf(metric, v),
+                      ...(href && { href }),
                     };
               }}
             />

@@ -112,3 +112,40 @@ test('Compare: ES against NQ, side by side', async ({ page }) => {
   await expect(tradesRow.getByRole('cell').nth(0)).toHaveText(String(a));
   await expect(tradesRow.getByRole('cell').nth(1)).toHaveText(String(b));
 });
+
+test('a weekday bar opens the log with exactly the trades it counted', async ({
+  page,
+}) => {
+  await openReports(page);
+  await page.goto('/app/reports/day-time?tab=weekday');
+  await expect(page.getByTestId('reports-day-time')).toBeVisible({
+    timeout: 30_000,
+  });
+  // The busiest weekday in the table, and how many trades it counted.
+  const table = page.getByRole('table', { name: 'Weekday summary' });
+  const counts = await table.getByRole('row').evaluateAll((rows) =>
+    rows.slice(1).map((r) => {
+      const cells = [...r.querySelectorAll('td')];
+      return {
+        name: cells[0]?.textContent ?? '',
+        trades: Number(cells[1]?.textContent ?? 0),
+      };
+    }),
+  );
+  const busiest = counts.reduce((a, b) => (b.trades > a.trades ? b : a));
+  expect(busiest.trades).toBeGreaterThan(0);
+
+  // Click that weekday's bar in the chart.
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const wd = days.indexOf(busiest.name) + 1;
+  await page
+    .getByRole('img', { name: /Net P&L by weekday/ })
+    .locator(`a[href*="wd=${wd}"]`)
+    .click();
+  await expect(page).toHaveURL(new RegExp(`/app/trades\\?.*wd=${wd}`));
+  await expect(
+    page.getByRole('radio', { name: `Closed ${busiest.trades}` }),
+  ).toBeChecked();
+  // The weekday shows as a chip the user can clear.
+  await expect(page.getByText(`Entry weekday: ${busiest.name}`)).toBeVisible();
+});

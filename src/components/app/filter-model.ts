@@ -5,6 +5,8 @@ import {
   resolveRange,
   type DateRange,
   type GlobalFilters,
+  type NumRange,
+  type TimeWindow,
 } from '@/data/filters';
 import type { Account, Strategy, Tag, TagCategory } from '@/domain/types';
 import { plural } from '@/lib/format';
@@ -168,6 +170,8 @@ export function unshownFilters(f: GlobalFilters): string[] {
     [f.ratings.length > 0, 'Ratings'],
     [f.weekdays.length > 0, 'Weekdays'],
     [f.months.length > 0, 'Months'],
+    [f.exitWeekdays.length > 0, 'Exit weekdays'],
+    [f.exitMonths.length > 0, 'Exit months'],
     [f.entryWindows.length > 0, 'Entry times'],
     [f.exitWindows.length > 0, 'Exit times'],
     [f.duration !== undefined, 'Duration'],
@@ -193,4 +197,127 @@ export function withoutUnshown(f: GlobalFilters): GlobalFilters {
     tagIds: f.tagIds,
     outcomes: f.outcomes,
   };
+}
+
+/** One of the filters the top bar has no chip for, as a chip of its own with the filters that clear it. */
+export interface DetailChip {
+  /** The filter's name, for tests and keys. */
+  id: string;
+  /** What the chip reads: "Weekday: Mon, Tue". */
+  label: string;
+  /** The filters with this one cleared. */
+  clear(f: GlobalFilters): GlobalFilters;
+}
+
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const MONTH_NAMES = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+/** A range in words: "5 to under 15", "over 100", "at most 2". */
+export function rangeText(r: NumRange, unit = ''): string {
+  const tail = unit === '' ? '' : ` ${unit}`;
+  const { min, max } = r;
+  if (min !== undefined && max !== undefined)
+    return `${min} to ${r.maxExclusive ? 'under ' : ''}${max}${tail}`;
+  if (min !== undefined)
+    return `${r.minExclusive ? 'over' : 'at least'} ${min}${tail}`;
+  return `${r.maxExclusive ? 'under' : 'at most'} ${max}${tail}`;
+}
+
+const windowText = (w: TimeWindow) => `${w.from ?? 'start'}-${w.to ?? 'end'}`;
+
+/**
+ * The filters a bucket link adds (and the rest of "More filters") as chips the
+ * trade log shows: the weekday, month, entry and exit time, duration, size, R
+ * and price ranges, and trades with no strategy. Status and review have their
+ * own switches in the log, and the date, symbol, side, strategy and tags have
+ * chips in the top bar.
+ */
+export function detailChips(f: GlobalFilters): DetailChip[] {
+  const out: DetailChip[] = [];
+  const add = (
+    on: boolean,
+    id: string,
+    label: () => string,
+    clear: Partial<GlobalFilters>,
+  ) => {
+    if (on)
+      out.push({ id, label: label(), clear: (g) => ({ ...g, ...clear }) });
+  };
+  const days = (xs: readonly number[]) =>
+    xs.map((n) => DAY_NAMES[n - 1]).join(', ');
+  const months = (xs: readonly number[]) =>
+    xs.map((n) => MONTH_NAMES[n - 1]).join(', ');
+  add(f.noStrategy, 'noStrategy', () => 'No strategy', { noStrategy: false });
+  add(
+    f.weekdays.length > 0,
+    'weekdays',
+    () => `Entry weekday: ${days(f.weekdays)}`,
+    { weekdays: [] },
+  );
+  add(
+    f.exitWeekdays.length > 0,
+    'exitWeekdays',
+    () => `Exit weekday: ${days(f.exitWeekdays)}`,
+    { exitWeekdays: [] },
+  );
+  add(f.months.length > 0, 'months', () => `Entry month: ${months(f.months)}`, {
+    months: [],
+  });
+  add(
+    f.exitMonths.length > 0,
+    'exitMonths',
+    () => `Exit month: ${months(f.exitMonths)}`,
+    { exitMonths: [] },
+  );
+  add(
+    f.entryWindows.length > 0,
+    'entryWindows',
+    () => `Entry time: ${f.entryWindows.map(windowText).join(', ')}`,
+    { entryWindows: [] },
+  );
+  add(
+    f.exitWindows.length > 0,
+    'exitWindows',
+    () => `Exit time: ${f.exitWindows.map(windowText).join(', ')}`,
+    { exitWindows: [] },
+  );
+  const { duration, size, r, entryPrice, exitPrice } = f;
+  add(
+    duration !== undefined,
+    'duration',
+    () => `Duration: ${rangeText(duration!, 'min')}`,
+    { duration: undefined },
+  );
+  add(size !== undefined, 'size', () => `Size: ${rangeText(size!)}`, {
+    size: undefined,
+  });
+  add(r !== undefined, 'r', () => `Realized R: ${rangeText(r!)}`, {
+    r: undefined,
+  });
+  add(
+    entryPrice !== undefined,
+    'entryPrice',
+    () => `Entry price: ${rangeText(entryPrice!)}`,
+    { entryPrice: undefined },
+  );
+  add(
+    exitPrice !== undefined,
+    'exitPrice',
+    () => `Exit price: ${rangeText(exitPrice!)}`,
+    { exitPrice: undefined },
+  );
+  return out;
 }

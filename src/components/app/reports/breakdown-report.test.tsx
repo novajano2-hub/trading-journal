@@ -490,3 +490,62 @@ test('in Ticks the largest-win column shows and sorts by the ticks, not the doll
     '+8.0 ticks',
   ]);
 });
+
+const hrefOf = (el: HTMLElement) =>
+  new URL(el.getAttribute('href')!, 'http://k');
+
+test('a symbol row is a link to the log filtered to that symbol, named for where it goes', async () => {
+  renderApp(<SymbolsView />, {
+    sample: breakdownSample,
+    url: '/app/reports/symbols?range=ytd&side=long',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const table = within(page).getByRole('table', { name: 'Symbols summary' });
+  const link = within(table).getByRole('link', {
+    name: /^ES, open \d+ trades? in the trade log$/,
+  });
+  const url = hrefOf(link);
+  expect(url.pathname).toBe('/app/trades');
+  // The page's range and side stay; the symbol is added.
+  expect(url.searchParams.get('symbol')).toBe('ES');
+  expect(url.searchParams.get('range')).toBe('ytd');
+  expect(url.searchParams.get('side')).toBe('long');
+});
+
+test('every bar of the chart is a link too, out of the tab order, over the keyboard table', async () => {
+  renderApp(<SymbolsView />, {
+    sample: breakdownSample,
+    url: '/app/reports/symbols',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const chart = within(page).getByRole('img', { name: /Net P&L by symbol/ });
+  const bars = [...chart.querySelectorAll('a')];
+  expect(bars.length).toBeGreaterThan(0);
+  for (const bar of bars) {
+    expect(bar.getAttribute('aria-hidden')).toBe('true');
+    expect(bar.getAttribute('tabindex')).toBe('-1');
+  }
+  const symbols = bars.map((b) => hrefOf(b).searchParams.get('symbol'));
+  expect(symbols).toContain('ES');
+  // Each has a focusable link in the table, so the keyboard loses nothing.
+  const table = within(page).getByRole('table', { name: 'Symbols summary' });
+  const inTable = within(table)
+    .getAllByRole('link')
+    .map((a) => a.getAttribute('href'));
+  for (const bar of bars) expect(inTable).toContain(bar.getAttribute('href'));
+});
+
+test('a cross-analysis cell links to the trades in both buckets', async () => {
+  renderApp(<SymbolsView />, {
+    sample: breakdownSample,
+    url: '/app/reports/symbols?x=side',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const matrix = within(page).getByRole('table', { name: 'Symbols by side' });
+  const cell = within(matrix).getAllByRole('link')[0]!;
+  const url = hrefOf(cell);
+  expect(url.pathname).toBe('/app/trades');
+  expect(url.searchParams.get('symbol')).not.toBeNull();
+  expect(['long', 'short']).toContain(url.searchParams.get('side'));
+  expect(cell.getAttribute('aria-label')).toMatch(/open in the trade log$/);
+});

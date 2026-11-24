@@ -1,0 +1,345 @@
+import { describe, expect, test } from 'vitest';
+import {
+  breakdown,
+  breakdown2D,
+  type BreakdownKey,
+  type BreakdownOptions,
+} from '../domain/metrics/breakdowns';
+import type { MetricContext } from '../domain/metrics/context';
+import { isClosed } from '../domain/trade-status';
+import {
+  applyFilters,
+  EMPTY_FILTERS,
+  parseFilters,
+  type FilterEnv,
+  type GlobalFilters,
+} from './filters';
+import {
+  bucketFilters,
+  bucketHref,
+  cellHref,
+  intersectRanges,
+  type BucketOptions,
+} from './report-links';
+import { generateSampleWorkspace } from './seed/generate';
+
+const ws = generateSampleWorkspace({ seed: 20261120, endDate: '2026-11-20' });
+const TZ = 'America/New_York';
+const env: FilterEnv = {
+  timeZone: TZ,
+  today: '2026-11-23',
+  accounts: ws.accounts,
+};
+const ctxOf = (pnlBasis: 'net' | 'gross' = 'net'): MetricContext => ({
+  timeZone: TZ,
+  breakevenRange: { unit: 'amount', from: 0, to: 0 },
+  pnlBasis,
+});
+
+/** The log's trades for a link: its address read back through the filter parser, closed only as the log shows by default. */
+function logIds(href: string, trades = ws.trades, pnlBasis?: 'net' | 'gross') {
+  const url = new URL(href, 'http://keel.test');
+  expect(url.pathname).toBe('/app/trades');
+  const f = parseFilters(url.searchParams);
+  return applyFilters(trades, f, pnlBasis ? { ...env, pnlBasis } : env)
+    .filter(isClosed)
+    .map((t) => t.id)
+    .sort();
+}
+
+const ALL: BreakdownKey[] = [
+  'weekday',
+  'hour',
+  'time-of-day',
+  'session',
+  'duration',
+  'side',
+  'symbol',
+  'strategy',
+  'tag',
+  'size',
+  'r',
+  'month',
+  'dte',
+];
+/** Buckets that have no filter, by design. */
+const NO_LINK = (by: BreakdownKey, key: string) =>
+  by === 'session' ||
+  by === 'dte' ||
+  (key === '__none__' && (by === 'r' || by === 'tag'));
+
+describe('a bucket opens exactly the trades it counted', () => {
+  const variants: { name: string; opts: BucketOptions }[] = [
+    { name: 'by entry', opts: { timeBasis: 'entry', bucketMinutes: 30 } },
+    { name: 'by exit', opts: { timeBasis: 'exit', bucketMinutes: 15 } },
+  ];
+  const bases: { name: string; base: GlobalFilters }[] = [
+    { name: 'no filters', base: EMPTY_FILTERS },
+    {
+      name: 'a date range',
+      base: {
+        ...EMPTY_FILTERS,
+        range: { from: '2026-10-01', to: '2026-11-13' },
+      },
+    },
+    {
+      name: 'a preset range',
+      base: { ...EMPTY_FILTERS, range: { preset: 'last-30-days' } },
+    },
+    { name: 'long only', base: { ...EMPTY_FILTERS, side: 'long' } },
+  ];
+  for (const { name: vname, opts } of variants)
+    for (const { name: bname, base } of bases)
+      for (const by of ALL)
+        test(`${by}, ${vname}, ${bname}`, () => {
+          const set = applyFilters(ws.trades, base, env);
+          const rows = breakdown(set, by, { ...ctxOf(), ...opts });
+          let linked = 0;
+          for (const row of rows) {
+            const href = bucketHref(base, by, row.key, opts);
+            if (NO_LINK(by, row.key)) {
+              expect(href).toBeUndefined();
+              continue;
+            }
+            // The page's own filters can leave a bucket empty: nothing to open.
+            if (href === undefined && row.tradeIds.length === 0) continue;
+            expect(href, `${by} ${row.key}`).toBeDefined();
+            linked += 1;
+            expect(logIds(href!), `${by} ${row.key}`).toEqual(
+              [...row.tradeIds].sort(),
+            );
+          }
+          if (!NO_LINK(by, 'x')) expect(linked).toBeGreaterThan(0);
+        });
+
+  test('the R buckets agree under the gross basis too', () => {
+    const base = EMPTY_FILTERS;
+    const rows = breakdown(ws.trades, 'r', ctxOf('gross'));
+    for (const row of rows) {
+      const href = bucketHref(base, 'r', row.key);
+      if (row.key === '__none__') continue;
+      expect(logIds(href!, ws.trades, 'gross')).toEqual(
+        [...row.tradeIds].sort(),
+      );
+    }
+  });
+});
+
+describe('the page filters stay in force', () => {
+  const closedIds = (f: GlobalFilters) =>
+    applyFilters(ws.trades, f, env)
+      .filter(isClosed)
+      .map((t) => t.id)
+      .sort();
+  const check = (
+    base: GlobalFilters,
+    by: BreakdownKey,
+    opts?: BucketOptions,
+  ) => {
+    const set = applyFilters(ws.trades, base, env);
+    let n = 0;
+    for (const row of breakdown(set, by, { ...ctxOf(), ...opts })) {
+      const f = bucketFilters(base, by, row.key, opts);
+      if (!f) continue;
+      n += 1;
+      expect(closedIds(f), `${by} ${row.key}`).toEqual(
+        [...row.tradeIds].sort(),
+      );
+    }
+    return n;
+  };
+
+  test('a weekday and an hour inside a weekday and entry window filter', () => {
+    const base: GlobalFilters = {
+      ...EMPTY_FILTERS,
+      weekdays: [1, 2, 3],
+      entryWindows: [{ from: '09:00', to: '11:30' }],
+    };
+    expect(check(base, 'weekday')).toBeGreaterThan(0);
+    expect(check(base, 'hour')).toBeGreaterThan(0);
+    expect(check(base, 'time-of-day', { bucketMinutes: 5 })).toBeGreaterThan(0);
+  });
+
+  test('a window that wraps past midnight is cut, not lost', () => {
+    const base: GlobalFilters = {
+      ...EMPTY_FILTERS,
+      entryWindows: [{ from: '22:00', to: '02:00' }],
+    };
+    const n = check(base, 'hour');
+    expect(n).toBeGreaterThanOrEqual(0);
+    const f = bucketFilters(base, 'hour', '23');
+    expect(f?.entryWindows).toEqual([{ from: '23:00', to: '23:59' }]);
+    expect(bucketFilters(base, 'hour', '12')).toBeNull();
+  });
+
+  test('a duration, size and R range on the page are intersected', () => {
+    const base: GlobalFilters = {
+      ...EMPTY_FILTERS,
+      duration: { min: 2, max: 90 },
+      size: { max: 10 },
+      r: { min: -3 },
+    };
+    expect(check(base, 'duration')).toBeGreaterThan(0);
+    expect(check(base, 'size')).toBeGreaterThan(0);
+    expect(check(base, 'r')).toBeGreaterThan(0);
+    expect(bucketFilters(base, 'duration', 'gt-1d')).toBeNull();
+    expect(bucketFilters(base, 'duration', '5-15m')?.duration).toEqual({
+      min: 5,
+      max: 15,
+      maxExclusive: true,
+    });
+  });
+
+  test('strategy and tag buckets combine with the page choice', () => {
+    const [a, b] = ws.strategies;
+    const base: GlobalFilters = { ...EMPTY_FILTERS, strategyIds: [a!.id] };
+    expect(check(base, 'strategy')).toBeGreaterThan(0);
+    const both = bucketFilters(base, 'strategy', b!.id);
+    expect(both?.strategyIds.sort()).toEqual([a!.id, b!.id].sort());
+    expect(both?.strategyMatch).toBe('all');
+    // Two strategies "any" on the page, a third in the bucket: no one filter says it.
+    const c = ws.strategies[2]!;
+    const two: GlobalFilters = {
+      ...EMPTY_FILTERS,
+      strategyIds: [a!.id, b!.id],
+    };
+    expect(bucketFilters(two, 'strategy', c.id)).toBeNull();
+    expect(bucketFilters(two, 'strategy', a!.id)?.strategyIds).toEqual([a!.id]);
+    const tag = ws.tags[0]!;
+    expect(
+      check({ ...EMPTY_FILTERS, tagIds: [tag.id] }, 'tag'),
+    ).toBeGreaterThan(0);
+  });
+
+  test('no strategy: the bucket sets the flag, and a page that excludes them has none', () => {
+    const f = bucketFilters(EMPTY_FILTERS, 'strategy', '__none__');
+    expect(f).toMatchObject({ noStrategy: true, strategyIds: [] });
+    expect(
+      bucketFilters(
+        { ...EMPTY_FILTERS, strategyIds: ['s1'] },
+        'strategy',
+        '__none__',
+      ),
+    ).toBeNull();
+    expect(
+      bucketFilters({ ...EMPTY_FILTERS, noStrategy: true }, 'strategy', 's1'),
+    ).toBeNull();
+  });
+
+  test('a symbol or side outside the page choice is not a link', () => {
+    expect(
+      bucketFilters({ ...EMPTY_FILTERS, symbols: ['ES'] }, 'symbol', 'NQ'),
+    ).toBeNull();
+    expect(
+      bucketFilters({ ...EMPTY_FILTERS, side: 'long' }, 'side', 'short'),
+    ).toBeNull();
+    expect(
+      bucketFilters({ ...EMPTY_FILTERS, status: 'open' }, 'side', 'long'),
+    ).toBeNull();
+  });
+
+  test('buckets with no filter are not links', () => {
+    expect(bucketHref(EMPTY_FILTERS, 'dte', '2-7')).toBeUndefined();
+    expect(bucketHref(EMPTY_FILTERS, 'session', 'london')).toBeUndefined();
+    expect(bucketHref(EMPTY_FILTERS, 'r', '__none__')).toBeUndefined();
+    expect(bucketHref(EMPTY_FILTERS, 'tag', '__none__')).toBeUndefined();
+    expect(bucketHref(EMPTY_FILTERS, 'symbol', 'Other')).toBeUndefined();
+  });
+
+  test('the address keeps the page filters and the date range', () => {
+    const base: GlobalFilters = {
+      ...EMPTY_FILTERS,
+      range: { preset: 'this-month' },
+      accountIds: ['acct-1'],
+      symbols: ['ES', 'NQ'],
+    };
+    const href = bucketHref(base, 'weekday', 'wed')!;
+    const p = new URL(href, 'http://x').searchParams;
+    expect(p.get('range')).toBe('this-month');
+    expect(p.get('account')).toBe('acct-1');
+    expect(p.get('wd')).toBe('3');
+    expect(p.get('symbol')).toBe('ES,NQ');
+  });
+});
+
+describe('a cross-analysis cell opens the trades in both buckets', () => {
+  const pairs: [BreakdownKey, BreakdownKey][] = [
+    ['weekday', 'side'],
+    ['symbol', 'hour'],
+    ['month', 'duration'],
+    ['strategy', 'tag'],
+    ['tag', 'weekday'],
+    ['side', 'duration'],
+  ];
+  for (const [rows, cols] of pairs)
+    for (const opts of [
+      { timeBasis: 'entry' as const },
+      { timeBasis: 'exit' as const },
+    ])
+      test(`${rows} by ${cols}, ${opts.timeBasis}`, () => {
+        const m = breakdown2D(
+          ws.trades,
+          { ...ctxOf(), ...(opts as BreakdownOptions) },
+          rows,
+          cols,
+          'trades',
+        );
+        let linked = 0;
+        m.rows.forEach((r, ri) =>
+          m.cols.forEach((c, ci) => {
+            const ids = m.tradeIds[ri]?.[ci] ?? [];
+            if (ids.length === 0) return;
+            const href = cellHref(
+              EMPTY_FILTERS,
+              { by: rows, key: r.key },
+              { by: cols, key: c.key },
+              opts,
+            );
+            if (href === undefined) return;
+            linked += 1;
+            expect(logIds(href), `${r.key} x ${c.key}`).toEqual(
+              [...ids].sort(),
+            );
+          }),
+        );
+        expect(linked).toBeGreaterThan(0);
+      });
+
+  test('a folded column or a bucket with no filter is not a link', () => {
+    expect(
+      cellHref(
+        EMPTY_FILTERS,
+        { by: 'symbol', key: 'ES' },
+        { by: 'tag', key: 'Other' },
+      ),
+    ).toBeUndefined();
+    expect(
+      cellHref(
+        EMPTY_FILTERS,
+        { by: 'symbol', key: 'ES' },
+        { by: 'session', key: 'asia' },
+      ),
+    ).toBeUndefined();
+  });
+});
+
+describe('intersectRanges', () => {
+  test('keeps the tighter bound and its exclusion', () => {
+    expect(intersectRanges({ min: 1, max: 10 }, { min: 5, max: 20 })).toEqual({
+      min: 5,
+      max: 10,
+    });
+    expect(intersectRanges({ max: 5 }, { max: 5, maxExclusive: true })).toEqual(
+      { max: 5, maxExclusive: true },
+    );
+    expect(
+      intersectRanges({ min: 5 }, { max: 5, maxExclusive: true }),
+    ).toBeNull();
+    expect(intersectRanges({ min: 5, max: 5 }, { min: 5 })).toEqual({
+      min: 5,
+      max: 5,
+    });
+    expect(intersectRanges({ min: 6 }, { max: 5 })).toBeNull();
+    expect(intersectRanges(undefined, { min: 1 })).toEqual({ min: 1 });
+  });
+});

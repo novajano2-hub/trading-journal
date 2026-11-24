@@ -476,6 +476,8 @@ describe('the full filter set', () => {
       'rating=4,5',
       'wd=1,2',
       'mo=11',
+      'xwd=5',
+      'xmo=1,12',
       'entry=09:30-11:00,13:00-',
       'exit=-10:00',
       'dur=5_60',
@@ -488,6 +490,94 @@ describe('the full filter set', () => {
       expect(f).not.toEqual(EMPTY_FILTERS);
       expect(queryString(serializeFilters(f))).toBe(qs);
     }
+  });
+
+  test('a bound that is out reads and writes with < and >', () => {
+    const f = parseFilters(new URLSearchParams('dur=1_<5&size=>100_&r=>-1_<1'));
+    expect(f.duration).toEqual({ min: 1, max: 5, maxExclusive: true });
+    expect(f.size).toEqual({ min: 100, minExclusive: true });
+    expect(f.r).toEqual({
+      min: -1,
+      max: 1,
+      minExclusive: true,
+      maxExclusive: true,
+    });
+    const back = serializeFilters(f);
+    expect(back.get('dur')).toBe('1_<5');
+    expect(back.get('size')).toBe('>100_');
+    expect(back.get('r')).toBe('>-1_<1');
+    expect(parseFilters(back)).toEqual(f);
+    // A flag on a missing bound is nothing.
+    expect(parseFilters(new URLSearchParams('dur=_<5')).duration).toEqual({
+      max: 5,
+      maxExclusive: true,
+    });
+    expect(
+      parseFilters(new URLSearchParams('dur=<1_5')).duration,
+    ).toBeUndefined();
+  });
+
+  test('an excluded bound leaves its own value out', () => {
+    const at5 = trade({
+      openedAt: '2026-11-18T15:00:00Z',
+      closedAt: '2026-11-18T15:05:00Z',
+      maxPosition: 100,
+    });
+    const at4 = trade({
+      openedAt: '2026-11-18T15:00:00Z',
+      closedAt: '2026-11-18T15:04:00Z',
+      maxPosition: 101,
+    });
+    expect(
+      run([at5, at4], { duration: { min: 1, max: 5, maxExclusive: true } }),
+    ).toEqual([at4]);
+    expect(run([at5, at4], { duration: { min: 1, max: 5 } })).toEqual([
+      at5,
+      at4,
+    ]);
+    expect(run([at5, at4], { size: { min: 100, minExclusive: true } })).toEqual(
+      [at4],
+    );
+  });
+
+  test('exit weekday and month read the day the trade closed', () => {
+    // Opened Friday 20 Nov 23:30 in New York, closed Saturday 21 Nov 00:30 (UTC-5).
+    const overnight = trade({
+      openedAt: '2026-11-21T04:30:00Z',
+      closedAt: '2026-11-21T05:30:00Z',
+    });
+    // Opened Sunday 30 Nov, closed Tuesday 1 Dec.
+    const monthEnd = trade({
+      openedAt: '2026-11-30T15:00:00Z',
+      closedAt: '2026-12-01T15:00:00Z',
+    });
+    const open = trade({ status: 'open', openedAt: '2026-11-18T15:00:00Z' });
+    const ts = [overnight, monthEnd, open];
+    expect(run(ts, { weekdays: [5] })).toEqual([overnight]);
+    expect(run(ts, { exitWeekdays: [6] })).toEqual([overnight]);
+    expect(run(ts, { months: [11] })).toEqual([overnight, monthEnd, open]);
+    expect(run(ts, { exitMonths: [12] })).toEqual([monthEnd]);
+    expect(run(ts, { exitMonths: [11], exitWeekdays: [7] })).toEqual([]);
+    expect(run(ts, { exitWeekdays: [2] })).toEqual([monthEnd]);
+  });
+
+  test('the R range reads the P&L basis the figures read', () => {
+    const t = trade({ net: 90, gross: 100, fees: 10, initialRisk: 100 });
+    const runOn = (pnlBasis: 'net' | 'gross', r: GlobalFilters['r']) =>
+      applyFilters([t], { ...EMPTY_FILTERS, r }, { ...env, pnlBasis });
+    expect(runOn('net', { min: 1 })).toEqual([]);
+    expect(runOn('gross', { min: 1 })).toEqual([t]);
+    expect(runOn('net', { max: 0.9 })).toEqual([t]);
+  });
+
+  test('the advanced count includes the exit day fields', () => {
+    expect(
+      advancedFilterCount({
+        ...EMPTY_FILTERS,
+        exitWeekdays: [1],
+        exitMonths: [2],
+      }),
+    ).toBe(2);
   });
 
   test('bad values for the new params are dropped', () => {

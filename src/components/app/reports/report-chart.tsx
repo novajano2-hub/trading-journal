@@ -1,6 +1,7 @@
 'use client';
 
 import { format, parseISO } from 'date-fns';
+import Link from 'next/link';
 import {
   memo,
   useContext,
@@ -684,6 +685,7 @@ export function ReportChart({
   extra,
   rowRatio = 1,
   tiltLabels = false,
+  hrefOf,
 }: {
   series: readonly ChartSeries[];
   label: string;
@@ -710,6 +712,12 @@ export function ReportChart({
   rowRatio?: number;
   /** Named bars with no order (symbols, strategies) tilt their labels rather than skip some, so every bar is named. */
   tiltLabels?: boolean;
+  /**
+   * Where a period's bar leads (its trades in the log), or undefined when it leads nowhere.
+   * A pointer user clicks the bar; the keyboard and assistive technology use the
+   * table the chart sits over, which carries the same links. Touch taps read the chart.
+   */
+  hrefOf?(key: string): string | undefined;
 }): React.JSX.Element {
   // Named periods read as they are named; dated ones as a date.
   const periodLabel = periodLabelProp ?? xLabel ?? periodText;
@@ -896,7 +904,7 @@ export function ReportChart({
           onPointerDown={onPress}
           onPointerMove={onPointer}
           onPointerLeave={() => setHover(null)}
-          className="overflow-hidden rounded-control outline-offset-4 focus-visible:outline-2 focus-visible:outline-accent"
+          className="relative overflow-hidden rounded-control outline-offset-4 focus-visible:outline-2 focus-visible:outline-accent"
         >
           <svg
             width={layout.width}
@@ -951,6 +959,27 @@ export function ReportChart({
               </g>
             ) : null}
           </svg>
+          {hrefOf
+            ? series[0]!.points.map((p, i) => {
+                const href = hrefOf(p.key);
+                return href === undefined ? null : (
+                  // A real link for a click, a middle click or a new tab. The
+                  // table beside the chart is the keyboard and screen reader path.
+                  <Link
+                    key={p.key}
+                    href={href}
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className="absolute top-0 block cursor-pointer pointer-coarse:hidden"
+                    style={{
+                      left: layout.padL + layout.step * i,
+                      width: layout.step,
+                      height: layout.height,
+                    }}
+                  />
+                );
+              })
+            : null}
         </div>
         <div role="status">
           {active !== null ? (

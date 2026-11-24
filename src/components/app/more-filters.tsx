@@ -483,6 +483,32 @@ function Panel({
               patch({ months: toggleNumber(draft.months, Number(id)) })
             }
           />
+          <Toggles
+            legend="Exit weekday"
+            items={WEEKDAYS.map(([n, short, name]) => ({
+              id: String(n),
+              label: short,
+              name: `${name}, exit`,
+            }))}
+            selected={draft.exitWeekdays.map(String)}
+            onToggle={(id) =>
+              patch({
+                exitWeekdays: toggleNumber(draft.exitWeekdays, Number(id)),
+              })
+            }
+          />
+          <Toggles
+            legend="Exit month"
+            items={MONTHS.map((name, i) => ({
+              id: String(i + 1),
+              label: name.slice(0, 3),
+              name: `${name}, exit`,
+            }))}
+            selected={draft.exitMonths.map(String)}
+            onToggle={(id) =>
+              patch({ exitMonths: toggleNumber(draft.exitMonths, Number(id)) })
+            }
+          />
           <WindowsField
             legend="Entry time"
             windows={draft.entryWindows}

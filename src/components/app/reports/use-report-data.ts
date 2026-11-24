@@ -4,7 +4,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
 import { pickPartition } from '@/data/dashboard';
-import { EMPTY_FILTERS, resolveRange } from '@/data/filters';
+import {
+  EMPTY_FILTERS,
+  resolveRange,
+  type GlobalFilters,
+} from '@/data/filters';
 import { metricContextOf, type CurrencyMetrics } from '@/data/metrics';
 import {
   useGlobalFilters,
@@ -39,6 +43,8 @@ export interface ReportData {
   today: string;
   /** The range in words, e.g. "all time", "1-20 Nov". */
   caption: string;
+  /** The page's filters as the log reads them: a bucket's link adds its own to these. */
+  filters: GlobalFilters;
   /** What the display units read: the trades behind the figures, the context and the percentage's base. */
   source: FigureSource;
 }
@@ -161,6 +167,7 @@ export function useReportData(): ReportState {
       basis: view.ctx.pnlBasis,
       today: view.today,
       caption: view.caption,
+      filters: shown,
       source: view.source,
     },
   };

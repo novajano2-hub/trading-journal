@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { FigureText } from '@/components/product/figure-text';
 import { useDisplay } from '@/lib/display';
 import { plural } from '@/lib/format';
@@ -17,6 +18,8 @@ export interface CrossCell {
   text?: string;
   /** Signed strength of the tint: positive gain, negative loss; default `value`. */
   tint?: number;
+  /** Where the cell's trades are listed; the cell is then a link. */
+  href?: string;
 }
 
 /**
@@ -46,6 +49,33 @@ export function CrossAnalysis({
   const peak = Math.max(
     1,
     ...cells.flat().map((c) => (c ? Math.abs(c.tint ?? c.value) : 0)),
+  );
+  /** What a cell reads: its figure, and how many trades stand behind it. */
+  const figure = (c: CrossCell) => (
+    <>
+      <span
+        className={`block font-semibold ${(c.tint ?? c.value) > 0 ? 'text-gain' : (c.tint ?? c.value) < 0 ? 'text-loss' : 'text-text'}`}
+      >
+        {c.text !== undefined ? (
+          c.text
+        ) : (
+          <FigureText
+            f={
+              c.tradeIds
+                ? display.figure(
+                    display.ofTrades(c.tradeIds, c.value),
+                    true,
+                    currency,
+                  )
+                : display.cash(c.value, true, currency)
+            }
+          />
+        )}
+      </span>
+      <span className="block text-[11.5px] text-faint">
+        {c.count} {plural(c.count, 'trade')}
+      </span>
+    </>
   );
   return (
     <div className="overflow-x-auto">
@@ -91,30 +121,17 @@ export function CrossAnalysis({
                   }
                 >
                   {c ? (
-                    <>
-                      <span
-                        className={`block font-semibold ${(c.tint ?? c.value) > 0 ? 'text-gain' : (c.tint ?? c.value) < 0 ? 'text-loss' : 'text-text'}`}
+                    c.href !== undefined ? (
+                      <Link
+                        href={c.href}
+                        aria-label={`${r.label}, ${columns[ci]!.label}${c.text !== undefined ? `, ${c.text}` : ''}, ${c.count} ${plural(c.count, 'trade')}, open in the trade log`}
+                        className="-mx-2 block rounded-[7px] px-2 py-1 outline-offset-0 hover:underline focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:py-2.5"
                       >
-                        {c.text !== undefined ? (
-                          c.text
-                        ) : (
-                          <FigureText
-                            f={
-                              c.tradeIds
-                                ? display.figure(
-                                    display.ofTrades(c.tradeIds, c.value),
-                                    true,
-                                    currency,
-                                  )
-                                : display.cash(c.value, true, currency)
-                            }
-                          />
-                        )}
-                      </span>
-                      <span className="block text-[11.5px] text-faint">
-                        {c.count} {plural(c.count, 'trade')}
-                      </span>
-                    </>
+                        {figure(c)}
+                      </Link>
+                    ) : (
+                      figure(c)
+                    )
                   ) : null}
                 </td>
               ))}

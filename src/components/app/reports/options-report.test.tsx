@@ -48,3 +48,20 @@ test('a workspace with no options says so', async () => {
     await screen.findByText(/No option trades in these filters/),
   ).toBeTruthy();
 });
+
+test('days to expiry has no filter, so its buckets are not links', async () => {
+  renderApp(<OptionsView />, {
+    sample: breakdownSample,
+    url: '/app/reports/options',
+  });
+  const page = await screen.findByTestId('reports-options');
+  const table = within(page).getByRole('table', {
+    name: 'Days to expiry summary',
+  });
+  expect(within(table).queryAllByRole('link')).toEqual([]);
+  expect(
+    within(page)
+      .getByRole('img', { name: /Net P&L by days to expiry/ })
+      .querySelectorAll('a'),
+  ).toHaveLength(0);
+});

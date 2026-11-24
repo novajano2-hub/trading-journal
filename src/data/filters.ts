@@ -11,7 +11,7 @@ import {
   subMonths,
 } from 'date-fns';
 import { classify } from '../domain/metrics/context';
-import { unitKeeps } from '../domain/metrics/units';
+import { rOf, unitKeeps } from '../domain/metrics/units';
 import { localDate, localParts } from '../domain/time';
 import type {
   Account,
@@ -45,6 +45,10 @@ export interface TimeWindow {
 export interface NumRange {
   min?: number;
   max?: number;
+  /** The bound itself is out: `size > 100`. Written `>100_` in the address. */
+  minExclusive?: boolean;
+  /** The bound itself is out: `duration < 5`. Written `_<5` in the address. */
+  maxExclusive?: boolean;
 }
 export type Outcome = 'win' | 'loss' | 'breakeven';
 export type Rating = 1 | 2 | 3 | 4 | 5;
@@ -72,6 +76,10 @@ export interface GlobalFilters {
   weekdays: number[];
   /** 1 to 12, of the month the trade opened. */
   months: number[];
+  /** 1 Monday to 7 Sunday, of the day the trade closed. */
+  exitWeekdays: number[];
+  /** 1 to 12, of the month the trade closed. */
+  exitMonths: number[];
   entryWindows: TimeWindow[];
   exitWindows: TimeWindow[];
   /** Minutes. */
@@ -100,6 +108,8 @@ export const EMPTY_FILTERS: GlobalFilters = {
   ratings: [],
   weekdays: [],
   months: [],
+  exitWeekdays: [],
+  exitMonths: [],
   entryWindows: [],
   exitWindows: [],
 };
@@ -126,6 +136,8 @@ export const FILTER_PARAMS = [
   'rating',
   'wd',
   'mo',
+  'xwd',
+  'xmo',
   'entry',
   'exit',
   'dur',
@@ -151,6 +163,8 @@ export function advancedFilterCount(f: GlobalFilters): number {
     f.ratings.length > 0,
     f.weekdays.length > 0,
     f.months.length > 0,
+    f.exitWeekdays.length > 0,
+    f.exitMonths.length > 0,
     f.entryWindows.length > 0,
     f.exitWindows.length > 0,
     f.duration !== undefined,
@@ -187,7 +201,8 @@ function uniqueValues(
 }
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
-const NUMBER = /^-?\d+(\.\d+)?$/;
+const NUMBER_LO = /^>?-?\d+(\.\d+)?$/;
+const NUMBER_HI = /^<?-?\d+(\.\d+)?$/;
 
 /** A list param: comma-separated, and repeated keys from older links add to it. */
 function listOf(
@@ -242,16 +257,24 @@ function rangeOf(
   if (raw === null) return undefined;
   const [lo, hi, ...rest] = raw.split('_');
   if (lo === undefined || hi === undefined || rest.length > 0) return undefined;
-  if ((lo !== '' && !NUMBER.test(lo)) || (hi !== '' && !NUMBER.test(hi)))
+  if ((lo !== '' && !NUMBER_LO.test(lo)) || (hi !== '' && !NUMBER_HI.test(hi)))
     return undefined;
   if (lo === '' && hi === '') return undefined;
-  let min = lo === '' ? undefined : Number(lo);
-  let max = hi === '' ? undefined : Number(hi);
-  if (min !== undefined && max !== undefined && min > max)
+  const loOut = lo.startsWith('>');
+  const hiOut = hi.startsWith('<');
+  let min = lo === '' ? undefined : Number(lo.replace('>', ''));
+  let max = hi === '' ? undefined : Number(hi.replace('<', ''));
+  let minExclusive = loOut;
+  let maxExclusive = hiOut;
+  if (min !== undefined && max !== undefined && min > max) {
     [min, max] = [max, min];
+    [minExclusive, maxExclusive] = [maxExclusive, minExclusive];
+  }
   return {
     ...(min !== undefined ? { min } : {}),
     ...(max !== undefined ? { max } : {}),
+    ...(min !== undefined && minExclusive ? { minExclusive: true } : {}),
+    ...(max !== undefined && maxExclusive ? { maxExclusive: true } : {}),
   };
 }
 
@@ -311,6 +334,8 @@ export function parseFilters(
     ratings,
     weekdays: intsOf(params, 'wd', 1, 7),
     months: intsOf(params, 'mo', 1, 12),
+    exitWeekdays: intsOf(params, 'xwd', 1, 7),
+    exitMonths: intsOf(params, 'xmo', 1, 12),
     entryWindows: windowsOf(params, 'entry'),
     exitWindows: windowsOf(params, 'exit'),
     ...optional('duration', duration),
@@ -335,7 +360,7 @@ export function serializeFilters(f: GlobalFilters): URLSearchParams {
   const span = (r: NumRange | undefined) =>
     r === undefined || (r.min === undefined && r.max === undefined)
       ? undefined
-      : `${r.min ?? ''}_${r.max ?? ''}`;
+      : `${r.min === undefined ? '' : `${r.minExclusive ? '>' : ''}${r.min}`}_${r.max === undefined ? '' : `${r.maxExclusive ? '<' : ''}${r.max}`}`;
   const windows = (key: string, ws: readonly TimeWindow[]) =>
     list(
       key,
@@ -371,6 +396,14 @@ export function serializeFilters(f: GlobalFilters): URLSearchParams {
   list(
     'mo',
     [...new Set(f.months)].sort((a, b) => a - b),
+  );
+  list(
+    'xwd',
+    [...new Set(f.exitWeekdays)].sort((a, b) => a - b),
+  );
+  list(
+    'xmo',
+    [...new Set(f.exitMonths)].sort((a, b) => a - b),
   );
   windows('entry', f.entryWindows);
   windows('exit', f.exitWindows);
@@ -476,8 +509,10 @@ const NO_RANGE: BreakevenRange = { unit: 'amount', from: 0, to: 0 };
 
 function within(v: number, r: NumRange | undefined): boolean {
   if (r === undefined) return true;
-  if (r.min !== undefined && v < r.min) return false;
-  if (r.max !== undefined && v > r.max) return false;
+  if (r.min !== undefined && (r.minExclusive ? v <= r.min : v < r.min))
+    return false;
+  if (r.max !== undefined && (r.maxExclusive ? v >= r.max : v > r.max))
+    return false;
   return true;
 }
 
@@ -515,6 +550,8 @@ export function applyFilters(
   const ratings = new Set<number>(f.ratings);
   const weekdays = new Set(f.weekdays);
   const months = new Set(f.months);
+  const exitWeekdays = new Set(f.exitWeekdays);
+  const exitMonths = new Set(f.exitMonths);
   const breakeven = env.breakevenRange ?? NO_RANGE;
   const tz = env.timeZone;
 
@@ -581,6 +618,14 @@ export function applyFilters(
       )
         return false;
     }
+    if (exitWeekdays.size > 0 || exitMonths.size > 0) {
+      if (!closed) return false;
+      const out = localParts(t.closedAt!, tz);
+      if (exitWeekdays.size > 0 && !exitWeekdays.has(out.weekday || 7))
+        return false;
+      if (exitMonths.size > 0 && !exitMonths.has(Number(out.date.slice(5, 7))))
+        return false;
+    }
     if (f.exitWindows.length > 0) {
       if (!closed) return false;
       const out = localParts(t.closedAt!, tz);
@@ -599,9 +644,9 @@ export function applyFilters(
     }
     if (!within(t.maxPosition, f.size)) return false;
     if (f.r !== undefined) {
-      if (!closed || t.initialRisk === undefined || !(t.initialRisk > 0))
-        return false;
-      if (!within(t.net / t.initialRisk, f.r)) return false;
+      // The same R every report buckets by: on the basis the figures read.
+      const r = rOf(t, env.pnlBasis ?? 'net');
+      if (!closed || r === undefined || !within(r, f.r)) return false;
     }
     return true;
   });

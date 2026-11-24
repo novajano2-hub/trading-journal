@@ -52,6 +52,7 @@ import { rowFacts, type RowFacts } from '@/data/trade-rows';
 import { summarize } from '@/domain/metrics/summary';
 import { isTradeUnit } from '@/domain/metrics/units';
 import { isClosed } from '@/domain/trade-status';
+import { ActiveFilters } from './active-filters';
 import { localDate } from '@/domain/time';
 import type { JournalEntry, Trade } from '@/domain/types';
 import {
@@ -630,6 +631,8 @@ export function TradesView(): React.JSX.Element {
           onHide={() => savePrefs({ hideTradeSummary: true })}
         />
       )}
+
+      <ActiveFilters filters={filters} onChange={setFilters} />
 
       {result ? (
         <div
