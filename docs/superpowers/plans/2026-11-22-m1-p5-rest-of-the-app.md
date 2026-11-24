@@ -1388,12 +1388,246 @@ Behaviour, one journey per spec on the sample workspace unless stated:
 
 ---
 
+## Part 2: gaps from the TradeZella recording (2026-11-24)
+
+The user recorded their TradeZella account with Keel's sample data imported and asked for every missing feature to be copied. A frame-by-frame inventory was compared against this branch. The research (git-ignored) is in `.superpowers/research/tradezella/recording/`:
+- `gaps.md` is the authority for these tasks. Its item ids (U1, D1 ...) are used below.
+- `inventory-*.md` holds the observations behind it.
+
+Items that need new data or new screens went to Plan 6 and the backlog (Task 31 records them).
+
+**Rulings for Part 2.** These come from the recording and the connector, and are binding.
+- **Display unit narrows the set (U1).**
+  - Ticks and Points keep only futures trades. Pips keeps only forex trades. R keeps only trades with an initial risk. Dollar, Percent and Privacy keep every trade.
+  - Under a narrowing unit, the trade set itself narrows on every page: counts, win rate, profit factor, averages, days, calendar and charts.
+  - Profit factor, average win and average loss are computed from the unit values. TradeZella's Futures live under Ticks: 574 trades, win rate 50.52%, total +8,495 ticks, average win 109.09 ticks, average loss −81.38 ticks, profit factor 1.3689.
+  - This widens the Plan 5 rulings "R-multiple" and "Ticks, pips, points" from sums to the whole set. The user's rule (TradeZella's behaviour wins) decides it.
+- **Volume** is the sum of each trade's quantity, counted once, not every fill. TradeZella's 2 Nov 2026 has four forex trades of 1.8, 1.5, 1.6 and 1.9 lots: volume 6.8. Futures live: total 1,169, average daily 9.82 over 119 trading days.
+- **Average drawdown** is the mean of the daily drawdown series. The daily drawdown is the close-of-day equity minus its running peak, so it is 0 or negative. TradeZella's Futures live: average −$580.81, max −$2,168.55. Pin whichever averaging (over every trading day, or over days in drawdown) reproduces −$580.81 on Futures live.
+- **Ticks on a multi-contract trade (Q3):** Keel keeps its per-contract ruling, unless Keel's tick total on Futures live is not +8,495 while the contract-multiplied total is. In that case adopt the multiplied one and record it.
+- **Unchanged rulings** (see `gaps.md` §4): the trade page instead of a drawer, one chart with up to three metrics, Monday weeks, Privacy keeps ratios, the calendar clips to the date range, and the cap of three calendar stats.
+
+### Task 21: Figure definitions: winning-day share, unit narrowing, volume
+
+`gaps.md` R2, U1, plus the volume ruling.
+
+**Files:** `src/domain/metrics/days.ts`, `src/domain/metrics/summary.ts`, `src/data/metrics.ts`, `src/data/query/derived.ts` (`useTradeSet`), `src/lib/display.ts` (an eligibility predicate), `src/data/filters.ts` if the predicate belongs there, `src/components/app/display-menu.tsx`, `src/components/app/filter-bar.tsx` or `top-bar.tsx` (the notice), `src/content/metric-definitions.ts`, the trade card's volume, and tests.
+
+**Behaviour**
+- **Average daily win rate** becomes winning days over trading days, shown with the green, red and flat day counts. It then equals Keel's green-days share, so show it once with the counts. Retire the mean-of-daily-win-rates metric everywhere it appears.
+- **U1, as ruled above.** The display menu says under each narrowing unit which trades it keeps.
+  - A page whose set narrowed shows one quiet line: how many trades the unit leaves out, and a control back to Dollar.
+  - Balance-based figures (return %, balance, drawdown %) show their empty value under Ticks, Pips, Points and R.
+  - Day-level sets (`dayTrades`) narrow the same way.
+- **Volume** follows the ruling wherever Keel shows volume.
+
+**Tests**
+- Futures live under Ticks: 574 trades, win rate 50.52%, profit factor 1.37 (1.3689 unrounded), +8,495 ticks (or the Q3 outcome), average win 109.09 ticks, average loss −81.38 ticks.
+- Under Pips, only forex trades count. Under R, trades without a stop leave the count.
+- Average daily win rate equals green days over trading days.
+- The volume pins above.
+- Name every pin you move.
+
+- [ ] Steps: tests first, implement, run the full gate (`npm test && npm run typecheck && npm run lint && npx prettier --check . && npm run e2e`), commit `feat(metrics): unit narrows the trade set, winning-day share, volume per trade`.
+
+### Task 22: From a report to its trades
+
+`gaps.md` R10.
+
+**Files:** `src/components/app/reports/breakdown-report.tsx`, `cross-analysis.tsx`, `report-chart.tsx`, `summary-table.tsx`, `src/data/filters.ts` (`serializeFilters`), and the trade-log filters if a bucket needs a filter that doesn't exist yet (entry-hour window, duration, size or R range).
+
+**Behaviour**
+- In every breakdown, a table row, a chart bar and a cross-analysis cell are links. Each opens the trade log with the page's filters and date range kept and the bucket's filter added.
+- The log then shows exactly the trade count the bucket showed.
+- Align the date each filter reads with the date its breakdown buckets by (see E63).
+- A bucket with no matching filter (days to expiry) is not a link.
+- Links are keyboard reachable and say where they go.
+
+**Tests**
+- For each breakdown type, the link's URL round-trips through `parseFilters` to a filter whose trade count equals the bucket's.
+- One e2e: click a weekday bar, and the log shows that count.
+
+- [ ] Steps: tests first, implement, full gate, commit `feat(reports): every bucket opens its trades`.
+
+### Task 23: Overview: the missing figures and their links
+
+`gaps.md` R1, plus the average-drawdown ruling.
+
+**Files:** `src/components/app/reports/overview.tsx` (put the new groups in their own components; the file is already large, E101), `src/data/metrics.ts`, `src/domain/metrics/days.ts`, `src/domain/metrics/summary.ts`, `src/content/metric-definitions.ts`, and `useJournal` for logged days.
+
+**Behaviour.** The Overview adds:
+- best month, lowest month and average per month (each month named);
+- winners, losers, breakevens and open trades;
+- trading days, green, red and flat days;
+- logged days (days in range with a daily note, excluding trash);
+- average daily P&L, and average daily win/loss (average green day over the size of the average red day);
+- largest green day and largest red day;
+- average hold time over all trades, winners, losers and breakevens;
+- average daily volume;
+- commissions and fees as separate totals;
+- average drawdown in money and %.
+
+The largest win, largest loss, largest green day and largest red day link to that trade or that calendar day. Every new label gets a definition. There is no swap: Keel stores none.
+
+**Tests:** each new figure on a small fixture, the average-drawdown pin on Futures live (−$580.81), and the four links.
+
+- [ ] Steps: tests first, implement, full gate, commit `feat(reports): overview month, day, count, hold, cost and drawdown figures`.
+
+### Task 24: Strategies follow the date range and accounts
+
+`gaps.md` S1.
+
+**Files:** `src/components/app/nav.ts` (`filterScoped`), `strategies/strategies-view.tsx`, `strategy-view.tsx`, `use-strategy-figures.ts`.
+
+**Behaviour.** The Strategies list and each strategy page show the filter bar. Every strategy figure reads the filtered trades: net, win rate, profit factor, expectancy, adherence, rule stats, equity line and the trade list. Empty results use the existing empty states.
+
+**Tests:** a date range and an account filter each change a strategy's figures to the filtered subset.
+
+- [ ] Steps: tests first, implement, full gate, commit `feat(strategies): figures follow the date range and accounts`.
+
+### Task 25: Performance metric catalogue and full-screen charts
+
+`gaps.md` R4 (first pass) and R5.
+
+**Files:** `src/domain/metrics/series.ts`, `reports/performance.tsx`, `metric-chips.tsx`, `report-chart.tsx` (duration axis, expand), `src/content/metric-definitions.ts`, and the breakdown card headers.
+
+**Behaviour**
+- The metric picker lists the R4 metrics in five groups (Profitability, Risk, Time, Activity, Consistency) with a search box.
+- Each metric plots per period (day, week or month) or as a running value from the range start, chosen by a per-metric switch.
+- Durations get their own axis format. The cap of three metrics stays.
+- Every report chart card has an Expand action that opens a taller full-screen view. Escape closes it and focus returns to the trigger.
+
+**Tests:** series values for a sample of new metrics in both modes, the search, the cap, and the expand dialog's focus and escape behaviour.
+
+- [ ] Steps: tests first, implement, full gate, commit `feat(reports): performance metric catalogue and expandable charts`.
+
+### Task 26: Trade page: unit rows, the day's journal, manage tags
+
+`gaps.md` TP1, TP3, TP4.
+
+**Files:** `trades/trade-view.tsx`, `trade-journal.tsx`, `src/components/app/tag-picker.tsx`, `src/lib/display.ts` (`tradeFigure`), `src/domain/metrics/context.ts` (`costBasis`), `notes/note-editor.tsx`, and the hooks `useJournal` and `useSaveJournalEntry`.
+
+**Behaviour**
+- **TP1.** The Execution card shows:
+  - points, ticks and contracts for futures;
+  - pips and money per pip for forex;
+  - the cost basis for every trade.
+
+  A row the asset class lacks is absent.
+- **TP3.** The notes card switches between Trade note and Daily note.
+  - Daily note edits the daily entry for the trade's exit date, or its open date when the trade is still open. The entry is created on first edit, as the Notebook does.
+  - A link opens that entry in the Notebook.
+- **TP4.** The tags card and the tag picker link to Settings > Tags.
+
+**Tests:** the unit rows per asset class; that a daily-note edit saves to the right date and appears in the Notebook; the link.
+
+- [ ] Steps: tests first, implement, full gate, commit `feat(trades): unit rows, the day's journal and manage tags on the trade page`.
+
+### Task 27: Dashboard and the account menu
+
+`gaps.md` D1, D2, D3, A2.
+
+**Files:** `dashboard/recent-trades.tsx`, `performance-card.tsx`, `dashboard-view.tsx`, `src/data/dashboard.ts`, `src/data/query/hooks.ts` (`useImportHistory`), `src/components/app/account-switcher.tsx`, `src/content/metric-definitions.ts`.
+
+**Behaviour**
+- **D1.** Recent trades gets an Open positions tab. Each open trade shows instrument, side, opened time, open quantity, average entry, and any realized P&L from partial exits. There is no unrealized P&L. A row opens the trade, and the empty state says none are open.
+- **D2.** The performance card adds day win % (with the green, flat and red counts) and average win/loss (with both amounts).
+- **D3.** One quiet line under the title gives the latest import's time and account, and links to Import history. With no imports, the line is absent.
+- **A2.** The account menu ends with "Manage accounts", which goes to Settings > Accounts.
+
+**Tests:** for each item, including the empty states.
+
+- [ ] Steps: tests first, implement, full gate, commit `feat(dashboard): open positions, day win and win/loss, last import; manage accounts link`.
+
+### Task 28: Trade log: summary, outcome status, paging
+
+`gaps.md` T1, T2, T3.
+
+**Files:** `trades/summary-strip.tsx`, `trades-view.tsx`, `columns.tsx`, `trade-view.tsx`, `src/data/trade-columns.ts`, `src/data/csv-export.ts`.
+
+**Behaviour**
+- **T1.** The summary strip:
+  - adds an average win/loss card (the ratio, plus both amounts);
+  - counts won, breakeven and lost in the win-rate line;
+  - adds a small running-P&L line by exit date to the net card.
+
+  The phone 2×2 layout stays. Put the new card where the phone layout still reads.
+- **T2.** Status reads Win, Loss, Breakeven (by the trader's breakeven range) or Open.
+  - The trade page header shows the same outcome chip.
+  - The outcome chip uses gain or loss colour only as signed-money meaning allows. Otherwise it stays neutral (hue jobs).
+  - The CSV keeps a plain value.
+- **T3.** The pager offers 25, 50 or 100 rows (default 50) and a page jump ("page n of N"). Both live in the URL.
+
+**Tests:** for each item. The 50-row performance budget still holds.
+
+- [ ] Steps: tests first, implement, full gate, commit `feat(trades): win/loss and running P&L in the summary, outcome status, page size and jump`.
+
+### Task 29: Breakdowns: highlights, columns, symbol views, more cross-analysis
+
+`gaps.md` R6, R7, R8, R9.
+
+**Files:** `reports/breakdown-report.tsx` (`SymbolsView`, `CROSS_DIMS`), `summary-table.tsx`, `sub-tabs.tsx`, `src/domain/metrics/breakdowns.ts`.
+
+**Behaviour**
+- **R6.** Highlights add the most active bucket (with its count) and the best win-rate bucket (with win rate and count).
+- **R7.** Tables add average win, average loss and average daily volume columns, plus a column chooser. The choice lives in the URL.
+- **R8.** Symbols gets three views:
+  - by symbol;
+  - by instrument (asset class);
+  - by entry-price range, with ranges chosen to suit the prices in the set.
+
+  A limiter offers all, top 10 or bottom 10 by net.
+- **R9.** Cross-analysis adds account, instrument, entry-price and exit-price ranges, exit hour, position size, R-multiple, and top 10 or bottom 10 symbols.
+- Every new bucket also links to its trades, as in Task 22.
+
+**Tests:** bucket membership for each new key, the price-range choice on stock, futures and forex prices, the top and bottom limiter, and the chooser's URL round-trip.
+
+- [ ] Steps: tests first, implement, full gate, commit `feat(reports): breakdown highlights, columns, symbol views and cross-analysis dimensions`.
+
+### Task 30: Calendar: day and month figures, unit stats
+
+`gaps.md` C1, C2, C3.
+
+**Files:** `calendar/day-panel.tsx`, `month-panel.tsx`, `month-grid.tsx`, `calendar-view.tsx`, `src/data/calendar.ts`, `src/domain/types.ts` (`CalendarStat`).
+
+**Behaviour**
+- **C1.** The day panel adds the winner and loser counts, the day's volume and the day's profit factor (it shows "None" when there is no loss).
+- **C2.** The stats menu adds Ticks, Pips and Points. Each is the day's sum over the eligible trades. A day with none shows "None", never a dash (the empty-value rule). The cap of three stats stays. This closes E65.
+- **C3.** The month panel adds the winner and loser counts with the month's trade win rate. A link opens Reports > Overview with the date range set to the month.
+
+**Tests:** for each item.
+
+- [ ] Steps: tests first, implement, full gate, commit `feat(calendar): day and month figures, ticks, pips and points stats`.
+
+### Task 31: Accounts, Overview figure choice, and records
+
+`gaps.md` A1 and R3, plus the records for everything deferred.
+
+**Files:** `settings/accounts.tsx`, `import/import-flow.tsx` and `trades/manual-trade-form.tsx` (an `account` query parameter), `reports/overview.tsx`, `src/domain/types.ts` (`UserPrefs`), `src/data/local/prefs.ts`, `docs/BACKLOG.md`, `docs/research/tradezella-feature-map.md`.
+
+**Behaviour**
+- **A1.** Each active account's menu adds "Import trades" and "Add a trade", each opening its flow with that account chosen. A "Last import" column shows the latest import, or "None".
+- **R3.** "Choose figures" on the Overview opens a dialog listing every figure with a checkbox and its current value, all on by default, with Cancel and Save. The hidden set is saved in prefs as one optional field, with no Dexie migration.
+
+**Records**
+- Add `gaps.md` §3's new rows to BACKLOG.md and the feature map, as Plan 6 or backlog as proposed there.
+- Append §3's additions to the existing Plan 6 rows (#35-#49) and backlog rows.
+- Mark Part 2's delivered items Done in the feature map.
+- Everything is paraphrased in Keel's words.
+
+**Tests:** for A1 and R3. The 1440 Accounts table must not overflow its card.
+
+- [ ] Steps: tests first, implement, full gate, commit `feat(settings): account import and add-trade shortcuts, last import; overview figure choice; docs: recording gaps recorded`.
+
+---
+
 ## Done when
 
 - Every P5 row of the feature map works on the sample workspace and on an imported file, and is marked Done.
 - Every §6 route renders at 390-1680px without overflow, and the global filters, the display unit and privacy apply consistently.
 - A user CSV imports through the full mapping flow and shows correctly in Trades, Dashboard, Calendar and Reports, and it can be undone.
 - The full gate is green, the finish reviewer returns ship, DESIGN.md records the new components, and BACKLOG.md lists everything deferred.
+- Part 2: every build item in the recording's `gaps.md` §2 (U1, D1-D3, T1-T3, TP1, TP3, TP4, C1-C3, R1-R10, S1, A1, A2) works on the sample workspace, and its §3 rows are recorded in BACKLOG.md and the feature map.
 
 ## Self-review
 
