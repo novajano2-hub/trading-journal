@@ -106,6 +106,7 @@ export const METRIC_IDS = [
   'day-ticks',
   'day-pips',
   'day-points',
+  'day-rating',
 ] as const;
 
 export type MetricId = (typeof METRIC_IDS)[number];
@@ -365,6 +366,11 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Volume',
     definition:
       'Contracts, lots or shares traded, each trade counted once by the quantity it opened, not by every fill. On a day, a trade counts what its exits closed that day, so a trade that exits over several days is shared among them by exited size. What an open trade still holds counts on the day it opened.',
+  },
+  'day-rating': {
+    label: 'Day rating',
+    definition:
+      "The average star rating of the day's rated trades. A trade that exits over several days counts on each of them; trades with no rating are left out. None when no trade of the day is rated.",
   },
   'day-ticks': {
     label: 'Ticks',

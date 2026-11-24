@@ -1,6 +1,7 @@
 'use client';
 
 import { X } from '@phosphor-icons/react/dist/ssr';
+import { useId } from 'react';
 import { plural } from '@/lib/format';
 
 const BTN =
@@ -31,6 +32,7 @@ export function AccountsBulkBar({
   onDelete(): void;
   onClear(): void;
 }): React.JSX.Element {
+  const whyId = useId();
   return (
     <div
       role="toolbar"
@@ -54,15 +56,20 @@ export function AccountsBulkBar({
         type="button"
         className={`${BTN} ${deletable > 0 ? 'text-loss' : ''}`}
         disabled={deletable === 0}
-        title={
-          deletable === 0
-            ? 'An account with trades needs Clear trades first.'
-            : undefined
-        }
+        aria-describedby={deletable === 0 ? whyId : undefined}
         onClick={onDelete}
       >
         {deletable > 0 ? `Delete ${deletable}` : 'Delete'}
       </button>
+      {deletable === 0 ? (
+        <span
+          id={whyId}
+          className="basis-full px-2.5 pb-1 text-[12.5px] leading-snug text-muted"
+        >
+          Accounts with trades can&apos;t be deleted. Archive them or clear
+          their trades first.
+        </span>
+      ) : null}
       <button
         type="button"
         aria-label="Clear selection"

@@ -11,6 +11,7 @@ import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { createLocalRepository } from '@/data/local/local-repository';
+import { metricDefinition } from '@/content/metric-definitions';
 import { defaultPrefs } from '@/data/repository';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { makeTrade } from '@/domain/__fixtures__/trades';
@@ -1071,4 +1072,19 @@ test('Day rating: Privacy leaves the rating readable, it is not money', async ()
   renderApp(<CalendarView />, { repository, url: url('&day=2026-11-19') });
   const cell = await screen.findByRole('button', { name: /^Thu 19 Nov/ });
   expect(cell.textContent).toContain('4.3★');
+});
+
+test('Day rating in the day panel carries a metric tip that says how it is worked out', async () => {
+  renderApp(<CalendarView />, {
+    sample: withTrades(RATED),
+    url: url('&day=2026-11-19'),
+  });
+  const panel = await screen.findByRole('complementary', {
+    name: /Thu 19 Nov/,
+  });
+  const tip = panel.querySelector('[data-metric-tip="day-rating"]');
+  expect(tip).not.toBeNull();
+  expect(metricDefinition('day-rating' as never, 'net').definition).toContain(
+    'no rating',
+  );
 });

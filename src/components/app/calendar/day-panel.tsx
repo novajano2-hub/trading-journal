@@ -168,7 +168,7 @@ export function DayPanel({
     ['Volume', tip('volume', 'Volume'), formatQty(day.volume)],
     [
       'Day rating',
-      'Day rating',
+      tip('day-rating', 'Day rating'),
       day.rating === null ? 'None' : `${ratingText(day.rating)}★`,
     ],
     [

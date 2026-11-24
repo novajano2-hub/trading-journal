@@ -4,6 +4,9 @@ import { useId, useState } from 'react';
 import { Dialog } from 'radix-ui';
 import { Button } from '@/components/ui/button';
 
+/** Thrown from `onConfirm` to say, in the dialog, exactly what happened. */
+export class ConfirmFailure extends Error {}
+
 /**
  * A small confirmation. Confirm runs `onConfirm`; the dialog stays open and
  * busy until it settles, then closes through `onClose`. A failure keeps the
@@ -32,7 +35,7 @@ export function ConfirmDialog({
 }): React.JSX.Element {
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
   const inputId = useId();
 
   // A reopened dialog starts clean.
@@ -41,7 +44,7 @@ export function ConfirmDialog({
     setWasOpen(open);
     if (open) {
       setTyped('');
-      setFailed(false);
+      setFailed(null);
     }
   }
 
@@ -49,12 +52,16 @@ export function ConfirmDialog({
 
   const confirm = async () => {
     setBusy(true);
-    setFailed(false);
+    setFailed(null);
     try {
       await onConfirm();
       onClose();
-    } catch {
-      setFailed(true);
+    } catch (e) {
+      setFailed(
+        e instanceof ConfirmFailure
+          ? e.message
+          : "Couldn't finish that. Try again.",
+      );
     } finally {
       setBusy(false);
     }
@@ -99,7 +106,7 @@ export function ConfirmDialog({
           ) : null}
           {failed ? (
             <p role="alert" className="mt-3 text-[13px] text-loss">
-              Couldn&apos;t finish that. Try again.
+              {failed}
             </p>
           ) : null}
           <div className="mt-6 flex flex-wrap justify-end gap-2">

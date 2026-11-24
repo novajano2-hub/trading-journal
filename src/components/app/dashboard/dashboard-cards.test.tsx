@@ -634,6 +634,7 @@ test('every metric carries its definition', async () => {
     'day-ticks',
     'day-pips',
     'day-points',
+    'day-rating',
     'trading-days',
     'green-days',
     'best-day',

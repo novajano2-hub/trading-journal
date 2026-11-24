@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useMemo, useRef, useState } from 'react';
-import { ConfirmDialog } from '@/components/app/confirm-dialog';
+import { ConfirmDialog, ConfirmFailure } from '@/components/app/confirm-dialog';
 import { CARD, CardHeader } from '@/components/app/dashboard/shared';
 import { writeParam } from '@/components/app/reports/use-report-data';
 import { SelectBox } from '@/components/app/trades/select-box';
@@ -185,6 +185,12 @@ function AccountsBody(): React.JSX.Element {
     if (patch.types) writeParam(TYPE_PARAM, formatList(next.types));
     if (patch.statuses) writeParam(STATUS_PARAM, formatList(next.statuses));
     if (patch.currencies) writeParam(CCY_PARAM, formatList(next.currencies));
+  };
+  /** Search and every filter cleared in one write, from no stale copy. */
+  const clearAll = () => {
+    setView({ q: '', types: [], statuses: [], currencies: [] });
+    for (const k of [SEARCH_PARAM, TYPE_PARAM, STATUS_PARAM, CCY_PARAM])
+      writeParam(k, null);
   };
   const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set());
 
@@ -414,10 +420,7 @@ function AccountsBody(): React.JSX.Element {
             <p className="text-[13.5px] text-muted">No account matches.</p>
             <button
               type="button"
-              onClick={() => {
-                onSearch('');
-                onFilters({ types: [], statuses: [], currencies: [] });
-              }}
+              onClick={clearAll}
               className="mt-1 text-[13.5px] font-semibold text-accent-ink underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11"
             >
               {view.q.trim() === ''
@@ -767,8 +770,36 @@ function AccountsBody(): React.JSX.Element {
           danger
           onConfirm={async () => {
             if (dialog?.kind !== 'bulk-delete') return;
-            for (const r of dialog.remove)
-              await remove.mutateAsync(r.account.id);
+            // One by one, and stop at the first failure so the words are exact.
+            const gone = new Set(rows?.map((r) => r.account.id));
+            const todo = dialog.remove.filter((r) => gone.has(r.account.id));
+            const done: string[] = [];
+            for (const [i, r] of todo.entries()) {
+              try {
+                await remove.mutateAsync(r.account.id);
+                done.push(r.account.name);
+              } catch (e) {
+                const reason = e instanceof Error ? e.message : 'unknown error';
+                const left = todo.slice(i + 1).map((x) => x.account.name);
+                const removed = new Set([...done]);
+                setChosen(
+                  new Set(
+                    todo
+                      .filter((x) => !removed.has(x.account.name))
+                      .map((x) => x.account.id),
+                  ),
+                );
+                throw new ConfirmFailure(
+                  [
+                    done.length > 0 ? `Deleted: ${done.join(', ')}.` : '',
+                    `Couldn't delete: ${r.account.name} (${reason}).`,
+                    left.length > 0 ? `Not attempted: ${left.join(', ')}.` : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' '),
+                );
+              }
+            }
             setChosen(new Set());
           }}
           onClose={() => setDialog(null)}

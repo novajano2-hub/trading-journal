@@ -815,16 +815,78 @@ test('bulk Delete lists what goes, keeps accounts that hold trades, and asks the
   expect(await r.cashFlows.list('sample')).toHaveLength(0);
 });
 
-test('Delete in the bar is off when every selected account holds trades, with the reason', async () => {
+test('Delete in the bar is off when every selected account holds trades, and the bar says why in plain text', async () => {
   renderApp(<AccountsSettings />, { repository: repo(), url: URL });
   fireEvent.click(
     await screen.findByRole('checkbox', { name: 'Select Futures main' }),
   );
-  const del = within(await screen.findByRole('toolbar')).getByRole('button', {
+  const bar = await screen.findByRole('toolbar');
+  const del = within(bar).getByRole('button', {
     name: 'Delete',
   }) as HTMLButtonElement;
   expect(del.disabled).toBe(true);
-  expect(del.title).toBe('An account with trades needs Clear trades first.');
+  const why = within(bar).getByText(
+    "Accounts with trades can't be deleted. Archive them or clear their trades first.",
+  );
+  expect(del.getAttribute('aria-describedby')).toBe(why.id);
+});
+
+test('the empty state clears a search and filters together in one action', async () => {
+  renderApp(<AccountsSettings />, {
+    repository: await wideRepo(),
+    url: `${URL}?q=zzz&type=live&status=active`,
+  });
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Clear search and filters' }),
+  );
+  await waitFor(() => expect(names()).toHaveLength(5));
+  expect(window.location.search).toBe('');
+  expect(((await search()) as HTMLInputElement).value).toBe('');
+  expect(screen.queryByRole('button', { name: /^Clear filter/ })).toBeNull();
+});
+
+test('a bulk delete that fails on the second account says what was deleted, what failed and what was not tried, and keeps the rest selected', async () => {
+  const r = await wideRepo();
+  for (const name of ['Spare one', 'Spare two'])
+    await r.accounts.create('sample', { ...base, name });
+  let calls = 0;
+  const flaky = {
+    ...r,
+    accounts: {
+      ...r.accounts,
+      remove: async (ws: string, id: string) => {
+        calls += 1;
+        if (calls === 2) throw new Error('disk full');
+        return r.accounts.remove(ws, id);
+      },
+    },
+  };
+  renderApp(<AccountsSettings />, { repository: flaky, url: URL });
+  for (const n of ['Empty one', 'Spare one', 'Spare two'])
+    fireEvent.click(
+      await screen.findByRole('checkbox', { name: `Select ${n}` }),
+    );
+  fireEvent.click(
+    within(screen.getByRole('toolbar')).getByRole('button', {
+      name: 'Delete 3',
+    }),
+  );
+  const dialog = await screen.findByRole('dialog');
+  fireEvent.click(
+    within(dialog).getByRole('button', { name: 'Delete accounts' }),
+  );
+  const alert = await within(dialog).findByRole('alert');
+  expect(alert.textContent).toContain('Deleted: Empty one');
+  expect(alert.textContent).toContain("Couldn't delete: Spare one (disk full)");
+  expect(alert.textContent).toContain('Not attempted: Spare two');
+  const left = (await r.accounts.list('sample')).map((a) => a.name);
+  expect(left).not.toContain('Empty one');
+  expect(left).toContain('Spare one');
+  expect(left).toContain('Spare two');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  // Only the accounts still there stay selected.
+  expect(await screen.findByText('2 selected')).toBeTruthy();
 });
 
 test('an archived account is read-only: no bulk Archive for it, only Unarchive', async () => {

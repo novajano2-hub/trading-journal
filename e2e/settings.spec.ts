@@ -139,3 +139,29 @@ test('Accounts search and filters live in the address and survive a reload', asy
   await expect(page).toHaveURL(/q=zzz/);
   await expect(page.getByText('No account matches.')).toBeVisible();
 });
+
+test('Accounts: Back restores the search and filter after leaving the page', async ({
+  page,
+}) => {
+  await page.goto('/app/settings/accounts');
+  const box = page.getByRole('searchbox', { name: 'Search accounts' });
+  await expect(box).toBeVisible({ timeout: 30_000 });
+  await box.fill('futures');
+  await page.getByRole('button', { name: /^Filter by/ }).click();
+  await page.getByRole('checkbox', { name: 'Active' }).check();
+  await page.keyboard.press('Escape');
+  await expect(
+    page.getByRole('button', { name: 'Clear filter Status: Active' }),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Tags' }).first().click();
+  await expect(page).toHaveURL(/settings\/tags/);
+  await page.goBack();
+  await expect(page).toHaveURL(/q=futures/);
+  await expect(page).toHaveURL(/status=active/);
+  await expect(
+    page.getByRole('searchbox', { name: 'Search accounts' }),
+  ).toHaveValue('futures');
+  await expect(
+    page.getByRole('button', { name: 'Clear filter Status: Active' }),
+  ).toBeVisible();
+});
