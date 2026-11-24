@@ -473,33 +473,40 @@ export function DashboardView(): React.JSX.Element {
             open({ kind: 'rule', ruleId }, button)
           }
         />
-        {/* Row 2: three cards from xl, Performance the widest; between md and xl two, then Performance across both. */}
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)_minmax(0,1.38fr)]">
-          <MistakesCard
-            mistakes={m.mistakes}
-            basis={m.basis}
-            currency={m.currency}
-            caption={caption}
-            listRef={mistakesList}
-            onOpenMistake={(tagId, button) =>
-              open({ kind: 'mistake', tagId }, button)
-            }
-          />
-          <GoalsCard
-            // A workspace switch drops a half-edited form.
-            key={workspace.data?.id}
-            goals={m.goals}
-            days={view.days}
-            set={view.goals}
-            currency={prefs?.baseCurrency ?? m.currency}
-            weekLabel={view.weekLabel}
-            rangeLabel={caption}
-            onSave={async (next) => {
-              const ws = workspace.data;
-              if (!ws) throw new Error('No active workspace');
-              await updatePrefs.mutateAsync(withGoals(ws.id, next));
-            }}
-          />
+        {/*
+          Row 2. From xl, Mistakes and Goals stack in one column beside
+          Performance, whose line takes the height they make together, so no
+          card has a tail of empty space. Between md and xl the two sit side
+          by side with Performance across both; on a phone, one column.
+        */}
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.75fr)]">
+          <div className="contents xl:flex xl:min-w-0 xl:flex-col xl:gap-4">
+            <MistakesCard
+              mistakes={m.mistakes}
+              basis={m.basis}
+              currency={m.currency}
+              caption={caption}
+              listRef={mistakesList}
+              onOpenMistake={(tagId, button) =>
+                open({ kind: 'mistake', tagId }, button)
+              }
+            />
+            <GoalsCard
+              // A workspace switch drops a half-edited form.
+              key={workspace.data?.id}
+              goals={m.goals}
+              days={view.days}
+              set={view.goals}
+              currency={prefs?.baseCurrency ?? m.currency}
+              weekLabel={view.weekLabel}
+              rangeLabel={caption}
+              onSave={async (next) => {
+                const ws = workspace.data;
+                if (!ws) throw new Error('No active workspace');
+                await updatePrefs.mutateAsync(withGoals(ws.id, next));
+              }}
+            />
+          </div>
           <div className="min-w-0 md:max-xl:col-span-2">
             <PerformanceCard
               performance={m.performance}

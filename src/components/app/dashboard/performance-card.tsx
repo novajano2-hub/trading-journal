@@ -363,7 +363,9 @@ export function PerformanceCard({
             ? `Equity line, the balance has no value in ${noBalance}`
             : `Equity, from ${start.label} to ${end.label}`
         }
-        className="mt-1.5 mb-2.5"
+        // From xl the card stands as tall as the two beside it: the line takes the height.
+        className="mt-1.5 mb-2.5 h-20 xl:h-auto xl:min-h-20 xl:flex-1"
+        fill
       />
       <div className="mt-auto grid grid-cols-3 border-t border-line">
         <Kpi

@@ -8,6 +8,7 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 import type { ImportContext, ImportPlan } from '@/domain/import/plan';
+import { useHydrated } from '@/lib/use-hydrated';
 import type {
   Account,
   CashFlow,
@@ -47,34 +48,76 @@ import { activeWorkspaceQuery, useInvalidate, useRepository } from './provider';
 
 // Reads
 
+/**
+ * Every read answers "nothing loaded yet" while the page hydrates, as the
+ * server's did. A part of the page can hydrate after the data is already in
+ * the cache; if it showed that data in its first frame it would not match the
+ * server's HTML (React keeps the server's attributes, so a chip would stay
+ * disabled, or regenerates the tree). `useHydrated` is false while hydrating
+ * and true from the next render, so the data appears one frame later.
+ */
+function useFirstFrame<T>(result: UseQueryResult<T>): UseQueryResult<T> {
+  const hydrated = useHydrated();
+  if (hydrated) return result;
+  return {
+    ...result,
+    data: undefined,
+    error: null,
+    status: 'pending',
+    isPending: true,
+    isLoading: false,
+    isSuccess: false,
+    isError: false,
+    isFetched: false,
+    isFetchedAfterMount: false,
+    isFetching: false,
+    isRefetching: false,
+    isStale: false,
+    isPlaceholderData: false,
+    isLoadingError: false,
+    isRefetchError: false,
+    failureCount: 0,
+    failureReason: null,
+    fetchStatus: 'idle',
+    dataUpdatedAt: 0,
+    errorUpdatedAt: 0,
+  } as UseQueryResult<T>;
+}
+
 export function useWorkspaces(): UseQueryResult<Workspace[]> {
   const repo = useRepository();
-  return useQuery({
-    queryKey: keys.workspaces(),
-    queryFn: () => repo.workspaces.list(),
-  });
+  return useFirstFrame(
+    useQuery({
+      queryKey: keys.workspaces(),
+      queryFn: () => repo.workspaces.list(),
+    }),
+  );
 }
 
 export function useActiveWorkspace(): UseQueryResult<Workspace> {
   const repo = useRepository();
-  return useQuery(activeWorkspaceQuery(repo));
+  return useFirstFrame(useQuery(activeWorkspaceQuery(repo)));
 }
 
 export function usePrefs(): UseQueryResult<UserPrefs> {
   const repo = useRepository();
-  return useQuery({
-    queryKey: keys.prefs(),
-    queryFn: () => repo.prefs.get(),
-  });
+  return useFirstFrame(
+    useQuery({
+      queryKey: keys.prefs(),
+      queryFn: () => repo.prefs.get(),
+    }),
+  );
 }
 
 /** The prefs the user has set, apart from the defaults they lie over. */
 export function useSavedPrefs(): UseQueryResult<Partial<UserPrefs>> {
   const repo = useRepository();
-  return useQuery({
-    queryKey: keys.prefsSaved(),
-    queryFn: () => repo.prefs.saved(),
-  });
+  return useFirstFrame(
+    useQuery({
+      queryKey: keys.prefsSaved(),
+      queryFn: () => repo.prefs.saved(),
+    }),
+  );
 }
 
 /** A query in the active workspace: idle until the workspace is known. */
@@ -85,11 +128,13 @@ function useWorkspaceQuery<T>(
 ): UseQueryResult<T> {
   const repo = useRepository();
   const ws = useActiveWorkspace().data?.id;
-  return useQuery({
-    queryKey: key(ws ?? ''),
-    queryFn: () => read(repo, ws!),
-    enabled: enabled && ws !== undefined,
-  });
+  return useFirstFrame(
+    useQuery({
+      queryKey: key(ws ?? ''),
+      queryFn: () => read(repo, ws!),
+      enabled: enabled && ws !== undefined,
+    }),
+  );
 }
 
 export function useAccounts(): UseQueryResult<Account[]> {
@@ -99,10 +144,12 @@ export function useAccounts(): UseQueryResult<Account[]> {
 /** The accounts of My workspace, whichever workspace is active: imports land only there. */
 export function useUserAccounts(): UseQueryResult<Account[]> {
   const repo = useRepository();
-  return useQuery({
-    queryKey: keys.accounts(USER_WORKSPACE.id),
-    queryFn: () => repo.accounts.list(USER_WORKSPACE.id),
-  });
+  return useFirstFrame(
+    useQuery({
+      queryKey: keys.accounts(USER_WORKSPACE.id),
+      queryFn: () => repo.accounts.list(USER_WORKSPACE.id),
+    }),
+  );
 }
 
 export function useCashFlows(): UseQueryResult<CashFlow[]> {
@@ -199,22 +246,26 @@ export function useJournalForTrade(
 /** Imports always live in My workspace, whichever workspace is showing. */
 export function useImportHistory(): UseQueryResult<ImportJob[]> {
   const repo = useRepository();
-  return useQuery({
-    queryKey: keys.imports(USER_WORKSPACE.id),
-    queryFn: () => repo.imports.list(USER_WORKSPACE.id),
-  });
+  return useFirstFrame(
+    useQuery({
+      queryKey: keys.imports(USER_WORKSPACE.id),
+      queryFn: () => repo.imports.list(USER_WORKSPACE.id),
+    }),
+  );
 }
 
 export function useImportContext(
   accountId: string | undefined,
 ): UseQueryResult<ImportContext> {
   const repo = useRepository();
-  return useQuery({
-    queryKey: keys.importContext(USER_WORKSPACE.id, accountId ?? ''),
-    queryFn: () => repo.imports.context(USER_WORKSPACE.id, accountId!),
-    enabled: accountId !== undefined,
-    staleTime: 0,
-  });
+  return useFirstFrame(
+    useQuery({
+      queryKey: keys.importContext(USER_WORKSPACE.id, accountId ?? ''),
+      queryFn: () => repo.imports.context(USER_WORKSPACE.id, accountId!),
+      enabled: accountId !== undefined,
+      staleTime: 0,
+    }),
+  );
 }
 
 // Writes
