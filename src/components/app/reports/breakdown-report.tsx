@@ -34,6 +34,7 @@ import {
   useTags,
 } from '@/data/query/hooks';
 import type { TagCategory } from '@/domain/types';
+import { useAddressCopy } from '@/lib/use-address-copy';
 import { useDisplay } from '@/lib/display';
 import { csvText, decimalOf, downloadCsv } from '@/lib/csv';
 import { formatPct, formatQty, plural } from '@/lib/format';
@@ -418,16 +419,26 @@ export function BreakdownCards({
     display.figure(sumOf(r), true, currency).label;
   const bestRow = best[0];
   const worstRow = best.length > 1 ? best[best.length - 1] : undefined;
-  const picks = useMemo(
-    () =>
+  const param = params.get('m');
+  const fromAddress = useMemo(
+    (): Pick[] =>
       // A breakdown has no time to run along: a running mode in the link is dropped.
-      parsePicks(params.get('m'), DEFAULT_PICKS, CHART_METRICS).map((x) => ({
+      parsePicks(param, DEFAULT_PICKS, CHART_METRICS).map((x) => ({
         ...x,
-        mode: 'period' as const,
+        mode: 'period',
       })),
-    [params],
+    [param],
   );
-  const setPicks = (next: Pick[]) => writeParam('m', formatPicks(next));
+  // The chips change at once and follow the address when it changes, so a
+  // second change before the address catches up keeps the first.
+  const [picks, setLocalPicks] = useAddressCopy(
+    fromAddress,
+    JSON.stringify(param),
+  );
+  const setPicks = (next: Pick[]) => {
+    setLocalPicks(next);
+    writeParam('m', formatPicks(next));
+  };
   // The caller words the label for Net P&L. With Net P&L first it stays, and the other
   // metrics follow at the end; without it the label names what is plotted.
   const metricNames = picks.map((x) => metricLabel(x.metric, basis));

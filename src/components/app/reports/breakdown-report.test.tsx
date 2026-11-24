@@ -11,6 +11,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import type { SampleWorkspace } from '@/data/seed/generate';
 import { breakdown2D } from '@/domain/metrics/breakdowns';
 import { breakdownSample } from '../__fixtures__/breakdown-sample';
+import { commitNavigation, deferNavigation } from '../__fixtures__/navigation';
 import { renderApp } from '../__fixtures__/render-app';
 import {
   accountNamesOf,
@@ -952,4 +953,22 @@ test('in R the chart plots each bucket in R, as the table beside it reads (I2)',
   expect(readout.textContent).toContain('+2.00R');
   expect(readout.textContent).not.toContain('$');
   expect(chart.textContent).not.toContain('$');
+});
+
+test('two quick chip changes before the address catches up both stick (I5)', async () => {
+  renderApp(<SymbolsView />, {
+    sample: breakdownSample,
+    url: '/app/reports/symbols',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const chips = within(
+    await within(page).findByRole('group', { name: 'Chart metrics' }),
+  );
+  deferNavigation();
+  fireEvent.click(chips.getByRole('button', { name: /^Net P&L, bars/ }));
+  fireEvent.click(chips.getByRole('button', { name: 'Remove Win rate' }));
+  expect(chips.getByRole('button', { name: /^Net P&L, line/ })).toBeTruthy();
+  expect(chips.queryByRole('button', { name: 'Remove Win rate' })).toBeNull();
+  act(() => commitNavigation());
+  expect(new URLSearchParams(window.location.search).get('m')).toBe('net:line');
 });

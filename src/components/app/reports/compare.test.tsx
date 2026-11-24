@@ -1,8 +1,15 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  screen,
+  within,
+} from '@testing-library/react';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import { breakdownSample } from '../__fixtures__/breakdown-sample';
+import { commitNavigation, deferNavigation } from '../__fixtures__/navigation';
 import { renderApp } from '../__fixtures__/render-app';
 import { CompareView } from './compare';
 
@@ -249,4 +256,27 @@ test('in R and Ticks the chart plots each group in the unit and says where it en
       name: /Group A, all time, ends at [+−]?[\d.,]+ ticks/,
     }),
   ).toBeTruthy();
+});
+
+test('two quick outcome ticks in a group before the address catches up both stick (I5)', async () => {
+  renderApp(<CompareView />, {
+    sample: breakdownSample,
+    url: '/app/reports/compare?a=symbol%3DES&b=symbol%3DNQ',
+  });
+  const page = await screen.findByTestId('reports-compare');
+  const a = within(within(page).getByRole('region', { name: 'Group A' }));
+  fireEvent.click(a.getByRole('button', { name: 'Outcome' }));
+  const dialog = within(await screen.findByRole('dialog', { name: 'Outcome' }));
+  deferNavigation();
+  fireEvent.click(dialog.getByRole('checkbox', { name: 'Win' }));
+  fireEvent.click(dialog.getByRole('checkbox', { name: 'Loss' }));
+  expect(
+    (dialog.getByRole('checkbox', { name: 'Win' }) as HTMLInputElement).checked,
+  ).toBe(true);
+  act(() => commitNavigation());
+  const group = new URLSearchParams(
+    new URLSearchParams(window.location.search).get('a')!,
+  );
+  expect(group.get('symbol')).toBe('ES');
+  expect(group.get('outcome')?.split(',').sort()).toEqual(['loss', 'win']);
 });

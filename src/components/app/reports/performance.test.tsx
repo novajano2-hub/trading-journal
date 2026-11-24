@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import {
+  act,
   cleanup,
   fireEvent,
   screen,
@@ -13,6 +14,7 @@ import {
   SERIES_META,
   SERIES_METRICS,
 } from '@/domain/metrics/series';
+import { commitNavigation, deferNavigation } from '../__fixtures__/navigation';
 import { renderApp } from '../__fixtures__/render-app';
 import {
   newYorkRepository,
@@ -325,4 +327,24 @@ test('the catalogue is closed until + Metric opens it, and its ticks use the acc
   expect(
     screen.getByRole('radiogroup', { name: 'Net P&L plotted' }),
   ).toBeTruthy();
+});
+
+test('two quick ticks before the address catches up both stick (I5)', async () => {
+  renderApp(<PerformanceView />, { sample: reportsSample, url: URL });
+  const metrics = await picker();
+  const box = (name: string) =>
+    metrics.getByRole('checkbox', { name }) as HTMLInputElement;
+  // The router delivers the address a beat after each write, as Next's transition does.
+  deferNavigation();
+  fireEvent.click(box('Win rate'));
+  expect(box('Win rate').checked).toBe(true);
+  fireEvent.click(box('Trades'));
+  expect(box('Win rate').checked).toBe(true);
+  expect(box('Trades').checked).toBe(true);
+  act(() => commitNavigation());
+  expect(new URLSearchParams(window.location.search).get('m')).toBe(
+    'net:bar,win-rate:line,trades:bar',
+  );
+  expect(box('Win rate').checked).toBe(true);
+  expect(box('Trades').checked).toBe(true);
 });

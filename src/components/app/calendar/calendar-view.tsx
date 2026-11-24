@@ -51,6 +51,7 @@ import { StorageUnavailableError } from '@/data/repository';
 import { localDate } from '@/domain/time';
 import type { CalendarStat } from '@/domain/types';
 import { pctBaseOf, useDisplay } from '@/lib/display';
+import { useAddressCopy } from '@/lib/use-address-copy';
 import { formatPct, plural } from '@/lib/format';
 import { enter, exit } from '@/lib/motion';
 import { onTradingDate } from '@/lib/time-format';
@@ -332,7 +333,10 @@ export function CalendarView(): React.JSX.Element {
     timeZone === undefined
       ? undefined
       : localDate(new Date().toISOString(), timeZone);
-  const month = useMemo(() => monthOf(search, today), [search, today]);
+  const addressMonth = useMemo(() => monthOf(search, today), [search, today]);
+  // The arrows move the shown month at once and it follows the address when
+  // that changes, so two quick clicks move two months.
+  const [month, setMonth] = useAddressCopy(addressMonth, addressMonth ?? '');
   const day = dayOf(search);
   const hasDayParam = new URLSearchParams(search).has('day');
 
@@ -460,8 +464,10 @@ export function CalendarView(): React.JSX.Element {
     'en-US',
   );
   const thisMonth = today.slice(0, 7);
-  const goMonth = (next: string) =>
+  const goMonth = (next: string) => {
+    setMonth(next);
     writeParams({ month: next === thisMonth ? null : next, day: null });
+  };
   // A pick counts only inside the shown month and the date range.
   const selected = weeks
     .flatMap((w) => w.days)

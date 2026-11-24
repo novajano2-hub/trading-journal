@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import {
+  act,
   cleanup,
   fireEvent,
   screen,
@@ -17,6 +18,7 @@ import { defaultMetricContext } from '@/domain/metrics/context';
 import type { SampleWorkspace } from '@/data/seed/generate';
 import { calendarYear } from '@/data/calendar';
 import { everyString } from '../__fixtures__/every-string';
+import { commitNavigation, deferNavigation } from '../__fixtures__/navigation';
 import { renderApp } from '../__fixtures__/render-app';
 import { CalendarView } from './calendar-view';
 import { YearGrid } from './year-grid';
@@ -132,6 +134,21 @@ test('month buttons write ?month', async () => {
   expect(window.location.search).toContain('month=2026-10');
   fireEvent.click(screen.getByRole('button', { name: 'This month' }));
   expect(window.location.search).not.toContain('month=2026-10');
+});
+
+test('two quick clicks on Next month before the address catches up move two months (I5)', async () => {
+  renderApp(<CalendarView />, { sample: withTrades(NOV), url: url() });
+  const next = await screen.findByRole('button', { name: 'Next month' });
+  deferNavigation();
+  fireEvent.click(next);
+  fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
+  expect(
+    screen.getAllByRole('heading', { name: 'January 2027' }).length,
+  ).toBeGreaterThan(0);
+  act(() => commitNavigation());
+  expect(new URLSearchParams(window.location.search).get('month')).toBe(
+    '2027-01',
+  );
 });
 
 test('choosing Win rate as a third stat shows it in the cells', async () => {

@@ -90,6 +90,7 @@ import { ScrollFade } from '@/components/ui/scroll-fade';
 import { symbolOptions } from '../search';
 import { CARD, CARD_PAD, CardHeader, signTone } from '../dashboard/shared';
 import { UnitLeftOut } from '../unit-notice';
+import { useAddressCopy } from '@/lib/use-address-copy';
 import { formatterOf, ReportChart, type ChartSeries } from './report-chart';
 import { ReportSkeleton, State } from './report-scope';
 import { writeParam } from './use-report-data';
@@ -129,8 +130,8 @@ const writeGroup = (key: string, f: GlobalFilters) =>
 function GroupFilters({
   name,
   colour,
-  filters: f,
-  onChange,
+  filters,
+  onChange: write,
   symbols,
   strategies,
   tags,
@@ -151,6 +152,16 @@ function GroupFilters({
   today: string;
   count: number;
 }): React.JSX.Element {
+  // The chips change at once and follow the address when it changes, so a
+  // second change before the address catches up keeps the first.
+  const [f, setLocal] = useAddressCopy(
+    filters,
+    serializeFilters(filters).toString(),
+  );
+  const onChange = (next: GlobalFilters) => {
+    setLocal(next);
+    write(next);
+  };
   const names = useMemo(
     () => ({
       strategies: new Map(strategies.map((s) => [s.id, s.name])),

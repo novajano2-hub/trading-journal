@@ -26,6 +26,7 @@ import {
   type SeriesMetric,
   type SeriesPoint,
 } from '@/domain/metrics/series';
+import { useAddressCopy } from '@/lib/use-address-copy';
 import { useDisplay } from '@/lib/display';
 import { CARD, CARD_PAD, CardHeader, signTone } from '../dashboard/shared';
 import {
@@ -132,7 +133,14 @@ function seriesLabel(pick: Pick, basis: PnlBasis): string {
 function Body({ data }: { data: ReportData }): React.JSX.Element {
   const { partition: p, ctx, basis, currency } = data;
   const params = useSearchParams();
-  const picks = useMemo(() => parsePicks(params.get('m')), [params]);
+  const param = params.get('m');
+  const fromAddress = useMemo(() => parsePicks(param), [param]);
+  // The ticks flip at once and follow the address when it changes, so a
+  // second tick before the address catches up keeps the first.
+  const [picks, setLocalPicks] = useAddressCopy(
+    fromAddress,
+    JSON.stringify(param),
+  );
   const bucket = bucketOf(params.get('bucket'));
   const display = useDisplay();
   const fmt = formatterOf(display, currency);
@@ -143,7 +151,10 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
   const full = picks.length >= MAX_METRICS;
   const [expandSlot, setExpandSlot] = useExpandSlot();
 
-  const setPicks = (next: Pick[]) => writeParam('m', formatPicks(next));
+  const setPicks = (next: Pick[]) => {
+    setLocalPicks(next);
+    writeParam('m', formatPicks(next));
+  };
   const toggle = (metric: SeriesMetric, on: boolean) =>
     setPicks(
       on
