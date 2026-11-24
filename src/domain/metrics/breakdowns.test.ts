@@ -372,6 +372,28 @@ describe('breakdown2D', () => {
     expect(m.cells[0]!.reduce((a, b) => a! + b!, 0)).toBe(26);
   });
 
+  test('a range dimension shows every bucket and never folds: R has 13, each its own column (E148)', () => {
+    // One trade in each R bucket: the two tails, ten whole-R steps, and a trade with no stop.
+    const rs = [-6, -4.5, -3.5, -2.5, -1.5, -0.5, 0.5, 1.5, 2.5, 3.5, 4.5, 6];
+    const t = [
+      ...rs.map((r) => makeTrade({ net: r * 1000, initialRisk: 1000 })),
+      makeTrade({ net: 500 }),
+    ];
+    const m = breakdown2D(t, ctx, 'side', 'r', 'trades');
+    expect(m.cols).toHaveLength(13);
+    expect(m.cols.some((c) => c.key === 'Other')).toBe(false);
+    expect(m.folded).toBeUndefined();
+    expect(m.cells[0]!.every((c) => c === 1)).toBe(true);
+    // A list dimension past the limit still folds.
+    const roots = Array.from({ length: 13 }, (_, i) => `S${i}`);
+    const many = roots.map((root) =>
+      makeTrade({ net: 100, instrument: { ...es, root, symbol: root } }),
+    );
+    expect(
+      breakdown2D(many, ctx, 'side', 'symbol', 'trades').cols,
+    ).toHaveLength(12);
+  });
+
   test('a trade with two strategies counts in each of them', () => {
     const t = [makeTrade({ net: 500, strategyIds: ['a', 'b'] })];
     const m = breakdown2D(t, ctx, 'strategy', 'side', 'net', {

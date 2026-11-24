@@ -17,9 +17,8 @@ import {
 } from '@/domain/metrics/breakdowns';
 import { classify, pnlOf } from '@/domain/metrics/context';
 import { seriesUnit, type SeriesMetric } from '@/domain/metrics/series';
-import { largestInUnit } from '@/domain/metrics/summary';
+import { averageTradePnl, largestInUnit } from '@/domain/metrics/summary';
 import { unitOf } from '@/domain/metrics/units';
-import { roundHalfEven } from '@/domain/money';
 import { bucketHref, cellHref, type BucketOptions } from '@/data/report-links';
 import {
   useAccounts,
@@ -686,20 +685,17 @@ export function BreakdownCards({
       header: 'Average',
       tip: 'avg-trade',
       align: 'right',
-      value: (r) =>
-        r.summary.closedCount > 0
-          ? roundHalfEven(basisNet(r) / r.summary.closedCount)
-          : null,
+      value: (r) => averageTradePnl(basisNet(r), r.summary.closedCount),
       csv: {
         header: `Average (${currency})`,
         value: (r) =>
           r.summary.closedCount > 0
-            ? decimalOf(roundHalfEven(basisNet(r) / r.summary.closedCount))
+            ? decimalOf(averageTradePnl(basisNet(r), r.summary.closedCount)!)
             : null,
       },
       cell: (r) => {
         if (r.summary.closedCount === 0) return none;
-        const avg = roundHalfEven(basisNet(r) / r.summary.closedCount);
+        const avg = averageTradePnl(basisNet(r), r.summary.closedCount)!;
         return (
           <span className={signTone(avg)}>
             <FigureText

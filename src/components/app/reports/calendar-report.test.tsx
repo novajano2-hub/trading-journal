@@ -66,3 +66,26 @@ test('in R the months and the year read in R, as the Calendar does (I2)', async 
   expect(nov.textContent).not.toContain('$');
   expect(page.textContent).toContain('net +1.00R');
 });
+
+test('with trades in two currencies a month link opens the Calendar on the one read (E143)', async () => {
+  renderApp(<CalendarReportView />, {
+    sample: async () => {
+      const s = await breakdownSample();
+      s.trades.push({
+        ...s.trades[0]!,
+        id: 'b-eur',
+        serial: 99,
+        pnlCurrency: 'EUR',
+      });
+      return s;
+    },
+    url: '/app/reports/calendar?year=2026&cur=EUR',
+  });
+  const page = await screen.findByTestId('reports-calendar');
+  const href = within(page)
+    .getAllByTestId('year-month')[10]!
+    .querySelector('a')!
+    .getAttribute('href')!;
+  expect(new URL(href, 'http://x').searchParams.get('cur')).toBe('EUR');
+  expect(new URL(href, 'http://x').searchParams.get('month')).toBe('2026-11');
+});

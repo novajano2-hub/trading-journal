@@ -59,7 +59,10 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
     0,
   );
   // A month opens the Calendar on the same filters.
-  const filterQuery = queryString(serializeFilters(parseFilters(params)));
+  // With trades in several currencies it opens on the one this year reads.
+  const links = serializeFilters(parseFilters(params));
+  if (data.currencies.length > 1) links.set('cur', currency);
+  const filterQuery = queryString(links);
   const go = (to: number) =>
     writeParam('year', to === thisYear ? null : String(to));
 

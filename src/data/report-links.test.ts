@@ -23,6 +23,8 @@ import {
   monthReportHref,
   cellHref,
   intersectRanges,
+  otherFilters,
+  tradeLogHref,
   type BucketOptions,
 } from './report-links';
 import { generateSampleWorkspace } from './seed/generate';
@@ -40,13 +42,19 @@ const ctxOf = (pnlBasis: 'net' | 'gross' = 'net'): MetricContext => ({
   pnlBasis,
 });
 
-/** The log's trades for a link: its address read back through the filter parser, closed only as the log shows by default. */
+/**
+ * The log's trades for a link: its address read back through the filter
+ * parser, then the log's own status rule (the Closed switch, unless the
+ * address says `status`). Every matching trade is read first, open and closed,
+ * so a filter that matched an open trade the bucket never counted would show.
+ */
 function logIds(href: string, trades = ws.trades, pnlBasis?: 'net' | 'gross') {
   const url = new URL(href, 'http://keel.test');
   expect(url.pathname).toBe('/app/trades');
   const f = parseFilters(url.searchParams);
+  const status = f.status ?? 'closed';
   return applyFilters(trades, f, pnlBasis ? { ...env, pnlBasis } : env)
-    .filter(isClosed)
+    .filter((t) => t.status === status)
     .map((t) => t.id)
     .sort();
 }
@@ -115,6 +123,8 @@ describe('a bucket opens exactly the trades it counted', () => {
           expect(linked, by).toBe(
             rows.filter((r) => r.tradeIds.length > 0).length,
           );
+          // And the fixture has buckets to check, so this cannot pass empty.
+          expect(linked, `${by} has buckets`).toBeGreaterThan(0);
         });
 
   test('the R buckets agree under the gross basis too', () => {
@@ -776,5 +786,147 @@ describe('calendarHref', () => {
     const read = parseFilters(url.searchParams);
     expect(read.symbols).toEqual(['ES']);
     expect(read.range).toEqual({ preset: 'last-30-days' });
+  });
+});
+
+describe('the fixture holds what the link tests need, and open trades stay out on both sides', () => {
+  const rowsOf = (by: BreakdownKey) => breakdown(ws.trades, by, ctxOf());
+  const withTrades = (by: BreakdownKey) =>
+    rowsOf(by)
+      .filter((r) => r.tradeIds.length > 0)
+      .map((r) => r.key);
+
+  test('untagged, no-stop, no-strategy, both traded sessions and several days to expiry buckets have trades', () => {
+    expect(withTrades('tag')).toContain('__none__');
+    expect(withTrades('r')).toContain('__none__');
+    expect(withTrades('strategy')).toContain('__none__');
+    // The sample trades London and New York hours only; the other two sessions are empty (named, so a change shows).
+    expect(withTrades('session').sort()).toEqual(['london', 'new-york']);
+    expect(withTrades('dte').length).toBeGreaterThanOrEqual(3);
+  });
+
+  test('the untagged and no-stop buckets open exactly their trades', () => {
+    for (const [by, key] of [
+      ['tag', '__none__'],
+      ['r', '__none__'],
+      ['strategy', '__none__'],
+    ] as const) {
+      const row = rowsOf(by).find((r) => r.key === key)!;
+      expect(
+        logIds(bucketHref(EMPTY_FILTERS, by, key)!),
+        `${by} ${key}`,
+      ).toEqual([...row.tradeIds].sort());
+    }
+  });
+
+  test('open trades match a bucket filter, and are left out of the count and of the log alike', () => {
+    const open = ws.trades.filter((t) => t.status === 'open');
+    expect(open.length).toBeGreaterThan(0);
+    for (const by of ['side', 'symbol', 'instrument', 'account'] as const) {
+      for (const row of rowsOf(by).filter((r) => r.tradeIds.length > 0)) {
+        const f = bucketFilters(EMPTY_FILTERS, by, row.key)!;
+        const matched = applyFilters(ws.trades, f, env);
+        const closed = matched
+          .filter(isClosed)
+          .map((t) => t.id)
+          .sort();
+        // The filter alone also matches open trades of the bucket (before the status rule) ...
+        expect(matched.length, `${by} ${row.key}`).toBeGreaterThanOrEqual(
+          closed.length,
+        );
+        // ... the breakdown counts closed trades only, and the log's Closed switch agrees.
+        expect(closed).toEqual([...row.tradeIds].sort());
+        expect(logIds(tradeLogHref(f))).toEqual(closed);
+      }
+    }
+    // At least one bucket really does match an open trade the count left out.
+    const side = bucketFilters(EMPTY_FILTERS, 'side', 'long')!;
+    expect(
+      applyFilters(ws.trades, side, env).some((t) => t.status === 'open'),
+    ).toBe(true);
+    // A page showing open trades gives no bucket link at all.
+    expect(
+      bucketFilters({ ...EMPTY_FILTERS, status: 'open' }, 'side', 'long'),
+    ).toBeNull();
+  });
+});
+
+describe('every "Other" branch opens the trades it folded', () => {
+  /** The keys of a breakdown that hold trades, split into kept and folded by `fold`. */
+  function check(
+    trades: Trade[],
+    by: BreakdownKey,
+    fold: (keys: string[]) => string[],
+    opts: BucketOptions = {},
+    base: GlobalFilters = EMPTY_FILTERS,
+  ) {
+    const set = applyFilters(trades, base, env);
+    const rows = breakdown(set, by, { ...ctxOf(), ...opts }).filter(
+      (r) => r.tradeIds.length > 0,
+    );
+    const keys = rows.map((r) => r.key);
+    const others = fold(keys);
+    expect(others.length, `${by} folds something`).toBeGreaterThan(0);
+    const kept = keys.filter((k) => !others.includes(k));
+    const f = otherFilters(base, by, { kept, others }, opts);
+    expect(f, `${by} has a filter`).not.toBeNull();
+    // A trade with two strategies is in two buckets, and once in the log.
+    const want = [
+      ...new Set(
+        rows.filter((r) => others.includes(r.key)).flatMap((r) => r.tradeIds),
+      ),
+    ].sort();
+    expect(want.length).toBeGreaterThan(0);
+    expect(logIds(tradeLogHref(f!), trades), by).toEqual(want);
+  }
+  const lastTwo = (keys: string[]) => keys.slice(-2);
+  const firstHalf = (keys: string[]) =>
+    keys.slice(0, Math.ceil(keys.length / 2));
+
+  test('strategy, with the no-strategy key among the folded', () => {
+    check(ws.trades, 'strategy', (keys) => [
+      ...keys.filter((k) => k !== '__none__').slice(0, 1),
+      '__none__',
+    ]);
+    // And a fold of strategies only.
+    check(ws.trades, 'strategy', (keys) =>
+      keys.filter((k) => k !== '__none__').slice(0, 2),
+    );
+  });
+  test('a natural fold: thirteen strategies, the busiest eleven keep a column', () => {
+    const account = ws.accounts[0]!.id;
+    const trades = Array.from({ length: 13 }, (_, i) =>
+      Array.from({ length: 13 - i }, () =>
+        makeTrade({ net: 100, accountId: account, strategyIds: [`st${i}`] }),
+      ),
+    ).flat();
+    const m = breakdown2D(trades, ctxOf(), 'side', 'strategy', 'trades');
+    expect(m.folded).toBeDefined();
+    const href = cellHref(
+      EMPTY_FILTERS,
+      { by: 'side', key: 'long' },
+      { by: 'strategy', key: 'Other', folded: m.folded! },
+    )!;
+    const other = m.cols.findIndex((c) => c.key === 'Other');
+    expect(logIds(href, trades)).toEqual([...m.tradeIds[0]![other]!].sort());
+  });
+  test('month', () => {
+    check(ws.trades, 'month', lastTwo);
+    check(ws.trades, 'month', firstHalf, { timeBasis: 'exit' });
+  });
+  test('account', () => {
+    check(ws.trades, 'account', lastTwo);
+  });
+  test('instrument', () => {
+    check(ws.trades, 'instrument', lastTwo);
+  });
+  test('session, by entry and by exit', () => {
+    check(ws.trades, 'session', lastTwo);
+    check(ws.trades, 'session', lastTwo, { timeBasis: 'exit' });
+  });
+  test('weekday and hour, entry basis', () => {
+    check(ws.trades, 'weekday', lastTwo);
+    check(ws.trades, 'hour', firstHalf);
+    check(ws.trades, 'hour', lastTwo, { timeBasis: 'exit' });
   });
 });

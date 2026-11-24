@@ -230,7 +230,7 @@ test('the added metrics read in the address: counts as numbers, balance and aver
   );
 });
 
-test('under a unit the balance has no value and the averages read the unit', async () => {
+test('under a unit the balance has no value and says why', async () => {
   const repository = await newYorkRepository();
   await repository.prefs.update({ displayUnit: 'ticks' });
   renderApp(<PerformanceView />, {
@@ -242,6 +242,81 @@ test('under a unit the balance has no value and the averages read the unit', asy
       /Net account balance has no value in R, ticks, pips or points\./,
     ),
   ).toBeTruthy();
+});
+
+test('under a unit the average trade reads the unit and the balance has no value', async () => {
+  const repository = await newYorkRepository();
+  await repository.prefs.update({ displayUnit: 'ticks' });
+  renderApp(<PerformanceView />, {
+    repository,
+    url: `${URL}?m=avg-trade:bar,net-balance:line&bucket=day`,
+  });
+  const chart = await screen.findByRole('img', {
+    name: /Average trade P&L, Net account balance by day/,
+  });
+  const label = chart.getAttribute('aria-label')!;
+  // Ticks have no dollar sign; the balance has no value to run from.
+  expect(label).toMatch(/Average trade P&L runs from/);
+  expect(label).not.toMatch(/Average trade P&L runs from [^.]*\$/);
+  expect(label).not.toMatch(/Net account balance runs/);
+});
+
+test('under the percent display the balance is a share of the base balance, unsigned (the percent rule)', async () => {
+  const repository = await newYorkRepository();
+  await repository.prefs.update({ displayUnit: 'percent' });
+  renderApp(<PerformanceView />, {
+    repository,
+    url: `${URL}?m=net-balance:line&bucket=day`,
+  });
+  const chart = await screen.findByRole('img', {
+    name: /Net account balance by day/,
+  });
+  // Money becomes a share under Percent, as every money figure does; a balance carries no sign.
+  expect(chart.getAttribute('aria-label')).toMatch(
+    /Net account balance runs from \d[\d,.]*% to \d[\d,.]*%\./,
+  );
+});
+
+test('under Privacy the chart axis ticks and the readout cells hide money, for a money series and for the balance', async () => {
+  const repository = await newYorkRepository();
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  const { container } = renderApp(<PerformanceView />, {
+    repository,
+    url: `${URL}?m=net:bar,net-balance:line&bucket=day`,
+  });
+  const chart = await screen.findByRole('img', {
+    name: /Net P&L, Net account balance by day/,
+  });
+  const svgText = Array.from(container.querySelectorAll('svg text'))
+    .map((n) => n.textContent ?? '')
+    .join(' ');
+  // The tick labels carry no dollar figure.
+  expect(svgText).not.toMatch(/\$\s?\d/);
+  expect(chart.getAttribute('aria-label')).not.toMatch(/\$\s?\d/);
+  // The table (the readout cells) is masked as well.
+  const tables = await screen.findAllByRole('table');
+  expect(tables.length).toBeGreaterThan(0);
+  for (const table of tables) expect(table.textContent).not.toMatch(/\$\s?\d/);
+  // And there is a tick to check: the axis labels exist, and are masked money.
+  expect(svgText).toMatch(/\$•/);
+});
+
+test('the journal is read only when a Logged days series is plotted (A-M6)', async () => {
+  const repository = await newYorkRepository();
+  const list = vi.spyOn(repository.journal, 'list');
+  const { unmount } = renderApp(<PerformanceView />, {
+    repository,
+    url: `${URL}?m=net:bar&bucket=day`,
+  });
+  await screen.findByRole('img', { name: /^Net P&L by day/ });
+  expect(list).not.toHaveBeenCalled();
+  unmount();
+  renderApp(<PerformanceView />, {
+    repository,
+    url: `${URL}?m=logged-days:bar&bucket=day`,
+  });
+  await screen.findByRole('img', { name: /^Logged days by day/ });
+  await waitFor(() => expect(list).toHaveBeenCalled());
 });
 
 test('the picker holds five groups, each with its metrics and their definitions', async () => {

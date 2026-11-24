@@ -4,6 +4,7 @@ import type { Execution, Trade } from '../types';
 import { defaultMetricContext } from './context';
 import { dailyPnl, daySummary } from './days';
 import { riskRatios } from './risk';
+import { averageTradePnl } from './summary';
 import {
   SERIES_GROUPS,
   SERIES_META,
@@ -107,9 +108,9 @@ describe('the catalogue', () => {
     const inGroup = (g: string) =>
       SERIES_METRICS.filter((m) => SERIES_META[m].group === g);
     expect(inGroup('Profitability')).toHaveLength(13);
-    expect(inGroup('Risk')).toHaveLength(6);
+    expect(inGroup('Risk')).toHaveLength(7);
     expect(inGroup('Time')).toHaveLength(4);
-    expect(inGroup('Activity')).toHaveLength(20);
+    expect(inGroup('Activity')).toHaveLength(19);
     expect(inGroup('Consistency')).toHaveLength(11);
   });
 
@@ -138,7 +139,7 @@ describe('the catalogue', () => {
     'Avg planned R-multiple': ['avg-planned-r', 'Risk'],
     'Avg realized R-multiple': ['avg-realized-r', 'Risk'],
     'Breakeven days': ['flat-day-count', 'Risk'],
-    'Breakeven trades': ['breakevens', 'Activity'],
+    'Breakeven trades': ['breakevens', 'Risk'],
     'Losing days': ['red-day-count', 'Risk'],
     'Max daily net drawdown': ['max-drawdown', 'Risk'],
     // Time Analysis
@@ -187,7 +188,7 @@ describe('the catalogue', () => {
     expect(new Set(ids).size).toBe(53);
     for (const [name, [id, group]] of Object.entries(TRADEZELLA)) {
       expect(SERIES_METRICS, name).toContain(id);
-      // Breakeven trades sit with Keel's trade counts; the rest follow TradeZella's groups.
+      // Every metric sits in the group TradeZella files it under.
       expect(SERIES_META[id].group, name).toBe(group);
     }
     // Keel keeps one of its own: the fees.
@@ -222,6 +223,18 @@ describe('the new metrics', () => {
     expect(values([...all, flat], 'avg-trade')[0]).toBe(1667);
     // The Overview's number: the basis P&L over the closed trades.
     expect(values(all, 'avg-trade', 'month')[0]).toBe(Math.round(5000 / 7));
+  });
+
+  test('average trade P&L rounds half to even, as the one shared function does', () => {
+    // 1 and 4 cents: 2.5 rounds to 2 (half-even), where Math.round says 3.
+    const cents = [
+      makeTrade({ net: 1, closedAt: '2026-11-02T18:00:00Z', serial: 90 }),
+      makeTrade({ net: 4, closedAt: '2026-11-02T19:00:00Z', serial: 91 }),
+    ];
+    expect(values(cents, 'avg-trade')[0]).toBe(averageTradePnl(5, 2));
+    expect(averageTradePnl(5, 2)).toBe(2);
+    expect(averageTradePnl(7, 2)).toBe(4);
+    expect(averageTradePnl(0, 0)).toBeNull();
   });
 
   test('in a unit it is the mean of the trades own ticks', () => {
@@ -323,6 +336,28 @@ describe('the new metrics', () => {
       ),
     ).toEqual([1_005_000, 1_010_000, 1_005_000]);
     expect(SERIES_META['net-balance'].running).toBe(true);
+    // A deposit after the last trade gets its own point, so the line ends on the balance.
+    const trailing = timeSeries(all, ctx, 'net-balance', 'day', {
+      balance: {
+        start: 1_000_000,
+        flows: [{ date: '2026-11-30', amount: 100_000 }],
+      },
+    });
+    expect(trailing.at(-1)).toEqual({ key: '2026-11-30', value: 1_105_000 });
+    // A flow outside the date range is not a point.
+    const clipped = timeSeries(
+      all,
+      { ...ctx, range: { from: '2026-11-01', to: '2026-11-20' } },
+      'net-balance',
+      'day',
+      {
+        balance: {
+          start: 1_000_000,
+          flows: [{ date: '2026-11-30', amount: 100_000 }],
+        },
+      },
+    );
+    expect(clipped.at(-1)!.key).toBe('2026-11-16');
     // No balance to read it on, or a unit: no value.
     expect(at({})).toEqual([null, null, null, null, null]);
     expect(at({ balance }, { ...ctx, unit: 'ticks' })).toEqual([

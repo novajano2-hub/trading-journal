@@ -81,13 +81,14 @@ export function useSavedPrefs(): UseQueryResult<Partial<UserPrefs>> {
 function useWorkspaceQuery<T>(
   key: (ws: string) => readonly unknown[],
   read: (repo: Repository, ws: string) => Promise<T>,
+  enabled = true,
 ): UseQueryResult<T> {
   const repo = useRepository();
   const ws = useActiveWorkspace().data?.id;
   return useQuery({
     queryKey: key(ws ?? ''),
     queryFn: () => read(repo, ws!),
-    enabled: ws !== undefined,
+    enabled: enabled && ws !== undefined,
   });
 }
 
@@ -153,18 +154,24 @@ export function useTemplates(): UseQueryResult<NoteTemplate[]> {
  * 30 days, which unlinks the trade notes among them: when a cached trade still
  * points at a note that is gone, the trades are read again.
  */
-export function useJournal(): UseQueryResult<JournalEntry[]> {
+export function useJournal(
+  opts: { enabled?: boolean } = {},
+): UseQueryResult<JournalEntry[]> {
   const queryClient = useQueryClient();
-  return useWorkspaceQuery(keys.journal, async (r, ws) => {
-    const entries = await r.journal.list(ws);
-    const ids = new Set(entries.map((e) => e.id));
-    const cached = queryClient.getQueryData<Trade[]>(keys.trades(ws));
-    if (cached?.some((t) => t.noteId !== undefined && !ids.has(t.noteId))) {
-      void queryClient.invalidateQueries({ queryKey: keys.trades(ws) });
-      void queryClient.invalidateQueries({ queryKey: keys.imports(ws) });
-    }
-    return entries;
-  });
+  return useWorkspaceQuery(
+    keys.journal,
+    async (r, ws) => {
+      const entries = await r.journal.list(ws);
+      const ids = new Set(entries.map((e) => e.id));
+      const cached = queryClient.getQueryData<Trade[]>(keys.trades(ws));
+      if (cached?.some((t) => t.noteId !== undefined && !ids.has(t.noteId))) {
+        void queryClient.invalidateQueries({ queryKey: keys.trades(ws) });
+        void queryClient.invalidateQueries({ queryKey: keys.imports(ws) });
+      }
+      return entries;
+    },
+    opts.enabled ?? true,
+  );
 }
 
 export function useFolders(): UseQueryResult<NoteFolder[]> {

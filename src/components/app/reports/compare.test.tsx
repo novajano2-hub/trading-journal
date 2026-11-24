@@ -278,9 +278,50 @@ test('in R and Ticks the chart plots each group in the unit and says where it en
   // b-1 and b-2 have no exit price apart from their entry in the sample: 0 ticks each.
   expect(
     within(ticks).getByRole('img', {
-      name: /Group A, all time, ends at [+−]?[\d.,]+ ticks/,
+      name: /Group A, all time, ends at 0\.0 ticks\. Group B, all time, ends at 0\.0 ticks\./,
     }),
   ).toBeTruthy();
+});
+
+test('in Ticks the chart ends on the exact tick total of the group (E144)', async () => {
+  const { createLocalRepository } =
+    await import('@/data/local/local-repository');
+  const { IDBFactory, IDBKeyRange } = await import('fake-indexeddb');
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    // ES ticks are 0.25. b-1 long, 2 contracts, 4500 to 4502: 8 ticks a contract, 16.
+    // b-2 short, 1 contract, 4500 to 4501: 4 ticks against it, -4. Together +12.
+    sample: async () => {
+      const s = await breakdownSample();
+      for (const t of s.trades) {
+        if (t.id === 'b-1') {
+          t.avgEntry = 4500;
+          t.avgExit = 4502;
+          t.executions = [];
+          t.maxPosition = 2;
+        }
+        if (t.id === 'b-2') {
+          t.avgEntry = 4500;
+          t.avgExit = 4501;
+          t.executions = [];
+          t.maxPosition = 1;
+        }
+      }
+      return s;
+    },
+  });
+  await repository.prefs.update({ displayUnit: 'ticks' });
+  renderApp(<CompareView />, {
+    repository,
+    url: '/app/reports/compare?a=symbol%3DES&b=symbol%3DNQ',
+  });
+  const page = await screen.findByTestId('reports-compare');
+  expect(
+    within(page)
+      .getByRole('img', { name: /Group A, all time, ends at/ })
+      .getAttribute('aria-label'),
+  ).toContain('Group A, all time, ends at +12.0 ticks.');
 });
 
 test('two quick outcome ticks in a group before the address catches up both stick (I5)', async () => {

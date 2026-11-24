@@ -187,12 +187,6 @@ interface Slot {
 function useSlot(data: ReportData, n: SlotNumber, active: boolean): Slot {
   const { partition: p, ctx, basis } = data;
   const params = useSearchParams();
-  const entries = useJournal().data;
-  // The days with a daily note, for Logged days; none until the journal loads.
-  const noted = useMemo(
-    () => (entries ? loggedDates(entries) : undefined),
-    [entries],
-  );
   const names = SLOT_PARAMS[n];
   const picksParam = params.get(names.picks);
   const bucketParam = params.get(names.bucket);
@@ -210,6 +204,14 @@ function useSlot(data: ReportData, n: SlotNumber, active: boolean): Slot {
   );
   // A removed chart plots nothing, so it costs nothing.
   const plotted = active ? picks : NONE;
+  // The journal is read only while Logged days is plotted.
+  const wantsLogged = plotted.some((x) => x.metric === 'logged-days');
+  const entries = useJournal({ enabled: wantsLogged }).data;
+  // The days with a daily note, for Logged days; none until the journal loads.
+  const noted = useMemo(
+    () => (wantsLogged && entries ? loggedDates(entries) : undefined),
+    [wantsLogged, entries],
+  );
   const { keys, aligned } = useMemo(
     () =>
       align(

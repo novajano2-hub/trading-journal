@@ -90,6 +90,15 @@ export function tradeVolume(t: Trade): number {
   );
 }
 
+/**
+ * The average trade P&L: a total over its closed trades, rounded half to even
+ * to the cent. The one figure behind the Overview, the breakdown tables and
+ * the Average trade P&L series. Null with no trade.
+ */
+export function averageTradePnl(total: Cents, count: number): Cents | null {
+  return count === 0 ? null : roundHalfEven(total / count);
+}
+
 /** The volume of a set: each trade's quantity, counted once, open trades included. */
 export function volumeOf(trades: readonly Trade[]): number {
   return clean(trades.reduce((n, t) => n + tradeVolume(t), 0));

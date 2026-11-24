@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import type { MetricContext } from '../domain/metrics/context';
+import { balanceAt } from '../domain/metrics/balance';
+import type { CashFlow } from '../domain/types';
 import {
+  bucketKey,
   bucketSpan,
   timeSeries,
   type SeriesMetric,
@@ -139,6 +142,49 @@ describe('the added metrics are the Overview figures', () => {
         m.riskFlows.reduce((n, f) => n + f.amount, 0) +
         m.summary.netPnl,
     );
+  });
+
+  test('the balance is the Accounts page balance (balanceAt) at every bucket end, flows included', () => {
+    const account = ws.accounts.filter((a) => a.id === 'sample-futures');
+    const flow = (date: string, amount: number, i: number): CashFlow => ({
+      id: `f${i}`,
+      workspaceId: 'w',
+      accountId: 'sample-futures',
+      date,
+      amount,
+    });
+    // One before the first trade, two inside the range, one after the last trade.
+    const flows = [
+      flow('2020-01-01', 250_000, 1),
+      flow('2026-03-10', 500_000, 2),
+      flow('2026-07-15', -300_000, 3),
+      flow('2026-12-02', 125_000, 4),
+    ];
+    const withFlows = metricsByCurrency(trades, {
+      accounts: account,
+      ctx,
+      baseCurrency: 'USD',
+      flows,
+    })[0]!;
+    const series = timeSeries(trades, ctx, 'net-balance', 'week', {
+      balance: { start: withFlows.riskStart, flows: withFlows.riskFlows },
+    });
+    const at = (date: string) =>
+      balanceAt(account, flows, trades, date, { timeZone: ctx.timeZone });
+    const pick = [0, Math.floor(series.length / 2)];
+    for (const i of pick) {
+      const end = bucketSpan(series[i]!.key, 'week').to;
+      expect(series[i]!.value, series[i]!.key).toBe(at(end));
+    }
+    // The flow after the last trade shows: the last point is today's balance.
+    expect(series.at(-1)!.key).toBe(bucketKey('2026-12-02', 'week'));
+    expect(series.at(-1)!.value).toBe(at('2026-12-02'));
+    // A bucket holding a trade and a flow reads both.
+    const day = timeSeries(trades, ctx, 'net-balance', 'day', {
+      balance: { start: withFlows.riskStart, flows: withFlows.riskFlows },
+    });
+    for (const p of day.filter((x) => x.key >= '2026-03-09').slice(0, 4))
+      expect(p.value, p.key).toBe(at(p.key));
   });
 
   test('in ticks, the average trade is the total over the trades', () => {

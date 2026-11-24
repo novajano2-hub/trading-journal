@@ -16,7 +16,7 @@ import {
 import { drawdownSeries } from './equity';
 import { sizedRealizations } from './realized';
 import { riskRatios } from './risk';
-import { expectancyOf, plannedR, rOf } from './summary';
+import { averageTradePnl, expectancyOf, plannedR, rOf } from './summary';
 import { unitOf } from './units';
 
 export type SeriesMetric =
@@ -186,7 +186,7 @@ export const SERIES_META: Record<SeriesMetric, SeriesMeta> = {
   trades: meta('Activity', 'Trades', 'count', 'bar'),
   wins: meta('Activity', 'Winning trades', 'count', 'bar'),
   losses: meta('Activity', 'Losing trades', 'count', 'bar'),
-  breakevens: meta('Activity', 'Breakeven trades', 'count', 'bar'),
+  breakevens: meta('Risk', 'Breakeven trades', 'count', 'bar'),
   'open-trades': meta('Activity', 'Open trades', 'count', 'bar'),
   'long-trades': meta('Activity', 'Long trades', 'count', 'bar'),
   'short-trades': meta('Activity', 'Short trades', 'count', 'bar'),
@@ -449,11 +449,7 @@ function accValue(
   const uLoss = ratio(a.lossU.sum, a.lossU.n);
   switch (metric) {
     case 'avg-trade':
-      return unit
-        ? ratio(a.uSum, a.uN)
-        : a.n === 0
-          ? null
-          : roundHalfEven(a.sum / a.n);
+      return unit ? ratio(a.uSum, a.uN) : averageTradePnl(a.sum, a.n);
     case 'avg-win':
       return unit ? uWin : avgWin === null ? null : roundHalfEven(avgWin);
     case 'avg-loss':
@@ -654,8 +650,18 @@ export function timeSeries(
           .map((date) => ({ date }))
       : null;
 
+  // The deposits and withdrawals in the range, each on its own date: a flow
+  // after the last trade still moves the balance the line ends on.
+  const flowDates =
+    metric === 'net-balance' && !ctx.unit && opts.balance
+      ? opts.balance.flows
+          .map((f) => f.date)
+          .filter((date) => inRange(date, ctx.range))
+      : [];
+
   const keys = [
     ...new Set([
+      ...flowDates.map(keyOf),
       ...days.map((d) => keyOf(d.date)),
       ...fees.keys(),
       ...facts.map((f) => f.key),
@@ -697,7 +703,8 @@ export function timeSeries(
 
   const acc = emptyAcc();
   let added = 0;
-  const negative = (n: number | null) => (n === null ? null : n === 0 ? 0 : -n);
+  // A distance under a peak is 0 or below; never the negative zero.
+  const noNegativeZero = (n: number) => (n === 0 ? 0 : n);
   let feeTotal = 0;
   return keys.map((key): SeriesPoint => {
     const span = bucketSpan(key, bucket);
@@ -737,7 +744,9 @@ export function timeSeries(
           return daySummary(scopeDays, ctx).flatDays;
         case 'daily-drawdown':
           // Where the period's last day closed, against the peak so far.
-          return scopeDays.length === 0 ? null : negative(-base.under[d1 - 1]!);
+          return scopeDays.length === 0
+            ? null
+            : noNegativeZero(base.under[d1 - 1]!);
         case 'net-balance': {
           if (ctx.unit || !opts.balance) return null;
           const [, n1] = netAt(span);
@@ -765,7 +774,7 @@ export function timeSeries(
         case 'max-drawdown':
           return scopeDays.length === 0
             ? null
-            : negative(-Math.min(0, ...base.under.slice(d0, d1)));
+            : noNegativeZero(Math.min(0, ...base.under.slice(d0, d1)));
         case 'avg-drawdown': {
           const depths = base.under.slice(d0, d1).filter((v) => v < 0);
           const m = mean(depths);

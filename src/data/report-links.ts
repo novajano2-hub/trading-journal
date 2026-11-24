@@ -300,10 +300,9 @@ function within<T>(base: readonly T[], values: readonly T[]): T[] | null {
  * trades in none of the columns that kept one. Symbols say it as "every
  * symbol except these"; the dimensions that file a trade under one value
  * (weekday, month, hour, account, instrument) as the list of the folded values;
- * strategies and tags as "any of the folded ones". Null for a dimension whose
- * folded buckets are ranges (prices, R, size, duration: no one range says
- * them), or where the page's own filter on the dimension cannot be combined
- * with it.
+ * strategies and tags as "any of the folded ones". The range dimensions (prices,
+ * R, size, duration) never fold, so they have no "Other"; null for one anyway,
+ * and where the page's own filter on the dimension cannot be combined with it.
  */
 export function otherFilters(
   base: GlobalFilters,
@@ -391,7 +390,7 @@ export function otherFilters(
       }
       return cut.length === 0 ? null : { ...base, [field]: mergeWindows(cut) };
     }
-    // Ranges: the folded buckets are not one range.
+    // Ranges never fold (`RANGE_KEYS`), so there is nothing to say.
     default:
       return null;
   }

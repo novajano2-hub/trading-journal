@@ -437,7 +437,7 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'daily-drawdown': {
     label: 'Daily drawdown',
     definition:
-      'How far the close of a trading day sat under its running peak, as the {basis} P&L day by day has it: 0 on a day that closed at a new peak, below 0 otherwise. A period reads where its last trading day closed. The peak starts at the starting balances of the selected accounts. It stays in money under ticks, pips, points and R.',
+      'How far the close of a trading day sat under its running peak, as the {basis} P&L day by day has it: 0 on a day that closed at a new peak, below 0 otherwise. A period reads where its last trading day closed. The peak starts at the start of the date range, as 0, and rises with the best running total since. It stays in money under ticks, pips, points and R.',
   },
   'account-balance': {
     label: 'Net account balance',
@@ -511,7 +511,7 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'avg-drawdown': {
     label: 'Average drawdown',
     definition:
-      'How far the close of a trading day sat under its running peak, averaged over the days that closed under a peak. Days at a new peak are not in a drawdown, so they are not counted. The peak starts at the starting balances of the selected accounts. The line is the day-by-day {basis} P&L, as in the max drawdown.',
+      'How far the close of a trading day sat under its running peak, averaged over the days that closed under a peak. Days at a new peak are not in a drawdown, so they are not counted. The peak starts at the start of the date range, as 0, and rises with the best running total since. The line is the day-by-day {basis} P&L, as in the max drawdown.',
   },
   'avg-drawdown-pct': {
     label: 'Average drawdown %',

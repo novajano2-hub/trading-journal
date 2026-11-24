@@ -549,6 +549,19 @@ export type CrossMetric = 'net' | 'trades' | 'win-rate' | 'profit-factor';
 /** The most columns a cross-analysis shows: the busiest fill 11 and the rest fold into 'Other'. */
 export const MAX_CROSS_COLUMNS = 12;
 export const OTHER = 'Other';
+/**
+ * The dimensions that file a trade under a range of values. Their columns
+ * never fold into 'Other': one filter cannot say several scattered ranges, and
+ * every range bucket is a link. R has the most, 13.
+ */
+export const RANGE_KEYS: readonly BreakdownKey[] = [
+  'duration',
+  'size',
+  'r',
+  'dte',
+  'entry-price',
+  'exit-price',
+];
 
 /** A row or column of the cross-analysis: `key` is unique, `label` is what it reads. */
 export interface CrossAxis {
@@ -561,7 +574,8 @@ export interface CrossAxis {
  * `cols` entry, each cell the metric over the trades in both. Entries carry a
  * unique `key` and the label the breakdown shows (two tags may share a label).
  * `counts` holds the trades in each cell, so one call serves the metric and the count. Rows and columns with no trades are left out; past
- * 12 columns the busiest 11 stay in their order and the rest fold into 'Other'.
+ * 12 columns the busiest 11 stay in their order and the rest fold into 'Other'
+ * (a range dimension never folds: see `RANGE_KEYS`).
  * A pair with no trades is null, as is a win rate with no decided trade. A trade
  * with several strategies or tags counts in each of them. `net` follows the
  * P&L basis, as every figure does.
@@ -594,7 +608,8 @@ export function breakdown2D(
     breakdown(trades, by, merged).filter((r) => r.summary.closedCount > 0);
   const rowAxis = order(rows).map((r) => ({ key: r.key, label: r.label }));
   let colRows = order(cols);
-  const folded = colRows.length > MAX_CROSS_COLUMNS;
+  const folded =
+    !RANGE_KEYS.includes(cols) && colRows.length > MAX_CROSS_COLUMNS;
   let other = new Set<string>();
   if (folded) {
     const keep = new Set(
