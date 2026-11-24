@@ -61,13 +61,19 @@ export const STAT_LABELS: Record<CalendarStat, string> = {
   points: 'Points',
 };
 
+/** A line under the lead reads short in a narrow cell and in full once the cell is wide enough to hold it. */
+const FULL_FROM_HIDE = '@[1000px]/cal:hidden';
+const FULL_FROM_SHOW = 'hidden @[1000px]/cal:inline';
+
 interface Line {
   key: CalendarStat;
   node: React.ReactNode;
   /** Money and R take the day's tone; counts stay quiet. */
   toned: boolean;
-  /** The short form for the phone's small cell, when the line has one. */
+  /** The short form (`+1.1k`, `+64t`), for the phone's small cell and for a line under the lead in a narrow cell. */
   compact?: string;
+  /** The full value in words: the cell's tooltip and its accessible label. */
+  label: string;
 }
 
 function linesOf(
@@ -78,89 +84,118 @@ function linesOf(
 ): Line[] {
   return stats.flatMap<Line>((key) => {
     switch (key) {
-      case 'net':
+      case 'net': {
+        const full = fmt(day.net, day.r, false, day);
         return [
           {
             key,
             toned: true,
-            node: <FigureText f={fmt(day.net, day.r, false, day)} />,
+            node: <FigureText f={full} />,
+            compact: fmt(day.net, day.r, true, day).text,
+            label: full.label,
           },
         ];
-      case 'trades':
+      }
+      case 'trades': {
+        const text = `${day.trades} ${plural(day.trades, 'trade')}`;
+        return [{ key, toned: false, node: text, label: text }];
+      }
+      case 'winRate': {
+        const decided = day.wins + day.losses;
+        if (decided === 0) return [];
+        const rate = formatPct(day.wins / decided);
         return [
           {
             key,
             toned: false,
-            node: `${day.trades} ${plural(day.trades, 'trade')}`,
+            node: `${rate} win rate`,
+            compact: `${rate} win`,
+            label: `${rate} win rate`,
           },
         ];
-      case 'winRate': {
-        const decided = day.wins + day.losses;
-        return decided === 0
-          ? []
-          : [
-              {
-                key,
-                toned: false,
-                node: `${formatPct(day.wins / decided)} win rate`,
-              },
-            ];
       }
-      case 'r':
-        return day.r === null
-          ? []
-          : [
-              {
-                key,
-                toned: true,
-                node: formatUnitValue('r', day.r, {
-                  currency,
-                  signed: true,
-                }),
-              },
-            ];
+      case 'r': {
+        if (day.r === null) return [];
+        const full = formatUnitValue('r', day.r, { currency, signed: true });
+        return [
+          {
+            key,
+            toned: true,
+            node: full,
+            compact: formatUnitValue('r', day.r, {
+              currency,
+              signed: true,
+              compact: true,
+            }),
+            label: full,
+          },
+        ];
+      }
       case 'ticks':
       case 'pips':
       case 'points': {
         const value = day[key];
         // A day without an eligible trade says None, never a dash.
         if (value === null)
-          return [{ key, toned: false, node: 'None', compact: 'None' }];
+          return [
+            {
+              key,
+              toned: false,
+              node: 'None',
+              compact: 'None',
+              label: `${STAT_LABELS[key]}: None`,
+            },
+          ];
+        const full = formatUnitValue(key, value, { currency, signed: true });
         return [
           {
             key,
             toned: true,
-            node: formatUnitValue(key, value, { currency, signed: true }),
+            node: full,
             compact: formatUnitValue(key, value, {
               currency,
               signed: true,
               compact: true,
             }),
+            label: full,
           },
         ];
       }
-      case 'fees':
+      case 'fees': {
+        const full = fmt(-day.fees);
         return [
           {
             key,
             toned: false,
             node: (
               <>
-                <FigureText f={fmt(-day.fees)} /> fees
+                <FigureText f={full} /> fees
               </>
             ),
+            compact: `${fmt(-day.fees, null, true).text} fees`,
+            label: `${full.label} fees`,
           },
         ];
+      }
     }
   });
 }
 
 /** What a screen reader gets for a day: the date, its net, its trades, its note. */
-function dayName(day: CalendarDay, fmt: FormatMoney): string {
+function dayName(
+  day: CalendarDay,
+  fmt: FormatMoney,
+  lines: readonly Line[],
+): string {
   const when = dayLabel(day.date);
   if (day.trades === 0)
     return `${when}, no trades${day.hasNote ? ', daily note' : ''}`;
-  return `${when}, ${fmt(day.net, day.r, false, day).label}, ${day.trades} ${plural(day.trades, 'trade')}${day.hasNote ? ', daily note' : ''}`;
+  // The net and the trades first, then every other stat the cell shows, in full.
+  const more = lines
+    .filter((l) => l.key !== 'net' && l.key !== 'trades')
+    .map((l) => `, ${l.label}`)
+    .join('');
+  return `${when}, ${fmt(day.net, day.r, false, day).label}, ${day.trades} ${plural(day.trades, 'trade')}${more}${day.hasNote ? ', daily note' : ''}`;
 }
 
 function Cell({
@@ -197,7 +232,7 @@ function Cell({
         type="button"
         data-date={day.date}
         tabIndex={tabbable ? 0 : -1}
-        aria-label={dayName(day, fmt)}
+        aria-label={dayName(day, fmt, lines)}
         aria-current={isToday ? 'date' : undefined}
         onClick={() => onSelect(day.date)}
         onFocus={() => onFocusDay(day.date)}
@@ -236,9 +271,19 @@ function Cell({
             {rest.map((l) => (
               <span
                 key={l.key}
-                className="mt-px block text-[11.5px] break-words text-muted tabular-nums @[700px]/cal:text-[12px]"
+                title={l.label}
+                className="mt-px block text-[11.5px] whitespace-nowrap text-muted tabular-nums @[700px]/cal:text-[12px]"
               >
-                {l.node}
+                {l.compact === undefined ? (
+                  l.node
+                ) : (
+                  <>
+                    <span aria-hidden="true" className={FULL_FROM_HIDE}>
+                      {l.compact}
+                    </span>
+                    <span className={FULL_FROM_SHOW}>{l.node}</span>
+                  </>
+                )}
               </span>
             ))}
             <span aria-hidden="true" className="block h-[11px]" />

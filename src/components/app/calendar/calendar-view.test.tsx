@@ -255,6 +255,36 @@ test('with every stat ticked a cell stacks every line in the chosen order, and t
     expect(panel.textContent, term).toContain(term);
 });
 
+test('E146: under the lead a line has a compact form, and the full values sit in the tooltip and the accessible label', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: UNITS,
+  });
+  await repository.prefs.update({
+    calendarStats: ['net', 'winRate', 'trades', 'fees', 'ticks', 'pips'],
+  });
+  renderApp(<CalendarView />, { repository, url: url() });
+  const es = await screen.findByRole('button', { name: /^Mon 2 Nov/ });
+  const lines = [...es.querySelectorAll('span[title]')];
+  const titles = lines.map((l) => l.getAttribute('title'));
+  // Each line under the lead carries its full value as a tooltip.
+  expect(titles).toContain('+40.0 ticks');
+  expect(titles.some((t) => t?.endsWith(' fees'))).toBe(true);
+  expect(titles).toContain('Pips: None');
+  const compact = lines.map(
+    (l) => l.querySelector('[aria-hidden="true"]')?.textContent,
+  );
+  expect(compact).toContain('+40t');
+  // The full value of every ticked stat is in the cell's name.
+  const name = es.getAttribute('aria-label')!;
+  expect(name).toContain('+40.0 ticks');
+  expect(name).toContain(' fees');
+  expect(name).toMatch(/win rate/);
+  // The compact forms never carry a dollar sign and the lead keeps its figure.
+  expect(compact.join(' ')).not.toMatch(/\$/);
+});
+
 test('with Privacy on, the cells show $••• and no digit follows a $', async () => {
   const repository = createLocalRepository({
     indexedDB: new IDBFactory(),
