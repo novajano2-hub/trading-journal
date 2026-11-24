@@ -27,7 +27,7 @@ export function OverviewDayFigures({
   const red = ds.largestRedDay;
   const open = (day: string) => `Open ${periodText(day)} on the calendar`;
   return (
-    <StatCard title="Day figures" icon={CalendarBlank}>
+    <StatCard group="day-figures" title="Day figures" icon={CalendarBlank}>
       <Stat
         id="avg-daily-pnl"
         data={data}

@@ -16,7 +16,7 @@ export function OverviewMonths({
   const m = data.partition.months;
   const money = useDayValue(data);
   return (
-    <StatCard title="Months" icon={CalendarDots}>
+    <StatCard group="months" title="Months" icon={CalendarDots}>
       <Stat
         id="best-month"
         data={data}

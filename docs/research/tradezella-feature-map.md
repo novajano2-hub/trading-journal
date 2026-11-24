@@ -33,6 +33,7 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | X7 | Trade-behaviour flags computed by rules, not AI: back-to-back losses, a winner that turned into a loser, holding a loser too long, scaling in/out, unusually high volume. They work as filters and on trades | New | P6 |
 | X8 | Field-level history of edits (entity, field, old value, new value, source: you, import or the app) | New | P6 |
 | X9 | Extra metrics: Sharpe, Sortino, max winning/losing streaks by day, avg daily win %, longest trading day | New | P5, Done |
+| X10 | Shell polish: collapse the sidebar to icons on desktop, and the Settings navigation likewise (with E52 and E55) | New (recording) | P6 (BACKLOG #50) |
 
 ## Trades (`/app/trades`)
 
@@ -47,6 +48,7 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | TR7 | Day-grouped view (one card per day with its net and a link to that day's note) and a week view, with a mini month calendar to jump between dates | New | P6 |
 | TR8 | Merge and split trades by hand | Gap 3, E10 | P6 |
 | TR9 | Move trades to another account | Research "Later" | P6 |
+| TR10 | Trade scale: where a trade's P&L sits between the largest loss and largest win of the set, as a trade-log column, a trade-page row, a strip on week cards and an average on reports. The two ends are not settled | New (recording) | P6 (BACKLOG #52, with TR7) |
 
 ## Adding trades by hand
 
@@ -63,6 +65,9 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | TD2 | One note per trade, stored in the notebook's Trade notes folder. It is titled with the symbol and date and shows the trade's stats | Gap 14 | P5, Done |
 | TD3 | Several profit targets and stop losses per trade, each with a share of the position (partials), feeding planned R | Gap 7 | P6 |
 | TD4 | Chart screenshots attached to a trade (stored locally) | Backlog #5 | P6 |
+| TD5 | Swap and financing per trade, read from the import and shown on the trade page and the Overview | New (recording) | B#55 (with E27) |
+| TD6 | Choose which fields the trade page lists | New (recording) | B#56 |
+| TD7 | Share a trade by link, as a read-only page | New (recording) | B#57 (like NB10) |
 
 ## Import (`/app/import`)
 
@@ -99,6 +104,8 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | RE6 | Performance report with a dollars/R switch | Gap 10 | P5, Done |
 | RE7 | Options report by days to expiry (moved into Plan 5) | Research "Later" | P5, Done |
 | RE8 | Weekly and monthly written recaps | AI | B#22 |
+| RE9 | Export a report as a PDF in a print layout, charts and tables included | New (recording) | P6 (BACKLOG #51) |
+| RE10 | Performance metrics, second pass: account balance, the daily drawdown series, logged days, average MAE and MFE, breakeven days and trades, as per-period and running series. Average drawdown was built in Task 25 | New (recording) | P6 (BACKLOG #54) |
 
 ## Strategies (`/app/strategies`)
 
@@ -113,6 +120,7 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | ST7 | A template gallery of ready-made strategies to copy, written by us (never copied from theirs), with example trades | New | P6 |
 | ST8 | Share a strategy, or have strategies shared with you | Backlog #19 | B#19 |
 | ST9 | Backtest a strategy on a historical session | Backlog #16 | B#16 |
+| ST10 | A cover photo for a strategy, stored locally | New (recording) | P6 (BACKLOG #53, with NB7) |
 
 ## Notebook (`/app/notebook`)
 
@@ -152,6 +160,7 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | AC3 | Archive an account, which makes it read-only; clear an account's trades after a confirmation | Gap 13 | P5, Done |
 | AC4 | Each account's own time zone, used for manual entry and as the import default | New | P5, Done |
 | AC5 | Cost method per account (FIFO today; LIFO or average later) | Research "Later" | P6 |
+| AC6 | Search the accounts list by name or broker, filter it, and select several rows | New (recording) | B#59 |
 
 ## Prop firms (`/app/prop-firms`)
 
@@ -178,6 +187,7 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | SE6 | Email recaps, reminders | Backlog #26 | B#26 |
 | SE7 | Subscription and plan limits | Backlog #3 | B#3 |
 | SE8 | AI settings and an AI-assistant connector for Keel itself | Backlog #22 | B#22 |
+| SE9 | Opt-in support access to the user's data, off by default | New (recording) | B#58 |
 
 ## Dashboard (built in Plan 4)
 
@@ -197,6 +207,39 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | ON3 | Sign-up survey: experience level, what capital you trade (own, prop, not yet), main broker, instruments, goals (journal, analyse, backtest, learn), how you heard of us. It tailors the defaults, for example hiding prop pages | New | P6 (with ON1) |
 | ON4 | Paywall, plan choice, retention offers | New | B#3 |
 | ON5 | Referral programme | New | B#3 |
+
+## Plan 5, Part 2: gaps found by the recording
+
+Built after comparing a recorded TradeZella account (with Keel's sample data imported) against this branch. Each row extends a row above, in Keel's own UI and words. The longer wish lists the recording adds to the Plan 6 and backlog rows are in BACKLOG.md (#35 to #49, #22, #25 and #26).
+
+| ID | Feature | Extends | Goes |
+|---|---|---|---|
+| U1 | The display unit decides which trades count: Ticks and Points keep futures, Pips keeps forex, R keeps trades with a risk, and every page narrows its counts and averages to that set | X4, X6 | P5, Done |
+| D1 | Open positions listed beside Recent trades on the dashboard | Dashboard | P5, Done |
+| D2 | Day win rate and the average win to loss ratio on the dashboard | Dashboard | P5, Done |
+| D3 | The last import on the dashboard | Dashboard | P5, Done |
+| T1 | The trade summary strip adds the win to loss ratio, breakevens and a running P&L | TR1 | P5, Done |
+| T2 | A trade's status column reads its outcome | TR2 | P5, Done |
+| T3 | Rows per page and a page jump on the trade log | TR1 | P5, Done |
+| TP1 | Rows for each display unit on the trade page | TD1 | P5, Done |
+| TP3 | The day's journal reachable from the trade page | TD2 | P5, Done |
+| TP4 | Manage tags from a trade | TD1, SE3 | P5, Done |
+| C1 | Calendar day panel: winners, losers, volume and profit factor | CA1 | P5, Done |
+| C2 | Ticks, pips and points as day stats, within the three-stat cap | CA2 | P5, Done |
+| C3 | A month's full picture, one link to its stats | CA1 | P5, Done |
+| R1 | Overview: months, trade and day counts, logged days, day figures, hold time, volume and costs, with links to the day or trade behind a figure | RE1 | P5, Done |
+| R2 | Average daily win rate is the share of winning days | RE1 | P5, Done |
+| R3 | Choose which Overview figures show: a dialog with a checkbox and the current value for every figure, saved in the preferences | RE1 | P5, Done |
+| R4 | Performance: a full metric catalogue | RE6 | P5, Done |
+| R5 | Expand a chart to full screen | RE2 | P5, Done |
+| R6 | Highlights on breakdown reports | RE2 | P5, Done |
+| R7 | Breakdown table columns and a column chooser | RE2 | P5, Done |
+| R8 | Symbols by instrument and by price | RE2 | P5, Done |
+| R9 | More dimensions to cross-analyse by | RE2 | P5, Done |
+| R10 | From a report row to its trades | RE2 | P5, Done |
+| S1 | Strategy figures follow the date range and the account filters | ST1 | P5, Done |
+| A1 | Account rows: Import trades and Add a trade with that account chosen, and the last import (under the account name) | AC1 | P5, Done |
+| A2 | Manage accounts from the top bar's account menu | X3 | P5, Done |
 
 ## Not for milestone 1
 

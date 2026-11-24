@@ -84,6 +84,12 @@ function validate(p: Partial<UserPrefs>): void {
     );
   if (p.displayUnit !== undefined && !DISPLAY_UNITS.includes(p.displayUnit))
     throw new RangeError(`Unknown display unit "${p.displayUnit}"`);
+  const hidden = p.overviewHidden;
+  if (
+    hidden !== undefined &&
+    !(Array.isArray(hidden) && hidden.every((k) => typeof k === 'string'))
+  )
+    throw new RangeError('Hidden Overview figures must be a list of keys');
   const stats = p.calendarStats;
   if (
     stats &&

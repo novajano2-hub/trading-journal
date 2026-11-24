@@ -11,7 +11,7 @@ import {
 import { useId, useMemo, type ReactNode } from 'react';
 import { FigureText } from '@/components/product/figure-text';
 import { MetricTip } from '@/components/ui/metric-tip';
-import type { MetricId } from '@/content/metric-definitions';
+import { metricDefinition, type MetricId } from '@/content/metric-definitions';
 import { winsVsLosses } from '@/domain/metrics/breakdowns';
 import { timeSeries } from '@/domain/metrics/series';
 import { largestTrade, rExpectancy, summarize } from '@/domain/metrics/summary';
@@ -21,12 +21,19 @@ import { formatUnitValue, useDisplay } from '@/lib/display';
 import { formatDuration, formatPct, plural } from '@/lib/format';
 import { CARD, CARD_PAD, CardHeader, signTone } from '../dashboard/shared';
 import { periodText, ReportChart, type Shade } from './report-chart';
+import {
+  ChoiceRow,
+  ChoiceScope,
+  ChooseFigures,
+  FigureGroup,
+  useFigureSlot,
+} from './overview-choice';
 import { OverviewCosts } from './overview-costs';
 import { OverviewDayFigures } from './overview-day-figures';
 import { OverviewDayCounts, OverviewTradeCounts } from './overview-counts';
 import { OverviewHold } from './overview-hold';
 import { OverviewMonths } from './overview-months';
-import { LinkedFigure, NONE, Stat } from './overview-stat';
+import { LinkedFigure, NONE, Stat, StatCard } from './overview-stat';
 import { ReportScope } from './report-scope';
 import type { ReportData } from './use-report-data';
 
@@ -49,10 +56,19 @@ function Kpi({
   linkLabel?: string;
   /** The figure; null reads "None". */
   children: ReactNode;
-}): React.JSX.Element {
+}): React.JSX.Element | null {
+  const slot = useFigureSlot(id);
+  if (slot.mode === 'list')
+    return (
+      <ChoiceRow figure={id} label={metricDefinition(id, data.basis).label}>
+        {children}
+      </ChoiceRow>
+    );
+  if (slot.hidden) return null;
   return (
     <div
       data-kpi={id}
+      data-figure={slot.key}
       className="min-w-0 border-r border-b border-line px-4 py-3.5"
     >
       <div className="text-xs leading-4 text-faint pointer-coarse:-my-3.5">
@@ -67,6 +83,90 @@ function Kpi({
       </div>
       <div className="mt-px truncate text-xs text-faint">{sub}</div>
     </div>
+  );
+}
+
+/** One line of Gross to net: the label, a bar to scale, and the amount. */
+function GrossRow({
+  id,
+  cents,
+  fill,
+  widest,
+  data,
+  children,
+}: {
+  id: 'gross-pnl' | 'fees' | 'net-pnl';
+  cents: number;
+  fill: string;
+  widest: number;
+  data: ReportData;
+  children: ReactNode;
+}): React.JSX.Element | null {
+  const slot = useFigureSlot(id);
+  if (slot.mode === 'list')
+    return (
+      <ChoiceRow figure={id} label={metricDefinition(id, data.basis).label}>
+        {children}
+      </ChoiceRow>
+    );
+  if (slot.hidden) return null;
+  return (
+    <div
+      data-figure={slot.key}
+      className="grid grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-line/70 py-2.5 last:border-b-0"
+    >
+      <span className="text-[13.5px] text-muted">
+        <MetricTip id={id} basis={data.basis} />
+      </span>
+      <span
+        aria-hidden="true"
+        className="h-2 overflow-hidden rounded-full bg-sunken"
+      >
+        <span
+          className={`block h-full rounded-full ${fill}`}
+          style={{
+            width: `${cents === 0 ? 0 : Math.max(2, (Math.abs(cents) / widest) * 100)}%`,
+          }}
+        />
+      </span>
+      <span
+        data-stat={id}
+        className={`text-right font-semibold tabular-nums ${signTone(cents)}`}
+      >
+        {children}
+      </span>
+    </div>
+  );
+}
+
+/** One row of the Long and short table; gone when its figure is hidden. */
+function SideRow({
+  row,
+  basis,
+}: {
+  row: {
+    id: MetricId;
+    cell(i: number): ReactNode;
+    tone?(i: number): string;
+  };
+  basis: ReportData['basis'];
+}): React.JSX.Element | null {
+  const slot = useFigureSlot(row.id);
+  if (slot.hidden) return null;
+  return (
+    <tr data-figure={slot.key} className="border-t border-line/70">
+      <th scope="row" className="h-10 text-left font-normal text-muted">
+        <MetricTip id={row.id} basis={basis} />
+      </th>
+      {[0, 1].map((i) => (
+        <td
+          key={i}
+          className={`h-10 text-right font-semibold tabular-nums ${row.tone?.(i) ?? ''}`}
+        >
+          {row.cell(i)}
+        </td>
+      ))}
+    </tr>
   );
 }
 
@@ -198,111 +298,334 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
     },
   ];
 
+  const keyFigures = (
+    <FigureGroup
+      id="key"
+      frame={(inner) => (
+        <section aria-label="Key figures" className={`${CARD} overflow-hidden`}>
+          <div className="-mr-px -mb-px grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7">
+            {inner}
+          </div>
+        </section>
+      )}
+    >
+      <Kpi
+        id="pnl"
+        data={data}
+        tone={signTone(net.money)}
+        sub={`${s.closedCount.toLocaleString('en-US')} closed ${plural(s.closedCount, 'trade')}`}
+      >
+        {fig(net)}
+      </Kpi>
+      <Kpi id="win-rate" data={data} sub={`${s.wins} won, ${s.losses} lost`}>
+        {s.winRate === null ? null : formatPct(s.winRate, 1)}
+      </Kpi>
+      <Kpi id="profit-factor" data={data} sub="total won over total lost">
+        {ratio(s.profitFactor)}
+      </Kpi>
+      <Kpi
+        id="expectancy"
+        data={data}
+        tone={signTone(expectancy?.money ?? 0)}
+        sub="per trade"
+      >
+        {fig(expectancy)}
+      </Kpi>
+      <Kpi
+        id="avg-win"
+        data={data}
+        tone="text-gain"
+        sub={`${s.wins} winning ${plural(s.wins, 'trade')}`}
+      >
+        {s.avgWin === null
+          ? null
+          : fig(display.meanOfTrades(outcomes.wins.tradeIds, s.avgWin))}
+      </Kpi>
+      <Kpi
+        id="avg-loss"
+        data={data}
+        tone="text-loss"
+        sub={`${s.losses} losing ${plural(s.losses, 'trade')}`}
+      >
+        {s.avgLoss === null
+          ? null
+          : fig(display.meanOfTrades(outcomes.losses.tradeIds, s.avgLoss))}
+      </Kpi>
+      <Kpi
+        id="largest-win"
+        data={data}
+        tone="text-gain"
+        sub="one trade"
+        href={tradeHref(largestWin.trade)}
+        linkLabel="Open the largest win"
+      >
+        {fig(largestWin.figure)}
+      </Kpi>
+      <Kpi
+        id="largest-loss"
+        data={data}
+        tone="text-loss"
+        sub="one trade"
+        href={tradeHref(largestLoss.trade)}
+        linkLabel="Open the largest loss"
+      >
+        {fig(largestLoss.figure)}
+      </Kpi>
+      <Kpi
+        id="max-drawdown"
+        data={data}
+        tone={drawdown.amount > 0 ? 'text-loss' : ''}
+        sub={
+          drawdown.amount === 0
+            ? 'no fall from a peak'
+            : drawdown.pct === null
+              ? 'from a peak'
+              : `${formatPct(drawdown.pct, 1)} of peak balance`
+        }
+      >
+        <FigureText f={money(-drawdown.amount)} />
+      </Kpi>
+      <Kpi id="win-streak" data={data} sub="winning trades in a row">
+        {p.tradeStreaks.maxWin}
+      </Kpi>
+      <Kpi id="loss-streak" data={data} sub="losing trades in a row">
+        {p.tradeStreaks.maxLoss}
+      </Kpi>
+      <Kpi
+        id="green-days"
+        data={data}
+        sub={`${ds.greenDays} green, ${ds.redDays} red, ${ds.flatDays} flat`}
+      >
+        {ds.greenPct === null ? null : formatPct(ds.greenPct, 1)}
+      </Kpi>
+      <Kpi id="sharpe" data={data} sub="daily, annualised">
+        {ratio(p.risk.sharpe)}
+      </Kpi>
+      <Kpi id="sortino" data={data} sub="daily, annualised">
+        {ratio(p.risk.sortino)}
+      </Kpi>
+    </FigureGroup>
+  );
+
+  const grossToNet = (
+    <FigureGroup
+      id="gross-net"
+      frame={(inner) => (
+        <section aria-label="Gross to net" className={`${CARD} ${CARD_PAD}`}>
+          <CardHeader
+            icon={Receipt}
+            tone="neutral"
+            headingId={`${cumulativeId}-gross`}
+            title="Gross to net"
+          />
+          <div className="mt-2">{inner}</div>
+          <p className="mt-2 text-[13px] leading-[1.5] text-muted">
+            {feeShare !== null && s.fees > 0
+              ? `Fees took ${formatPct(feeShare, 1)} of gross.`
+              : s.fees === 0
+                ? 'No fees on these trades.'
+                : 'Fees came on top of a gross loss.'}
+          </p>
+        </section>
+      )}
+    >
+      {(
+        [
+          ['gross-pnl', s.grossPnl, 'bg-gain-fill'],
+          ['fees', -s.fees, 'bg-loss-fill'],
+          ['net-pnl', s.netPnl, 'bg-accent'],
+        ] as const
+      ).map(([id, cents, fill]) => (
+        <GrossRow
+          key={id}
+          id={id}
+          cents={cents}
+          fill={fill}
+          widest={widest}
+          data={data}
+        >
+          <FigureText f={display.cash(cents, true, currency)} />
+        </GrossRow>
+      ))}
+    </FigureGroup>
+  );
+
+  const riskInR = (
+    <StatCard group="risk" title="Risk in R" icon={Target} tone="accent">
+      <Stat
+        id="planned-r"
+        label="Average planned R"
+        data={data}
+        sub={
+          s.plannedRTradeCount === 0
+            ? undefined
+            : `${s.plannedRTradeCount} ${plural(s.plannedRTradeCount, 'trade')}`
+        }
+      >
+        {s.avgPlannedR === null ? null : r(s.avgPlannedR, false)}
+      </Stat>
+      <Stat
+        id="realized-r"
+        label="Average realized R"
+        data={data}
+        tone={signTone(s.avgRealizedR ?? 0)}
+        sub={
+          s.realizedRTradeCount === 0
+            ? undefined
+            : `${s.realizedRTradeCount} ${plural(s.realizedRTradeCount, 'trade')}`
+        }
+      >
+        {s.avgRealizedR === null ? null : r(s.avgRealizedR, true)}
+      </Stat>
+      <Stat
+        id="r-expectancy"
+        data={data}
+        tone={signTone(rExp.value ?? 0)}
+        sub={
+          rExp.count === 0
+            ? undefined
+            : `${rExp.count} ${plural(rExp.count, 'trade')}`
+        }
+      >
+        {rExp.value === null ? null : r(rExp.value, true)}
+      </Stat>
+      <Stat id="no-stop" data={data} sub={`left out of R`}>
+        {s.noRiskCount}
+      </Stat>
+    </StatCard>
+  );
+
+  const daysAndReturns = (
+    <StatCard
+      group="days"
+      title="Days and returns"
+      name="Days"
+      icon={CalendarBlank}
+    >
+      <Stat
+        id="avg-green-day"
+        data={data}
+        tone="text-gain"
+        sub={`${ds.greenDays} ${plural(ds.greenDays, 'day')}`}
+      >
+        {fig(ds.avgGreenDay === null ? null : { money: ds.avgGreenDay })}
+      </Stat>
+      <Stat
+        id="avg-red-day"
+        data={data}
+        tone="text-loss"
+        sub={`${ds.redDays} ${plural(ds.redDays, 'day')}`}
+      >
+        {fig(ds.avgRedDay === null ? null : { money: ds.avgRedDay })}
+      </Stat>
+      <Stat id="trades-per-day" data={data} sub="closed">
+        {ds.tradesPerDay === null ? null : ds.tradesPerDay.toFixed(1)}
+      </Stat>
+      <Stat id="day-streaks" data={data} sub={`${p.dayStreaks.maxLoss} red`}>
+        {`${p.dayStreaks.maxWin} green`}
+      </Stat>
+      <Stat
+        id="longest-day"
+        data={data}
+        sub={
+          durations.average === null
+            ? undefined
+            : `${formatDuration(durations.average * 60000)} on average`
+        }
+      >
+        {durations.longest === null
+          ? null
+          : formatDuration(durations.longest * 60000)}
+      </Stat>
+      <Stat id="net-roi" data={data}>
+        {s.netRoi === null
+          ? null
+          : formatUnitValue('percent', s.netRoi, {
+              currency,
+              signed: true,
+            })}
+      </Stat>
+    </StatCard>
+  );
+
+  const longAndShort = (
+    <FigureGroup
+      id="sides"
+      frame={(inner) => (
+        <section aria-label="Long and short" className={`${CARD} ${CARD_PAD}`}>
+          <CardHeader
+            icon={ArrowsLeftRight}
+            tone="neutral"
+            headingId={`${cumulativeId}-sides`}
+            title="Long and short"
+          />
+          {inner}
+        </section>
+      )}
+      listChildren={sideRows.map((r) => (
+        <ChoiceRow
+          key={r.id}
+          figure={r.id}
+          label={metricDefinition(r.id, basis).label}
+        >
+          {r.cell(0)} long, {r.cell(1)} short
+        </ChoiceRow>
+      ))}
+    >
+      <table
+        aria-label="Long and short"
+        className="mt-2 w-full border-collapse text-[13.5px]"
+      >
+        <thead>
+          <tr>
+            <td className="h-8" />
+            {['Long', 'Short'].map((h) => (
+              <th
+                key={h}
+                scope="col"
+                className="h-8 text-right text-xs font-medium text-faint"
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {sideRows.map((r) => (
+            <SideRow key={r.id} row={r} basis={basis} />
+          ))}
+        </tbody>
+      </table>
+    </FigureGroup>
+  );
+
+  const months = <OverviewMonths data={data} />;
+  const tradeCounts = <OverviewTradeCounts data={data} />;
+  const dayCounts = <OverviewDayCounts data={data} />;
+  const dayFigures = <OverviewDayFigures data={data} />;
+  const hold = <OverviewHold data={data} />;
+  const costs = <OverviewCosts data={data} />;
+
   return (
-    <>
-      <section aria-label="Key figures" className={`${CARD} overflow-hidden`}>
-        <div className="-mr-px -mb-px grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7">
-          <Kpi
-            id="pnl"
-            data={data}
-            tone={signTone(net.money)}
-            sub={`${s.closedCount.toLocaleString('en-US')} closed ${plural(s.closedCount, 'trade')}`}
-          >
-            {fig(net)}
-          </Kpi>
-          <Kpi
-            id="win-rate"
-            data={data}
-            sub={`${s.wins} won, ${s.losses} lost`}
-          >
-            {s.winRate === null ? null : formatPct(s.winRate, 1)}
-          </Kpi>
-          <Kpi id="profit-factor" data={data} sub="total won over total lost">
-            {ratio(s.profitFactor)}
-          </Kpi>
-          <Kpi
-            id="expectancy"
-            data={data}
-            tone={signTone(expectancy?.money ?? 0)}
-            sub="per trade"
-          >
-            {fig(expectancy)}
-          </Kpi>
-          <Kpi
-            id="avg-win"
-            data={data}
-            tone="text-gain"
-            sub={`${s.wins} winning ${plural(s.wins, 'trade')}`}
-          >
-            {s.avgWin === null
-              ? null
-              : fig(display.meanOfTrades(outcomes.wins.tradeIds, s.avgWin))}
-          </Kpi>
-          <Kpi
-            id="avg-loss"
-            data={data}
-            tone="text-loss"
-            sub={`${s.losses} losing ${plural(s.losses, 'trade')}`}
-          >
-            {s.avgLoss === null
-              ? null
-              : fig(display.meanOfTrades(outcomes.losses.tradeIds, s.avgLoss))}
-          </Kpi>
-          <Kpi
-            id="largest-win"
-            data={data}
-            tone="text-gain"
-            sub="one trade"
-            href={tradeHref(largestWin.trade)}
-            linkLabel="Open the largest win"
-          >
-            {fig(largestWin.figure)}
-          </Kpi>
-          <Kpi
-            id="largest-loss"
-            data={data}
-            tone="text-loss"
-            sub="one trade"
-            href={tradeHref(largestLoss.trade)}
-            linkLabel="Open the largest loss"
-          >
-            {fig(largestLoss.figure)}
-          </Kpi>
-          <Kpi
-            id="max-drawdown"
-            data={data}
-            tone={drawdown.amount > 0 ? 'text-loss' : ''}
-            sub={
-              drawdown.amount === 0
-                ? 'no fall from a peak'
-                : drawdown.pct === null
-                  ? 'from a peak'
-                  : `${formatPct(drawdown.pct, 1)} of peak balance`
-            }
-          >
-            <FigureText f={money(-drawdown.amount)} />
-          </Kpi>
-          <Kpi id="win-streak" data={data} sub="winning trades in a row">
-            {p.tradeStreaks.maxWin}
-          </Kpi>
-          <Kpi id="loss-streak" data={data} sub="losing trades in a row">
-            {p.tradeStreaks.maxLoss}
-          </Kpi>
-          <Kpi
-            id="green-days"
-            data={data}
-            sub={`${ds.greenDays} green, ${ds.redDays} red, ${ds.flatDays} flat`}
-          >
-            {ds.greenPct === null ? null : formatPct(ds.greenPct, 1)}
-          </Kpi>
-          <Kpi id="sharpe" data={data} sub="daily, annualised">
-            {ratio(p.risk.sharpe)}
-          </Kpi>
-          <Kpi id="sortino" data={data} sub="daily, annualised">
-            {ratio(p.risk.sortino)}
-          </Kpi>
-        </div>
-      </section>
+    <ChoiceScope>
+      <ChooseFigures
+        groups={
+          <>
+            {keyFigures}
+            {grossToNet}
+            {riskInR}
+            {daysAndReturns}
+            {longAndShort}
+            {months}
+            {tradeCounts}
+            {dayCounts}
+            {dayFigures}
+            {hold}
+            {costs}
+          </>
+        }
+      />
+      {keyFigures}
 
       <section aria-labelledby={cumulativeId} className={`${CARD} ${CARD_PAD}`}>
         <CardHeader
@@ -396,224 +719,21 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
       </section>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <section aria-label="Gross to net" className={`${CARD} ${CARD_PAD}`}>
-          <CardHeader
-            icon={Receipt}
-            tone="neutral"
-            headingId={`${cumulativeId}-gross`}
-            title="Gross to net"
-          />
-          <div className="mt-2">
-            {(
-              [
-                ['gross-pnl', s.grossPnl, 'bg-gain-fill'],
-                ['fees', -s.fees, 'bg-loss-fill'],
-                ['net-pnl', s.netPnl, 'bg-accent'],
-              ] as const
-            ).map(([id, cents, fill]) => (
-              <div
-                key={id}
-                className="grid grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-line/70 py-2.5 last:border-b-0"
-              >
-                <span className="text-[13.5px] text-muted">
-                  <MetricTip id={id} basis={basis} />
-                </span>
-                <span
-                  aria-hidden="true"
-                  className="h-2 overflow-hidden rounded-full bg-sunken"
-                >
-                  <span
-                    className={`block h-full rounded-full ${fill}`}
-                    style={{
-                      width: `${cents === 0 ? 0 : Math.max(2, (Math.abs(cents) / widest) * 100)}%`,
-                    }}
-                  />
-                </span>
-                <span
-                  data-stat={id}
-                  className={`text-right font-semibold tabular-nums ${signTone(cents)}`}
-                >
-                  <FigureText f={display.cash(cents, true, currency)} />
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="mt-2 text-[13px] leading-[1.5] text-muted">
-            {feeShare !== null && s.fees > 0
-              ? `Fees took ${formatPct(feeShare, 1)} of gross.`
-              : s.fees === 0
-                ? 'No fees on these trades.'
-                : 'Fees came on top of a gross loss.'}
-          </p>
-        </section>
-
-        <section aria-label="Risk in R" className={`${CARD} ${CARD_PAD}`}>
-          <CardHeader
-            icon={Target}
-            tone="accent"
-            headingId={`${cumulativeId}-risk`}
-            title="Risk in R"
-          />
-          <div className="mt-1">
-            <Stat
-              id="planned-r"
-              label="Average planned R"
-              data={data}
-              sub={
-                s.plannedRTradeCount === 0
-                  ? undefined
-                  : `${s.plannedRTradeCount} ${plural(s.plannedRTradeCount, 'trade')}`
-              }
-            >
-              {s.avgPlannedR === null ? null : r(s.avgPlannedR, false)}
-            </Stat>
-            <Stat
-              id="realized-r"
-              label="Average realized R"
-              data={data}
-              tone={signTone(s.avgRealizedR ?? 0)}
-              sub={
-                s.realizedRTradeCount === 0
-                  ? undefined
-                  : `${s.realizedRTradeCount} ${plural(s.realizedRTradeCount, 'trade')}`
-              }
-            >
-              {s.avgRealizedR === null ? null : r(s.avgRealizedR, true)}
-            </Stat>
-            <Stat
-              id="r-expectancy"
-              data={data}
-              tone={signTone(rExp.value ?? 0)}
-              sub={
-                rExp.count === 0
-                  ? undefined
-                  : `${rExp.count} ${plural(rExp.count, 'trade')}`
-              }
-            >
-              {rExp.value === null ? null : r(rExp.value, true)}
-            </Stat>
-            <Stat id="no-stop" data={data} sub={`left out of R`}>
-              {s.noRiskCount}
-            </Stat>
-          </div>
-        </section>
-
-        <section aria-label="Days" className={`${CARD} ${CARD_PAD}`}>
-          <CardHeader
-            icon={CalendarBlank}
-            tone="neutral"
-            headingId={`${dailyId}-days`}
-            title="Days and returns"
-          />
-          <div className="mt-1">
-            <Stat
-              id="avg-green-day"
-              data={data}
-              tone="text-gain"
-              sub={`${ds.greenDays} ${plural(ds.greenDays, 'day')}`}
-            >
-              {fig(ds.avgGreenDay === null ? null : { money: ds.avgGreenDay })}
-            </Stat>
-            <Stat
-              id="avg-red-day"
-              data={data}
-              tone="text-loss"
-              sub={`${ds.redDays} ${plural(ds.redDays, 'day')}`}
-            >
-              {fig(ds.avgRedDay === null ? null : { money: ds.avgRedDay })}
-            </Stat>
-            <Stat id="trades-per-day" data={data} sub="closed">
-              {ds.tradesPerDay === null ? null : ds.tradesPerDay.toFixed(1)}
-            </Stat>
-            <Stat
-              id="day-streaks"
-              data={data}
-              sub={`${p.dayStreaks.maxLoss} red`}
-            >
-              {`${p.dayStreaks.maxWin} green`}
-            </Stat>
-            <Stat
-              id="longest-day"
-              data={data}
-              sub={
-                durations.average === null
-                  ? undefined
-                  : `${formatDuration(durations.average * 60000)} on average`
-              }
-            >
-              {durations.longest === null
-                ? null
-                : formatDuration(durations.longest * 60000)}
-            </Stat>
-            <Stat id="net-roi" data={data}>
-              {s.netRoi === null
-                ? null
-                : formatUnitValue('percent', s.netRoi, {
-                    currency,
-                    signed: true,
-                  })}
-            </Stat>
-          </div>
-        </section>
-
-        <section aria-label="Long and short" className={`${CARD} ${CARD_PAD}`}>
-          <CardHeader
-            icon={ArrowsLeftRight}
-            tone="neutral"
-            headingId={`${cumulativeId}-sides`}
-            title="Long and short"
-          />
-          <table
-            aria-label="Long and short"
-            className="mt-2 w-full border-collapse text-[13.5px]"
-          >
-            <thead>
-              <tr>
-                <td className="h-8" />
-                {['Long', 'Short'].map((h) => (
-                  <th
-                    key={h}
-                    scope="col"
-                    className="h-8 text-right text-xs font-medium text-faint"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sideRows.map((r) => (
-                <tr key={r.id} className="border-t border-line/70">
-                  <th
-                    scope="row"
-                    className="h-10 text-left font-normal text-muted"
-                  >
-                    <MetricTip id={r.id} basis={basis} />
-                  </th>
-                  {[0, 1].map((i) => (
-                    <td
-                      key={i}
-                      className={`h-10 text-right font-semibold tabular-nums ${r.tone?.(i) ?? ''}`}
-                    >
-                      {r.cell(i)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+        {grossToNet}
+        {riskInR}
+        {daysAndReturns}
+        {longAndShort}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <OverviewMonths data={data} />
-        <OverviewTradeCounts data={data} />
-        <OverviewDayCounts data={data} />
-        <OverviewDayFigures data={data} />
-        <OverviewHold data={data} />
-        <OverviewCosts data={data} />
+        {months}
+        {tradeCounts}
+        {dayCounts}
+        {dayFigures}
+        {hold}
+        {costs}
       </div>
-    </>
+    </ChoiceScope>
   );
 }
 

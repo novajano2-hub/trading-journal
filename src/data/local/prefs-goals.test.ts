@@ -119,3 +119,21 @@ test.each([
   ).rejects.toBeInstanceOf(RangeError);
   expect(await repo.prefs.get()).toEqual(defaultPrefs());
 });
+
+test('the hidden Overview figures persist, and only a list of strings is stored', async () => {
+  const indexedDB = new IDBFactory();
+  await open(indexedDB).prefs.update({
+    overviewHidden: ['costs:commissions', 'hold:hold-time'],
+  });
+  expect((await open(indexedDB).prefs.get()).overviewHidden).toEqual([
+    'costs:commissions',
+    'hold:hold-time',
+  ]);
+  // An empty list is a choice too: everything shows.
+  await open(indexedDB).prefs.update({ overviewHidden: [] });
+  expect((await open(indexedDB).prefs.get()).overviewHidden).toEqual([]);
+  for (const bad of ['costs:commissions', [1], [null]])
+    await expect(
+      open(indexedDB).prefs.update({ overviewHidden: bad as never }),
+    ).rejects.toBeInstanceOf(RangeError);
+});

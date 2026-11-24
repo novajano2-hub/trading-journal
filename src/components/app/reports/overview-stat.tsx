@@ -6,9 +6,16 @@ import { useId, type ReactNode } from 'react';
 import { FigureText } from '@/components/product/figure-text';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { MetricId } from '@/content/metric-definitions';
+import { metricDefinition } from '@/content/metric-definitions';
 import { formatUnitValue, useDisplay } from '@/lib/display';
 import type { TileTone } from '@/components/ui/icon-tile';
 import { CARD, CARD_PAD, CardHeader } from '../dashboard/shared';
+import {
+  ChoiceRow,
+  FigureGroup,
+  useFigureSlot,
+  type FigureGroupId,
+} from './overview-choice';
 import type { ReportData } from './use-report-data';
 
 /** The empty value: "None", never a dash or blank. */
@@ -81,9 +88,32 @@ export function Stat({
   linkLabel?: string;
   /** The figure; null reads None. */
   children: ReactNode;
-}): React.JSX.Element {
+}): React.JSX.Element | null {
+  const slot = useFigureSlot(id);
+  if (slot.mode === 'list')
+    return (
+      <ChoiceRow
+        figure={id}
+        label={label ?? metricDefinition(id, data.basis).label}
+      >
+        {children === null || children === undefined ? null : (
+          <>
+            {children}
+            {sub ? (
+              <small className="ml-1.5 text-xs font-normal text-faint">
+                {sub}
+              </small>
+            ) : null}
+          </>
+        )}
+      </ChoiceRow>
+    );
+  if (slot.hidden) return null;
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-line/70 py-2.5 last:border-b-0">
+    <div
+      data-figure={slot.key}
+      className="flex items-baseline justify-between gap-3 border-b border-line/70 py-2.5 last:border-b-0"
+    >
       <span className="text-[13.5px] text-muted">
         <MetricTip id={id} basis={data.basis}>
           {label}
@@ -104,24 +134,45 @@ export function Stat({
   );
 }
 
-/** A titled card of stat rows, named for assistive tech by its title. */
+/** A titled card of stat rows, named for assistive tech by its title; gone when all its figures are hidden. */
 export function StatCard({
+  group,
   title,
+  name,
   icon,
   tone = 'neutral',
   children,
 }: {
+  group: FigureGroupId;
   title: string;
+  /** The region's accessible name, where it is not the title. */
+  name?: string;
   icon: Icon;
   tone?: TileTone;
   children: ReactNode;
 }): React.JSX.Element {
   const headingId = useId();
   return (
-    <section aria-labelledby={headingId} className={`${CARD} ${CARD_PAD}`}>
-      <CardHeader icon={icon} tone={tone} headingId={headingId} title={title} />
-      <div className="mt-1">{children}</div>
-    </section>
+    <FigureGroup
+      id={group}
+      frame={(inner) => (
+        <section
+          aria-label={name}
+          aria-labelledby={name ? undefined : headingId}
+          className={`${CARD} ${CARD_PAD}`}
+        >
+          <CardHeader
+            icon={icon}
+            tone={tone}
+            headingId={headingId}
+            title={title}
+          />
+          <div className="mt-1">{inner}</div>
+        </section>
+      )}
+    >
+      {children}
+    </FigureGroup>
   );
 }
 

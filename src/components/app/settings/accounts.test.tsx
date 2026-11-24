@@ -11,6 +11,7 @@ import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
+import type { ImportJob } from '@/domain/types';
 import { renderApp } from '../__fixtures__/render-app';
 import { AccountsSettings } from './accounts';
 
@@ -450,4 +451,89 @@ describe('below 640px', () => {
     );
     expect(await screen.findByRole('menuitem', { name: 'Edit' })).toBeTruthy();
   });
+});
+
+test("an active account's menu offers Import trades and Add a trade, each opening its flow with that account", async () => {
+  renderApp(<AccountsSettings />, { repository: repo(), url: URL });
+  await openMenu('Futures main');
+  fireEvent.click(
+    await screen.findByRole('menuitem', { name: 'Import trades' }),
+  );
+  await waitFor(() =>
+    expect(window.location.pathname + window.location.search).toBe(
+      '/app/import?account=acc-a',
+    ),
+  );
+  window.history.replaceState(null, '', URL);
+  cleanup();
+  renderApp(<AccountsSettings />, { repository: repo(), url: URL });
+  await openMenu('Futures main');
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Add a trade' }));
+  await waitFor(() =>
+    expect(window.location.pathname + window.location.search).toBe(
+      '/app/trades/new?account=acc-a',
+    ),
+  );
+});
+
+test('an archived account is read-only: its menu offers neither', async () => {
+  renderApp(<AccountsSettings />, { repository: repo(), url: URL });
+  await openMenu('Old demo');
+  await screen.findByRole('menuitem', { name: 'Unarchive' });
+  expect(screen.queryByRole('menuitem', { name: 'Import trades' })).toBeNull();
+  expect(screen.queryByRole('menuitem', { name: 'Add a trade' })).toBeNull();
+});
+
+const job = (over: Partial<ImportJob>): ImportJob => ({
+  id: 'job',
+  workspaceId: 'mine',
+  accountId: 'acc-a',
+  fileName: 'fills.csv',
+  mapping: {} as ImportJob['mapping'],
+  rowCount: 2,
+  tradeCount: 1,
+  skippedCount: 0,
+  duplicateCount: 0,
+  status: 'active',
+  createdAt: '2026-11-10T15:00:00.000Z',
+  ...over,
+});
+
+const lastImport = (row: HTMLElement) =>
+  row.querySelector('[data-last-import]') as HTMLElement;
+
+test('Last import reads None, or the newest import not undone', async () => {
+  const r = repo();
+  renderApp(<AccountsSettings />, { repository: r, url: URL });
+  const none = await rowOf('Futures main');
+  expect(lastImport(none).textContent).toBe('Last import None');
+  cleanup();
+
+  const jobs = [
+    job({ id: 'a', createdAt: '2026-11-10T15:00:00.000Z' }),
+    job({
+      id: 'b',
+      fileName: 'newer.csv',
+      createdAt: '2026-11-12T15:00:00.000Z',
+      status: 'undone',
+    }),
+    job({
+      id: 'c',
+      accountId: 'acc-b',
+      fileName: 'other.csv',
+      createdAt: '2026-11-15T15:00:00.000Z',
+    }),
+  ];
+  renderApp(<AccountsSettings />, {
+    repository: { ...r, imports: { ...r.imports, list: async () => jobs } },
+    url: URL,
+  });
+  const row = await rowOf('Futures main');
+  await waitFor(() =>
+    expect(lastImport(row).textContent).toBe('Last import 10 Nov 2026'),
+  );
+  expect(lastImport(row).getAttribute('title')).toBe('fills.csv');
+  expect(lastImport(await rowOf('Old demo')).textContent).toBe(
+    'Last import 15 Nov 2026',
+  );
 });

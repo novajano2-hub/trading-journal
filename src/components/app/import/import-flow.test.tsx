@@ -104,3 +104,65 @@ test('the stepper has a one-line phone form: "Step 2 of 4: Map columns" over a p
     screen.getByRole('list', { name: 'Import steps' }).className,
   ).toContain('max-sm:hidden');
 });
+
+async function openWith(search: string) {
+  const repo = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+  const base = {
+    broker: 'Sample broker',
+    type: 'live' as const,
+    currency: 'USD',
+    startingBalance: 5_000_000,
+    timeZone: 'America/Chicago',
+  };
+  const first = await repo.accounts.create('mine', {
+    ...base,
+    name: 'Alpha',
+    status: 'active',
+  });
+  const second = await repo.accounts.create('mine', {
+    ...base,
+    name: 'Bravo',
+    status: 'active',
+  });
+  const gone = await repo.accounts.create('mine', {
+    ...base,
+    name: 'Charlie',
+    status: 'archived',
+  });
+  renderApp(
+    <Suspense fallback={null}>
+      <ImportFlow />
+    </Suspense>,
+    {
+      repository: repo,
+      url: `/app/import?${search.replace('$second', second.id).replace('$gone', gone.id)}`,
+    },
+  );
+  void first;
+}
+
+async function chosenAccount(): Promise<string> {
+  fireEvent.change(await screen.findByLabelText('Import file'), {
+    target: { files: [new File([FILE], 'fills.csv', { type: 'text/csv' })] },
+  });
+  fireEvent.click(await screen.findByRole('button', { name: /^Map columns/ }));
+  const select = (await screen.findByLabelText('Account')) as HTMLSelectElement;
+  return select.selectedOptions[0]!.textContent!;
+}
+
+test('the account query parameter chooses the account', async () => {
+  await openWith('account=$second');
+  expect(await chosenAccount()).toBe('Bravo');
+});
+
+test.each(['account=nope', 'account=$gone', ''])(
+  'an unknown or archived account (%s) is ignored: the first is chosen',
+  async (search) => {
+    await openWith(search);
+    expect(await chosenAccount()).toBe('Alpha');
+  },
+);

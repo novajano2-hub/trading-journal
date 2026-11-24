@@ -58,8 +58,11 @@ export function ImportFlow() {
   );
 
   // Adjusting state while rendering: the first account is chosen once they are known.
-  if (accountId === null && accountsQuery.data && accounts[0])
-    setAccountId(accounts[0].id);
+  // `?account=` (from Settings > Accounts) picks one; an unknown or archived id is not in the list.
+  const requested = params.get('account');
+  const preferred = accounts.find((a) => a.id === requested) ?? accounts[0];
+  if (accountId === null && accountsQuery.data && preferred)
+    setAccountId(preferred.id);
 
   // The mapping opens once for each file and account (saved mapping, else Keel's guess).
   const account = accounts.find((a) => a.id === accountId);
@@ -70,8 +73,8 @@ export function ImportFlow() {
   if (key && file && prefs && mapState?.key !== key)
     setMapState(openMapState(key, file.parsed, account, prefs.timeZone));
 
-  const requested = params.get('step');
-  const wanted: Step = isStep(requested) ? requested : 'upload';
+  const requestedStep = params.get('step');
+  const wanted: Step = isStep(requestedStep) ? requestedStep : 'upload';
   const ready =
     mapState !== null &&
     accountId !== null &&
@@ -97,8 +100,9 @@ export function ImportFlow() {
   // A step the flow can't show yet is replaced in the address bar, not left to lie.
   // While the pending file is still being looked for, the URL is left alone.
   useEffect(() => {
-    if (!checking && requested !== null && step !== wanted) go(step, 'replace');
-  }, [checking, requested, step, wanted, go]);
+    if (!checking && requestedStep !== null && step !== wanted)
+      go(step, 'replace');
+  }, [checking, requestedStep, step, wanted, go]);
 
   const open = useCallback(
     async (chosen: File, then?: 'map') => {

@@ -16,7 +16,7 @@ export function OverviewHold({
 }): React.JSX.Element {
   const h = data.partition.holds;
   return (
-    <StatCard title="Hold time" icon={Timer}>
+    <StatCard group="hold" title="Hold time" icon={Timer}>
       <Stat id="hold-time" data={data}>
         {text(h.all)}
       </Stat>

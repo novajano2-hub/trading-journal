@@ -13,7 +13,7 @@ export function OverviewCosts({
   const c = data.partition.costs;
   const money = useMoney(data);
   return (
-    <StatCard title="Costs" icon={Receipt}>
+    <StatCard group="costs" title="Costs" icon={Receipt}>
       <Stat id="commissions" data={data}>
         {money(c.commissions, false)}
       </Stat>

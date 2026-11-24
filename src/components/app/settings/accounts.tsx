@@ -2,6 +2,7 @@
 
 import { Bank, CheckCircle, Lock, Plus } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useMemo, useRef, useState } from 'react';
 import { ConfirmDialog } from '@/components/app/confirm-dialog';
 import { CARD, CardHeader } from '@/components/app/dashboard/shared';
@@ -13,6 +14,7 @@ import {
   useActiveWorkspace,
   useCashFlows,
   useClearAccountTrades,
+  useImportHistory,
   usePrefs,
   useRemoveAccount,
   useTrades,
@@ -20,7 +22,7 @@ import {
 } from '@/data/query/hooks';
 import { balanceAt } from '@/domain/metrics/balance';
 import { localDate } from '@/domain/time';
-import type { Account, Trade } from '@/domain/types';
+import type { Account, ImportJob, Trade } from '@/domain/types';
 import { useDisplay } from '@/lib/display';
 import { plural } from '@/lib/format';
 import { usePhone } from '@/lib/use-phone';
@@ -50,8 +52,40 @@ type Dialog =
   | { kind: 'clear'; account: Account; count: number }
   | { kind: 'delete'; account: Account };
 
+/** "10 Nov 2026" in the trader's zone. */
+const importDay = (iso: string, timeZone: string) =>
+  new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(iso));
+
 const typeLabel = (a: Account) =>
   ACCOUNT_TYPES.find((t) => t.value === a.type)?.label ?? a.type;
+
+/**
+ * The account's newest import not undone, or None, under its name. It sits on
+ * the name's second line, not in a column of its own: a tenth column would
+ * squeeze the broker to an ellipsis in the 1440 card.
+ */
+function LastImport({
+  job,
+  timeZone,
+}: {
+  job: ImportJob | undefined;
+  timeZone: string;
+}): React.JSX.Element {
+  return (
+    <small
+      data-last-import=""
+      title={job?.fileName}
+      className="block text-[12px] leading-4 font-normal text-faint"
+    >
+      Last import {job ? importDay(job.createdAt, timeZone) : 'None'}
+    </small>
+  );
+}
 
 /** Prop accounts have rules to set; the others have none to. */
 function PropRules({ account }: { account: Account }): React.JSX.Element {
@@ -91,6 +125,8 @@ export function AccountsSettings(): React.JSX.Element {
     tradesQuery.status === 'error' ||
     flowsQuery.status === 'error';
   const prefs = usePrefs().data;
+  const router = useRouter();
+  const imports = useImportHistory().data;
   const workspace = useActiveWorkspace().data;
   const update = useUpdateAccount();
   const clear = useClearAccountTrades();
@@ -127,6 +163,18 @@ export function AccountsSettings(): React.JSX.Element {
       });
   }, [accounts.data, trades, flows, timeZone]);
 
+  // The newest import of each account that has not been undone.
+  const lastImport = useMemo(() => {
+    const latest = new Map<string, ImportJob>();
+    for (const job of imports ?? []) {
+      if (job.status === 'undone') continue;
+      const have = latest.get(job.accountId);
+      if (!have || job.createdAt > have.createdAt)
+        latest.set(job.accountId, job);
+    }
+    return latest;
+  }, [imports]);
+
   const selected =
     rows?.find((r) => r.account.id === pickedId)?.account ??
     rows?.find((r) => r.account.status === 'active')?.account ??
@@ -138,6 +186,25 @@ export function AccountsSettings(): React.JSX.Element {
 
   const actions = (account: Account, tradeCount: number): MenuAction[] => [
     { label: 'Edit', onSelect: () => setDialog({ kind: 'edit', account }) },
+    // An archived account is read-only: nothing can be added to it.
+    ...(account.status === 'active'
+      ? [
+          {
+            label: 'Import trades',
+            onSelect: () =>
+              router.push(
+                `/app/import?account=${encodeURIComponent(account.id)}`,
+              ),
+          },
+          {
+            label: 'Add a trade',
+            onSelect: () =>
+              router.push(
+                `/app/trades/new?account=${encodeURIComponent(account.id)}`,
+              ),
+          },
+        ]
+      : []),
     {
       label: 'Deposits and withdrawals',
       onSelect: () => {
@@ -371,6 +438,10 @@ export function AccountsSettings(): React.JSX.Element {
                             Read-only
                           </small>
                         ) : null}
+                        <LastImport
+                          job={lastImport.get(a.id)}
+                          timeZone={timeZone ?? 'UTC'}
+                        />
                       </td>
                       <td
                         className={`${TD} max-w-[160px] text-muted`}

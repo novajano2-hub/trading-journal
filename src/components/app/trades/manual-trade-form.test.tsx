@@ -283,3 +283,33 @@ test('a negative commission or fee is refused at its fill, not flipped', async (
   }
   expect(window.location.pathname).toBe('/app/trades/new');
 });
+
+test('the account query parameter preselects an active account; an unknown or archived one is ignored', async () => {
+  const twoActive = async (): Promise<SampleWorkspace> => {
+    const fx = fixtureSample();
+    fx.accounts = [
+      ...fx.accounts,
+      { ...fx.accounts[0]!, id: 'acc-c', name: 'Options book' },
+    ];
+    return fx;
+  };
+  const chosen = async (search: string) => {
+    renderApp(<ManualTradeForm />, {
+      sample: twoActive,
+      url: `/app/trades/new${search}`,
+    });
+    const select = (await screen.findByLabelText(
+      'Account',
+    )) as HTMLSelectElement;
+    const name = select.selectedOptions[0]!.textContent;
+    const all = [...select.options].map((o) => o.textContent);
+    cleanup();
+    return { name, all };
+  };
+  expect((await chosen('')).name).toBe('Futures main');
+  expect((await chosen('?account=acc-c')).name).toBe('Options book');
+  expect((await chosen('?account=nope')).name).toBe('Futures main');
+  const archived = await chosen('?account=acc-b');
+  expect(archived.name).toBe('Futures main');
+  expect(archived.all).not.toContain('Old demo');
+});

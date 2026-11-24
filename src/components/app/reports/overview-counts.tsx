@@ -15,7 +15,7 @@ export function OverviewTradeCounts({
 }): React.JSX.Element {
   const s = data.partition.summary;
   return (
-    <StatCard title="Trade counts" icon={ListNumbers}>
+    <StatCard group="trade-counts" title="Trade counts" icon={ListNumbers}>
       <Stat id="winners" data={data} tone="text-gain">
         {s.wins}
       </Stat>
@@ -46,7 +46,7 @@ export function OverviewDayCounts({
     [entries, data.ctx.range],
   );
   return (
-    <StatCard title="Day counts" icon={CalendarCheck}>
+    <StatCard group="day-counts" title="Day counts" icon={CalendarCheck}>
       <Stat id="trading-days" data={data}>
         {data.partition.days.length}
       </Stat>

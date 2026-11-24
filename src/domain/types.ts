@@ -268,6 +268,8 @@ export interface UserPrefs {
   displayUnit: DisplayUnit;
   /** The trade log's columns, in order; undefined: its default set. */
   tradeColumns?: string[];
+  /** Overview figures the user switched off, as `group:figure` keys; undefined or empty: all show. */
+  overviewHidden?: string[];
   hideTradeSummary: boolean;
   /** What a calendar day shows, at most 3. */
   calendarStats: CalendarStat[];

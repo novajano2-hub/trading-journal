@@ -24,20 +24,25 @@ Picked by the user on 2026-11-22 from the TradeZella feature map (`docs/research
 
 | # | Item | Feature map IDs | Waiting on |
 |---|---|---|---|
-| 35 | Progress tracker: trading days, a daily discipline score from prepare/trade/reflect rules, custom checklist rules, heatmap, streaks, follow rate, and its dashboard card (absorbs E50) | PT1, PT2, DA3 | Comps |
-| 36 | Day page: plan mode (daily note, chart screenshots) and review mode (the day's trades and stats), with the day's checklist | DV1 | Comps, #35 |
-| 37 | Trade log grouped by day and by week, with a mini calendar | TR7 | Comps |
+| 35 | Progress tracker: trading days, a daily discipline score from prepare/trade/reflect rules, custom checklist rules, heatmap, streaks, follow rate, and its dashboard card (absorbs E50). The recording adds: a current streak, a score for the chosen date range, and today's progress as rules met over active rules; a daily checklist showing each rule's live value against its limit (start time, trades linked to a strategy, trades with a stop, trades past the per-trade loss cap, the day's loss against its cap); a rules table with condition, rule streak, average value and follow rate; a weekday-by-week heat grid with non-trading days unscored and today marked; the page follows the date range and account filters; the dashboard card shows today's score and a button to the checklist. | PT1, PT2, DA3 | Comps |
+| 36 | Day page: plan mode (daily note, chart screenshots) and review mode (the day's trades and stats), with the day's checklist. The recording adds: review mode lists the day's trades (symbol, outcome, entry, exit, net, Net ROI) with net, win rate and session length from first entry to last exit; plan mode has the note with a change-template choice and a screenshot drop zone; both modes carry the rules card and an import shortcut; the daily start routine marks the start-by rule met. | DV1 | Comps, #35 |
+| 37 | Trade log grouped by day and by week, with a mini calendar. The recording adds: a day card (running P&L chart that enlarges, a stat grid of trades, gross, winners and losers, commissions, win rate, volume and profit factor, open or add the day note, expand in place to the day's trade table); a mini calendar marking days green or red where a click filters to that day; a week card (a tile per weekday with net and count, a daily P&L bar chart, the stat grid, and the week's trades with a Day column). | TR7 | Comps |
 | 38 | Merge and split trades; move trades between accounts (absorbs E10) | TR8, TR9 | Comps |
-| 39 | Several targets and stops per trade with partial sizes; default stop/target rules and default commission/fee rules per account and instrument | TD3, SE4, SE5 | Comps |
-| 40 | Trade-behaviour flags computed by rules (back-to-back losses, winner turned loser, held a loser, scaling, high volume) as filters and trade badges | X7 | Comps |
+| 39 | Several targets and stops per trade with partial sizes; default stop/target rules and default commission/fee rules per account and instrument. The recording adds: each target and stop is entered in a chosen unit (price at least, the other units were not seen), with a quantity per level and an add-level control; the trade page shows the planned reward and risk in money. | TD3, SE4, SE5 | Comps |
+| 40 | Trade-behaviour flags computed by rules (back-to-back losses, winner turned loser, held a loser, scaling, high volume) as filters and trade badges. The recording adds the full flag list: back-to-back loss, drawdown four times the profit, held longer than average, green to breakeven, green to red, held onto a loser, high volume (top quarter), most time in drawdown, no drawdown, weak trade, profit five times the drawdown, red to green, scale in, scale out. The trade log gets a flag-count column, and a top-patterns summary gives each flag's share and count marked as strength, area to improve or neutral. Several flags need the price path inside a trade (#14). | X7 | Comps |
 | 42 | Edit history: field-level log of changes with their source | X8 | Comps |
-| 43 | Screenshots on trades and images in notes, stored locally; note column layouts, colours, font settings, version history, voice dictation | TD4, NB7, NB8, NB9 | Comps |
-| 44 | Missed trades logged against a strategy; a strategy template gallery written by us, with example trades | ST6, ST7 | Comps, template content |
-| 45 | Prop finances (payouts, fees, resets; totals invested, earned, net) and pass-rate / breach-reason insights | PF5, PF6 | Comps |
-| 46 | Saved dashboard layouts with widgets; balance, drawdown, time-of-day and duration charts on the dashboard (absorbs E51) | DA1, DA2 | Comps |
-| 47 | Getting started: first-run setup and sign-up survey (experience, capital, broker, instruments, goals, referral source) that tailor defaults; a getting-started checklist | ON1, ON2, ON3 | Comps |
+| 43 | Screenshots on trades and images in notes, stored locally; note column layouts, colours, font settings, version history, voice dictation. The recording adds: full-screen note editing, text alignment, a setting that strikes through ticked checklist items, and a live preview of the font settings. | TD4, NB7, NB8, NB9 | Comps |
+| 44 | Missed trades logged against a strategy; a strategy template gallery written by us, with example trades. The recording adds: the create flow opens a chooser (a template or a blank start) with an asset-class filter, search and a show-every-time choice. Templates stay ones we write; templates other users wrote on their platform are theirs and out of scope. | ST6, ST7 | Comps, template content |
+| 45 | Prop finances (payouts, fees, resets; totals invested, earned, net) and pass-rate / breach-reason insights. The recording adds: spend and payouts broken down by firm, challenge type, account size and expense type; the pass rate per firm (passed of attempted); the most common breach reasons, ranked. | PF5, PF6 | Comps |
+| 46 | Saved dashboard layouts with widgets; balance, drawdown, time-of-day and duration charts on the dashboard (absorbs E51). The recording adds widgets for: net daily P&L bars, a month calendar, an account balance line with deposits and withdrawals, a drawdown area, and time-of-day and duration scatters each with an entry or exit time switch. | DA1, DA2 | Comps |
+| 47 | Getting started: first-run setup and sign-up survey (experience, capital, broker, instruments, goals, referral source) that tailor defaults; a getting-started checklist. The recording adds: a checklist with a done count and next-step suggestions that follow the user's setup (for prop traders, setting up daily loss and max drawdown monitoring). | ON1, ON2, ON3 | Comps |
 | 48 | Import parsing in a worker (E44's worker part). Excel import was Plan 5's (E25, done) | — | — |
-| 49 | Cost method per account (LIFO, average); save the calendar as an image. The options report (days to expiry) and ticks, pips and points were Plan 5's, and are done | AC5, CA5 | Comps |
+| 49 | Cost method per account (LIFO, average); save the calendar as an image. The options report (days to expiry) and ticks, pips and points were Plan 5's, and are done. The recording adds: download the calendar image, or copy it to the clipboard. | AC5, CA5 | Comps |
+| 50 | Shell polish: collapse the sidebar to icons on desktop, and the Settings navigation likewise (with E52 and E55) | X10 | Comps |
+| 51 | Export a report as a PDF: any report page with its charts and tables in a print layout | RE9 | Comps |
+| 52 | Trade scale: where a trade's P&L sits between the largest loss and largest win of the set, as a trade-log column, a trade-page row, a strip on week cards and an average on reports. The two ends need settling first (with #37) | TR10 | Comps, a definition |
+| 53 | Strategy cover photo, stored locally (with #43) | ST10 | Comps, local file storage |
+| 54 | Performance metrics, second pass: the metrics left out of the first catalogue (account balance, daily drawdown series, logged days, average MAE and MFE, breakeven days and trades) as per-period and running series. Average drawdown was built in Task 25 | RE10 | Comps |
 
 ## Data in
 
@@ -65,7 +70,7 @@ Picked by the user on 2026-11-22 from the TradeZella feature map (`docs/research
 | 19 | Mentor mode (invite a mentor to view stats and journal) | Both | Multi-user | #1, #2 |
 | 20 | Spaces: rooms, shared trades, challenges, leaderboards | TZ | Multi-user and moderation | #19 |
 | 21 | Public or verified track record page | MTJ | Needs verified (synced) data | #10 |
-| 22 | AI assistant: Q&A on trades, auto-tagging, session review, pre-market plan | TZ | Needs backend and an LLM provider | #1 |
+| 22 | AI assistant: Q&A on trades, auto-tagging, session review, pre-market plan. The recording adds: generated recaps (a first-import analysis, weekly, monthly) listed by type with a viewed state; headline figures with a short reading; a story per trade. | TZ | Needs backend and an LLM provider | #1 |
 | 23 | Composite performance score (our own, not a copy of the Zella Score) | TZ (concept) | Needs design and validation | Metrics from M1 |
 
 ## Risk and routines
@@ -73,8 +78,8 @@ Picked by the user on 2026-11-22 from the TradeZella feature map (`docs/research
 | # | Item | Origin | Why deferred | Waiting on |
 |---|---|---|---|---|
 | 24 | Live prop-firm rule tracking (daily loss, trailing drawdown, consistency) with firm presets | TZ | Preview only in M1 | #1, #12, firm rule data |
-| 25 | Economic calendar in routines | TZ | Needs a data source | Provider choice |
-| 26 | Notifications and email recaps (daily/weekly) | — | Needs backend | #1, #2 |
+| 25 | Economic calendar in routines. The recording adds: event dots on calendar days with country and impact filters, an events overlay on a trade chart, and a page of events with actual, forecast and previous values. | TZ | Needs a data source | Provider choice |
+| 26 | Notifications and email recaps (daily/weekly). The recording adds: a notification centre with unread marks, mark all read and an action per item; weekly and monthly recap emails sent only once enough closed trades exist (the other journal uses at least four). | — | Needs backend | #1, #2 |
 | 27 | Options analytics (multi-leg spread grouping, Greeks) | — | Generic trades first | #13 for Greeks |
 
 ## Separate products
@@ -93,6 +98,18 @@ Picked by the user on 2026-11-22 from the TradeZella feature map (`docs/research
 | 32 | Free trading calculators (position size, R:R, pip value) | TZ | SEO play, not core | — |
 | 33 | Comparison pages vs. other journals | TZ | Needs careful, factual claims | Legal review |
 | 34 | Real social proof (testimonials, counts, ratings) | — | None exists; must not be invented | Real users |
+
+## From the TradeZella recording (backlog)
+
+Found by comparing a recorded TradeZella account with Keel (Part 2 of Plan 5). Each needs a backend, a new field or a decision before it is built.
+
+| # | Item | Origin | Why deferred | Waiting on |
+|---|---|---|---|---|
+| 55 | Swap and financing per trade: read from the import (pairs with E27), shown on the trade page and totalled on the Overview | TZ | Needs a new field and an import mapping | #11, E27 |
+| 56 | Choose which fields the trade page lists | TZ | Low value: Keel already shows every field | None |
+| 57 | Share a trade by link, as a read-only page (like the note share in the feature map, NB10) | TZ | Needs a backend | #1 |
+| 58 | Opt-in support access to the user's data, off by default | TZ | Needs a backend and accounts | #1, #2 |
+| 59 | Accounts list: search by name or broker, a filter and bulk select | TZ | Low value with a handful of accounts | None |
 
 ## Engineering follow-ups (from Plan 1 reviews)
 
@@ -222,3 +239,6 @@ Deferred minors from the Plan 5 module reviews, one line each, and the TradeZell
 | E115 | Task 22 bucket links: the Untagged bucket and the R report's "No stop" bucket have no filter (no "no tags" or "no initial risk" field), and sessions are cut in New York time, so none of the three is a link. A "no tags" filter and a session filter would complete it | Reports |
 | E116 | Task 22: (the currency part is closed: a `ccy` filter, carried by report links when trades span more than one currency). Duration and size buckets use an excluded upper bound (`_<5` in the address), which the More filters fields cannot yet write | Reports |
 | E117 | Task 29: the top and bottom 10 limiter is on Symbols by symbol only (not by instrument or price); the best win-rate highlight has no minimum trade count, so a one-trade bucket at 100% can win; trades with an entry or exit price of zero or below file in no price range; the Reports landing demo (`reports-demo`, `sample-view`) does not show the new views | Reports |
+| E118 | Notebook: the day card stays in money under a display unit that narrows the trade set (Ticks, Pips, Points, R), while the rest of the app narrows. Revisit if the card should follow the unit | Notebook |
+| E119 | Notebook editor: the Checklist slash command cannot insert a checklist inside a collapsible section | Notebook |
+| E120 | Task 31: Choose figures lists the Overview's figures from a fixed list in `overview-choice.tsx`, held to the page by a test; the group's checkboxes do not have a select-all or reset; "Last import" sits under the account name on desktop and is not shown in the phone rows; Import trades on a sample-workspace account opens Import with no account chosen, because imports land in My workspace only | Reports, Settings |

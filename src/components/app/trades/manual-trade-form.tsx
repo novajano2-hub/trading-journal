@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   useEffect,
   useId,
@@ -261,10 +261,13 @@ function Form({
   trade,
   accounts,
   prefsZone,
+  preferredAccountId,
 }: {
   trade: Trade | null;
   accounts: Account[];
   prefsZone: string;
+  /** An account to start on when adding (`?account=`); not in `accounts` (archived, unknown): ignored. */
+  preferredAccountId?: string | null;
 }) {
   const router = useRouter();
   const create = useCreateManualTrade();
@@ -272,7 +275,10 @@ function Form({
   const listId = useId();
   const nextKey = useRef(100);
 
-  const first = accounts.find((a) => a.id === trade?.accountId) ?? accounts[0]!;
+  const first =
+    accounts.find((a) => a.id === trade?.accountId) ??
+    (trade ? undefined : accounts.find((a) => a.id === preferredAccountId)) ??
+    accounts[0]!;
   const [init] = useState(() =>
     initialFor(trade, first, zoneOf(first, prefsZone)),
   );
@@ -957,6 +963,7 @@ export function ManualTradeForm({ tradeId }: { tradeId?: string }) {
   const accounts = useAccounts();
   const prefs = usePrefs();
   const trade = useTrade(tradeId ?? '');
+  const preferredAccountId = useSearchParams().get('account');
 
   if (
     !accounts.data ||
@@ -1012,6 +1019,7 @@ export function ManualTradeForm({ tradeId }: { tradeId?: string }) {
       trade={trade.data ?? null}
       accounts={usable}
       prefsZone={prefs.data.timeZone}
+      preferredAccountId={preferredAccountId}
     />
   );
 }
