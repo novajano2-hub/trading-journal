@@ -453,25 +453,38 @@ describe('below 640px', () => {
   });
 });
 
-test("an active account's menu offers Import trades and Add a trade, each opening its flow with that account", async () => {
+test('on the sample workspace the menu offers Add a trade but not Import trades, which lands only in My workspace', async () => {
   renderApp(<AccountsSettings />, { repository: repo(), url: URL });
   await openMenu('Futures main');
+  await screen.findByRole('menuitem', { name: 'Edit' });
+  expect(screen.queryByRole('menuitem', { name: 'Import trades' })).toBeNull();
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Add a trade' }));
+  await waitFor(() =>
+    expect(window.location.pathname + window.location.search).toBe(
+      '/app/trades/new?account=acc-a',
+    ),
+  );
+});
+
+test('in My workspace an active account offers Import trades, opening Import with that account', async () => {
+  const r = repo();
+  const made = await r.accounts.create('mine', {
+    name: 'Mine live',
+    broker: 'Broker',
+    type: 'live',
+    currency: 'USD',
+    startingBalance: 100_000,
+    status: 'active',
+  });
+  await r.workspaces.setActive('mine');
+  renderApp(<AccountsSettings />, { repository: r, url: URL });
+  await openMenu('Mine live');
   fireEvent.click(
     await screen.findByRole('menuitem', { name: 'Import trades' }),
   );
   await waitFor(() =>
     expect(window.location.pathname + window.location.search).toBe(
-      '/app/import?account=acc-a',
-    ),
-  );
-  window.history.replaceState(null, '', URL);
-  cleanup();
-  renderApp(<AccountsSettings />, { repository: repo(), url: URL });
-  await openMenu('Futures main');
-  fireEvent.click(await screen.findByRole('menuitem', { name: 'Add a trade' }));
-  await waitFor(() =>
-    expect(window.location.pathname + window.location.search).toBe(
-      '/app/trades/new?account=acc-a',
+      `/app/import?account=${made.id}`,
     ),
   );
 });

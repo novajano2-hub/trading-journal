@@ -186,8 +186,9 @@ export function AccountsSettings(): React.JSX.Element {
 
   const actions = (account: Account, tradeCount: number): MenuAction[] => [
     { label: 'Edit', onSelect: () => setDialog({ kind: 'edit', account }) },
-    // An archived account is read-only: nothing can be added to it.
-    ...(account.status === 'active'
+    // An archived account is read-only: nothing can be added to it. Imports land
+    // only in My workspace, so the sample's accounts do not offer Import.
+    ...(account.status === 'active' && workspace?.kind === 'user'
       ? [
           {
             label: 'Import trades',
@@ -196,6 +197,10 @@ export function AccountsSettings(): React.JSX.Element {
                 `/app/import?account=${encodeURIComponent(account.id)}`,
               ),
           },
+        ]
+      : []),
+    ...(account.status === 'active'
+      ? [
           {
             label: 'Add a trade',
             onSelect: () =>

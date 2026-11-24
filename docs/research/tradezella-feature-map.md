@@ -30,7 +30,7 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | X4 | Display unit switch: dollars, % return, R-multiple (built as seven units in one Display menu, beside the Gross/Net choice, and shown on every money figure) | Spec has gross/net; Gap 5 | P5, Done |
 | X5 | Privacy mode that hides every money figure (for screen sharing) | New | P5, Done |
 | X6 | Display in ticks, pips or points per instrument (moved into Plan 5) | New | P5, Done |
-| X7 | Trade-behaviour flags computed by rules, not AI: back-to-back losses, a winner that turned into a loser, holding a loser too long, scaling in/out, unusually high volume. They work as filters and on trades | New | P6 |
+| X7 | Trade-behaviour flags computed by rules, not AI: two losses in a row, a winner that gave back its whole gain, holding a loser too long, adding to or reducing a position, an unusually large size. They work as filters and on trades | New | P6 |
 | X8 | Field-level history of edits (entity, field, old value, new value, source: you, import or the app) | New | P6 |
 | X9 | Extra metrics: Sharpe, Sortino, max winning/losing streaks by day, avg daily win %, longest trading day | New | P5, Done |
 | X10 | Shell polish: collapse the sidebar to icons on desktop, and the Settings navigation likewise (with E52 and E55) | New (recording) | P6 (BACKLOG #50) |

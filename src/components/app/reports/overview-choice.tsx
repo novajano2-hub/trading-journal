@@ -320,6 +320,13 @@ export function ChooseFigures({
           </p>
         ) : null}
         <div className="sticky bottom-0 -mx-5 -mb-4 mt-4 flex justify-end gap-2 border-t border-line bg-surface-1 px-5 py-3">
+          <Button
+            variant="ghost"
+            onClick={() => setDraft(new Set())}
+            className="mr-auto"
+          >
+            Show all
+          </Button>
           <Button variant="secondary" onClick={() => setOpen(false)}>
             Cancel
           </Button>

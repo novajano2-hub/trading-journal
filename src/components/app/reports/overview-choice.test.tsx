@@ -179,3 +179,26 @@ test('hiding every key figure removes the key figures section', async () => {
   expect(root.querySelector('[data-kpi]')).toBeNull();
   expect(screen.getByRole('region', { name: 'Gross to net' })).toBeTruthy();
 });
+
+test('Show all turns every figure back on in the draft, and applies only at Save', async () => {
+  const { root, repo } = await page(['costs:commissions', 'key:win-rate']);
+  await waitFor(() =>
+    expect(root.querySelector('[data-kpi="win-rate"]')).toBeNull(),
+  );
+  const dialog = await openDialog();
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Show all' }));
+  expect(
+    within(dialog)
+      .getAllByRole('checkbox')
+      .every((b) => (b as HTMLInputElement).checked),
+  ).toBe(true);
+  // Not yet applied.
+  expect(root.querySelector('[data-kpi="win-rate"]')).toBeNull();
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+  await waitFor(() =>
+    expect(root.querySelector('[data-kpi="win-rate"]')).not.toBeNull(),
+  );
+  await waitFor(async () =>
+    expect((await repo.prefs.get()).overviewHidden).toEqual([]),
+  );
+});
