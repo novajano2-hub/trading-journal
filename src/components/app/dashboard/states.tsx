@@ -11,7 +11,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { IconTile } from '@/components/ui/icon-tile';
+import { unitEmptyCopy } from '@/content/display-units';
 import { StorageUnavailableError } from '@/data/repository';
+import type { TradeUnit } from '@/domain/metrics/units';
 import { CARD, CARD_PAD, HERO } from './shared';
 
 function Bar({ className }: { className: string }): React.JSX.Element {
@@ -194,6 +196,22 @@ function PlanPreview(): React.JSX.Element {
 }
 
 /**
+ * No closed trade the display unit reads: "No closed futures trades in these
+ * filters." The way back to Dollar is the line under the top bar, which says
+ * how many trades the unit left out.
+ */
+function UnitEmpty({ unit }: { unit: TradeUnit }): React.JSX.Element {
+  const { title, body } = unitEmptyCopy(unit);
+  return (
+    <StateBlock
+      visual={<IconTile icon={FunnelSimple} />}
+      title={title}
+      body={body}
+    />
+  );
+}
+
+/**
  * Why there is nothing to show, with the way out:
  * - `no-trades`: the workspace is empty, so Import or open the sample.
  * - `no-matches`: trades exist but the filters leave none, so Clear filters.
@@ -201,20 +219,27 @@ function PlanPreview(): React.JSX.Element {
  *   until one is unarchived or picked in the account filter.
  * - `no-closed`: every trade shown is still open. When `filtered`, it says
  *   the filters hold none closed and offers Clear filters.
+ * - `unit`: the display unit (`unit`) left out every closed trade the
+ *   filters matched; the line under the top bar switches back to Dollar.
  */
 export function DashboardEmpty({
   variant,
   filtered = false,
+  unit = 'r',
   onClearFilters,
   onOpenSample,
 }: {
-  variant: 'no-trades' | 'no-matches' | 'no-closed' | 'archived';
+  variant: 'no-trades' | 'no-matches' | 'no-closed' | 'archived' | 'unit';
   /** Any filter is set. */
   filtered?: boolean;
+  /** For `unit`: the unit that narrowed the trades. */
+  unit?: TradeUnit;
   onClearFilters(): void;
   onOpenSample(): void;
 }): React.JSX.Element {
   switch (variant) {
+    case 'unit':
+      return <UnitEmpty unit={unit} />;
     case 'no-trades':
       return (
         <StateBlock

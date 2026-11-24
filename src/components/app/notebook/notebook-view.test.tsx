@@ -47,7 +47,7 @@ const entry = (
  * that says "breakout" only in its body, a user folder "Ideas" with a note in
  * it, and a trade on the 19th: net $380.26, a win.
  */
-function sample() {
+function sample(edit?: (fx: SampleWorkspace) => void) {
   return async (): Promise<SampleWorkspace> => {
     const fx = fixtureSample();
     fx.journal[0]!.kind = 'trade-note';
@@ -113,6 +113,7 @@ function sample() {
         ],
       }),
     );
+    edit?.(fx);
     return fx;
   };
 }
@@ -126,12 +127,14 @@ async function openWith(
     >[0];
     /** Writes made before the page loads, which would not refresh a page already open. */
     prepare?: (repo: Repository, ideasId: string) => Promise<void>;
+    /** Changes to the sample before it is stored. */
+    edit?: (fx: SampleWorkspace) => void;
   } = {},
 ) {
   const repo = createLocalRepository({
     indexedDB: new IDBFactory(),
     IDBKeyRange,
-    sample: sample(),
+    sample: sample(opts.edit),
   });
   const ideas = await repo.folders.create(WS, 'Ideas');
   await repo.prefs.update(opts.prefs ?? {});
@@ -441,6 +444,44 @@ test("a trade note shows the trade's stats and a link to the trade", async () =>
   expect(
     within(card).getByRole('link', { name: 'Open trade' }).getAttribute('href'),
   ).toBe('/app/trades/f-1');
+});
+
+test("a trade's volume counts its quantity once, not every fill", async () => {
+  const fill = (
+    id: string,
+    side: 'buy' | 'sell',
+    qty: number,
+    price: number,
+  ) => ({
+    id,
+    accountId: 'acc-a',
+    symbol: 'ESZ5',
+    side,
+    qty,
+    price,
+    time: '2026-11-16T15:00:00.000Z',
+    fees: 0,
+    commission: 0,
+  });
+  await openWith('/app/notebook/j-1', {
+    edit: (fx) => {
+      // Two in, one more, then all three out: six contracts of fills, three traded.
+      Object.assign(fx.trades[0]!, {
+        maxPosition: 3,
+        executions: [
+          fill('e1', 'buy', 2, 6000),
+          fill('e2', 'buy', 1, 6000),
+          fill('x1', 'sell', 3, 6005),
+        ],
+      });
+    },
+  });
+  const card = await screen.findByRole('region', { name: "The trade's stats" });
+  const volume = (await within(card).findByText('Volume')).closest('div')!;
+  expect(volume.querySelector('b')!.textContent).toBe('3');
+  expect(
+    within(card).getByRole('button', { name: 'Volume' }).dataset.metricTip,
+  ).toBe('volume');
 });
 
 test('Privacy hides the day figures', async () => {

@@ -15,7 +15,11 @@ import type { MetricId } from '@/content/metric-definitions';
 import { winsVsLosses } from '@/domain/metrics/breakdowns';
 import { pnlOf } from '@/domain/metrics/context';
 import { timeSeries } from '@/domain/metrics/series';
-import { rExpectancy, summarize } from '@/domain/metrics/summary';
+import {
+  largestInUnit,
+  rExpectancy,
+  summarize,
+} from '@/domain/metrics/summary';
 import { isClosed } from '@/domain/trade-status';
 import { formatUnitValue, useDisplay } from '@/lib/display';
 import { formatDuration, formatPct, plural } from '@/lib/format';
@@ -115,8 +119,13 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
     const t = closed.find((c) => pnlOf(c, basis) === cents);
     return t ? display.ofTrade(t) : { money: cents };
   };
-  const largestWin = trade(s.largestWin);
-  const largestLoss = trade(s.largestLoss);
+  // In a unit, the trade largest in it; in money, the summary's.
+  const largest = (outcome: 'win' | 'loss', cents: number | null) => {
+    const t = largestInUnit(closed, ctx, outcome);
+    return t ? display.ofTrade(t) : trade(cents);
+  };
+  const largestWin = largest('win', s.largestWin);
+  const largestLoss = largest('loss', s.largestLoss);
   const fig = (f: { money: number } | null) =>
     f === null ? null : <FigureText f={display.figure(f, true, currency)} />;
   const drawdown = p.drawdown;
@@ -299,7 +308,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
           <Kpi
             id="green-days"
             data={data}
-            sub={`${ds.greenDays} of ${days.length} trading ${plural(days.length, 'day')}`}
+            sub={`${ds.greenDays} green, ${ds.redDays} red, ${ds.flatDays} flat`}
           >
             {ds.greenPct === null ? null : formatPct(ds.greenPct, 1)}
           </Kpi>
@@ -532,11 +541,6 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
             </Stat>
             <Stat id="trades-per-day" data={data} sub="closed">
               {ds.tradesPerDay === null ? null : ds.tradesPerDay.toFixed(1)}
-            </Stat>
-            <Stat id="avg-daily-win-rate" data={data}>
-              {p.avgDailyWinRate === null
-                ? null
-                : formatPct(p.avgDailyWinRate, 1)}
             </Stat>
             <Stat
               id="day-streaks"

@@ -4,7 +4,11 @@ import type { Account, UserPrefs } from '../domain/types';
 import { defaultPrefs } from './repository';
 import { riskRatios } from '../domain/metrics/risk';
 import { metricContextOf, metricsByCurrency } from './metrics';
-import { pctBaseOf } from '../lib/display';
+import { meanFigure, pctBaseOf, sumFigures, tradeFigure } from '../lib/display';
+import { classify } from '../domain/metrics/context';
+import { isClosed } from '../domain/trade-status';
+import type { DisplayUnit, Trade } from '../domain/types';
+import { applyFilters, EMPTY_FILTERS, narrowToUnit } from './filters';
 import { generateSampleWorkspace, SAMPLE_SEED } from './seed/generate';
 
 /** Spec §10 asks for 50 ms; the bound is 3x so load cannot flake it. */
@@ -108,6 +112,141 @@ test('metricContextOf maps prefs', () => {
     timeZone: 'Europe/London',
     breakevenRange: { unit: 'amount', from: -500, to: 500 },
     pnlBasis: 'gross',
+  });
+});
+
+test('a unit that narrows the set rides in the context; the others do not', () => {
+  const of = (displayUnit: DisplayUnit) =>
+    metricContextOf({ ...defaultPrefs(), displayUnit }).unit;
+  expect(of('ticks')).toBe('ticks');
+  expect(of('pips')).toBe('pips');
+  expect(of('points')).toBe('points');
+  expect(of('r')).toBe('r');
+  for (const u of ['dollar', 'percent', 'privacy'] as const)
+    expect(
+      'unit' in metricContextOf({ ...defaultPrefs(), displayUnit: u }),
+    ).toBe(false);
+});
+
+/**
+ * The sample as TradeZella imported it (it ends on 20 Nov 2026), read in the
+ * trader's New York days. The figures TradeZella showed on it are the pins
+ * (Part 2 rulings).
+ */
+describe('the sample under a narrowing unit, as TradeZella read it', () => {
+  const ws = generateSampleWorkspace({
+    seed: SAMPLE_SEED,
+    endDate: '2026-11-20',
+  });
+  const env = {
+    timeZone: 'America/New_York',
+    today: '2026-11-21',
+    accounts: ws.accounts,
+  };
+  const picked = (accountIds: string[], unit: DisplayUnit, range = {}) =>
+    narrowToUnit(
+      applyFilters(ws.trades, { ...EMPTY_FILTERS, accountIds, range }, env),
+      unit,
+    );
+  const metricsOf = (trades: Trade[], unit: DisplayUnit) =>
+    metricsByCurrency(trades, {
+      accounts: ws.accounts,
+      ctx: metricContextOf({
+        ...defaultPrefs(),
+        timeZone: 'America/New_York',
+        displayUnit: unit,
+      }),
+      baseCurrency: 'USD',
+    })[0]!;
+  const uctx = { ...ctx, unit: 'ticks' as const };
+
+  test('Futures live in Ticks: 574 trades, 50.52% won, profit factor 1.3689, +8,495 ticks', () => {
+    const trades = picked(['sample-futures'], 'ticks');
+    expect(trades).toHaveLength(574);
+    const m = metricsOf(trades, 'ticks');
+    expect(m.summary.closedCount + m.summary.openCount).toBe(574);
+    expect(m.summary.winRate).toBeCloseTo(0.5052, 4);
+    expect(m.summary.profitFactor).toBeCloseTo(1.3689, 4);
+    expect(m.summary.profitFactor!.toFixed(2)).toBe('1.37');
+    const closed = trades.filter(isClosed);
+    const figs = closed.map((t) => tradeFigure(t, uctx));
+    // Q3: each trade's ticks count every contract it closed.
+    expect(sumFigures(figs, null).ticks).toBe(8495);
+    const of = (o: 'win' | 'loss') =>
+      meanFigure(
+        closed
+          .filter((t) => classify(t, uctx).outcome === o)
+          .map((t) => tradeFigure(t, uctx)),
+        null,
+      ).ticks!;
+    expect(of('win')).toBeCloseTo(109.09, 2);
+    expect(of('loss')).toBeCloseTo(-81.38, 2);
+  });
+
+  test('every account in Ticks keeps only the futures trades, in Points too', () => {
+    for (const unit of ['ticks', 'points'] as const) {
+      const trades = picked([], unit);
+      expect(trades).toHaveLength(863);
+      expect(trades.every((t) => t.instrument.assetClass === 'future')).toBe(
+        true,
+      );
+    }
+  });
+
+  test('in Pips only the forex trades count: 48.97% won, profit factor 1.30, 31 green days of 56', () => {
+    const trades = picked([], 'pips');
+    expect(trades).toHaveLength(146);
+    expect(trades.every((t) => t.instrument.assetClass === 'forex')).toBe(true);
+    const m = metricsOf(trades, 'pips');
+    expect(m.summary.winRate).toBeCloseTo(0.4897, 4);
+    expect(m.summary.profitFactor!.toFixed(2)).toBe('1.30');
+    expect(m.daySummary).toMatchObject({ greenDays: 31, redDays: 25 });
+    expect(m.daySummary.greenPct).toBeCloseTo(0.5536, 4);
+  });
+
+  test('in R the trades without a stop leave the count', () => {
+    const all = picked([], 'dollar');
+    const trades = picked([], 'r');
+    expect(all).toHaveLength(1519);
+    expect(trades).toHaveLength(1300);
+    expect(
+      trades.every((t) => t.initialRisk !== undefined && t.initialRisk > 0),
+    ).toBe(true);
+    expect(metricsOf(trades, 'r').summary.noRiskCount).toBe(0);
+  });
+
+  test("Futures live's daily win rate is its winning-day share: 70 green days of 119, 58.82%", () => {
+    const m = metricsOf(picked(['sample-futures'], 'dollar'), 'dollar');
+    expect(m.days).toHaveLength(119);
+    expect(m.daySummary).toMatchObject({
+      greenDays: 70,
+      redDays: 49,
+      flatDays: 0,
+    });
+    expect(m.daySummary.greenPct).toBeCloseTo(0.5882, 4);
+  });
+
+  test('volume counts each trade once: Futures live 1,169, 9.82 a trading day', () => {
+    const m = metricsOf(picked(['sample-futures'], 'dollar'), 'dollar');
+    expect(m.volume).toBe(1169);
+    expect(m.avgDailyVolume).toBeCloseTo(1169 / 119, 10);
+    expect(m.avgDailyVolume!.toFixed(2)).toBe('9.82');
+  });
+
+  test('2 Nov 2026: four forex trades of 1.8, 1.5, 1.6 and 1.9 lots, volume 6.8', () => {
+    const day = { from: '2026-11-02', to: '2026-11-02' };
+    const trades = picked(['sample-forex-prop'], 'dollar', day);
+    expect(trades).toHaveLength(4);
+    expect(metricsOf(trades, 'dollar').volume).toBe(6.8);
+  });
+
+  test('balance figures have no value once the unit narrows the set', () => {
+    const futures = picked(['sample-futures'], 'ticks');
+    expect(metricsOf(futures, 'dollar').drawdown.pct).not.toBeNull();
+    expect(metricsOf(futures, 'ticks').drawdown.pct).toBeNull();
+    expect(metricsOf(futures, 'ticks').drawdown.amount).toBe(
+      metricsOf(futures, 'dollar').drawdown.amount,
+    );
   });
 });
 

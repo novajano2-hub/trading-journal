@@ -19,6 +19,7 @@ import {
   useTrade,
   useTrades,
 } from '@/data/query/hooks';
+import { tradeVolume } from '@/domain/metrics/summary';
 import { localDate } from '@/domain/time';
 import type { PnlBasis, Trade } from '@/domain/types';
 import {
@@ -27,7 +28,7 @@ import {
   useDisplay,
   type FigureSource,
 } from '@/lib/display';
-import { formatPct } from '@/lib/format';
+import { formatPct, formatQty } from '@/lib/format';
 import { InstrumentName, signTone } from '../dashboard/shared';
 import { LinkedTrades } from './linked-trades';
 import { useFigureSource } from './use-figure-source';
@@ -328,7 +329,8 @@ function StatsBody({
     true,
     cur,
   );
-  const volume = trade.executions.reduce((n, e) => n + e.qty, 0);
+  // Counted once, as the trade's quantity: not every fill.
+  const volume = tradeVolume(trade);
   const base =
     tradeFigure(trade, { ...source.ctx, pnlBasis: 'net' }).pct ?? null;
   return (
@@ -337,8 +339,18 @@ function StatsBody({
         <Kpi label="Net P&L" tone={signTone(trade.net)}>
           <FigureText f={net} />
         </Kpi>
-        <Kpi label="Quantity">{trade.maxPosition}</Kpi>
-        <Kpi label="Volume">{volume}</Kpi>
+        <Kpi label="Quantity">{formatQty(trade.maxPosition)}</Kpi>
+        <Kpi
+          label={
+            <MetricTip
+              id="volume"
+              basis={source.ctx.pnlBasis}
+              className="pointer-coarse:-my-3.5"
+            />
+          }
+        >
+          {formatQty(volume)}
+        </Kpi>
         <Kpi label="Commissions">
           <FigureText f={display.cash(trade.fees, false, cur)} />
         </Kpi>

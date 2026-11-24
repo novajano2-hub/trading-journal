@@ -3,7 +3,6 @@ import { makeTrade } from '../__fixtures__/trades';
 import { outcomeOf } from '../outcome';
 import { defaultMetricContext } from './context';
 import {
-  avgDailyWinRate,
   dailyPnl,
   dayDurations,
   dayStreaks,
@@ -231,21 +230,30 @@ describe('days booked by exit', () => {
     expect(dayDurations(t, ctx)).toEqual({ longest: 360, average: 210 });
     expect(dayDurations([], ctx)).toEqual({ longest: null, average: null });
   });
-  test('average daily win rate is the mean of each day win rate', () => {
+  test('the daily win rate is the share of winning days, with the green, red and flat counts', () => {
     const t = build([
-      // Mon: two wins and a loss
+      // Mon: two wins and a loss, green
       fill('a1', 'buy', 1, 5000, '2026-11-16T15:00:00Z'),
       fill('a2', 'sell', 1, 5010, '2026-11-16T15:10:00Z'),
       fill('b1', 'buy', 1, 5000, '2026-11-16T16:00:00Z'),
       fill('b2', 'sell', 1, 5010, '2026-11-16T16:10:00Z'),
       fill('c1', 'buy', 1, 5000, '2026-11-16T17:00:00Z'),
       fill('c2', 'sell', 1, 4990, '2026-11-16T17:10:00Z'),
-      // Tue: one win
+      // Tue: one win, green
       fill('d1', 'buy', 1, 5000, '2026-11-17T15:00:00Z'),
       fill('d2', 'sell', 1, 5010, '2026-11-17T15:10:00Z'),
+      // Wed: one loss, red
+      fill('e1', 'buy', 1, 5000, '2026-11-18T15:00:00Z'),
+      fill('e2', 'sell', 1, 4990, '2026-11-18T15:10:00Z'),
+      // Thu: flat
+      fill('f1', 'buy', 1, 5000, '2026-11-19T15:00:00Z'),
+      fill('f2', 'sell', 1, 5000, '2026-11-19T15:10:00Z'),
     ]);
-    expect(avgDailyWinRate(t, ctx)).toBeCloseTo(0.8333, 4);
-    expect(avgDailyWinRate([], ctx)).toBeNull();
+    const s = daySummary(dailyPnl(t, ctx), ctx);
+    expect(s).toMatchObject({ greenDays: 2, redDays: 1, flatDays: 1 });
+    // Two winning days of four: not the mean of each day's trade win rate (5/9).
+    expect(s.greenPct).toBe(0.5);
+    expect(daySummary([], ctx).greenPct).toBeNull();
   });
   test('a range clips day figures to the exits dated inside it', () => {
     // Opened 18 Nov, exits on the 19th and the 20th, the last lot still open.

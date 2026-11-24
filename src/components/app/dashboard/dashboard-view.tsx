@@ -27,6 +27,7 @@ import {
 import { StorageUnavailableError } from '@/data/repository';
 import { SAMPLE_WORKSPACE } from '@/data/workspaces';
 import { dailyPnl, type DayStat } from '@/domain/metrics/days';
+import { isTradeUnit } from '@/domain/metrics/units';
 import { goalWeek } from '@/domain/metrics/goals';
 import { localDate } from '@/domain/time';
 import {
@@ -286,18 +287,25 @@ export function DashboardView(): React.JSX.Element {
       accounts.length > 0 &&
       accounts.every((a) => a.status === 'archived') &&
       shownFilters.accountIds.length === 0;
+    // The display unit left out every closed trade: say so, not "none yet".
+    const unit = prefs?.displayUnit;
+    const narrowed =
+      (set.data?.unitLeftOut ?? 0) > 0 && isTradeUnit(unit) ? unit : undefined;
     const variant =
       allTrades.length === 0
         ? 'no-trades'
         : allArchived
           ? 'archived'
-          : filtered && set.data?.trades.length === 0
-            ? 'no-matches'
-            : 'no-closed';
+          : narrowed
+            ? 'unit'
+            : filtered && set.data?.trades.length === 0
+              ? 'no-matches'
+              : 'no-closed';
     return (
       <DashboardEmpty
         variant={variant}
         filtered={filtered}
+        unit={narrowed}
         onClearFilters={() => {
           focusOnReady.current = true;
           setFilters(EMPTY_FILTERS);

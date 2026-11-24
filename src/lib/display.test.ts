@@ -104,6 +104,17 @@ describe('formatFigure', () => {
       '+3.0 pts',
     );
   });
+  test('thousands group as money does: +8,495.0 ticks, −1,204.5 pips', () => {
+    expect(formatFigure({ money: 1, ticks: 8495 }, o('ticks')).text).toBe(
+      '+8,495.0 ticks',
+    );
+    expect(formatFigure({ money: -1, pips: -1204.5 }, o('pips')).text).toBe(
+      '−1,204.5 pips',
+    );
+    expect(formatFigure({ money: 0, ticks: 0.04 }, o('ticks')).text).toBe(
+      '0.0 ticks',
+    );
+  });
   test('a figure with no value in the unit shows its dollars', () => {
     expect(formatFigure({ money: 12345, r: null }, o('r')).text).toBe(
       '+$123.45',
@@ -133,6 +144,11 @@ describe('formatFigure', () => {
 });
 
 describe('tradeFigure', () => {
+  test('ticks count every contract the trade closed; points stay per contract (Q3)', () => {
+    const two = trade('ESZ6', 'long', 5000, 5003.25, { maxPosition: 2 });
+    expect(tradeFigure(two, ctx).ticks).toBe(26);
+    expect(tradeFigure(two, ctx).points).toBe(3.25);
+  });
   test('an ES long 5000 to 5003.25 is 13 ticks and 3.25 points, with no pips', () => {
     const f = tradeFigure(trade('ESZ6', 'long', 5000, 5003.25), ctx);
     expect(f.ticks).toBe(13);

@@ -2,6 +2,7 @@ import { quoteToPnl } from '../currency';
 import { toCents } from '../money';
 import { outcomeOf } from '../outcome';
 import type { BreakevenRange, Cents, PnlBasis, Trade } from '../types';
+import type { TradeUnit } from './units';
 
 export type { BreakevenRange, PnlBasis } from '../types';
 
@@ -15,6 +16,13 @@ export interface MetricContext {
    * trade-level sets are already chosen by the filters.
    */
   range?: { from?: string; to?: string };
+  /**
+   * The display unit, when it is one that narrows the trade set (R, ticks,
+   * pips or points): the set holds only the trades that carry it, and the
+   * ratios of money totals (profit factor, the win/loss ratio) read in it.
+   * Classifying a trade as a win or a loss stays on its P&L.
+   */
+  unit?: TradeUnit;
 }
 
 /** Whether a local date falls inside `range` (always, when there is none). */

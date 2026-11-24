@@ -127,24 +127,6 @@ export function dayDurations(
   };
 }
 
-/** The mean over days of each day's wins / (wins + losses); days with neither are left out. */
-export function avgDailyWinRate(
-  trades: readonly Trade[],
-  ctx: MetricContext,
-): number | null {
-  return winRateOfDays(dailyPnl(trades, ctx));
-}
-
-/** The mean over days of each day's wins / (wins + losses), from day stats already built. */
-export function winRateOfDays(days: readonly DayStat[]): number | null {
-  const rates = days
-    .filter((d) => d.wins + d.losses > 0)
-    .map((d) => d.wins / (d.wins + d.losses));
-  return rates.length === 0
-    ? null
-    : rates.reduce((s, r) => s + r, 0) / rates.length;
-}
-
 export function daySummary(
   days: readonly DayStat[],
   ctx: MetricContext,
@@ -152,6 +134,10 @@ export function daySummary(
   greenDays: number;
   redDays: number;
   flatDays: number;
+  /**
+   * The daily win rate: winning (green) days over trading days, flat days
+   * counted as trading days (Part 2, R2). Null with no days.
+   */
   greenPct: number | null;
   best: DayStat | null;
   worst: DayStat | null;

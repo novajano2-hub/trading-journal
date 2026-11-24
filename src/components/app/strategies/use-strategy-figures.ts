@@ -86,7 +86,9 @@ export function useStrategyData(): {
       !flows.data
     )
       return undefined;
-    const ctx = metricContextOf(prefs.data);
+    // The display unit doesn't narrow these figures yet: they read every
+    // trade, so their ratios stay on money (the unit reads only the sums).
+    const ctx = { ...metricContextOf(prefs.data), unit: undefined };
     const base = prefs.data.baseCurrency;
     const figures = new Map<string, StrategyFigures>();
     for (const strategy of strategies.data) {

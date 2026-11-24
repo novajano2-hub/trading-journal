@@ -27,7 +27,6 @@ export const METRIC_IDS = [
   'mfe',
   'sharpe',
   'sortino',
-  'avg-daily-win-rate',
   'longest-day',
   'day-streaks',
   'trading-days',
@@ -53,6 +52,7 @@ export const METRIC_IDS = [
   'no-stop',
   'r-expectancy',
   'avg-trade',
+  'volume',
   'prop-profit',
   'prop-profit-funded',
   'prop-drawdown-left',
@@ -147,7 +147,7 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'profit-factor': {
     label: 'Profit factor',
     definition:
-      'Total won divided by total lost, on {basis} P&L. None when there are no losing trades.',
+      'Total won divided by total lost, on {basis} P&L. In R, ticks, pips or points, the same totals in that unit, over the trades it reads. None when there are no losing trades.',
   },
   expectancy: {
     label: 'Expectancy',
@@ -157,7 +157,7 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   equity: {
     label: 'Equity',
     definition:
-      'Starting balances of the selected accounts plus cumulative {basis} P&L, after each closed trade.',
+      'Starting balances of the selected accounts plus cumulative {basis} P&L, after each closed trade. A balance has no value in R, ticks, pips or points.',
   },
   'net-roi': {
     label: 'Net ROI',
@@ -194,11 +194,6 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     definition:
       'Mean daily return divided by the downside deviation, the root of the average squared losing return over all days, times the square root of 252. None without a losing day.',
   },
-  'avg-daily-win-rate': {
-    label: 'Average daily win rate',
-    definition:
-      'For each day, wins divided by wins plus losses, then the mean over days. P&L is booked on the day of each exit, and days with no win or loss are left out.',
-  },
   'longest-day': {
     label: 'Day length',
     definition:
@@ -217,7 +212,7 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'green-days': {
     label: 'Green days',
     definition:
-      'Trading days that ended in profit, outside your breakeven range, as a share of all trading days. Flat days count as trading days.',
+      'The daily win rate: trading days that ended in profit, outside your breakeven range, as a share of all trading days, shown with the green, red and flat days. Flat days count as trading days.',
   },
   'best-day': {
     label: 'Best day',
@@ -258,12 +253,12 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'avg-win': {
     label: 'Average win',
     definition:
-      'Mean {basis} P&L of the winning trades. Breakeven trades, inside your breakeven range, are left out.',
+      'Mean {basis} P&L of the winning trades, or their mean in R, ticks, pips or points when you show one. Breakeven trades, inside your breakeven range, are left out.',
   },
   'avg-loss': {
     label: 'Average loss',
     definition:
-      'Mean {basis} P&L of the losing trades. Breakeven trades, inside your breakeven range, are left out.',
+      'Mean {basis} P&L of the losing trades, or their mean in R, ticks, pips or points when you show one. Breakeven trades, inside your breakeven range, are left out.',
   },
   'largest-win': {
     label: 'Largest win',
@@ -276,7 +271,7 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'max-drawdown': {
     label: 'Max drawdown',
     definition:
-      'The largest fall of the running total of your daily {basis} P&L from a peak day to a later low day, as a day-by-day line, with that fall as a share of the real balance on the peak day: the balance there plus the deposits and withdrawals dated up to it. A day books the trades by the day they exit, as the calendar does, and the line starts at the starting balances of the selected accounts. A dip within one day does not count.',
+      'The largest fall of the running total of your daily {basis} P&L from a peak day to a later low day, as a day-by-day line, with that fall as a share of the real balance on the peak day: the balance there plus the deposits and withdrawals dated up to it. A day books the trades by the day they exit, as the calendar does, and the line starts at the starting balances of the selected accounts. A dip within one day does not count. In R, ticks, pips or points the share has no value.',
   },
   'win-streak': {
     label: 'Longest win streak',
@@ -318,6 +313,11 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
       'Win rate times average winning R, plus loss rate times average losing R, over the decided trades that have a stop. What a trade is worth on average, in units of risk.',
   },
   // Prop firm rules read closed trades after fees, so they ignore the P&L basis.
+  volume: {
+    label: 'Volume',
+    definition:
+      'Contracts, lots or shares traded, each trade counted once by the quantity it opened, not by every fill.',
+  },
   'prop-profit': {
     label: 'Profit target',
     definition:

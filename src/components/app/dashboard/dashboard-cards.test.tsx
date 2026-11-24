@@ -562,7 +562,6 @@ test('every metric carries its definition', async () => {
     'mfe',
     'sharpe',
     'sortino',
-    'avg-daily-win-rate',
     'longest-day',
     'day-streaks',
     // On the calendar (Task 13).
@@ -598,6 +597,8 @@ test('every metric carries its definition', async () => {
     'rule-followed-pnl',
     'rule-followed-win-rate',
     'rule-followed-pf',
+    // On a trade note's stats card (Task 21).
+    'volume',
     // On a challenge's card (Task 19).
     'prop-profit',
     'prop-profit-funded',

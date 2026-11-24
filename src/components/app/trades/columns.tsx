@@ -19,7 +19,7 @@ import {
 } from '@/data/trade-rows';
 import { type MetricContext } from '@/domain/metrics/context';
 import type { Trade } from '@/domain/types';
-import { formatDuration } from '@/lib/format';
+import { formatDuration, formatQty } from '@/lib/format';
 import { formatUnitValue, tradeFigure, type Display } from '@/lib/display';
 import { shortTime } from '@/lib/time-format';
 import { InstrumentName, TradeTime, signTone } from '../dashboard/shared';
@@ -143,8 +143,7 @@ export const price = (n: number, tick: number) => {
     maximumFractionDigits: digits,
   });
 };
-export const qty = (n: number) =>
-  n.toLocaleString('en-US', { maximumFractionDigits: 4 });
+export const qty = formatQty;
 
 /** A column's text-or-number value for sorting; undefined sorts last. */
 function sortValue(

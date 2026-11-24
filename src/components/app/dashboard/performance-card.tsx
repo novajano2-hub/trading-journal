@@ -16,6 +16,8 @@ import type { DayStat } from '@/domain/metrics/days';
 import { summarize } from '@/domain/metrics/summary';
 import { closedInOrder } from '@/domain/trade-status';
 import type { Cents, PnlBasis, Trade } from '@/domain/types';
+import { UNIT_SCOPE } from '@/content/display-units';
+import { isTradeUnit } from '@/domain/metrics/units';
 import { leftOutIn, useDisplay, type TickerSpec } from '@/lib/display';
 import { plural } from '@/lib/format';
 import { CARD, CARD_PAD, CardHeader } from './shared';
@@ -214,6 +216,10 @@ export function PerformanceCard({
     display.figure({ money: cents }, false, currency);
   const start = balance(equity[0] ?? 0);
   const end = balance(equity[equity.length - 1] ?? 0);
+  // A balance means nothing in R, ticks, pips or points: it has no value there.
+  const noBalance = isTradeUnit(display.unit)
+    ? UNIT_SCOPE[display.unit].name
+    : null;
   const pnl = display.ofAll(performance.pnl);
   const pnlTicker = display.ticker(pnl, currency);
   const leftOut = leftOutIn(pnl, display.unit);
@@ -244,10 +250,17 @@ export function PerformanceCard({
               }
               className="pointer-coarse:-my-3.5"
             />{' '}
-            {/* The line's own label already says this to a screen reader. */}
-            <span aria-hidden="true" className="whitespace-nowrap tabular-nums">
-              {start.text} to {end.text}
-            </span>
+            {noBalance !== null ? (
+              <span className="font-medium">None</span>
+            ) : (
+              // The line's own label already says this to a screen reader.
+              <span
+                aria-hidden="true"
+                className="whitespace-nowrap tabular-nums"
+              >
+                {start.text} to {end.text}
+              </span>
+            )}
           </span>
         }
       />
@@ -285,7 +298,11 @@ export function PerformanceCard({
       </div>
       <Sparkline
         series={line.points}
-        label={`Equity, from ${start.label} to ${end.label}`}
+        label={
+          noBalance !== null
+            ? `Equity line, the balance has no value in ${noBalance}`
+            : `Equity, from ${start.label} to ${end.label}`
+        }
         className="mt-1.5 mb-2.5"
       />
       <div className="mt-auto grid grid-cols-3 border-t border-line">

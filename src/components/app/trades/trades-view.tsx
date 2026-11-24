@@ -23,6 +23,7 @@ import { IconTile } from '@/components/ui/icon-tile';
 import { MenuSelect, type MenuSelectOption } from '@/components/ui/menu-select';
 import { MetricTip } from '@/components/ui/metric-tip';
 import { Segmented } from '@/components/ui/segmented';
+import { unitEmptyCopy } from '@/content/display-units';
 import type { MetricId } from '@/content/metric-definitions';
 import { tradesCsv } from '@/data/csv-export';
 import { downloadCsv } from '@/lib/csv';
@@ -49,6 +50,7 @@ import {
 } from '@/data/trade-columns';
 import { rowFacts, type RowFacts } from '@/data/trade-rows';
 import { summarize } from '@/domain/metrics/summary';
+import { isTradeUnit } from '@/domain/metrics/units';
 import { isClosed } from '@/domain/trade-status';
 import { localDate } from '@/domain/time';
 import type { JournalEntry, Trade } from '@/domain/types';
@@ -483,6 +485,11 @@ export function TradesView(): React.JSX.Element {
     filters.status !== undefined ||
     filters.reviewed !== undefined ||
     search.trim() !== '';
+  // The display unit, when it left out some of the trades the filters matched.
+  const narrowed =
+    (set.data?.unitLeftOut ?? 0) > 0 && isTradeUnit(prefs.displayUnit)
+      ? prefs.displayUnit
+      : undefined;
 
   const savePrefs = (patch: Parameters<typeof updatePrefs.mutate>[0]) =>
     updatePrefs.mutate(patch);
@@ -723,7 +730,13 @@ export function TradesView(): React.JSX.Element {
         </div>
 
         {rows.length === 0 ? (
-          filtered ? (
+          narrowed && search.trim() === '' ? (
+            // The line under the top bar says how many it left out, and goes back to Dollar.
+            <StateBlock
+              icon={FunnelSimple}
+              {...unitEmptyCopy(narrowed, status)}
+            />
+          ) : filtered ? (
             <StateBlock
               icon={FunnelSimple}
               title="No trades match these filters."

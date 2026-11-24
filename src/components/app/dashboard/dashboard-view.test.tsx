@@ -573,7 +573,7 @@ function everyString(root: Element): string[] {
 }
 
 async function inUnit(
-  displayUnit: 'privacy' | 'percent' | 'r',
+  displayUnit: 'privacy' | 'percent' | 'r' | 'ticks',
   sample = graded,
 ) {
   const repository = repositoryWith(() => ({}), sample);
@@ -607,13 +607,16 @@ test('in Percentage the amounts read over the accounts, signed to two decimals',
   ).toBeGreaterThan(0);
 });
 
-test('in R a figure without a risk shows its dollars, so nothing is blank', async () => {
+test('in R with no trade that has a stop, the Dashboard says R reads none of them', async () => {
   await inUnit('r');
-  await screen.findByTestId('dashboard-ready');
-  const text = document.body.textContent ?? '';
-  expect(text).not.toMatch(/NaN|undefined|null/);
-  const plan = screen.getByRole('region', { name: 'Your plan, all time' });
-  expect(plan.textContent).toMatch(/−\$400\.00|−?\d+\.\d{2}R/);
+  expect(
+    await screen.findByText('No closed trades with a stop in these filters.'),
+  ).toBeTruthy();
+  expect(
+    screen.getByText('R-multiple counts trades with a stop only.'),
+  ).toBeTruthy();
+  expect(screen.queryByTestId('dashboard-ready')).toBeNull();
+  expect(document.body.textContent).not.toMatch(/NaN|undefined|null/);
 });
 
 test('under Privacy the screen-reader text of every amount reads "hidden amount", never the bullets', async () => {
@@ -645,8 +648,8 @@ test('under Privacy the screen-reader text of every amount reads "hidden amount"
   ).toBe(true);
 });
 
-test('under R an aggregate reports how many trades it leaves out, to a screen reader too', async () => {
-  // Only the first trade has a risk, so the others are left out of every R figure.
+test('under R the Dashboard reads only the trades with a stop, so no figure leaves one out', async () => {
+  // Only the first trade has a risk: the set is that trade alone.
   await inUnit(
     'r',
     sampleWith((s) => {
@@ -656,13 +659,32 @@ test('under R an aggregate reports how many trades it leaves out, to a screen re
   await screen.findByTestId('dashboard-ready');
   const text = (e: Element) => e.textContent ?? '';
   const pnl = screen.getByTestId('kpi-pnl');
+  // f-1 lost $400 on a $100 risk.
+  expect(pnl.textContent).toContain('−4.00R');
   const heard = [
+    document.body.textContent ?? '',
     ...Array.from(pnl.querySelectorAll('.sr-only')).map(text),
     ...Array.from(document.body.querySelectorAll('[aria-label]')).map(
       (e) => e.getAttribute('aria-label') ?? '',
     ),
   ];
-  expect(heard.some((s) => /\d+ trades? left out/.test(s))).toBe(true);
+  expect(heard.some((s) => /left out/.test(s))).toBe(false);
+  const recent = screen.getByRole('table', { name: 'Recent trades' });
+  expect(within(recent).getAllByRole('row').slice(1)).toHaveLength(1);
+});
+
+test('under Ticks the balance has no value: the equity reads None', async () => {
+  await inUnit('ticks');
+  await screen.findByTestId('dashboard-ready');
+  const perf = screen.getByRole('region', { name: 'Performance' });
+  expect(perf.textContent).not.toMatch(/\$\d/);
+  expect(
+    within(perf).getByRole('img', {
+      name: 'Equity line, the balance has no value in Ticks',
+    }),
+  ).toBeTruthy();
+  const equity = within(perf).getByRole('button', { name: 'Equity' });
+  expect(equity.parentElement!.textContent).toBe('Equity None');
 });
 
 test("a trade with no mistake in a rule's drill-down can be tagged on the spot (E46)", async () => {

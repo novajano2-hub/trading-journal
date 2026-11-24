@@ -10,6 +10,7 @@ import { localDate } from '@/domain/time';
 import {
   applyFilters,
   mergeFilterParams,
+  narrowToUnit,
   parseFilters,
   queryString,
   resolveRange,
@@ -137,11 +138,14 @@ export function useGlobalFilters(): {
 export interface TradeSet {
   /** The filters as applied: cleaned of ids the workspace doesn't have. Chips read these. */
   filters: GlobalFilters;
+  /** The trades the filters match that the display unit reads. */
   trades: Trade[];
-  /** The same filters except the date: what the day figures are built from. */
+  /** The same filters except the date, narrowed the same way: what the day figures are built from. */
   dayTrades: Trade[];
   /** The selected accounts: the active ones when no account is filtered. */
   accounts: Account[];
+  /** The trades the filters matched that the display unit leaves out (R, ticks, pips, points); 0 otherwise. */
+  unitLeftOut: number;
 }
 
 /**
@@ -162,6 +166,9 @@ export interface TradeSet {
  *   days books each exit on its own day and only those in the range. They
  *   are built from `dayTrades` (every filter but the date), so an exit in the
  *   range counts even when its trade is matched outside it.
+ * - The display unit narrows both sets (Part 2, U1): Ticks and Points keep the
+ *   futures trades, Pips the forex trades, R those with an initial risk.
+ *   `unitLeftOut` counts the matched trades it drops.
  */
 export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
   const trades = useTrades();
@@ -173,6 +180,7 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
 
   const filterKey = serializeFilters(filters).toString();
   const timeZone = prefs.data?.timeZone;
+  const unit = prefs.data?.displayUnit ?? 'dollar';
   const today =
     timeZone === undefined
       ? undefined
@@ -201,11 +209,17 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
       breakevenRange: prefs.data?.breakevenRange,
       pnlBasis: prefs.data?.pnlBasis,
     };
+    const matched = applyFilters(trades.data, clean, env);
+    const kept = narrowToUnit(matched, unit);
     return {
       filters: clean,
-      trades: applyFilters(trades.data, clean, env),
-      dayTrades: applyFilters(trades.data, { ...clean, range: {} }, env),
+      trades: kept,
+      dayTrades: narrowToUnit(
+        applyFilters(trades.data, { ...clean, range: {} }, env),
+        unit,
+      ),
       accounts: selectedAccounts(accounts.data, clean),
+      unitLeftOut: matched.length - kept.length,
     };
   }, [
     trades.data,
@@ -217,6 +231,7 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
     filterKey,
     prefs.data?.breakevenRange,
     prefs.data?.pnlBasis,
+    unit,
   ]);
 
   return { ...state, data: state.status === 'success' ? data : undefined };

@@ -11,6 +11,7 @@ import { MobileNav } from './mobile-nav';
 import { SampleLabel } from './sample-label';
 import { Sidebar } from './sidebar';
 import { TopBar } from './top-bar';
+import { UnitNotice } from './unit-notice';
 
 /** The chips as prerendered, before the URL is read: all unset and inert. */
 const FILTERS_FALLBACK = (
@@ -66,6 +67,10 @@ export function AppShell({
           basis={<DisplayMenu />}
           label={<SampleLabel />}
         />
+        {/* How many trades the display unit leaves out of the page, when it narrows them. */}
+        <Suspense fallback={null}>
+          <UnitNotice />
+        </Suspense>
         <main
           id="content"
           tabIndex={-1}

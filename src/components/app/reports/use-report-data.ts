@@ -19,6 +19,7 @@ import {
 } from '@/data/query/hooks';
 import { StorageUnavailableError } from '@/data/repository';
 import type { MetricContext } from '@/domain/metrics/context';
+import { isTradeUnit, type TradeUnit } from '@/domain/metrics/units';
 import { localDate } from '@/domain/time';
 import type { PnlBasis } from '@/domain/types';
 import { pctBaseOf, type FigureSource } from '@/lib/display';
@@ -49,6 +50,8 @@ export type ReportState =
       state: 'empty';
       variant: 'no-trades' | 'no-closed';
       filtered: boolean;
+      /** The display unit, when it left out trades the filters matched. */
+      unit?: TradeUnit;
       clearFilters(): void;
     }
   | { state: 'ready'; data: ReportData };
@@ -135,13 +138,18 @@ export function useReportData(): ReportState {
       },
     };
   if (!view || !shown || !allTrades || !prefs) return { state: 'loading' };
-  if (view.none)
+  if (view.none) {
+    const unit = prefs.displayUnit;
     return {
       state: 'empty',
       variant: allTrades.length === 0 ? 'no-trades' : 'no-closed',
       filtered: hasActiveFilters(shown),
+      ...((set.data?.unitLeftOut ?? 0) > 0 && isTradeUnit(unit)
+        ? { unit }
+        : {}),
       clearFilters: () => setFilters(EMPTY_FILTERS),
     };
+  }
   return {
     state: 'ready',
     data: {

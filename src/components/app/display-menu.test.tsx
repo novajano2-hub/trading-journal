@@ -65,8 +65,8 @@ test('the units are one radio group, the basis another', async () => {
   open('Net, $, show as Dollar');
   const units = await screen.findByRole('group', { name: 'Show as' });
   expect(
-    Array.from(units.querySelectorAll('[role="menuitemradio"]')).map(
-      (n) => n.textContent,
+    Array.from(units.querySelectorAll('[role="menuitemradio"]')).map((n) =>
+      n.getAttribute('aria-label'),
     ),
   ).toEqual([
     'Dollar',
@@ -100,4 +100,23 @@ test('with no trades the P&L group is unavailable and changes nothing; the unit 
   await waitFor(async () =>
     expect((await repository.prefs.get()).displayUnit).toBe('percent'),
   );
+});
+
+test('under each unit that narrows the trades, the menu says which it keeps', async () => {
+  renderApp(<DisplayMenu />);
+  open('Net, $, show as Dollar');
+  const keeps = async (name: string) => {
+    const item = await screen.findByRole('menuitemradio', { name });
+    const id = item.getAttribute('aria-describedby');
+    return id === null ? null : document.getElementById(id)!.textContent;
+  };
+  expect(await keeps('R-multiple')).toBe('Trades with a stop only');
+  expect(await keeps('Ticks')).toBe('Futures trades only');
+  expect(await keeps('Pips')).toBe('Forex trades only');
+  expect(await keeps('Points')).toBe('Futures trades only');
+  // Its visible name leads the item, so the label is in the name.
+  const ticks = await screen.findByRole('menuitemradio', { name: 'Ticks' });
+  expect(ticks.textContent).toBe('TicksFutures trades only');
+  for (const name of ['Dollar', 'Percentage', 'Privacy'])
+    expect(await keeps(name)).toBeNull();
 });

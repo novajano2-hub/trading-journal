@@ -48,6 +48,11 @@ export function adherenceDigits(ratio: number): 0 | 1 {
   return whole === formatPct(0, 0) || whole === formatPct(1, 0) ? 1 : 0;
 }
 
+/** A quantity of contracts, lots or shares: grouped, up to four decimals, no binary noise (1.8, not 1.7999999999999998). */
+export function formatQty(n: number): string {
+  return n.toLocaleString('en-US', { maximumFractionDigits: 4 });
+}
+
 /** A plain ratio such as profit factor, to two decimals. */
 export function formatRatio(value: number, digits = 2): string {
   return value.toFixed(digits);

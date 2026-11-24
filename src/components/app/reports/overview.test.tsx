@@ -88,7 +88,7 @@ test('two charts, by realization date, and both are labelled', async () => {
   expect(within(page).getByRole('img', { name: /Daily net P&L/ })).toBeTruthy();
 });
 
-test('every metric on the page has a definition, and the six held back from the dashboard are here', async () => {
+test('every metric on the page has a definition, and the five held back from the dashboard are here', async () => {
   renderApp(<OverviewView />, { sample: reportsSample, url: URL });
   const page = await ready();
   const ids = new Set(
@@ -102,11 +102,22 @@ test('every metric on the page has a definition, and the six held back from the 
     'net-roi',
     'sharpe',
     'sortino',
-    'avg-daily-win-rate',
     'longest-day',
     'day-streaks',
   ])
     expect(ids.has(id), id).toBe(true);
+});
+
+test('the daily win rate is shown once, as green days: the winning-day share with the green, red and flat counts', async () => {
+  renderApp(<OverviewView />, { sample: reportsSample, url: URL });
+  const page = await ready();
+  // Mon +60, Tue +100, Wed -80, Thu +45: three winning days of four.
+  const cell = page.querySelector('[data-kpi="green-days"]')!;
+  expect(cell.textContent).toContain('75.0%');
+  expect(cell.textContent).toContain('3 green, 1 red, 0 flat');
+  // The old mean of each day's trade win rate is gone, under any name.
+  expect(page.querySelector('[data-stat="avg-daily-win-rate"]')).toBeNull();
+  expect(page.textContent).not.toContain('Average daily win rate');
 });
 
 test('Privacy leaves no dollar amount anywhere on the page', async () => {
@@ -204,7 +215,10 @@ test('the cumulative line carries the max drawdown band, and a clean run has non
   expect(again.container.querySelector('[data-band="drawdown"]')).toBeNull();
 });
 
-async function inUnit(unit: 'r' | 'privacy', sample = breakdownSample) {
+async function inUnit(
+  unit: 'r' | 'privacy' | 'ticks',
+  sample = breakdownSample,
+) {
   const repository = createLocalRepository({
     indexedDB: new IDBFactory(),
     IDBKeyRange,
@@ -323,4 +337,48 @@ test('the cumulative readout gives that day and its trades', async () => {
   expect(readout.textContent).toContain('Tue 3 Nov');
   expect(readout.textContent).toMatch(/That day\s*\+\$100\.00/);
   expect(readout.textContent).toMatch(/Trades\s*2/);
+});
+
+/** Three ES longs on Mon 2 Nov: +8 ticks for +$100, +4 for +$10, -6 for -$200; and a stock trade. */
+async function ticksSample() {
+  const s = await breakdownSample();
+  const es = s.trades[0]!;
+  const at = (avgExit: number, net: number, id: string) => ({
+    ...es,
+    id,
+    net,
+    gross: net,
+    avgEntry: 4500,
+    avgExit,
+    maxPosition: 1,
+    initialRisk: undefined,
+  });
+  s.trades = [
+    at(4502, 10000, 'k-1'),
+    at(4501, 1000, 'k-2'),
+    { ...at(4498.5, -20000, 'k-3'), closedAt: '2026-11-03T16:00:00Z' },
+    { ...s.trades[4]!, id: 'k-4', net: 50000, gross: 50000 },
+  ];
+  return s;
+}
+
+test('in Ticks the figures read the futures trades alone, profit factor and averages in ticks, and drawdown has no %', async () => {
+  renderApp(<OverviewView />, {
+    repository: await inUnit('ticks', ticksSample),
+    url: URL,
+  });
+  const page = await ready();
+  const kpi = (id: string) =>
+    page.querySelector(`[data-kpi="${id}"]`)!.textContent;
+  // The stock trade is left out: three trades, two won.
+  expect(kpi('pnl')).toContain('3 closed trades');
+  expect(kpi('win-rate')).toContain('66.7%');
+  // 12 ticks won over 6 lost; in dollars it would be 0.55.
+  expect(kpi('profit-factor')).toContain('2.00');
+  expect(kpi('avg-win')).toContain('+6.0 ticks');
+  expect(kpi('avg-loss')).toContain('−6.0 ticks');
+  expect(kpi('largest-win')).toContain('+8.0 ticks');
+  expect(kpi('largest-loss')).toContain('−6.0 ticks');
+  expect(kpi('max-drawdown')).toContain('from a peak');
+  expect(kpi('max-drawdown')).not.toContain('%');
 });

@@ -11,11 +11,13 @@ import {
   subMonths,
 } from 'date-fns';
 import { classify } from '../domain/metrics/context';
+import { unitKeeps } from '../domain/metrics/units';
 import { localDate, localParts } from '../domain/time';
 import type {
   Account,
   BreakevenRange,
   Direction,
+  DisplayUnit,
   PnlBasis,
   Trade,
 } from '../domain/types';
@@ -603,6 +605,18 @@ export function applyFilters(
     }
     return true;
   });
+}
+
+/**
+ * The trades a display unit reads: Ticks and Points the futures, Pips the
+ * forex, R those with an initial risk; every trade under Dollar, Percentage
+ * and Privacy. Applied after the filters, so a page's set narrows to the unit.
+ */
+export function narrowToUnit(
+  trades: readonly Trade[],
+  unit: DisplayUnit,
+): Trade[] {
+  return trades.filter((t) => unitKeeps(unit, t));
 }
 
 /** Drops ids that don't exist in the current workspace so a stale or foreign link doesn't blank the view. */

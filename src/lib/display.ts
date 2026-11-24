@@ -5,7 +5,11 @@ import { metricContextOf } from '@/data/metrics';
 import { usePrefs } from '@/data/query/hooks';
 import { balanceAt, dayBefore } from '@/domain/metrics/balance';
 import { costBasis, pnlOf, type MetricContext } from '@/domain/metrics/context';
-import { rOf } from '@/domain/metrics/summary';
+import {
+  TRADE_UNITS,
+  tradeUnits,
+  type TradeUnit,
+} from '@/domain/metrics/units';
 import type {
   Account,
   CashFlow,
@@ -14,9 +18,6 @@ import type {
   Trade,
 } from '@/domain/types';
 import { formatMoney, formatPnl, plural } from './format';
-
-/** The units a figure can carry besides dollars and a percentage. */
-type TradeUnit = 'r' | 'ticks' | 'pips' | 'points';
 
 /**
  * One amount in every unit it has. `money` is always there; a unit it can't be
@@ -48,35 +49,20 @@ export interface FormatOptions {
 /** Rounds away binary noise: 0.00205 / 0.0001 is 20.499999999999996. */
 const clean = (n: number) => Math.round(n * 1e6) / 1e6;
 
-/** One trade in every unit. Ticks and points are futures', pips forex's; the rest are null. */
+/**
+ * One trade in every unit (`tradeUnits`): ticks and points are futures',
+ * pips forex's, R needs an initial risk; the rest are null. Ticks count every
+ * contract the trade closed; points and pips are per contract or lot.
+ */
 export function tradeFigure(t: Trade, ctx: MetricContext): Figure {
   const money = pnlOf(t, ctx.pnlBasis);
   const base = costBasis(t);
-  const r = rOf(t, ctx.pnlBasis);
-  const { instrument } = t;
-  let points: number | null = null;
-  if (t.avgExit !== undefined) {
-    points = clean(
-      (t.avgExit - t.avgEntry) * (t.direction === 'long' ? 1 : -1),
-    );
-  }
-  const future = instrument.assetClass === 'future';
-  const forex = instrument.assetClass === 'forex';
-  const pip = instrument.quoteCurrency === 'JPY' ? 0.01 : 0.0001;
   return {
     money,
     pct: base > 0 ? money / base : null,
-    r: r === undefined ? null : r,
-    ticks:
-      points !== null && future && instrument.tickSize > 0
-        ? clean(points / instrument.tickSize)
-        : null,
-    pips: points !== null && forex ? clean(points / pip) : null,
-    points: future ? points : null,
+    ...tradeUnits(t, ctx.pnlBasis),
   };
 }
-
-const UNITS: readonly TradeUnit[] = ['r', 'ticks', 'pips', 'points'];
 
 /** The figure's sum, its percentage over `pctBase` (null without one). A unit sums over the trades that have it; the others are counted as left out. */
 export function sumFigures(
@@ -89,7 +75,7 @@ export function sumFigures(
     pct: pctBase !== null && pctBase > 0 ? money / pctBase : null,
   };
   const leftOutBy: Partial<Record<TradeUnit, number>> = {};
-  for (const u of UNITS) {
+  for (const u of TRADE_UNITS) {
     const have = figs.flatMap((f) => f[u] ?? []);
     out[u] = have.length === 0 ? null : clean(have.reduce((a, b) => a + b, 0));
     leftOutBy[u] = figs.length - have.length;
@@ -113,7 +99,7 @@ export function meanFigure(
     money,
     pct: pctBase !== null && pctBase > 0 ? money / pctBase : null,
   };
-  for (const u of UNITS) {
+  for (const u of TRADE_UNITS) {
     const have = figs.filter((f) => f[u] !== null && f[u] !== undefined).length;
     out[u] = sum[u] == null || have === 0 ? null : clean(sum[u] / have);
   }
@@ -138,10 +124,14 @@ export function shownUnit(f: Figure, unit: DisplayUnit): DisplayUnit {
   return unitValue(f, unit) === null ? 'dollar' : unit;
 }
 
-/** `+`, a minus (U+2212) or nothing for a number that rounds to zero. */
+/** `+`, a minus (U+2212) or nothing for a number that rounds to zero; thousands grouped, as money is. */
 function signed(value: number, digits: number, on: boolean): string {
-  const body = Math.abs(value).toFixed(digits);
-  if (Number(body) === 0 || value === 0) return body;
+  const fixed = Math.abs(value).toFixed(digits);
+  const body = Number(fixed).toLocaleString('en-US', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+  if (Number(fixed) === 0 || value === 0) return body;
   if (value < 0) return `−${body}`;
   return on ? `+${body}` : body;
 }

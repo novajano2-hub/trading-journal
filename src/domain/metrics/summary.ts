@@ -5,10 +5,12 @@ import type { Cents, Trade } from '../types';
 import {
   classify,
   costBasis,
-  pnlOf,
   type MetricContext,
   type PnlBasis,
 } from './context';
+import { rOf, unitOf, type TradeUnit } from './units';
+
+export { rOf } from './units';
 
 /** `netPnl`/`grossPnl` are always the true net and gross totals; `basis` says which one every other figure uses. */
 export interface Summary {
@@ -23,9 +25,11 @@ export interface Summary {
   /** Which P&L every classification, sum and ratio below is computed on. */
   basis: PnlBasis;
   winRate: number | null;
+  /** Total won over total lost, on the basis P&L; in `ctx.unit` when the context has one. */
   profitFactor: number | null;
   avgWin: Cents | null;
   avgLoss: Cents | null;
+  /** The average win over the size of the average loss; in `ctx.unit` when the context has one. */
   winLossRatio: number | null;
   expectancy: Cents | null;
   avgRealizedR: number | null;
@@ -40,13 +44,6 @@ export interface Summary {
   netRoi: number | null;
   /** Sorted distinct pnlCurrency values of the closed trades; more than one means the set is mixed. */
   currencies: string[];
-}
-
-/** Realized R: P&L on the basis / initialRisk, only when initialRisk > 0. */
-export function rOf(trade: Trade, basis: PnlBasis): number | undefined {
-  if (trade.initialRisk === undefined || !(trade.initialRisk > 0))
-    return undefined;
-  return pnlOf(trade, basis) / trade.initialRisk;
 }
 
 /** Planned R: |target - entry| / |entry - stop|; needs both a target and a stop distinct from the entry. */
@@ -74,6 +71,83 @@ export function riskFromStop(trade: Trade, stop: number): Cents {
 const sum = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0);
 const ratio = (n: number, d: number): number | null => (d === 0 ? null : n / d);
 
+/** Rounds away binary noise: lots of 1.8 and 1.5 are 3.3, not 3.3000000000000003. */
+const clean = (n: number) => Math.round(n * 1e6) / 1e6;
+
+/**
+ * A trade's volume: its quantity counted once, the contracts, lots or shares
+ * its opening fills bought or sold, not every fill (Part 2 ruling). A trade
+ * with no fills counts its size.
+ */
+export function tradeVolume(t: Trade): number {
+  if (t.executions.length === 0) return t.maxPosition;
+  return clean(
+    t.executions.reduce(
+      (n, e) =>
+        (e.side === 'buy') === (t.direction === 'long') ? n + e.qty : n,
+      0,
+    ),
+  );
+}
+
+/** The volume of a set: each trade's quantity, counted once, open trades included. */
+export function volumeOf(trades: readonly Trade[]): number {
+  return clean(trades.reduce((n, t) => n + tradeVolume(t), 0));
+}
+
+/**
+ * Total won over total lost and the average win over the average loss, in a
+ * trade unit. Wins and losses are the trades `classify` calls so, on their
+ * P&L, as for the win rate; their values are read in the unit. A loss total
+ * that is not below zero has no profit factor.
+ */
+function unitRatios(
+  wins: readonly Trade[],
+  losses: readonly Trade[],
+  unit: TradeUnit,
+  basis: PnlBasis,
+): { profitFactor: number | null; winLossRatio: number | null } {
+  const values = (ts: readonly Trade[]) =>
+    ts.flatMap((t) => unitOf(t, unit, basis) ?? []);
+  const won = values(wins);
+  const lost = values(losses);
+  const lostSum = sum(lost);
+  const avgWin = ratio(sum(won), won.length);
+  const avgLoss = ratio(lostSum, lost.length);
+  return {
+    profitFactor:
+      lost.length === 0 || lostSum >= 0 ? null : sum(won) / -lostSum,
+    winLossRatio:
+      avgWin === null || avgLoss === null || avgLoss >= 0
+        ? null
+        : avgWin / -avgLoss,
+  };
+}
+
+/**
+ * Under `ctx.unit`, the closed trade `classify` calls a win (or a loss) that is
+ * largest in that unit: the most ticks won, or lost. Undefined without a unit
+ * or without such a trade. In money the summary's `largestWin` and
+ * `largestLoss` say it; a unit can rank the trades otherwise (a five-lot win in
+ * ticks against a one-lot win in dollars).
+ */
+export function largestInUnit(
+  trades: readonly Trade[],
+  ctx: MetricContext,
+  outcome: 'win' | 'loss',
+): Trade | undefined {
+  const { unit } = ctx;
+  if (!unit) return undefined;
+  let best: { t: Trade; v: number } | undefined;
+  for (const t of trades) {
+    if (!isClosed(t) || classify(t, ctx).outcome !== outcome) continue;
+    const v = unitOf(t, unit, ctx.pnlBasis);
+    if (v === null) continue;
+    if (!best || (outcome === 'win' ? v > best.v : v < best.v)) best = { t, v };
+  }
+  return best?.t;
+}
+
 /**
  * Aggregate closed trades. The input must be a single-currency set (the data layer
  * partitions by pnlCurrency first); `currencies` lets the UI warn when it is not.
@@ -84,6 +158,14 @@ export function summarize(
 ): Summary {
   const closed = trades.filter(isClosed);
   const classified = closed.map((t) => classify(t, ctx));
+  const inUnit = ctx.unit
+    ? unitRatios(
+        closed.filter((_, i) => classified[i]!.outcome === 'win'),
+        closed.filter((_, i) => classified[i]!.outcome === 'loss'),
+        ctx.unit,
+        ctx.pnlBasis,
+      )
+    : undefined;
   const winNets = classified
     .filter((c) => c.outcome === 'win')
     .map((c) => c.value);
@@ -127,11 +209,16 @@ export function summarize(
     grossPnl: sum(closed.map((t) => t.gross)),
     fees: sum(closed.map((t) => t.fees)),
     winRate: ratio(wins, decisive),
-    profitFactor: losses === 0 ? null : ratio(winSum, Math.abs(lossSum)),
+    profitFactor: inUnit
+      ? inUnit.profitFactor
+      : losses === 0
+        ? null
+        : ratio(winSum, Math.abs(lossSum)),
     avgWin: avgWinRaw === null ? null : roundHalfEven(avgWinRaw),
     avgLoss: avgLossRaw === null ? null : roundHalfEven(avgLossRaw),
-    winLossRatio:
-      avgWinRaw === null || avgLossRaw === null || avgLossRaw === 0
+    winLossRatio: inUnit
+      ? inUnit.winLossRatio
+      : avgWinRaw === null || avgLossRaw === null || avgLossRaw === 0
         ? null
         : avgWinRaw / Math.abs(avgLossRaw),
     expectancy: expectancy === null ? null : roundHalfEven(expectancy),

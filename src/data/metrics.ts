@@ -1,6 +1,5 @@
 import { partitionByCurrency } from '../domain/currency';
 import {
-  winRateOfDays,
   dailyPnl,
   dayDurations,
   dayStreaks,
@@ -17,7 +16,8 @@ import {
 import { balanceAt, dayBefore } from '../domain/metrics/balance';
 import { riskRatios } from '../domain/metrics/risk';
 import { tradeStreaks, type StreakResult } from '../domain/metrics/streaks';
-import { summarize, type Summary } from '../domain/metrics/summary';
+import { summarize, volumeOf, type Summary } from '../domain/metrics/summary';
+import { isTradeUnit } from '../domain/metrics/units';
 import type {
   Account,
   CashFlow,
@@ -26,11 +26,17 @@ import type {
   UserPrefs,
 } from '../domain/types';
 
+/**
+ * The prefs' context. A display unit that narrows the trade set (R, ticks,
+ * pips, points) rides along as `unit`, so the ratios read in it; a view whose
+ * trades are not narrowed to the unit drops it.
+ */
 export function metricContextOf(prefs: UserPrefs): MetricContext {
   return {
     timeZone: prefs.timeZone,
     breakevenRange: prefs.breakevenRange,
     pnlBasis: prefs.pnlBasis,
+    ...(isTradeUnit(prefs.displayUnit) ? { unit: prefs.displayUnit } : {}),
   };
 }
 
@@ -52,7 +58,10 @@ export interface CurrencyMetrics {
   tradeStreaks: StreakResult;
   dayStreaks: StreakResult;
   dayDurations: ReturnType<typeof dayDurations>;
-  avgDailyWinRate: number | null;
+  /** Each trade's quantity, counted once: every trade matched, open ones too. */
+  volume: number;
+  /** The volume over the trading days; null with none. */
+  avgDailyVolume: number | null;
   risk: ReturnType<typeof riskRatios>;
 }
 
@@ -119,6 +128,8 @@ export function metricsByCurrency(
       startDay === undefined
         ? []
         : ownFlows.filter((f) => f.date > dayBefore(startDay));
+    const drawdown = maxDrawdown(days, riskStart, riskFlows);
+    const volume = volumeOf(own);
     return {
       currency,
       trades: own,
@@ -129,11 +140,14 @@ export function metricsByCurrency(
       netDays,
       daySummary: daySummary(days, ctx),
       equity: equityCurve(own, startingBalance, ctx),
-      drawdown: maxDrawdown(days, riskStart, riskFlows),
+      // A share of the balance means nothing once the unit has narrowed the
+      // trades to some of the accounts' P&L: it has no value then.
+      drawdown: ctx.unit ? { ...drawdown, pct: null } : drawdown,
       tradeStreaks: tradeStreaks(own, ctx),
       dayStreaks: dayStreaks(days, ctx),
       dayDurations: dayDurations(dayOwn, ctx),
-      avgDailyWinRate: winRateOfDays(days),
+      volume,
+      avgDailyVolume: days.length === 0 ? null : volume / days.length,
       risk: riskRatios(netDays, riskStart, riskFlows),
     };
   });

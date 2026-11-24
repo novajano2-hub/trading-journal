@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { IconTile } from '@/components/ui/icon-tile';
 import { Segmented } from '@/components/ui/segmented';
+import { unitEmptyCopy } from '@/content/display-units';
 import { StorageUnavailableError } from '@/data/repository';
 import { FigureSourceContext } from '@/lib/display';
 import { CARD } from '../dashboard/shared';
@@ -132,6 +133,9 @@ export function ReportScope({
             </Link>
           }
         />
+      ) : report.unit ? (
+        // The line under the top bar says how many it left out, and goes back to Dollar.
+        <State icon={FunnelSimple} {...unitEmptyCopy(report.unit)} />
       ) : (
         <State
           icon={report.filtered ? FunnelSimple : ClockCounterClockwise}

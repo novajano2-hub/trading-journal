@@ -2,7 +2,15 @@ import { describe, expect, test } from 'vitest';
 import { makeTrade } from '../__fixtures__/trades';
 import { resolveInstrument } from '../instruments';
 import { costBasis, defaultMetricContext, pnlOf } from './context';
-import { plannedR, riskFromStop, rExpectancy, summarize } from './summary';
+import {
+  largestInUnit,
+  plannedR,
+  riskFromStop,
+  rExpectancy,
+  summarize,
+  tradeVolume,
+  volumeOf,
+} from './summary';
 
 const ctx = defaultMetricContext('America/New_York');
 
@@ -261,5 +269,97 @@ describe('rExpectancy', () => {
       value: null,
       count: 0,
     });
+  });
+});
+
+describe('in a trade unit', () => {
+  // ES: 4 ticks a point. Wins of 8 and 4 ticks, a loss of 6: the money differs.
+  const es = (net: number, avgExit: number, maxPosition = 1) =>
+    makeTrade({ net, avgEntry: 4500, avgExit, maxPosition });
+  const set = [es(30000, 4502), es(100, 4501), es(-20000, 4498.5)];
+
+  test('profit factor and the win/loss ratio read the unit, the counts stay on money', () => {
+    const money = summarize(set, ctx);
+    expect(money.profitFactor).toBeCloseTo(30100 / 20000, 10);
+    const ticks = summarize(set, { ...ctx, unit: 'ticks' });
+    expect(ticks.profitFactor).toBeCloseTo(12 / 6, 10);
+    expect(ticks.winLossRatio).toBeCloseTo(6 / 6, 10);
+    // Wins and losses are classified on the P&L, as the win rate is.
+    expect(ticks).toMatchObject({ wins: 2, losses: 1, winRate: 2 / 3 });
+    expect(ticks.avgWin).toBe(money.avgWin);
+  });
+  test('ticks count every contract: two contracts double the move', () => {
+    const s = summarize([es(30000, 4502, 2), es(-20000, 4498.5)], {
+      ...ctx,
+      unit: 'ticks',
+    });
+    expect(s.profitFactor).toBeCloseTo(16 / 6, 10);
+  });
+  test('no loss in the unit has no profit factor', () => {
+    const s = summarize([es(30000, 4502)], { ...ctx, unit: 'points' });
+    expect(s.profitFactor).toBeNull();
+    expect(s.winLossRatio).toBeNull();
+  });
+  test('the largest win and loss are the largest in the unit, not in money', () => {
+    // A one-lot +$300 win of 8 ticks against a three-lot +$200 win of 12.
+    const one = es(30000, 4502);
+    const three = es(20000, 4501, 3);
+    const loss = es(-20000, 4498.5);
+    const set2 = [one, three, loss];
+    expect(summarize(set2, ctx).largestWin).toBe(30000);
+    expect(largestInUnit(set2, { ...ctx, unit: 'ticks' }, 'win')).toBe(three);
+    expect(largestInUnit(set2, { ...ctx, unit: 'ticks' }, 'loss')).toBe(loss);
+    expect(largestInUnit(set2, ctx, 'win')).toBeUndefined();
+    expect(largestInUnit([one], { ...ctx, unit: 'ticks' }, 'loss')).toBe(
+      undefined,
+    );
+  });
+  test('R reads realized R', () => {
+    const s = summarize(
+      [
+        makeTrade({ net: 3000, initialRisk: 1000 }),
+        makeTrade({ net: -2000, initialRisk: 4000 }),
+      ],
+      { ...ctx, unit: 'r' },
+    );
+    expect(s.profitFactor).toBeCloseTo(3 / 0.5, 10);
+  });
+});
+
+describe('volume', () => {
+  const fill = (side: 'buy' | 'sell', qty: number) => ({
+    id: `${side}-${qty}`,
+    accountId: 'a1',
+    symbol: 'ESZ5',
+    side,
+    qty,
+    price: 4500,
+    time: '2026-03-02T15:00:00Z',
+    fees: 0,
+    commission: 0,
+  });
+  test('a trade counts its quantity once: the side it opened, not every fill', () => {
+    const t = makeTrade({
+      net: 0,
+      maxPosition: 3,
+      executions: [fill('buy', 2), fill('buy', 1), fill('sell', 3)],
+    });
+    expect(tradeVolume(t)).toBe(3);
+    const short = makeTrade({
+      net: 0,
+      direction: 'short',
+      executions: [fill('sell', 2), fill('buy', 1), fill('buy', 1)],
+    });
+    expect(tradeVolume(short)).toBe(2);
+  });
+  test('a trade without fills counts its size', () => {
+    expect(tradeVolume(makeTrade({ net: 0, maxPosition: 4 }))).toBe(4);
+  });
+  test('lots add without binary noise: 1.8, 1.5, 1.6 and 1.9 make 6.8', () => {
+    const lots = [1.7999999999999998, 1.5, 1.6, 1.9].map((maxPosition) =>
+      makeTrade({ net: 0, maxPosition }),
+    );
+    expect(volumeOf(lots)).toBe(6.8);
+    expect(volumeOf([])).toBe(0);
   });
 });

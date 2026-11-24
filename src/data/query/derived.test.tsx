@@ -17,6 +17,7 @@ import { parseCsv } from '@/domain/import/csv';
 import { guessMapping } from '@/domain/import/mapping';
 import { EMPTY_FILTERS } from '../filters';
 import { makeTrade } from '@/domain/__fixtures__/trades';
+import { resolveInstrument } from '@/domain/instruments';
 import { fixtureSample } from '../__fixtures__/sample';
 import { createLocalRepository } from '../local/local-repository';
 import type { Repository } from '../repository';
@@ -407,4 +408,91 @@ test('useMetrics: day figures keep an exit dated inside the range when the open 
   expect(usd.netDays.map((d) => [d.date, d.net])).toEqual([
     ['2026-11-17', -100000],
   ]);
+});
+
+/** The fixture's two ES trades (f-1 with a stop), plus a forex and a stock trade on the same account. */
+function mixedSample() {
+  const base = fixtureSample();
+  const own = { workspaceId: SAMPLE_WORKSPACE.id, accountId: 'acc-a' };
+  return {
+    ...base,
+    trades: [
+      { ...base.trades[0]!, initialRisk: 10_000 },
+      base.trades[1]!,
+      makeTrade({
+        ...own,
+        id: 'fx-1',
+        serial: 4,
+        instrument: resolveInstrument('EURUSD')!,
+        openedAt: '2026-11-18T09:00:00Z',
+        closedAt: '2026-11-18T10:00:00Z',
+        avgEntry: 1.07483,
+        avgExit: 1.07688,
+        net: 20_500,
+      }),
+      makeTrade({
+        ...own,
+        id: 'st-1',
+        serial: 5,
+        instrument: resolveInstrument('AAPL')!,
+        openedAt: '2026-11-18T15:00:00Z',
+        closedAt: '2026-11-18T16:00:00Z',
+        avgEntry: 200,
+        avgExit: 201,
+        net: 10_000,
+        initialRisk: 5_000,
+      }),
+    ],
+  };
+}
+
+test.each([
+  ['dollar', ['f-1', 'f-2', 'fx-1', 'st-1']],
+  ['percent', ['f-1', 'f-2', 'fx-1', 'st-1']],
+  ['privacy', ['f-1', 'f-2', 'fx-1', 'st-1']],
+  ['ticks', ['f-1', 'f-2']],
+  ['points', ['f-1', 'f-2']],
+  ['pips', ['fx-1']],
+  ['r', ['f-1', 'st-1']],
+] as const)(
+  'under %s the trade set keeps %j, day trades too, and counts the rest as left out',
+  async (unit, kept) => {
+    const { Wrapper, repository } = setup(mixedSample);
+    await repository.prefs.update({ displayUnit: unit });
+    const { result } = renderHook(() => useTradeSet(EMPTY_FILTERS), {
+      wrapper: Wrapper,
+    });
+    await waitFor(() => expect(result.current.status).toBe('success'));
+    const set = result.current.data!;
+    const ids = (ts: { id: string }[]) => ts.map((t) => t.id).sort();
+    expect(ids(set.trades)).toEqual([...kept]);
+    expect(ids(set.dayTrades)).toEqual([...kept]);
+    expect(set.unitLeftOut).toBe(4 - kept.length);
+  },
+);
+
+test('the left-out count is of the trades the filters matched', async () => {
+  const { Wrapper, repository } = setup(mixedSample);
+  await repository.prefs.update({ displayUnit: 'pips' });
+  const { result } = renderHook(
+    () => useTradeSet({ ...EMPTY_FILTERS, symbols: ['ES', 'EURUSD'] }),
+    { wrapper: Wrapper },
+  );
+  await waitFor(() => expect(result.current.status).toBe('success'));
+  expect(result.current.data!.trades.map((t) => t.id)).toEqual(['fx-1']);
+  expect(result.current.data!.unitLeftOut).toBe(2);
+});
+
+test('useMetrics under Ticks reads only the futures trades, and its profit factor in ticks', async () => {
+  const { Wrapper, repository } = setup(mixedSample);
+  await repository.prefs.update({ displayUnit: 'ticks' });
+  const { result } = renderHook(() => useMetrics(EMPTY_FILTERS), {
+    wrapper: Wrapper,
+  });
+  await waitFor(() => expect(result.current.status).toBe('success'));
+  const usd = result.current.data![0]!;
+  expect(usd.summary).toMatchObject({ closedCount: 2, wins: 1, losses: 1 });
+  // f-1 made 5 points (20 ticks), f-2 lost 2.5 (10 ticks).
+  expect(usd.summary.profitFactor).toBeCloseTo(2, 10);
+  expect(usd.days.map((d) => d.date)).toEqual(['2026-11-16', '2026-11-17']);
 });

@@ -20,6 +20,7 @@ import type { MetricId } from '@/content/metric-definitions';
 import {
   applyFilters,
   EMPTY_FILTERS,
+  narrowToUnit,
   parseFilters,
   previousRange,
   resolveRange,
@@ -42,6 +43,7 @@ import {
 import { StorageUnavailableError } from '@/data/repository';
 import { winsVsLosses } from '@/domain/metrics/breakdowns';
 import { timeSeries } from '@/domain/metrics/series';
+import { unitKeeps } from '@/domain/metrics/units';
 import { summarize, type Summary } from '@/domain/metrics/summary';
 import { localDate } from '@/domain/time';
 import { isClosed } from '@/domain/trade-status';
@@ -86,6 +88,7 @@ import {
 import { ScrollFade } from '@/components/ui/scroll-fade';
 import { symbolOptions } from '../search';
 import { CARD, CARD_PAD, CardHeader, signTone } from '../dashboard/shared';
+import { UnitLeftOut } from '../unit-notice';
 import { ReportChart, type ChartSeries } from './report-chart';
 import { ReportSkeleton, State } from './report-scope';
 import { writeParam } from './use-report-data';
@@ -466,14 +469,29 @@ function Compared({
     }),
     [prefs, today, accounts],
   );
+  // Each group narrows to the display unit, as every other report does.
+  const unit = prefs.displayUnit;
   const picked = useMemo(
     () =>
-      filters.map((f) => ({
-        trades: applyFilters(trades, f, env),
-        dayTrades: applyFilters(trades, { ...f, range: {} }, env),
-        ctx: { ...base, range: resolveRange(f.range, today) },
-      })),
-    [filters, trades, env, base, today],
+      filters.map((f) => {
+        const matched = applyFilters(trades, f, env);
+        const kept = narrowToUnit(matched, unit);
+        return {
+          trades: kept,
+          dayTrades: narrowToUnit(
+            applyFilters(trades, { ...f, range: {} }, env),
+            unit,
+          ),
+          leftOut: matched.filter((t) => !unitKeeps(unit, t)),
+          ctx: { ...base, range: resolveRange(f.range, today) },
+        };
+      }),
+    [filters, trades, env, base, today, unit],
+  );
+  // A trade both groups match is left out once.
+  const unitLeftOut = useMemo(
+    () => new Set(picked.flatMap((g) => g.leftOut.map((t) => t.id))).size,
+    [picked],
   );
 
   const currencies = useMemo(() => {
@@ -685,6 +703,8 @@ function Compared({
           period before it when that has a start date. Each group has its own,
           and the address holds both, so a comparison can be linked.
         </p>
+        {/* Empty, it takes back the gap above it. */}
+        <UnitLeftOut count={unitLeftOut} className="-mt-2 empty:-mt-4" />
 
         <section
           aria-label="Comparison"

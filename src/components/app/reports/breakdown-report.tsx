@@ -20,6 +20,7 @@ import {
 } from '@/domain/metrics/breakdowns';
 import { pnlOf } from '@/domain/metrics/context';
 import { SERIES_META, type SeriesMetric } from '@/domain/metrics/series';
+import { largestInUnit } from '@/domain/metrics/summary';
 import { roundHalfEven } from '@/domain/money';
 import { useStrategies, useTagCategories, useTags } from '@/data/query/hooks';
 import type { TagCategory } from '@/domain/types';
@@ -374,17 +375,21 @@ export function BreakdownCards({
     () => new Map(p.trades.map((t) => [t.id, t])),
     [p.trades],
   );
-  const largestCell = (r: BreakdownRow, cents: number | null) => {
+  const largestCell = (
+    r: BreakdownRow,
+    cents: number | null,
+    outcome: 'win' | 'loss',
+  ) => {
     if (cents === null) return none;
-    const trade = r.tradeIds
-      .map((id) => tradeById.get(id))
-      .find((t) => t !== undefined && pnlOf(t, basis) === cents);
+    const own = r.tradeIds.flatMap((id) => tradeById.get(id) ?? []);
+    // In a unit, the trade largest in it; in money, the one with that amount.
+    const inUnit = largestInUnit(own, merged, outcome);
+    const trade = inUnit ?? own.find((t) => pnlOf(t, basis) === cents);
+    const money = inUnit ? pnlOf(inUnit, basis) : cents;
     const f = trade ? display.ofTrade(trade) : display.ofAll(cents);
     return (
-      <span className={`font-[550] ${signTone(cents)}`}>
-        <FigureText
-          f={display.figure({ ...f, money: cents }, true, currency)}
-        />
+      <span className={`font-[550] ${signTone(money)}`}>
+        <FigureText f={display.figure({ ...f, money }, true, currency)} />
       </span>
     );
   };
@@ -494,7 +499,7 @@ export function BreakdownCards({
       tip: 'largest-win',
       align: 'right',
       value: (r) => r.summary.largestWin,
-      cell: (r) => largestCell(r, r.summary.largestWin),
+      cell: (r) => largestCell(r, r.summary.largestWin, 'win'),
       csv: {
         header: `Largest win (${currency})`,
         value: (r) =>
@@ -511,7 +516,7 @@ export function BreakdownCards({
       value: (r) => r.summary.largestLoss,
       // The most negative first.
       descFirst: false,
-      cell: (r) => largestCell(r, r.summary.largestLoss),
+      cell: (r) => largestCell(r, r.summary.largestLoss, 'loss'),
       csv: {
         header: `Largest loss (${currency})`,
         value: (r) =>

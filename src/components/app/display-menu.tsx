@@ -5,6 +5,8 @@ import { DropdownMenu } from 'radix-ui';
 import { useId } from 'react';
 import { usePrefs, useTrades, useUpdatePrefs } from '@/data/query/hooks';
 import type { DisplayUnit, PnlBasis } from '@/domain/types';
+import { UNIT_SCOPE } from '@/content/display-units';
+import { isTradeUnit } from '@/domain/metrics/units';
 
 const UNITS: readonly { value: DisplayUnit; name: string; short: string }[] = [
   { value: 'dollar', name: 'Dollar', short: '$' },
@@ -23,8 +25,12 @@ const BASES: readonly { value: PnlBasis; name: string }[] = [
 const ITEM =
   'relative flex min-h-9 cursor-pointer items-center rounded-[8px] py-1.5 pr-3 pl-8 text-[13.5px] text-text select-none data-highlighted:bg-sunken data-disabled:cursor-default data-disabled:text-faint pointer-coarse:min-h-11';
 const LABEL = 'px-2 pt-2 pb-1 text-[12px] font-medium text-faint';
+/** Under a unit's name, the trades it keeps. */
+const KEEPS = 'block text-[12px] leading-4 text-faint';
 const TRIGGER =
   'inline-flex h-[34px] flex-none items-center gap-1.5 rounded-control border border-line bg-surface-1 pr-2 pl-3 text-[13.5px] font-medium whitespace-nowrap text-text shadow-[0_1px_1px_rgb(18_22_51/0.04)] transition-[border-color] duration-200 ease-(--ease-glide) hover:border-accent/35 data-[state=open]:border-accent/35 pointer-coarse:h-11 pointer-coarse:pl-3.5';
+
+const upper = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 function Indicator(): React.JSX.Element {
   return (
@@ -40,7 +46,9 @@ function Indicator(): React.JSX.Element {
  * menu with two radio groups, "Show as" (the unit) and "P&L" (Net or Gross).
  * Both are saved preferences; a pending change shows at once. With no trades
  * in the workspace there is no P&L to choose: its group reads faint and
- * changes nothing, while the unit still can.
+ * changes nothing, while the unit still can. Under each unit that narrows the
+ * trades (R, ticks, pips, points) a quiet line says which it keeps; it is the
+ * item's description, so its name stays the unit's.
  */
 export function DisplayMenu(): React.JSX.Element {
   const prefs = usePrefs().data;
@@ -51,6 +59,7 @@ export function DisplayMenu(): React.JSX.Element {
   const basis = pending?.pnlBasis ?? prefs?.pnlBasis ?? 'net';
   const unitLabel = useId();
   const basisLabel = useId();
+  const keepsId = useId();
   const current = UNITS.find((u) => u.value === unit) ?? UNITS[0]!;
   const basisName = BASES.find((b) => b.value === basis)?.name ?? 'Net';
   // The accessible name starts with the face, so the visible label is always in it.
@@ -96,17 +105,31 @@ export function DisplayMenu(): React.JSX.Element {
               update.mutate({ displayUnit: v as DisplayUnit })
             }
           >
-            {UNITS.map((u) => (
-              <DropdownMenu.RadioItem
-                key={u.value}
-                value={u.value}
-                onSelect={(e) => e.preventDefault()}
-                className={ITEM}
-              >
-                <Indicator />
-                {u.name}
-              </DropdownMenu.RadioItem>
-            ))}
+            {UNITS.map((u) => {
+              const scope = isTradeUnit(u.value)
+                ? UNIT_SCOPE[u.value]
+                : undefined;
+              return (
+                <DropdownMenu.RadioItem
+                  key={u.value}
+                  value={u.value}
+                  aria-label={u.name}
+                  aria-describedby={scope ? `${keepsId}-${u.value}` : undefined}
+                  onSelect={(e) => e.preventDefault()}
+                  className={ITEM}
+                >
+                  <Indicator />
+                  <span>
+                    {u.name}
+                    {scope ? (
+                      <span id={`${keepsId}-${u.value}`} className={KEEPS}>
+                        {upper(scope.keeps)} only
+                      </span>
+                    ) : null}
+                  </span>
+                </DropdownMenu.RadioItem>
+              );
+            })}
           </DropdownMenu.RadioGroup>
           <DropdownMenu.Separator className="-mx-1.5 my-1.5 h-px bg-line" />
           <DropdownMenu.Label id={basisLabel} className={LABEL}>
