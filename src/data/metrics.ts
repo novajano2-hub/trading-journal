@@ -79,6 +79,9 @@ export interface CurrencyMetrics {
   /** The volume over the trading days; null with none. */
   avgDailyVolume: number | null;
   risk: ReturnType<typeof riskRatios>;
+  /** The balance the day before the range starts, and the deposits and withdrawals after it: what Sharpe and Sortino are read on, and the same series per period. */
+  riskStart: Cents;
+  riskFlows: readonly { date: string; amount: Cents }[];
 }
 
 /**
@@ -173,6 +176,8 @@ export function metricsByCurrency(
       risk: ctx.unit
         ? { sharpe: null, sortino: null }
         : riskRatios(netDays, riskStart, riskFlows),
+      riskStart,
+      riskFlows,
     };
   });
 }

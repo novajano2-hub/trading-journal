@@ -110,11 +110,14 @@ export function dailyPnl(
   );
 }
 
-/** Minutes from the first entry fill to the last exit fill on each local day that has an exit; the longest and the mean. */
-export function dayDurations(
+/**
+ * Minutes from the first entry fill to the last exit fill on each local day
+ * that has an exit, ascending by date. Only fills inside `ctx.range` count.
+ */
+export function dayLengths(
   trades: readonly Trade[],
-  ctx: MetricContext,
-): { longest: number | null; average: number | null } {
+  ctx: Pick<MetricContext, 'timeZone' | 'range'>,
+): { date: string; minutes: number }[] {
   const byDate = new Map<
     string,
     { firstEntry: number; firstAny: number; lastExit: number }
@@ -136,12 +139,21 @@ export function dayDurations(
       byDate.set(date, d);
     }
   }
-  const minutes: number[] = [];
-  for (const d of byDate.values()) {
+  const lengths: { date: string; minutes: number }[] = [];
+  for (const [date, d] of byDate) {
     if (d.lastExit === -Infinity) continue;
     const start = d.firstEntry === Infinity ? d.firstAny : d.firstEntry;
-    minutes.push(Math.max(0, (d.lastExit - start) / 60000));
+    lengths.push({ date, minutes: Math.max(0, (d.lastExit - start) / 60000) });
   }
+  return lengths.sort((a, b) => (a.date < b.date ? -1 : 1));
+}
+
+/** The longest and the mean of the day lengths; null with no day that has an exit. */
+export function dayDurations(
+  trades: readonly Trade[],
+  ctx: MetricContext,
+): { longest: number | null; average: number | null } {
+  const minutes = dayLengths(trades, ctx).map((d) => d.minutes);
   if (minutes.length === 0) return { longest: null, average: null };
   return {
     longest: Math.max(...minutes),

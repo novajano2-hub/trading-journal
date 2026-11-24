@@ -1,34 +1,46 @@
 'use client';
 
-import { ChartBar, Sliders, Table } from '@phosphor-icons/react/dist/ssr';
+import {
+  ChartBar,
+  MagnifyingGlass,
+  Sliders,
+  Table,
+  X,
+} from '@phosphor-icons/react/dist/ssr';
 import { format, parseISO } from 'date-fns';
 import { useSearchParams } from 'next/navigation';
-import { useId, useMemo } from 'react';
-import { FigureText } from '@/components/product/figure-text';
+import { useId, useMemo, useState } from 'react';
 import { MetricTip } from '@/components/ui/metric-tip';
 import { Segmented } from '@/components/ui/segmented';
 import { TaskCheckbox } from '@/components/ui/task-checkbox';
 import type { MetricId } from '@/content/metric-definitions';
+import type { PnlBasis } from '@/domain/types';
 import {
-  type SeriesUnit,
+  SERIES_GROUPS,
   SERIES_META,
   SERIES_METRICS,
+  seriesUnit,
   timeSeries,
   type Bucket,
   type SeriesMetric,
   type SeriesPoint,
 } from '@/domain/metrics/series';
 import { useDisplay } from '@/lib/display';
-import { formatPct } from '@/lib/format';
 import { CARD, CARD_PAD, CardHeader, signTone } from '../dashboard/shared';
 import {
   formatPicks,
   labelOf,
   MAX_METRICS,
+  modeOf,
   parsePicks,
   type Pick,
 } from './metric-chips';
-import { periodText, ReportChart, type ChartSeries } from './report-chart';
+import {
+  formatterOf,
+  periodText,
+  ReportChart,
+  type ChartSeries,
+} from './report-chart';
 import { ReportScope } from './report-scope';
 import { SummaryTable, type SummaryColumn } from './summary-table';
 import { writeParam, type ReportData } from './use-report-data';
@@ -38,13 +50,42 @@ const BUCKETS: readonly Bucket[] = ['day', 'week', 'month'];
 const TIPS: Record<SeriesMetric, MetricId> = {
   net: 'pnl',
   'cumulative-net': 'cumulative-pnl',
-  'win-rate': 'win-rate',
-  'profit-factor': 'profit-factor',
-  expectancy: 'expectancy',
+  'avg-daily-net': 'avg-daily-pnl',
   'avg-win': 'avg-win',
   'avg-loss': 'avg-loss',
-  trades: 'trades',
+  'win-loss-ratio': 'avg-win-loss',
+  expectancy: 'expectancy',
+  'largest-win': 'largest-win',
+  'largest-loss': 'largest-loss',
+  'profit-factor': 'profit-factor',
   fees: 'fees',
+  'avg-planned-r': 'planned-r',
+  'avg-realized-r': 'realized-r',
+  'max-drawdown': 'max-drawdown',
+  'avg-drawdown': 'avg-drawdown',
+  'avg-hold-time': 'hold-time',
+  'longest-trade': 'longest-trade',
+  'avg-day-length': 'avg-day-length',
+  'longest-day': 'longest-day',
+  trades: 'trades',
+  wins: 'winners',
+  losses: 'losers',
+  breakevens: 'breakevens',
+  'open-trades': 'open-trades',
+  'long-trades': 'long-trades',
+  'short-trades': 'short-trades',
+  volume: 'volume',
+  'avg-daily-volume': 'avg-daily-volume',
+  'win-rate': 'win-rate',
+  'long-win-rate': 'long-win-rate',
+  'short-win-rate': 'short-win-rate',
+  'green-days': 'daily-win-rate',
+  'win-streak': 'win-streak',
+  'loss-streak': 'loss-streak',
+  'green-day-streak': 'green-day-streak',
+  'red-day-streak': 'red-day-streak',
+  sharpe: 'sharpe',
+  sortino: 'sortino',
 };
 
 function bucketOf(param: string | null): Bucket {
@@ -73,49 +114,71 @@ function align(all: readonly SeriesPoint[][]): {
   };
 }
 
+const MODES = [
+  { value: 'period', label: 'Period' },
+  { value: 'running', label: 'Running' },
+] as const;
+
+/** What a plotted metric is called: its name, and "(running)" when it is the running value. */
+function seriesLabel(pick: Pick, basis: PnlBasis): string {
+  const name = labelOf(pick.metric, basis);
+  return modeOf(pick) === 'running' && !SERIES_META[pick.metric].running
+    ? `${name} (running)`
+    : name;
+}
+
 function Body({ data }: { data: ReportData }): React.JSX.Element {
   const { partition: p, ctx, basis, currency } = data;
   const params = useSearchParams();
   const picks = useMemo(() => parsePicks(params.get('m')), [params]);
   const bucket = bucketOf(params.get('bucket'));
   const display = useDisplay();
+  const fmt = formatterOf(display, currency);
   const metricsId = useId();
   const chartId = useId();
   const tableId = useId();
+  const [query, setQuery] = useState('');
   const full = picks.length >= MAX_METRICS;
 
   const setPicks = (next: Pick[]) => writeParam('m', formatPicks(next));
   const toggle = (metric: SeriesMetric, on: boolean) =>
     setPicks(
       on
-        ? [...picks, { metric, kind: SERIES_META[metric].kind }]
+        ? [...picks, { metric, kind: SERIES_META[metric].kind, mode: 'period' }]
         : picks.filter((x) => x.metric !== metric),
     );
+  const change = (pick: Pick, to: Partial<Pick>) =>
+    setPicks(picks.map((x) => (x === pick ? { ...x, ...to } : x)));
+
+  const needle = query.trim().toLowerCase();
+  const groups = SERIES_GROUPS.map((group) => ({
+    group,
+    metrics: SERIES_METRICS.filter(
+      (m) =>
+        SERIES_META[m].group === group &&
+        (needle === '' || labelOf(m, basis).toLowerCase().includes(needle)),
+    ),
+  })).filter((g) => g.metrics.length > 0);
 
   const { keys, aligned } = useMemo(
     () =>
-      align(picks.map((x) => timeSeries(p.dayTrades, ctx, x.metric, bucket))),
-    [picks, p.dayTrades, ctx, bucket],
+      align(
+        picks.map((x) =>
+          timeSeries(p.dayTrades, ctx, x.metric, bucket, {
+            mode: modeOf(x),
+            balance: { start: p.riskStart, flows: p.riskFlows },
+          }),
+        ),
+      ),
+    [picks, p.dayTrades, p.riskStart, p.riskFlows, ctx, bucket],
   );
   const series: ChartSeries[] = picks.map((x, i) => ({
-    label: labelOf(x.metric, basis),
+    label: seriesLabel(x, basis),
     kind: x.kind,
-    unit: SERIES_META[x.metric].unit,
+    unit: seriesUnit(x.metric, ctx),
     points: aligned[i]!,
   }));
   const period = periodOf(bucket);
-  const valueText = (unit: SeriesUnit, v: number): string => {
-    switch (unit) {
-      case 'money':
-        return display.cash(v, true, currency).label;
-      case 'pct':
-        return formatPct(v, 1);
-      case 'ratio':
-        return v.toFixed(2);
-      case 'count':
-        return String(Math.round(v));
-    }
-  };
   /** Where each metric runs, so the label carries values as well as names. */
   const ranges = series
     .map((x) => {
@@ -126,8 +189,8 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
       const lo = Math.min(...vs);
       const hi = Math.max(...vs);
       return lo === hi
-        ? ` ${x.label} is ${valueText(x.unit, lo)}.`
-        : ` ${x.label} runs from ${valueText(x.unit, lo)} to ${valueText(x.unit, hi)}.`;
+        ? ` ${x.label} is ${fmt.text(x.unit, lo)}.`
+        : ` ${x.label} runs from ${fmt.text(x.unit, lo)} to ${fmt.text(x.unit, hi)}.`;
     })
     .join('');
 
@@ -148,10 +211,10 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
       descFirst: false,
     },
     ...picks.map((x, i): SummaryColumn<(typeof rows)[number]> => {
-      const unit = SERIES_META[x.metric].unit;
+      const unit = series[i]!.unit;
       return {
         id: x.metric,
-        header: labelOf(x.metric, basis),
+        header: seriesLabel(x, basis),
         tip: TIPS[x.metric],
         align: 'right',
         value: (r) => r.values[i],
@@ -159,20 +222,13 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
           const v = r.values[i];
           if (v === null || v === undefined)
             return <span className="text-faint">None</span>;
-          switch (unit) {
-            case 'money':
-              return (
-                <span className={`font-[550] ${signTone(v)}`}>
-                  <FigureText f={display.cash(v, true, currency)} />
-                </span>
-              );
-            case 'pct':
-              return formatPct(v, 1);
-            case 'ratio':
-              return v.toFixed(2);
-            case 'count':
-              return String(Math.round(v));
-          }
+          if (unit === 'money' || unit === 'tradeunit')
+            return (
+              <span className={`font-[550] ${signTone(v)}`}>
+                {fmt.node(unit, v)}
+              </span>
+            );
+          return fmt.node(unit, v);
         },
       };
     }),
@@ -209,57 +265,119 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
             />
           }
         />
-        <div
-          role="group"
-          aria-label="Metrics"
-          className="mt-3 grid gap-x-6 gap-y-0.5 sm:grid-cols-2 xl:grid-cols-3"
-        >
-          {SERIES_METRICS.map((metric) => {
-            const pick = picks.find((x) => x.metric === metric);
-            const label = labelOf(metric, basis);
-            return (
-              <div
-                key={metric}
-                className="flex min-h-10 items-center gap-2.5 border-b border-line/60 py-1"
-              >
-                <TaskCheckbox
-                  checked={pick !== undefined}
-                  disabled={pick === undefined && full}
-                  aria-label={label}
-                  aria-describedby={
-                    pick === undefined && full
-                      ? `${metricsId}-limit`
-                      : undefined
-                  }
-                  onCheckedChange={(on) => toggle(metric, on)}
-                />
-                <span
-                  className={`text-[13.5px] ${pick || !full ? 'text-text' : 'text-faint'}`}
+        {picks.length > 0 ? (
+          <ul
+            aria-label="Plotted metrics"
+            className="mt-3 divide-y divide-line/60 rounded-control border border-line"
+          >
+            {picks.map((pick) => {
+              const label = labelOf(pick.metric, basis);
+              return (
+                <li
+                  key={pick.metric}
+                  className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-1.5"
                 >
-                  <MetricTip id={TIPS[metric]} basis={basis}>
+                  <span className="min-w-0 flex-1 text-[13.5px] font-medium text-text">
                     {label}
-                  </MetricTip>
-                </span>
-                {pick ? (
+                  </span>
                   <Segmented
-                    className="ml-auto"
                     label={`${label} chart type`}
                     options={[
                       { value: 'bar', label: 'Bar' },
                       { value: 'line', label: 'Line' },
                     ]}
                     value={pick.kind}
-                    onChange={(kind) =>
-                      setPicks(
-                        picks.map((x) => (x === pick ? { ...x, kind } : x)),
-                      )
-                    }
+                    onChange={(kind) => change(pick, { kind })}
                     coarseTargets
                   />
-                ) : null}
+                  {SERIES_META[pick.metric].running ? null : (
+                    <Segmented
+                      label={`${label} plotted`}
+                      options={MODES}
+                      value={pick.mode}
+                      onChange={(mode) => change(pick, { mode })}
+                      coarseTargets
+                    />
+                  )}
+                  <button
+                    type="button"
+                    aria-label={`Remove ${label}`}
+                    onClick={() => toggle(pick.metric, false)}
+                    className="inline-grid size-7 cursor-pointer place-items-center rounded-[7px] text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:size-11"
+                  >
+                    <X size={13} weight="bold" aria-hidden="true" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+        <div className="relative mt-3">
+          <MagnifyingGlass
+            size={15}
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-faint"
+          />
+          <input
+            type="search"
+            aria-label="Search metrics"
+            placeholder="Search metrics"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="h-9 w-full rounded-control border border-line bg-surface-1 pr-3 pl-9 text-[13.5px] text-text outline-none placeholder:text-faint focus-visible:border-accent/60 focus-visible:outline-2 focus-visible:outline-accent sm:max-w-xs pointer-coarse:h-11"
+          />
+        </div>
+        <div
+          role="group"
+          aria-label="Metrics"
+          className="mt-2 max-h-[22rem] overflow-y-auto pr-1"
+        >
+          {groups.length === 0 ? (
+            <p
+              role="status"
+              className="py-6 text-center text-[13.5px] text-faint"
+            >
+              {`No metric matches "${query.trim()}"`}
+            </p>
+          ) : null}
+          {groups.map(({ group, metrics }) => (
+            <div key={group} role="group" aria-label={group} className="mt-2">
+              <h3 className="py-1 text-[12.5px] font-semibold text-muted">
+                {group}
+              </h3>
+              <div className="grid gap-x-6 gap-y-0.5 sm:grid-cols-2 xl:grid-cols-3">
+                {metrics.map((metric) => {
+                  const pick = picks.find((x) => x.metric === metric);
+                  const label = labelOf(metric, basis);
+                  return (
+                    <div
+                      key={metric}
+                      className="flex min-h-10 items-center gap-2.5 border-b border-line/60 py-1"
+                    >
+                      <TaskCheckbox
+                        checked={pick !== undefined}
+                        disabled={pick === undefined && full}
+                        aria-label={label}
+                        aria-describedby={
+                          pick === undefined && full
+                            ? `${metricsId}-limit`
+                            : undefined
+                        }
+                        onCheckedChange={(on) => toggle(metric, on)}
+                      />
+                      <span
+                        className={`text-[13.5px] ${pick || !full ? 'text-text' : 'text-faint'}`}
+                      >
+                        <MetricTip id={TIPS[metric]} basis={basis}>
+                          {label}
+                        </MetricTip>
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       </section>
 
@@ -300,7 +418,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
         />
         <div className="mt-2">
           <SummaryTable
-            key={`${bucket}-${picks.map((x) => x.metric).join()}`}
+            key={`${bucket}-${picks.map((x) => `${x.metric}${modeOf(x)}`).join()}`}
             label={`Summary by ${bucket}`}
             rows={rows}
             columns={columns}

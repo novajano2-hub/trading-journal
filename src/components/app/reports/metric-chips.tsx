@@ -6,6 +6,7 @@ import {
   SERIES_META,
   SERIES_METRICS,
   type SeriesMetric,
+  type SeriesMode,
 } from '@/domain/metrics/series';
 import type { PnlBasis } from '@/domain/types';
 
@@ -14,9 +15,19 @@ export const MAX_METRICS = 3;
 export interface Pick {
   metric: SeriesMetric;
   kind: 'bar' | 'line';
+  /** A value per period, or the running value from the range start. */
+  mode: SeriesMode;
 }
 
-export const DEFAULT_PICK: Pick = { metric: 'net', kind: 'bar' };
+export const DEFAULT_PICK: Pick = {
+  metric: 'net',
+  kind: 'bar',
+  mode: 'period',
+};
+
+/** The mode a pick plots in: a metric that is a running total already has no choice. */
+export const modeOf = (pick: Pick): SeriesMode =>
+  SERIES_META[pick.metric].running ? 'running' : pick.mode;
 
 export function labelOf(metric: SeriesMetric, basis: PnlBasis): string {
   return metric === 'net'
@@ -25,8 +36,9 @@ export function labelOf(metric: SeriesMetric, basis: PnlBasis): string {
 }
 
 /**
- * `?m=net:bar,win-rate:line`: absent is `fallback`, empty is none. At most
- * three, none twice, and only from `allowed`.
+ * `?m=net:bar,win-rate:line:running`: absent is `fallback`, empty is none. At
+ * most three, none twice, and only from `allowed`. A kind that is not bar or
+ * line is the metric's own; a mode other than `running` is per period.
  */
 export function parsePicks(
   param: string | null,
@@ -36,19 +48,24 @@ export function parsePicks(
   if (param === null) return [...fallback];
   const picks: Pick[] = [];
   for (const part of param.split(',')) {
-    const [name, kind] = part.split(':');
+    const [name, kind, mode] = part.split(':');
     const metric = allowed.find((m) => m === name);
     if (!metric || picks.some((p) => p.metric === metric)) continue;
     picks.push({
       metric,
       kind: kind === 'bar' || kind === 'line' ? kind : SERIES_META[metric].kind,
+      mode: mode === 'running' ? 'running' : 'period',
     });
   }
   return picks.slice(0, MAX_METRICS);
 }
 
 export const formatPicks = (picks: readonly Pick[]): string =>
-  picks.map((p) => `${p.metric}:${p.kind}`).join(',');
+  picks
+    .map(
+      (p) => `${p.metric}:${p.kind}${p.mode === 'running' ? ':running' : ''}`,
+    )
+    .join(',');
 
 const CHIP =
   'inline-flex h-[30px] items-center gap-1.5 rounded-[9px] bg-surface-1 text-[13px] font-medium whitespace-nowrap text-text shadow-[inset_0_0_0_1px_var(--line-2)] pointer-coarse:h-11';
@@ -139,7 +156,11 @@ export function MetricChips({
                 onSelect={() =>
                   onChange([
                     ...picks,
-                    { metric, kind: SERIES_META[metric].kind },
+                    {
+                      metric,
+                      kind: SERIES_META[metric].kind,
+                      mode: 'period',
+                    },
                   ])
                 }
                 className="flex min-h-9 cursor-pointer items-center rounded-[8px] px-3 py-1.5 text-[13.5px] text-text outline-none select-none data-highlighted:bg-sunken pointer-coarse:min-h-11"

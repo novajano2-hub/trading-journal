@@ -295,6 +295,16 @@ export function rExpectancy(
 
 const MINUTE = 60_000;
 
+/** Minutes a closed trade was held, open to close. */
+const heldMinutes = (t: Trade & { closedAt: string }): number =>
+  (Date.parse(t.closedAt) - Date.parse(t.openedAt)) / MINUTE;
+
+/** The longest a closed trade was held, in minutes; null with none. */
+export function longestHold(trades: readonly Trade[]): number | null {
+  const held = trades.filter(isClosed).map(heldMinutes);
+  return held.length === 0 ? null : Math.max(...held);
+}
+
 /**
  * Minutes held, averaged over all closed trades and over the winners, the
  * losers and the breakevens apart (outcomes from `classify`). A trade is held
@@ -305,7 +315,7 @@ export function holdTimes(
   ctx: MetricContext,
 ): Record<'all' | 'wins' | 'losses' | 'breakevens', number | null> {
   const held = trades.filter(isClosed).map((t) => ({
-    minutes: (Date.parse(t.closedAt) - Date.parse(t.openedAt)) / MINUTE,
+    minutes: heldMinutes(t),
     outcome: classify(t, ctx).outcome,
   }));
   const mean = (xs: readonly { minutes: number }[]) =>

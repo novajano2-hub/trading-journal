@@ -77,6 +77,16 @@ export const METRIC_IDS = [
   'hold-time-breakevens',
   'commissions',
   'fill-fees',
+  'avg-win-loss',
+  'longest-trade',
+  'avg-day-length',
+  'long-trades',
+  'short-trades',
+  'long-win-rate',
+  'short-win-rate',
+  'daily-win-rate',
+  'green-day-streak',
+  'red-day-streak',
   'prop-profit',
   'prop-profit-funded',
   'prop-drawdown-left',
@@ -456,6 +466,54 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Fees',
     definition:
       'The total of the exchange and regulatory fees on the fills of closed trades, apart from commissions. A trade typed in without fills counts its whole cost here.',
+  },
+  'avg-win-loss': {
+    label: 'Average win to loss',
+    definition:
+      'The average winning trade over the size of the average losing trade, on {basis} P&L. Above 1 means your winners are larger than your losers. In R, ticks, pips or points, the same ratio in that unit. None without both a win and a loss.',
+  },
+  'longest-trade': {
+    label: 'Longest trade',
+    definition:
+      'The longest a closed trade was held, from its open to its close.',
+  },
+  'avg-day-length': {
+    label: 'Average day length',
+    definition:
+      'Minutes from the first entry to the last exit of each trading day, in your timezone, averaged over the days.',
+  },
+  'long-trades': {
+    label: 'Long trades',
+    definition: 'Closed trades that bought first.',
+  },
+  'short-trades': {
+    label: 'Short trades',
+    definition: 'Closed trades that sold first.',
+  },
+  'long-win-rate': {
+    label: 'Long win rate',
+    definition:
+      'Win rate of the long trades alone: wins divided by wins plus losses, breakevens left out.',
+  },
+  'short-win-rate': {
+    label: 'Short win rate',
+    definition:
+      'Win rate of the short trades alone: wins divided by wins plus losses, breakevens left out.',
+  },
+  'daily-win-rate': {
+    label: 'Daily win rate',
+    definition:
+      'Trading days that ended in profit, outside your breakeven range, as a share of all trading days. Flat days count as trading days.',
+  },
+  'green-day-streak': {
+    label: 'Longest green day streak',
+    definition:
+      'The most green days in a row. A flat day, inside your breakeven range, neither extends nor breaks a run.',
+  },
+  'red-day-streak': {
+    label: 'Longest red day streak',
+    definition:
+      'The most red days in a row. A flat day, inside your breakeven range, neither extends nor breaks a run.',
   },
   // Prop firm rules read closed trades after fees, so they ignore the P&L basis.
   'prop-profit': {

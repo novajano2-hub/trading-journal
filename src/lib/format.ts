@@ -188,3 +188,17 @@ export function formatDuration(ms: number): string {
   if (m > 0) return `${m}m ${String(s).padStart(2, '0')}s`;
   return `${s}s`;
 }
+
+/**
+ * A length of time given in minutes, to the minute: "45m", "1h 20m", "2h",
+ * "1d 3h". For an axis and a table of average hold times and day lengths.
+ */
+export function formatMinutes(minutes: number): string {
+  const total = Math.max(0, Math.round(minutes));
+  const d = Math.floor(total / 1440);
+  const h = Math.floor((total % 1440) / 60);
+  const m = total % 60;
+  if (d > 0) return h > 0 ? `${d}d ${h}h` : `${d}d`;
+  if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  return `${m}m`;
+}

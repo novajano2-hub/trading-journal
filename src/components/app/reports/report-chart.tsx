@@ -10,14 +10,22 @@ import {
   useMemo,
   useRef,
   useState,
+  type ComponentProps,
   type KeyboardEvent,
   type PointerEvent,
 } from 'react';
+import { ArrowsOut } from '@phosphor-icons/react/dist/ssr';
 import { FigureText } from '@/components/product/figure-text';
+import { MorphDialog } from '@/components/ui/morph-dialog';
 import { usePrefs } from '@/data/query/hooks';
 import type { SeriesPoint, SeriesUnit } from '@/domain/metrics/series';
-import { FigureSourceContext, useDisplay, type Display } from '@/lib/display';
-import { formatPct } from '@/lib/format';
+import {
+  FigureSourceContext,
+  formatUnitValue,
+  useDisplay,
+  type Display,
+} from '@/lib/display';
+import { formatMinutes, formatPct, formatQty } from '@/lib/format';
 
 export interface ChartSeries {
   label: string;
@@ -81,6 +89,29 @@ export function niceScale(
     // A bar's zero line stays where it is: the room goes only to the side with data.
     lo: lo === 0 ? 0 : lo - room,
     hi: hi === 0 ? 0 : hi + room,
+    ticks,
+  };
+}
+
+/** The steps a duration axis counts in: whole minutes, a quarter hour, hours, days. */
+const MINUTE_STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 180, 360, 720, 1440];
+
+/** `niceScale` for minutes: ticks fall on minutes, hours and days, so no tick reads "1h 7m". */
+function niceMinutes(
+  lo: number,
+  hi: number,
+): { lo: number; hi: number; ticks: number[] } {
+  const raw = Math.max(hi - lo, 1) / 4;
+  const step =
+    MINUTE_STEPS.find((x) => x >= raw) ?? Math.ceil(raw / 1440) * 1440;
+  const ticks: number[] = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step)
+    ticks.push(v);
+  if (ticks.length < 2) ticks.push((ticks[0] ?? 0) + step);
+  const room = (hi - lo) * 0.04;
+  return {
+    lo: lo === 0 ? 0 : lo - room,
+    hi: hi === 0 ? 0 : Math.max(hi + room, ticks[ticks.length - 1]!),
     ticks,
   };
 }
@@ -178,26 +209,53 @@ function compactMoney(cents: number, currency: string): string {
   return `${cents < 0 ? '−' : '+'}${body}`;
 }
 
-interface Formatter {
+export interface Formatter {
   /** A value as the readout and the table show it. */
   node(unit: SeriesUnit, v: number | null): React.ReactNode;
+  /** A value as plain words, for a label that names where a metric runs. */
+  text(unit: SeriesUnit, v: number): string;
   /** A value as an axis tick shows it. */
   tick(unit: SeriesUnit, v: number): string;
 }
 
-function formatterOf(display: Display, currency: string): Formatter {
+/** A multiple of risk: +1.25R, −0.50R. */
+const multiple = (v: number, digits: number): string =>
+  `${v < 0 ? '−' : v > 0 ? '+' : ''}${Math.abs(v).toFixed(digits)}R`;
+
+/**
+ * How each kind of value reads. Money and the display unit's own numbers go
+ * through the display formatter, so Privacy and the unit apply to the axis,
+ * the readout, the table and the label alike; shares, ratios, counts,
+ * quantities and durations are not amounts and read as they are.
+ */
+export function formatterOf(display: Display, currency: string): Formatter {
+  const unitText = (v: number, compact: boolean, signed: boolean) =>
+    formatUnitValue(display.unit, v, { currency, signed, compact });
   return {
     node(unit, v) {
       if (v === null) return 'None';
+      if (unit === 'money')
+        return <FigureText f={display.cash(v, true, currency)} />;
+      return this.text(unit, v);
+    },
+    text(unit, v) {
       switch (unit) {
         case 'money':
-          return <FigureText f={display.cash(v, true, currency)} />;
+          return display.cash(v, true, currency).label;
+        case 'tradeunit':
+          return unitText(v, false, true);
         case 'pct':
           return formatPct(v, 1);
         case 'ratio':
           return v.toFixed(2);
+        case 'multiple':
+          return multiple(v, 2);
         case 'count':
           return String(Math.round(v));
+        case 'qty':
+          return formatQty(v);
+        case 'minutes':
+          return formatMinutes(v);
       }
     },
     tick(unit, v) {
@@ -206,12 +264,20 @@ function formatterOf(display: Display, currency: string): Formatter {
           return display.unit === 'dollar'
             ? compactMoney(v, currency)
             : display.cash(v, v !== 0, currency).text;
+        case 'tradeunit':
+          return unitText(v, true, v !== 0);
         case 'pct':
           return formatPct(v, 0);
         case 'ratio':
           return Number.isInteger(v) ? String(v) : v.toFixed(1);
+        case 'multiple':
+          return v === 0 ? '0R' : multiple(v, Number.isInteger(v) ? 0 : 1);
         case 'count':
           return String(Math.round(v));
+        case 'qty':
+          return formatQty(Math.round(v * 10) / 10);
+        case 'minutes':
+          return formatMinutes(v);
       }
     },
   };
@@ -285,7 +351,7 @@ function bandOf(s: ChartSeries, top: number, bandH: number): Band {
     lo = Math.min(lo, 0);
     hi = Math.max(hi, 0);
   }
-  const scale = niceScale(lo, hi);
+  const scale = s.unit === 'minutes' ? niceMinutes(lo, hi) : niceScale(lo, hi);
   const t = top + PAD_Y;
   const b = top + bandH - PAD_Y;
   return {
@@ -672,7 +738,7 @@ const ValuesTable = memo(function ValuesTable({
  * jump to the first and the last. The chart is an image with `label`, and its
  * values are in a table only assistive technology sees.
  */
-export function ReportChart({
+function ChartBody({
   series,
   label,
   periodLabel: periodLabelProp,
@@ -686,6 +752,7 @@ export function ReportChart({
   rowRatio = 1,
   tiltLabels = false,
   hrefOf,
+  expand,
 }: {
   series: readonly ChartSeries[];
   label: string;
@@ -718,6 +785,8 @@ export function ReportChart({
    * table the chart sits over, which carries the same links. Touch taps read the chart.
    */
   hrefOf?(key: string): string | undefined;
+  /** The Expand action, drawn at the top right of the chart. */
+  expand?: React.ReactNode;
 }): React.JSX.Element {
   // Named periods read as they are named; dated ones as a date.
   const periodLabel = periodLabelProp ?? xLabel ?? periodText;
@@ -868,25 +937,28 @@ export function ReportChart({
 
   return (
     <div className="min-w-0">
-      {series.length > 1 ? (
-        <ul className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-muted">
-          {series.map((s, i) => (
-            <li key={s.label} className="inline-flex items-center gap-1.5">
-              <Swatch
-                kind={
-                  s.kind === 'bar' && s.unit === 'money' && moneyOnly
-                    ? 'signed'
-                    : s.kind === 'dots'
-                      ? 'dot'
-                      : 'box'
-                }
-                colour={COLOURS[i % COLOURS.length]!}
-              />
-              {s.label}
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      <div className="mb-2 flex items-start justify-between gap-3 empty:hidden">
+        {series.length > 1 ? (
+          <ul className="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-[12.5px] text-muted">
+            {series.map((s, i) => (
+              <li key={s.label} className="inline-flex items-center gap-1.5">
+                <Swatch
+                  kind={
+                    s.kind === 'bar' && s.unit === 'money' && moneyOnly
+                      ? 'signed'
+                      : s.kind === 'dots'
+                        ? 'dot'
+                        : 'box'
+                  }
+                  colour={COLOURS[i % COLOURS.length]!}
+                />
+                {s.label}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {expand ? <div className="ml-auto flex-none">{expand}</div> : null}
+      </div>
       <div className="relative">
         <div
           ref={box}
@@ -1025,5 +1097,61 @@ export function ReportChart({
         periodLabel={periodLabel}
       />
     </div>
+  );
+}
+
+/** The first sentence of a chart's label, for the title of its full-screen view. */
+function titleOf(label: string): string {
+  return label.split(/\.\s/)[0]!.replace(/\.$/, '');
+}
+
+/**
+ * Bars and lines over one shared x axis (see `ChartBody`), with an Expand
+ * action that opens the same chart full screen over a taller plot. Escape or
+ * Close returns to the page, and focus goes back to Expand.
+ */
+export function ReportChart(
+  props: ComponentProps<typeof ChartBody>,
+): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const filled = (props.series[0]?.points.length ?? 0) > 0;
+  const bands = props.overlay ? 1 : props.series.length;
+  // The plot grows by four fifths of what it had; the dialog scrolls if the bands outgrow it.
+  const taller = Math.round((props.height ?? (bands === 1 ? 260 : 150)) * 1.8);
+  return (
+    <>
+      <ChartBody
+        {...props}
+        expand={
+          filled ? (
+            <button
+              ref={trigger}
+              type="button"
+              aria-label="Expand chart"
+              aria-haspopup="dialog"
+              aria-expanded={open}
+              onClick={() => setOpen(true)}
+              className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-control px-2 text-[12.5px] font-medium text-muted transition-colors duration-200 ease-(--ease-glide) hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 pointer-coarse:px-3"
+            >
+              <ArrowsOut size={14} aria-hidden="true" />
+              Expand
+            </button>
+          ) : null
+        }
+      />
+      {filled ? (
+        <MorphDialog
+          open={open}
+          onOpenChange={setOpen}
+          origin={trigger}
+          returnFocus={trigger}
+          title={titleOf(props.label)}
+          size="full"
+        >
+          <ChartBody {...props} height={taller} />
+        </MorphDialog>
+      ) : null}
+    </>
   );
 }

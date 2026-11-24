@@ -8,6 +8,11 @@ import {
 } from '@testing-library/react';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
+import {
+  SERIES_GROUPS,
+  SERIES_META,
+  SERIES_METRICS,
+} from '@/domain/metrics/series';
 import { renderApp } from '../__fixtures__/render-app';
 import {
   newYorkRepository,
@@ -38,7 +43,7 @@ test('choosing net (bar), win rate (line) and trades (bar) disables the rest', a
 
   const chosen = ['Net P&L', 'Win rate', 'Trades'];
   const boxes = metrics.getAllByRole('checkbox') as HTMLInputElement[];
-  expect(boxes).toHaveLength(9);
+  expect(boxes).toHaveLength(SERIES_METRICS.length);
   for (const box of boxes) {
     const name = box.getAttribute('aria-label')!;
     expect(box.checked, name).toBe(chosen.includes(name));
@@ -110,7 +115,7 @@ test('the chart type and the bucket come from the link and change it', async () 
   expect(new URLSearchParams(window.location.search).get('m')).toBe(
     'net:line,trades:line',
   );
-  expect(metrics.getAllByRole('checkbox')).toHaveLength(9);
+  expect(metrics.getAllByRole('checkbox')).toHaveLength(SERIES_METRICS.length);
 });
 
 test('the summary table has a column per chosen metric and sorts', async () => {
@@ -177,4 +182,122 @@ test('the chart says the range and where each metric runs, and Privacy hides the
       name: /^Net P&L by day, all time\. Net P&L runs from hidden amount to hidden amount/,
     }),
   ).toBeTruthy();
+});
+
+test('the picker holds five groups, each with its metrics and their definitions', async () => {
+  renderApp(<PerformanceView />, { sample: reportsSample, url: URL });
+  const metrics = await picker();
+  for (const name of SERIES_GROUPS) {
+    const group = metrics.getByRole('group', { name });
+    const boxes = within(group).getAllByRole('checkbox');
+    expect(boxes.length, name).toBe(
+      SERIES_METRICS.filter((m) => SERIES_META[m].group === name).length,
+    );
+  }
+  expect(metrics.getAllByRole('checkbox')).toHaveLength(SERIES_METRICS.length);
+  // Every row's label opens its definition.
+  const tips = document.querySelectorAll(
+    '[role="group"][aria-label="Metrics"] [data-metric-tip]',
+  );
+  expect(tips).toHaveLength(SERIES_METRICS.length);
+});
+
+test('the search narrows every group, hides the empty ones and says when nothing matches', async () => {
+  renderApp(<PerformanceView />, { sample: reportsSample, url: URL });
+  const metrics = await picker();
+  const search = screen.getByRole('searchbox', { name: 'Search metrics' });
+  fireEvent.change(search, { target: { value: 'DRAWDOWN' } });
+  expect(
+    metrics.getAllByRole('checkbox').map((b) => b.getAttribute('aria-label')),
+  ).toEqual(['Max drawdown', 'Average drawdown']);
+  expect(metrics.queryByRole('group', { name: 'Profitability' })).toBeNull();
+  expect(metrics.getByRole('group', { name: 'Risk' })).toBeTruthy();
+  // Matches across groups.
+  fireEvent.change(search, { target: { value: 'win rate' } });
+  expect(
+    metrics.getAllByRole('checkbox').map((b) => b.getAttribute('aria-label')),
+  ).toEqual(['Win rate', 'Long win rate', 'Short win rate', 'Daily win rate']);
+  fireEvent.change(search, { target: { value: 'zzz' } });
+  expect(metrics.queryAllByRole('checkbox')).toHaveLength(0);
+  expect(screen.getByText('No metric matches "zzz"')).toBeTruthy();
+  fireEvent.change(search, { target: { value: '' } });
+  expect(metrics.getAllByRole('checkbox')).toHaveLength(SERIES_METRICS.length);
+});
+
+test('a chosen metric stays chosen while the search hides it, and the cap still holds', async () => {
+  renderApp(<PerformanceView />, { sample: reportsSample, url: URL });
+  const metrics = await picker();
+  const search = screen.getByRole('searchbox', { name: 'Search metrics' });
+  fireEvent.click(metrics.getByRole('checkbox', { name: 'Win rate' }));
+  fireEvent.click(metrics.getByRole('checkbox', { name: 'Volume' }));
+  fireEvent.change(search, { target: { value: 'sharpe' } });
+  const sharpe = metrics.getByRole('checkbox', {
+    name: 'Sharpe ratio',
+  }) as HTMLInputElement;
+  expect(sharpe.disabled).toBe(true);
+  expect(new URLSearchParams(window.location.search).get('m')).toBe(
+    'net:bar,win-rate:line,volume:bar',
+  );
+});
+
+test('each chosen metric switches between a value per period and a running value', async () => {
+  renderApp(<PerformanceView />, {
+    sample: reportsSample,
+    url: `${URL}?bucket=day`,
+  });
+  const metrics = await picker();
+  const mode = (m: string) =>
+    within(screen.getByRole('radiogroup', { name: `${m} plotted` }));
+  expect(
+    (mode('Net P&L').getByRole('radio', { checked: true }) as HTMLInputElement)
+      .value,
+  ).toBe('period');
+  // Days: +$60, +$100, -$80, +$45. Running: 60, 160, 80, 125.
+  fireEvent.click(mode('Net P&L').getByRole('radio', { name: 'Running' }));
+  expect(new URLSearchParams(window.location.search).get('m')).toBe(
+    'net:bar:running',
+  );
+  expect(
+    await screen.findByRole('img', {
+      name: /^Net P&L \(running\) by day, all time\. Net P&L \(running\) runs from \+\$60\.00 to \+\$160\.00/,
+    }),
+  ).toBeTruthy();
+  // Not offered for a metric that is a total already.
+  fireEvent.click(metrics.getByRole('checkbox', { name: 'Cumulative P&L' }));
+  expect(
+    screen.queryByRole('radiogroup', { name: 'Cumulative P&L plotted' }),
+  ).toBeNull();
+});
+
+test('the mode comes from the link and a bad one is ignored', async () => {
+  renderApp(<PerformanceView />, {
+    sample: reportsSample,
+    url: `${URL}?m=trades:bar:running,win-rate:line:sideways&bucket=day`,
+  });
+  await picker();
+  const checked = (m: string) =>
+    (
+      within(
+        screen.getByRole('radiogroup', { name: `${m} plotted` }),
+      ).getByRole('radio', { checked: true }) as HTMLInputElement
+    ).value;
+  expect(checked('Trades')).toBe('running');
+  expect(checked('Win rate')).toBe('period');
+  // The table's headers say which.
+  const table = await screen.findByRole('table', { name: 'Summary by day' });
+  expect(
+    within(table)
+      .getAllByRole('columnheader')
+      .map((h) => h.textContent),
+  ).toEqual(['Period', 'Trades (running)', 'Win rate']);
+});
+
+test('durations and quantities show in their own units in the table', async () => {
+  renderApp(<PerformanceView />, {
+    sample: reportsSample,
+    url: `${URL}?m=avg-hold-time:line,volume:bar&bucket=month`,
+  });
+  const table = await screen.findByRole('table', { name: 'Summary by month' });
+  const row = within(table).getAllByRole('row')[1]!.textContent!;
+  expect(row).toMatch(/\d+(h|m)/);
 });

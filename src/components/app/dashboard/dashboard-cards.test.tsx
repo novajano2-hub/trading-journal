@@ -606,6 +606,17 @@ test('every metric carries its definition', async () => {
     'sortino',
     'longest-day',
     'day-streaks',
+    // Plotted on Reports, Performance (Task 25).
+    'avg-win-loss',
+    'longest-trade',
+    'avg-day-length',
+    'long-trades',
+    'short-trades',
+    'long-win-rate',
+    'short-win-rate',
+    'daily-win-rate',
+    'green-day-streak',
+    'red-day-streak',
     // On the calendar (Task 13).
     'trading-days',
     'green-days',

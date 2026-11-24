@@ -304,3 +304,141 @@ test('few bars keep flat labels', async () => {
   expect(labels).toHaveLength(3);
   expect(labels[0]!.getAttribute('transform')).toBeNull();
 });
+
+const svgHeight = (root: HTMLElement) =>
+  Number(root.querySelector('svg')!.getAttribute('height'));
+
+test('Expand opens the chart full screen, taller; Escape closes it and focus returns', async () => {
+  const { container } = renderApp(
+    <ReportChart
+      label="Net P&L by day, all time. Net P&L runs from $1 to $2."
+      series={[SERIES[0]!]}
+    />,
+  );
+  await screen.findByRole('img', { name: /^Net P&L by day/ });
+  const inline = svgHeight(container);
+  const expand = screen.getByRole('button', { name: 'Expand chart' });
+  expand.focus();
+  fireEvent.click(expand);
+  const dialog = await screen.findByRole('dialog', {
+    name: 'Net P&L by day, all time',
+  });
+  // The same chart again, with its values, and taller.
+  const big = within(dialog).getByRole('img', { name: /^Net P&L by day/ });
+  expect(big).toBeTruthy();
+  expect(svgHeight(dialog)).toBeGreaterThan(inline);
+  // One expanded chart has no Expand of its own.
+  expect(
+    within(dialog).queryByRole('button', { name: 'Expand chart' }),
+  ).toBeNull();
+  // The readout works in the expanded chart as it does inline.
+  act(() => big.focus());
+  fireEvent.keyDown(big, { key: 'ArrowRight' });
+  expect(within(dialog).getByRole('status').textContent).toContain('Tue 3 Nov');
+
+  fireEvent.keyDown(dialog, { key: 'Escape' });
+  await vi.waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(document.activeElement).toBe(expand);
+});
+
+test('the Close button closes the expanded chart too', async () => {
+  renderApp(<ReportChart label="By day" series={SERIES} />);
+  await screen.findByRole('img', { name: 'By day' });
+  const expand = screen.getByRole('button', { name: 'Expand chart' });
+  fireEvent.click(expand);
+  const dialog = await screen.findByRole('dialog');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+  await vi.waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(document.activeElement).toBe(expand);
+});
+
+test('an empty chart has nothing to expand', async () => {
+  renderApp(<ReportChart label="Nothing" series={[]} />);
+  await screen.findByText('Nothing to chart in this range.');
+  expect(screen.queryByRole('button', { name: 'Expand chart' })).toBeNull();
+});
+
+test('the expanded chart hides amounts under Privacy', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<ReportChart label="By day" series={SERIES} />, { repository });
+  await screen.findByRole('img', { name: 'By day' });
+  fireEvent.click(screen.getByRole('button', { name: 'Expand chart' }));
+  const dialog = await screen.findByRole('dialog');
+  expect(dialog.textContent).toContain('$•••');
+  expect(dialog.textContent).not.toMatch(/\$\d/);
+});
+
+test('durations read in hours and minutes, on the axis and in the table', async () => {
+  const { container } = renderApp(
+    <ReportChart
+      label="Hold time"
+      series={[
+        {
+          label: 'Average hold time',
+          kind: 'line',
+          unit: 'minutes',
+          points: [
+            { key: '2026-11-02', value: 45 },
+            { key: '2026-11-03', value: 150 },
+          ],
+        },
+      ]}
+    />,
+  );
+  await screen.findByRole('img', { name: 'Hold time' });
+  const table = screen.getByRole('table', { name: 'Hold time' });
+  const cells = within(table)
+    .getAllByRole('row')
+    .map((r) => r.textContent);
+  expect(cells[1]).toContain('45m');
+  expect(cells[2]).toContain('2h 30m');
+  // Ticks are whole minutes or hours, never decimals.
+  const ticks = [...container.querySelectorAll('text')].map(
+    (t) => t.textContent,
+  );
+  expect(
+    ticks.some((t) => /^(\d+h)?( ?\d+m)?$/.test(t ?? '') && t !== ''),
+  ).toBe(true);
+  expect(ticks.join(' ')).not.toMatch(/\d\.\d/);
+});
+
+test('ratios of risk, quantities and counts have their own formats', async () => {
+  renderApp(
+    <ReportChart
+      label="Formats"
+      series={[
+        {
+          label: 'Average realized R',
+          kind: 'line',
+          unit: 'multiple',
+          points: [
+            { key: '2026-11-02', value: 1.25 },
+            { key: '2026-11-03', value: -0.5 },
+          ],
+        },
+        {
+          label: 'Volume',
+          kind: 'bar',
+          unit: 'qty',
+          points: [
+            { key: '2026-11-02', value: 6.8 },
+            { key: '2026-11-03', value: 1169 },
+          ],
+        },
+      ]}
+    />,
+  );
+  await screen.findByRole('img', { name: 'Formats' });
+  const rows = within(screen.getByRole('table', { name: 'Formats' }))
+    .getAllByRole('row')
+    .map((r) => r.textContent);
+  expect(rows[1]).toContain('+1.25R');
+  expect(rows[1]).toContain('6.8');
+  expect(rows[2]).toContain('−0.50R');
+  expect(rows[2]).toContain('1,169');
+});

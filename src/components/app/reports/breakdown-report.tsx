@@ -155,8 +155,8 @@ const UNORDERED: ReadonlySet<BreakdownKey> = new Set([
 ]);
 
 const DEFAULT_PICKS: readonly Pick[] = [
-  { metric: 'net', kind: 'bar' },
-  { metric: 'win-rate', kind: 'line' },
+  { metric: 'net', kind: 'bar', mode: 'period' },
+  { metric: 'win-rate', kind: 'line', mode: 'period' },
 ];
 
 function chartValue(r: BreakdownRow, metric: SeriesMetric): number | null {
