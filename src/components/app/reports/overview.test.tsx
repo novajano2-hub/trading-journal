@@ -381,4 +381,27 @@ test('in Ticks the figures read the futures trades alone, profit factor and aver
   expect(kpi('largest-loss')).toContain('−6.0 ticks');
   expect(kpi('max-drawdown')).toContain('from a peak');
   expect(kpi('max-drawdown')).not.toContain('%');
+  // Daily returns on the balance have no value in ticks.
+  expect(kpi('sharpe')).toContain('None');
+  expect(kpi('sortino')).toContain('None');
+});
+
+test('when the unit leaves out every closed trade the page says so, and keeps Clear filters while a filter is set', async () => {
+  // No report trade has a stop, so R reads none of them.
+  renderApp(<OverviewView />, {
+    repository: await inUnit('r', reportsSample),
+    url: `${URL}?symbol=ES`,
+  });
+  expect(
+    await screen.findByText('No closed trades with a stop in these filters.'),
+  ).toBeTruthy();
+  expect(
+    screen.getByText('R-multiple counts trades with a stop only.'),
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+  await vi.waitFor(() => expect(window.location.search).toBe(''));
+  expect(
+    await screen.findByText('No closed trades with a stop in these filters.'),
+  ).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
 });

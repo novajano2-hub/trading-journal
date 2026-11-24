@@ -109,7 +109,7 @@ async function inUnit(displayUnit: 'r' | 'percent' | 'privacy') {
   return repository;
 }
 
-test('in R each group keeps only its trades with a stop, so a group with none holds no trades', async () => {
+test('in R each group keeps only its trades with a stop, so a group with none holds no trades and reads None', async () => {
   renderApp(<CompareView />, {
     repository: await inUnit('r'),
     url: '/app/reports/compare?a=symbol%3DES&b=symbol%3DNQ',
@@ -118,7 +118,8 @@ test('in R each group keeps only its trades with a stop, so a group with none ho
   const table = within(page).getByRole('table', { name: 'Comparison' });
   // ES: b-1 +2R and b-2 -1R. NQ's two trades have no stop.
   expect(row(table, /^Trades/).slice(0, 2)).toEqual(['2', '0']);
-  expect(row(table, /^Net P&L/).slice(0, 2)).toEqual(['+1.00R', '$0.00']);
+  // A group with no trades has no P&L: it reads None, not a zero in dollars.
+  expect(row(table, /^Net P&L/).slice(0, 2)).toEqual(['+1.00R', 'None']);
   expect(row(table, /^Expectancy/)[0]).toBe('+0.50R');
   expect(row(table, /^Average win/)[0]).toBe('+2.00R');
   expect(row(table, /^Average loss/)[0]).toBe('−1.00R');

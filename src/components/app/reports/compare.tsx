@@ -347,7 +347,9 @@ const ROWS: {
     id: 'pnl',
     kind: 'money',
     over: { of: 'all', mean: false },
-    get: (s) => (s.basis === 'gross' ? s.grossPnl : s.netPnl),
+    // A group with no closed trade has no P&L: None, not a zero in dollars.
+    get: (s) =>
+      s.closedCount === 0 ? null : s.basis === 'gross' ? s.grossPnl : s.netPnl,
   },
   { id: 'trades', kind: 'count', get: (s) => s.closedCount },
   { id: 'win-rate', kind: 'pct', get: (s) => s.winRate },

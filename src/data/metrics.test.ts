@@ -247,6 +247,25 @@ describe('the sample under a narrowing unit, as TradeZella read it', () => {
     expect(metricsOf(futures, 'ticks').drawdown.amount).toBe(
       metricsOf(futures, 'dollar').drawdown.amount,
     );
+    // Sharpe and Sortino are daily returns on the balance: none in a unit.
+    const dollar = metricsOf(futures, 'dollar').risk;
+    expect(dollar.sharpe).not.toBeNull();
+    expect(dollar.sortino).not.toBeNull();
+    for (const unit of ['r', 'ticks', 'pips', 'points'] as const)
+      expect(metricsOf(futures, unit).risk).toEqual({
+        sharpe: null,
+        sortino: null,
+      });
+  });
+
+  test('points are ticks times the tick size on every Futures live trade', () => {
+    const closed = picked(['sample-futures'], 'points').filter(isClosed);
+    for (const t of closed) {
+      const f = tradeFigure(t, uctx);
+      expect(f.points).toBeCloseTo(f.ticks! * t.instrument.tickSize, 6);
+    }
+    // Some of them hold more than one contract, so this is not per contract.
+    expect(closed.some((t) => t.maxPosition > 1)).toBe(true);
   });
 });
 

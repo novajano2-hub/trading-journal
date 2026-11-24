@@ -434,3 +434,59 @@ test('the chart readout gives the trades in the bucket', async () => {
   const readout = within(page).getAllByRole('status')[0]!;
   expect(readout.textContent).toMatch(/Trades\s*\d/);
 });
+
+test('in Ticks the largest-win column shows and sorts by the ticks, not the dollars', async () => {
+  const { createLocalRepository } =
+    await import('@/data/local/local-repository');
+  const { IDBFactory, IDBKeyRange } = await import('fake-indexeddb');
+  const { resolveInstrument } = await import('@/domain/instruments');
+  const sample = async (): Promise<SampleWorkspace> => {
+    const s = await breakdownSample();
+    const es = s.trades[0]!;
+    // ES: $1,000 on 8 ticks. NQ: $100 on 20 ticks.
+    s.trades = [
+      {
+        ...es,
+        id: 'w-es',
+        net: 100000,
+        gross: 100000,
+        avgEntry: 4500,
+        avgExit: 4502,
+        maxPosition: 1,
+      },
+      {
+        ...es,
+        id: 'w-nq',
+        instrument: resolveInstrument('NQZ5')!,
+        net: 10000,
+        gross: 10000,
+        avgEntry: 21000,
+        avgExit: 21005,
+        maxPosition: 1,
+      },
+    ];
+    return s;
+  };
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample,
+  });
+  await repository.prefs.update({ displayUnit: 'ticks' });
+  renderApp(<SymbolsView />, { repository, url: '/app/reports/symbols' });
+  const page = await screen.findByTestId('reports-symbols');
+  const table = within(page).getByRole('table', { name: 'Symbols summary' });
+  const header = within(table)
+    .getAllByRole('columnheader')
+    .find((h) => h.querySelector('[data-metric-tip="largest-win"]'))!;
+  const column = within(table).getAllByRole('columnheader').indexOf(header);
+  fireEvent.click(
+    within(header).getByRole('button', { name: 'Sort by Largest win' }),
+  );
+  const rows = within(table).getAllByRole('row').slice(1);
+  expect(header.getAttribute('aria-sort')).toBe('descending');
+  expect(rows.map((r) => r.children[column]!.textContent)).toEqual([
+    '+20.0 ticks',
+    '+8.0 ticks',
+  ]);
+});

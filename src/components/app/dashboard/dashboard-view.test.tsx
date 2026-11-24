@@ -648,6 +648,24 @@ test('under Privacy the screen-reader text of every amount reads "hidden amount"
   ).toBe(true);
 });
 
+test('the unit empty state keeps Clear filters while a filter is set', async () => {
+  const repository = repositoryWith(() => ({}));
+  await repository.prefs.update({ displayUnit: 'r' });
+  renderApp(<DashboardView />, {
+    repository,
+    url: '/app/dashboard?symbol=ES',
+  });
+  expect(
+    await screen.findByText('No closed trades with a stop in these filters.'),
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+  await waitFor(() => expect(window.location.search).toBe(''));
+  expect(
+    await screen.findByText('No closed trades with a stop in these filters.'),
+  ).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
+});
+
 test('under R the Dashboard reads only the trades with a stop, so no figure leaves one out', async () => {
   // Only the first trade has a risk: the set is that trade alone.
   await inUnit(

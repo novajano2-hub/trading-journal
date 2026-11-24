@@ -142,6 +142,11 @@ export interface TradeSet {
   trades: Trade[];
   /** The same filters except the date, narrowed the same way: what the day figures are built from. */
   dayTrades: Trade[];
+  /**
+   * `dayTrades` before the display unit narrows them. Money targets (the
+   * Dashboard's goals) read these under every unit, as Prop firms do.
+   */
+  moneyDayTrades: Trade[];
   /** The selected accounts: the active ones when no account is filtered. */
   accounts: Account[];
   /** The trades the filters matched that the display unit leaves out (R, ticks, pips, points); 0 otherwise. */
@@ -211,13 +216,12 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
     };
     const matched = applyFilters(trades.data, clean, env);
     const kept = narrowToUnit(matched, unit);
+    const dayMatched = applyFilters(trades.data, { ...clean, range: {} }, env);
     return {
       filters: clean,
       trades: kept,
-      dayTrades: narrowToUnit(
-        applyFilters(trades.data, { ...clean, range: {} }, env),
-        unit,
-      ),
+      dayTrades: narrowToUnit(dayMatched, unit),
+      moneyDayTrades: dayMatched,
       accounts: selectedAccounts(accounts.data, clean),
       unitLeftOut: matched.length - kept.length,
     };

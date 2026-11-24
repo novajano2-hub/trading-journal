@@ -1,4 +1,5 @@
 import type { MetricContext } from '@/domain/metrics/context';
+import type { DayStat } from '@/domain/metrics/days';
 import {
   dailyLossProgress,
   goalWeek,
@@ -97,6 +98,11 @@ export interface DashboardEnv {
   /** The resolved date range. */
   range: { from?: string; to?: string };
   today: string;
+  /**
+   * The net days the goals read, when they are not the bundle's own: under a
+   * display unit that narrows the set, goals still read every trade, in money.
+   */
+  goalDays?: readonly DayStat[];
 }
 
 export interface DashboardModel {
@@ -160,8 +166,9 @@ export function buildDashboard(
       unavailable: `Goals use your base currency (${env.baseCurrency}).`,
     };
   } else {
-    // Goals read the net days, whatever the basis shows.
-    const days = m.netDays;
+    // Goals read the net days, whatever the basis shows, and every trade
+    // whatever the unit: they are money targets.
+    const days = env.goalDays ?? m.netDays;
     const window = goalWeek(env.range, env.today);
     goals = {
       weekly:

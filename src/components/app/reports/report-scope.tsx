@@ -135,7 +135,15 @@ export function ReportScope({
         />
       ) : report.unit ? (
         // The line under the top bar says how many it left out, and goes back to Dollar.
-        <State icon={FunnelSimple} {...unitEmptyCopy(report.unit)} />
+        <State
+          icon={FunnelSimple}
+          {...unitEmptyCopy(report.unit)}
+          actions={
+            report.filtered ? (
+              <Button onClick={report.clearFilters}>Clear filters</Button>
+            ) : undefined
+          }
+        />
       ) : (
         <State
           icon={report.filtered ? FunnelSimple : ClockCounterClockwise}

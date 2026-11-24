@@ -137,11 +137,13 @@ export function DashboardView(): React.JSX.Element {
       ? undefined
       : localDate(new Date().toISOString(), timeZone);
   const shownFilters = set.data?.filters;
+  const moneyDayTrades = set.data?.moneyDayTrades;
 
   const view = useMemo(() => {
     if (
       !metrics.data ||
       !shownFilters ||
+      !moneyDayTrades ||
       !prefs ||
       !workspace.data ||
       !strategies ||
@@ -175,6 +177,14 @@ export function DashboardView(): React.JSX.Element {
     const partition = pickPartition(metrics.data, chosen, prefs.baseCurrency);
     // Day figures (the loss-limit grid, goals) take the exits dated in the range.
     const ctx = { ...metricContextOf(prefs), range };
+    // Goals are money targets: under a unit that narrows the set they still
+    // read every trade the filters match, on net.
+    const goalDays = ctx.unit
+      ? dailyPnl(
+          moneyDayTrades.filter((t) => t.pnlCurrency === partition.currency),
+          { ...ctx, pnlBasis: 'net' },
+        )
+      : partition.netDays;
     const model = buildDashboard(partition, {
       strategies,
       tags,
@@ -184,9 +194,10 @@ export function DashboardView(): React.JSX.Element {
       ctx,
       range,
       today,
+      goalDays,
     });
     // The daily loss limit's grid: every trading day, always on net, as the goal reads them.
-    const days = !model.goals.dailyLoss ? [] : partition.netDays;
+    const days = !model.goals.dailyLoss ? [] : goalDays;
     // What the display units divide by, and the trades behind each figure.
     const pctBase = pctBaseOf({
       accounts,
@@ -241,6 +252,7 @@ export function DashboardView(): React.JSX.Element {
   }, [
     metrics.data,
     shownFilters,
+    moneyDayTrades,
     prefs,
     workspace.data,
     strategies,

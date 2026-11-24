@@ -187,12 +187,12 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   sharpe: {
     label: 'Sharpe ratio',
     definition:
-      'Mean daily return divided by its sample standard deviation, times the square root of 252. A day return is its net P&L over the balance at the start of that day, with a risk-free rate of zero.',
+      'Mean daily return divided by its sample standard deviation, times the square root of 252. A day return is its net P&L over the balance at the start of that day, with a risk-free rate of zero. A return on the balance has no value in R, ticks, pips or points.',
   },
   sortino: {
     label: 'Sortino ratio',
     definition:
-      'Mean daily return divided by the downside deviation, the root of the average squared losing return over all days, times the square root of 252. None without a losing day.',
+      'Mean daily return divided by the downside deviation, the root of the average squared losing return over all days, times the square root of 252. None without a losing day. A return on the balance has no value in R, ticks, pips or points.',
   },
   'longest-day': {
     label: 'Day length',
@@ -262,11 +262,13 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   },
   'largest-win': {
     label: 'Largest win',
-    definition: 'The winning trade with the highest {basis} P&L.',
+    definition:
+      'The winning trade with the highest {basis} P&L, or the most in R, ticks, pips or points when you show one.',
   },
   'largest-loss': {
     label: 'Largest loss',
-    definition: 'The losing trade with the lowest {basis} P&L.',
+    definition:
+      'The losing trade with the lowest {basis} P&L, or the most lost in R, ticks, pips or points when you show one.',
   },
   'max-drawdown': {
     label: 'Max drawdown',
@@ -312,12 +314,12 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     definition:
       'Win rate times average winning R, plus loss rate times average losing R, over the decided trades that have a stop. What a trade is worth on average, in units of risk.',
   },
-  // Prop firm rules read closed trades after fees, so they ignore the P&L basis.
   volume: {
     label: 'Volume',
     definition:
       'Contracts, lots or shares traded, each trade counted once by the quantity it opened, not by every fill.',
   },
+  // Prop firm rules read closed trades after fees, so they ignore the P&L basis.
   'prop-profit': {
     label: 'Profit target',
     definition:

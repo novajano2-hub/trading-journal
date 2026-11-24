@@ -73,7 +73,7 @@ describe('which trades a unit keeps', () => {
 });
 
 describe('a trade in each unit', () => {
-  test('ticks count every contract the trade closed (Q3); points stay per contract', () => {
+  test('ticks and points count every contract the trade closed (Q3): points are ticks times the tick size', () => {
     // MES long: 2 at 5850 and 3 at 5851, all 5 out at 5852. Avg entry 5850.6.
     const t = makeTrade({
       net: 0,
@@ -88,9 +88,10 @@ describe('a trade in each unit', () => {
       ],
     });
     const u = tradeUnits(t, 'net');
-    // 1.4 points a contract, 5.6 ticks a contract, 28 ticks over five.
-    expect(u.points).toBe(1.4);
+    // 1.4 points and 5.6 ticks a contract: 7 points and 28 ticks over five.
+    expect(u.points).toBe(7);
     expect(u.ticks).toBe(28);
+    expect(u.points).toBe(u.ticks! * 0.25);
     expect(u.pips).toBeNull();
   });
   test('an open trade counts the contracts it has closed so far', () => {
@@ -112,7 +113,7 @@ describe('a trade in each unit', () => {
       maxPosition: 2,
     });
     expect(tradeUnits(t, 'net').ticks).toBe(26);
-    expect(tradeUnits(t, 'net').points).toBe(3.25);
+    expect(tradeUnits(t, 'net').points).toBe(6.5);
   });
   test('pips stay per lot', () => {
     const t = { ...forex, maxPosition: 1.9 };

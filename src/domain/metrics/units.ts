@@ -64,12 +64,14 @@ export interface TradeUnits {
 }
 
 /**
- * One trade's move in each unit: (avg exit − avg entry) in the trade's
- * direction, per contract or lot, in points (futures); over the pip of 0.0001,
- * or 0.01 for a JPY quote (pips, forex). Ticks are the points over the tick
- * size times the contracts the exits closed (Q3, settled on the sample's
- * Futures live: +8,495 ticks). R is the P&L on the basis over the initial
- * risk. A trade with no exit has no price move.
+ * One trade's move in each unit, from (avg exit − avg entry) in the trade's
+ * direction. Futures read it times the contracts the exits closed (Q3,
+ * settled on the sample's Futures live: +8,495 ticks): as is in points, and
+ * over the tick size in ticks, so points are always ticks times the tick
+ * size. Forex reads it per lot over the pip of 0.0001, or 0.01 for a JPY
+ * quote (pips; the reference's forex profit factor of 1.30 is per lot). R is
+ * the P&L on the basis over the initial risk. A trade with no exit has no
+ * price move.
  */
 export function tradeUnits(t: Trade, basis: PnlBasis): TradeUnits {
   const r = rOf(t, basis);
@@ -81,14 +83,15 @@ export function tradeUnits(t: Trade, basis: PnlBasis): TradeUnits {
   const future = instrument.assetClass === 'future';
   const forex = instrument.assetClass === 'forex';
   const pip = instrument.quoteCurrency === 'JPY' ? 0.01 : 0.0001;
+  const contracts = future ? closedQty(t) : 1;
   return {
     r: r === undefined ? null : r,
     ticks:
       move !== null && future && instrument.tickSize > 0
-        ? clean((move / instrument.tickSize) * closedQty(t))
+        ? clean((move / instrument.tickSize) * contracts)
         : null,
     pips: move !== null && forex ? clean(move / pip) : null,
-    points: move !== null && future ? clean(move) : null,
+    points: move !== null && future ? clean(move * contracts) : null,
   };
 }
 

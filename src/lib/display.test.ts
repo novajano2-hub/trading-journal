@@ -144,10 +144,10 @@ describe('formatFigure', () => {
 });
 
 describe('tradeFigure', () => {
-  test('ticks count every contract the trade closed; points stay per contract (Q3)', () => {
+  test('ticks and points count every contract the trade closed (Q3)', () => {
     const two = trade('ESZ6', 'long', 5000, 5003.25, { maxPosition: 2 });
     expect(tradeFigure(two, ctx).ticks).toBe(26);
-    expect(tradeFigure(two, ctx).points).toBe(3.25);
+    expect(tradeFigure(two, ctx).points).toBe(6.5);
   });
   test('an ES long 5000 to 5003.25 is 13 ticks and 3.25 points, with no pips', () => {
     const f = tradeFigure(trade('ESZ6', 'long', 5000, 5003.25), ctx);

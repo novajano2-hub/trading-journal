@@ -573,3 +573,24 @@ test('above 640px the log is the table and has no Sort dropdown', async () => {
   expect(screen.queryByRole('button', { name: /^Sort,/ })).toBeNull();
   expect(screen.queryByRole('list', { name: 'Trades' })).toBeNull();
 });
+
+test('when the unit leaves out every trade the log says so, and keeps Clear filters while a filter is set', async () => {
+  // The sample's trades are all ES with no stop: R reads none of them.
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: sample(),
+  });
+  await repository.prefs.update({ displayUnit: 'r' });
+  renderApp(<TradesView />, { repository, url: '/app/trades?symbol=ES' });
+  expect(
+    await screen.findByText('No closed trades with a stop in these filters.'),
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+  await waitFor(() => expect(window.location.search).toBe(''));
+  // With no filter set there is nothing to clear.
+  expect(
+    await screen.findByText('No closed trades with a stop in these filters.'),
+  ).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
+});

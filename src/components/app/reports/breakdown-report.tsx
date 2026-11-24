@@ -21,6 +21,7 @@ import {
 import { pnlOf } from '@/domain/metrics/context';
 import { SERIES_META, type SeriesMetric } from '@/domain/metrics/series';
 import { largestInUnit } from '@/domain/metrics/summary';
+import { unitOf } from '@/domain/metrics/units';
 import { roundHalfEven } from '@/domain/money';
 import { useStrategies, useTagCategories, useTags } from '@/data/query/hooks';
 import type { TagCategory } from '@/domain/types';
@@ -375,18 +376,39 @@ export function BreakdownCards({
     () => new Map(p.trades.map((t) => [t.id, t])),
     [p.trades],
   );
+  /**
+   * A bucket's largest win or loss: in a unit, the trade largest in it, and
+   * the column sorts on its value there; in money, the trade with that amount.
+   */
+  const largestOf = (
+    r: BreakdownRow,
+    cents: number | null,
+    outcome: 'win' | 'loss',
+  ) => {
+    if (cents === null) return null;
+    const own = r.tradeIds.flatMap((id) => tradeById.get(id) ?? []);
+    const inUnit = largestInUnit(own, merged, outcome);
+    if (inUnit && merged.unit)
+      return {
+        trade: inUnit,
+        money: pnlOf(inUnit, basis),
+        sort: unitOf(inUnit, merged.unit, basis) ?? cents,
+      };
+    return {
+      trade: own.find((t) => pnlOf(t, basis) === cents),
+      money: cents,
+      sort: cents,
+    };
+  };
   const largestCell = (
     r: BreakdownRow,
     cents: number | null,
     outcome: 'win' | 'loss',
   ) => {
-    if (cents === null) return none;
-    const own = r.tradeIds.flatMap((id) => tradeById.get(id) ?? []);
-    // In a unit, the trade largest in it; in money, the one with that amount.
-    const inUnit = largestInUnit(own, merged, outcome);
-    const trade = inUnit ?? own.find((t) => pnlOf(t, basis) === cents);
-    const money = inUnit ? pnlOf(inUnit, basis) : cents;
-    const f = trade ? display.ofTrade(trade) : display.ofAll(cents);
+    const largest = largestOf(r, cents, outcome);
+    if (largest === null) return none;
+    const { trade, money } = largest;
+    const f = trade ? display.ofTrade(trade) : display.ofAll(money);
     return (
       <span className={`font-[550] ${signTone(money)}`}>
         <FigureText f={display.figure({ ...f, money }, true, currency)} />
@@ -498,7 +520,7 @@ export function BreakdownCards({
       header: 'Largest win',
       tip: 'largest-win',
       align: 'right',
-      value: (r) => r.summary.largestWin,
+      value: (r) => largestOf(r, r.summary.largestWin, 'win')?.sort ?? null,
       cell: (r) => largestCell(r, r.summary.largestWin, 'win'),
       csv: {
         header: `Largest win (${currency})`,
@@ -513,7 +535,7 @@ export function BreakdownCards({
       header: 'Largest loss',
       tip: 'largest-loss',
       align: 'right',
-      value: (r) => r.summary.largestLoss,
+      value: (r) => largestOf(r, r.summary.largestLoss, 'loss')?.sort ?? null,
       // The most negative first.
       descFirst: false,
       cell: (r) => largestCell(r, r.summary.largestLoss, 'loss'),

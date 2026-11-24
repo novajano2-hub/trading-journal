@@ -102,6 +102,48 @@ test('goals: reached this week; one day broke the loss limit', async () => {
   ).toBeTruthy();
 });
 
+test('goals are money targets: under every narrowing unit they read every trade, in money', async () => {
+  // A −$500 forex loss on Thu 19 Nov, beside the two ES trades: Ticks,
+  // Points and R leave it out of the page, Pips keeps only it.
+  const edit = (s: SampleWorkspace) => {
+    s.trades.push({
+      ...s.trades.find((t) => t.id === 'f-1')!,
+      id: 'fx-1',
+      serial: 9,
+      instrument: resolveInstrument('EURUSD')!,
+      avgEntry: 1.07688,
+      avgExit: 1.07483,
+      net: -50_000,
+      gross: -49_500,
+      fees: 500,
+      strategyIds: [],
+      ruleChecks: [],
+      tagIds: [],
+      initialRisk: undefined,
+    });
+    s.trades.find((t) => t.id === 'f-1')!.initialRisk = 10_000;
+  };
+  for (const displayUnit of [
+    'dollar',
+    'r',
+    'ticks',
+    'pips',
+    'points',
+  ] as const) {
+    await renderDashboard({ prefs: { displayUnit }, edit });
+    const goals = await goalsCard();
+    // The week: +$600, −$400 and −$500. Thursday: −$900.
+    expect(goals.textContent, displayUnit).toContain(
+      '−$300.00 this week, 16-20 Nov',
+    );
+    expect(goals.textContent, displayUnit).toContain(
+      'Broken once, all time: Thu 19 Nov at −$900.00.',
+    );
+    expect(goals.textContent, displayUnit).toContain('Kept 1 of 2 days');
+    cleanup();
+  }
+});
+
 test('goals: a week in progress, and a limit kept every day', async () => {
   await renderDashboard({
     prefs: { goals: { sample: { weeklyNet: 50000, dailyLossLimit: 50000 } } },

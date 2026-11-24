@@ -200,13 +200,25 @@ function PlanPreview(): React.JSX.Element {
  * filters." The way back to Dollar is the line under the top bar, which says
  * how many trades the unit left out.
  */
-function UnitEmpty({ unit }: { unit: TradeUnit }): React.JSX.Element {
+function UnitEmpty({
+  unit,
+  onClearFilters,
+}: {
+  unit: TradeUnit;
+  /** Given while a filter is set: the filters may be what left nothing. */
+  onClearFilters?: () => void;
+}): React.JSX.Element {
   const { title, body } = unitEmptyCopy(unit);
   return (
     <StateBlock
       visual={<IconTile icon={FunnelSimple} />}
       title={title}
       body={body}
+      actions={
+        onClearFilters ? (
+          <Button onClick={onClearFilters}>Clear filters</Button>
+        ) : undefined
+      }
     />
   );
 }
@@ -221,6 +233,7 @@ function UnitEmpty({ unit }: { unit: TradeUnit }): React.JSX.Element {
  *   the filters hold none closed and offers Clear filters.
  * - `unit`: the display unit (`unit`) left out every closed trade the
  *   filters matched; the line under the top bar switches back to Dollar.
+ *   When `filtered`, it offers Clear filters too.
  */
 export function DashboardEmpty({
   variant,
@@ -239,7 +252,12 @@ export function DashboardEmpty({
 }): React.JSX.Element {
   switch (variant) {
     case 'unit':
-      return <UnitEmpty unit={unit} />;
+      return (
+        <UnitEmpty
+          unit={unit}
+          onClearFilters={filtered ? onClearFilters : undefined}
+        />
+      );
     case 'no-trades':
       return (
         <StateBlock

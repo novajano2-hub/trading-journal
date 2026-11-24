@@ -3,6 +3,8 @@ import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { afterEach, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
+import { EMPTY_FILTERS } from '@/data/filters';
+import { useTradeSet } from '@/data/query/derived';
 import { createLocalRepository } from '@/data/local/local-repository';
 import { SAMPLE_WORKSPACE } from '@/data/workspaces';
 import { makeTrade } from '@/domain/__fixtures__/trades';
@@ -77,16 +79,41 @@ test('its control goes back to Dollar, and the line goes', async () => {
   await waitFor(() => expect(screen.queryByText(/left out/)).toBeNull());
 });
 
-test('nothing shows when the unit keeps every trade, or the page does not read the filters', async () => {
+test('nothing shows when the unit keeps every trade', async () => {
   await inUnit('dollar');
-  // The fixture loads; a narrowed page would have spoken by now.
+  // The region appears once the trade set has loaded, so the line had its chance.
   await screen.findByTestId('unit-notice');
   expect(screen.queryByText(/left out/)).toBeNull();
-  cleanup();
-  await inUnit('pips', '/app/strategies');
-  await new Promise((r) => setTimeout(r, 50));
+});
+
+test('a page the filters do not drive shows no line, though its unit leaves trades out', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample,
+  });
+  await repository.prefs.update({ displayUnit: 'pips' });
+  renderApp(
+    <>
+      <UnitNotice />
+      <Loaded />
+    </>,
+    { repository, url: '/app/strategies' },
+  );
+  // Once the trade set has loaded (2 trades left out), a filtered page
+  // would show the line: this one shows no region at all.
+  expect((await screen.findByTestId('loaded')).textContent).toBe('2');
+  expect(screen.queryByTestId('unit-notice')).toBeNull();
   expect(screen.queryByText(/left out/)).toBeNull();
 });
+
+/** The trade set the notice reads, once it has loaded: its left-out count. */
+function Loaded(): React.JSX.Element | null {
+  const set = useTradeSet(EMPTY_FILTERS);
+  return set.data ? (
+    <span data-testid="loaded">{set.data.unitLeftOut}</span>
+  ) : null;
+}
 
 test('a unit that leaves nothing out says nothing', async () => {
   const repository = createLocalRepository({
@@ -96,7 +123,7 @@ test('a unit that leaves nothing out says nothing', async () => {
   });
   await repository.prefs.update({ displayUnit: 'ticks' });
   renderApp(<UnitNotice />, { repository });
+  // The region appears once the trade set has loaded.
   await screen.findByTestId('unit-notice');
-  await new Promise((r) => setTimeout(r, 50));
   expect(screen.queryByText(/left out/)).toBeNull();
 });

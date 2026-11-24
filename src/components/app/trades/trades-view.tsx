@@ -485,6 +485,16 @@ export function TradesView(): React.JSX.Element {
     filters.status !== undefined ||
     filters.reviewed !== undefined ||
     search.trim() !== '';
+  const clearFilters = (
+    <Button
+      onClick={() => {
+        setSearch('');
+        setFilters(EMPTY_FILTERS);
+      }}
+    >
+      Clear filters
+    </Button>
+  );
   // The display unit, when it left out some of the trades the filters matched.
   const narrowed =
     (set.data?.unitLeftOut ?? 0) > 0 && isTradeUnit(prefs.displayUnit)
@@ -735,21 +745,13 @@ export function TradesView(): React.JSX.Element {
             <StateBlock
               icon={FunnelSimple}
               {...unitEmptyCopy(narrowed, status)}
+              actions={filtered ? clearFilters : undefined}
             />
           ) : filtered ? (
             <StateBlock
               icon={FunnelSimple}
               title="No trades match these filters."
-              actions={
-                <Button
-                  onClick={() => {
-                    setSearch('');
-                    setFilters(EMPTY_FILTERS);
-                  }}
-                >
-                  Clear filters
-                </Button>
-              }
+              actions={clearFilters}
             />
           ) : (
             <StateBlock

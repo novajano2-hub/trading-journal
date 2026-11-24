@@ -141,14 +141,17 @@ export function metricsByCurrency(
       daySummary: daySummary(days, ctx),
       equity: equityCurve(own, startingBalance, ctx),
       // A share of the balance means nothing once the unit has narrowed the
-      // trades to some of the accounts' P&L: it has no value then.
+      // trades to some of the accounts' P&L: it has no value then. Nor do
+      // Sharpe and Sortino, daily returns on that balance.
       drawdown: ctx.unit ? { ...drawdown, pct: null } : drawdown,
       tradeStreaks: tradeStreaks(own, ctx),
       dayStreaks: dayStreaks(days, ctx),
       dayDurations: dayDurations(dayOwn, ctx),
       volume,
       avgDailyVolume: days.length === 0 ? null : volume / days.length,
-      risk: riskRatios(netDays, riskStart, riskFlows),
+      risk: ctx.unit
+        ? { sharpe: null, sortino: null }
+        : riskRatios(netDays, riskStart, riskFlows),
     };
   });
 }

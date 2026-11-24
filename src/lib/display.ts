@@ -51,8 +51,8 @@ const clean = (n: number) => Math.round(n * 1e6) / 1e6;
 
 /**
  * One trade in every unit (`tradeUnits`): ticks and points are futures',
- * pips forex's, R needs an initial risk; the rest are null. Ticks count every
- * contract the trade closed; points and pips are per contract or lot.
+ * pips forex's, R needs an initial risk; the rest are null. Ticks and points
+ * count every contract the trade closed; pips are per lot.
  */
 export function tradeFigure(t: Trade, ctx: MetricContext): Figure {
   const money = pnlOf(t, ctx.pnlBasis);
