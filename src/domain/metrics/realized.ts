@@ -27,6 +27,8 @@ export function exitShare(qty: number, total: number, count: number): number {
 /** A realization with the quantity it exited, for sharing per-trade figures by size (infinite for a trade booked whole at its close). */
 export interface SizedRealization extends Realization {
   qty: number;
+  /** The exit fill's price; absent for a trade booked whole at its close. */
+  price?: number;
 }
 
 /**
@@ -41,6 +43,7 @@ export function sizedRealizations(trade: Trade): SizedRealization[] {
   const exits: {
     time: string;
     qty: number;
+    price: number;
     /** In the trade's P&L currency, converted at this exit's own price, unrounded. */
     pnl: number;
     ownFees: number;
@@ -71,6 +74,7 @@ export function sizedRealizations(trade: Trade): SizedRealization[] {
     exits.push({
       time: e.time,
       qty: e.qty,
+      price: e.price,
       pnl: quoteToPnl(pnl, trade.instrument, trade.pnlCurrency, e.price),
       ownFees: e.fees + e.commission,
       entryFees,
@@ -107,6 +111,7 @@ export function sizedRealizations(trade: Trade): SizedRealization[] {
       fees,
       net: gross - fees,
       qty: x.qty,
+      price: x.price,
     };
   });
 }

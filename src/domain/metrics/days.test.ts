@@ -7,10 +7,12 @@ import {
   dayDurations,
   dayStreaks,
   daySummary,
+  dayVolumes,
   loggedDays,
   monthSummary,
   type DayStat,
 } from './days';
+import { unitOf } from './units';
 import { buildTrades } from '../trade-builder';
 import { resolveInstrument } from '../instruments';
 import type { Execution, JournalEntry } from '../types';
@@ -452,5 +454,94 @@ describe('the day and month figures under a unit', () => {
       average: -8,
       months: 2,
     });
+  });
+});
+
+describe('a day reads each exit of the day in the unit (final review I3)', () => {
+  // ES long 2 from 4500 on Wed: one out at 4506 that day (+$300, +3R, +24
+  // ticks), one at 4498 on Thu (-$100, -1R, -8 ticks). Risk $100.
+  const twoDays = build([
+    fill('e1', 'buy', 2, 4500, '2026-11-04T15:00:00Z'),
+    fill('x1', 'sell', 1, 4506, '2026-11-04T16:00:00Z'),
+    fill('x2', 'sell', 1, 4498, '2026-11-05T15:00:00Z'),
+  ]).map((t) => ({ ...t, initialRisk: 10000 }));
+
+  test('in R a red day reads below zero: each exit over the risk, never a share of the trade', () => {
+    const r = { ...ctx, unit: 'r' as const };
+    expect(dailyPnl(twoDays, r).map((d) => [d.date, d.net, d.unit])).toEqual([
+      ['2026-11-04', 30000, 3],
+      ['2026-11-05', -10000, -1],
+    ]);
+    expect(daySummary(dailyPnl(twoDays, r), r).largestRedDay?.unit).toBe(-1);
+  });
+
+  test('in ticks each exit is its own move times the contracts it closed', () => {
+    const ticks = { ...ctx, unit: 'ticks' as const };
+    expect(dailyPnl(twoDays, ticks).map((d) => d.unit)).toEqual([24, -8]);
+  });
+
+  test("a day's profit factor reads the exits of the day in the unit", () => {
+    const winner = build([
+      fill('e1', 'buy', 1, 4500, '2026-11-05T14:00:00Z'),
+      fill('x1', 'sell', 1, 4504, '2026-11-05T14:30:00Z'),
+    ]).map((t) => ({ ...t, id: 'w', serial: 2, initialRisk: 10000 }));
+    const r = { ...ctx, unit: 'r' as const };
+    const thu = dailyPnl([...twoDays, ...winner], r).find(
+      (d) => d.date === '2026-11-05',
+    )!;
+    // +$200 (+2R) won over the -1R exit lost.
+    expect(thu.profitFactor).toBe(2);
+  });
+
+  test('fully closed single-exit trades do not move', () => {
+    const ticks = { ...ctx, unit: 'ticks' as const };
+    const one = build([
+      fill('e1', 'buy', 2, 4500, '2026-11-04T15:00:00Z'),
+      fill('x1', 'sell', 2, 4502, '2026-11-04T16:00:00Z'),
+    ]);
+    expect(dailyPnl(one, ticks)[0]!.unit).toBe(unitOf(one[0]!, 'ticks', 'net'));
+  });
+});
+
+describe('dayVolumes', () => {
+  const twoDays = build([
+    fill('e1', 'buy', 2, 4500, '2026-11-04T15:00:00Z'),
+    fill('x1', 'sell', 1, 4506, '2026-11-04T16:00:00Z'),
+    fill('x2', 'sell', 1, 4498, '2026-11-05T15:00:00Z'),
+  ]);
+
+  test('a closed trade shares its volume among its exit days by exited size', () => {
+    expect(dayVolumes(twoDays, ctx)).toEqual([
+      { date: '2026-11-04', value: 1 },
+      { date: '2026-11-05', value: 1 },
+    ]);
+  });
+
+  test('an open trade books what it has exited on the exit days and the rest on the day it opened', () => {
+    const open = build([
+      fill('e1', 'buy', 3, 4500, '2026-11-03T15:00:00Z'),
+      fill('x1', 'sell', 1, 4506, '2026-11-04T16:00:00Z'),
+    ]);
+    expect(open[0]!.status).toBe('open');
+    expect(dayVolumes(open, ctx)).toEqual([
+      { date: '2026-11-03', value: 2 },
+      { date: '2026-11-04', value: 1 },
+    ]);
+    const unexited = build([
+      fill('e1', 'buy', 3, 4500, '2026-11-03T15:00:00Z'),
+    ]);
+    expect(dayVolumes(unexited, ctx)).toEqual([
+      { date: '2026-11-03', value: 3 },
+    ]);
+  });
+
+  test('a trade typed in by hand books its size on the day it closed; the range clips', () => {
+    const plain = makeTrade({ net: 0, maxPosition: 4 });
+    expect(dayVolumes([plain], ctx)).toEqual([
+      { date: '2026-03-02', value: 4 },
+    ]);
+    expect(
+      dayVolumes(twoDays, { ...ctx, range: { from: '2026-11-05' } }),
+    ).toEqual([{ date: '2026-11-05', value: 1 }]);
   });
 });

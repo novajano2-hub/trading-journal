@@ -15,6 +15,7 @@ import { makeTrade } from '@/domain/__fixtures__/trades';
 import { resolveInstrument } from '@/domain/instruments';
 import type { DisplayUnit, Execution, Trade } from '@/domain/types';
 import { renderApp } from './__fixtures__/render-app';
+import { CalendarView } from './calendar/calendar-view';
 import { DashboardView } from './dashboard/dashboard-view';
 import { CompareView } from './reports/compare';
 import { OverviewView } from './reports/overview';
@@ -247,5 +248,72 @@ describe('expectancy reads the decided trades on every page (I1)', () => {
 
   test.each(cases)('in %s, the Strategy page', async (unit, want) => {
     expect(await strategyStat(unit, 'expectancy')).toContain(want);
+  });
+});
+
+describe('a day reads the same on every page (I3)', () => {
+  // x-5's second exit lost $100 on Thu 5 Nov: -1R and -8 ticks that day, never
+  // a share of the trade's +2R or +16 ticks.
+  test('in R, Thu 5 Nov is -1.00R on the Calendar, the Performance day bar and the Overview largest red day', async () => {
+    renderApp(<CalendarView />, {
+      repository: await inUnit('r'),
+      url: '/app/calendar?month=2026-11&day=2026-11-05',
+    });
+    const panel = await screen.findByRole('complementary', {
+      name: /Thu 5 Nov|5 November|Thursday/,
+    });
+    expect(text(panel)).toContain('−1.00R');
+    cleanup();
+
+    const rows = await performanceRows('r', 'net');
+    const thu = rows.find((r) => r[0]!.includes('5 Nov'))!;
+    expect(thu[1]).toBe('−1.00R');
+    const wed = rows.find((r) => r[0]!.includes('4 Nov'))!;
+    expect(wed[1]).toBe('+3.00R');
+    cleanup();
+
+    renderApp(<OverviewView />, {
+      repository: await inUnit('r'),
+      url: '/app/reports',
+    });
+    const page = await screen.findByTestId('reports-overview');
+    expect(text(page.querySelector('[data-stat="largest-red-day"]'))).toContain(
+      '−1.00R',
+    );
+  });
+
+  test('in Ticks, Wed 4 Nov is +24 ticks on the Calendar and on the Performance day bar', async () => {
+    renderApp(<CalendarView />, {
+      repository: await inUnit('ticks'),
+      url: '/app/calendar?month=2026-11&day=2026-11-04',
+    });
+    const panel = await screen.findByRole('complementary', {
+      name: /Wed 4 Nov|4 November|Wednesday/,
+    });
+    expect(text(panel)).toContain('+24.0 ticks');
+    cleanup();
+    const rows = await performanceRows('ticks', 'net');
+    expect(rows.find((r) => r[0]!.includes('4 Nov'))![1]).toBe('+24.0 ticks');
+  });
+
+  test('volume: x-5 shares its two contracts between Wed and Thu on the Calendar and the Performance bars', async () => {
+    renderApp(<CalendarView />, {
+      repository: await inUnit('dollar'),
+      url: '/app/calendar?month=2026-11&day=2026-11-04',
+    });
+    const panel = await screen.findByRole('complementary', {
+      name: /Wed 4 Nov|4 November|Wednesday/,
+    });
+    const volume = [...panel.querySelectorAll('dt')].find(
+      (dt) => text(dt) === 'Volume',
+    )!;
+    expect(text(volume.nextElementSibling)).toBe('1');
+    cleanup();
+    const rows = await performanceRows('dollar', 'volume');
+    expect(rows.map((r) => r[1])).toEqual(['2', '2', '1', '1']);
+    cleanup();
+    // Running, every trade counts once: 6 in all.
+    const running = await performanceRows('dollar', 'volume', 'running');
+    expect(running.at(-1)![1]).toBe('6');
   });
 });

@@ -1,14 +1,8 @@
 import { outcomeOf } from '@/domain/outcome';
 import { mistakeTags } from '@/domain/metrics/mistakes';
-import { dailyPnl } from '@/domain/metrics/days';
+import { dailyPnl, dayVolumes } from '@/domain/metrics/days';
 import { classify, type MetricContext } from '@/domain/metrics/context';
-import {
-  exitShare,
-  realizations,
-  sizedRealizations,
-} from '@/domain/metrics/realized';
-import { tradeVolume } from '@/domain/metrics/summary';
-import { realizedUnits, tradeUnits } from '@/domain/metrics/units';
+import { exitUnits } from '@/domain/metrics/units';
 import { localDate } from '@/domain/time';
 import type {
   Cents,
@@ -34,17 +28,17 @@ export interface CalendarDay {
   trades: number;
   wins: number;
   losses: number;
-  /** The sum of the day's realized R; trades without risk are left out. Null when none has risk. */
+  /** The sum of the R of the day's exits (each exit's P&L over its trade's risk); trades without risk are left out. Null when none has risk. */
   r: number | null;
   /**
-   * The day's ticks, pips and points: each eligible trade's value shared among
-   * its exit days by exited size, summed. Null when no trade of the day has
-   * the unit (a forex day has no ticks), so the cell reads "None".
+   * The day's ticks, pips and points: each exit of the day by its own value
+   * (`exitUnits`), summed. Null when no trade of the day has the unit (a
+   * forex day has no ticks), so the cell reads "None".
    */
   ticks: number | null;
   pips: number | null;
   points: number | null;
-  /** Each trade that exited the day, by its quantity counted once. */
+  /** The day's volume as `dayVolumes` shares it: what the exits closed, and what an open trade still holds on the day it opened. */
   volume: number;
   /**
    * Won over lost by the summary's own profit factor: wins and losses by the
@@ -165,75 +159,29 @@ function bookDays(
       outside: false,
     });
   }
-  // Gross, fees and R come from the same exits the day's net was booked from.
-  const rs = new Map<string, number>();
-  for (const t of trades) {
-    const risk =
-      t.initialRisk !== undefined && t.initialRisk > 0
-        ? t.initialRisk
-        : undefined;
-    for (const x of realizations(t)) {
-      const date = localDate(x.time, ctx.timeZone);
-      const day = out.get(date);
+  // Gross, fees, R and the units come from the same exits the day's net was
+  // booked from, each exit in the unit by its own value (`exitUnits`), so a
+  // day here reads as it does on every other page.
+  for (const t of trades)
+    for (const x of exitUnits(t, ctx.pnlBasis)) {
+      const day = out.get(localDate(x.time, ctx.timeZone));
       if (!day) continue;
       day.gross += x.gross;
       day.fees += x.fees;
-      if (risk !== undefined)
-        rs.set(
-          date,
-          (rs.get(date) ?? 0) +
-            (ctx.pnlBasis === 'gross' ? x.gross : x.net) / risk,
-        );
-    }
-  }
-  for (const [date, r] of rs) out.get(date)!.r = r;
-  bookUnits(trades, ctx, out);
-  return out;
-}
-
-/**
- * Volume, won and lost, and the day's ticks, pips and points. A trade counts
- * once on each day it exits; its unit values are shared among those days by
- * exited size, as the day's cost basis and unit P&L are in `dailyPnl`.
- */
-function bookUnits(
-  trades: readonly Trade[],
-  ctx: MetricContext,
-  out: Map<string, CalendarDay>,
-): void {
-  for (const t of trades) {
-    // Each exit day's share of the trade, by exited size.
-    const parts = new Map<string, number>();
-    const realized = sizedRealizations(t);
-    const realizedQty = realized.reduce((n, r) => n + r.qty, 0);
-    for (const r of realized) {
-      const date = localDate(r.time, ctx.timeZone);
-      if (!out.has(date)) continue;
-      parts.set(
-        date,
-        (parts.get(date) ?? 0) + exitShare(r.qty, realizedQty, realized.length),
-      );
-    }
-    if (parts.size === 0) continue;
-    const units =
-      t.status === 'closed'
-        ? tradeUnits(t, ctx.pnlBasis)
-        : realizedUnits(t, ctx.pnlBasis);
-    const volume = tradeVolume(t);
-    for (const [date, share] of parts) {
-      const day = out.get(date)!;
-      day.volume += volume * share;
-      for (const u of ['ticks', 'pips', 'points'] as const) {
-        const v = units?.[u];
-        if (v !== null && v !== undefined) day[u] = (day[u] ?? 0) + v * share;
+      for (const u of ['r', 'ticks', 'pips', 'points'] as const) {
+        const v = x.units[u];
+        if (v !== null) day[u] = (day[u] ?? 0) + v;
       }
     }
+  // Volume, as every page shares it among the days (`dayVolumes`).
+  for (const v of dayVolumes(trades, scoped)) {
+    const day = out.get(v.date);
+    if (day) day.volume = v.value;
   }
-  for (const day of out.values()) {
-    day.volume = Math.round(day.volume * 1e6) / 1e6;
+  for (const day of out.values())
     for (const u of ['ticks', 'pips', 'points'] as const)
       if (day[u] !== null) day[u] = Math.round(day[u] * 1e6) / 1e6;
-  }
+  return out;
 }
 
 function toneOf(
@@ -421,45 +369,25 @@ export interface DayExit extends UnitSums {
   r: number | null;
 }
 
-/** The exits dated `date`, earliest first. */
+/** The exits dated `date`, earliest first, each in the units by its own value (`exitUnits`). */
 export function dayExits(
   trades: readonly Trade[],
   date: string,
   ctx: MetricContext,
 ): DayExit[] {
   const out: DayExit[] = [];
-  for (const trade of trades) {
-    const risk =
-      trade.initialRisk !== undefined && trade.initialRisk > 0
-        ? trade.initialRisk
-        : undefined;
-    const sized = sizedRealizations(trade);
-    const total = sized.reduce((n, x) => n + x.qty, 0);
-    const units =
-      trade.status === 'closed'
-        ? tradeUnits(trade, ctx.pnlBasis)
-        : realizedUnits(trade, ctx.pnlBasis);
-    for (const x of sized) {
+  for (const trade of trades)
+    for (const x of exitUnits(trade, ctx.pnlBasis)) {
       if (localDate(x.time, ctx.timeZone) !== date) continue;
-      const value = ctx.pnlBasis === 'gross' ? x.gross : x.net;
-      const share = exitShare(x.qty, total, sized.length);
-      const part = (v: number | null | undefined) =>
-        v === null || v === undefined
-          ? null
-          : Math.round(v * share * 1e6) / 1e6;
       out.push({
-        ticks: part(units?.ticks),
-        pips: part(units?.pips),
-        points: part(units?.points),
+        ...x.units,
         trade,
         time: x.time,
-        value,
+        value: ctx.pnlBasis === 'gross' ? x.gross : x.net,
         gross: x.gross,
         fees: x.fees,
-        r: risk === undefined ? null : value / risk,
       });
     }
-  }
   return out.sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
 }
 

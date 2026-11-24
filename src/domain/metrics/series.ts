@@ -9,12 +9,13 @@ import {
   daySummary,
   dayStreaks,
   dayValue,
+  dayVolumes,
   type DayStat,
 } from './days';
 import { drawdownSeries } from './equity';
 import { sizedRealizations } from './realized';
 import { riskRatios } from './risk';
-import { expectancyOf, plannedR, rOf, tradeVolume } from './summary';
+import { expectancyOf, plannedR, rOf } from './summary';
 import { unitOf } from './units';
 
 export type SeriesMetric =
@@ -258,7 +259,6 @@ interface Fact {
   realizedR: number | undefined;
   plannedR: number | undefined;
   held: number;
-  volume: number;
 }
 
 /** The sums a running figure is read from, carried from bucket to bucket. */
@@ -452,8 +452,8 @@ interface Base {
   facts: Fact[];
   lengths?: { date: string; minutes: number }[];
   netDays?: DayStat[];
-  /** Volume by date: closed trades by close, open ones by open. */
-  volume?: { date: string; value: number; open: boolean }[];
+  /** Volume by date, as `dayVolumes` shares it. */
+  volume?: { date: string; value: number }[];
 }
 
 const cache = new WeakMap<readonly Trade[], WeakMap<MetricContext, Base>>();
@@ -479,7 +479,6 @@ function baseOf(trades: readonly Trade[], ctx: MetricContext): Base {
       realizedR: rOf(t, ctx.pnlBasis),
       plannedR: plannedR(t),
       held: (Date.parse(t.closedAt) - Date.parse(t.openedAt)) / 60000,
-      volume: tradeVolume(t),
     });
   }
   const base: Base = {
@@ -500,9 +499,11 @@ function baseOf(trades: readonly Trade[], ctx: MetricContext): Base {
  * hold times) go on the local date a trade closed. Pass the trades with every
  * filter but the date, and the date range in `ctx.range`: both kinds then
  * count only what is dated inside it. A bucket with exits but no trade closed
- * in it has no win rate (null); trades and fees are 0. Volume counts open
- * trades too, dated by their open, as the Overview's does. The input must be
- * a single-currency set.
+ * in it has no win rate (null); trades and fees are 0. Volume is shared
+ * among the days by `dayVolumes`, as the Calendar's is: what the exits
+ * closed on each exit day, and what an open trade still holds on the day it
+ * opened, so the running volume is the Overview's. The input must be a
+ * single-currency set.
  *
  * In `running` mode each bucket holds the metric over everything from the
  * range start to the bucket's end (the win rate of all trades so far), read
@@ -535,13 +536,9 @@ export function timeSeries(
         const key = keyOf(date);
         fees.set(key, (fees.get(key) ?? 0) + r.fees);
       }
-  // Open trades are dated by their open, and only their own metrics show them.
-  const wantsOpen =
-    metric === 'open-trades' ||
-    metric === 'volume' ||
-    metric === 'avg-daily-volume';
+  // Open trades are dated by their open, and only their own metric shows them.
   const opened: { date: string; key: string; trade: Trade }[] = [];
-  if (wantsOpen)
+  if (metric === 'open-trades')
     for (const t of trades) {
       if (isClosed(t)) continue;
       const date = localDate(t.openedAt, ctx.timeZone);
@@ -550,12 +547,19 @@ export function timeSeries(
     }
   opened.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
+  // Volume is shared among the days as on every page: what the exits closed,
+  // and what an open trade still holds on the day it opened.
+  const wantsVolume = metric === 'volume' || metric === 'avg-daily-volume';
+  if (wantsVolume && !base.volume) base.volume = dayVolumes(trades, ctx);
+  const volumeItems = wantsVolume ? (base.volume ?? []) : [];
+
   const keys = [
     ...new Set([
       ...days.map((d) => keyOf(d.date)),
       ...fees.keys(),
       ...facts.map((f) => f.key),
       ...opened.map((o) => o.key),
+      ...volumeItems.map((v) => keyOf(v.date)),
     ]),
   ].sort();
 
@@ -569,10 +573,6 @@ export function timeSeries(
         : dailyPnl(trades, { ...ctx, pnlBasis: 'net' });
   const lengths = base.lengths ?? [];
   const netDays = base.netDays ?? [];
-  const volumeItems = [
-    ...facts.map((f) => ({ date: f.date, value: f.volume })),
-    ...opened.map((o) => ({ date: o.date, value: tradeVolume(o.trade) })),
-  ].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
   // Each list is in date order: a bucket's slice is two moving indices.
   const cursor = (list: readonly { date: string }[]) => {

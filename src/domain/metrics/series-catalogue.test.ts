@@ -261,6 +261,44 @@ describe('per period and running', () => {
     ).toEqual(DAYS);
   });
 
+  test('volume shares a trade held over two days among its exit days, as the Calendar does (I3)', () => {
+    const held = makeTrade({
+      id: 'held',
+      net: 0,
+      maxPosition: 2,
+      openedAt: '2026-11-17T15:00:00Z',
+      closedAt: '2026-11-18T15:00:00Z',
+      executions: [
+        { ...fill('buy', 4500, '2026-11-17T15:00:00Z', 'h1'), qty: 2 },
+        fill('sell', 4501, '2026-11-17T16:00:00Z', 'h2'),
+        fill('sell', 4499, '2026-11-18T15:00:00Z', 'h3'),
+      ],
+    });
+    const series = timeSeries([held], ctx, 'volume', 'day');
+    expect(series).toEqual([
+      { key: '2026-11-17', value: 1 },
+      { key: '2026-11-18', value: 1 },
+    ]);
+    // One trading day each: the average is the same split.
+    expect(values([held], 'avg-daily-volume')).toEqual([1, 1]);
+    // A partly exited open trade: its exit day gets what it closed, its open day the rest.
+    const open = makeTrade({
+      id: 'open',
+      net: 0,
+      status: 'open',
+      maxPosition: 3,
+      openedAt: '2026-11-17T15:00:00Z',
+      executions: [
+        { ...fill('buy', 4500, '2026-11-17T15:00:00Z', 'o1'), qty: 3 },
+        fill('sell', 4501, '2026-11-18T16:00:00Z', 'o2'),
+      ],
+    });
+    expect(timeSeries([open], ctx, 'volume', 'day')).toEqual([
+      { key: '2026-11-17', value: 2 },
+      { key: '2026-11-18', value: 1 },
+    ]);
+  });
+
   test('average drawdown is the mean of the days under a peak', () => {
     expect(values(all, 'avg-drawdown', 'week', 'running')).toEqual([
       null,

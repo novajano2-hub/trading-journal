@@ -444,11 +444,14 @@ describe('the day and month figures (Task 30)', () => {
     expect(dayOf(m, day)!.profitFactor).toBeNull();
   });
 
-  test('a trade held over two days shares its units by exited size', () => {
+  test('a trade held over two days books each exit by its own move (final review ruling 2)', () => {
     const m = calendarMonth(heldTwoDays(), [], '2026-11', ctx);
-    // 1 ES contract out each day: avg exit 5015, entry 5000, 2 contracts = 120 ticks.
-    expect(dayOf(m, '2026-11-16')!.ticks).toBe(60);
-    expect(dayOf(m, '2026-11-17')!.ticks).toBe(60);
+    // 1 ES contract out each day from 5000: at 5010 (+40 ticks), then at 5020
+    // (+80 ticks). The trade's 120 ticks are their sum.
+    expect(dayOf(m, '2026-11-16')!.ticks).toBe(40);
+    expect(dayOf(m, '2026-11-17')!.ticks).toBe(80);
+    expect(dayOf(m, '2026-11-16')!.volume).toBe(1);
+    expect(dayOf(m, '2026-11-17')!.volume).toBe(1);
   });
 
   test('the month counts winners and losers and the trade win rate', () => {

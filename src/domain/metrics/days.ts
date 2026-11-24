@@ -4,8 +4,8 @@ import { localDate } from '../time';
 import type { Cents, JournalEntry, Trade } from '../types';
 import { costBasis, inRange, type MetricContext } from './context';
 import { exitShare, sizedRealizations } from './realized';
-import { profitFactorOf } from './summary';
-import { unitOf } from './units';
+import { profitFactorOf, tradeVolume } from './summary';
+import { exitUnits } from './units';
 import { streaksOf, type StreakResult } from './streaks';
 
 /** `net` is the day's P&L on ctx.pnlBasis; `costBasis` is the sum of its trades' cost bases (percent-range ROI denominator). */
@@ -18,8 +18,8 @@ export interface DayStat {
   costBasis: Cents;
   /**
    * The day's P&L in `ctx.unit` (ticks, pips, points or R), only when the
-   * context has one: each trade's unit value shared among its exit days by
-   * exited size, as the cost basis is.
+   * context has one: each exit of the day in the unit (`exitUnits`), summed,
+   * so the day's R has the sign of its P&L.
    */
   unit?: number;
   /**
@@ -29,6 +29,9 @@ export interface DayStat {
    */
   profitFactor?: number | null;
 }
+
+/** Rounds away binary noise: an exit's ticks summed with the next. */
+const clean = (n: number) => Math.round(n * 1e6) / 1e6;
 
 /** The day's value as the figures of the Overview read it: in the unit when the context has one. */
 export function dayValue(d: DayStat, ctx: Pick<MetricContext, 'unit'>): number {
@@ -55,6 +58,7 @@ export function dailyPnl(
   trades: readonly Trade[],
   ctx: MetricContext,
 ): DayStat[] {
+  const { unit } = ctx;
   const byDate = new Map<string, DayStat>();
   const results = new Map<string, { won: number[]; lost: number[] }>();
   const ordered = [...trades].sort((a, b) => a.serial - b.serial);
@@ -65,21 +69,23 @@ export function dailyPnl(
         (e.side === 'buy') === (t.direction === 'long') ? s + e.qty : s,
       0,
     );
-    // One bucket per local date for this trade.
+    // One bucket per local date for this trade: its exits of that day, with
+    // their own value in the unit (null when the trade has none there).
     const parts = new Map<
       string,
-      { value: Cents; qty: number; share: number }
+      { value: Cents; qty: number; unit: number | null }
     >();
-    const realized = sizedRealizations(t);
-    const realizedQty = realized.reduce((n, r) => n + r.qty, 0);
-    const tradeUnit = ctx.unit ? unitOf(t, ctx.unit, ctx.pnlBasis) : null;
+    const realized = unit
+      ? exitUnits(t, ctx.pnlBasis)
+      : sizedRealizations(t).map((r) => ({ ...r, units: undefined }));
     for (const r of realized) {
       const date = localDate(r.time, ctx.timeZone);
       if (!inRange(date, ctx.range)) continue;
-      const p = parts.get(date) ?? { value: 0, qty: 0, share: 0 };
+      const p = parts.get(date) ?? { value: 0, qty: 0, unit: null };
       p.value += ctx.pnlBasis === 'gross' ? r.gross : r.net;
       p.qty += r.qty;
-      p.share += exitShare(r.qty, realizedQty, realized.length);
+      const v = unit ? (r.units?.[unit] ?? null) : null;
+      if (v !== null) p.unit = (p.unit ?? 0) + v;
       parts.set(date, p);
     }
     for (const [date, p] of parts) {
@@ -100,7 +106,7 @@ export function dailyPnl(
       const share = entryQty > 0 ? Math.min(1, p.qty / entryQty) : 1;
       const dayBasis = share === 1 ? basis : Math.round(basis * share);
       d.net += p.value;
-      if (ctx.unit) d.unit = (d.unit ?? 0) + (tradeUnit ?? 0) * p.share;
+      if (unit) d.unit = (d.unit ?? 0) + (p.unit ?? 0);
       d.costBasis += dayBasis;
       d.tradeCount += 1;
       const o = outcomeOf(
@@ -109,11 +115,7 @@ export function dailyPnl(
         dayBasis > 0 ? p.value / dayBasis : undefined,
       );
       if (o !== 'breakeven') {
-        const amount = ctx.unit
-          ? tradeUnit === null
-            ? null
-            : tradeUnit * p.share
-          : p.value;
+        const amount = unit ? p.unit : p.value;
         const r = results.get(date) ?? { won: [], lost: [] };
         if (amount !== null) r[o === 'win' ? 'won' : 'lost'].push(amount);
         results.set(date, r);
@@ -124,9 +126,53 @@ export function dailyPnl(
   }
   for (const [date, r] of results)
     byDate.get(date)!.profitFactor = profitFactorOf(r.won, r.lost);
+  if (unit) for (const d of byDate.values()) d.unit = clean(d.unit ?? 0);
   return [...byDate.values()].sort((a, b) =>
     a.date < b.date ? -1 : a.date > b.date ? 1 : 0,
   );
+}
+
+/**
+ * Each local date's volume, ascending (Part 2 rulings, final review I3): a
+ * trade's volume is its quantity counted once (`tradeVolume`). What its exits
+ * closed books on each exit's day, by exited size; what is still open books
+ * on the day the trade opened. A closed trade so books all of it on its exit
+ * days, and a trade booked whole at its close (no fills) on its close. Only
+ * dates inside `ctx.range` count. Every page that shows a day's or a
+ * period's volume reads it from here.
+ */
+export function dayVolumes(
+  trades: readonly Trade[],
+  ctx: Pick<MetricContext, 'timeZone' | 'range'>,
+): { date: string; value: number }[] {
+  const byDate = new Map<string, number>();
+  const book = (date: string, v: number) => {
+    if (v > 0 && inRange(date, ctx.range))
+      byDate.set(date, (byDate.get(date) ?? 0) + v);
+  };
+  for (const t of trades) {
+    const volume = tradeVolume(t);
+    const realized = sizedRealizations(t);
+    const exited = realized.reduce((n, r) => n + r.qty, 0);
+    // A closed trade's exits close all of it; an open one's, what they say.
+    const whole = t.status === 'closed' ? exited : Math.max(exited, volume);
+    let booked = 0;
+    for (const r of realized) {
+      const share =
+        t.status === 'closed'
+          ? exitShare(r.qty, exited, realized.length)
+          : Number.isFinite(whole) && whole > 0
+            ? r.qty / whole
+            : 0;
+      booked += share;
+      book(localDate(r.time, ctx.timeZone), volume * share);
+    }
+    if (t.status !== 'closed' && booked < 1)
+      book(localDate(t.openedAt, ctx.timeZone), volume * (1 - booked));
+  }
+  return [...byDate]
+    .map(([date, value]) => ({ date, value: clean(value) }))
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 }
 
 /**

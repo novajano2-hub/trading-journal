@@ -3,8 +3,10 @@ import { makeTrade } from '../__fixtures__/trades';
 import { resolveInstrument } from '../instruments';
 import type { DisplayUnit, Execution, Trade } from '../types';
 import {
+  exitUnits,
   isTradeUnit,
   moneyPerPip,
+  realizedUnits,
   tradeUnits,
   unitKeeps,
   unitOf,
@@ -154,5 +156,81 @@ describe('moneyPerPip', () => {
   test('no pips, no figure', () => {
     expect(moneyPerPip(fx({ avgExit: 1.1, gross: 0 }))).toBeNull();
     expect(moneyPerPip(future)).toBeNull();
+  });
+});
+
+describe('each exit in each unit (exitUnits)', () => {
+  const at = (
+    id: string,
+    side: 'buy' | 'sell',
+    qty: number,
+    price: number,
+    time: string,
+  ): Execution => ({ ...fill(id, side, qty, price), time });
+  // ES long 2 at 4500: one out at 4506 (+$300), one at 4498 (-$100). Risk $100.
+  const es = makeTrade({
+    net: 20000,
+    avgEntry: 4500,
+    avgExit: 4502,
+    maxPosition: 2,
+    initialRisk: 10000,
+    executions: [
+      at('e', 'buy', 2, 4500, '2026-11-04T15:00:00Z'),
+      at('x1', 'sell', 1, 4506, '2026-11-04T16:00:00Z'),
+      at('x2', 'sell', 1, 4498, '2026-11-05T15:00:00Z'),
+    ],
+  });
+
+  test("an exit's R is its own P&L over the risk; ticks and points are its own move times the contracts it closed", () => {
+    const [a, b] = exitUnits(es, 'net');
+    expect(a!.time).toBe('2026-11-04T16:00:00Z');
+    expect(a!.units).toEqual({ r: 3, ticks: 24, pips: null, points: 6 });
+    expect(b!.units).toEqual({ r: -1, ticks: -8, pips: null, points: -2 });
+  });
+
+  test("a trade's total is the sum of its exits", () => {
+    const whole = tradeUnits(es, 'net');
+    const exits = exitUnits(es, 'net');
+    for (const u of ['r', 'ticks', 'points'] as const)
+      expect(exits.reduce((n, x) => n + x.units[u]!, 0)).toBeCloseTo(
+        whole[u]!,
+        9,
+      );
+  });
+
+  test('pips stay per lot: each exit its move over its share of the size', () => {
+    const eur = makeTrade({
+      net: 3000,
+      instrument: resolveInstrument('EURUSD')!,
+      avgEntry: 1.07,
+      avgExit: 1.0705,
+      maxPosition: 2,
+      executions: [
+        at('e', 'buy', 2, 1.07, '2026-11-04T15:00:00Z'),
+        at('x1', 'sell', 1, 1.0708, '2026-11-04T16:00:00Z'),
+        at('x2', 'sell', 1, 1.0702, '2026-11-05T15:00:00Z'),
+      ],
+    });
+    const [a, b] = exitUnits(eur, 'net');
+    expect(a!.units.pips).toBe(4);
+    expect(b!.units.pips).toBe(1);
+    expect(a!.units.pips! + b!.units.pips!).toBe(tradeUnits(eur, 'net').pips);
+  });
+
+  test('a trade with no fills is one exit holding the whole trade; an open trade sums to what it has booked', () => {
+    const plain = makeTrade({ net: 10000, avgExit: 4502, initialRisk: 5000 });
+    expect(exitUnits(plain, 'net').map((x) => x.units)).toEqual([
+      tradeUnits(plain, 'net'),
+    ]);
+    const open = makeTrade({
+      net: 0,
+      status: 'open',
+      avgEntry: 4500,
+      maxPosition: 2,
+      initialRisk: 10000,
+      executions: es.executions.slice(0, 2),
+    });
+    const [only] = exitUnits(open, 'net');
+    expect(only!.units).toEqual(realizedUnits(open, 'net'));
   });
 });

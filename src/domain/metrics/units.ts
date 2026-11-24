@@ -1,6 +1,10 @@
 import type { DisplayUnit, Trade } from '../types';
 import { pnlOf, type PnlBasis } from './context';
-import { sizedRealizations } from './realized';
+import {
+  exitShare,
+  sizedRealizations,
+  type SizedRealization,
+} from './realized';
 
 /** The units a figure can carry besides money, a percentage and Privacy. */
 export type TradeUnit = 'r' | 'ticks' | 'pips' | 'points';
@@ -103,6 +107,51 @@ export function unitOf(
   basis: PnlBasis,
 ): number | null {
   return tradeUnits(t, basis)[unit];
+}
+
+/** One exit fill's own values: its realization and what it alone is worth in each unit. */
+export interface ExitUnits extends SizedRealization {
+  units: TradeUnits;
+}
+
+/**
+ * Each exit of a trade in each unit, from that exit's own realized value
+ * (the final review's day rule): R is the exit's P&L on the basis over the
+ * trade's initial risk; ticks and points are the exit's own move from the
+ * average entry, in the trade's direction, times the contracts it closed;
+ * pips are its move over a pip, per lot, so each exit carries its share of
+ * the exited size. The exits of a trade add up to `tradeUnits` (to
+ * `realizedUnits` while it is open). A trade booked whole at its close (no
+ * fills) is one exit holding the whole trade. The days read their units
+ * from these, summed per local date, so a red day cannot read +R.
+ */
+export function exitUnits(t: Trade, basis: PnlBasis): ExitUnits[] {
+  const exits = sizedRealizations(t);
+  const { instrument } = t;
+  const risk =
+    t.initialRisk !== undefined && t.initialRisk > 0 ? t.initialRisk : null;
+  const future = instrument.assetClass === 'future';
+  const forex = instrument.assetClass === 'forex';
+  const pip = instrument.quoteCurrency === 'JPY' ? 0.01 : 0.0001;
+  const sign = t.direction === 'long' ? 1 : -1;
+  const exited = exits.reduce((n, x) => n + x.qty, 0);
+  return exits.map((x) => {
+    if (x.price === undefined) return { ...x, units: tradeUnits(t, basis) };
+    const move = (x.price - t.avgEntry) * sign;
+    const share = exitShare(x.qty, exited, exits.length);
+    return {
+      ...x,
+      units: {
+        r: risk === null ? null : (basis === 'gross' ? x.gross : x.net) / risk,
+        ticks:
+          future && instrument.tickSize > 0
+            ? clean((move / instrument.tickSize) * x.qty)
+            : null,
+        pips: forex ? clean((move / pip) * share) : null,
+        points: future ? clean(move * x.qty) : null,
+      },
+    };
+  });
 }
 
 /**
