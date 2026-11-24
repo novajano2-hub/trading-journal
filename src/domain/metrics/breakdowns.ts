@@ -96,13 +96,14 @@ const SESSIONS: Bucket[] = [
   ['new-york', 'New York'],
   ['after-hours', 'After hours'],
 ];
+/** Numeric ranges read "a to b" (DESIGN.md); the keys keep their hyphens, and the links read the keys. */
 const DURATIONS: Bucket[] = [
   ['lt-1m', '<1m'],
-  ['1-5m', '1-5m'],
-  ['5-15m', '5-15m'],
-  ['15-60m', '15-60m'],
-  ['1-4h', '1-4h'],
-  ['4h-1d', '4h-1d'],
+  ['1-5m', '1m to 5m'],
+  ['5-15m', '5m to 15m'],
+  ['15-60m', '15m to 60m'],
+  ['1-4h', '1h to 4h'],
+  ['4h-1d', '4h to 1d'],
   ['gt-1d', '>1d'],
 ];
 const SIDES: Bucket[] = [
@@ -181,11 +182,11 @@ const MONTHS: Bucket[] = [
 const SIZES: Bucket[] = [
   ['lt-1', '<1'],
   ['1', '1'],
-  ['2-3', '2-3'],
-  ['4-5', '4-5'],
-  ['6-10', '6-10'],
-  ['11-25', '11-25'],
-  ['26-100', '26-100'],
+  ['2-3', '2 to 3'],
+  ['4-5', '4 to 5'],
+  ['6-10', '6 to 10'],
+  ['11-25', '11 to 25'],
+  ['26-100', '26 to 100'],
   ['gt-100', '101+'],
 ];
 
@@ -209,8 +210,8 @@ function sizeKey(size: number): string {
 const DTES: Bucket[] = [
   ['0', '0'],
   ['1', '1'],
-  ['2-7', '2-7'],
-  ['8-30', '8-30'],
+  ['2-7', '2 to 7'],
+  ['8-30', '8 to 30'],
   ['31+', '31+'],
 ];
 

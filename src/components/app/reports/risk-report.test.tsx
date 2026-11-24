@@ -52,7 +52,7 @@ test('the position size tab uses the largest position each trade held', async ()
     name: 'Position size summary',
   });
   expect(cellsOf(table, '1')[1]).toBe('6');
-  expect(cellsOf(table, '2-3')[1]).toBe('1');
+  expect(cellsOf(table, '2 to 3')[1]).toBe('1');
 });
 
 test('the R distribution tab clamps, counts trades without a stop, and the drawdown curve sits below every tab', async () => {

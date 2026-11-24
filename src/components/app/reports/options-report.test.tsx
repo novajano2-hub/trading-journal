@@ -26,8 +26,8 @@ test('a 0DTE option lands in the 0 bucket, stock and futures are absent, and the
   expect(rows.map((r) => [r[0], r[1]])).toEqual([
     ['0', '1'],
     ['1', '0'],
-    ['2-7', '1'],
-    ['8-30', '0'],
+    ['2 to 7', '1'],
+    ['8 to 30', '0'],
     ['31+', '0'],
   ]);
   // 0DTE won $30.00; the 5-day option lost $10.00. The six futures trades are not here.

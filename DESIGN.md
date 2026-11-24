@@ -575,7 +575,7 @@ The Trades page's `SummaryStrip`: a card (see Cards) with 20px side padding and 
 - **Figure:** a 12.5px `faint` MetricTip label, a 22px/600 figure with -0.02em tracking, tabular, never wrapping, then a **secondary line** at 12.5px `faint`. P&L reads "after $1,204.00 fees" (or "before" under Gross); trades reads "closed" or "closed, 3 still open"; win rate reads "12 won, 2 breakeven, 5 lost" with each count keeping its word; profit factor reads "Avg win/loss 1.42" over a second line "$310.00 / -$218.00". Only P&L and expectancy take sign colour. An absent figure is "None" at 15px/500 `faint`.
 - **Columns:** two on phones, three from `sm`, five from `lg`; from 1360px the note column sits at the end as a sixth, 236px, behind a hairline. Figures are divided by a `line` hairline from `lg`.
 - **Phone 2 by 2:** below `sm` the strip shows four figures in two rows, in the order P&L, win rate, profit factor, closed trades. Expectancy is left out. Net leads because it is the first thing read.
-- **Note:** "Figures cover the closed trades in your filters, 1 to 20 Nov." plus, when it applies, how many trades in other currencies are left out, then an `accent-ink` "Hide summary" button. The strip is the only place this sentence lives.
+- **Note:** "Figures cover the closed trades in your filters, 1-20 Nov." plus, when it applies, how many trades in other currencies are left out, then an `accent-ink` "Hide summary" button. The strip is the only place this sentence lives.
 
 ##### Two-line phone rows
 
@@ -589,7 +589,7 @@ Below `sm` (the `usePhone` hook, 640px) a list that is a table on desktop become
 
 ##### Report cards
 
-Every report section is a card (see Cards) with a 28px header: an icon tile in the card's tone (accent for charts, neutral for tables), a 15px/600 title, a 12.5px `faint` caption ("By week, 1 to 20 Nov"), and controls at the right.
+Every report section is a card (see Cards) with a 28px header: an icon tile in the card's tone (accent for charts, neutral for tables), a 15px/600 title, a 12.5px `faint` caption ("By week, 1-20 Nov"), and controls at the right.
 
 - **Chart card header:** the **Expand** action sits at the right of the header, in a slot (`useExpandSlot`) the chart portals into. It is a 28px ghost button (44px coarse), `rounded-control`, 12.5px/500 muted, an ArrowsOut glyph at 14px, `aria-haspopup="dialog"`, `aria-label="Expand chart"`. Where a chart has no header slot, Expand sits above the plot.
 - **Expanded-chart dialog:** a `MorphDialog` with `size="full"` (inset 12px, 24px from `sm`, `rounded-card`, `line` border, `--shadow`, over the `veil`) that grows from the Expand button and returns focus to it. The plot is 1.8 times the card's height and re-fits to the dialog; a chart with several bands scrolls inside. Under reduced motion the plot's own transitions are off so the fit measures the final size.
@@ -619,7 +619,7 @@ Every report section is a card (see Cards) with a 28px header: an icon tile in t
 - **Thousands separators everywhere:** counts and amounts alike ("1,204 trades", "$12,480.00"), set through `formatCount` and the display formatter, never raw `toString`.
 - **Unit suffixes** go with the figure, unspaced: `%`, `R`, `t` (ticks), `p` (pips), `pt` (points). Money is signed with a leading `+` or `-` where sign matters; the minus on a chart axis is the true minus sign.
 - **Empty values:** "None", per Empty values below, in `faint` at the figure's size.
-- **Ranges are written "a to b":** "1 to 20 Nov", "$100 to $500", "5 to 10 trades". No hyphen, en dash or em dash between the ends.
+- **Numeric ranges are written "a to b":** "$100 to $500", "5 to 10 trades", "1m to 5m", "26 to 100". No hyphen, en dash or em dash between the ends. **Date ranges keep the hyphen:** "1-20 Nov", "16-20 Nov", "10-15 Nov 2026" (ruling E122), in the range caption, the filter chip and the goals card.
 - **Copy has no em or en dashes**, anywhere in the app.
 
 #### Empty and error states
@@ -666,7 +666,7 @@ Tokens in `src/lib/motion.ts`, mirrored as CSS variables. Several patterns are a
 - **Do** use the three radii: 6 chips, 10 buttons and inner panels, 16 cards, and only the documented role exceptions beside them.
 - **Do** put cards on the canvas as white surfaces with the card shadow and a hairline; keep the "Your plan" hero the only coloured surface.
 - **Do** show the product as a real app window built from live components, and label it "Sample data. Not a real account." wherever invented figures appear.
-- **Do** write copy with commas, periods and colons. Use hyphens only inside words.
+- **Do** write copy with commas, periods and colons. Use hyphens only inside words and in date ranges ("1-20 Nov").
 - **Do** use Phosphor icons at 18px, with Motion durations and curves from `src/lib/motion.ts`.
 - **Do** keep light as the default and design dark as the navy palette with its own tokens, the hero staying ultramarine.
 - **Do** put card-header icons in 28px duotone tiles toned to the card's job: accent, marigold or cyan; outline-only faint when the module is not live.
@@ -677,7 +677,7 @@ Tokens in `src/lib/motion.ts`, mirrored as CSS variables. Several patterns are a
 - **Do** give chart series one job each: series 1 accent, series 2 ink (`muted`), series 3 the accent tint, dashed. Cyan stays with goals and marigold with mistakes, so a chart never takes either.
 - **Do** replace a desktop table with two-line rows below `sm`, carrying the same facts, link and figures.
 - **Do** keep a dialog's body in a scroller and its actions in a fixed footer (Choose figures, the expanded chart).
-- **Do** set every number with a thousands separator and its unit suffix, write an absent value as "None", and write ranges as "a to b".
+- **Do** set every number with a thousands separator and its unit suffix, write an absent value as "None", and write numeric ranges as "a to b" (date ranges keep the hyphen).
 - **Do** keep the outcome chip neutral (Open is the accent) and the tag count chip neutral until a mistake is among the tags, then marigold.
 
 ### Don't:
@@ -695,7 +695,7 @@ Tokens in `src/lib/motion.ts`, mirrored as CSS variables. Several patterns are a
 - **Don't** reach for a library tooltip, modal or search box that bypasses the HorizonX-adapted ones.
 - **Don't** stack a desktop table's columns into cells on a phone, or scroll it sideways there.
 - **Don't** give a chart series cyan or marigold, or tell series apart by colour alone: the third is dashed.
-- **Don't** write a range with a hyphen or dash ("1-20 Nov"); write "1 to 20 Nov".
+- **Don't** write a numeric range with a hyphen or dash ("$100-$500", "2-3"); write "$100 to $500", "2 to 3". A date range keeps its hyphen ("1-20 Nov").
 
 ## Empty values
 

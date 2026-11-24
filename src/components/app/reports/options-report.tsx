@@ -57,7 +57,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
 
 /**
  * Reports, Options: option trades by the days left to expiry when they were
- * opened, in buckets 0, 1, 2-7, 8-30 and 31+. Trades that are not options, and
+ * opened, in buckets 0, 1, 2 to 7, 8 to 30 and 31+. Trades that are not options, and
  * options with no expiry, are left out; the note says how many of the latter.
  * Render inside `<Suspense>`.
  */

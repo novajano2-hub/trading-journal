@@ -447,7 +447,7 @@ describe('new dimensions', () => {
     const size = breakdown(t, 'size', ctx);
     expect(
       size.filter((r) => r.summary.closedCount).map((r) => r.label),
-    ).toEqual(['1', '2-3', '26-100']);
+    ).toEqual(['1', '2 to 3', '26 to 100']);
     const month = breakdown(t, 'month', ctx);
     expect(month.find((r) => r.label === 'Mar')!.summary.closedCount).toBe(2);
     expect(month.find((r) => r.label === 'Jul')!.summary.closedCount).toBe(1);
@@ -459,7 +459,7 @@ describe('new dimensions', () => {
     ).toBe(1);
   });
 
-  test('days to expiry bucket at entry: 0, 1, 2-7, 8-30, 31+, and stock is left out', () => {
+  test('days to expiry bucket at entry: 0, 1, 2 to 7, 8 to 30, 31+, and stock is left out', () => {
     const opt = (sym: string, openedAt: string) =>
       makeTrade({
         net: 100,
@@ -703,5 +703,38 @@ describe('the Task 29 dimensions', () => {
       ...Array.from({ length: 4 }, () => fx('a1', 'ESZ5', 0)),
     ];
     expect(highlights(breakdown(flat, 'symbol', ctx)).bestWinRate).toBeNull();
+  });
+});
+
+describe('bucket labels', () => {
+  test('numeric ranges read "a to b", as the price ranges do (DESIGN.md, E122); the keys stay', () => {
+    const labels = (by: 'duration' | 'size' | 'dte') =>
+      breakdown([], by, ctx).map((r) => [r.key, r.label]);
+    expect(labels('duration')).toEqual([
+      ['lt-1m', '<1m'],
+      ['1-5m', '1m to 5m'],
+      ['5-15m', '5m to 15m'],
+      ['15-60m', '15m to 60m'],
+      ['1-4h', '1h to 4h'],
+      ['4h-1d', '4h to 1d'],
+      ['gt-1d', '>1d'],
+    ]);
+    expect(labels('size')).toEqual([
+      ['lt-1', '<1'],
+      ['1', '1'],
+      ['2-3', '2 to 3'],
+      ['4-5', '4 to 5'],
+      ['6-10', '6 to 10'],
+      ['11-25', '11 to 25'],
+      ['26-100', '26 to 100'],
+      ['gt-100', '101+'],
+    ]);
+    expect(labels('dte')).toEqual([
+      ['0', '0'],
+      ['1', '1'],
+      ['2-7', '2 to 7'],
+      ['8-30', '8 to 30'],
+      ['31+', '31+'],
+    ]);
   });
 });
