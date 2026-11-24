@@ -380,25 +380,30 @@ test('?day alone opens its month; a day outside the shown month or not a real da
   }
 });
 
-test('a date range leaves days outside it muted and unselectable, and the page says so', async () => {
+test('the date range does not touch the month: every day is live, the totals cover the whole month, and there is no range note', async () => {
   renderApp(<CalendarView />, {
     sample: withTrades(NOV),
     url: url('&from=2026-11-10&to=2026-11-20&day=2026-11-02'),
   });
   const grid = await screen.findByRole('grid', { name: 'November 2026' });
-  expect(screen.queryByRole('button', { name: /^Mon 2 Nov/ })).toBeNull();
-  const out = within(grid).getByRole('gridcell', { name: /^Mon 2 Nov/ });
-  expect(out.getAttribute('aria-disabled')).toBe('true');
-  expect(out.textContent).not.toMatch(/\$/);
-  expect(await dayButton(/^Thu 19 Nov/)).toBeTruthy();
-  // The picked day is outside the range: no panel for it.
-  expect(screen.getByRole('complementary', { name: 'Day' })).toBeTruthy();
-  expect(screen.getByText(/Your date range applies/)).toBeTruthy();
-  // Only 19 Nov is inside the range (4405 + 1000 - 500); 2 Nov's $1,020.93 is left out.
-  expect(screen.getAllByText('+$49.05').length).toBeGreaterThan(0);
-  expect(screen.queryByText('+$1,020.93')).toBeNull();
-  fireEvent.keyDown(await dayButton(/^Thu 19 Nov/), { key: 'ArrowRight' });
-  expect(focused()).toMatch(/^Fri 20 Nov/);
+  // 2 Nov is outside the range and still a day with its figures, and the pick opens.
+  const cell = await dayButton(/^Mon 2 Nov/);
+  expect(cell.textContent).toContain('+$1,020.93');
+  expect(within(grid).queryAllByRole('gridcell', { name: /outside/ })).toEqual(
+    [],
+  );
+  expect(
+    await screen.findByRole('complementary', { name: /Mon 2 Nov/ }),
+  ).toBeTruthy();
+  expect(screen.queryByText(/Your date range applies/)).toBeNull();
+  expect(screen.queryByText(/sit outside it/)).toBeNull();
+  // The month total: 1,020.93 - 727.63 + 49.05.
+  expect(screen.getAllByText('+$342.35').length).toBeGreaterThan(0);
+  fireEvent.keyDown(cell, { key: 'ArrowRight' });
+  expect(focused()).toMatch(/^Tue 3 Nov/);
+  // Month navigation is free of the range.
+  fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
+  expect(window.location.search).toContain('month=2026-12');
 });
 
 test('below 1280px the day panel is a sheet, from 1280px it sits beside the grid', async () => {

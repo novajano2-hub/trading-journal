@@ -269,24 +269,14 @@ function Cell({
   );
 }
 
-/** A day the date range leaves out, or a date of the next or previous month. */
-function MutedCell({
-  date,
-  label,
-  number,
-}: {
-  date?: string;
-  label?: string;
-  number: number;
-}): React.JSX.Element {
+/** A date of the next or previous month. */
+function MutedCell({ number }: { number: number }): React.JSX.Element {
   return (
     <div
       role="gridcell"
       aria-disabled="true"
-      aria-label={label}
-      aria-hidden={label === undefined ? true : undefined}
-      data-outside-date={date}
-      className={`flex min-h-[58px] min-w-0 rounded-[10px] p-1.5 text-[12.5px] font-medium text-faint/60 @[600px]/cal:min-h-[92px] @[600px]/cal:px-2.5 @[600px]/cal:py-2 ${label === undefined ? '' : 'bg-sunken/50'}`}
+      aria-hidden="true"
+      className="flex min-h-[58px] min-w-0 rounded-[10px] p-1.5 text-[12.5px] font-medium text-faint/60 @[600px]/cal:min-h-[92px] @[600px]/cal:px-2.5 @[600px]/cal:py-2"
     >
       {number}
     </div>
@@ -351,8 +341,8 @@ const weekdayHeaders = (weekStart: WeekStart) =>
  * in the tab order; the arrows move by a day or a week, Home and End to the
  * row's ends, and Enter or Space picks (the day is a button). Below `sm` the
  * cells shrink to a day number over a coloured box and the weeks list under
- * the grid: seven columns cannot hold a figure at 390px. A day the date range
- * leaves out is muted and skipped.
+ * the grid: seven columns cannot hold a figure at 390px. The page's date range
+ * does not touch the month.
  */
 export function MonthGrid({
   label,
@@ -388,7 +378,7 @@ export function MonthGrid({
       .flatMap((w) => w.days)
       .flatMap((d) => (d ? [[d.date, d] as const] : [])),
   );
-  const pickable = (date: string) => days.get(date)?.outside === false;
+  const pickable = (date: string) => days.has(date);
   const tabDate =
     [active, selected, today].find((d) => d !== undefined && pickable(d)) ??
     [...days.keys()].find(pickable);
@@ -467,13 +457,6 @@ export function MonthGrid({
                 <MutedCell
                   key={`${week.start}-${di}`}
                   number={Number(addDays(week.start, di).slice(8))}
-                />
-              ) : day.outside ? (
-                <MutedCell
-                  key={day.date}
-                  date={day.date}
-                  label={`${dayLabel(day.date)}, outside the date range`}
-                  number={Number(day.date.slice(8))}
                 />
               ) : (
                 <Cell

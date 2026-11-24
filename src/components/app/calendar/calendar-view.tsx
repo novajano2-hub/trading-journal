@@ -31,7 +31,7 @@ import {
   dayGrading,
   type CalendarDay,
 } from '@/data/calendar';
-import { resolveRange, serializeFilters } from '@/data/filters';
+import { serializeFilters } from '@/data/filters';
 import { monthReportHref } from '@/data/report-links';
 import { metricContextOf } from '@/data/metrics';
 import { useGlobalFilters, useTradeSet } from '@/data/query/derived';
@@ -354,25 +354,20 @@ export function CalendarView(): React.JSX.Element {
         ? baseCurrency
         : (currencies[0] ?? baseCurrency);
 
-  const dateRange = set.data?.filters.range;
   const model = useMemo(() => {
     if (
       !dayTrades ||
       !prefs ||
       !notes ||
       month === undefined ||
-      today === undefined ||
-      dateRange === undefined
+      today === undefined
     )
       return undefined;
-    // The global date range clips the month: its days outside it are left out.
-    const ctx = {
-      ...metricContextOf(prefs),
-      range: resolveRange(dateRange, today),
-    };
+    // The month shows every one of its days: the page's date range does not clip it.
+    const ctx = metricContextOf(prefs);
     const trades = dayTrades.filter((t) => t.pnlCurrency === currency);
     return { ctx, trades, ...calendarMonth(trades, notes, month, ctx) };
-  }, [dayTrades, prefs, notes, month, currency, dateRange, today]);
+  }, [dayTrades, prefs, notes, month, currency, today]);
 
   // With no ?day the panel opens on today if it has trades, else the latest day that has.
   // Only where the panel sits beside the grid: below xl it is a sheet, and a sheet must not open by itself.
@@ -380,9 +375,7 @@ export function CalendarView(): React.JSX.Element {
     if (!model || today === undefined) return undefined;
     const live = model.weeks
       .flatMap((w) => w.days)
-      .filter(
-        (d): d is CalendarDay => d !== null && !d.outside && d.trades > 0,
-      );
+      .filter((d): d is CalendarDay => d !== null && d.trades > 0);
     return (
       live.find((d) => d.date === today)?.date ??
       live.reduce<string | undefined>(
@@ -469,10 +462,10 @@ export function CalendarView(): React.JSX.Element {
     setMonth(next);
     writeParams({ month: next === thisMonth ? null : next, day: null });
   };
-  // A pick counts only inside the shown month and the date range.
+  // A pick counts only inside the shown month.
   const selected = weeks
     .flatMap((w) => w.days)
-    .find((d) => d !== null && d.date === day && !d.outside);
+    .find((d) => d !== null && d.date === day);
   const exits = selected ? dayExits(trades, selected.date, ctx) : [];
   const stillOpen = selected
     ? trades.filter(
@@ -669,14 +662,6 @@ export function CalendarView(): React.JSX.Element {
             )}
           </Kpi>
         </div>
-
-        {summary.outsideDays > 0 ? (
-          <p className="mt-3 text-[13px] text-muted">
-            Your date range applies here. {summary.outsideDays}{' '}
-            {plural(summary.outsideDays, 'day')} of {monthName} sit outside it
-            and are left out of the figures.
-          </p>
-        ) : null}
 
         {allTrades?.length === 0 ? (
           <p className="mt-3 text-[13.5px] text-muted">

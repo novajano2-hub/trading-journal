@@ -56,8 +56,6 @@ export interface CalendarDay {
   /** `flat` is inside the breakeven range; `none` is a day with no exit. */
   tone: 'gain' | 'loss' | 'flat' | 'none';
   hasNote: boolean;
-  /** The day is outside the global date range: no figures, not selectable. */
-  outside: boolean;
 }
 
 /** A day's, a week's or a month's ticks, pips and points; null where nothing has the unit. */
@@ -93,8 +91,6 @@ export interface CalendarSummary extends UnitSums {
   tradingDays: number;
   /** Green days over trading days (`daySummary`'s day win rate); null with none. */
   dayWinRate: number | null;
-  /** Days of the month the global date range leaves out. */
-  outsideDays: number;
   best: CalendarDay | null;
   worst: CalendarDay | null;
 }
@@ -170,7 +166,6 @@ function bookDays(
       profitFactor: s.profitFactor ?? null,
       tone: toneOf(s.net, s.costBasis, ctx),
       hasNote: noted.has(s.date),
-      outside: false,
     });
   }
   // Gross, fees, R and the units come from the same exits the day's net was
@@ -211,11 +206,7 @@ function toneOf(
   return o === 'win' ? 'gain' : o === 'loss' ? 'loss' : 'flat';
 }
 
-const emptyDay = (
-  date: string,
-  notes: ReadonlySet<string>,
-  outside = false,
-): CalendarDay => ({
+const emptyDay = (date: string, notes: ReadonlySet<string>): CalendarDay => ({
   date,
   net: 0,
   gross: 0,
@@ -227,7 +218,6 @@ const emptyDay = (
   ...noFigures(),
   tone: 'none',
   hasNote: notes.has(date),
-  outside,
 });
 
 function notedDates(notes: readonly JournalEntry[]): Set<string> {
@@ -246,10 +236,9 @@ function notedDates(notes: readonly JournalEntry[]): Set<string> {
 /**
  * A month as weeks of seven days from the preferred first day (Sunday by default). Each in-month date is a day (`tone: 'none'`
  * when nothing exited); dates of the neighbouring months are null. `trades` is
- * the whole set: only exits dated inside the month and inside `ctx.range` (the
- * resolved global date range) count. A day outside the range is `outside`: it
- * books nothing and stays out of the week totals and the summary. Input must
- * be a single-currency set.
+ * the whole set: only exits dated inside the month count, whatever the page's
+ * date range (`ctx.range` is not read: the month shows all of its days, as
+ * TradeZella's does). Input must be a single-currency set.
  */
 export function calendarMonth(
   trades: readonly Trade[],
@@ -260,15 +249,10 @@ export function calendarMonth(
   const count = daysInMonth(month);
   const first = `${month}-01`;
   const last = `${month}-${pad(count)}`;
-  const from =
-    ctx.range?.from !== undefined && ctx.range.from > first
-      ? ctx.range.from
-      : first;
-  const to =
-    ctx.range?.to !== undefined && ctx.range.to < last ? ctx.range.to : last;
+  const from = first;
+  const to = last;
   const { out: booked, stats } = bookDays(trades, notes, ctx, { from, to });
   const noted = notedDates(notes);
-  const outside = (date: string) => date < from || date > to;
   const weeks: CalendarWeek[] = [];
   for (
     let start = addDays(first, -weekIndex(first, ctx.weekStart));
@@ -279,9 +263,7 @@ export function calendarMonth(
       const date = addDays(start, i);
       return date < first || date > last
         ? null
-        : outside(date)
-          ? emptyDay(date, noted, true)
-          : (booked.get(date) ?? emptyDay(date, noted));
+        : (booked.get(date) ?? emptyDay(date, noted));
     });
     const live = days.filter((d): d is CalendarDay => d !== null);
     weeks.push({
@@ -327,9 +309,6 @@ export function calendarMonth(
       flatDays: days.flatDays,
       tradingDays: traded.length,
       dayWinRate: days.greenPct,
-      outsideDays: Array.from({ length: count }, (_, i) =>
-        outside(`${month}-${pad(i + 1)}`),
-      ).filter(Boolean).length,
       best,
       worst,
     },

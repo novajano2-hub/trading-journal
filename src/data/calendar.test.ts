@@ -279,7 +279,7 @@ describe('trades that cross the month edge (U4)', () => {
   });
 });
 
-describe('the date range (I4)', () => {
+describe('the date range does not clip the month', () => {
   const trades = [
     makeTrade({ net: 1000, closedAt: '2026-11-02T15:00:00Z' }),
     makeTrade({ net: 2000, closedAt: '2026-11-12T15:00:00Z' }),
@@ -288,44 +288,23 @@ describe('the date range (I4)', () => {
   ];
   const ranged = { ...ctx, range: { from: '2026-11-10', to: '2026-11-20' } };
 
-  test('days outside the range are outside: no figures, left out of totals and summary', () => {
+  test('every day of the month carries its figures, and the totals cover the whole month', () => {
     const m = calendarMonth(trades, [], '2026-11', ranged);
-    expect(dayOf(m, '2026-11-02')).toMatchObject({
-      outside: true,
-      trades: 0,
-      net: 0,
-      tone: 'none',
-    });
-    expect(dayOf(m, '2026-11-25')!.outside).toBe(true);
-    expect(dayOf(m, '2026-11-12')).toMatchObject({
-      outside: false,
-      net: 2000,
-    });
-    expect(dayOf(m, '2026-11-11')!.outside).toBe(false);
-    expect(m.summary).toMatchObject({
-      net: 1500,
-      trades: 2,
-      tradingDays: 2,
-      outsideDays: 19,
-    });
-    expect(m.weeks.reduce((s, w) => s + w.net, 0)).toBe(1500);
+    expect(dayOf(m, '2026-11-02')).toMatchObject({ trades: 1, net: 1000 });
+    expect(dayOf(m, '2026-11-25')).toMatchObject({ trades: 1, net: 4000 });
+    expect(dayOf(m, '2026-11-12')).toMatchObject({ net: 2000 });
+    expect(m.summary).toMatchObject({ net: 6500, trades: 4, tradingDays: 4 });
+    expect(m.weeks.reduce((s, w) => s + w.net, 0)).toBe(6500);
+    expect(m).toEqual(calendarMonth(trades, [], '2026-11', ctx));
   });
 
-  test('without a range, or with one that holds the month, no day is outside', () => {
-    expect(calendarMonth(trades, [], '2026-11', ctx).summary.outsideDays).toBe(
-      0,
-    );
-    const wide = { ...ctx, range: { from: '2026-10-01', to: '2026-12-31' } };
-    expect(calendarMonth(trades, [], '2026-11', wide).summary).toMatchObject({
-      outsideDays: 0,
-      trades: 4,
-    });
-  });
-
-  test('a range that misses the month leaves every day outside', () => {
+  test('a range that misses the month changes nothing either', () => {
     const away = { ...ctx, range: { from: '2026-12-01', to: '2026-12-31' } };
     const m = calendarMonth(trades, [], '2026-11', away);
-    expect(m.summary).toMatchObject({ trades: 0, outsideDays: 30 });
+    expect(m.summary).toMatchObject({ trades: 4, net: 6500 });
+    expect(calendarMonth(trades, [], '2026-11', away)).toEqual(
+      calendarMonth(trades, [], '2026-11', ctx),
+    );
   });
 });
 
