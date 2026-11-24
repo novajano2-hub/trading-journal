@@ -257,7 +257,11 @@ test('under a unit the average trade reads the unit and the balance has no value
   const label = chart.getAttribute('aria-label')!;
   // Ticks have no dollar sign; the balance has no value to run from.
   expect(label).toMatch(/Average trade P&L runs from/);
-  expect(label).not.toMatch(/Average trade P&L runs from [^.]*\$/);
+  // A $ anywhere in the averages' sentence, whatever follows it, is money.
+  const averageSentence = label.match(
+    /Average trade P&L runs from[^]*?(?=Net account balance|$)/,
+  )![0];
+  expect(averageSentence).not.toContain('$');
   expect(label).not.toMatch(/Net account balance runs/);
 });
 

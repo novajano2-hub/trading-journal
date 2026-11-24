@@ -98,3 +98,37 @@ test('a late hydration over a full cache renders the server first frame, then go
   expect(chips.every((b) => !(b as HTMLButtonElement).disabled)).toBe(true);
   root.unmount();
 });
+
+/** The other half: the gate is for hydration only. A part mounted later, by a client-side navigation, reads the cache at once. */
+test('a component mounted after hydration over a warm cache shows its data on its first render (no first-frame delay)', async () => {
+  window.history.replaceState(null, '', '/app/trades');
+  commitNavigation();
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+  });
+  const tree = (
+    <DataProvider repository={repository} queryClient={queryClient}>
+      <FilterBar />
+    </DataProvider>
+  );
+  const warm = render(tree);
+  await waitFor(() =>
+    expect(
+      (screen.getByRole('button', { name: 'Symbol' }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false),
+  );
+  warm.unmount();
+  // A fresh client mount: the very first committed frame already has live chips.
+  const mounted = render(tree);
+  const chips = [
+    ...mounted.container.querySelectorAll('[role="group"] button'),
+  ];
+  expect(chips.length).toBeGreaterThan(4);
+  expect(chips.every((b) => !(b as HTMLButtonElement).disabled)).toBe(true);
+});

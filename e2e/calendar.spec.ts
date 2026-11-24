@@ -192,3 +192,42 @@ test('at 390 with every stat ticked the compact cell shows the lead stat only an
     );
   expect(tooWide).toBe(0);
 });
+
+test('at 1680 with every stat ticked no cell clips its content, and the full values show', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1680, height: 1000 });
+  await page.goto('/app/calendar?month=2026-11');
+  await expect(page.getByTestId('calendar-ready')).toBeVisible({
+    timeout: 30_000,
+  });
+  await page.getByRole('button', { name: 'Stats shown' }).click();
+  for (const name of [
+    'Net P&L',
+    'Trades',
+    'Win rate',
+    'R',
+    'Fees',
+    'Ticks',
+    'Pips',
+    'Points',
+  ]) {
+    const box = page.getByRole('checkbox', { name, exact: true });
+    if (!(await box.isChecked()))
+      await box.evaluate((el) => (el as HTMLElement).click());
+  }
+  await page.keyboard.press('Escape');
+  const cells = page.locator('button[data-date]');
+  await expect(cells.first()).toBeVisible();
+  const clipped = await cells.evaluateAll((els) =>
+    els
+      .filter((el) => el.scrollWidth > el.clientWidth)
+      .map((el) => (el as HTMLElement).dataset.date),
+  );
+  expect(clipped).toEqual([]);
+  // Wide enough for the full forms: a fees line reads "-$154.xx fees", not the short form.
+  const cell = page.getByRole('button', { name: /^Mon 2 Nov/ });
+  await expect(
+    cell.locator('span:visible', { hasText: /fees$/ }).first(),
+  ).toContainText('$');
+});

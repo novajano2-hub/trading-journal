@@ -830,10 +830,20 @@ describe('the fixture holds what the link tests need, and open trades stay out o
           .filter(isClosed)
           .map((t) => t.id)
           .sort();
-        // The filter alone also matches open trades of the bucket (before the status rule) ...
-        expect(matched.length, `${by} ${row.key}`).toBeGreaterThanOrEqual(
-          closed.length,
-        );
+        // The filter alone also matches the open trades of the bucket, before the status rule ...
+        const matchedOpen = matched
+          .filter((t) => t.status === 'open')
+          .map((t) => t.id)
+          .sort();
+        if (by === 'side') {
+          // Exactly the open trades of that side, found another way.
+          expect(matchedOpen, `${by} ${row.key}`).toEqual(
+            ws.trades
+              .filter((t) => t.status === 'open' && t.direction === row.key)
+              .map((t) => t.id)
+              .sort(),
+          );
+        }
         // ... the breakdown counts closed trades only, and the log's Closed switch agrees.
         expect(closed).toEqual([...row.tradeIds].sort());
         expect(logIds(tradeLogHref(f))).toEqual(closed);
@@ -920,9 +930,12 @@ describe('every "Other" branch opens the trades it folded', () => {
   test('instrument', () => {
     check(ws.trades, 'instrument', lastTwo);
   });
-  test('session, by entry and by exit', () => {
-    check(ws.trades, 'session', lastTwo);
-    check(ws.trades, 'session', lastTwo, { timeBasis: 'exit' });
+  test('session, by entry and by exit (the other traded session keeps its column)', () => {
+    // Only London and New York hold trades: one is folded, the other kept.
+    const firstOnly = (keys: string[]) => keys.slice(0, 1);
+    check(ws.trades, 'session', firstOnly);
+    check(ws.trades, 'session', firstOnly, { timeBasis: 'exit' });
+    check(ws.trades, 'session', (keys) => keys.slice(-1));
   });
   test('weekday and hour, entry basis', () => {
     check(ws.trades, 'weekday', lastTwo);

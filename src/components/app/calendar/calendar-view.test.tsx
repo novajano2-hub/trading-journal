@@ -285,6 +285,32 @@ test('E146: under the lead a line has a compact form, and the full values sit in
   expect(compact.join(' ')).not.toMatch(/\$/);
 });
 
+test('M6: a five-figure day reads short in a narrow cell, with the full value in the tooltip and the label; a short one is written out', async () => {
+  renderApp(<CalendarView />, {
+    sample: withTrades([
+      ['2026-11-18', 1_234_567],
+      ['2026-11-19', -1_234_567],
+      ['2026-11-20', 95_110],
+    ]),
+    url: url(),
+  });
+  const big = await screen.findByRole('button', { name: /^Wed 18 Nov/ });
+  const lead = big.querySelector('span[title="+$12,345.67"]')!;
+  expect(lead).not.toBeNull();
+  expect(lead.querySelector('[aria-hidden="true"]')!.textContent).toBe('+12k');
+  expect(big.getAttribute('aria-label')).toContain('+$12,345.67');
+  const loss = screen.getByRole('button', { name: /^Thu 19 Nov/ });
+  expect(loss.querySelector('span[title]')!.getAttribute('title')).toBe(
+    '−$12,345.67',
+  );
+  expect(
+    loss.querySelector('span[title] [aria-hidden="true"]')!.textContent,
+  ).toBe('−12k');
+  // "+$951.10" fits as written: no second form.
+  const small = screen.getByRole('button', { name: /^Fri 20 Nov/ });
+  expect(small.querySelector('span[title] [aria-hidden="true"]')).toBeNull();
+});
+
 test('with Privacy on, the cells show $••• and no digit follows a $', async () => {
   const repository = createLocalRepository({
     indexedDB: new IDBFactory(),

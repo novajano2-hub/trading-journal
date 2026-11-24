@@ -65,6 +65,9 @@ export const STAT_LABELS: Record<CalendarStat, string> = {
 const FULL_FROM_HIDE = '@[1000px]/cal:hidden';
 const FULL_FROM_SHOW = 'hidden @[1000px]/cal:inline';
 
+/** The longest lead figure that fits the cell as written ('+$951.10'); a longer one reads short until the cell is wide. */
+const LEAD_FITS = 8;
+
 interface Line {
   key: CalendarStat;
   node: React.ReactNode;
@@ -72,6 +75,8 @@ interface Line {
   toned: boolean;
   /** The short form (`+1.1k`, `+64t`), for the phone's small cell and for a line under the lead in a narrow cell. */
   compact?: string;
+  /** The full value as plain text, to tell whether it fits a narrow cell. */
+  text: string;
   /** The full value in words: the cell's tooltip and its accessible label. */
   label: string;
 }
@@ -91,6 +96,7 @@ function linesOf(
             key,
             toned: true,
             node: <FigureText f={full} />,
+            text: full.text,
             compact: fmt(day.net, day.r, true, day).text,
             label: full.label,
           },
@@ -98,7 +104,7 @@ function linesOf(
       }
       case 'trades': {
         const text = `${day.trades} ${plural(day.trades, 'trade')}`;
-        return [{ key, toned: false, node: text, label: text }];
+        return [{ key, toned: false, node: text, text, label: text }];
       }
       case 'winRate': {
         const decided = day.wins + day.losses;
@@ -109,6 +115,7 @@ function linesOf(
             key,
             toned: false,
             node: `${rate} win rate`,
+            text: `${rate} win rate`,
             compact: `${rate} win`,
             label: `${rate} win rate`,
           },
@@ -122,6 +129,7 @@ function linesOf(
             key,
             toned: true,
             node: full,
+            text: full,
             compact: formatUnitValue('r', day.r, {
               currency,
               signed: true,
@@ -142,6 +150,7 @@ function linesOf(
               key,
               toned: false,
               node: 'None',
+              text: 'None',
               compact: 'None',
               label: `${STAT_LABELS[key]}: None`,
             },
@@ -152,6 +161,7 @@ function linesOf(
             key,
             toned: true,
             node: full,
+            text: full,
             compact: formatUnitValue(key, value, {
               currency,
               signed: true,
@@ -172,6 +182,7 @@ function linesOf(
                 <FigureText f={full} /> fees
               </>
             ),
+            text: `${full.text} fees`,
             compact: `${fmt(-day.fees, null, true).text} fees`,
             label: `${full.label} fees`,
           },
@@ -264,9 +275,19 @@ function Cell({
         {head ? (
           <span className="mt-auto hidden min-w-0 @[600px]/cal:block">
             <span
+              title={head.label}
               className={`block text-[12px] leading-tight font-semibold tracking-[-0.02em] whitespace-nowrap tabular-nums @[700px]/cal:text-[13.5px] @[780px]/cal:text-[14.5px] ${head.toned ? TONE_INK[day.tone] : 'text-text'}`}
             >
-              {head.node}
+              {head.compact !== undefined && head.text.length > LEAD_FITS ? (
+                <>
+                  <span aria-hidden="true" className={FULL_FROM_HIDE}>
+                    {head.compact}
+                  </span>
+                  <span className={FULL_FROM_SHOW}>{head.node}</span>
+                </>
+              ) : (
+                head.node
+              )}
             </span>
             {rest.map((l) => (
               <span

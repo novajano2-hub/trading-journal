@@ -342,33 +342,36 @@ export function PlanCard({
             {caption}
           </span>
         </div>
-        <div className="mt-3.5 flex flex-wrap items-end gap-x-3.5 gap-y-2">
-          <AdherenceNumeral value={kept} />
-          <span className="pb-[3px] text-[15px] leading-[1.3] text-muted">
-            <MetricTip id="rule-adherence" basis={basis}>
-              of rule checks kept
-            </MetricTip>
-          </span>
-        </div>
-        {/* Kept and broken checks as one whole; a part at zero draws nothing. */}
-        <div aria-hidden="true" className="mt-[22px] mb-[18px]">
-          <div className="flex h-2 gap-[3px]">
-            {kept > 0 ? (
-              <span
-                className="rounded-[3px] bg-accent"
-                style={{ flex: `${kept} 1 0` }}
-              />
-            ) : null}
-            {kept < 1 ? (
-              <span
-                className="rounded-[3px] bg-loss-fill"
-                style={{ flex: `${1 - kept} 1 0` }}
-              />
-            ) : null}
+        {/* The card stands as tall as the rules beside it: the numeral and the bar share the spare height, centred, so no band is left above the footer. */}
+        <div className="flex flex-1 flex-col justify-center">
+          <div className="mt-3.5 flex flex-wrap items-end gap-x-3.5 gap-y-2">
+            <AdherenceNumeral value={kept} />
+            <span className="pb-[3px] text-[15px] leading-[1.3] text-muted">
+              <MetricTip id="rule-adherence" basis={basis}>
+                of rule checks kept
+              </MetricTip>
+            </span>
           </div>
-          <div className="mt-[7px] flex justify-between text-xs text-faint">
-            <span>Kept</span>
-            <span>Broken</span>
+          {/* Kept and broken checks as one whole; a part at zero draws nothing. */}
+          <div aria-hidden="true" className="mt-[22px] mb-[18px]">
+            <div className="flex h-2 gap-[3px]">
+              {kept > 0 ? (
+                <span
+                  className="rounded-[3px] bg-accent"
+                  style={{ flex: `${kept} 1 0` }}
+                />
+              ) : null}
+              {kept < 1 ? (
+                <span
+                  className="rounded-[3px] bg-loss-fill"
+                  style={{ flex: `${1 - kept} 1 0` }}
+                />
+              ) : null}
+            </div>
+            <div className="mt-[7px] flex justify-between text-xs text-faint">
+              <span>Kept</span>
+              <span>Broken</span>
+            </div>
           </div>
         </div>
         <div className="-mx-[22px] mt-auto flex min-h-[54px] flex-wrap items-center justify-between gap-x-3 border-t border-line bg-sunken/60 px-[22px] py-2">
