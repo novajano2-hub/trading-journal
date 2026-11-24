@@ -24,6 +24,22 @@ function Swatch({ color }: { color: string }): React.JSX.Element {
   );
 }
 
+/** Where tags are made, renamed and recoloured. */
+export function ManageTagsLink({
+  className = '',
+}: {
+  className?: string;
+}): React.JSX.Element {
+  return (
+    <Link
+      href="/app/settings/tags"
+      className={`inline-block rounded-chip text-[13px] font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:py-3 ${className}`}
+    >
+      Manage tags
+    </Link>
+  );
+}
+
 /**
  * Tags grouped by category, with a search box that is a combobox over the
  * list: the arrow keys move, Enter picks (or creates), Escape clears the text.
@@ -290,14 +306,7 @@ export function TagPicker({
           <p className="px-2 py-3 text-[13px] text-faint">No tags match.</p>
         ) : null}
       </div>
-      {manageLink ? (
-        <Link
-          href="/app/settings/tags"
-          className="self-start rounded-chip px-2 text-[13px] font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:py-3"
-        >
-          Manage tags
-        </Link>
-      ) : null}
+      {manageLink ? <ManageTagsLink className="self-start px-2" /> : null}
       {failed ? (
         <p role="alert" className="text-[13px] text-loss">
           Couldn&apos;t create that tag. Try again.

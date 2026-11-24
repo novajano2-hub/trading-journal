@@ -30,7 +30,6 @@ import { metricContextOf } from '@/data/metrics';
 import { useGlobalFilters, useTradeSet } from '@/data/query/derived';
 import {
   useAccounts,
-  useJournal,
   usePrefs,
   useRemoveTrades,
   useStrategies,
@@ -46,6 +45,7 @@ import {
   withTagPick,
   type TradePatch,
 } from '@/data/trade-patch';
+import { closedQty, moneyPerPip } from '@/domain/metrics/units';
 import { costBasis, type MetricContext } from '@/domain/metrics/context';
 import {
   plannedR,
@@ -76,7 +76,6 @@ import { clock, clockOnDay, dayLabel } from './trade-time';
 import {
   DayNote,
   dayNoteDate,
-  findDailyEntry,
   RatingRow,
   StrategyPicker,
   TagRows,
@@ -306,6 +305,8 @@ function Stats({
   const forex = trade.instrument.assetClass === 'forex';
   const unitRows: React.ReactNode[] = [];
   if (future) {
+    const opened = tradeVolume(trade);
+    const closed = closedQty(trade);
     const units = (key: 'points' | 'ticks', label: string) => {
       const v = fig[key];
       return (
@@ -326,14 +327,15 @@ function Stats({
       units('points', 'Points'),
       units('ticks', 'Ticks'),
       <Stat key="contracts" label="Contracts">
-        {qty(tradeVolume(trade))}
+        {closed < opened - 1e-9
+          ? `${qty(closed)} of ${qty(opened)} closed`
+          : qty(opened)}
       </Stat>,
     );
   }
   if (forex) {
     const pips = fig.pips ?? null;
-    const perPip =
-      pips === null || pips === 0 ? undefined : Math.round(trade.gross / pips);
+    const perPip = moneyPerPip(trade);
     unitRows.push(
       <Stat
         key="pips"
@@ -348,7 +350,7 @@ function Stats({
         )}
       </Stat>,
       <Stat key="per-pip" label="Money per pip" sub="gross P&L over pips">
-        {perPip === undefined ? (
+        {perPip === null ? (
           <span className="text-[14px] font-normal text-faint">None</span>
         ) : (
           cash(perPip, false)
@@ -724,7 +726,6 @@ function NoteCard({
   );
   const [which, setWhich] = useState<'trade' | 'day'>('trade');
   const date = dayNoteDate(trade, timeZone);
-  const day = findDailyEntry(useJournal().data, date);
   const switchTo = (next: 'trade' | 'day') => {
     setWhich(next);
     setStatus('idle');
@@ -762,23 +763,6 @@ function NoteCard({
           ]}
           onChange={switchTo}
         />
-        {which === 'day' ? (
-          <span className="flex items-center gap-3 text-[12.5px] text-faint">
-            <span className="tabular-nums">
-              {dayLabel(`${date}T12:00:00Z`, 'UTC')}
-            </span>
-            <Link
-              href={
-                day
-                  ? `/app/notebook/${encodeURIComponent(day.id)}`
-                  : `/app/notebook/daily/${date}`
-              }
-              className="rounded-chip text-[13px] font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:py-3"
-            >
-              Open in the Notebook
-            </Link>
-          </span>
-        ) : null}
       </div>
       {which === 'trade' ? (
         <TradeNote

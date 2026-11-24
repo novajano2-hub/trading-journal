@@ -47,7 +47,7 @@ export function rOf(trade: Trade, basis: PnlBasis): number | undefined {
 const clean = (n: number) => Math.round(n * 1e6) / 1e6;
 
 /** The quantity the trade's exits closed; its size when it has no fills. */
-function closedQty(t: Trade): number {
+export function closedQty(t: Trade): number {
   if (t.executions.length === 0) return t.maxPosition;
   return t.executions.reduce(
     (n, e) => ((e.side === 'buy') !== (t.direction === 'long') ? n + e.qty : n),
@@ -102,4 +102,13 @@ export function unitOf(
   basis: PnlBasis,
 ): number | null {
   return tradeUnits(t, basis)[unit];
+}
+
+/**
+ * Money per pip: the trade's gross P&L over its pips, in cents (TradeZella's
+ * definition). Null when the trade has no pips value or moved zero pips.
+ */
+export function moneyPerPip(t: Trade): number | null {
+  const pips = tradeUnits(t, 'gross').pips;
+  return pips === null || pips === 0 ? null : Math.round(t.gross / pips);
 }

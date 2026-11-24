@@ -2,7 +2,13 @@ import { describe, expect, test } from 'vitest';
 import { makeTrade } from '../__fixtures__/trades';
 import { resolveInstrument } from '../instruments';
 import type { DisplayUnit, Execution, Trade } from '../types';
-import { isTradeUnit, tradeUnits, unitKeeps, unitOf } from './units';
+import {
+  isTradeUnit,
+  moneyPerPip,
+  tradeUnits,
+  unitKeeps,
+  unitOf,
+} from './units';
 
 const fill = (
   id: string,
@@ -124,5 +130,29 @@ describe('a trade in each unit', () => {
     expect(unitOf(t, 'r', 'net')).toBe(2);
     expect(unitOf(t, 'r', 'gross')).toBeCloseTo(6500 / 3000);
     expect(unitOf(future, 'r', 'net')).toBeNull();
+  });
+});
+
+describe('moneyPerPip', () => {
+  const fx = (p: Partial<Trade>) =>
+    makeTrade({
+      net: 0,
+      instrument: resolveInstrument('EURUSD')!,
+      avgEntry: 1.1,
+      avgExit: 1.1025,
+      ...p,
+    });
+  test('gross P&L over pips, for a winner', () => {
+    expect(moneyPerPip(fx({ gross: 5000 }))).toBe(200);
+  });
+  test('a loser has negative gross and negative pips, so a positive figure', () => {
+    expect(moneyPerPip(fx({ avgExit: 1.0975, gross: -5000 }))).toBe(200);
+  });
+  test('a multi-lot trade is gross over the per-lot pips', () => {
+    expect(moneyPerPip(fx({ maxPosition: 3, gross: 15000 }))).toBe(600);
+  });
+  test('no pips, no figure', () => {
+    expect(moneyPerPip(fx({ avgExit: 1.1, gross: 0 }))).toBeNull();
+    expect(moneyPerPip(future)).toBeNull();
   });
 });

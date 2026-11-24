@@ -8,6 +8,7 @@ import {
   useDailyNote,
   useEnsureTradeNote,
   useJournal,
+  useTemplates,
   useJournalEntry,
   useSaveJournalEntry,
 } from '@/data/query/hooks';
@@ -19,11 +20,14 @@ import type {
   Trade,
 } from '@/domain/types';
 import { localDate } from '@/domain/time';
+import { dayLabel } from './trade-time';
 import { NoteEditor, type NoteEditorHandle } from '../notes/note-editor';
-import { TagPicker } from '../tag-picker';
+import { ManageTagsLink, TagPicker } from '../tag-picker';
 
 /** How long typing rests before the note is saved. */
 export const NOTE_SAVE_DELAY_MS = 600;
+
+const EMPTY_DOC = { type: 'doc', content: [{ type: 'paragraph' }] };
 
 const CHIP =
   'inline-flex h-[30px] items-center gap-1.5 rounded-full px-3 text-[13px] font-medium outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:h-11';
@@ -200,22 +204,6 @@ function CategoryRow({
   );
 }
 
-/** Where tags are made, renamed and recoloured. */
-export function ManageTagsLink({
-  className = '',
-}: {
-  className?: string;
-}): React.JSX.Element {
-  return (
-    <Link
-      href="/app/settings/tags"
-      className={`inline-block rounded-chip text-[13px] font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:py-3 ${className}`}
-    >
-      Manage tags
-    </Link>
-  );
-}
-
 /** The trade's tags, a row per category (name and colour). */
 export function TagRows({
   categories,
@@ -320,6 +308,7 @@ function NoteBody({
   label,
   placeholder,
   entry,
+  fallback,
   ensure,
   readOnly,
   handleRef,
@@ -328,6 +317,8 @@ function NoteBody({
   label: string;
   placeholder: string;
   entry: JournalEntry | null;
+  /** What the editor opens with when there is no entry yet. */
+  fallback?: JournalEntry['body'];
   /** Makes (or finds) the entry the first change belongs to. */
   ensure(): Promise<JournalEntry>;
   readOnly: boolean;
@@ -336,7 +327,7 @@ function NoteBody({
 }): React.JSX.Element {
   const save = useSaveJournalEntry();
   // The editor owns the text from here on: the stored body seeds it once.
-  const [seed] = useState(entry?.body);
+  const [seed] = useState(entry?.body ?? fallback);
   const latest = useRef<unknown>(undefined);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // The trade's note: the one it has, or the one the first change makes.
@@ -470,12 +461,13 @@ export function DayNote({
   onStatus(s: NoteStatus): void;
 }): React.JSX.Element {
   const journal = useJournal();
+  const templates = useTemplates();
   const daily = useDailyNote();
   const entry = findDailyEntry(journal.data, date);
   // As in TradeNote: once mounted for this date the editor stays, even though
   // the first change adds the entry to the journal.
   const [mountedFor, setMountedFor] = useState<string | null>(null);
-  const waiting = !journal.isSuccess;
+  const waiting = !journal.isSuccess || !templates.isSuccess;
   if (!waiting && mountedFor !== date) setMountedFor(date);
   if (waiting && mountedFor !== date)
     return (
@@ -485,16 +477,38 @@ export function DayNote({
         className="mt-3 h-[120px] rounded-control bg-sunken"
       />
     );
+  // The Notebook's rule: with no entry the day opens from the default daily template.
+  const template =
+    templates.data?.find((t) => t.kind === 'daily-review' && t.isDefault)
+      ?.body ?? EMPTY_DOC;
   return (
-    <NoteBody
-      key={date}
-      label="Daily note"
-      placeholder="How did the day go? Type / for blocks"
-      ensure={() => daily.mutateAsync(date)}
-      entry={entry ?? null}
-      readOnly={readOnly}
-      handleRef={handleRef}
-      onStatus={onStatus}
-    />
+    <>
+      <div className="mt-3 flex items-center justify-between gap-3 text-[12.5px] text-faint">
+        <span className="tabular-nums">
+          {dayLabel(`${date}T12:00:00Z`, 'UTC')}
+        </span>
+        <Link
+          href={
+            entry
+              ? `/app/notebook/${encodeURIComponent(entry.id)}`
+              : `/app/notebook/daily/${date}`
+          }
+          className="rounded-chip text-[13px] font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:py-3"
+        >
+          Open in the Notebook
+        </Link>
+      </div>
+      <NoteBody
+        key={date}
+        label="Daily note"
+        placeholder="How did the day go? Type / for blocks"
+        ensure={() => daily.mutateAsync(date)}
+        entry={entry ?? null}
+        fallback={template}
+        readOnly={readOnly}
+        handleRef={handleRef}
+        onStatus={onStatus}
+      />
+    </>
   );
 }

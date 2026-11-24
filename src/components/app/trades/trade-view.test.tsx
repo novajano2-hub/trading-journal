@@ -620,6 +620,7 @@ test('a futures trade shows points, ticks, contracts and cost basis', async () =
   expect(text).toContain('Points+22.5 pts');
   expect(text).toContain('Ticks+90.0 ticks');
   expect(text).toContain('Contracts6');
+  expect(text).not.toContain('closed');
   // 6309.75 x 6 x 50.
   expect(text).toContain('Cost basis$1,892,925.00');
   expect(text).not.toContain('Pips');
@@ -726,14 +727,14 @@ test('editing the day note creates the daily entry for the exit date once, and t
   expect(
     (await repo.journal.list(WS)).filter((e) => e.kind === 'daily-review'),
   ).toHaveLength(0);
-  act(() => handle.current!.runSlashCommand('Checklist'));
+  act(() => handle.current!.runSlashCommand('Divider'));
   await waitFor(
     async () => {
       const days = (await repo.journal.list(WS)).filter(
         (e) => e.kind === 'daily-review' && e.date === '2026-11-09',
       );
       expect(days).toHaveLength(1);
-      expect(JSON.stringify(days[0]!.body)).toContain('taskList');
+      expect(JSON.stringify(days[0]!.body)).toContain('horizontalRule');
     },
     { timeout: 3000 },
   );
@@ -793,4 +794,105 @@ test('the tags card links to Settings > Tags, and so does the picker', async () 
       2,
     ),
   );
+});
+
+test('a partly closed futures trade reads Contracts as closed of opened', async () => {
+  renderApp(<TradeView id="t-c" />, {
+    sample: sample({
+      executions: [
+        fill('e1', 'buy', 5, 6310.5, '2026-11-09T16:00:00.000Z'),
+        fill('e3', 'sell', 3, 6312.5, '2026-11-09T16:20:00.000Z'),
+      ],
+      maxPosition: 5,
+    }),
+    url: URL_C,
+  });
+  await screen.findByRole('region', { name: 'Execution' });
+  expect(execText()).toContain('Contracts3 of 5 closed');
+});
+
+test('the day note opens with the default daily template and the first save keeps it', async () => {
+  const handle: { current: NoteEditorHandle | null } = { current: null };
+  const { repo } = renderApp(<TradeView id="t-c" noteHandleRef={handle} />, {
+    sample: sample(),
+    url: URL_C,
+  });
+  await screen.findByRole('textbox', { name: 'Trade note' });
+  fireEvent.click(screen.getByRole('radio', { name: 'Daily note' }));
+  const box = await screen.findByRole('textbox', { name: 'Daily note' });
+  const template = (await repo.templates.list(WS)).find(
+    (t) => t.kind === 'daily-review' && t.isDefault,
+  )!;
+  const first = JSON.stringify(template.body).match(/"text":"([^"]+)"/)![1]!;
+  await waitFor(() => expect(box.textContent).toContain(first));
+  act(() => handle.current!.runSlashCommand('Divider'));
+  await waitFor(
+    async () => {
+      const day = (await repo.journal.list(WS)).find(
+        (e) => e.kind === 'daily-review' && e.date === '2026-11-09',
+      )!;
+      const body = JSON.stringify(day.body);
+      expect(body).toContain(first);
+      expect(body).toContain('horizontalRule');
+    },
+    { timeout: 3000 },
+  );
+});
+
+test('a trashed daily entry for the date is ignored, as the Notebook does: a fresh one is made', async () => {
+  const handle: { current: NoteEditorHandle | null } = { current: null };
+  const base = sample();
+  const { repo } = renderApp(<TradeView id="t-c" noteHandleRef={handle} />, {
+    sample: async () => ({
+      ...(await base()),
+      journal: [
+        {
+          id: 'j-trashed',
+          workspaceId: WS,
+          kind: 'daily-review',
+          date: '2026-11-09',
+          title: 'Old day',
+          body: { type: 'doc', content: [{ type: 'paragraph' }] },
+          linkedTradeIds: [],
+          tags: [],
+          updatedAt: '2026-11-10T00:00:00.000Z',
+          deletedAt: '2026-11-11T00:00:00.000Z',
+        },
+      ],
+    }),
+    url: URL_C,
+  });
+  await screen.findByRole('textbox', { name: 'Trade note' });
+  fireEvent.click(screen.getByRole('radio', { name: 'Daily note' }));
+  await screen.findByRole('textbox', { name: 'Daily note' });
+  expect(
+    screen
+      .getByRole('link', { name: 'Open in the Notebook' })
+      .getAttribute('href'),
+  ).toBe('/app/notebook/daily/2026-11-09');
+  await waitFor(() => expect(handle.current).not.toBeNull());
+  act(() => handle.current!.runSlashCommand('Divider'));
+  await waitFor(
+    async () => {
+      const live = (await repo.journal.list(WS)).filter(
+        (e) =>
+          e.kind === 'daily-review' &&
+          e.date === '2026-11-09' &&
+          e.deletedAt === undefined,
+      );
+      expect(live).toHaveLength(1);
+      expect(live[0]!.id).not.toBe('j-trashed');
+    },
+    { timeout: 3000 },
+  );
+});
+
+test('the trade note tab does not read the journal', async () => {
+  const { repo } = renderApp(<TradeView id="t-c" />, {
+    sample: sample(),
+    url: URL_C,
+  });
+  const list = vi.spyOn(repo.journal, 'list');
+  await screen.findByRole('textbox', { name: 'Trade note' });
+  expect(list).not.toHaveBeenCalled();
 });
