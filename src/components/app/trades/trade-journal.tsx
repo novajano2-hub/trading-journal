@@ -334,17 +334,31 @@ function NoteBody({
     entry ? Promise.resolve(entry) : null,
   );
   const queue = useRef<Promise<void>>(Promise.resolve());
+  // Saves queued and not yet written. While none is, the note follows the
+  // stored one (another tab may have renamed, moved or trashed it), so a save
+  // builds on what is stored, never on the copy this editor opened with, as
+  // the Notebook's pane does. A note gone from the store (trashed or deleted)
+  // is let go: the next change makes a new one rather than bring it back.
+  const waiting = useRef(0);
+  useEffect(() => {
+    if (waiting.current === 0)
+      note.current = entry ? Promise.resolve(entry) : null;
+  }, [entry]);
 
   const flush = () => {
     timer.current = undefined;
     const body = latest.current;
+    waiting.current += 1;
     queue.current = queue.current.then(async () => {
       try {
         const current = await note.current!;
-        await save.mutateAsync({ ...current, body });
+        const saved = await save.mutateAsync({ ...current, body });
+        note.current = Promise.resolve(saved);
         onStatus('saved');
       } catch {
         onStatus('failed');
+      } finally {
+        waiting.current -= 1;
       }
     });
   };

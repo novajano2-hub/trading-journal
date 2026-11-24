@@ -754,6 +754,61 @@ test('editing the day note creates the daily entry for the exit date once, and t
   );
 });
 
+test('a day note trashed in another tab is not brought back by the next keystroke (M5)', async () => {
+  const handle: { current: NoteEditorHandle | null } = { current: null };
+  const { repo } = renderApp(<TradeView id="t-c" noteHandleRef={handle} />, {
+    sample: async () => {
+      const fx = await sample()();
+      fx.journal.push({
+        id: 'd-9',
+        workspaceId: WS,
+        kind: 'daily-review',
+        date: '2026-11-09',
+        title: 'Mon 9 Nov',
+        body: { type: 'doc', content: [] },
+        linkedTradeIds: [],
+        tags: [],
+        updatedAt: '2026-11-09T20:00:00.000Z',
+      });
+      return fx;
+    },
+    url: URL_C,
+  });
+  await screen.findByRole('textbox', { name: 'Trade note' });
+  fireEvent.click(screen.getByRole('radio', { name: 'Daily note' }));
+  await screen.findByRole('textbox', { name: 'Daily note' });
+  await waitFor(() => expect(handle.current).not.toBeNull());
+  expect(
+    screen
+      .getByRole('link', { name: 'Open in the Notebook' })
+      .getAttribute('href'),
+  ).toBe('/app/notebook/d-9');
+  // Another tab trashes the day's note and tells this one.
+  await repo.journal.trash(WS, 'd-9');
+  const other = new BroadcastChannel('keel-data');
+  other.postMessage({ keys: [['keel', 'ws', WS, 'journal']] });
+  other.close();
+  await waitFor(() =>
+    expect(
+      screen
+        .getByRole('link', { name: 'Open in the Notebook' })
+        .getAttribute('href'),
+    ).toBe('/app/notebook/daily/2026-11-09'),
+  );
+  act(() => handle.current!.runSlashCommand('Divider'));
+  await screen.findByText('Saved', undefined, { timeout: 3000 });
+  // The trashed note stays in the Trash; the change made a new day note.
+  expect((await repo.journal.get(WS, 'd-9'))?.deletedAt).toBeDefined();
+  const live = (await repo.journal.list(WS)).filter(
+    (e) =>
+      e.kind === 'daily-review' &&
+      e.date === '2026-11-09' &&
+      e.deletedAt === undefined,
+  );
+  expect(live).toHaveLength(1);
+  expect(JSON.stringify(live[0]!.body)).toContain('horizontalRule');
+});
+
 test('a still-open trade takes the day note of its open date', async () => {
   renderApp(<TradeView id="t-c" />, {
     sample: sample({
