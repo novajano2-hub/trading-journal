@@ -8,7 +8,7 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import { Chip } from '@/components/ui/chip';
 import type { TradeRulesSummary } from '@/data/dashboard';
-import type { TagInfo } from '@/data/trade-rows';
+import type { TagInfo, TradeStatus } from '@/data/trade-rows';
 
 /** "a and b", "a, b and c". */
 function listOf(items: readonly string[]): string {
@@ -274,4 +274,17 @@ export function TradeLink({
       {children}
     </Link>
   );
+}
+
+/**
+ * A trade's outcome as a pill. Win, Loss and Breakeven stay neutral, like the
+ * side chip: they name a result, not signed money, so gain and loss ink is
+ * left to the amounts. Open is the accent.
+ */
+export function StatusChip({
+  status,
+}: {
+  status: TradeStatus;
+}): React.JSX.Element {
+  return <Chip tone={status === 'Open' ? 'accent' : 'neutral'}>{status}</Chip>;
 }

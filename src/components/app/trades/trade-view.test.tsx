@@ -107,7 +107,8 @@ test('the header shows the net and the realized R once a stop is known', async (
   expect(within(head).getByText('+$81.30')).toBeTruthy();
   expect(within(head).getByText('+0.54R')).toBeTruthy();
   expect(within(head).getByText('Long')).toBeTruthy();
-  expect(within(head).getByText('Closed')).toBeTruthy();
+  expect(within(head).getByText('Win')).toBeTruthy();
+  expect(within(head).queryByText('Closed')).toBeNull();
 });
 
 test('Previous and Next stay within ?symbol=ES, by open time, and keep the params', async () => {

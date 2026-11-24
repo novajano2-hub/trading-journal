@@ -14,6 +14,7 @@ import { createLocalRepository } from '@/data/local/local-repository';
 import type { SampleWorkspace } from '@/data/seed/generate';
 import { ALL_COLUMNS, DEFAULT_COLUMNS } from '@/data/trade-columns';
 import { makeTrade } from '@/domain/__fixtures__/trades';
+import type { Trade } from '@/domain/types';
 import { everyString } from '../__fixtures__/every-string';
 import { renderApp } from '../__fixtures__/render-app';
 import { TradesView } from './trades-view';
@@ -71,7 +72,12 @@ const table = () => screen.findByRole('table', { name: 'Trades' });
 const bodyRows = (t: HTMLElement) => within(t).getAllByRole('row').slice(1);
 /** The trade a row's instrument link points to. */
 const idOf = (row: HTMLElement) =>
-  within(row).getByRole('link').getAttribute('href')!.split('/').pop();
+  within(row)
+    .getByRole('link')
+    .getAttribute('href')!
+    .split('?')[0]!
+    .split('/')
+    .pop();
 
 test('the summary strip counts the filtered closed trades', async () => {
   renderApp(<TradesView />, {
@@ -506,13 +512,21 @@ describe('at 390px', () => {
     window.innerWidth = 1024;
   });
 
-  test('the summary is a 2 by 2 grid: net, win rate, profit factor, trades', async () => {
+  test('the summary is a two-across grid, now three rows with the win/loss card', async () => {
     renderApp(<TradesView />, { sample: sample(), url: '/app/trades' });
     const strip = await screen.findByRole('region', { name: 'Summary' });
     const kpis = [...strip.querySelectorAll('[data-kpi]')].map((k) =>
       k.getAttribute('data-kpi'),
     );
-    expect(kpis).toEqual(['pnl', 'win-rate', 'profit-factor', 'trades']);
+    // Six figures, two across: net, win rate, profit factor, average win to loss, expectancy, trades.
+    expect(kpis).toEqual([
+      'pnl',
+      'win-rate',
+      'profit-factor',
+      'avg-win-loss',
+      'expectancy',
+      'trades',
+    ]);
     expect(strip.className).toContain('grid-cols-2');
   });
 
@@ -593,4 +607,243 @@ test('when the unit leaves out every trade the log says so, and keeps Clear filt
     await screen.findByText('No closed trades with a stop in these filters.'),
   ).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
+});
+
+/** Two wins (+$30, +$10), a loss (-$10), a flat trade and an open one, each on its own day. */
+function mixed() {
+  return async (): Promise<SampleWorkspace> => {
+    const fx = fixtureSample();
+    const day = (d: number) => Date.UTC(2026, 10, d, 15, 0);
+    const mk = (n: number, net: number, p: Partial<Trade> = {}) =>
+      makeTrade({
+        id: `m-${n}`,
+        serial: n,
+        workspaceId: WS,
+        accountId: 'acc-a',
+        openedAt: new Date(day(n)).toISOString(),
+        closedAt: new Date(day(n) + 300_000).toISOString(),
+        ...p,
+        net,
+      });
+    return {
+      ...fx,
+      trades: [
+        mk(2, 3000),
+        mk(3, 1000),
+        mk(4, -1000),
+        mk(5, 0),
+        mk(6, 0, { status: 'open', closedAt: undefined }),
+      ],
+    };
+  };
+}
+
+describe('the summary strip, win/loss and running P&L', () => {
+  test('the win-rate line counts won, breakeven and lost', async () => {
+    renderApp(<TradesView />, { sample: mixed(), url: '/app/trades' });
+    const strip = await screen.findByRole('region', { name: 'Summary' });
+    expect(strip.textContent).toContain('2 won, 1 breakeven, 1 lost');
+  });
+
+  test('an average win to loss card gives the ratio and both amounts', async () => {
+    renderApp(<TradesView />, { sample: mixed(), url: '/app/trades' });
+    const strip = await screen.findByRole('region', { name: 'Summary' });
+    const card = strip.querySelector(
+      '[data-kpi="avg-win-loss"]',
+    ) as HTMLElement;
+    expect(card).toBeTruthy();
+    expect(
+      within(card).getByRole('button', { name: 'Average win to loss' }),
+    ).toBeTruthy();
+    expect(card.textContent).toContain('2.00');
+    expect(card.textContent).toContain('+$20.00');
+    expect(card.textContent).toMatch(/[-\u2212]\$10\.00/);
+  });
+
+  test('with no losing trade the card says None', async () => {
+    renderApp(<TradesView />, { sample: sample(), url: '/app/trades' });
+    const strip = await screen.findByRole('region', { name: 'Summary' });
+    const card = strip.querySelector(
+      '[data-kpi="avg-win-loss"]',
+    ) as HTMLElement;
+    expect(card.textContent).toContain('None');
+  });
+
+  test('the net card carries a running P&L line by exit date, labelled without amounts', async () => {
+    renderApp(<TradesView />, { sample: mixed(), url: '/app/trades' });
+    const strip = await screen.findByRole('region', { name: 'Summary' });
+    const net = strip.querySelector('[data-kpi="pnl"]') as HTMLElement;
+    const line = within(net).getByRole('img', {
+      name: /Running P&L by exit date/,
+    });
+    expect(line.getAttribute('aria-label')).not.toMatch(/\$/);
+  });
+
+  test('the average win and loss follow the display unit', async () => {
+    const repository = createLocalRepository({
+      indexedDB: new IDBFactory(),
+      IDBKeyRange,
+      sample: mixed(),
+    });
+    await repository.prefs.update({ displayUnit: 'percent' });
+    renderApp(<TradesView />, { repository, url: '/app/trades' });
+    const strip = await screen.findByRole('region', { name: 'Summary' });
+    await waitFor(() => {
+      const card = strip.querySelector(
+        '[data-kpi="avg-win-loss"]',
+      ) as HTMLElement;
+      expect(card.textContent).toContain('%');
+      expect(card.textContent).not.toContain('$');
+    });
+  });
+});
+
+describe('the Status column reads the outcome', () => {
+  async function statuses(url: string) {
+    const repository = createLocalRepository({
+      indexedDB: new IDBFactory(),
+      IDBKeyRange,
+      sample: mixed(),
+    });
+    await repository.prefs.update({
+      tradeColumns: [...DEFAULT_COLUMNS, 'status'],
+    });
+    renderApp(<TradesView />, { repository, url });
+    const t = await table();
+    const heads = within(t).getAllByRole('columnheader');
+    const at = heads.findIndex((h) => /Status/.test(h.textContent ?? ''));
+    return {
+      t,
+      read: () =>
+        bodyRows(t).map((r) => r.querySelectorAll('td')[at]!.textContent),
+    };
+  }
+
+  test('Win, Loss and Breakeven for closed trades, never Closed', async () => {
+    const { read } = await statuses('/app/trades');
+    await waitFor(() => expect(read()).toContain('Win'));
+    expect(read().sort()).toEqual(['Breakeven', 'Loss', 'Win', 'Win']);
+  });
+
+  test('an open trade reads Open', async () => {
+    const { read } = await statuses('/app/trades?status=open');
+    await waitFor(() => expect(read()).toEqual(['Open']));
+  });
+
+  test('the column sorts by outcome', async () => {
+    const { t, read } = await statuses('/app/trades');
+    await waitFor(() => expect(read()).toContain('Win'));
+    fireEvent.click(within(t).getByRole('button', { name: 'Status' }));
+    await waitFor(() =>
+      expect(
+        within(t)
+          .getByRole('columnheader', { name: /Status/ })
+          .getAttribute('aria-sort'),
+      ).not.toBe('none'),
+    );
+    const rank: Record<string, number> = { Win: 0, Breakeven: 1, Loss: 2 };
+    const ranks = read().map((s) => rank[s!]!);
+    const asc = [...ranks].sort((a, b) => a - b);
+    const desc = [...asc].reverse();
+    expect([asc, desc]).toContainEqual(ranks);
+  });
+});
+
+describe('paging in the URL', () => {
+  const at = (search: string) => '/app/trades' + search;
+
+  test('?per= and ?page= set the rows and the page on load', async () => {
+    renderApp(<TradesView />, { sample: sample(), url: at('?per=25&page=2') });
+    await table();
+    expect(screen.getByText(/26-50 of 120/)).toBeTruthy();
+  });
+
+  test('a bad ?per= falls back to 50 and a page past the end to the last', async () => {
+    renderApp(<TradesView />, { sample: sample(), url: at('?per=7&page=99') });
+    const t = await table();
+    expect(screen.getByText(/101-120 of 120/)).toBeTruthy();
+    expect(bodyRows(t)).toHaveLength(20);
+  });
+
+  test('Rows per page offers 25, 50 and 100 in the app dropdown and writes ?per=', async () => {
+    renderApp(<TradesView />, { sample: sample(), url: at('') });
+    const t = await table();
+    expect(document.querySelector('select')).toBeNull();
+    const trigger = screen.getByRole('button', {
+      name: 'Rows per page, 50 per page',
+    });
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+    expect(
+      (await screen.findAllByRole('menuitemradio')).map((o) => o.textContent),
+    ).toEqual(['25 per page', '50 per page', '100 per page']);
+    fireEvent.click(screen.getByRole('menuitemradio', { name: '25 per page' }));
+    await waitFor(() => expect(window.location.search).toContain('per=25'));
+    expect(screen.getByText(/1-25 of 120/)).toBeTruthy();
+    expect(bodyRows(t)).toHaveLength(25);
+  });
+
+  test('choosing the default again leaves ?per= off the URL, and a new size starts at page 1', async () => {
+    renderApp(<TradesView />, { sample: sample(), url: at('?per=25&page=3') });
+    await table();
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: 'Rows per page, 25 per page' }),
+      {
+        key: 'Enter',
+      },
+    );
+    fireEvent.click(
+      await screen.findByRole('menuitemradio', { name: '50 per page' }),
+    );
+    await waitFor(() => expect(screen.getByText(/1-50 of 120/)).toBeTruthy());
+    expect(window.location.search).not.toContain('per=');
+    expect(window.location.search).not.toContain('page=');
+  });
+
+  test('Next page writes ?page=, and the jump field goes to a page and reads "of N"', async () => {
+    renderApp(<TradesView />, { sample: sample(), url: at('') });
+    const t = await table();
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
+    await waitFor(() => expect(window.location.search).toContain('page=2'));
+    const jump = screen.getByRole('spinbutton', { name: 'Go to page' });
+    expect((jump as HTMLInputElement).value).toBe('2');
+    expect(screen.getByText('of 3')).toBeTruthy();
+    fireEvent.change(jump, { target: { value: '3' } });
+    fireEvent.keyDown(jump, { key: 'Enter' });
+    await waitFor(() =>
+      expect(screen.getByText(/101-120 of 120/)).toBeTruthy(),
+    );
+    expect(window.location.search).toContain('page=3');
+    expect(bodyRows(t)).toHaveLength(20);
+    // Going back to page 1 leaves it off the URL.
+    const again = screen.getByRole('spinbutton', { name: 'Go to page' });
+    fireEvent.change(again, { target: { value: '1' } });
+    fireEvent.keyDown(again, { key: 'Enter' });
+    await waitFor(() => expect(screen.getByText(/1-50 of 120/)).toBeTruthy());
+    expect(window.location.search).not.toContain('page=');
+  });
+
+  test('a jump past the last page lands on the last', async () => {
+    renderApp(<TradesView />, { sample: sample(), url: at('') });
+    await table();
+    const jump = screen.getByRole('spinbutton', { name: 'Go to page' });
+    fireEvent.change(jump, { target: { value: '40' } });
+    fireEvent.blur(jump);
+    await waitFor(() =>
+      expect(screen.getByText(/101-120 of 120/)).toBeTruthy(),
+    );
+  });
+
+  test('changing a filter sends the log back to page 1', async () => {
+    renderApp(<TradesView />, {
+      sample: sample({ open: 3 }),
+      url: at('?page=2'),
+    });
+    await table();
+    expect(screen.getByText(/51-100 of 120/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: /Open/ }));
+    await waitFor(() =>
+      expect(window.location.search).toContain('status=open'),
+    );
+    expect(window.location.search).not.toContain('page=');
+  });
 });

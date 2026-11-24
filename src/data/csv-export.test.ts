@@ -94,4 +94,17 @@ describe('tradesCsv', () => {
   test('no trades is the header alone', () => {
     expect(tradesCsv([], ['open', 'net'], env)).toBe('Open,Net');
   });
+
+  test('Status is a plain outcome: Win, Loss, Breakeven or Open', () => {
+    const flat = makeTrade({ id: 'c', net: 0, gross: 0 });
+    const open = makeTrade({ id: 'd', status: 'open', net: 0 });
+    const csv = tradesCsv([win, loss, flat, open], ['status'], env);
+    expect(csv.split('\r\n')).toEqual([
+      'Status',
+      'Win',
+      'Loss',
+      'Breakeven',
+      'Open',
+    ]);
+  });
 });

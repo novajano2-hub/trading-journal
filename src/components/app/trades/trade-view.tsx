@@ -21,7 +21,7 @@ import {
 import { FigureText } from '@/components/product/figure-text';
 import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
-import { Chip, SideChip } from '@/components/ui/chip';
+import { SideChip } from '@/components/ui/chip';
 import { Segmented } from '@/components/ui/segmented';
 import { IconTile } from '@/components/ui/icon-tile';
 import { MetricTip } from '@/components/ui/metric-tip';
@@ -39,7 +39,7 @@ import {
   useUpdateTrades,
 } from '@/data/query/hooks';
 import { StorageUnavailableError } from '@/data/repository';
-import { heldMs, netRoiOf } from '@/data/trade-rows';
+import { heldMs, netRoiOf, statusOf } from '@/data/trade-rows';
 import {
   withRuleCheck,
   withTagPick,
@@ -70,6 +70,7 @@ import { CARD, CardHeader, InstrumentName } from '../dashboard/shared';
 import { ConfirmDialog } from '../confirm-dialog';
 import type { NoteEditorHandle } from '../notes/note-editor';
 import { price } from '@/lib/format';
+import { StatusChip } from './cells';
 import { qty } from './columns';
 import { FillsTimeline, positions, sortedFills } from './fills-timeline';
 import { RuleChecklist } from './rule-checklist';
@@ -953,9 +954,7 @@ function TradePage({
               className="flex-nowrap"
             />
             <SideChip side={trade.direction} />
-            <Chip tone={trade.status === 'open' ? 'info' : 'neutral'}>
-              {trade.status === 'open' ? 'Open' : 'Closed'}
-            </Chip>
+            <StatusChip status={statusOf(trade, ctx)} />
             <button
               type="button"
               aria-pressed={trade.reviewed === true}

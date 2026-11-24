@@ -253,3 +253,46 @@ test('the keyboard ring is themed on a bare link: 2px, 3px off, the chip radius'
     )
     .toEqual(['2px', '3px', '6px']);
 });
+
+test('rows per page and the page jump live in the URL and survive Back', async ({
+  page,
+}) => {
+  await openLog(page);
+  await expect(tradeLog(page).locator('tbody tr')).toHaveCount(50);
+  await page.getByRole('button', { name: /^Rows per page/ }).click();
+  await page.getByRole('menuitemradio', { name: '25 per page' }).click();
+  await expect(page).toHaveURL(/per=25/);
+  await expect(tradeLog(page).locator('tbody tr')).toHaveCount(25);
+  const jump = page.getByRole('spinbutton', { name: 'Go to page' });
+  await jump.fill('3');
+  await jump.press('Enter');
+  await expect(page).toHaveURL(/page=3/);
+  const firstLink = tradeLog(page)
+    .locator('tbody tr')
+    .first()
+    .getByRole('link')
+    .first();
+  // Rows carry the log's address, so page 3's rows say page=3.
+  await expect(firstLink).toHaveAttribute('href', /page=3/);
+  const firstId = await tradeLog(page)
+    .locator('tbody tr')
+    .first()
+    .getByRole('link')
+    .first()
+    .getAttribute('href');
+  await tradeLog(page)
+    .locator('tbody tr')
+    .first()
+    .getByRole('link')
+    .first()
+    .click();
+  await expect(page).toHaveURL(/\/app\/trades\/[^/?]+/);
+  await page.goBack();
+  await expect(tradeLog(page)).toBeVisible();
+  await expect(page).toHaveURL(/per=25/);
+  await expect(page).toHaveURL(/page=3/);
+  await expect(jump).toHaveValue('3');
+  await expect(
+    tradeLog(page).locator('tbody tr').first().getByRole('link').first(),
+  ).toHaveAttribute('href', firstId!);
+});

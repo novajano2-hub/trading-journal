@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { FigureText } from '@/components/product/figure-text';
+import { Sparkline } from '@/components/product/sparkline';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { MetricId } from '@/content/metric-definitions';
 import type { Summary } from '@/domain/metrics/summary';
@@ -17,20 +18,24 @@ function Kpi({
   id,
   basis,
   sub,
+  trend,
   children,
 }: {
   id: MetricId;
   basis: PnlBasis;
   sub: ReactNode;
+  /** A small line beside the label. */
+  trend?: ReactNode;
   children: ReactNode;
 }): React.JSX.Element {
   return (
     <div
       data-kpi={id}
-      className="min-w-0 py-1 not-first:lg:border-l not-first:lg:border-line not-first:lg:pl-5"
+      className="min-w-0 py-1 not-first:xl:border-l not-first:xl:border-line not-first:xl:pl-5"
     >
-      <div className="text-[12.5px] leading-4 text-faint pointer-coarse:-my-3">
+      <div className="flex items-center justify-between gap-2 text-[12.5px] leading-4 text-faint pointer-coarse:-my-3">
         <MetricTip id={id} basis={basis} />
+        {trend}
       </div>
       <div className="mt-1 text-[22px] leading-[1.2] font-semibold tracking-[-0.02em] whitespace-nowrap tabular-nums">
         {children}
@@ -41,8 +46,9 @@ function Kpi({
 }
 
 /**
- * Five figures over the closed trades in the filters: how many, the P&L, win
- * rate, profit factor and expectancy. Money goes through the display unit, so
+ * Six figures over the closed trades in the filters: how many, the P&L (with
+ * its running line by exit date), win rate, profit factor, the average win to
+ * loss and expectancy. Money goes through the display unit, so
  * Privacy hides it; the profit factor's words carry no currency sign.
  */
 export function SummaryStrip({
@@ -51,6 +57,9 @@ export function SummaryStrip({
   pnl,
   fees,
   expectancy,
+  avgWin,
+  avgLoss,
+  running,
   openCount,
   scope,
   otherCurrencies,
@@ -61,6 +70,11 @@ export function SummaryStrip({
   pnl: Shown & { cents: number };
   fees: Shown;
   expectancy: (Shown & { cents: number }) | null;
+  /** The average winning and losing trade in the display unit; null without one. */
+  avgWin: (Shown & { cents: number }) | null;
+  avgLoss: (Shown & { cents: number }) | null;
+  /** The running P&L at the close of each exit day, in the display unit's terms, oldest first. */
+  running: readonly number[];
   /** Open positions in the filters, which the figures leave out. */
   openCount: number;
   /** The range, "1-20 Nov". */
@@ -70,7 +84,7 @@ export function SummaryStrip({
   onHide(): void;
 }): React.JSX.Element {
   const open = openCount;
-  // A phone reads net first and leaves expectancy out: four figures in two rows.
+  // A phone reads net first, then the rest: six figures, two across in three rows.
   const phone = usePhone();
   const kTrades = (
     <Kpi
@@ -89,6 +103,16 @@ export function SummaryStrip({
     <Kpi
       id="pnl"
       basis={basis}
+      trend={
+        running.length > 1 ? (
+          <Sparkline
+            variant="line"
+            series={running}
+            label={`Running P&L by exit date, over ${running.length} trading days`}
+            className="h-5 w-12 flex-none"
+          />
+        ) : null
+      }
       sub={
         <>
           {basis === 'gross' ? 'before ' : 'after '}
@@ -105,7 +129,7 @@ export function SummaryStrip({
     <Kpi
       id="win-rate"
       basis={basis}
-      sub={`${summary.wins} won, ${summary.losses} lost`}
+      sub={`${summary.wins} won, ${summary.breakevens} breakeven, ${summary.losses} lost`}
     >
       {summary.winRate === null ? (
         <span className="text-[15px] font-medium text-faint">None</span>
@@ -131,6 +155,32 @@ export function SummaryStrip({
       )}
     </Kpi>
   );
+  const kRatio = (
+    <Kpi
+      id="avg-win-loss"
+      basis={basis}
+      sub={
+        avgWin === null || avgLoss === null ? (
+          'needs a win and a loss'
+        ) : (
+          <>
+            <span className="block">
+              <FigureText f={avgWin} /> avg win
+            </span>
+            <span className="block">
+              <FigureText f={avgLoss} /> avg loss
+            </span>
+          </>
+        )
+      }
+    >
+      {summary.winLossRatio === null ? (
+        <span className="text-[15px] font-medium text-faint">None</span>
+      ) : (
+        formatRatio(summary.winLossRatio)
+      )}
+    </Kpi>
+  );
   const kExp = (
     <Kpi id="expectancy" basis={basis} sub="per closed trade">
       {expectancy === null ? (
@@ -145,13 +195,15 @@ export function SummaryStrip({
   return (
     <section
       aria-label="Summary"
-      className={`${CARD} grid grid-cols-2 items-start gap-x-5 gap-y-3 px-5 py-4 sm:grid-cols-3 sm:gap-y-4 lg:grid-cols-[repeat(5,minmax(0,1fr))_auto]`}
+      className={`${CARD} grid grid-cols-2 items-start gap-x-5 gap-y-3 px-5 py-4 sm:grid-cols-3 sm:gap-y-4 xl:grid-cols-[repeat(6,minmax(0,1fr))_auto]`}
     >
       {phone ? (
         <>
           {kPnl}
           {kWin}
           {kPf}
+          {kRatio}
+          {kExp}
           {kTrades}
         </>
       ) : (
@@ -160,10 +212,11 @@ export function SummaryStrip({
           {kPnl}
           {kWin}
           {kPf}
+          {kRatio}
           {kExp}
         </>
       )}
-      <div className="col-span-full flex items-start gap-4 border-line text-[12.5px] leading-[1.5] text-faint lg:col-span-1 lg:w-[236px] lg:border-l lg:pl-5">
+      <div className="col-span-full flex items-start gap-4 border-line text-[12.5px] leading-[1.5] text-faint xl:col-span-1 xl:w-[236px] xl:border-l xl:pl-5">
         <p className="min-w-0 flex-1">
           Figures cover the closed trades in your filters, {scope}.
           {otherCurrencies > 0

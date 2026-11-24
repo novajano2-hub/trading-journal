@@ -7,7 +7,7 @@ import {
   tableFeatures,
   type ColumnDef,
 } from '@tanstack/react-table';
-import { Chip, SideChip } from '@/components/ui/chip';
+import { SideChip } from '@/components/ui/chip';
 import { FigureText } from '@/components/product/figure-text';
 import { COLUMN_LABELS, type ColumnId } from '@/data/trade-columns';
 import {
@@ -15,6 +15,8 @@ import {
   netRoiOf,
   plannedR,
   rOf,
+  statusOf,
+  STATUS_RANK,
   type RowFacts,
 } from '@/data/trade-rows';
 import { type MetricContext } from '@/domain/metrics/context';
@@ -28,6 +30,7 @@ import {
   RatingCell,
   ReviewedCell,
   RulesCell,
+  StatusChip,
   StrategiesCell,
   TagsCell,
   TradeLink,
@@ -179,7 +182,7 @@ function sortValue(
     case 'reviewed':
       return t.reviewed === true ? 1 : 0;
     case 'status':
-      return t.status;
+      return STATUS_RANK[statusOf(t, env.ctx)];
   }
 }
 
@@ -303,11 +306,7 @@ export function cellOf(id: ColumnId, t: Trade, env: CellEnv): React.ReactNode {
     case 'reviewed':
       return <ReviewedCell reviewed={t.reviewed === true} />;
     case 'status':
-      return (
-        <Chip tone={t.status === 'open' ? 'accent' : 'neutral'}>
-          {t.status === 'open' ? 'Open' : 'Closed'}
-        </Chip>
-      );
+      return <StatusChip status={statusOf(t, env.ctx)} />;
   }
 }
 

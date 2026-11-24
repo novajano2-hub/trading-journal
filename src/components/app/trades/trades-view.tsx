@@ -3,7 +3,8 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useTable, type SortingState } from '@tanstack/react-table';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CaretDown,
   CaretLeft,
@@ -49,6 +50,8 @@ import {
   type ColumnId,
 } from '@/data/trade-columns';
 import { rowFacts, type RowFacts } from '@/data/trade-rows';
+import { classify } from '@/domain/metrics/context';
+import { runningByExit } from '@/domain/metrics/running';
 import { summarize } from '@/domain/metrics/summary';
 import { isTradeUnit } from '@/domain/metrics/units';
 import { isClosed } from '@/domain/trade-status';
@@ -82,8 +85,48 @@ import {
 import { ColumnsMenu } from './columns-menu';
 import { SummaryStrip } from './summary-strip';
 
-const PAGE_SIZE = 50;
+/** The rows a page can hold; the first used is the default. */
+const PAGE_SIZES = [25, 50, 100] as const;
+const DEFAULT_PAGE_SIZE = 50;
+const PAGE_SIZE_OPTIONS: MenuSelectOption[] = PAGE_SIZES.map((n) => ({
+  value: String(n),
+  label: `${n} per page`,
+}));
+
+/** The URL's `?per=`: 25, 50 or 100, else the default. */
+function perOf(raw: string | null): number {
+  const n = Number(raw);
+  return (PAGE_SIZES as readonly number[]).includes(n) ? n : DEFAULT_PAGE_SIZE;
+}
+
+/** The URL's `?page=`, a 1-based number, as an index; 0 when it is not a positive whole number. */
+function pageIndexOf(raw: string | null): number {
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 1 ? n - 1 : 0;
+}
+
+/** Writes the paging to the address bar in place, as the filters do; the default page and size stay off the URL. */
+function writePaging(patch: { per?: number; pageIndex?: number }): void {
+  const params = new URLSearchParams(window.location.search);
+  if (patch.per !== undefined) {
+    if (patch.per === DEFAULT_PAGE_SIZE) params.delete('per');
+    else params.set('per', String(patch.per));
+  }
+  if (patch.pageIndex !== undefined) {
+    if (patch.pageIndex <= 0) params.delete('page');
+    else params.set('page', String(patch.pageIndex + 1));
+  }
+  const qs = params.toString();
+  window.history.replaceState(
+    null,
+    '',
+    window.location.pathname + (qs ? `?${qs}` : ''),
+  );
+}
 const NEWEST_OPEN: SortingState = [{ id: 'open', desc: true }];
+
+/** A figure and how it reads, as `useDisplay().figure` gives it. */
+type Shown = { text: string; label: string };
 
 type Status = 'closed' | 'open';
 type Review = 'all' | 'unreviewed' | 'reviewed';
@@ -311,13 +354,22 @@ export function TradesView(): React.JSX.Element {
 
   const [search, setSearch] = useState('');
   const [sorting, setSorting] = useState<SortingState>(NEWEST_OPEN);
-  const [pagination, setPagination] = useState({
-    pageIndex: 0,
-    pageSize: PAGE_SIZE,
-  });
+  // The page and its size live in the URL, so Back brings the same page.
+  const urlParams = useSearchParams();
+  const pageSize = perOf(urlParams.get('per'));
+  const wantedPage = pageIndexOf(urlParams.get('page'));
+  const setPageIndex = (pageIndex: number) => writePaging({ pageIndex });
   // The chosen trades belong to the filters they were chosen under: a changed
   // filter or search leaves them behind.
   const selectionKey = `${serializeFilters(filters).toString()}|${search.trim().toLowerCase()}`;
+  // A changed filter starts the log again at page 1.
+  const filterKey = serializeFilters(filters).toString();
+  const lastFilterKey = useRef(filterKey);
+  useEffect(() => {
+    if (lastFilterKey.current === filterKey) return;
+    lastFilterKey.current = filterKey;
+    writePaging({ pageIndex: 0 });
+  }, [filterKey]);
   const [selection, setSelection] = useState<{
     key: string;
     ids: readonly string[];
@@ -409,13 +461,24 @@ export function TradesView(): React.JSX.Element {
     [columnIds, cellEnv],
   );
 
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const pageIndex = Math.min(wantedPage, pageCount - 1);
+  const pagination = { pageIndex, pageSize };
   const table = useTable({
     features,
     columns,
     data: rows,
     state: { sorting, pagination },
-    onSortingChange: setSorting,
-    onPaginationChange: setPagination,
+    onSortingChange: (updater) => {
+      setSorting(updater);
+      setPageIndex(0);
+    },
+    onPaginationChange: (updater) => {
+      const next =
+        typeof updater === 'function' ? updater(pagination) : updater;
+      writePaging({ pageIndex: next.pageIndex });
+    },
+    autoResetPageIndex: false,
     enableSortingRemoval: false,
     getRowId: (t) => t.id,
   });
@@ -543,12 +606,44 @@ export function TradesView(): React.JSX.Element {
     ...display.figure(pnlFigure, true, stripCurrency),
     cents: basisMoney,
   };
+  // The average win and loss: the winners' (losers') mean figure, with the summary's own money.
+  const outcomes = stripTrades.map((t) => classify(t, ctx).outcome);
+  const averageOf = (
+    outcome: 'win' | 'loss',
+    money: number | null,
+  ): (Shown & { cents: number }) | null => {
+    if (money === null) return null;
+    const mean = meanFigure(
+      figures.filter((_, i) => outcomes[i] === outcome),
+      pctBase,
+    );
+    return {
+      ...display.figure(
+        { ...mean, money, pct: pctBase ? money / pctBase : null },
+        true,
+        stripCurrency,
+      ),
+      cents: money,
+    };
+  };
+  const avgWin = averageOf('win', summary.avgWin);
+  const avgLoss = averageOf('loss', summary.avgLoss);
+  // The running line reads the display unit as the figures do; other units read the money.
+  const running = runningByExit(
+    stripTrades,
+    (t) => {
+      const f = tradeFigure(t, ctx);
+      return isTradeUnit(prefs.displayUnit)
+        ? (f[prefs.displayUnit] ?? 0)
+        : f.money;
+    },
+    timeZone,
+  );
 
   const page = table.getRowModel().rows;
   const total = rows.length;
-  const from = pagination.pageIndex * PAGE_SIZE + 1;
+  const from = pageIndex * pageSize + 1;
   const to = Math.min(total, from + page.length - 1);
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const sortOptions: MenuSelectOption[] = PHONE_SORTS.filter(
     (o) => o.always || columnIds.includes(o.id),
@@ -625,6 +720,9 @@ export function TradesView(): React.JSX.Element {
                   cents: summary.expectancy,
                 }
           }
+          avgWin={avgWin}
+          avgLoss={avgLoss}
+          running={running}
           openCount={model.openCount}
           scope={rangeCaption(range, today)}
           otherCurrencies={model.stripTrades.length - stripTrades.length}
@@ -704,7 +802,7 @@ export function TradesView(): React.JSX.Element {
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
-                setPagination((p) => ({ ...p, pageIndex: 0 }));
+                setPageIndex(0);
               }}
               className="h-[34px] w-full rounded-control border border-line bg-surface-1 pr-3 pl-9 text-[13.5px] text-text placeholder:text-faint hover:border-accent/35 focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11"
             />
@@ -819,7 +917,6 @@ export function TradesView(): React.JSX.Element {
                     onChange={(v) => {
                       const [id, dir] = v.split(':');
                       table.setSorting([{ id: id!, desc: dir === 'desc' }]);
-                      setPagination((p) => ({ ...p, pageIndex: 0 }));
                     }}
                   />
                 </div>
@@ -955,41 +1052,59 @@ export function TradesView(): React.JSX.Element {
                 </span>{' '}
                 {status} {plural(total, 'trade')}
               </p>
-              <nav
-                aria-label="Pages"
-                className="ml-auto flex items-center gap-0.5"
-              >
-                <PageButton
-                  label="Previous page"
-                  disabled={pagination.pageIndex === 0}
-                  onClick={() => table.previousPage()}
-                >
-                  <CaretLeft size={14} aria-hidden="true" />
-                </PageButton>
-                {pageButtons(pagination.pageIndex, pageCount).map((p, i) =>
-                  p === null ? (
-                    <span key={`gap-${i}`} aria-hidden="true" className="px-1">
-                      ...
-                    </span>
-                  ) : (
-                    <PageButton
-                      key={p}
-                      label={`Page ${p + 1}`}
-                      current={p === pagination.pageIndex}
-                      onClick={() => table.setPageIndex(p)}
-                    >
-                      {p + 1}
-                    </PageButton>
-                  ),
-                )}
-                <PageButton
-                  label="Next page"
-                  disabled={pagination.pageIndex >= pageCount - 1}
-                  onClick={() => table.nextPage()}
-                >
-                  <CaretRight size={14} aria-hidden="true" />
-                </PageButton>
-              </nav>
+              <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-2">
+                <MenuSelect
+                  label="Rows per page"
+                  align="end"
+                  value={String(pageSize)}
+                  options={PAGE_SIZE_OPTIONS}
+                  onChange={(v) =>
+                    writePaging({ per: Number(v), pageIndex: 0 })
+                  }
+                />
+                <PageJump
+                  key={pageIndex}
+                  pageIndex={pageIndex}
+                  pageCount={pageCount}
+                  onJump={setPageIndex}
+                />
+                <nav aria-label="Pages" className="flex items-center gap-0.5">
+                  <PageButton
+                    label="Previous page"
+                    disabled={pageIndex === 0}
+                    onClick={() => table.previousPage()}
+                  >
+                    <CaretLeft size={14} aria-hidden="true" />
+                  </PageButton>
+                  {pageButtons(pageIndex, pageCount).map((p, i) =>
+                    p === null ? (
+                      <span
+                        key={`gap-${i}`}
+                        aria-hidden="true"
+                        className="px-1"
+                      >
+                        ...
+                      </span>
+                    ) : (
+                      <PageButton
+                        key={p}
+                        label={`Page ${p + 1}`}
+                        current={p === pageIndex}
+                        onClick={() => setPageIndex(p)}
+                      >
+                        {p + 1}
+                      </PageButton>
+                    ),
+                  )}
+                  <PageButton
+                    label="Next page"
+                    disabled={pageIndex >= pageCount - 1}
+                    onClick={() => table.nextPage()}
+                  >
+                    <CaretRight size={14} aria-hidden="true" />
+                  </PageButton>
+                </nav>
+              </div>
             </div>
           </>
         )}
@@ -1013,6 +1128,53 @@ export function TradesView(): React.JSX.Element {
 }
 
 const NO_ROWS: Trade[] = [];
+
+/**
+ * "Page [n] of N": a number field in the app's field look. Enter or leaving
+ * the field goes to the page; a number past either end lands on the nearest
+ * page, and a field left empty puts the current page back.
+ */
+function PageJump({
+  pageIndex,
+  pageCount,
+  onJump,
+}: {
+  pageIndex: number;
+  pageCount: number;
+  onJump(index: number): void;
+}): React.JSX.Element {
+  const [draft, setDraft] = useState(String(pageIndex + 1));
+  const go = () => {
+    const n = Math.round(Number(draft));
+    if (draft.trim() === '' || !Number.isFinite(n)) {
+      setDraft(String(pageIndex + 1));
+      return;
+    }
+    const target = Math.min(pageCount, Math.max(1, n)) - 1;
+    setDraft(String(target + 1));
+    if (target !== pageIndex) onJump(target);
+  };
+  return (
+    <label className="flex items-center gap-2 text-[12.5px] text-faint">
+      Page
+      <input
+        type="number"
+        inputMode="numeric"
+        min={1}
+        max={pageCount}
+        aria-label="Go to page"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={go}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') go();
+        }}
+        className="h-8 w-16 rounded-control border border-line bg-surface-1 px-2 text-center text-[13.5px] font-medium text-text tabular-nums hover:border-accent/35 focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11"
+      />
+      <span className="tabular-nums">of {pageCount}</span>
+    </label>
+  );
+}
 
 function PageButton({
   label,

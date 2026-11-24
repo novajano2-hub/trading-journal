@@ -7,6 +7,7 @@ import {
   plannedR,
   rOf,
   rowFacts,
+  statusOf,
   type RowEnv,
 } from './trade-rows';
 
@@ -101,7 +102,7 @@ export function tradesCsv(
       case 'reviewed':
         return t.reviewed === true ? 'Yes' : 'No';
       case 'status':
-        return t.status === 'closed' ? 'Closed' : 'Open';
+        return statusOf(t, env.ctx);
     }
   };
   const header = columns.map((id) => {

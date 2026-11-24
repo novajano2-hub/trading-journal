@@ -1,6 +1,10 @@
 // What a trade log row says about a trade, shared by the table and the CSV.
 import { rOf, plannedR } from '@/domain/metrics/summary';
-import { costBasis, type MetricContext } from '@/domain/metrics/context';
+import {
+  classify,
+  costBasis,
+  type MetricContext,
+} from '@/domain/metrics/context';
 import { mistakeTags } from '@/domain/metrics/mistakes';
 import {
   type Account,
@@ -74,6 +78,26 @@ export function heldMs(t: Trade): number | undefined {
 export function netRoiOf(t: Trade): number | undefined {
   const base = costBasis(t);
   return base > 0 ? t.net / base : undefined;
+}
+
+/** What a trade log's Status says: the outcome of a closed trade by the breakeven range, or Open. */
+export type TradeStatus = 'Win' | 'Loss' | 'Breakeven' | 'Open';
+
+/** Sort order of the Status column: wins first, open trades last. */
+export const STATUS_RANK: Record<TradeStatus, number> = {
+  Win: 0,
+  Breakeven: 1,
+  Loss: 2,
+  Open: 3,
+};
+
+export function statusOf(
+  t: Trade,
+  ctx: Pick<MetricContext, 'pnlBasis' | 'breakevenRange'>,
+): TradeStatus {
+  if (t.status !== 'closed') return 'Open';
+  const { outcome } = classify(t, ctx);
+  return outcome === 'win' ? 'Win' : outcome === 'loss' ? 'Loss' : 'Breakeven';
 }
 
 export { rOf, plannedR };
