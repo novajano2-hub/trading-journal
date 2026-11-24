@@ -16,6 +16,7 @@ import type { SampleWorkspace } from '@/data/seed/generate';
 import type { Repository } from '@/data/repository';
 import { SAMPLE_WORKSPACE } from '@/data/workspaces';
 import { makeTrade } from '@/domain/__fixtures__/trades';
+import { resolveInstrument } from '@/domain/instruments';
 import type { JournalEntry } from '@/domain/types';
 import { renderApp } from '../__fixtures__/render-app';
 import { NotebookView } from './notebook-view';
@@ -493,6 +494,59 @@ test('Privacy hides the day figures', async () => {
     (await within(card).findAllByText('hidden amount')).length,
   ).toBeGreaterThan(0);
   expect(card.textContent).not.toMatch(/\$\d/);
+});
+
+/** The 19th in ticks: t-19 is an ES long, 4500 to 4502 on two contracts, 16 ticks; a stock trade the same day. */
+const tickDay = (fx: SampleWorkspace) => {
+  const es = fx.trades.find((t) => t.id === 't-19')!;
+  es.avgEntry = 4500;
+  es.avgExit = 4502;
+  es.maxPosition = 2;
+  es.executions = [];
+  fx.trades.push(
+    makeTrade({
+      id: 't-19-stock',
+      serial: 11,
+      workspaceId: WS,
+      accountId: 'acc-a',
+      openedAt: '2026-11-19T16:00:00.000Z',
+      closedAt: '2026-11-19T16:30:00.000Z',
+      net: -1000,
+      gross: -1000,
+      instrument: resolveInstrument('SPY')!,
+    }),
+  );
+};
+
+test('under Ticks the day card reads ticks, and counts only the futures trades (ruling 67)', async () => {
+  await openWith('/app/notebook/daily/2026-11-19', {
+    prefs: { displayUnit: 'ticks' },
+    edit: tickDay,
+  });
+  const card = await screen.findByRole('region', { name: "The day's stats" });
+  expect((await within(card).findAllByText('+16.0 ticks')).length).toBe(2);
+  const kpi = (label: string) =>
+    within(card).getByText(label).closest('div')!.querySelector('b')!
+      .textContent;
+  // The stock trade is left out, as on every page under a unit.
+  expect(kpi('Trades')).toBe('1');
+  expect(kpi('Win rate')).toBe('100%');
+  expect(card.textContent).not.toContain('$');
+  // The chip of the linked trade shows what it made in ticks.
+  expect(within(card).getByRole('link', { name: /^ES/ }).textContent).toContain(
+    '+16.0 ticks',
+  );
+});
+
+test('under Dollar and Percent the day card is unchanged by the unit work, the stock trade counts', async () => {
+  await openWith('/app/notebook/daily/2026-11-19', { edit: tickDay });
+  const card = await screen.findByRole('region', { name: "The day's stats" });
+  expect((await within(card).findAllByText('+$370.26')).length).toBe(1);
+  expect(
+    within(card).getByText('Trades').closest('div')!.querySelector('b')!
+      .textContent,
+  ).toBe('2');
+  expect(card.textContent).not.toContain('ticks');
 });
 
 test('an unknown note is a not-found state', async () => {

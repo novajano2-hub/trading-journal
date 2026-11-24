@@ -427,6 +427,63 @@ test('in Ticks the figures read the futures trades alone, profit factor and aver
   expect(kpi('sortino')).toContain('None');
 });
 
+test('in Ticks the Days card reads the unit: the average green and red day are ticks, not dollars (E139)', async () => {
+  renderApp(<OverviewView />, {
+    repository: await inUnit('ticks', ticksSample),
+    url: URL,
+  });
+  const page = await ready();
+  const card = within(page).getByRole('region', { name: 'Days' });
+  // Mon 2 Nov +12 ticks is the one green day, Tue 3 Nov -6 ticks the one red day.
+  expect(stat(card, 'avg-green-day')).toContain('+12.0 ticks');
+  expect(stat(card, 'avg-red-day')).toContain('−6.0 ticks');
+  expect(stat(card, 'avg-green-day')).not.toContain('$');
+  expect(stat(card, 'avg-red-day')).not.toContain('$');
+});
+
+test('in R the Days card reads R, and under Privacy the money is hidden (E139)', async () => {
+  const { unmount } = renderApp(<OverviewView />, {
+    repository: await inUnit('r'),
+    url: URL,
+  });
+  const card = within(await ready()).getByRole('region', { name: 'Days' });
+  expect(stat(card, 'avg-green-day')).toMatch(/\dR/);
+  expect(stat(card, 'avg-green-day')).not.toContain('$');
+  unmount();
+  renderApp(<OverviewView />, {
+    repository: await inUnit('privacy'),
+    url: URL,
+  });
+  const hidden = within(await ready()).getByRole('region', { name: 'Days' });
+  expect(stat(hidden, 'avg-green-day')).not.toMatch(/\$\s?\d/);
+  expect(stat(hidden, 'avg-green-day')).toContain('hidden');
+});
+
+test('Long and short says None for a side with no trades, never $0.00 (E139)', async () => {
+  renderApp(<OverviewView />, {
+    repository: await inUnit('privacy', ticksSample).then(async (r) => {
+      await r.prefs.update({ displayUnit: 'dollar' });
+      return r;
+    }),
+    url: URL,
+  });
+  const page = await ready();
+  const table = within(page).getByRole('table', { name: 'Long and short' });
+  // Every sample trade here is long: the Short column has no trades.
+  const pnl = table
+    .querySelector('[data-metric-tip="pnl"]')!
+    .closest('tr')!
+    .querySelectorAll('td');
+  expect(pnl[1]!.textContent).toBe('None');
+  expect(pnl[1]!.textContent).not.toContain('$');
+  expect(pnl[0]!.textContent).toContain('$');
+  const count = table
+    .querySelector('[data-metric-tip="trades"]')!
+    .closest('tr')!
+    .querySelectorAll('td');
+  expect(count[1]!.textContent).toBe('0');
+});
+
 test('when the unit leaves out every closed trade the page says so, and keeps Clear filters while a filter is set', async () => {
   // No report trade has a stop, so R reads none of them.
   renderApp(<OverviewView />, {

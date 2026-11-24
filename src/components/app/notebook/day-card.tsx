@@ -20,6 +20,7 @@ import {
   useTrades,
 } from '@/data/query/hooks';
 import { tradeVolume } from '@/domain/metrics/summary';
+import { isTradeUnit, unitKeeps } from '@/domain/metrics/units';
 import { localDate } from '@/domain/time';
 import type { PnlBasis, Trade } from '@/domain/types';
 import {
@@ -60,26 +61,32 @@ function Kpi({
 /** A linked trade as a chip that links it, with what it made on the note's day. */
 function TradeChip({
   trade,
-  value,
-  r,
+  made,
   timeZone,
   currency,
   pctBase,
 }: {
   trade: Trade;
   /** What its exits on the day made; undefined when it did not exit that day. */
-  value: number | undefined;
-  r: number | null;
+  made: Made | undefined;
   timeZone: string;
   currency: string;
   pctBase: number | null;
 }): React.JSX.Element {
   const display = useDisplay();
+  const value = made?.value;
   const figure =
-    value === undefined
+    made === undefined
       ? undefined
       : display.figure(
-          { money: value, pct: pctBase ? value / pctBase : null, r },
+          {
+            money: made.value,
+            pct: pctBase ? made.value / pctBase : null,
+            r: made.r,
+            ticks: made.ticks,
+            pips: made.pips,
+            points: made.points,
+          },
           true,
           currency,
         );
@@ -107,7 +114,18 @@ function TradeChip({
   );
 }
 
-interface DayModel {
+/** What a trade's exits on the day made, in money and in each unit (each exit's own value). */
+interface Made extends Units {
+  value: number;
+  r: number | null;
+}
+interface Units {
+  ticks: number | null;
+  pips: number | null;
+  points: number | null;
+}
+
+interface DayModel extends Units {
   net: number;
   r: number | null;
   trades: number;
@@ -115,7 +133,7 @@ interface DayModel {
   losses: number;
   rules: DayGrading['rules'];
   /** What each trade with an exit that day made on it. */
-  made: Map<string, { value: number; r: number | null }>;
+  made: Map<string, Made>;
   /** The day's trades: those with an exit that day, and those opened and still open. */
   dayIds: Set<string>;
 }
@@ -152,8 +170,7 @@ function DayBody({
       chip={(t) => (
         <TradeChip
           trade={t}
-          value={model.made.get(t.id)?.value}
-          r={model.made.get(t.id)?.r ?? null}
+          made={model.made.get(t.id)}
           timeZone={timeZone}
           currency={currency}
           pctBase={pctBase}
@@ -168,8 +185,17 @@ function DayBody({
         {linked}
       </>
     );
+  // A balance-based figure (the share of the balance) is empty under a unit
+  // that narrows the trades; the unit's own number is each exit's own value.
   const net = display.figure(
-    { money: model.net, pct: pctBase ? model.net / pctBase : null, r: model.r },
+    {
+      money: model.net,
+      pct: pctBase && !isTradeUnit(display.unit) ? model.net / pctBase : null,
+      r: model.r,
+      ticks: model.ticks,
+      pips: model.pips,
+      points: model.points,
+    },
     true,
     currency,
   );
@@ -262,9 +288,11 @@ export function DayCard({
   const tags = useTags().data;
   const categories = useTagCategories().data;
   const currency = prefs?.baseCurrency ?? 'USD';
+  const unit = prefs?.displayUnit ?? 'dollar';
+  // A unit that narrows the trades (ticks, pips, points, R) narrows the day too.
   const trades = useMemo(
-    () => all?.filter((t) => t.pnlCurrency === currency),
-    [all, currency],
+    () => all?.filter((t) => t.pnlCurrency === currency && unitKeeps(unit, t)),
+    [all, currency, unit],
   );
   const noAccounts = useMemo(() => [] as string[], []);
   const source = useFigureSource({
@@ -280,15 +308,18 @@ export function DayCard({
     const { weeks } = calendarMonth(trades, [], date.slice(0, 7), ctx);
     const day = weeks.flatMap((w) => w.days).find((d) => d?.date === date);
     const exits = dayExits(trades, date, ctx);
-    const made = new Map<string, { value: number; r: number | null }>();
+    const made = new Map<string, Made>();
+    // A unit sums over the exits that have it; none has it, none is shown.
+    const add = (a: number | null | undefined, b: number | null) =>
+      b === null ? (a ?? null) : (a ?? 0) + b;
     for (const e of exits) {
       const seen = made.get(e.trade.id);
       made.set(e.trade.id, {
         value: (seen?.value ?? 0) + e.value,
-        r:
-          e.r === null && seen === undefined
-            ? null
-            : (seen?.r ?? 0) + (e.r ?? 0),
+        r: add(seen?.r, e.r),
+        ticks: add(seen?.ticks, e.ticks),
+        pips: add(seen?.pips, e.pips),
+        points: add(seen?.points, e.points),
       });
     }
     const dayIds = new Set(made.keys());
@@ -298,6 +329,9 @@ export function DayCard({
     return {
       net: day?.net ?? 0,
       r: day?.r ?? null,
+      ticks: day?.ticks ?? null,
+      pips: day?.pips ?? null,
+      points: day?.points ?? null,
       trades: day?.trades ?? 0,
       wins: day?.wins ?? 0,
       losses: day?.losses ?? 0,

@@ -32,7 +32,13 @@ import { OverviewDayFigures } from './overview-day-figures';
 import { OverviewDayCounts, OverviewTradeCounts } from './overview-counts';
 import { OverviewHold } from './overview-hold';
 import { OverviewMonths } from './overview-months';
-import { LinkedFigure, NONE, Stat, StatCard } from './overview-stat';
+import {
+  LinkedFigure,
+  NONE,
+  Stat,
+  StatCard,
+  useDayValue,
+} from './overview-stat';
 import { ReportScope } from './report-scope';
 import type { ReportData } from './use-report-data';
 import { RatioText } from '../ratio-text';
@@ -196,6 +202,8 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
   };
   const largestWin = largest('win');
   const largestLoss = largest('loss');
+  // Day figures read the display unit when one narrows the trades.
+  const dayFigure = useDayValue(data);
   const fig = (f: { money: number } | null) =>
     f === null ? null : <FigureText f={display.figure(f, true, currency)} />;
   const drawdown = p.drawdown;
@@ -297,9 +305,12 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
     },
     {
       id: 'pnl',
-      cell: (i) => (
-        <FigureText f={display.figure(sides[i]!.net, true, currency)} />
-      ),
+      cell: (i) =>
+        sides[i]!.count === 0 ? (
+          NONE
+        ) : (
+          <FigureText f={display.figure(sides[i]!.net, true, currency)} />
+        ),
       tone: (i) => signTone(sides[i]!.moneyNet),
     },
     {
@@ -511,7 +522,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
         tone="text-gain"
         sub={`${ds.greenDays} ${plural(ds.greenDays, 'day')}`}
       >
-        {fig(ds.avgGreenDay === null ? null : { money: ds.avgGreenDay })}
+        {dayFigure(ds.avgGreenValue)}
       </Stat>
       <Stat
         id="avg-red-day"
@@ -519,7 +530,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
         tone="text-loss"
         sub={`${ds.redDays} ${plural(ds.redDays, 'day')}`}
       >
-        {fig(ds.avgRedDay === null ? null : { money: ds.avgRedDay })}
+        {dayFigure(ds.avgRedValue)}
       </Stat>
       <Stat id="trades-per-day" data={data} sub="closed">
         {ds.tradesPerDay === null ? null : ds.tradesPerDay.toFixed(1)}
