@@ -125,7 +125,7 @@ test('below sm the chips always have their own row, under the pinned first row',
   ).toContain('max-sm:fixed');
 });
 
-test('the source reads as the bar does: menu, title, chips, search, label, Display menu, Import, theme; none reordered by CSS', () => {
+test('the source reads as the bar does: menu, title, chips, search, label, Display menu, Import; none reordered by CSS', () => {
   layOut({ titleWidth: 115, chipsWidth: 100 });
   render(
     <TopBar
@@ -154,8 +154,9 @@ test('the source reads as the bar does: menu, title, chips, search, label, Displ
     'label',
     'basis',
     'Import',
-    'Switch to dark theme',
   ]);
+  // No theme toggle at any width: Appearance lives in Settings and the menus.
+  expect(within(bar).queryByRole('button', { name: /theme/i })).toBeNull();
   expect(bar.innerHTML).not.toMatch(/\border-/);
 });
 

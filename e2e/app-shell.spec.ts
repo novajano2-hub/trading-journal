@@ -207,7 +207,6 @@ test('below sm the menu and title stay put; the chips and controls scroll away (
   for (const gone of [
     bar.getByRole('button', { name: /^Filters/ }),
     bar.getByRole('link', { name: 'Import' }),
-    bar.getByRole('button', { name: 'Switch to dark theme' }),
   ]) {
     const box = (await gone.boundingBox())!;
     expect(box.y + box.height).toBeLessThan(0);
@@ -266,7 +265,7 @@ async function walkBar(page: Page, from: Locator, stops: Locator[]) {
   }
 }
 
-test('Tab walks the top bar in the order it reads: title, chips, search, Display, Import, theme', async ({
+test('Tab walks the top bar in the order it reads: title, chips, search, Display, Import', async ({
   page,
 }, info) => {
   const mobile = info.project.name === 'mobile';
@@ -278,7 +277,6 @@ test('Tab walks the top bar in the order it reads: title, chips, search, Display
     bar.getByRole('combobox', { name: 'Search' }),
     bar.getByRole('button', { name: /show as / }),
     bar.getByRole('link', { name: 'Import' }),
-    bar.getByRole('button', { name: 'Switch to dark theme' }),
   ];
   // What comes before the bar: the skip link on phones, the sidebar's last link on desktop.
   const before = mobile

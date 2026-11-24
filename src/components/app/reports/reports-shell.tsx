@@ -106,7 +106,7 @@ export function ReportsShell({
         className="px-5 pb-1 [scrollbar-width:none]"
       >
         <nav aria-label="Reports">
-          <div className="inline-flex rounded-[11px] bg-accent/8 p-[3px] shadow-[inset_0_1px_2px_rgb(18_22_51/0.07)] [[data-theme=dark]_&]:shadow-[inset_0_1px_2px_rgb(0_0_0/0.35)]">
+          <div className="inline-flex rounded-[11px] bg-track p-[3px] shadow-[inset_0_1px_2px_rgb(18_22_51/0.07)] [[data-theme=dark]_&]:shadow-[inset_0_1px_2px_rgb(0_0_0/0.35)]">
             {tabLink(SIMPLE_TABS[0]!)}
             {tabLink(SIMPLE_TABS[1]!)}
             <DropdownMenu.Root>

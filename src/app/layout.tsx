@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Instrument_Sans } from 'next/font/google';
+import { APPEARANCE_SCRIPT } from '@/lib/appearance';
 import './globals.css';
 
 // Keel's one family, numbers set in its tabular figures (theme.css maps
@@ -15,9 +16,6 @@ export const metadata: Metadata = {
   description: 'Trading journal',
 };
 
-// Runs before first paint so a saved dark choice never flashes light.
-const themeInit = `try{if(localStorage.getItem('keel-theme')==='dark')document.documentElement.dataset.theme='dark'}catch(e){}`;
-
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
     <html
@@ -26,7 +24,8 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
       suppressHydrationWarning
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+        {/* Before first paint, so a dark choice never flashes light. */}
+        <script dangerouslySetInnerHTML={{ __html: APPEARANCE_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

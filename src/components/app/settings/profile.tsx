@@ -11,6 +11,7 @@ import {
   useUpdatePrefs,
 } from '@/data/query/hooks';
 import { zoneLabel } from '@/lib/time-zone-label';
+import { AppearanceControl } from '../appearance';
 import { FieldError } from './settings-ui';
 
 /** A three-letter currency code Intl knows. */
@@ -49,7 +50,7 @@ interface Draft {
   text: string;
 }
 
-/** Name, time zone and base currency. Each saves as you finish it. */
+/** Name, time zone, base currency and appearance. Each saves as you finish it. */
 export function ProfileSettings(): React.JSX.Element {
   const prefs = usePrefs().data;
   const saved = useSavedPrefs().data;
@@ -172,6 +173,14 @@ export function ProfileSettings(): React.JSX.Element {
               currency are shown on their own.
             </p>
           )}
+        </div>
+        <div>
+          {/* The control's own name is Appearance; this is its visible label. */}
+          <p aria-hidden="true" className={LABEL}>
+            Appearance
+          </p>
+          <AppearanceControl />
+          <p className={HELP}>System follows your device&apos;s setting.</p>
         </div>
         <SaveStatus saving={busy} failed={update.isError || unset.isError} />
       </div>

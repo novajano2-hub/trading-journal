@@ -1,9 +1,12 @@
 /*
- * Keel tokens, "Daylight premium" (.impeccable/mocks/rebrand-app/c-daylight-premium.html).
- * The marketing site wears the app's world: periwinkle canvas, white cards with
- * brand-tinted shadows, Keel Ultramarine as the one brand hue. Light is the
- * default regardless of OS; dark is an explicit [data-theme='dark'] on <html>.
- * Radius rule: chips 6, buttons/inputs/inner panels 10, cards 16.
+ * Keel tokens. One set for the app and the marketing site: light is a
+ * periwinkle canvas with white cards on brand-tinted shadows; dark is a
+ * neutral graphite (no blue in its greys). Keel Ultramarine is the one brand
+ * hue and is spent sparingly: primary actions, the active state, focus and
+ * series 1. The Appearance setting (System, Light, Dark) resolves to
+ * [data-theme] on <html> before first paint; System follows
+ * prefers-color-scheme. Radius rule: chips 6, buttons/inputs/inner panels 10,
+ * cards 16.
  */
 :root {
   color-scheme: light;
@@ -22,9 +25,6 @@
   --accent-fg: #ffffff;
   --accent-deep: #1f278c;
   --accent-tint: #dcdff8;
-  /* Secondary text and the loss figure on the ultramarine hero surface. */
-  --on-accent-muted: #c9ccf5;
-  --on-accent-loss: #ffb3b8;
   --gain: #0a7a52;
   --gain-fill: #19a672;
   --gain-soft: #ddf3e8;
@@ -38,6 +38,8 @@
   --info: #0a6f94;
   --info-fill: #1693be;
   --info-soft: #e0f1f8;
+  /* The recessed track under Segmented and Tabs. */
+  --track: color-mix(in srgb, var(--accent) 8%, transparent);
   --shadow:
     0 1px 2px rgba(18, 22, 51, 0.06), 0 24px 48px -20px rgba(34, 42, 150, 0.28);
   --shadow-card:
@@ -45,8 +47,6 @@
     0 18px 34px -22px rgba(34, 42, 150, 0.38);
   --shadow-chip:
     0 1px 2px rgba(18, 22, 51, 0.06), 0 2px 6px -2px rgba(34, 42, 150, 0.1);
-  --shadow-hero:
-    0 2px 4px rgba(31, 39, 140, 0.18), 0 22px 40px -18px rgba(31, 39, 140, 0.55);
   --veil: rgba(18, 22, 51, 0.36);
 
   /* One family; `font-mono` keeps its job (tabular numbers) in the same face. */
@@ -70,126 +70,44 @@
   --dur-exit: 160ms;
 }
 
-/* Deep navy, designed rather than inverted. The hero surface stays ultramarine. */
+/*
+ * Graphite, the family pro trading terminals use: a near-black canvas, neutral
+ * surfaces lifted a step at a time, hairline borders, grey text. Every neutral
+ * has equal red, green and blue, so nothing reads blue. Depth is the lift and
+ * the hairline; shadows are plain black.
+ */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --bg: #0c0e1c;
-  --surface-1: #151831;
-  --sunken: #1b1f3b;
-  --line: #262a4a;
-  --line-2: #323760;
-  --text: #eceefb;
-  --muted: #aeb2d2;
-  --faint: #9095bb;
+  --bg: #0b0b0b;
+  --surface-1: #141414;
+  --sunken: #1b1b1b;
+  --line: #252525;
+  --line-2: #313131;
+  --text: #ededed;
+  --muted: #a3a3a3;
+  --faint: #878787;
   --accent: #4c57dc;
   --accent-hover: #5c66e6;
-  --accent-soft: #22285a;
+  --accent-soft: #1c1d2e;
   --accent-ink: #aeb4ff;
   --accent-fg: #ffffff;
   --accent-deep: #1f278c;
-  --accent-tint: #2c336e;
+  --accent-tint: #2a2f5e;
   --gain: #3fc08e;
   --gain-fill: #2fb27f;
-  --gain-soft: #10291f;
+  --gain-soft: #10261c;
   --loss: #f06a78;
   --loss-fill: #e5484d;
-  --loss-soft: #2e1620;
+  --loss-soft: #2b1517;
   --warn: #f0b44a;
   --warn-fill: #e9a21a;
-  --warn-soft: #2d2210;
+  --warn-soft: #2a2010;
   --info: #4db8e0;
   --info-fill: #1693be;
-  --info-soft: #0e2533;
+  --info-soft: #0d2330;
+  --track: rgb(255 255 255 / 0.05);
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 24px 48px -20px rgba(0, 0, 0, 0.75);
-  --shadow-card:
-    0 1px 2px rgba(0, 0, 0, 0.45), 0 18px 34px -22px rgba(0, 0, 0, 0.8);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-chip: 0 1px 2px rgba(0, 0, 0, 0.45);
-  --shadow-hero:
-    0 2px 4px rgba(0, 0, 0, 0.4), 0 22px 40px -18px rgba(43, 53, 175, 0.55);
-  --veil: rgba(4, 5, 14, 0.66);
-}
-
-/*
- * The app's world: "Daylight premium" (.impeccable/mocks/rebrand-app/c-daylight-premium.html).
- * Scoped with :has() on <html> so Radix portals, the page background and the
- * scrollbars follow it while any /app page is mounted. Marketing keeps the
- * tokens above. Keel Ultramarine is the one hue the money palette never uses.
- */
-:root:has([data-surface='app']) {
-  --bg: #eceef8;
-  --surface-1: #ffffff;
-  --sunken: #f0f1f8;
-  --line: #e7e9f3;
-  --line-2: #d5d8ea;
-  --text: #121633;
-  --muted: #4b5175;
-  --faint: #636889;
-  --accent: #2b35af;
-  --accent-hover: #1f278c;
-  --accent-soft: #eeeffc;
-  --accent-ink: #2b35af;
-  --accent-fg: #ffffff;
-  --accent-deep: #1f278c;
-  --accent-tint: #dcdff8;
-  --on-accent-muted: #c9ccf5;
-  --on-accent-loss: #ffb3b8;
-  --gain: #0a7a52;
-  --gain-fill: #19a672;
-  --gain-soft: #ddf3e8;
-  --loss: #c22e3a;
-  --loss-fill: #e5484d;
-  --loss-soft: #fceced;
-  --warn: #9a5700;
-  --warn-fill: #e9a21a;
-  --warn-soft: #fcf1dc;
-  --info: #0a6f94;
-  --info-fill: #1693be;
-  --info-soft: #e0f1f8;
-  --shadow:
-    0 1px 2px rgba(18, 22, 51, 0.06), 0 24px 48px -20px rgba(34, 42, 150, 0.28);
-  --shadow-card:
-    0 1px 2px rgba(18, 22, 51, 0.05), 0 4px 10px -6px rgba(34, 42, 150, 0.1),
-    0 18px 34px -22px rgba(34, 42, 150, 0.38);
-  --shadow-chip:
-    0 1px 2px rgba(18, 22, 51, 0.06), 0 2px 6px -2px rgba(34, 42, 150, 0.1);
-  --shadow-hero:
-    0 2px 4px rgba(31, 39, 140, 0.18), 0 22px 40px -18px rgba(31, 39, 140, 0.55);
-  --veil: rgba(18, 22, 51, 0.36);
-}
-
-:root[data-theme='dark']:has([data-surface='app']) {
-  --bg: #0c0e1c;
-  --surface-1: #151831;
-  --sunken: #1b1f3b;
-  --line: #262a4a;
-  --line-2: #323760;
-  --text: #eceefb;
-  --muted: #aeb2d2;
-  --faint: #9095bb;
-  --accent: #4c57dc;
-  --accent-hover: #5c66e6;
-  --accent-soft: #22285a;
-  --accent-ink: #aeb4ff;
-  --accent-fg: #ffffff;
-  --accent-deep: #1f278c;
-  --accent-tint: #2c336e;
-  --gain: #3fc08e;
-  --gain-fill: #2fb27f;
-  --gain-soft: #10291f;
-  --loss: #f06a78;
-  --loss-fill: #e5484d;
-  --loss-soft: #2e1620;
-  --warn: #f0b44a;
-  --warn-fill: #e9a21a;
-  --warn-soft: #2d2210;
-  --info: #4db8e0;
-  --info-fill: #1693be;
-  --info-soft: #0e2533;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 24px 48px -20px rgba(0, 0, 0, 0.75);
-  --shadow-card:
-    0 1px 2px rgba(0, 0, 0, 0.45), 0 18px 34px -22px rgba(0, 0, 0, 0.8);
-  --shadow-chip: 0 1px 2px rgba(0, 0, 0, 0.45);
-  --shadow-hero:
-    0 2px 4px rgba(0, 0, 0, 0.4), 0 22px 40px -18px rgba(43, 53, 175, 0.55);
-  --veil: rgba(4, 5, 14, 0.66);
+  --veil: rgba(0, 0, 0, 0.62);
 }

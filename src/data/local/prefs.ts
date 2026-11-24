@@ -1,5 +1,10 @@
 import { isValidTimeZone } from '@/domain/time';
-import type { CalendarStat, DisplayUnit, UserPrefs } from '@/domain/types';
+import type {
+  Appearance,
+  CalendarStat,
+  DisplayUnit,
+  UserPrefs,
+} from '@/domain/types';
 import { defaultPrefs, type PrefsRepo } from '../repository';
 import type { LocalContext } from './context';
 import type { KeelDb } from './db';
@@ -14,6 +19,7 @@ const DISPLAY_UNITS: readonly DisplayUnit[] = [
   'pips',
   'points',
 ];
+const APPEARANCES: readonly Appearance[] = ['system', 'light', 'dark'];
 const CALENDAR_STATS: readonly CalendarStat[] = [
   'net',
   'trades',
@@ -89,6 +95,11 @@ function validate(p: Partial<UserPrefs>): void {
     p.weekStart !== 'monday'
   )
     throw new RangeError(`Unknown week start "${String(p.weekStart)}"`);
+  if (
+    p.appearance !== undefined &&
+    !APPEARANCES.includes(p.appearance as Appearance)
+  )
+    throw new RangeError(`Unknown appearance "${String(p.appearance)}"`);
   const hidden = p.overviewHidden;
   if (
     hidden !== undefined &&

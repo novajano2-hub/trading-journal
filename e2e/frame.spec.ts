@@ -118,9 +118,8 @@ test('footer carries the legal and module links', async ({ page }) => {
   const footer = page.getByRole('contentinfo');
   for (const name of ['Terms', 'Privacy', 'Pricing', 'Journal'])
     await expect(footer.getByRole('link', { name })).toBeVisible();
-  await expect(
-    footer.getByRole('button', { name: /Switch to (dark|light) theme/ }),
-  ).toBeVisible();
+  // Appearance is a setting in the app; the site has no sun or moon toggle.
+  await expect(footer.getByRole('button')).toHaveCount(0);
   await expect(footer).toContainText('© 2026 Keel');
 });
 

@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { MODULES } from '@/content/modules';
-import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { BrandMark } from './brand-mark';
 import { PRIMARY_LINKS } from './nav-links';
 
@@ -20,7 +19,6 @@ export function SiteFooter() {
             A trading journal for the whole review loop.
           </p>
           <p className="mt-5">© 2026 Keel</p>
-          <ThemeToggle className="mt-5" />
         </div>
         <div>
           <h2 className={HEAD}>Product</h2>

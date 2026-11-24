@@ -15,6 +15,7 @@ import {
   useSetActiveWorkspace,
   useWorkspaces,
 } from '@/data/query/hooks';
+import { AppearanceMenuGroup } from './appearance';
 import { FIELD } from './filter-chip';
 import { SwitcherPlaceholder } from './sidebar';
 import { useShownFilters } from './use-shown-filters';
@@ -68,7 +69,12 @@ function LabelledGroup({
  * place and the menu stays open. A workspace that can't load says so, and
  * clicking it reloads the page.
  */
-export function AccountSwitcher(): React.JSX.Element {
+export function AccountSwitcher({
+  appearance = true,
+}: {
+  /** The Appearance choice at the menu's foot: on desktop. The phone's More sheet has its own. */
+  appearance?: boolean;
+} = {}): React.JSX.Element {
   const { filters, shown: clean, setFilters } = useShownFilters();
   const workspaces = useWorkspaces().data ?? [];
   const activeQuery = useActiveWorkspace();
@@ -275,6 +281,16 @@ export function AccountSwitcher(): React.JSX.Element {
               Manage accounts
             </Link>
           </DropdownMenu.Item>
+          {appearance ? (
+            <>
+              <DropdownMenu.Separator className="-mx-1.5 my-1.5 h-px bg-line" />
+              <AppearanceMenuGroup
+                itemClassName={ITEM}
+                labelClassName={LABEL}
+                indicator={<Indicator />}
+              />
+            </>
+          ) : null}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

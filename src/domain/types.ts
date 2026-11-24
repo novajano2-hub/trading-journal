@@ -249,6 +249,8 @@ export type BreakevenRange =
 export type PnlBasis = 'net' | 'gross';
 /** The first day of a week: TradeZella's Sunday, or Monday. */
 export type WeekStart = 'sunday' | 'monday';
+/** Light, dark, or whichever the device prefers. */
+export type Appearance = 'system' | 'light' | 'dark';
 export type DisplayUnit =
   'dollar' | 'percent' | 'privacy' | 'r' | 'ticks' | 'pips' | 'points';
 export type CalendarStat =
@@ -279,4 +281,6 @@ export interface UserPrefs {
   calendarStats: CalendarStat[];
   instrumentsTraded: AssetClass[];
   settleExpiredOptions: boolean;
+  /** Light, dark, or the device's preference; undefined: System. */
+  appearance?: Appearance;
 }
