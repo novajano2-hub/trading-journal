@@ -698,6 +698,22 @@ describe('the summary strip, win/loss and running P&L', () => {
     expect(card.textContent).toMatch(/[-\u2212]\$10\.00/);
   });
 
+  test("on touch the Avg win/loss tip's 44px target overlaps its line, as the KPI labels' do, so the line does not grow (M3)", async () => {
+    renderApp(<TradesView />, { sample: mixed(), url: '/app/trades' });
+    const strip = await screen.findByRole('region', { name: 'Summary' });
+    const card = strip.querySelector(
+      '[data-kpi="profit-factor"]',
+    ) as HTMLElement;
+    const line = within(card).getByRole('button', {
+      name: 'Avg win/loss',
+    }).parentElement!;
+    const label = card.querySelector(
+      '[data-metric-tip="profit-factor"]',
+    )!.parentElement!;
+    expect(label.className).toContain('pointer-coarse:-my-3');
+    expect(line.className).toContain('pointer-coarse:-my-3');
+  });
+
   test('with no losing trade the ratio says None', async () => {
     renderApp(<TradesView />, { sample: sample(), url: '/app/trades' });
     const strip = await screen.findByRole('region', { name: 'Summary' });

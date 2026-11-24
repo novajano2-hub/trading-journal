@@ -155,7 +155,8 @@ export function SummaryStrip({
         // The sentence "won for every 1 lost" gives way: the card's room goes to the
         // average win to loss, which wraps to a second line holding both amounts.
         <>
-          <span className="block">
+          {/* On touch the tip's 44px target overlaps the line, as the labels' do, instead of growing it. */}
+          <span className="block pointer-coarse:-my-3">
             <MetricTip id="avg-win-loss" basis={basis}>
               Avg win/loss
             </MetricTip>{' '}
