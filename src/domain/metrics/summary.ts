@@ -326,27 +326,13 @@ export function rExpectancy(
   trades: readonly Trade[],
   ctx: MetricContext,
 ): { value: number | null; count: number } {
-  const decided = trades
-    .filter(isClosed)
-    .map((t) => ({ r: rOf(t, ctx.pnlBasis), o: classify(t, ctx).outcome }))
-    .filter(
-      (x): x is { r: number; o: 'win' | 'loss' } =>
-        x.r !== undefined && x.o !== 'breakeven',
-    );
-  if (decided.length === 0) return { value: null, count: 0 };
-  const mean = (o: 'win' | 'loss') => {
-    const rs = decided.filter((x) => x.o === o).map((x) => x.r);
-    return {
-      share: rs.length / decided.length,
-      avg: ratio(sum(rs), rs.length),
-    };
-  };
-  const w = mean('win');
-  const l = mean('loss');
-  return {
-    value: w.share * (w.avg ?? 0) + l.share * (l.avg ?? 0),
-    count: decided.length,
-  };
+  const count = trades.filter(
+    (t) =>
+      isClosed(t) &&
+      classify(t, ctx).outcome !== 'breakeven' &&
+      unitOf(t, 'r', ctx.pnlBasis) !== null,
+  ).length;
+  return { value: expectancyIn(trades, ctx, 'r'), count };
 }
 
 const MINUTE = 60_000;
