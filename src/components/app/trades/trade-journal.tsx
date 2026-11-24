@@ -5,7 +5,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Popover } from 'radix-ui';
 import { Plus, Star, X } from '@phosphor-icons/react/dist/ssr';
 import {
+  useDailyNote,
   useEnsureTradeNote,
+  useJournal,
   useJournalEntry,
   useSaveJournalEntry,
 } from '@/data/query/hooks';
@@ -16,6 +18,7 @@ import type {
   TagCategory,
   Trade,
 } from '@/domain/types';
+import { localDate } from '@/domain/time';
 import { NoteEditor, type NoteEditorHandle } from '../notes/note-editor';
 import { TagPicker } from '../tag-picker';
 
@@ -197,6 +200,22 @@ function CategoryRow({
   );
 }
 
+/** Where tags are made, renamed and recoloured. */
+export function ManageTagsLink({
+  className = '',
+}: {
+  className?: string;
+}): React.JSX.Element {
+  return (
+    <Link
+      href="/app/settings/tags"
+      className={`inline-block rounded-chip text-[13px] font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:py-3 ${className}`}
+    >
+      Manage tags
+    </Link>
+  );
+}
+
 /** The trade's tags, a row per category (name and colour). */
 export function TagRows({
   categories,
@@ -213,6 +232,7 @@ export function TagRows({
 }): React.JSX.Element {
   return (
     <div className="mt-1.5">
+      <ManageTagsLink className="mb-0.5" />
       {categories.map((c) => (
         <CategoryRow
           key={c.id}
@@ -297,19 +317,23 @@ type NoteStatus = 'idle' | 'saving' | 'saved' | 'failed';
 
 /** The editor and its autosave; mounts once the trade's note (if it has one) has loaded. */
 function NoteBody({
-  trade,
+  label,
+  placeholder,
   entry,
+  ensure,
   readOnly,
   handleRef,
   onStatus,
 }: {
-  trade: Trade;
+  label: string;
+  placeholder: string;
   entry: JournalEntry | null;
+  /** Makes (or finds) the entry the first change belongs to. */
+  ensure(): Promise<JournalEntry>;
   readOnly: boolean;
   handleRef?: { current: NoteEditorHandle | null };
   onStatus(s: NoteStatus): void;
 }): React.JSX.Element {
-  const ensure = useEnsureTradeNote();
   const save = useSaveJournalEntry();
   // The editor owns the text from here on: the stored body seeds it once.
   const [seed] = useState(entry?.body);
@@ -352,16 +376,16 @@ function NoteBody({
 
   return (
     <NoteEditor
-      label="Trade note"
+      label={label}
       value={seed}
       readOnly={readOnly}
       handleRef={handleRef}
-      placeholder="What did you see, and what would you do again? Type / for blocks"
+      placeholder={placeholder}
       onChange={(doc) => {
         latest.current = doc;
         onStatus('saving');
         // The first change makes the note; later ones reuse it.
-        note.current ??= ensure.mutateAsync(trade.id);
+        note.current ??= ensure();
         note.current.catch(() => {
           note.current = null;
         });
@@ -384,6 +408,7 @@ export function TradeNote({
   handleRef?: { current: NoteEditorHandle | null };
   onStatus(s: NoteStatus): void;
 }): React.JSX.Element {
+  const ensureNote = useEnsureTradeNote();
   const entryQuery = useJournalEntry(trade.noteId ?? '');
   const waiting = trade.noteId !== undefined && !entryQuery.isSuccess;
   // Once the body has mounted for this trade it stays: the first edit links a
@@ -401,8 +426,72 @@ export function TradeNote({
   return (
     <NoteBody
       key={trade.id}
-      trade={trade}
+      label="Trade note"
+      placeholder="What did you see, and what would you do again? Type / for blocks"
+      ensure={() => ensureNote.mutateAsync(trade.id)}
       entry={trade.noteId === undefined ? null : (entryQuery.data ?? null)}
+      readOnly={readOnly}
+      handleRef={handleRef}
+      onStatus={onStatus}
+    />
+  );
+}
+
+/** The day note's date: the trade's last exit (its open date while it is open), on the account's clock. */
+export function dayNoteDate(trade: Trade, timeZone: string): string {
+  return localDate(trade.closedAt ?? trade.openedAt, timeZone);
+}
+
+/** The daily entry for a date, if the day has one that is not in Trash. */
+export function findDailyEntry(
+  entries: readonly JournalEntry[] | undefined,
+  date: string,
+): JournalEntry | undefined {
+  return entries?.find(
+    (e) =>
+      e.kind === 'daily-review' && e.date === date && e.deletedAt === undefined,
+  );
+}
+
+/**
+ * The day note: the same editor and autosave, bound to the daily entry of the
+ * trade's day. The entry is made on the first change (as the Notebook makes
+ * it), never by looking. One editor per date.
+ */
+export function DayNote({
+  date,
+  readOnly,
+  handleRef,
+  onStatus,
+}: {
+  date: string;
+  readOnly: boolean;
+  handleRef?: { current: NoteEditorHandle | null };
+  onStatus(s: NoteStatus): void;
+}): React.JSX.Element {
+  const journal = useJournal();
+  const daily = useDailyNote();
+  const entry = findDailyEntry(journal.data, date);
+  // As in TradeNote: once mounted for this date the editor stays, even though
+  // the first change adds the entry to the journal.
+  const [mountedFor, setMountedFor] = useState<string | null>(null);
+  const waiting = !journal.isSuccess;
+  if (!waiting && mountedFor !== date) setMountedFor(date);
+  if (waiting && mountedFor !== date)
+    return (
+      <div
+        role="status"
+        aria-label="Loading the day note"
+        className="mt-3 h-[120px] rounded-control bg-sunken"
+      />
+    );
+  return (
+    <NoteBody
+      key={date}
+      label="Daily note"
+      placeholder="How did the day go? Type / for blocks"
+      ensure={() => daily.mutateAsync(date)}
+      entry={entry ?? null}
       readOnly={readOnly}
       handleRef={handleRef}
       onStatus={onStatus}

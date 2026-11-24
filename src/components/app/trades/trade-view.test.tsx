@@ -606,3 +606,191 @@ test('at phone width Net, ROI and R share one row of three, and the crumb replac
   const back = screen.getByRole('link', { name: /Back to trades/ });
   expect(back.className).toContain('max-sm:hidden');
 });
+
+/** The Execution card's unit rows: label then value, as the card prints them. */
+function execText(): string {
+  return screen.getByRole('region', { name: 'Execution' }).textContent ?? '';
+}
+
+test('a futures trade shows points, ticks, contracts and cost basis', async () => {
+  renderApp(<TradeView id="t-c" />, { sample: sample(), url: URL_C });
+  await screen.findByRole('region', { name: 'Execution' });
+  const text = execText();
+  // 3.75 points on 6 contracts closed: 15 ticks each.
+  expect(text).toContain('Points+22.5 pts');
+  expect(text).toContain('Ticks+90.0 ticks');
+  expect(text).toContain('Contracts6');
+  // 6309.75 x 6 x 50.
+  expect(text).toContain('Cost basis$1,892,925.00');
+  expect(text).not.toContain('Pips');
+  expect(text).not.toContain('Money per pip');
+});
+
+test('a forex trade shows pips, money per pip and cost basis, and no futures rows', async () => {
+  renderApp(<TradeView id="t-c" />, {
+    sample: sample({
+      instrument: resolveInstrument('EURUSD')!,
+      avgEntry: 1.1,
+      avgExit: 1.1025,
+      maxPosition: 1,
+      gross: 5000,
+      executions: [],
+    }),
+    url: URL_C,
+  });
+  await screen.findByRole('region', { name: 'Execution' });
+  const text = execText();
+  expect(text).toContain('Pips+25.0 pips');
+  expect(text).toContain('Money per pip$2.00');
+  expect(text).toContain('Cost basis');
+  expect(text).not.toContain('Points');
+  expect(text).not.toContain('Ticks');
+  expect(text).not.toContain('Contracts');
+});
+
+test('money per pip reads None when the move is zero pips', async () => {
+  renderApp(<TradeView id="t-c" />, {
+    sample: sample({
+      instrument: resolveInstrument('EURUSD')!,
+      avgEntry: 1.1,
+      avgExit: 1.1,
+      maxPosition: 1,
+      gross: 0,
+      executions: [],
+    }),
+    url: URL_C,
+  });
+  await screen.findByRole('region', { name: 'Execution' });
+  expect(execText()).toContain('Money per pipNone');
+});
+
+test('a stock trade shows only the cost basis', async () => {
+  renderApp(<TradeView id="t-c" />, {
+    sample: sample({
+      instrument: resolveInstrument('AAPL')!,
+      avgEntry: 200,
+      avgExit: 210,
+      maxPosition: 10,
+      executions: [],
+    }),
+    url: URL_C,
+  });
+  await screen.findByRole('region', { name: 'Execution' });
+  const text = execText();
+  expect(text).toContain('Cost basis$2,000.00');
+  for (const gone of ['Points', 'Ticks', 'Contracts', 'Pips', 'Money per pip'])
+    expect(text).not.toContain(gone);
+});
+
+test('the cost basis is hidden under Privacy', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: sample(),
+  });
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<TradeView id="t-c" />, { repository, url: URL_C });
+  await screen.findByRole('region', { name: 'Execution' });
+  expect(execText()).toContain('Cost basis$•••');
+  expect(execText()).not.toContain('1,892,925');
+});
+
+test('the notes card switches between the trade note and the day note, and links to the day in the Notebook', async () => {
+  renderApp(<TradeView id="t-c" />, { sample: sample(), url: URL_C });
+  await screen.findByRole('textbox', { name: 'Trade note' });
+  expect(screen.queryByRole('textbox', { name: 'Daily note' })).toBeNull();
+  fireEvent.click(screen.getByRole('radio', { name: 'Daily note' }));
+  await screen.findByRole('textbox', { name: 'Daily note' });
+  expect(screen.queryByRole('textbox', { name: 'Trade note' })).toBeNull();
+  // No entry yet: the link opens the day, which the Notebook makes.
+  expect(
+    screen
+      .getByRole('link', { name: 'Open in the Notebook' })
+      .getAttribute('href'),
+  ).toBe('/app/notebook/daily/2026-11-09');
+  fireEvent.click(screen.getByRole('radio', { name: 'Trade note' }));
+  await screen.findByRole('textbox', { name: 'Trade note' });
+});
+
+test('editing the day note creates the daily entry for the exit date once, and the link then opens it', async () => {
+  const handle: { current: NoteEditorHandle | null } = { current: null };
+  const { repo } = renderApp(<TradeView id="t-c" noteHandleRef={handle} />, {
+    sample: sample(),
+    url: URL_C,
+  });
+  await screen.findByRole('textbox', { name: 'Trade note' });
+  fireEvent.click(screen.getByRole('radio', { name: 'Daily note' }));
+  await screen.findByRole('textbox', { name: 'Daily note' });
+  await waitFor(() => expect(handle.current).not.toBeNull());
+  // Looking creates nothing.
+  expect(
+    (await repo.journal.list(WS)).filter((e) => e.kind === 'daily-review'),
+  ).toHaveLength(0);
+  act(() => handle.current!.runSlashCommand('Checklist'));
+  await waitFor(
+    async () => {
+      const days = (await repo.journal.list(WS)).filter(
+        (e) => e.kind === 'daily-review' && e.date === '2026-11-09',
+      );
+      expect(days).toHaveLength(1);
+      expect(JSON.stringify(days[0]!.body)).toContain('taskList');
+    },
+    { timeout: 3000 },
+  );
+  // The trade's own note is untouched.
+  expect((await repo.trades.get(WS, 't-c'))?.noteId).toBeUndefined();
+  await screen.findByText('Saved', undefined, { timeout: 3000 });
+  const day = (await repo.journal.list(WS)).find(
+    (e) => e.kind === 'daily-review' && e.date === '2026-11-09',
+  )!;
+  await waitFor(() =>
+    expect(
+      screen
+        .getByRole('link', { name: 'Open in the Notebook' })
+        .getAttribute('href'),
+    ).toBe(`/app/notebook/${encodeURIComponent(day.id)}`),
+  );
+});
+
+test('a still-open trade takes the day note of its open date', async () => {
+  renderApp(<TradeView id="t-c" />, {
+    sample: sample({
+      status: 'open',
+      closedAt: undefined,
+      avgExit: undefined,
+    }),
+    url: URL_C,
+  });
+  await screen.findByRole('textbox', { name: 'Trade note' });
+  fireEvent.click(screen.getByRole('radio', { name: 'Daily note' }));
+  expect(
+    (
+      await screen.findByRole('link', { name: 'Open in the Notebook' })
+    ).getAttribute('href'),
+  ).toBe('/app/notebook/daily/2026-11-09');
+});
+
+test('an archived account shows the day note read-only', async () => {
+  renderApp(<TradeView id="t-c" />, {
+    sample: sample({}, 'acc-b'),
+    url: '/app/trades/t-c',
+  });
+  await screen.findByText(
+    'This account is archived. Its trades are read-only.',
+  );
+  fireEvent.click(screen.getByRole('radio', { name: 'Daily note' }));
+  await screen.findByRole('textbox', { name: 'Daily note' });
+  expect(screen.queryByRole('toolbar', { name: 'Formatting' })).toBeNull();
+});
+
+test('the tags card links to Settings > Tags, and so does the picker', async () => {
+  renderApp(<TradeView id="t-c" />, { sample: sample(), url: URL_C });
+  const links = await screen.findAllByRole('link', { name: 'Manage tags' });
+  expect(links[0]!.getAttribute('href')).toBe('/app/settings/tags');
+  fireEvent.click(screen.getByRole('button', { name: 'Add to Setups' }));
+  await waitFor(() =>
+    expect(screen.getAllByRole('link', { name: 'Manage tags' })).toHaveLength(
+      2,
+    ),
+  );
+});

@@ -2,6 +2,7 @@
 
 import { useId, useMemo, useRef, useState } from 'react';
 import { Check, Plus, X } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { useCreateTag, useTagCategories, useTags } from '@/data/query/hooks';
 import type { Tag, TagCategory } from '@/domain/types';
 
@@ -38,6 +39,7 @@ export function TagPicker({
   allowCreate = true,
   label,
   autoFocus = false,
+  manageLink = true,
 }: {
   selected: string[];
   onChange(ids: string[]): void;
@@ -45,6 +47,8 @@ export function TagPicker({
   allowCreate?: boolean;
   label: string;
   autoFocus?: boolean;
+  /** A "Manage tags" link to Settings > Tags below the list. */
+  manageLink?: boolean;
 }): React.JSX.Element {
   const allTags = useTags().data;
   const allCategories = useTagCategories().data;
@@ -286,6 +290,14 @@ export function TagPicker({
           <p className="px-2 py-3 text-[13px] text-faint">No tags match.</p>
         ) : null}
       </div>
+      {manageLink ? (
+        <Link
+          href="/app/settings/tags"
+          className="self-start rounded-chip px-2 text-[13px] font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:py-3"
+        >
+          Manage tags
+        </Link>
+      ) : null}
       {failed ? (
         <p role="alert" className="text-[13px] text-loss">
           Couldn&apos;t create that tag. Try again.

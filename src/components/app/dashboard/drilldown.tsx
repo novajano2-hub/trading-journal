@@ -370,6 +370,7 @@ function TagMissing({
           className="z-[60] w-[280px] max-w-[calc(100vw-24px)] origin-(--radix-popover-content-transform-origin) rounded-[12px] border border-line bg-surface-1 p-3 text-text shadow-[var(--shadow)] outline-none motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in"
         >
           <TagPicker
+            manageLink={false}
             label="Mistakes"
             autoFocus
             categories={categories}

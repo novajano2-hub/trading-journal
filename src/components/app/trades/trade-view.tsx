@@ -22,6 +22,7 @@ import { FigureText } from '@/components/product/figure-text';
 import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { Chip, SideChip } from '@/components/ui/chip';
+import { Segmented } from '@/components/ui/segmented';
 import { IconTile } from '@/components/ui/icon-tile';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { MetricId } from '@/content/metric-definitions';
@@ -29,6 +30,7 @@ import { metricContextOf } from '@/data/metrics';
 import { useGlobalFilters, useTradeSet } from '@/data/query/derived';
 import {
   useAccounts,
+  useJournal,
   usePrefs,
   useRemoveTrades,
   useStrategies,
@@ -44,14 +46,25 @@ import {
   withTagPick,
   type TradePatch,
 } from '@/data/trade-patch';
-import { plannedR, riskFromStop, rOf } from '@/domain/metrics/summary';
+import { costBasis, type MetricContext } from '@/domain/metrics/context';
+import {
+  plannedR,
+  riskFromStop,
+  rOf,
+  tradeVolume,
+} from '@/domain/metrics/summary';
 import {
   strategyRules,
   type Execution,
   type PnlBasis,
   type Trade,
 } from '@/domain/types';
-import { formatUnitValue, useDisplay, type Display } from '@/lib/display';
+import {
+  formatUnitValue,
+  tradeFigure,
+  useDisplay,
+  type Display,
+} from '@/lib/display';
 import { formatDuration, formatInstrument, plural } from '@/lib/format';
 import { CARD, CardHeader, InstrumentName } from '../dashboard/shared';
 import { ConfirmDialog } from '../confirm-dialog';
@@ -60,7 +73,15 @@ import { price, qty } from './columns';
 import { FillsTimeline, positions, sortedFills } from './fills-timeline';
 import { RuleChecklist } from './rule-checklist';
 import { clock, clockOnDay, dayLabel } from './trade-time';
-import { RatingRow, StrategyPicker, TagRows, TradeNote } from './trade-journal';
+import {
+  DayNote,
+  dayNoteDate,
+  findDailyEntry,
+  RatingRow,
+  StrategyPicker,
+  TagRows,
+  TradeNote,
+} from './trade-journal';
 
 const PAD = 'px-5 pt-[18px] pb-4';
 
@@ -233,12 +254,14 @@ function Stats({
   trade,
   display,
   basis,
+  ctx,
   readOnly,
   save,
 }: {
   trade: Trade;
   display: Display;
   basis: 'net' | 'gross';
+  ctx: MetricContext;
   readOnly: boolean;
   save: Save;
 }): React.JSX.Element {
@@ -276,6 +299,70 @@ function Stats({
       : Math.abs(trade.plannedTarget - trade.avgEntry);
   const per = future ? 'points' : `per ${noun(trade, 1)}`;
   const held = heldMs(trade);
+
+  // The unit rows: the same functions every report reads, so the page agrees
+  // with them. A row the asset class lacks is absent.
+  const fig = tradeFigure(trade, ctx);
+  const forex = trade.instrument.assetClass === 'forex';
+  const unitRows: React.ReactNode[] = [];
+  if (future) {
+    const units = (key: 'points' | 'ticks', label: string) => {
+      const v = fig[key];
+      return (
+        <Stat
+          key={key}
+          label={label}
+          tone={v === null || v === undefined ? '' : tone(v)}
+        >
+          {v === null || v === undefined ? (
+            <span className="text-[14px] font-normal text-faint">None</span>
+          ) : (
+            formatUnitValue(key, v, { currency: cur, signed: true })
+          )}
+        </Stat>
+      );
+    };
+    unitRows.push(
+      units('points', 'Points'),
+      units('ticks', 'Ticks'),
+      <Stat key="contracts" label="Contracts">
+        {qty(tradeVolume(trade))}
+      </Stat>,
+    );
+  }
+  if (forex) {
+    const pips = fig.pips ?? null;
+    const perPip =
+      pips === null || pips === 0 ? undefined : Math.round(trade.gross / pips);
+    unitRows.push(
+      <Stat
+        key="pips"
+        label="Pips"
+        tone={pips === null ? '' : tone(pips)}
+        sub="per lot"
+      >
+        {pips === null ? (
+          <span className="text-[14px] font-normal text-faint">None</span>
+        ) : (
+          formatUnitValue('pips', pips, { currency: cur, signed: true })
+        )}
+      </Stat>,
+      <Stat key="per-pip" label="Money per pip" sub="gross P&L over pips">
+        {perPip === undefined ? (
+          <span className="text-[14px] font-normal text-faint">None</span>
+        ) : (
+          cash(perPip, false)
+        )}
+      </Stat>,
+    );
+  }
+  unitRows.push(
+    <Stat key="basis" label="Cost basis" sub="entry price x size">
+      {cash(costBasis(trade), false)}
+    </Stat>,
+  );
+  // Whole rows only, so the hairlines between cells never show an empty one.
+  const fillers = (4 - (unitRows.length % 4)) % 4;
 
   return (
     <div className="mt-3.5 grid grid-cols-2 gap-px border-t border-line bg-line sm:grid-cols-4 [&>div]:border-0">
@@ -449,6 +536,10 @@ function Stats({
           cash(trade.mfe)
         )}
       </Stat>
+      {unitRows}
+      {Array.from({ length: fillers }, (_, i) => (
+        <div key={`fill-${i}`} aria-hidden="true" className="bg-surface-1" />
+      ))}
     </div>
   );
 }
@@ -619,16 +710,25 @@ function Neighbour({
 
 function NoteCard({
   trade,
+  timeZone,
   readOnly,
   handleRef,
 }: {
   trade: Trade;
+  timeZone: string;
   readOnly: boolean;
   handleRef?: { current: NoteEditorHandle | null };
 }): React.JSX.Element {
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'failed'>(
     'idle',
   );
+  const [which, setWhich] = useState<'trade' | 'day'>('trade');
+  const date = dayNoteDate(trade, timeZone);
+  const day = findDailyEntry(useJournal().data, date);
+  const switchTo = (next: 'trade' | 'day') => {
+    setWhich(next);
+    setStatus('idle');
+  };
   return (
     <section aria-labelledby="note-h" className={`${CARD} ${PAD}`}>
       <CardHeader
@@ -651,13 +751,52 @@ function NoteCard({
           </span>
         }
       />
-      <TradeNote
-        key={trade.id}
-        trade={trade}
-        readOnly={readOnly}
-        handleRef={handleRef}
-        onStatus={setStatus}
-      />
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <Segmented<'trade' | 'day'>
+          label="Note"
+          coarseTargets
+          value={which}
+          options={[
+            { value: 'trade', label: 'Trade note' },
+            { value: 'day', label: 'Daily note' },
+          ]}
+          onChange={switchTo}
+        />
+        {which === 'day' ? (
+          <span className="flex items-center gap-3 text-[12.5px] text-faint">
+            <span className="tabular-nums">
+              {dayLabel(`${date}T12:00:00Z`, 'UTC')}
+            </span>
+            <Link
+              href={
+                day
+                  ? `/app/notebook/${encodeURIComponent(day.id)}`
+                  : `/app/notebook/daily/${date}`
+              }
+              className="rounded-chip text-[13px] font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:py-3"
+            >
+              Open in the Notebook
+            </Link>
+          </span>
+        ) : null}
+      </div>
+      {which === 'trade' ? (
+        <TradeNote
+          key={trade.id}
+          trade={trade}
+          readOnly={readOnly}
+          handleRef={handleRef}
+          onStatus={setStatus}
+        />
+      ) : (
+        <DayNote
+          key={date}
+          date={date}
+          readOnly={readOnly}
+          handleRef={handleRef}
+          onStatus={setStatus}
+        />
+      )}
     </section>
   );
 }
@@ -953,6 +1092,7 @@ function TradePage({
               trade={trade}
               display={display}
               basis={basis}
+              ctx={ctx}
               readOnly={readOnly}
               save={save}
             />
@@ -1037,6 +1177,7 @@ function TradePage({
 
           <NoteCard
             trade={trade}
+            timeZone={timeZone}
             readOnly={readOnly}
             handleRef={noteHandleRef}
           />
