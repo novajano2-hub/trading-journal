@@ -16,7 +16,7 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
-import { IconTile } from '@/components/ui/icon-tile';
+import { StateGlyph } from '@/components/ui/state-glyph';
 import {
   useDailyNote,
   useFolders,
@@ -275,7 +275,7 @@ export function NotebookView(): React.JSX.Element {
     return (
       <StateBlock
         role="alert"
-        visual={<IconTile icon={Warning} />}
+        visual={<StateGlyph icon={Warning} />}
         title={
           error instanceof StorageUnavailableError
             ? "Keel can't open storage in this browser, so your notes can't load."
@@ -414,7 +414,7 @@ export function NotebookView(): React.JSX.Element {
   if (selection.type === 'none')
     pane = (
       <StateBlock
-        visual={<IconTile icon={NotePencil} />}
+        visual={<StateGlyph icon={NotePencil} />}
         title="Pick a note to read it."
         body="Or start one from New: a daily note, a pre-market plan, a weekly recap or a plain note."
       />
@@ -430,7 +430,7 @@ export function NotebookView(): React.JSX.Element {
       />
     ) : (
       <StateBlock
-        visual={<IconTile icon={CalendarX} />}
+        visual={<StateGlyph icon={CalendarX} />}
         title="That day does not exist."
         body="Daily notes are named by a date like 2026-11-19."
         actions={
@@ -444,7 +444,7 @@ export function NotebookView(): React.JSX.Element {
   else
     pane = (
       <StateBlock
-        visual={<IconTile icon={NotePencil} />}
+        visual={<StateGlyph icon={NotePencil} />}
         title="That note isn't here."
         body="It may have been deleted for good, or it belongs to another workspace."
         actions={

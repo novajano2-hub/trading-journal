@@ -1,6 +1,5 @@
 'use client';
 
-import { User } from '@phosphor-icons/react/dist/ssr';
 import { useId, useState } from 'react';
 import { CARD, CardHeader } from '@/components/app/dashboard/shared';
 import { TimeZoneField } from '@/components/app/import/time-zone-field';
@@ -88,12 +87,7 @@ export function ProfileSettings(): React.JSX.Element {
       aria-labelledby="profile-heading"
       className={`${CARD} px-5 pt-[18px] pb-6`}
     >
-      <CardHeader
-        icon={User}
-        tone="accent"
-        headingId="profile-heading"
-        title="Profile"
-      />
+      <CardHeader headingId="profile-heading" title="Profile" />
       <div className="mt-5 grid max-w-[460px] gap-5">
         <div>
           <label htmlFor={nameId} className={LABEL}>

@@ -1,9 +1,7 @@
 'use client';
 
-import { ArrowDown, ArrowUp } from '@phosphor-icons/react/dist/ssr';
 import { useMemo, type ReactNode } from 'react';
 import { FigureText } from '@/components/product/figure-text';
-import { IconTile } from '@/components/ui/icon-tile';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { MetricId } from '@/content/metric-definitions';
 import { winsVsLosses, type WinLossSide } from '@/domain/metrics/breakdowns';
@@ -69,11 +67,7 @@ function Side({
       aria-label={name}
       className={`${CARD} ${CARD_PAD} flex min-w-0 flex-col`}
     >
-      <div className="flex min-h-7 items-center gap-2.5">
-        <IconTile
-          icon={win ? ArrowUp : ArrowDown}
-          tone={win ? 'gain' : 'loss'}
-        />
+      <div className="flex min-h-7 items-center">
         <h2 className="text-[15px] leading-snug font-semibold tracking-[-0.015em] text-text">
           {name}
         </h2>

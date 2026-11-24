@@ -1,6 +1,5 @@
 'use client';
 
-import { CalendarDots } from '@phosphor-icons/react/dist/ssr';
 import { plural } from '@/lib/format';
 import { signTone } from '../dashboard/shared';
 import { periodText } from './report-chart';
@@ -16,7 +15,7 @@ export function OverviewMonths({
   const m = data.partition.months;
   const money = useDayValue(data);
   return (
-    <StatCard group="months" title="Months" icon={CalendarDots}>
+    <StatCard group="months" title="Months">
       <Stat
         id="best-month"
         data={data}

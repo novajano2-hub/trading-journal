@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  ArrowsLeftRight,
-  ChartBar,
-  DownloadSimple,
-  ListNumbers,
-  Table,
-} from '@phosphor-icons/react/dist/ssr';
+import { DownloadSimple } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useId, useMemo, type ReactNode } from 'react';
@@ -856,8 +850,6 @@ export function BreakdownCards({
       <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
         <section aria-labelledby={chartId} className={`${CARD} ${CARD_PAD}`}>
           <CardHeader
-            icon={ChartBar}
-            tone="accent"
             headingId={chartId}
             title={chartTitle ?? title}
             after={
@@ -897,8 +889,6 @@ export function BreakdownCards({
 
         <section aria-labelledby={rankId} className={`${CARD} ${CARD_PAD}`}>
           <CardHeader
-            icon={ListNumbers}
-            tone="neutral"
             headingId={rankId}
             title="Best and worst"
             end={
@@ -990,8 +980,6 @@ export function BreakdownCards({
         className={`${CARD} ${CARD_PAD} min-w-0`}
       >
         <CardHeader
-          icon={cross ? ArrowsLeftRight : Table}
-          tone="neutral"
           headingId={tableId}
           title={cross ? `${rowTitle} by ${cross.label.toLowerCase()}` : title}
           after={

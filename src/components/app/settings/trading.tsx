@@ -1,6 +1,5 @@
 'use client';
 
-import { SlidersHorizontal } from '@phosphor-icons/react/dist/ssr';
 import { useId, useState } from 'react';
 import { CARD, CardHeader } from '@/components/app/dashboard/shared';
 import { HELP, INPUT, LABEL } from '@/components/app/import/styles';
@@ -218,12 +217,7 @@ export function TradingSettings(): React.JSX.Element {
       aria-labelledby="trading-heading"
       className={`${CARD} px-5 pt-[18px] pb-6`}
     >
-      <CardHeader
-        icon={SlidersHorizontal}
-        tone="accent"
-        headingId="trading-heading"
-        title="Trading"
-      />
+      <CardHeader headingId="trading-heading" title="Trading" />
       <div className="mt-5 grid max-w-[560px] gap-7">
         <fieldset>
           <legend className="text-[14px] font-medium text-text">

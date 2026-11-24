@@ -1,11 +1,6 @@
 'use client';
 
-import {
-  CurrencyDollar,
-  PencilSimple,
-  Plus,
-  Trash,
-} from '@phosphor-icons/react/dist/ssr';
+import { PencilSimple, Plus, Trash } from '@phosphor-icons/react/dist/ssr';
 import { useId, useState, type Ref } from 'react';
 import { ConfirmDialog } from '@/components/app/confirm-dialog';
 import { CARD, CardHeader } from '@/components/app/dashboard/shared';
@@ -243,8 +238,6 @@ export function BalanceAdjustments({
     >
       <CardHeader
         className="px-5"
-        icon={CurrencyDollar}
-        tone="accent"
         headingId="adjustments-heading"
         title="Balance adjustments"
         after={

@@ -1,17 +1,11 @@
 'use client';
 
-import {
-  CalendarBlank,
-  Info,
-  ListBullets,
-  NotePencil,
-} from '@phosphor-icons/react/dist/ssr';
+import { Info, ListBullets, NotePencil } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { useId } from 'react';
 import { FigureText } from '@/components/product/figure-text';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { Chip, SideChip } from '@/components/ui/chip';
-import { IconTile } from '@/components/ui/icon-tile';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { CalendarDay, DayExit, DayGrading } from '@/data/calendar';
 import { serializeFilters, type GlobalFilters } from '@/data/filters';
@@ -235,8 +229,7 @@ export function DayPanel({
   );
   return (
     <div className="flex min-h-0 flex-col">
-      <div className={`flex items-center gap-2.5 ${inSheet ? 'pr-11' : ''}`}>
-        <IconTile icon={CalendarBlank} tone="accent" />
+      <div className={`flex min-h-7 items-center ${inSheet ? 'pr-11' : ''}`}>
         <h2
           id={headingId}
           // The sheet opens with focus here, not on its close button.
@@ -360,12 +353,7 @@ export function DayPanel({
           href={`/app/notebook/daily/${date}`}
           className={`${buttonClasses('secondary', 'sm')} min-w-fit flex-1 px-2.5! whitespace-nowrap`}
         >
-          <NotePencil
-            aria-hidden="true"
-            size={16}
-            weight="duotone"
-            className="shrink-0"
-          />
+          <NotePencil aria-hidden="true" size={16} className="shrink-0" />
           Open daily note
         </Link>
         <Link

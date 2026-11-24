@@ -1,6 +1,5 @@
 'use client';
 
-import { Timer } from '@phosphor-icons/react/dist/ssr';
 import { formatDuration } from '@/lib/format';
 import { Stat, StatCard } from './overview-stat';
 import type { ReportData } from './use-report-data';
@@ -16,7 +15,7 @@ export function OverviewHold({
 }): React.JSX.Element {
   const h = data.partition.holds;
   return (
-    <StatCard group="hold" title="Hold time" icon={Timer}>
+    <StatCard group="hold" title="Hold time">
       <Stat id="hold-time" data={data}>
         {text(h.all)}
       </Stat>

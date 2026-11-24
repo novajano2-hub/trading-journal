@@ -1,6 +1,6 @@
 'use client';
 
-import { MagnifyingGlass, Plus, Tag } from '@phosphor-icons/react/dist/ssr';
+import { MagnifyingGlass, Plus } from '@phosphor-icons/react/dist/ssr';
 import { useId, useMemo, useState } from 'react';
 import { ConfirmDialog } from '@/components/app/confirm-dialog';
 import { CARD, CardHeader } from '@/components/app/dashboard/shared';
@@ -442,8 +442,6 @@ export function TagsSettings(): React.JSX.Element {
     >
       <CardHeader
         className="px-5"
-        icon={Tag}
-        tone="accent"
         headingId="tags-heading"
         title="Tags"
         end={

@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Rows, Warning } from '@phosphor-icons/react/dist/ssr';
+import { Check, Warning } from '@phosphor-icons/react/dist/ssr';
 import { useMemo, useState } from 'react';
 import {
   CARD,
@@ -354,12 +354,7 @@ function Blocked({
         className={`${CARD} ${CARD_PAD}`}
         aria-labelledby="import-blocked"
       >
-        <CardHeader
-          icon={Warning}
-          tone="warn"
-          headingId="import-blocked"
-          title={head}
-        />
+        <CardHeader headingId="import-blocked" title={head} />
         <p className="mt-2.5 text-[14px] leading-normal text-muted">{body}</p>
         {pricing.length > 0 && unknown.length > 0 ? (
           <p className="mt-2 text-[14px] leading-normal text-muted">
@@ -433,8 +428,6 @@ function IssuesCard({
   return (
     <section className={`${CARD} ${CARD_PAD}`} aria-labelledby="import-issues">
       <CardHeader
-        icon={Warning}
-        tone="neutral"
         headingId="import-issues"
         title="Skipped rows"
         end={
@@ -528,8 +521,6 @@ function TradesCard({
     >
       <CardHeader
         className="px-5"
-        icon={Rows}
-        tone="accent"
         headingId="import-trades"
         title="Trades Keel built"
         end={
@@ -747,8 +738,8 @@ function TradeRows({
                   />
                 </span>
               ) : filePnl !== undefined && !open ? (
-                <span className="inline-grid size-5 place-items-center rounded-full bg-accent-soft text-accent">
-                  <Check {...ICON} size={12} weight="bold" />
+                <span className="inline-flex text-muted">
+                  <Check {...ICON} size={14} />
                   <span className="sr-only">Matches the file</span>
                 </span>
               ) : (

@@ -1,6 +1,5 @@
 'use client';
 
-import { CalendarBlank } from '@phosphor-icons/react/dist/ssr';
 import { dayValue } from '@/domain/metrics/days';
 import { calendarHref } from '@/data/report-links';
 import { formatPct, formatQty, plural } from '@/lib/format';
@@ -30,7 +29,7 @@ export function OverviewDayFigures({
   // With several currencies the calendar opens on the one this page reads.
   const cur = data.currencies.length > 1 ? data.currency : undefined;
   return (
-    <StatCard group="day-figures" title="Day figures" icon={CalendarBlank}>
+    <StatCard group="day-figures" title="Day figures">
       <Stat
         id="avg-daily-pnl"
         data={data}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { Check, Target } from '@phosphor-icons/react/dist/ssr';
+import { Check } from '@phosphor-icons/react/dist/ssr';
 import { Chip } from '@/components/ui/chip';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { DashboardModel } from '@/data/dashboard';
@@ -317,8 +317,6 @@ export function GoalsCard({
       className={`${CARD} ${CARD_PAD} flex h-full flex-col`}
     >
       <CardHeader
-        icon={Target}
-        tone="info"
         headingId={headingId}
         title="Goals"
         className="mb-3"

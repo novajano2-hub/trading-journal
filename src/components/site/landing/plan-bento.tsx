@@ -1,15 +1,8 @@
 import type { ReactNode } from 'react';
-import type { Icon } from '@phosphor-icons/react';
-import {
-  ListChecks,
-  Notebook,
-  ShieldCheck,
-} from '@phosphor-icons/react/dist/ssr';
 import { CostBand, PLAN_SURFACE } from '@/components/product/plan-surface';
 import { TickRuleList } from '@/components/site/landing/tick-rule-list';
 import { Pill } from '@/components/site/pill';
 import { Chip } from '@/components/ui/chip';
-import { IconTile, type TileTone } from '@/components/ui/icon-tile';
 import { mistakeTags } from '@/domain/metrics/mistakes';
 import { formatMoney, formatPct, formatPnl } from '@/lib/format';
 import type { SampleView } from '@/lib/landing/sample-view';
@@ -34,36 +27,25 @@ const INNER = 'mt-[22px] border-t border-line';
 const STAT = 'flex items-baseline justify-between gap-4 py-3 text-sm';
 
 function CellHead({
-  icon,
-  tone,
   title,
   meta,
-  onAccent = false,
   children,
 }: {
-  icon: Icon;
-  tone: TileTone;
   title: string;
   meta?: string;
-  onAccent?: boolean;
   children: ReactNode;
 }) {
   return (
     <div>
       <div className="flex items-center gap-2.5">
-        <IconTile icon={icon} tone={tone} />
         <h3 className="text-xl font-semibold tracking-[-0.02em]">{title}</h3>
         {meta ? (
-          <span
-            className={`ml-auto shrink-0 pl-2 text-xs ${onAccent ? 'text-on-accent-muted' : 'text-faint'}`}
-          >
+          <span className="ml-auto shrink-0 pl-2 text-xs text-faint">
             {meta}
           </span>
         ) : null}
       </div>
-      <p
-        className={`mt-2.5 max-w-[44ch] text-[14.5px] leading-[1.55] ${onAccent ? 'text-on-accent-muted' : 'text-muted'}`}
-      >
+      <p className="mt-2.5 max-w-[44ch] text-[14.5px] leading-[1.55] text-muted">
         {children}
       </p>
     </div>
@@ -98,13 +80,7 @@ export function PlanBento({ view }: { view: SampleView }) {
       <SectionHeading id="plan-title" title="Hold yourself to your own plan." />
       <div className="mt-12 grid gap-4 lg:grid-cols-12">
         <div data-testid="bento-cell" className={`${PLAN_CELL} lg:col-span-7`}>
-          <CellHead
-            icon={ListChecks}
-            tone="on-accent"
-            title="Rules, graded on every trade"
-            meta="Sample data"
-            onAccent
-          >
+          <CellHead title="Rules, graded on every trade" meta="Sample data">
             Write a strategy once. Each trade is checked against it, and the
             misses add up where you can see them.
           </CellHead>
@@ -113,7 +89,7 @@ export function PlanBento({ view }: { view: SampleView }) {
               <TickRuleList
                 rules={rules}
                 label={`Rules for trade ${ruled.serial}`}
-                onAccent
+                bare
               />
             </TickIn>
           </div>
@@ -124,12 +100,7 @@ export function PlanBento({ view }: { view: SampleView }) {
         </div>
 
         <div data-testid="bento-cell" className={`${CARD_CELL} lg:col-span-5`}>
-          <CellHead
-            icon={ShieldCheck}
-            tone="info"
-            title="Prop rules after every trade"
-            meta="Sample data"
-          >
+          <CellHead title="Prop rules after every trade" meta="Sample data">
             Static, end-of-day or trailing drawdown, daily loss and consistency,
             as your firm wrote them.
           </CellHead>
@@ -170,11 +141,7 @@ export function PlanBento({ view }: { view: SampleView }) {
           data-testid="bento-cell"
           className={`${CARD_CELL} grid items-center gap-8 lg:col-span-12 lg:grid-cols-[minmax(0,4fr)_minmax(0,7fr)] lg:gap-10`}
         >
-          <CellHead
-            icon={Notebook}
-            tone="neutral"
-            title="A notebook beside the trades"
-          >
+          <CellHead title="A notebook beside the trades">
             Plan before the open, review after the close. Each entry links to
             the trades it covers.
           </CellHead>

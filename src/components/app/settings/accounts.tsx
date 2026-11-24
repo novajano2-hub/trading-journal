@@ -1,6 +1,6 @@
 'use client';
 
-import { Bank, CheckCircle, Lock, Plus } from '@phosphor-icons/react/dist/ssr';
+import { CheckCircle, Lock, Plus } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useRef, useState } from 'react';
@@ -263,8 +263,6 @@ export function AccountsSettings(): React.JSX.Element {
       >
         <CardHeader
           className="px-5"
-          icon={Bank}
-          tone="accent"
           headingId="accounts-heading"
           title="Accounts"
           after={
@@ -355,9 +353,7 @@ export function AccountsSettings(): React.JSX.Element {
                       <Chip
                         className={a.id === selected?.id ? SELECTED_PILL : ''}
                       >
-                        {gone ? (
-                          <Lock size={13} weight="duotone" aria-hidden="true" />
-                        ) : null}
+                        {gone ? <Lock size={13} aria-hidden="true" /> : null}
                         {gone ? 'Archived' : 'Active'}
                       </Chip>
                       <PropRules account={a} />
@@ -493,13 +489,7 @@ export function AccountsSettings(): React.JSX.Element {
                         <Chip
                           className={a.id === selected?.id ? SELECTED_PILL : ''}
                         >
-                          {gone ? (
-                            <Lock
-                              size={13}
-                              weight="duotone"
-                              aria-hidden="true"
-                            />
-                          ) : null}
+                          {gone ? <Lock size={13} aria-hidden="true" /> : null}
                           {gone ? 'Archived' : 'Active'}
                         </Chip>
                       </td>

@@ -1,6 +1,5 @@
 'use client';
 
-import { CalendarCheck, ListNumbers } from '@phosphor-icons/react/dist/ssr';
 import { useMemo } from 'react';
 import { loggedDays } from '@/domain/metrics/days';
 import { useJournal } from '@/data/query/hooks';
@@ -15,7 +14,7 @@ export function OverviewTradeCounts({
 }): React.JSX.Element {
   const s = data.partition.summary;
   return (
-    <StatCard group="trade-counts" title="Trade counts" icon={ListNumbers}>
+    <StatCard group="trade-counts" title="Trade counts">
       <Stat id="winners" data={data}>
         {s.wins}
       </Stat>
@@ -46,7 +45,7 @@ export function OverviewDayCounts({
     [entries, data.ctx.range],
   );
   return (
-    <StatCard group="day-counts" title="Day counts" icon={CalendarCheck}>
+    <StatCard group="day-counts" title="Day counts">
       <Stat id="trading-days" data={data}>
         {data.partition.days.length}
       </Stat>

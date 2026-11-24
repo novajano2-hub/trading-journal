@@ -10,8 +10,8 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { useId, useRef, useState } from 'react';
+import { StateGlyph } from '@/components/ui/state-glyph';
 import { buttonClasses } from '@/components/ui/button-styles';
-import { IconTile } from '@/components/ui/icon-tile';
 import type { ImportFile } from '@/lib/decode';
 import { CARD, CARD_PAD } from '@/components/app/dashboard/shared';
 import { CARD_TITLE } from './styles';
@@ -79,13 +79,9 @@ export function UploadStep({
           const dropped = e.dataTransfer.files[0];
           if (dropped) onFile(dropped);
         }}
-        className={`mt-4 flex flex-col items-center rounded-card border border-dashed px-6 py-10 text-center transition-colors duration-200 ${over ? 'border-accent bg-accent-soft' : 'border-line-2 bg-sunken'}`}
+        className={`mt-4 flex flex-col items-center rounded-card border border-dashed px-6 py-10 text-center transition-colors duration-200 ${over ? 'border-accent bg-accent-soft/40' : 'border-line-2'}`}
       >
-        <IconTile
-          icon={UploadSimple}
-          tone="accent"
-          className="size-10! rounded-[11px]! [&_svg]:size-[22px]"
-        />
+        <StateGlyph icon={UploadSimple} />
         <p className="mt-4 text-[15px] font-semibold text-text">
           Drop a file here
         </p>
@@ -133,8 +129,12 @@ export function UploadStep({
           </p>
         ) : null}
         {error ? (
-          <p className="mt-4 flex items-start gap-2.5 rounded-control bg-loss-soft px-3.5 py-3 text-[13.5px] leading-snug font-medium text-text">
-            <Warning {...ICON} size={18} className="mt-px shrink-0 text-loss" />
+          <p className="mt-4 flex items-start gap-2.5 rounded-control bg-sunken px-3.5 py-3 text-[13.5px] leading-snug font-medium text-text">
+            <Warning
+              {...ICON}
+              size={18}
+              className="mt-px shrink-0 text-muted"
+            />
             {error}
           </p>
         ) : null}
@@ -142,7 +142,11 @@ export function UploadStep({
 
       {file ? (
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-control border border-line px-3.5 py-3">
-          <IconTile icon={Glyph} tone="neutral" />
+          <Glyph
+            size={18}
+            aria-hidden="true"
+            className="flex-none text-muted"
+          />
           <div className="min-w-0 flex-1">
             <p className="truncate text-[14px] font-semibold text-text">
               {file.name}

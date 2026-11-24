@@ -3,11 +3,7 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useId } from 'react';
-import {
-  ArrowsLeftRight,
-  CheckCircle,
-  XCircle,
-} from '@phosphor-icons/react/dist/ssr';
+import { CheckCircle, XCircle } from '@phosphor-icons/react/dist/ssr';
 import { Chip, SideChip } from '@/components/ui/chip';
 import { Segmented } from '@/components/ui/segmented';
 import type {
@@ -474,8 +470,6 @@ export function RecentTrades({
       className={`${CARD} px-5 pt-[18px] pb-1`}
     >
       <CardHeader
-        icon={ArrowsLeftRight}
-        tone="neutral"
         headingId={headingId}
         title="Recent trades"
         after={<Caption>{caption}</Caption>}

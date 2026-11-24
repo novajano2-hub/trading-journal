@@ -1,5 +1,4 @@
 import { ArrowRight, FileCsv } from '@phosphor-icons/react/dist/ssr';
-import { IconTile } from '@/components/ui/icon-tile';
 import type { PreviewField } from '@/domain/import/guess-columns';
 import type { Preview, PreviewRow } from '@/domain/import/preview';
 
@@ -47,7 +46,11 @@ export function ColumnMapping({
   return (
     <div className="overflow-hidden rounded-card border border-line bg-surface-1 shadow-[var(--shadow-card)]">
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 px-4 pt-3.5 pb-1.5 sm:px-[18px]">
-        <IconTile icon={FileCsv} tone="accent" />
+        <FileCsv
+          size={18}
+          aria-hidden="true"
+          className="flex-none text-muted"
+        />
         <b className="text-sm font-semibold">{fileName}</b>
         <span className="ml-auto text-xs text-faint">{note}</span>
         {sample ? (

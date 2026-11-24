@@ -1,9 +1,6 @@
 'use client';
 
-import {
-  ArrowLeft,
-  ClockCounterClockwise,
-} from '@phosphor-icons/react/dist/ssr';
+import { ArrowLeft } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { useState } from 'react';
 import { ConfirmDialog } from '@/components/app/confirm-dialog';
@@ -96,8 +93,6 @@ export function ImportHistory() {
       <section className={`${CARD} overflow-hidden pt-[18px] pb-3`}>
         <CardHeader
           className="px-5"
-          icon={ClockCounterClockwise}
-          tone="accent"
           headingId="import-history-list"
           title="Import history"
           end={

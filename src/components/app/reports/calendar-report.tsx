@@ -1,10 +1,6 @@
 'use client';
 
-import {
-  CalendarBlank,
-  CaretLeft,
-  CaretRight,
-} from '@phosphor-icons/react/dist/ssr';
+import { CaretLeft, CaretRight } from '@phosphor-icons/react/dist/ssr';
 import { useSearchParams } from 'next/navigation';
 import { useId, useMemo } from 'react';
 import { FigureText } from '@/components/product/figure-text';
@@ -70,8 +66,6 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
   return (
     <section aria-labelledby={headingId} className={`${CARD} ${CARD_PAD}`}>
       <CardHeader
-        icon={CalendarBlank}
-        tone="accent"
         headingId={headingId}
         title={String(year)}
         after={

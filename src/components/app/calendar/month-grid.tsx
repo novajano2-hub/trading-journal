@@ -223,7 +223,6 @@ function Cell({
           <NotePencil
             aria-hidden="true"
             size={15}
-            weight="duotone"
             className="absolute top-1.5 right-1 hidden text-muted @[600px]/cal:top-1.5 @[600px]/cal:right-2 @[600px]/cal:block"
           />
         ) : null}

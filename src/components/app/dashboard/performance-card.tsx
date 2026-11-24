@@ -1,7 +1,6 @@
 'use client';
 
 import { useId } from 'react';
-import { ChartLineUp } from '@phosphor-icons/react/dist/ssr';
 import {
   formatTicker,
   NumberTicker,
@@ -297,8 +296,6 @@ export function PerformanceCard({
       className={`${CARD} ${CARD_PAD} flex h-full flex-col`}
     >
       <CardHeader
-        icon={ChartLineUp}
-        tone="accent"
         headingId={headingId}
         title="Performance"
         end={

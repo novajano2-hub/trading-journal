@@ -4,13 +4,11 @@ import { useMemo, useState, type RefObject } from 'react';
 import { Popover } from 'radix-ui';
 import {
   CheckCircle,
-  ListChecks,
   Tag as TagIcon,
   Warning,
   XCircle,
 } from '@phosphor-icons/react/dist/ssr';
 import { Chip, SideChip } from '@/components/ui/chip';
-import { IconTile } from '@/components/ui/icon-tile';
 import { MetricTip } from '@/components/ui/metric-tip';
 import { MorphDialog } from '@/components/ui/morph-dialog';
 import type { DashboardModel } from '@/data/dashboard';
@@ -489,13 +487,6 @@ export function Drilldown({
       // A rule's title keeps "1-hour" whole on a narrow screen.
       title={target.kind === 'rule' ? keepHyphens(title) : title}
       description={description}
-      icon={
-        target.kind === 'rule' ? (
-          <IconTile icon={ListChecks} tone="accent" />
-        ) : (
-          <IconTile icon={Warning} tone="warn" />
-        )
-      }
     >
       <TradesTable
         key={

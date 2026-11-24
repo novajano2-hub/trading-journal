@@ -37,11 +37,11 @@ test('the current, other and not-live modules each have their own look', () => {
   const link = (name: string) => screen.getByRole('link', { name });
   const glyph = (name: string) =>
     link(name).querySelector<SVGElement>('svg[aria-hidden="true"]')!;
-  // A white pill with a duotone accent glyph; bare in regular weight; faded.
+  // A white pill with an accent glyph; bare; faded. One weight for all: regular, no duotone layer.
   expect(link('Dashboard').className).toContain('bg-surface-1');
   expect(glyph('Dashboard').getAttribute('data-look')).toBe('current');
   expect(glyph('Dashboard').getAttribute('class')).toContain('text-accent-ink');
-  expect(glyph('Dashboard').querySelector('[opacity]')).not.toBeNull();
+  expect(glyph('Dashboard').querySelector('[opacity]')).toBeNull();
   expect(link('Trades').className).not.toMatch(/(^|\s)bg-/);
   expect(glyph('Trades').getAttribute('data-look')).toBe('module');
   expect(glyph('Trades').querySelector('[opacity]')).toBeNull();

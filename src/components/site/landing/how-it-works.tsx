@@ -1,16 +1,6 @@
 import type { ReactNode } from 'react';
-import {
-  ArrowRight,
-  ChartBar,
-  Check,
-  ListChecks,
-  Tag,
-  UploadSimple,
-  X,
-} from '@phosphor-icons/react/dist/ssr';
-import type { Icon } from '@phosphor-icons/react';
+import { ArrowRight, Check, X } from '@phosphor-icons/react/dist/ssr';
 import { Chip } from '@/components/ui/chip';
-import { IconTile, type TileTone } from '@/components/ui/icon-tile';
 import { SectionHeading } from './section-heading';
 import { guessColumns, type PreviewField } from '@/domain/import/guess-columns';
 import { mistakeTags } from '@/domain/metrics/mistakes';
@@ -33,30 +23,19 @@ const FRAG = 'mt-[18px] flex flex-wrap gap-1.5';
 const MAP_CHIP =
   'inline-flex h-6 items-center gap-1.5 rounded-full border border-line bg-surface-1 px-2.5 text-xs font-[550] shadow-[0_1px_1px_rgb(18_22_51/0.04)]';
 
-/**
- * One step: its tile in the app's colour code (the trade as it arrives,
- * mistakes in marigold, the plan in ultramarine, progress in cyan), the
- * title beside it, then a real fragment of the product.
- */
+/** One step: its title, a line on it, then a real fragment of the product. */
 function Step({
-  icon,
-  tone,
   title,
   children,
   fragment,
 }: {
-  icon: Icon;
-  tone: TileTone;
   title: string;
   children: ReactNode;
   fragment: ReactNode;
 }) {
   return (
     <li>
-      <div className="flex items-center gap-2.5">
-        <IconTile icon={icon} tone={tone} />
-        <h3 className="text-lg font-semibold tracking-[-0.015em]">{title}</h3>
-      </div>
+      <h3 className="text-lg font-semibold tracking-[-0.015em]">{title}</h3>
       <p className="mt-2.5 text-[14.5px] leading-[1.55] text-muted">
         {children}
       </p>
@@ -100,8 +79,6 @@ export function HowItWorks({ view }: { view: SampleView }) {
         />
         <ol className="mt-14 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
           <Step
-            icon={UploadSimple}
-            tone="neutral"
             title="Import"
             fragment={
               <ul aria-label="Column mapping" className={FRAG}>
@@ -124,8 +101,6 @@ export function HowItWorks({ view }: { view: SampleView }) {
             included.
           </Step>
           <Step
-            icon={Tag}
-            tone="warn"
             title="Journal"
             fragment={
               <ul aria-label="Tags" className={FRAG}>
@@ -145,8 +120,6 @@ export function HowItWorks({ view }: { view: SampleView }) {
             Tag the setup, the mistake and how you felt, right on the trade.
           </Step>
           <Step
-            icon={ListChecks}
-            tone="accent"
             title="Review"
             fragment={
               <p className={FRAG}>
@@ -164,8 +137,6 @@ export function HowItWorks({ view }: { view: SampleView }) {
             Every rule of your strategy marked kept or broken.
           </Step>
           <Step
-            icon={ChartBar}
-            tone="info"
             title="Improve"
             fragment={
               <p className={FRAG}>

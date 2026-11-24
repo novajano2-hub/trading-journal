@@ -20,7 +20,7 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
-import { IconTile } from '@/components/ui/icon-tile';
+import { StateGlyph } from '@/components/ui/state-glyph';
 import { MenuSelect, type MenuSelectOption } from '@/components/ui/menu-select';
 import { MetricTip } from '@/components/ui/metric-tip';
 import { Segmented } from '@/components/ui/segmented';
@@ -226,7 +226,7 @@ function StateBlock({
       role={role}
       className="mx-auto flex w-full max-w-[520px] flex-col items-center px-5 py-16 text-center"
     >
-      <IconTile icon={icon} />
+      <StateGlyph icon={icon} />
       <h2 className="mt-5 text-[17px] leading-snug font-semibold tracking-[-0.015em] text-balance text-text">
         {title}
       </h2>

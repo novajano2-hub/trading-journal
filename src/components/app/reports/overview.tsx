@@ -1,13 +1,5 @@
 'use client';
 
-import {
-  ArrowsLeftRight,
-  CalendarBlank,
-  ChartBar,
-  ChartLineUp,
-  Receipt,
-  Target,
-} from '@phosphor-icons/react/dist/ssr';
 import { useId, useMemo, type ReactNode } from 'react';
 import { FigureText } from '@/components/product/figure-text';
 import { MetricTip } from '@/components/ui/metric-tip';
@@ -431,8 +423,6 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
       frame={(inner) => (
         <section aria-label="Gross to net" className={`${CARD} ${CARD_PAD}`}>
           <CardHeader
-            icon={Receipt}
-            tone="neutral"
             headingId={`${cumulativeId}-gross`}
             title="Gross to net"
           />
@@ -469,7 +459,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
   );
 
   const riskInR = (
-    <StatCard group="risk" title="Risk in R" icon={Target} tone="accent">
+    <StatCard group="risk" title="Risk in R">
       <Stat
         id="planned-r"
         label="Average planned R"
@@ -514,12 +504,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
   );
 
   const daysAndReturns = (
-    <StatCard
-      group="days"
-      title="Days and returns"
-      name="Days"
-      icon={CalendarBlank}
-    >
+    <StatCard group="days" title="Days and returns" name="Days">
       <Stat
         id="avg-green-day"
         data={data}
@@ -572,8 +557,6 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
       frame={(inner) => (
         <section aria-label="Long and short" className={`${CARD} ${CARD_PAD}`}>
           <CardHeader
-            icon={ArrowsLeftRight}
-            tone="neutral"
             headingId={`${cumulativeId}-sides`}
             title="Long and short"
           />
@@ -647,8 +630,6 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
 
       <section aria-labelledby={cumulativeId} className={`${CARD} ${CARD_PAD}`}>
         <CardHeader
-          icon={ChartLineUp}
-          tone="accent"
           headingId={cumulativeId}
           title="Cumulative P&L"
           after={
@@ -705,8 +686,6 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
 
       <section aria-labelledby={dailyId} className={`${CARD} ${CARD_PAD}`}>
         <CardHeader
-          icon={ChartBar}
-          tone="accent"
           headingId={dailyId}
           title="Daily P&L"
           after={

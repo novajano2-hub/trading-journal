@@ -1,17 +1,12 @@
 'use client';
 
-import {
-  ArrowCounterClockwise,
-  CheckCircle,
-  UploadSimple,
-} from '@phosphor-icons/react/dist/ssr';
+import { ArrowCounterClockwise } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { CARD, CARD_PAD, CardHeader } from '@/components/app/dashboard/shared';
 import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
-import { IconTile } from '@/components/ui/icon-tile';
 import {
   useActiveWorkspace,
   useCommitImport,
@@ -95,12 +90,7 @@ export function ConfirmStep({
 
   return (
     <section className={`${CARD} ${CARD_PAD}`} aria-labelledby="import-confirm">
-      <CardHeader
-        icon={UploadSimple}
-        tone="accent"
-        headingId="import-confirm"
-        title="Confirm"
-      />
+      <CardHeader headingId="import-confirm" title="Confirm" />
       <p className="mt-2.5 text-[14px] leading-normal text-muted">
         Add <b className="font-semibold text-text">{trades(n)}</b> to{' '}
         <b className="font-semibold text-text">{account.name}</b> in My
@@ -169,8 +159,7 @@ export function ImportDone({
       className={`${CARD} ${CARD_PAD} max-w-[640px]`}
       aria-labelledby="import-done"
     >
-      <div className="flex items-start gap-3">
-        <IconTile icon={CheckCircle} tone="gain" />
+      <div>
         <div className="min-w-0">
           <h2
             id="import-done"

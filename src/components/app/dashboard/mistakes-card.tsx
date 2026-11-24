@@ -1,7 +1,6 @@
 'use client';
 
 import { useId, type RefObject } from 'react';
-import { Warning } from '@phosphor-icons/react/dist/ssr';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { MistakeCost } from '@/domain/metrics/mistakes';
 import type { PnlBasis } from '@/domain/types';
@@ -41,8 +40,6 @@ export function MistakesCard({
       className={`${CARD} ${CARD_PAD} flex flex-col`}
     >
       <CardHeader
-        icon={Warning}
-        tone="warn"
         headingId={headingId}
         // "cost" opens its definition, as every metric's label does.
         title={

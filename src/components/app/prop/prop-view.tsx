@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { IconTile } from '@/components/ui/icon-tile';
+import { StateGlyph } from '@/components/ui/state-glyph';
 import { Segmented } from '@/components/ui/segmented';
 import { metricContextOf } from '@/data/metrics';
 import {
@@ -119,7 +119,7 @@ export function PropView(): React.JSX.Element {
     return (
       <>
         <StateBlock
-          visual={<IconTile icon={ShieldCheck} />}
+          visual={<StateGlyph icon={ShieldCheck} />}
           title="No challenges yet."
           body="A challenge is a prop firm's evaluation steps and its funded phase. Add the firm's limits and Keel tracks each account against them."
           actions={<NewButton onClick={() => setEditing('new')} />}
@@ -155,7 +155,7 @@ export function PropView(): React.JSX.Element {
             href="/app/settings/accounts"
             className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-accent-ink underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
           >
-            <Bank size={16} weight="duotone" aria-hidden="true" />
+            <Bank size={16} aria-hidden="true" />
             Manage accounts
           </Link>
           <NewButton onClick={() => setEditing('new')} />

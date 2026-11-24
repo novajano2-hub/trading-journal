@@ -7,10 +7,7 @@ import {
   ArrowDown,
   ArrowUp,
   CaretLeft,
-  CheckSquare,
-  ListChecks,
   Plus,
-  Target,
   Trash,
   Warning,
 } from '@phosphor-icons/react/dist/ssr';
@@ -252,12 +249,7 @@ function StrategyEditor({
           aria-labelledby="basics-h"
           className={`${CARD} px-5 pt-[18px] pb-5`}
         >
-          <CardHeader
-            icon={Target}
-            tone="accent"
-            headingId="basics-h"
-            title="The strategy"
-          />
+          <CardHeader headingId="basics-h" title="The strategy" />
           <div className="mt-4 grid gap-4">
             <Field label="Name" error={errors.name}>
               {(p) => (
@@ -308,7 +300,7 @@ function StrategyEditor({
                         className="peer sr-only"
                       />
                       <span className="grid size-10 place-items-center rounded-[10px] border border-line bg-surface-1 text-muted transition-colors peer-checked:border-accent peer-checked:bg-accent-soft peer-checked:text-accent-ink peer-focus-visible:outline-2 peer-focus-visible:outline-accent hover:border-faint pointer-coarse:size-11">
-                        <Glyph size={20} weight="duotone" aria-hidden="true" />
+                        <Glyph size={20} aria-hidden="true" />
                       </span>
                     </label>
                   );
@@ -347,12 +339,7 @@ function StrategyEditor({
           aria-labelledby="rules-h"
           className={`${CARD} px-5 pt-[18px] pb-5`}
         >
-          <CardHeader
-            icon={ListChecks}
-            tone="accent"
-            headingId="rules-h"
-            title="Rules"
-          />
+          <CardHeader headingId="rules-h" title="Rules" />
           <p className="mt-2 text-[13px] leading-[1.5] text-muted">
             Group rules the way you think about a trade. Each rule is graded on
             the trades its show-when fits.
@@ -549,12 +536,7 @@ function StrategyEditor({
           aria-labelledby="checklist-h"
           className={`${CARD} px-5 pt-[18px] pb-5`}
         >
-          <CardHeader
-            icon={CheckSquare}
-            tone="accent"
-            headingId="checklist-h"
-            title="Checklist"
-          />
+          <CardHeader headingId="checklist-h" title="Checklist" />
           <p className="mt-2 text-[13px] leading-[1.5] text-muted">
             Ticked before each entry. Each item is its own yes or no on the
             trade.

@@ -15,7 +15,7 @@ import { EMPTY_FILTERS } from '@/data/filters';
 import { FigureText } from '@/components/product/figure-text';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { Chip } from '@/components/ui/chip';
-import { IconTile } from '@/components/ui/icon-tile';
+import { StateGlyph } from '@/components/ui/state-glyph';
 import { MetricTip } from '@/components/ui/metric-tip';
 import { Segmented } from '@/components/ui/segmented';
 import { useRemoveStrategy, useUpdateStrategy } from '@/data/query/hooks';
@@ -24,7 +24,12 @@ import { FigureSourceContext, useDisplay } from '@/lib/display';
 import { plural } from '@/lib/format';
 import { ConfirmDialog } from '../confirm-dialog';
 import { CARD, signTone } from '../dashboard/shared';
-import { ASSET_LABEL, deleteBody, iconOf, pctText } from './strategy-style';
+import {
+  ASSET_LABEL,
+  STRATEGY_ICON_GLYPH,
+  deleteBody,
+  pctText,
+} from './strategy-style';
 import {
   ArchiveFailed,
   HiddenTrades,
@@ -121,7 +126,7 @@ function StrategyCard({
   const display = useDisplay();
   const router = useRouter();
   const { strategy: s, summary } = f;
-  const Glyph = iconOf(s);
+  const Glyph = STRATEGY_ICON_GLYPH[s.icon ?? 'target'];
   const rules = f.rules.length;
   const money = display.figure(display.ofTrades(f.closedIds, f.pnl));
   return (
@@ -129,8 +134,13 @@ function StrategyCard({
       className={`${CARD} grid items-center gap-x-7 gap-y-5 px-[22px] py-[18px] lg:grid-cols-[minmax(0,286px)_minmax(0,1fr)_228px]`}
     >
       <div className="min-w-0">
-        <div className="flex items-center gap-2.5">
-          <IconTile icon={Glyph} tone="accent" />
+        <div className="flex items-center gap-2">
+          {/* The strategy's own mark, plain beside its name. */}
+          <Glyph
+            size={18}
+            aria-hidden="true"
+            className="flex-none text-muted"
+          />
           <h2 className="min-w-0 text-[17px] leading-snug font-semibold tracking-[-0.02em] text-text">
             <Link
               href={`/app/strategies/${encodeURIComponent(s.id)}`}
@@ -326,7 +336,7 @@ export function StrategiesView(): React.JSX.Element {
   if (all.length === 0)
     return (
       <StateBlock
-        visual={<IconTile icon={ListChecks} />}
+        visual={<StateGlyph icon={ListChecks} />}
         title="No strategies yet."
         body="A strategy is a set of rules you grade each trade against. Start from Entry, Exit, Risk and Management, and make them yours."
         actions={<NewStrategyLink />}

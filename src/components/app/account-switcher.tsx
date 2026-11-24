@@ -5,12 +5,10 @@ import {
   CaretUpDown,
   Check,
   MagnifyingGlass,
-  Wallet,
 } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { DropdownMenu } from 'radix-ui';
 import { useId, useRef, useState, type ReactNode } from 'react';
-import { IconTile } from '@/components/ui/icon-tile';
 import {
   useAccounts,
   useActiveWorkspace,
@@ -31,11 +29,11 @@ const ITEM =
 const LABEL = 'px-2 pt-2 pb-1 text-[12px] font-medium text-faint';
 /**
  * A white card on the canvas, its edge a hairline that firms on hover and
- * while open. Its gaps and the caret's are tight so "Sample workspace" fits
- * whole in the 220px sidebar.
+ * while open: the workspace's name over what it shows, and a caret. No glyph:
+ * the words are the identity.
  */
 const BOX =
-  'flex h-[52px] w-full items-center gap-2 rounded-[12px] border border-line bg-surface-1 py-2 pl-2 text-left shadow-[var(--shadow-chip)] transition-[border-color] duration-200 ease-(--ease-glide) hover:border-line-2';
+  'flex h-[52px] w-full items-center gap-2 rounded-[12px] border border-line bg-surface-1 py-2 pl-3 text-left shadow-[var(--shadow-chip)] transition-[border-color] duration-200 ease-(--ease-glide) hover:border-line-2';
 
 function Indicator(): React.JSX.Element {
   return (
@@ -88,9 +86,8 @@ export function AccountSwitcher(): React.JSX.Element {
         // Storage that failed to open never recovers in place; a fresh page tries again.
         onClick={() => window.location.reload()}
         // Nothing sits at the right end here: the words take its room.
-        className={`${BOX} pr-1`}
+        className={`${BOX} pr-3`}
       >
-        <IconTile icon={ArrowClockwise} tone="neutral" />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-[13.5px] leading-[1.25] font-semibold text-text">
             Workspace unavailable
@@ -99,6 +96,11 @@ export function AccountSwitcher(): React.JSX.Element {
             Try again
           </span>
         </span>
+        <ArrowClockwise
+          size={16}
+          aria-hidden="true"
+          className="flex-none text-muted"
+        />
       </button>
     );
   }
@@ -154,7 +156,6 @@ export function AccountSwitcher(): React.JSX.Element {
       <DropdownMenu.Trigger
         className={`${BOX} pr-2 data-[state=open]:border-line-2`}
       >
-        <IconTile icon={Wallet} tone="accent" />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-[13.5px] leading-[1.25] font-semibold text-text">
             {active.name}
@@ -163,11 +164,10 @@ export function AccountSwitcher(): React.JSX.Element {
             {summary}
           </span>
         </span>
-        {/* The glyph has air of its own inside its box: 4px is enough beside the words. */}
         <CaretUpDown
           size={14}
           aria-hidden="true"
-          className="-ml-1 flex-none text-faint"
+          className="flex-none text-faint"
         />
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>

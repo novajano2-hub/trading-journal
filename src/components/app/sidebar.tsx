@@ -14,7 +14,7 @@ const ROW =
 
 /**
  * Three looks, by state: the current module is a white pill on the canvas,
- * its glyph ultramarine and duotone; the others sit in muted ink and lift on
+ * its glyph in accent ink; the others sit in muted ink and lift on
  * hover; a module that isn't live is quieter still, its glyph faded.
  */
 function NavRow({
@@ -45,7 +45,6 @@ function NavRow({
       >
         <Glyph
           size={18}
-          weight={current ? 'duotone' : 'regular'}
           aria-hidden="true"
           data-look={current ? 'current' : quiet ? 'not-live' : 'module'}
           className={`flex-none ${current ? 'text-accent-ink' : quiet ? 'opacity-70' : ''}`}

@@ -33,7 +33,6 @@ export function AppWindow({
         <span className={`${control} font-semibold text-text tnum`}>
           <CalendarBlank
             size={14}
-            weight="duotone"
             className="text-accent-ink"
             aria-hidden="true"
           />

@@ -1,4 +1,5 @@
 import { ArrowLeft } from '@phosphor-icons/react/dist/ssr';
+import { StateGlyph } from '@/components/ui/state-glyph';
 import { DashboardLink } from './dashboard-link';
 import { navItem, type AppModuleId } from './nav';
 
@@ -14,13 +15,7 @@ export function ModulePlaceholder({
   return (
     <div className="mx-auto w-full max-w-[560px] px-5 py-16 sm:py-24">
       <div className="flex flex-col items-center rounded-card border border-line bg-surface-1 px-6 pt-9 pb-7 text-center shadow-[var(--shadow-card)] sm:px-10">
-        {/* The card-header tile, a size up: a module that isn't live is an outline. */}
-        <span
-          aria-hidden="true"
-          className={`grid size-10 place-items-center rounded-[11px] ${notLive ? 'bg-sunken text-faint [&_[opacity]]:opacity-0' : 'bg-accent-soft text-accent-ink'}`}
-        >
-          <Glyph size={22} weight="duotone" />
-        </span>
+        <StateGlyph icon={Glyph} />
         <h2 className="mt-5 text-[17px] leading-snug font-semibold tracking-[-0.015em] text-balance text-text">
           {`${item.label} isn't ${notLive ? 'live' : 'built'} yet.`}
         </h2>

@@ -68,13 +68,12 @@ export function SettingsNav(): React.JSX.Element {
               aria-current={current ? 'page' : undefined}
               className={`flex h-9 flex-none items-center gap-2.5 rounded-[9px] px-2.5 text-[14px] font-medium no-underline outline-offset-0 focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 ${
                 current
-                  ? 'bg-accent-soft font-semibold text-text'
+                  ? 'bg-sunken font-semibold text-text'
                   : 'text-muted hover:bg-sunken hover:text-text'
               }`}
             >
               <Glyph
-                size={17}
-                weight="duotone"
+                size={16}
                 aria-hidden="true"
                 className={current ? 'text-accent-ink' : ''}
               />

@@ -1,6 +1,5 @@
 'use client';
 
-import { ChartLineDown, Target } from '@phosphor-icons/react/dist/ssr';
 import { useSearchParams } from 'next/navigation';
 import { useId, useMemo } from 'react';
 import { FigureText } from '@/components/product/figure-text';
@@ -44,8 +43,6 @@ function Distribution({ data }: { data: ReportData }): React.JSX.Element {
   return (
     <section aria-labelledby={id} className={`${CARD} ${CARD_PAD}`}>
       <CardHeader
-        icon={Target}
-        tone="accent"
         headingId={id}
         title="R distribution"
         after={
@@ -90,8 +87,6 @@ function DrawdownCard({ data }: { data: ReportData }): React.JSX.Element {
   return (
     <section aria-labelledby={id} className={`${CARD} ${CARD_PAD}`}>
       <CardHeader
-        icon={ChartLineDown}
-        tone="loss"
         headingId={id}
         title="Drawdown"
         after={

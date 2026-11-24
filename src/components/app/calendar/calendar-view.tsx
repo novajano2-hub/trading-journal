@@ -713,12 +713,7 @@ export function CalendarView(): React.JSX.Element {
             Breakeven, {rangeText}
           </span>
           <span className="inline-flex items-center gap-[7px]">
-            <NotePencil
-              size={15}
-              weight="duotone"
-              aria-hidden="true"
-              className="text-muted"
-            />
+            <NotePencil size={15} aria-hidden="true" className="text-muted" />
             Journal entry
           </span>
           <span>Days are booked on the date a trade exits.</span>

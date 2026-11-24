@@ -2,9 +2,7 @@
 
 import {
   CalendarBlank,
-  ChartLineUp,
   ClockCounterClockwise,
-  Scales,
   Warning,
   X,
 } from '@phosphor-icons/react/dist/ssr';
@@ -740,8 +738,6 @@ function Compared({
           className={`${CARD} ${CARD_PAD} min-w-0`}
         >
           <CardHeader
-            icon={Scales}
-            tone="accent"
             headingId="compare-heading"
             title="Side by side"
             after={
@@ -809,8 +805,6 @@ function Compared({
           className={`${CARD} ${CARD_PAD}`}
         >
           <CardHeader
-            icon={ChartLineUp}
-            tone="accent"
             headingId="compare-chart"
             title="Cumulative P&L"
             after={

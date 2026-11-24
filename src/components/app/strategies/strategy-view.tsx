@@ -4,18 +4,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import {
   Archive,
-  ChartBar,
-  ChartLineUp,
-  CheckSquare,
   ListBullets,
-  ListChecks,
   PencilSimple,
 } from '@phosphor-icons/react/dist/ssr';
 import { FigureText } from '@/components/product/figure-text';
 import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { Chip } from '@/components/ui/chip';
-import { IconTile } from '@/components/ui/icon-tile';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { MetricId } from '@/content/metric-definitions';
 import { EMPTY_FILTERS } from '@/data/filters';
@@ -25,7 +20,12 @@ import type { Rule, RuleGroup, Strategy } from '@/domain/types';
 import { FigureSourceContext, useDisplay } from '@/lib/display';
 import { plural } from '@/lib/format';
 import { CARD, CardHeader, Caption, signTone } from '../dashboard/shared';
-import { ASSET_LABEL, SHOW_WHEN_CHIP, iconOf, pctText } from './strategy-style';
+import {
+  ASSET_LABEL,
+  SHOW_WHEN_CHIP,
+  STRATEGY_ICON_GLYPH,
+  pctText,
+} from './strategy-style';
 import { EquityLine } from './equity-line';
 import {
   ArchiveFailed,
@@ -418,23 +418,24 @@ function Header({
   leftOut: number;
 }): React.JSX.Element {
   const update = useUpdateStrategy();
-  const Glyph = iconOf(s);
+  const Glyph = STRATEGY_ICON_GLYPH[s.icon ?? 'target'];
   const archived = s.status === 'archived';
   return (
     <section
       aria-labelledby="strategy-h"
       className={`${CARD} flex flex-wrap items-center gap-x-4 gap-y-3 px-[22px] py-4`}
     >
-      <IconTile
-        icon={Glyph}
-        tone="accent"
-        className="!size-9 !rounded-[10px]"
-      />
       <div className="min-w-0 flex-[1_1_260px]">
         <h2
           id="strategy-h"
           className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[20px] leading-[1.25] font-semibold tracking-[-0.03em] text-text"
         >
+          {/* The strategy's own mark, plain beside its name. */}
+          <Glyph
+            size={20}
+            aria-hidden="true"
+            className="-mr-0.5 flex-none text-muted"
+          />
           {s.name}
           <Chip tone={archived ? 'warn' : 'neutral'}>
             {archived ? 'Archived' : 'Active'}
@@ -543,8 +544,6 @@ function StrategyBody({
         <div className="flex min-w-0 flex-col gap-4">
           <section aria-labelledby="rules-h" className={`${CARD} ${PAD}`}>
             <CardHeader
-              icon={ListChecks}
-              tone="accent"
               headingId="rules-h"
               title="Rules"
               after={
@@ -571,8 +570,6 @@ function StrategyBody({
 
           <section aria-labelledby="equity-h" className={`${CARD} ${PAD}`}>
             <CardHeader
-              icon={ChartLineUp}
-              tone="accent"
               headingId="equity-h"
               title="Equity"
               after={
@@ -603,8 +600,6 @@ function StrategyBody({
         <div className="flex min-w-0 flex-col gap-4">
           <section aria-labelledby="stats-h" className={`${CARD} ${PAD}`}>
             <CardHeader
-              icon={ChartBar}
-              tone="accent"
               headingId="stats-h"
               title="Stats"
               end={
@@ -677,8 +672,6 @@ function StrategyBody({
 
           <section aria-labelledby="checklist-h" className={`${CARD} ${PAD}`}>
             <CardHeader
-              icon={CheckSquare}
-              tone="accent"
               headingId="checklist-h"
               title="Checklist"
               end={

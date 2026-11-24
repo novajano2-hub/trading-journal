@@ -1,7 +1,5 @@
 // What the Dashboard's cards and its drill-down share.
-import type { Icon } from '@phosphor-icons/react';
 import type { ReactNode } from 'react';
-import { IconTile, type TileTone } from '@/components/ui/icon-tile';
 import type { Cents, Trade } from '@/domain/types';
 import { formatInstrument } from '@/lib/format';
 
@@ -14,32 +12,21 @@ export function signTone(cents: Cents): string {
 export const CARD =
   'rounded-card border border-line bg-surface-1 shadow-[var(--shadow-card)]';
 
-/**
- * The plan's hero: Keel Ultramarine, the Dashboard's one coloured surface. Its
- * gradient stops are the comp's and stay the same in both themes, so it reads
- * as the brand, not as the theme's accent.
- */
-export const HERO =
-  'rounded-card bg-[linear-gradient(155deg,#3440c2_0%,#2b35af_45%,#232b98_100%)] text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.18),var(--shadow-hero)]';
-
 /** A card's padding: 18px above, 20px at the sides, 16px below. */
 export const CARD_PAD = 'px-5 pt-[18px] pb-4';
 
 /**
- * A card's header row, 28px tall: its tile, its title (15px, 600), then
- * `after` beside the title and `end` at the far right (a link or a figure).
+ * A card's header row, 28px tall: its title (15px, 600), then `after` beside
+ * it (a caption) and `end` at the far right (a link, a figure or controls).
+ * No glyph and no tile: the title carries the card.
  */
 export function CardHeader({
-  icon,
-  tone,
   headingId,
   title,
   after,
   end,
   className = '',
 }: {
-  icon: Icon;
-  tone: TileTone;
   headingId: string;
   title: ReactNode;
   after?: ReactNode;
@@ -50,7 +37,6 @@ export function CardHeader({
     <div
       className={`flex min-h-7 flex-wrap items-center gap-x-2.5 gap-y-1 ${className}`}
     >
-      <IconTile icon={icon} tone={tone} />
       <h2
         id={headingId}
         className="text-[15px] leading-snug font-semibold tracking-[-0.015em] text-text"

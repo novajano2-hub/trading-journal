@@ -1,6 +1,5 @@
 'use client';
 
-import { Receipt } from '@phosphor-icons/react/dist/ssr';
 import { Stat, StatCard, useMoney } from './overview-stat';
 import type { ReportData } from './use-report-data';
 
@@ -13,7 +12,7 @@ export function OverviewCosts({
   const c = data.partition.costs;
   const money = useMoney(data);
   return (
-    <StatCard group="costs" title="Costs" icon={Receipt}>
+    <StatCard group="costs" title="Costs">
       <Stat id="commissions" data={data}>
         {money(c.commissions === 0 ? 0 : -c.commissions)}
       </Stat>

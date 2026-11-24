@@ -1,6 +1,5 @@
 'use client';
 
-import type { Icon } from '@phosphor-icons/react';
 import Link from 'next/link';
 import { useId, type ReactNode } from 'react';
 import { FigureText } from '@/components/product/figure-text';
@@ -8,7 +7,6 @@ import { MetricTip } from '@/components/ui/metric-tip';
 import type { MetricId } from '@/content/metric-definitions';
 import { metricDefinition } from '@/content/metric-definitions';
 import { formatUnitValue, useDisplay } from '@/lib/display';
-import type { TileTone } from '@/components/ui/icon-tile';
 import { CARD, CARD_PAD, CardHeader } from '../dashboard/shared';
 import {
   ChoiceRow,
@@ -139,16 +137,12 @@ export function StatCard({
   group,
   title,
   name,
-  icon,
-  tone = 'neutral',
   children,
 }: {
   group: FigureGroupId;
   title: string;
   /** The region's accessible name, where it is not the title. */
   name?: string;
-  icon: Icon;
-  tone?: TileTone;
   children: ReactNode;
 }): React.JSX.Element {
   const headingId = useId();
@@ -161,12 +155,7 @@ export function StatCard({
           aria-labelledby={name ? undefined : headingId}
           className={`${CARD} ${CARD_PAD}`}
         >
-          <CardHeader
-            icon={icon}
-            tone={tone}
-            headingId={headingId}
-            title={title}
-          />
+          <CardHeader headingId={headingId} title={title} />
           <div className="mt-1">{inner}</div>
         </section>
       )}

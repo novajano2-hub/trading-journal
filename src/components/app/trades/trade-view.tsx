@@ -7,23 +7,18 @@ import { useMemo, useState } from 'react';
 import {
   CaretLeft,
   CaretRight,
-  ChartLine,
   Info,
-  ListChecks,
-  NotePencil,
   PencilSimple,
   SealCheck,
-  Tag as TagIcon,
   Trash,
   Warning,
-  Stack,
 } from '@phosphor-icons/react/dist/ssr';
 import { FigureText } from '@/components/product/figure-text';
 import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { SideChip } from '@/components/ui/chip';
 import { Segmented } from '@/components/ui/segmented';
-import { IconTile } from '@/components/ui/icon-tile';
+import { StateGlyph } from '@/components/ui/state-glyph';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { MetricId } from '@/content/metric-definitions';
 import { metricContextOf } from '@/data/metrics';
@@ -123,7 +118,7 @@ function Message({
       role={role}
       className="mx-auto flex w-full max-w-[520px] flex-col items-center px-5 py-16 text-center"
     >
-      <IconTile icon={icon} />
+      <StateGlyph icon={icon} />
       <h2 className="mt-5 text-[17px] leading-snug font-semibold tracking-[-0.015em] text-balance text-text">
         {title}
       </h2>
@@ -736,8 +731,6 @@ function NoteCard({
   return (
     <section aria-labelledby="note-h" className={`${CARD} ${PAD}`}>
       <CardHeader
-        icon={NotePencil}
-        tone="neutral"
         headingId="note-h"
         title="Notes"
         end={
@@ -1053,8 +1046,6 @@ function TradePage({
         <div className="flex min-w-0 flex-col gap-4">
           <section aria-labelledby="exec-h" className={`${CARD} ${PAD}`}>
             <CardHeader
-              icon={ListChecks}
-              tone="accent"
               headingId="exec-h"
               title="Execution"
               after={
@@ -1085,8 +1076,6 @@ function TradePage({
 
           <section aria-labelledby="fills-h" className={`${CARD} ${PAD}`}>
             <CardHeader
-              icon={ChartLine}
-              tone="accent"
               headingId="fills-h"
               title="Fills"
               after={
@@ -1113,12 +1102,7 @@ function TradePage({
 
         <div className="flex min-w-0 flex-col gap-4">
           <section aria-labelledby="rules-h" className={`${CARD} ${PAD}`}>
-            <CardHeader
-              icon={Stack}
-              tone="accent"
-              headingId="rules-h"
-              title="Strategies and rules"
-            />
+            <CardHeader headingId="rules-h" title="Strategies and rules" />
             <div className="mt-3">
               <StrategyPicker
                 strategies={strategies}
@@ -1141,8 +1125,6 @@ function TradePage({
 
           <section aria-labelledby="tags-h" className={`${CARD} ${PAD}`}>
             <CardHeader
-              icon={TagIcon}
-              tone="warn"
               headingId="tags-h"
               title="Tags and rating"
               end={<ManageTagsLink header />}

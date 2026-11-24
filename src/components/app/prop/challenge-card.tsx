@@ -1,17 +1,11 @@
 'use client';
 
-import {
-  CheckCircle,
-  ShieldCheck,
-  Trophy,
-  XCircle,
-} from '@phosphor-icons/react/dist/ssr';
+import { CheckCircle, XCircle } from '@phosphor-icons/react/dist/ssr';
 import type { ReactNode } from 'react';
 import { CARD, signTone } from '@/components/app/dashboard/shared';
 import { FigureText } from '@/components/product/figure-text';
 import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/ui/chip';
-import { IconTile, type TileTone } from '@/components/ui/icon-tile';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { ChallengePatch } from '@/data/repository';
 import {
@@ -244,13 +238,6 @@ export function ChallengeCard({
           ? 'passed'
           : 'active';
   const funded = phase?.step === 'funded';
-  const tile: { tone: TileTone; icon: typeof ShieldCheck } =
-    chip === 'passed'
-      ? { tone: 'gain', icon: Trophy }
-      : {
-          tone: c.status === 'breached' ? 'loss' : 'accent',
-          icon: ShieldCheck,
-        };
 
   const sentence = finding
     ? (() => {
@@ -286,8 +273,7 @@ export function ChallengeCard({
       className={`${CARD} grid grid-cols-2 overflow-hidden lg:grid-cols-[288px_repeat(5,minmax(0,1fr))]`}
     >
       <div className="col-span-2 flex flex-col gap-2 px-5 pt-3.5 pb-3 lg:col-span-1">
-        <div className="flex items-center gap-2.5">
-          <IconTile icon={tile.icon} tone={tile.tone} />
+        <div className="flex items-center">
           <div className="min-w-0">
             <h2
               id={headingId}

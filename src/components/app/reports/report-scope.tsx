@@ -9,7 +9,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
-import { IconTile } from '@/components/ui/icon-tile';
+import { StateGlyph } from '@/components/ui/state-glyph';
 import { Segmented } from '@/components/ui/segmented';
 import { unitEmptyCopy } from '@/content/display-units';
 import { StorageUnavailableError } from '@/data/repository';
@@ -63,7 +63,7 @@ export function State({
       role={role}
       className={`${CARD} mx-auto flex w-full max-w-[560px] flex-col items-center px-6 py-10 text-center`}
     >
-      <IconTile icon={icon} />
+      <StateGlyph icon={icon} />
       <h2 className="mt-4 text-[17px] leading-snug font-semibold tracking-[-0.015em] text-balance text-text">
         {title}
       </h2>

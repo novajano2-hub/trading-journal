@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { ListChecks, Warning } from '@phosphor-icons/react/dist/ssr';
 import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
-import { IconTile } from '@/components/ui/icon-tile';
+import { StateGlyph } from '@/components/ui/state-glyph';
 import { UNIT_SCOPE } from '@/content/display-units';
 import type { TradeUnit } from '@/domain/metrics/units';
 import { plural } from '@/lib/format';
@@ -80,7 +80,7 @@ export function StrategyError({
   return (
     <StateBlock
       role="alert"
-      visual={<IconTile icon={Warning} />}
+      visual={<StateGlyph icon={Warning} />}
       title={
         storage
           ? "Keel can't open storage in this browser, so your workspace can't load."
@@ -103,7 +103,7 @@ export function StrategyError({
 export function NoStrategy(): React.JSX.Element {
   return (
     <StateBlock
-      visual={<IconTile icon={ListChecks} />}
+      visual={<StateGlyph icon={ListChecks} />}
       title="That strategy isn't here."
       body="It may have been deleted, or it belongs to another workspace."
       actions={

@@ -1,8 +1,6 @@
 'use client';
 
-import { CalendarBlank } from '@phosphor-icons/react/dist/ssr';
 import { FigureText } from '@/components/product/figure-text';
-import { IconTile } from '@/components/ui/icon-tile';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { CalendarDay, CalendarSummary } from '@/data/calendar';
 import type { MetricContext } from '@/domain/metrics/context';
@@ -69,8 +67,7 @@ export function MonthPanel({
     );
   return (
     <div>
-      <div className="flex items-center gap-2.5">
-        <IconTile icon={CalendarBlank} tone="accent" />
+      <div className="flex min-h-7 items-center">
         <h3
           id={headingId}
           className="text-[15px] font-semibold tracking-[-0.015em] text-text"

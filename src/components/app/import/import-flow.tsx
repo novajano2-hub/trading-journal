@@ -14,7 +14,6 @@ import { MapStep } from './map-step';
 import { openMapState, type MapState } from './mapping-state';
 import { PreviewStep } from './preview-step';
 import { UploadStep, fileSummary } from './upload-step';
-import { IconTile } from '@/components/ui/icon-tile';
 import { FileCsv, FileXls } from '@phosphor-icons/react/dist/ssr';
 
 export const STEPS = ['upload', 'map', 'preview', 'confirm'] as const;
@@ -323,7 +322,11 @@ function Stepper({
       </ol>
       {file ? (
         <div className="flex min-w-0 items-center gap-2.5 border-line sm:border-l sm:pl-5">
-          <IconTile icon={Glyph} tone="neutral" />
+          <Glyph
+            size={18}
+            aria-hidden="true"
+            className="flex-none text-muted"
+          />
           <div className="min-w-0">
             <p className="truncate text-[13.5px] leading-tight font-semibold text-text">
               {file.name}

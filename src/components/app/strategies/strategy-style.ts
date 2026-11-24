@@ -13,12 +13,7 @@ import {
   Waves,
 } from '@phosphor-icons/react/dist/ssr';
 import type { Icon } from '@phosphor-icons/react';
-import type {
-  AssetClass,
-  RuleShowWhen,
-  Strategy,
-  StrategyIcon,
-} from '@/domain/types';
+import type { AssetClass, RuleShowWhen, StrategyIcon } from '@/domain/types';
 
 /** The glyph of each strategy icon: the one map the list, the detail and the picker read. */
 export const STRATEGY_ICON_GLYPH: Record<StrategyIcon, Icon> = {
@@ -50,9 +45,6 @@ export const ICON_LABEL: Record<StrategyIcon, string> = {
   shield: 'Shield',
   rocket: 'Rocket',
 };
-
-export const iconOf = (s: Pick<Strategy, 'icon'>): Icon =>
-  STRATEGY_ICON_GLYPH[s.icon ?? 'target'];
 
 export const ASSET_LABEL: Record<AssetClass, string> = {
   future: 'Futures',

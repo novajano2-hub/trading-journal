@@ -25,8 +25,6 @@
   /* App-only tokens (theme.css, app scope). */
   --color-accent-deep: var(--accent-deep);
   --color-accent-tint: var(--accent-tint);
-  --color-on-accent-muted: var(--on-accent-muted);
-  --color-on-accent-loss: var(--on-accent-loss);
   --color-gain-fill: var(--gain-fill);
   --color-loss-fill: var(--loss-fill);
   --color-warn: var(--warn);

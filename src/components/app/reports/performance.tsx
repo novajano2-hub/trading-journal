@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  ChartBar,
-  MagnifyingGlass,
-  Plus,
-  Sliders,
-  Table,
-  X,
-} from '@phosphor-icons/react/dist/ssr';
+import { MagnifyingGlass, Plus, X } from '@phosphor-icons/react/dist/ssr';
 import { format, parseISO } from 'date-fns';
 import { useSearchParams } from 'next/navigation';
 import { useId, useMemo, useState } from 'react';
@@ -252,8 +245,6 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
     <>
       <section aria-labelledby={metricsId} className={`${CARD} ${CARD_PAD}`}>
         <CardHeader
-          icon={Sliders}
-          tone="accent"
           headingId={metricsId}
           title="Metrics"
           after={
@@ -426,8 +417,6 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
 
       <section aria-labelledby={chartId} className={`${CARD} ${CARD_PAD}`}>
         <CardHeader
-          icon={ChartBar}
-          tone="accent"
           headingId={chartId}
           title="Over time"
           after={
@@ -455,12 +444,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
       </section>
 
       <section aria-labelledby={tableId} className={`${CARD} ${CARD_PAD}`}>
-        <CardHeader
-          icon={Table}
-          tone="neutral"
-          headingId={tableId}
-          title={`By ${bucket}`}
-        />
+        <CardHeader headingId={tableId} title={`By ${bucket}`} />
         <div className="mt-2">
           <SummaryTable
             key={`${bucket}-${picks.map((x) => `${x.metric}${modeOf(x)}`).join()}`}

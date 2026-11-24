@@ -4,8 +4,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
-  Columns,
-  SlidersHorizontal,
   Warning,
 } from '@phosphor-icons/react/dist/ssr';
 import {
@@ -19,7 +17,6 @@ import {
 } from 'react';
 import { CARD, CARD_PAD, CardHeader } from '@/components/app/dashboard/shared';
 import { buttonClasses } from '@/components/ui/button-styles';
-import { IconTile } from '@/components/ui/icon-tile';
 import { Segmented } from '@/components/ui/segmented';
 import { useImportContext, useUpdateUserAccount } from '@/data/query/hooks';
 import { useImportPlan } from '@/data/query/derived';
@@ -282,8 +279,6 @@ export function MapStep({
         aria-labelledby={`${ids}-read`}
       >
         <CardHeader
-          icon={SlidersHorizontal}
-          tone="accent"
           headingId={`${ids}-read`}
           title="How to read the file"
           className="mb-3.5"
@@ -417,8 +412,6 @@ export function MapStep({
         aria-labelledby={`${ids}-match`}
       >
         <CardHeader
-          icon={Columns}
-          tone="accent"
           headingId={`${ids}-match`}
           title="Match your columns"
           after={
@@ -624,9 +617,13 @@ export function MapStep({
               key={root.key}
               role="group"
               aria-label={`Point value for ${root.key}`}
-              className="mt-3.5 grid items-center gap-3 rounded-[12px] bg-sunken px-4 py-3.5 sm:grid-cols-[28px_1fr_300px]"
+              className="mt-3.5 grid items-center gap-3 rounded-[12px] bg-sunken px-4 py-3.5 sm:grid-cols-[18px_1fr_300px]"
             >
-              <IconTile icon={Warning} tone="warn" className="hidden sm:grid" />
+              <Warning
+                size={18}
+                aria-hidden="true"
+                className="hidden text-muted sm:block"
+              />
               <div>
                 <p className="text-[14px] font-semibold text-text">
                   {root.key} is not in Keel&apos;s point-value list
