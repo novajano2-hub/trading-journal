@@ -65,16 +65,24 @@ test('filter to ES, sort by net, open the top trade, tag and note it, and see th
   await first.getByRole('link').first().click();
   // The log's filters travel with the trade.
   await expect(page).toHaveURL(/\/app\/trades\/[^/?]+\?.*symbol=ES/);
-  const tradeSerial = (
-    await page.getByRole('heading', { level: 1 }).innerText()
-  ).match(/(\d+)\s*$/)![1];
+  // The URL changes before the trade page renders: wait for its own heading.
+  const heading = page.getByRole('heading', { level: 1 });
+  await expect(heading).toHaveText(/Trade \d+\s*$/);
+  const tradeSerial = (await heading.innerText()).match(/(\d+)\s*$/)![1];
 
   // Tag it "fomo", made on the spot in the Mistakes category.
   await page.getByRole('button', { name: 'Add to Mistakes' }).click();
   await page.getByRole('combobox', { name: 'Mistakes tags' }).fill('fomo');
   await page.getByRole('option', { name: "Create 'fomo'" }).click();
+  // The chip on the trade's own Mistakes row. The picker's popover has a
+  // "Mistakes" group of its own, listing "fomo entry" too: scoped to the
+  // card and matched exactly, the check waits for the tag on the trade
+  // instead of passing on (or tripping over) the picker's options.
   await expect(
-    page.getByRole('group', { name: 'Mistakes' }).getByText('fomo'),
+    page
+      .getByRole('region', { name: 'Tags and rating' })
+      .getByRole('group', { name: 'Mistakes' })
+      .getByText('fomo', { exact: true }),
   ).toBeVisible();
   await page.keyboard.press('Escape');
 
