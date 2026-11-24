@@ -270,3 +270,54 @@ export function rExpectancy(
     count: decided.length,
   };
 }
+
+const MINUTE = 60_000;
+
+/**
+ * Minutes held, averaged over all closed trades and over the winners, the
+ * losers and the breakevens apart (outcomes from `classify`). A trade is held
+ * from its open to its close; a side with no trade has none.
+ */
+export function holdTimes(
+  trades: readonly Trade[],
+  ctx: MetricContext,
+): Record<'all' | 'wins' | 'losses' | 'breakevens', number | null> {
+  const held = trades.filter(isClosed).map((t) => ({
+    minutes: (Date.parse(t.closedAt) - Date.parse(t.openedAt)) / MINUTE,
+    outcome: classify(t, ctx).outcome,
+  }));
+  const mean = (xs: readonly { minutes: number }[]) =>
+    ratio(sum(xs.map((x) => x.minutes)), xs.length);
+  const of = (o: 'win' | 'loss' | 'breakeven') =>
+    mean(held.filter((h) => h.outcome === o));
+  return {
+    all: mean(held),
+    wins: of('win'),
+    losses: of('loss'),
+    breakevens: of('breakeven'),
+  };
+}
+
+/**
+ * The commissions and the fees of the closed trades' fills, each in its own
+ * total. A trade with no fills (typed in by hand) carries its whole cost as
+ * fees. Their sum is `Summary.fees`.
+ */
+export function costsOf(trades: readonly Trade[]): {
+  commissions: Cents;
+  fees: Cents;
+} {
+  let commissions = 0;
+  let fees = 0;
+  for (const t of trades.filter(isClosed)) {
+    if (t.executions.length === 0) {
+      fees += t.fees;
+      continue;
+    }
+    for (const e of t.executions) {
+      commissions += e.commission;
+      fees += e.fees;
+    }
+  }
+  return { commissions, fees };
+}

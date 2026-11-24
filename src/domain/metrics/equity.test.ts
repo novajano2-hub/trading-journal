@@ -3,7 +3,12 @@ import { generateSampleWorkspace, SAMPLE_SEED } from '@/data/seed/generate';
 import { makeTrade } from '../__fixtures__/trades';
 import { defaultMetricContext } from './context';
 import { dailyPnl, type DayStat } from './days';
-import { drawdownSeries, equityCurve, maxDrawdown } from './equity';
+import {
+  avgDrawdown,
+  drawdownSeries,
+  equityCurve,
+  maxDrawdown,
+} from './equity';
 
 const ctx = defaultMetricContext('America/New_York');
 
@@ -127,5 +132,47 @@ describe('drawdownSeries', () => {
     expect(Math.min(...s.map((p) => p.value))).toBe(
       -maxDrawdown(days, 1000).amount,
     );
+  });
+});
+
+describe('avgDrawdown', () => {
+  // Equity from 1000: 1100 (peak), 900, 1000, 1300 (peak), 1200.
+  const days = [
+    day('2026-03-02', 100),
+    day('2026-03-03', -200),
+    day('2026-03-04', 100),
+    day('2026-03-05', 300),
+    day('2026-03-06', -100),
+  ];
+  test('is the mean depth of the days that closed under their peak', () => {
+    // Depths 200, 100 and 100 over three days in drawdown, not five days.
+    expect(avgDrawdown(days, 1000)).toEqual({
+      amount: 133,
+      pct: (200 / 1100 + 100 / 1100 + 100 / 1300) / 3,
+      days: 3,
+    });
+  });
+  test('shares the deepest depth with the max drawdown', () => {
+    expect(maxDrawdown(days, 1000).amount).toBe(200);
+  });
+  test('the share reads the real balance at the peak, flows included', () => {
+    const r = avgDrawdown(
+      [day('2026-03-02', 100), day('2026-03-03', -100)],
+      900,
+      [{ date: '2026-03-01', amount: 100 }],
+    );
+    // Peak 1000 plus the 100 deposited: 100 under 1100.
+    expect(r.pct).toBeCloseTo(100 / 1100);
+  });
+  test('a range that never fell under a peak has none', () => {
+    expect(avgDrawdown([day('2026-03-02', 100)], 1000)).toEqual({
+      amount: null,
+      pct: null,
+      days: 0,
+    });
+    expect(avgDrawdown([], 1000)).toEqual({ amount: null, pct: null, days: 0 });
+  });
+  test('a zero balance gives no share', () => {
+    expect(avgDrawdown([day('2026-03-02', -500)], 0).pct).toBeNull();
   });
 });

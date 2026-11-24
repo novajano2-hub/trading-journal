@@ -7,11 +7,13 @@ import {
   dayDurations,
   dayStreaks,
   daySummary,
+  loggedDays,
+  monthSummary,
   type DayStat,
 } from './days';
 import { buildTrades } from '../trade-builder';
 import { resolveInstrument } from '../instruments';
-import type { Execution } from '../types';
+import type { Execution, JournalEntry } from '../types';
 
 const ctx = defaultMetricContext('America/New_York');
 
@@ -67,6 +69,10 @@ describe('days', () => {
       avgGreenDay: null,
       avgRedDay: null,
       tradesPerDay: null,
+      avgDailyPnl: null,
+      avgWinLoss: null,
+      largestGreenDay: null,
+      largestRedDay: null,
     });
     const d = (date: string, net: number) => ({
       date,
@@ -281,5 +287,118 @@ describe('days booked by exit', () => {
         range: { from: '2026-11-20', to: '2026-11-20' },
       }),
     ).toEqual({ longest: 0, average: 0 });
+  });
+});
+
+const stat = (date: string, net: number): DayStat => ({
+  date,
+  net,
+  tradeCount: 1,
+  wins: 0,
+  losses: 0,
+  costBasis: 0,
+});
+
+describe('the day figures of the Overview', () => {
+  const days = [
+    stat('2026-10-30', 300),
+    stat('2026-11-02', 900),
+    stat('2026-11-03', -200),
+    stat('2026-11-04', -600),
+    stat('2026-11-05', 0),
+  ];
+  test('average daily P&L is over every trading day, flat ones too', () => {
+    // 400 over five days.
+    expect(daySummary(days, ctx).avgDailyPnl).toBe(80);
+  });
+  test('average daily win/loss is the average green day over the size of the average red day', () => {
+    // Green: (300 + 900) / 2 = 600. Red: (-200 - 600) / 2 = -400.
+    expect(daySummary(days, ctx).avgWinLoss).toBe(1.5);
+  });
+  test('it has no value without a green or without a red day', () => {
+    expect(daySummary([stat('2026-11-02', 5)], ctx).avgWinLoss).toBeNull();
+    expect(daySummary([stat('2026-11-02', -5)], ctx).avgWinLoss).toBeNull();
+  });
+  test('the largest green and red days are the day with the most won and the most lost', () => {
+    const s = daySummary(days, ctx);
+    expect(s.largestGreenDay?.date).toBe('2026-11-02');
+    expect(s.largestRedDay?.date).toBe('2026-11-04');
+  });
+  test('a range of only red days has no largest green day', () => {
+    const s = daySummary([stat('2026-11-03', -200)], ctx);
+    expect(s.largestGreenDay).toBeNull();
+    expect(s.largestRedDay?.date).toBe('2026-11-03');
+  });
+});
+
+describe('monthSummary', () => {
+  const days = [
+    stat('2026-09-14', 500),
+    stat('2026-09-15', 100),
+    stat('2026-10-01', -900),
+    stat('2026-11-02', 2500),
+    stat('2026-11-03', -100),
+  ];
+  test('names the best and lowest month and averages over the months traded', () => {
+    expect(monthSummary(days)).toEqual({
+      best: { month: '2026-11', net: 2400 },
+      lowest: { month: '2026-10', net: -900 },
+      // 2100 over three months.
+      average: 700,
+      months: 3,
+    });
+  });
+  test('a single month is both the best and the lowest', () => {
+    expect(monthSummary([stat('2026-11-02', 50)])).toMatchObject({
+      best: { month: '2026-11', net: 50 },
+      lowest: { month: '2026-11', net: 50 },
+      average: 50,
+    });
+  });
+  test('no days, no months', () => {
+    expect(monthSummary([])).toEqual({
+      best: null,
+      lowest: null,
+      average: null,
+      months: 0,
+    });
+  });
+});
+
+describe('loggedDays', () => {
+  const entry = (
+    over: Partial<JournalEntry> & { date?: string },
+  ): JournalEntry => ({
+    id: Math.random().toString(),
+    workspaceId: 'w',
+    kind: 'daily-review',
+    title: '',
+    body: null,
+    linkedTradeIds: [],
+    tags: [],
+    updatedAt: '2026-11-01T00:00:00Z',
+    ...over,
+  });
+  test('counts the days in range that have a daily note, trash left out', () => {
+    const entries = [
+      entry({ date: '2026-11-02' }),
+      entry({ date: '2026-11-03', deletedAt: '2026-11-04T00:00:00Z' }),
+      entry({ date: '2026-11-04', kind: 'pre-market' }),
+      entry({ date: '2026-11-05' }),
+      entry({ date: '2026-10-30' }),
+      entry({}),
+    ];
+    expect(loggedDays(entries, { from: '2026-11-01', to: '2026-11-30' })).toBe(
+      2,
+    );
+    expect(loggedDays(entries, undefined)).toBe(3);
+  });
+  test('two notes on one day are one logged day', () => {
+    expect(
+      loggedDays(
+        [entry({ date: '2026-11-02' }), entry({ date: '2026-11-02' })],
+        undefined,
+      ),
+    ).toBe(1);
   });
 });

@@ -21,20 +21,27 @@ import {
   summarize,
 } from '@/domain/metrics/summary';
 import { isClosed } from '@/domain/trade-status';
+import type { Trade } from '@/domain/types';
 import { formatUnitValue, useDisplay } from '@/lib/display';
 import { formatDuration, formatPct, plural } from '@/lib/format';
 import { CARD, CARD_PAD, CardHeader, signTone } from '../dashboard/shared';
 import { periodText, ReportChart, type Shade } from './report-chart';
+import { OverviewCosts } from './overview-costs';
+import { OverviewDayFigures } from './overview-day-figures';
+import { OverviewDayCounts, OverviewTradeCounts } from './overview-counts';
+import { OverviewHold } from './overview-hold';
+import { OverviewMonths } from './overview-months';
+import { FigureLink, NONE, Stat } from './overview-stat';
 import { ReportScope } from './report-scope';
 import type { ReportData } from './use-report-data';
-
-const NONE = <span className="font-medium text-faint">None</span>;
 
 function Kpi({
   id,
   data,
   tone = '',
   sub,
+  href,
+  linkLabel,
   children,
 }: {
   id: MetricId;
@@ -42,6 +49,9 @@ function Kpi({
   /** Gain or loss ink for the figure. */
   tone?: string;
   sub: ReactNode;
+  /** Makes the figure a link to the trade behind it. */
+  href?: string;
+  linkLabel?: string;
   /** The figure; null reads "None". */
   children: ReactNode;
 }): React.JSX.Element {
@@ -56,48 +66,21 @@ function Kpi({
       <div
         className={`mt-0.5 text-[20px] leading-[1.25] font-semibold tracking-[-0.03em] whitespace-nowrap tabular-nums ${tone}`}
       >
-        {children ?? NONE}
+        {href !== undefined && children ? (
+          <FigureLink href={href} label={linkLabel ?? id}>
+            {children}
+          </FigureLink>
+        ) : (
+          (children ?? NONE)
+        )}
       </div>
       <div className="mt-px truncate text-xs text-faint">{sub}</div>
     </div>
   );
 }
 
-function Stat({
-  id,
-  label,
-  data,
-  tone = '',
-  sub,
-  children,
-}: {
-  id: MetricId;
-  /** The visible label, where the card words it differently from the definition's. */
-  label?: string;
-  data: ReportData;
-  tone?: string;
-  sub?: ReactNode;
-  children: ReactNode;
-}): React.JSX.Element {
-  return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-line/70 py-2.5 last:border-b-0">
-      <span className="text-[13.5px] text-muted">
-        <MetricTip id={id} basis={data.basis}>
-          {label}
-        </MetricTip>
-      </span>
-      <span
-        data-stat={id}
-        className={`text-right font-semibold tabular-nums ${tone}`}
-      >
-        {children ?? NONE}
-        {sub ? (
-          <small className="ml-1.5 text-xs font-normal text-faint">{sub}</small>
-        ) : null}
-      </span>
-    </div>
-  );
-}
+const tradeHref = (t: Trade | undefined) =>
+  t === undefined ? undefined : `/app/trades/${encodeURIComponent(t.id)}`;
 
 const ratio = (n: number | null) => (n === null ? null : n.toFixed(2));
 
@@ -114,15 +97,16 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
   const expectancy =
     s.expectancy === null ? null : display.meanOfAll(s.expectancy);
   const outcomes = useMemo(() => winsVsLosses(p.trades, ctx), [p.trades, ctx]);
-  const trade = (cents: number | null) => {
-    if (cents === null) return null;
-    const t = closed.find((c) => pnlOf(c, basis) === cents);
-    return t ? display.ofTrade(t) : { money: cents };
-  };
+  const tradeOf = (cents: number | null) =>
+    cents === null ? undefined : closed.find((c) => pnlOf(c, basis) === cents);
   // In a unit, the trade largest in it; in money, the summary's.
   const largest = (outcome: 'win' | 'loss', cents: number | null) => {
-    const t = largestInUnit(closed, ctx, outcome);
-    return t ? display.ofTrade(t) : trade(cents);
+    const t = largestInUnit(closed, ctx, outcome) ?? tradeOf(cents);
+    if (t) return { trade: t, figure: display.ofTrade(t) };
+    return {
+      trade: undefined,
+      figure: cents === null ? null : { money: cents },
+    };
   };
   const largestWin = largest('win', s.largestWin);
   const largestLoss = largest('loss', s.largestLoss);
@@ -279,11 +263,25 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
               ? null
               : fig(display.meanOfTrades(outcomes.losses.tradeIds, s.avgLoss))}
           </Kpi>
-          <Kpi id="largest-win" data={data} tone="text-gain" sub="one trade">
-            {fig(largestWin)}
+          <Kpi
+            id="largest-win"
+            data={data}
+            tone="text-gain"
+            sub="one trade"
+            href={tradeHref(largestWin.trade)}
+            linkLabel="Open the largest win"
+          >
+            {fig(largestWin.figure)}
           </Kpi>
-          <Kpi id="largest-loss" data={data} tone="text-loss" sub="one trade">
-            {fig(largestLoss)}
+          <Kpi
+            id="largest-loss"
+            data={data}
+            tone="text-loss"
+            sub="one trade"
+            href={tradeHref(largestLoss.trade)}
+            linkLabel="Open the largest loss"
+          >
+            {fig(largestLoss.figure)}
           </Kpi>
           <Kpi
             id="max-drawdown"
@@ -620,6 +618,15 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
             </tbody>
           </table>
         </section>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <OverviewMonths data={data} />
+        <OverviewTradeCounts data={data} />
+        <OverviewDayCounts data={data} />
+        <OverviewDayFigures data={data} />
+        <OverviewHold data={data} />
+        <OverviewCosts data={data} />
       </div>
     </>
   );

@@ -3,6 +3,8 @@ import { makeTrade } from '../__fixtures__/trades';
 import { resolveInstrument } from '../instruments';
 import { costBasis, defaultMetricContext, pnlOf } from './context';
 import {
+  costsOf,
+  holdTimes,
   largestInUnit,
   plannedR,
   riskFromStop,
@@ -361,5 +363,78 @@ describe('volume', () => {
     );
     expect(volumeOf(lots)).toBe(6.8);
     expect(volumeOf([])).toBe(0);
+  });
+});
+
+describe('holdTimes', () => {
+  const held = (net: number, minutes: number) =>
+    makeTrade({
+      net,
+      openedAt: '2026-03-02T15:00:00Z',
+      closedAt: new Date(
+        Date.parse('2026-03-02T15:00:00Z') + minutes * 60_000,
+      ).toISOString(),
+    });
+  test('averages the minutes held over all closed trades, winners, losers and breakevens', () => {
+    const trades = [
+      held(100, 10),
+      held(100, 30),
+      held(-100, 60),
+      held(0, 5),
+      makeTrade({ net: 0, status: 'open' }),
+    ];
+    expect(holdTimes(trades, ctx)).toEqual({
+      all: 26.25,
+      wins: 20,
+      losses: 60,
+      breakevens: 5,
+    });
+  });
+  test('a side with no trades has none', () => {
+    expect(holdTimes([held(100, 10)], ctx)).toEqual({
+      all: 10,
+      wins: 10,
+      losses: null,
+      breakevens: null,
+    });
+    expect(holdTimes([], ctx).all).toBeNull();
+  });
+});
+
+describe('costsOf', () => {
+  const fill = (fees: number, commission: number) => ({
+    id: 'e',
+    accountId: 'a1',
+    symbol: 'ESZ5',
+    side: 'buy' as const,
+    qty: 1,
+    price: 4500,
+    time: '2026-03-02T15:00:00Z',
+    fees,
+    commission,
+  });
+  test('adds the commissions and the fees of the fills apart', () => {
+    const a = makeTrade({
+      net: 0,
+      fees: 450,
+      executions: [fill(50, 100), fill(100, 200)],
+    });
+    const b = makeTrade({ net: 0, fees: 25, executions: [fill(5, 20)] });
+    expect(costsOf([a, b])).toEqual({ commissions: 320, fees: 155 });
+  });
+  test('a trade with no fills carries its total as fees', () => {
+    expect(costsOf([makeTrade({ net: 0, fees: 40 })])).toEqual({
+      commissions: 0,
+      fees: 40,
+    });
+  });
+  test('open trades are left out, as in gross to net', () => {
+    const open = makeTrade({
+      net: 0,
+      status: 'open',
+      fees: 25,
+      executions: [fill(5, 20)],
+    });
+    expect(costsOf([open])).toEqual({ commissions: 0, fees: 0 });
   });
 });

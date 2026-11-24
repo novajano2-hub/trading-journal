@@ -1,3 +1,4 @@
+import { roundHalfEven } from '../money';
 import { closedInOrder } from '../trade-status';
 import type { Cents, Trade } from '../types';
 import { pnlOf, type MetricContext } from './context';
@@ -96,4 +97,51 @@ export function drawdownSeries(
     if (equity > peak) peak = equity;
     return { key: d.date, value: equity - peak };
   });
+}
+
+/**
+ * The mean daily drawdown: how far the close of each trading day sat under its
+ * running peak, averaged over the days that sat under it (the days at a peak are
+ * not in a drawdown, so they are not counted). TradeZella's Futures live reads
+ * -$580.81 on this averaging; over every trading day it would read -$414.86.
+ * `amount` is the positive mean depth (null with no day under a peak); `pct`
+ * is the mean of each such day's depth over the real balance at its peak, as
+ * `maxDrawdown` reads it, over the days that have a positive peak.
+ */
+export function avgDrawdown(
+  days: readonly DayStat[],
+  startingBalance: Cents,
+  flows: readonly { date: string; amount: Cents }[] = [],
+): { amount: Cents | null; pct: number | null; days: number } {
+  const flowsTo = (date: string | undefined, inclusive: boolean): Cents =>
+    flows.reduce(
+      (n, f) =>
+        date !== undefined && (inclusive ? f.date <= date : f.date < date)
+          ? n + f.amount
+          : n,
+      0,
+    );
+  let equity = startingBalance;
+  let peak = startingBalance;
+  let peakBase = startingBalance + flowsTo(days[0]?.date, false);
+  const depths: Cents[] = [];
+  const shares: number[] = [];
+  for (const d of days) {
+    equity += d.net;
+    if (equity > peak) {
+      peak = equity;
+      peakBase = peak + flowsTo(d.date, true);
+    }
+    const dd = peak - equity;
+    if (dd <= 0) continue;
+    depths.push(dd);
+    if (peakBase > 0) shares.push(dd / peakBase);
+  }
+  const mean = (xs: readonly number[]) =>
+    xs.reduce((a, b) => a + b, 0) / xs.length;
+  return {
+    amount: depths.length === 0 ? null : roundHalfEven(mean(depths)),
+    pct: shares.length === 0 ? null : mean(shares),
+    days: depths.length,
+  };
 }

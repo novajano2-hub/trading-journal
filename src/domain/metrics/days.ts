@@ -1,7 +1,7 @@
 import { roundHalfEven } from '../money';
 import { outcomeOf } from '../outcome';
 import { localDate } from '../time';
-import type { Cents, Trade } from '../types';
+import type { Cents, JournalEntry, Trade } from '../types';
 import { costBasis, inRange, type MetricContext } from './context';
 import { sizedRealizations } from './realized';
 import { streaksOf, type StreakResult } from './streaks';
@@ -147,6 +147,14 @@ export function daySummary(
   avgRedDay: Cents | null;
   /** Trades exited per trading day; a trade counts on each day it exits. Null with no days. */
   tradesPerDay: number | null;
+  /** The mean P&L of every trading day, flat ones included; null with none. */
+  avgDailyPnl: Cents | null;
+  /** The average green day over the size of the average red day; null without both. */
+  avgWinLoss: number | null;
+  /** The green day with the most won; null with no green day. */
+  largestGreenDay: DayStat | null;
+  /** The red day with the most lost; null with no red day. */
+  largestRedDay: DayStat | null;
 } {
   const green = days.filter((d) => dayOutcome(d, ctx) === 'win');
   const red = days.filter((d) => dayOutcome(d, ctx) === 'loss');
@@ -162,6 +170,16 @@ export function daySummary(
     if (best === null || d.net > best.net) best = d;
     if (worst === null || d.net < worst.net) worst = d;
   }
+  const avgGreenDay = mean(green);
+  const avgRedDay = mean(red);
+  const largestGreenDay = green.reduce<DayStat | null>(
+    (a, d) => (a === null || d.net > a.net ? d : a),
+    null,
+  );
+  const largestRedDay = red.reduce<DayStat | null>(
+    (a, d) => (a === null || d.net < a.net ? d : a),
+    null,
+  );
   return {
     greenDays,
     redDays,
@@ -169,8 +187,15 @@ export function daySummary(
     greenPct: days.length === 0 ? null : greenDays / days.length,
     best,
     worst,
-    avgGreenDay: mean(green),
-    avgRedDay: mean(red),
+    avgGreenDay,
+    avgRedDay,
+    avgDailyPnl: mean(days),
+    avgWinLoss:
+      avgGreenDay === null || avgRedDay === null || avgRedDay === 0
+        ? null
+        : avgGreenDay / Math.abs(avgRedDay),
+    largestGreenDay,
+    largestRedDay,
     tradesPerDay:
       days.length === 0
         ? null
@@ -189,4 +214,57 @@ export function dayStreaks(
       return o === 'breakeven' ? undefined : o;
     }),
   );
+}
+
+/**
+ * The best and the lowest month by P&L, and the mean over the months that have
+ * trading days (a month with no trade is not a month traded). Months are the
+ * `YYYY-MM` of each day's date; ties go to the earlier month.
+ */
+export function monthSummary(days: readonly DayStat[]): {
+  best: { month: string; net: Cents } | null;
+  lowest: { month: string; net: Cents } | null;
+  average: Cents | null;
+  months: number;
+} {
+  const byMonth = new Map<string, Cents>();
+  for (const d of days) {
+    const month = d.date.slice(0, 7);
+    byMonth.set(month, (byMonth.get(month) ?? 0) + d.net);
+  }
+  const list = [...byMonth]
+    .map(([month, net]) => ({ month, net }))
+    .sort((a, b) => (a.month < b.month ? -1 : 1));
+  let best: { month: string; net: Cents } | null = null;
+  let lowest: { month: string; net: Cents } | null = null;
+  for (const m of list) {
+    if (best === null || m.net > best.net) best = m;
+    if (lowest === null || m.net < lowest.net) lowest = m;
+  }
+  return {
+    best,
+    lowest,
+    average:
+      list.length === 0
+        ? null
+        : roundHalfEven(list.reduce((n, m) => n + m.net, 0) / list.length),
+    months: list.length,
+  };
+}
+
+/**
+ * The days inside `range` with a daily journal entry: one per date however many
+ * notes it holds, entries in the trash left out.
+ */
+export function loggedDays(
+  entries: readonly JournalEntry[],
+  range: MetricContext['range'],
+): number {
+  const dates = new Set<string>();
+  for (const e of entries) {
+    if (e.kind !== 'daily-review' || e.deletedAt !== undefined) continue;
+    if (e.date === undefined || !inRange(e.date, range)) continue;
+    dates.add(e.date);
+  }
+  return dates.size;
 }

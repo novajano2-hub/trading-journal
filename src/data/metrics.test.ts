@@ -183,6 +183,38 @@ describe('the sample under a narrowing unit, as TradeZella read it', () => {
     expect(of('loss')).toBeCloseTo(-81.38, 2);
   });
 
+  test('Futures live: the average drawdown is -$580.81, over the days under a peak, beside a max of -$2,168.55', () => {
+    const m = metricsOf(picked(['sample-futures'], 'dollar'), 'dollar');
+    expect(m.daySummary.greenDays + m.daySummary.redDays).toBe(119);
+    expect(m.drawdown.amount).toBe(216855);
+    expect(m.avgDrawdown.amount).toBe(58081);
+    // Over every one of the 119 trading days it would be -$414.86: not the pin.
+    expect(m.avgDrawdown.days).toBe(85);
+    expect(m.avgDrawdown.pct).not.toBeNull();
+    expect(m.avgDrawdown.pct!).toBeGreaterThan(0);
+    expect(m.avgDrawdown.pct!).toBeLessThan(m.drawdown.pct!);
+  });
+
+  test('the average drawdown has no % under a unit, as the max has none', () => {
+    const m = metricsOf(picked(['sample-futures'], 'ticks'), 'ticks');
+    expect(m.avgDrawdown.pct).toBeNull();
+    expect(m.avgDrawdown.amount).not.toBeNull();
+  });
+
+  test('Futures live: the commissions and fees of the fills add up to the fees of the summary', () => {
+    const m = metricsOf(picked(['sample-futures'], 'dollar'), 'dollar');
+    expect(m.costs.commissions + m.costs.fees).toBe(m.summary.fees);
+    expect(m.costs.commissions).toBeGreaterThan(0);
+  });
+
+  test('Futures live: months, hold times and daily volume come with the bundle', () => {
+    const m = metricsOf(picked(['sample-futures'], 'dollar'), 'dollar');
+    expect(m.months.months).toBeGreaterThan(1);
+    expect(m.months.best!.net).toBeGreaterThanOrEqual(m.months.lowest!.net);
+    expect(m.holds.all).toBeGreaterThan(0);
+    expect(m.avgDailyVolume).toBeCloseTo(1169 / 119, 2);
+  });
+
   test('every account in Ticks keeps only the futures trades, in Points too', () => {
     for (const unit of ['ticks', 'points'] as const) {
       const trades = picked([], unit);

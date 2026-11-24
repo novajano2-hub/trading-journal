@@ -248,3 +248,14 @@ export function cellHref(
   const f = first && bucketFilters(first, cols.by, cols.key, opts);
   return f ? tradeLogHref(f) : undefined;
 }
+
+/**
+ * The calendar's address for one day: its month and the day open, under the
+ * page's filters, so the calendar reads the trades the figure did.
+ */
+export function calendarHref(base: GlobalFilters, day: string): string {
+  const params = serializeFilters(base);
+  params.set('month', day.slice(0, 7));
+  params.set('day', day);
+  return `/app/calendar?${queryString(params)}`;
+}

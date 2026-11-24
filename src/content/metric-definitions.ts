@@ -53,6 +53,30 @@ export const METRIC_IDS = [
   'r-expectancy',
   'avg-trade',
   'volume',
+  'best-month',
+  'worst-month',
+  'avg-month',
+  'winners',
+  'losers',
+  'breakevens',
+  'open-trades',
+  'green-day-count',
+  'red-day-count',
+  'flat-day-count',
+  'logged-days',
+  'avg-daily-pnl',
+  'avg-daily-win-loss',
+  'largest-green-day',
+  'largest-red-day',
+  'avg-daily-volume',
+  'avg-drawdown',
+  'avg-drawdown-pct',
+  'hold-time',
+  'hold-time-wins',
+  'hold-time-losses',
+  'hold-time-breakevens',
+  'commissions',
+  'fill-fees',
   'prop-profit',
   'prop-profit-funded',
   'prop-drawdown-left',
@@ -318,6 +342,120 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Volume',
     definition:
       'Contracts, lots or shares traded, each trade counted once by the quantity it opened, not by every fill.',
+  },
+  'best-month': {
+    label: 'Best month',
+    definition:
+      'The calendar month with the highest {basis} P&L, with that month named. A trade is booked on the day it exits.',
+  },
+  'worst-month': {
+    label: 'Lowest month',
+    definition:
+      'The calendar month with the lowest {basis} P&L, with that month named. With one month traded it is the best month too.',
+  },
+  'avg-month': {
+    label: 'Average per month',
+    definition:
+      'The {basis} P&L of all trading days over the number of months that have a trading day. A month with no trade is not counted.',
+  },
+  winners: {
+    label: 'Winners',
+    definition:
+      'Closed trades that ended in profit, outside your breakeven range.',
+  },
+  losers: {
+    label: 'Losers',
+    definition:
+      'Closed trades that ended in loss, outside your breakeven range.',
+  },
+  breakevens: {
+    label: 'Breakevens',
+    definition: 'Closed trades whose result fell inside your breakeven range.',
+  },
+  'open-trades': {
+    label: 'Open trades',
+    definition:
+      'Trades with no close yet. They are left out of every figure on closed trades.',
+  },
+  'green-day-count': {
+    label: 'Green days',
+    definition:
+      'Trading days that ended in profit, outside your breakeven range.',
+  },
+  'red-day-count': {
+    label: 'Red days',
+    definition:
+      'Trading days that ended in loss, outside your breakeven range.',
+  },
+  'flat-day-count': {
+    label: 'Flat days',
+    definition: 'Trading days whose result fell inside your breakeven range.',
+  },
+  'logged-days': {
+    label: 'Logged days',
+    definition:
+      'Days in the date range that have a daily journal entry. Two entries on one day count once, and entries in the trash do not count.',
+  },
+  'avg-daily-pnl': {
+    label: 'Average daily P&L',
+    definition: 'The mean {basis} P&L of all trading days, flat days included.',
+  },
+  'avg-daily-win-loss': {
+    label: 'Average daily win/loss',
+    definition:
+      'The average green day over the size of the average red day. Above 1 means your green days are larger than your red ones. None without both a green and a red day.',
+  },
+  'largest-green-day': {
+    label: 'Largest green day',
+    definition:
+      'The trading day with the most {basis} P&L won. Open the calendar on that day.',
+  },
+  'largest-red-day': {
+    label: 'Largest red day',
+    definition:
+      'The trading day with the most {basis} P&L lost. Open the calendar on that day.',
+  },
+  'avg-daily-volume': {
+    label: 'Average daily volume',
+    definition:
+      'Contracts, lots or shares traded over the trading days: the total volume, each trade counted once by the quantity it opened, divided by the number of trading days.',
+  },
+  'avg-drawdown': {
+    label: 'Average drawdown',
+    definition:
+      'How far the close of a trading day sat under its running peak, averaged over the days that closed under a peak. Days at a new peak are not in a drawdown, so they are not counted. The peak starts at the starting balances of the selected accounts. The line is the day-by-day {basis} P&L, as in the max drawdown.',
+  },
+  'avg-drawdown-pct': {
+    label: 'Average drawdown %',
+    definition:
+      'The same days as the average drawdown, each as a share of the real balance on its peak day (the balance there plus the deposits and withdrawals dated up to it), averaged. In R, ticks, pips or points it has no value.',
+  },
+  'hold-time': {
+    label: 'Average hold time',
+    definition:
+      'How long a closed trade was held on average, from its open to its close, over every closed trade.',
+  },
+  'hold-time-wins': {
+    label: 'Winners hold time',
+    definition: 'The average time from open to close of the winning trades.',
+  },
+  'hold-time-losses': {
+    label: 'Losers hold time',
+    definition: 'The average time from open to close of the losing trades.',
+  },
+  'hold-time-breakevens': {
+    label: 'Breakevens hold time',
+    definition: 'The average time from open to close of the breakeven trades.',
+  },
+  commissions: {
+    label: 'Commissions',
+    definition:
+      'The total of the commissions on the fills of closed trades. A trade typed in without fills has none.',
+  },
+  'fill-fees': {
+    label: 'Fees',
+    definition:
+      'The total of the exchange and regulatory fees on the fills of closed trades, apart from commissions. A trade typed in without fills counts its whole cost here.',
   },
   // Prop firm rules read closed trades after fees, so they ignore the P&L basis.
   'prop-profit': {

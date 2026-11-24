@@ -19,6 +19,7 @@ import {
 import {
   bucketFilters,
   bucketHref,
+  calendarHref,
   cellHref,
   intersectRanges,
   type BucketOptions,
@@ -437,4 +438,25 @@ describe('a bucket edge belongs to one bucket', () => {
       )!;
       expect(hits(t, 'size', sKeys)).toEqual([row.key]);
     });
+});
+
+describe('calendarHref', () => {
+  test('opens the calendar on the month and the day', () => {
+    expect(calendarHref(EMPTY_FILTERS, '2026-11-03')).toBe(
+      '/app/calendar?month=2026-11&day=2026-11-03',
+    );
+  });
+  test('keeps the page filters, so the calendar reads the same trades', () => {
+    const href = calendarHref(
+      { ...EMPTY_FILTERS, symbols: ['ES'], range: { preset: 'last-30-days' } },
+      '2026-11-03',
+    );
+    const url = new URL(href, 'http://x');
+    expect(url.pathname).toBe('/app/calendar');
+    expect(url.searchParams.get('day')).toBe('2026-11-03');
+    expect(url.searchParams.get('month')).toBe('2026-11');
+    const read = parseFilters(url.searchParams);
+    expect(read.symbols).toEqual(['ES']);
+    expect(read.range).toEqual({ preset: 'last-30-days' });
+  });
 });

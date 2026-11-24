@@ -4,10 +4,12 @@ import {
   dayDurations,
   dayStreaks,
   daySummary,
+  monthSummary,
   type DayStat,
 } from '../domain/metrics/days';
 import { type MetricContext } from '../domain/metrics/context';
 import {
+  avgDrawdown,
   equityCurve,
   maxDrawdown,
   type Drawdown,
@@ -16,7 +18,13 @@ import {
 import { balanceAt, dayBefore } from '../domain/metrics/balance';
 import { riskRatios } from '../domain/metrics/risk';
 import { tradeStreaks, type StreakResult } from '../domain/metrics/streaks';
-import { summarize, volumeOf, type Summary } from '../domain/metrics/summary';
+import {
+  costsOf,
+  holdTimes,
+  summarize,
+  volumeOf,
+  type Summary,
+} from '../domain/metrics/summary';
 import { isTradeUnit } from '../domain/metrics/units';
 import type {
   Account,
@@ -55,6 +63,14 @@ export interface CurrencyMetrics {
   daySummary: ReturnType<typeof daySummary>;
   equity: EquityPoint[];
   drawdown: Drawdown;
+  /** The mean daily drawdown over the days under a peak; `amount` is the positive depth, `pct` null in a unit. */
+  avgDrawdown: ReturnType<typeof avgDrawdown>;
+  /** Best, lowest and average month by P&L. */
+  months: ReturnType<typeof monthSummary>;
+  /** Minutes held on average, over all closed trades and the winners, losers and breakevens. */
+  holds: ReturnType<typeof holdTimes>;
+  /** The commissions and the fees of the closed trades' fills. */
+  costs: ReturnType<typeof costsOf>;
   tradeStreaks: StreakResult;
   dayStreaks: StreakResult;
   dayDurations: ReturnType<typeof dayDurations>;
@@ -129,6 +145,7 @@ export function metricsByCurrency(
         ? []
         : ownFlows.filter((f) => f.date > dayBefore(startDay));
     const drawdown = maxDrawdown(days, riskStart, riskFlows);
+    const avgDd = avgDrawdown(days, riskStart, riskFlows);
     const volume = volumeOf(own);
     return {
       currency,
@@ -144,6 +161,10 @@ export function metricsByCurrency(
       // trades to some of the accounts' P&L: it has no value then. Nor do
       // Sharpe and Sortino, daily returns on that balance.
       drawdown: ctx.unit ? { ...drawdown, pct: null } : drawdown,
+      avgDrawdown: ctx.unit ? { ...avgDd, pct: null } : avgDd,
+      months: monthSummary(days),
+      holds: holdTimes(own, ctx),
+      costs: costsOf(own),
       tradeStreaks: tradeStreaks(own, ctx),
       dayStreaks: dayStreaks(days, ctx),
       dayDurations: dayDurations(dayOwn, ctx),
