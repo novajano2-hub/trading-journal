@@ -2,6 +2,7 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { Segmented } from '@/components/ui/segmented';
 import { buildDashboard, pickPartition } from '@/data/dashboard';
 import { EMPTY_FILTERS, resolveRange } from '@/data/filters';
@@ -15,6 +16,8 @@ import {
 import {
   useAccounts,
   useCashFlows,
+  useImportHistory,
+  useUserAccounts,
   useActiveWorkspace,
   usePrefs,
   useSetActiveWorkspace,
@@ -41,6 +44,8 @@ import {
 } from '@/lib/display';
 import { closedInOrder } from '@/domain/trade-status';
 import { rangeCaption } from '@/lib/range-label';
+import { shortTime } from '@/lib/time-format';
+import type { Account, ImportJob } from '@/domain/types';
 import { hasActiveFilters, switchWorkspaceFilters } from '../filter-model';
 import { Drilldown } from './drilldown';
 import { GoalsCard } from './goals-card';
@@ -103,6 +108,49 @@ function useDrillAnchors() {
 }
 
 /**
+ * One quiet line: when the latest import that is not undone ran, and into
+ * which account, with a link to Import history. Absent with no such import.
+ */
+function LastImport({
+  jobs,
+  accounts,
+  timeZone,
+}: {
+  jobs: readonly ImportJob[] | undefined;
+  accounts: readonly Account[] | undefined;
+  timeZone: string;
+}): React.JSX.Element | null {
+  const latest = (jobs ?? [])
+    .filter((j) => j.status === 'active')
+    .reduce<ImportJob | undefined>(
+      (a, j) =>
+        a === undefined || Date.parse(j.createdAt) > Date.parse(a.createdAt)
+          ? j
+          : a,
+      undefined,
+    );
+  if (!latest) return null;
+  const account = accounts?.find((a) => a.id === latest.accountId);
+  return (
+    <p className="text-[13px] text-muted">
+      <span>
+        Last import{' '}
+        <span className="tabular-nums">
+          {shortTime(latest.createdAt, timeZone)}
+        </span>
+        {account ? ` into ${account.name}` : ''}.
+      </span>{' '}
+      <Link
+        href="/app/settings/import-history"
+        className="rounded-chip font-semibold text-accent-ink underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-accent"
+      >
+        Import history
+      </Link>
+    </p>
+  );
+}
+
+/**
  * The "Plan vs actual" Dashboard on the URL's filters. Render inside
  * `<Suspense>`: it reads the search params.
  */
@@ -121,6 +169,8 @@ export function DashboardView(): React.JSX.Element {
   const setActive = useSetActiveWorkspace();
   const updatePrefs = useUpdatePrefs();
   const queryClient = useQueryClient();
+  const imports = useImportHistory().data;
+  const userAccounts = useUserAccounts().data;
 
   const [currency, setCurrency] = useState<string>();
   const [drill, setDrill] = useState<Drill | null>(null);
@@ -362,6 +412,11 @@ export function DashboardView(): React.JSX.Element {
         data-testid="dashboard-ready"
         className="flex min-w-0 flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0"
       >
+        <LastImport
+          jobs={imports}
+          accounts={userAccounts}
+          timeZone={timeZone}
+        />
         {view.withClosed.length > 1 ? (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <Segmented
@@ -430,6 +485,7 @@ export function DashboardView(): React.JSX.Element {
         </div>
         <RecentTrades
           recent={m.recent}
+          open={m.open}
           basis={m.basis}
           timeZone={timeZone}
           caption={caption}

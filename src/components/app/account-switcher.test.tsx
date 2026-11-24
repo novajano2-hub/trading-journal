@@ -165,3 +165,14 @@ test('selecting two accounts writes them as one list', async () => {
     hidden: true,
   });
 });
+
+test('the menu ends with a Manage accounts link to Settings accounts', async () => {
+  renderSwitcher('/app/dashboard');
+  const menu = await openMenu(/Sample workspace\s*All accounts/);
+  const items = within(menu).getAllByRole('menuitem');
+  const manage = within(menu).getByRole('menuitem', {
+    name: 'Manage accounts',
+  });
+  expect(manage.getAttribute('href')).toBe('/app/settings/accounts');
+  expect(items[items.length - 1]).toBe(manage);
+});

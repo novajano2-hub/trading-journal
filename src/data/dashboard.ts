@@ -17,6 +17,8 @@ import {
   ruleScorecard,
   type RuleScore,
 } from '@/domain/metrics/rules';
+import { sizedRealizations } from '@/domain/metrics/realized';
+import { winsVsLosses } from '@/domain/metrics/breakdowns';
 import { ruleApplies } from '@/domain/rule-applies';
 import { closedInOrder } from '@/domain/trade-status';
 import {
@@ -87,6 +89,46 @@ export interface RecentTrade {
   rules: TradeRulesSummary;
 }
 
+/** An open trade: what is still held, and what its exits so far booked. */
+export interface OpenPosition {
+  trade: Trade;
+  /** Contracts, shares or lots still held: the entry fills less the exit fills. */
+  openQty: number;
+  /** The exits' booked P&L on the basis; null before the first exit. No unrealized P&L: Keel has no live prices. */
+  realized: Cents | null;
+}
+
+/** The open trades, newest opened first, each with its open size and the P&L its partial exits booked. */
+export function openPositions(
+  trades: readonly Trade[],
+  ctx: Pick<MetricContext, 'pnlBasis'>,
+): OpenPosition[] {
+  return trades
+    .filter((t) => t.status === 'open')
+    .sort(
+      (a, b) =>
+        Date.parse(b.openedAt) - Date.parse(a.openedAt) || b.serial - a.serial,
+    )
+    .map((trade) => {
+      const long = trade.direction === 'long';
+      let held = 0;
+      for (const e of trade.executions)
+        held += (e.side === 'buy') === long ? e.qty : -e.qty;
+      const exits = sizedRealizations(trade);
+      return {
+        trade,
+        openQty: trade.executions.length === 0 ? trade.maxPosition : held,
+        realized:
+          exits.length === 0
+            ? null
+            : exits.reduce(
+                (n, r) => n + (ctx.pnlBasis === 'gross' ? r.gross : r.net),
+                0,
+              ),
+      };
+    });
+}
+
 export interface DashboardEnv {
   strategies: readonly Strategy[];
   tags: readonly Tag[];
@@ -131,8 +173,23 @@ export interface DashboardModel {
     expectancy: Cents | null;
     /** Starting balance first, then the equity after each closed trade. */
     equity: Cents[];
+    /** Winning days over trading days, with the green, flat and red counts; null rate with no day. */
+    dayWin: {
+      rate: number | null;
+      green: number;
+      flat: number;
+      red: number;
+    };
+    /** Average win over average loss, from `Summary`; null without both. */
+    winLossRatio: number | null;
+    avgWin: Cents | null;
+    avgLoss: Cents | null;
+    /** The trades behind each average, so a display unit can read them. */
+    winIds: string[];
+    lossIds: string[];
   };
   recent: RecentTrade[];
+  open: OpenPosition[];
   tradesById: ReadonlyMap<string, Trade>;
 }
 
@@ -183,6 +240,7 @@ export function buildDashboard(
     };
   }
 
+  const outcomes = winsVsLosses(m.trades, env.ctx);
   const recent = closed
     .slice()
     .reverse()
@@ -214,8 +272,20 @@ export function buildDashboard(
       profitFactor: summary.profitFactor,
       expectancy: summary.expectancy,
       equity: [m.startingBalance, ...m.equity.map((p) => p.equity)],
+      dayWin: {
+        rate: m.daySummary.greenPct,
+        green: m.daySummary.greenDays,
+        flat: m.daySummary.flatDays,
+        red: m.daySummary.redDays,
+      },
+      winLossRatio: summary.winLossRatio,
+      avgWin: summary.avgWin,
+      avgLoss: summary.avgLoss,
+      winIds: outcomes.wins.tradeIds,
+      lossIds: outcomes.losses.tradeIds,
     },
     recent,
+    open: openPositions(m.trades, env.ctx),
     tradesById: new Map(m.trades.map((t) => [t.id, t])),
   };
 }

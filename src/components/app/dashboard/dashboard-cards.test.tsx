@@ -15,6 +15,8 @@ import { resolveInstrument } from '@/domain/instruments';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import type { Repository } from '@/data/repository';
+import { USER_WORKSPACE } from '@/data/workspaces';
+import type { ImportJob, Trade } from '@/domain/types';
 import type { SampleWorkspace } from '@/data/seed/generate';
 import { strategyRules, type UserPrefs } from '@/domain/types';
 import { keepHyphens } from '@/lib/format';
@@ -607,14 +609,12 @@ test('every metric carries its definition', async () => {
     'longest-day',
     'day-streaks',
     // Plotted on Reports, Performance (Task 25).
-    'avg-win-loss',
     'longest-trade',
     'avg-day-length',
     'long-trades',
     'short-trades',
     'long-win-rate',
     'short-win-rate',
-    'daily-win-rate',
     'green-day-streak',
     'red-day-streak',
     // On the calendar (Task 13).
@@ -688,4 +688,237 @@ test('every metric carries its definition', async () => {
   expect(new Set(ids)).toEqual(
     new Set(METRIC_IDS.filter((id) => !notOnDashboard.has(id))),
   );
+});
+
+/** An open ES long of 3 contracts at 6,000; `exits` are the contracts sold so far at 6,002. */
+function openTrade(id: string, exits: number): Trade {
+  const base = dashboardFixture().trades[0]!;
+  const sell = (qty: number) => ({
+    id: `${id}-x`,
+    accountId: 'acc-a',
+    symbol: 'ESZ5',
+    side: 'sell' as const,
+    qty,
+    price: 6002,
+    time: '2026-11-20T14:10:00.000Z',
+    fees: 0,
+    commission: 0,
+  });
+  const t: Trade = {
+    ...base,
+    id,
+    serial: 20,
+    status: 'open',
+    openedAt: '2026-11-20T14:00:00.000Z',
+    avgEntry: 6000,
+    maxPosition: 3,
+    gross: 0,
+    fees: 0,
+    net: 0,
+    strategyIds: [],
+    ruleChecks: [],
+    tagIds: [],
+    executions: [
+      {
+        id: `${id}-e`,
+        accountId: 'acc-a',
+        symbol: 'ESZ5',
+        side: 'buy',
+        qty: 3,
+        price: 6000,
+        time: '2026-11-20T14:00:00.000Z',
+        fees: 0,
+        commission: 0,
+      },
+      ...(exits > 0 ? [sell(exits)] : []),
+    ],
+  };
+  delete t.closedAt;
+  delete t.avgExit;
+  return t;
+}
+
+const openTab = async () => {
+  const group = await screen.findByRole('radiogroup', {
+    name: 'Recent trades view',
+  });
+  fireEvent.click(within(group).getByRole('radio', { name: 'Open positions' }));
+  return screen.findByRole('table', { name: 'Open positions' });
+};
+
+test('recent trades opens on the closed trades, with an Open positions tab beside them', async () => {
+  await renderDashboard();
+  const table = await screen.findByRole('table', { name: 'Recent trades' });
+  expect(table).toBeTruthy();
+  const group = screen.getByRole('radiogroup', { name: 'Recent trades view' });
+  expect(
+    within(group)
+      .getAllByRole('radio')
+      .map((r) => (r as HTMLInputElement).labels?.[0]?.textContent),
+  ).toEqual(['Closed', 'Open positions']);
+});
+
+test('open positions: each open trade with its quantity, entry and realized P&L from a partial exit', async () => {
+  await renderDashboard({
+    edit: (s) => {
+      s.trades.push(openTrade('o-1', 1));
+    },
+  });
+  const table = await openTab();
+  const headers = within(table)
+    .getAllByRole('columnheader')
+    .map((h) => h.textContent);
+  expect(headers).toEqual([
+    'Opened',
+    'Instrument',
+    'Side',
+    'Quantity',
+    'Avg entry',
+    'Realized P&L',
+  ]);
+  const rows = within(table).getAllByRole('row').slice(1);
+  expect(rows).toHaveLength(1);
+  const row = rows[0]!;
+  expect(row.textContent).toContain('20 Nov 09:00');
+  expect(row.textContent).toContain('Long');
+  // 3 bought, 1 sold: 2 still open.
+  expect(within(row).getAllByRole('cell')[3]!.textContent).toBe('2');
+  expect(row.textContent).toContain('6,000.00');
+  // One contract exited 2 points up, 50 a point.
+  expect(row.textContent).toContain('+$100.00');
+  expect(within(row).getByRole('link').getAttribute('href')).toContain(
+    '/app/trades/o-1',
+  );
+  // The closed table is gone while this tab shows.
+  expect(screen.queryByRole('table', { name: 'Recent trades' })).toBeNull();
+});
+
+test('an open trade with no exit yet has no realized P&L, and says None', async () => {
+  await renderDashboard({
+    edit: (s) => {
+      s.trades.push(openTrade('o-2', 0));
+    },
+  });
+  const table = await openTab();
+  const row = within(table).getAllByRole('row')[1]!;
+  expect(within(row).getAllByRole('cell')[5]!.textContent).toBe('None');
+  expect(within(row).getAllByRole('cell')[3]!.textContent).toBe('3');
+});
+
+test('open positions with none open says so', async () => {
+  await renderDashboard();
+  await openTab().catch(() => undefined);
+  const group = screen.getByRole('radiogroup', { name: 'Recent trades view' });
+  fireEvent.click(within(group).getByRole('radio', { name: 'Open positions' }));
+  const region = screen.getByRole('region', { name: 'Recent trades' });
+  expect(region.textContent).toContain('No open positions.');
+  expect(screen.queryByRole('table', { name: 'Open positions' })).toBeNull();
+});
+
+test('the performance card adds the day win rate and the average win to loss', async () => {
+  await renderDashboard();
+  const perf = await screen.findByRole('region', { name: 'Performance' });
+  const day = within(perf)
+    .getByRole('button', { name: 'Daily win rate' })
+    .closest('[data-kpi]')!;
+  // 18 Nov green, 19 Nov red.
+  expect(day.textContent).toContain('50.0%');
+  expect(day.textContent).toContain('1 green, 1 red, 0 flat');
+  const wl = within(perf)
+    .getByRole('button', { name: 'Average win to loss' })
+    .closest('[data-kpi]')!;
+  expect(wl.textContent).toContain('1.50');
+  expect(wl.textContent).toContain('+$600.00');
+  expect(wl.textContent).toContain('−$400.00');
+});
+
+test('with no loss the average win to loss reads None', async () => {
+  await renderDashboard({
+    edit: (s) => {
+      const f1 = s.trades.find((t) => t.id === 'f-1')!;
+      f1.net = 40_000;
+      f1.gross = 40_500;
+    },
+  });
+  const perf = await screen.findByRole('region', { name: 'Performance' });
+  const wl = within(perf)
+    .getByRole('button', { name: 'Average win to loss' })
+    .closest('[data-kpi]')!;
+  expect(wl.textContent).toContain('None');
+  expect(wl.textContent).not.toMatch(/NaN|Infinity/);
+});
+
+const job = (p: Partial<ImportJob>): ImportJob => ({
+  id: 'job',
+  workspaceId: USER_WORKSPACE.id,
+  accountId: 'u-acc',
+  fileName: 'x.csv',
+  mapping: {} as ImportJob['mapping'],
+  rowCount: 1,
+  tradeCount: 1,
+  skippedCount: 0,
+  duplicateCount: 0,
+  status: 'active',
+  createdAt: '2026-11-10T14:30:00.000Z',
+  ...p,
+});
+
+function withImports(jobs: ImportJob[]) {
+  return (repo: Repository): Partial<Repository> => ({
+    imports: { ...repo.imports, list: async () => jobs },
+    accounts: {
+      ...repo.accounts,
+      list: async (ws: string) =>
+        ws === USER_WORKSPACE.id
+          ? [
+              {
+                id: 'u-acc',
+                workspaceId: ws,
+                name: 'Live ES',
+                broker: 'B',
+                type: 'live' as const,
+                currency: 'USD',
+                startingBalance: 0,
+                status: 'active' as const,
+              },
+            ]
+          : repo.accounts.list(ws),
+    },
+  });
+}
+
+test('the last import line names the newest import that is not undone, with its account and a link', async () => {
+  await renderDashboard({
+    patch: withImports([
+      job({ id: 'a', createdAt: '2026-11-05T14:30:00.000Z' }),
+      job({ id: 'b', createdAt: '2026-11-18T14:30:00.000Z' }),
+      job({
+        id: 'c',
+        createdAt: '2026-11-19T14:30:00.000Z',
+        status: 'undone',
+      }),
+    ]),
+  });
+  const ready = await screen.findByTestId('dashboard-ready');
+  const line = await within(ready).findByText(/Last import/);
+  expect(line.textContent).toContain('18 Nov 09:30');
+  expect(line.textContent).toContain('Live ES');
+  expect(line.textContent).not.toContain('19 Nov');
+  expect(
+    within(ready)
+      .getByRole('link', { name: 'Import history' })
+      .getAttribute('href'),
+  ).toBe('/app/settings/import-history');
+});
+
+test('with no import, or only undone ones, there is no last import line', async () => {
+  await renderDashboard({
+    patch: withImports([job({ status: 'undone' })]),
+  });
+  const ready = await screen.findByTestId('dashboard-ready');
+  await new Promise((r) => setTimeout(r, 20));
+  expect(ready.textContent).not.toContain('Last import');
+  expect(
+    within(ready).queryByRole('link', { name: 'Import history' }),
+  ).toBeNull();
 });

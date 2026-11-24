@@ -19,8 +19,9 @@ import type { Cents, PnlBasis, Trade } from '@/domain/types';
 import { UNIT_SCOPE } from '@/content/display-units';
 import { isTradeUnit } from '@/domain/metrics/units';
 import { leftOutIn, useDisplay, type TickerSpec } from '@/lib/display';
-import { plural } from '@/lib/format';
-import { CARD, CARD_PAD, CardHeader } from './shared';
+import { FigureText } from '@/components/product/figure-text';
+import { formatPct, formatRatio, plural } from '@/lib/format';
+import { CARD, CARD_PAD, CardHeader, signTone } from './shared';
 
 /** How each KPI moved through the range, each point over a trailing window. */
 export interface KpiTrends {
@@ -189,6 +190,41 @@ function Kpi({
   );
 }
 
+/** A figure that reads on two lines: its value, and a quiet line of counts or amounts beneath. */
+function Stat({
+  id,
+  basis,
+  value,
+  sub,
+}: {
+  id: MetricId;
+  basis: PnlBasis;
+  /** Null reads None. */
+  value: string | null;
+  sub: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <div
+      data-kpi={id}
+      className="min-w-0 border-t border-line pt-2.5 not-first:border-l not-first:pl-3.5"
+    >
+      <div className="text-xs leading-4 text-faint pointer-coarse:-my-3.5">
+        <MetricTip id={id} basis={basis} />
+      </div>
+      <div className="mt-0.5 text-[20px] leading-[1.25] font-semibold tracking-[-0.03em] whitespace-nowrap tabular-nums">
+        {value === null ? (
+          <span className="font-medium text-faint">None</span>
+        ) : (
+          value
+        )}
+      </div>
+      <div className="mt-0.5 text-xs leading-[1.4] text-muted tabular-nums">
+        {sub}
+      </div>
+    </div>
+  );
+}
+
 /**
  * Row 2's Performance card: the P&L on the Gross/Net basis over the equity
  * line from the starting balance through each trading day's close, then win
@@ -227,6 +263,24 @@ export function PerformanceCard({
     performance.expectancy === null
       ? undefined
       : display.ticker(display.meanOfAll(performance.expectancy), currency);
+
+  // Under a unit the two averages read in it, like the figures above.
+  const avgWin =
+    performance.avgWin === null
+      ? undefined
+      : display.figure(
+          display.meanOfTrades(performance.winIds, performance.avgWin),
+          true,
+          currency,
+        );
+  const avgLoss =
+    performance.avgLoss === null
+      ? undefined
+      : display.figure(
+          display.meanOfTrades(performance.lossIds, performance.avgLoss),
+          true,
+          currency,
+        );
 
   return (
     <section
@@ -333,6 +387,42 @@ export function PerformanceCard({
           currency={currency}
           trend={trends.expectancy}
           windowSize={trends.window}
+        />
+      </div>
+      <div className="grid grid-cols-2">
+        <Stat
+          id="daily-win-rate"
+          basis={basis}
+          value={
+            performance.dayWin.rate === null
+              ? null
+              : formatPct(performance.dayWin.rate, 1)
+          }
+          sub={`${performance.dayWin.green} green, ${performance.dayWin.red} red, ${performance.dayWin.flat} flat`}
+        />
+        <Stat
+          id="avg-win-loss"
+          basis={basis}
+          value={
+            performance.winLossRatio === null
+              ? null
+              : formatRatio(performance.winLossRatio)
+          }
+          sub={
+            avgWin === undefined || avgLoss === undefined ? (
+              'None'
+            ) : (
+              <>
+                <span className={signTone(performance.avgWin ?? 0)}>
+                  <FigureText f={avgWin} />
+                </span>{' '}
+                /{' '}
+                <span className={signTone(performance.avgLoss ?? 0)}>
+                  <FigureText f={avgLoss} />
+                </span>
+              </>
+            )
+          }
         />
       </div>
     </section>

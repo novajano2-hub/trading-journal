@@ -2,21 +2,27 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import {
   ArrowsLeftRight,
   CheckCircle,
   XCircle,
 } from '@phosphor-icons/react/dist/ssr';
 import { Chip, SideChip } from '@/components/ui/chip';
-import type { RecentTrade, TradeRulesSummary } from '@/data/dashboard';
+import { Segmented } from '@/components/ui/segmented';
+import type {
+  OpenPosition,
+  RecentTrade,
+  TradeRulesSummary,
+} from '@/data/dashboard';
 import { pnlOf } from '@/domain/metrics/context';
 import type { PnlBasis } from '@/domain/types';
 import { useDisplay } from '@/lib/display';
 import { FigureText } from '@/components/product/figure-text';
-import { keepHyphens, plural } from '@/lib/format';
+import { formatQty, keepHyphens, plural } from '@/lib/format';
 import { shortTime } from '@/lib/time-format';
 import { navHref, navItem } from '../nav';
+import { price } from '../trades/columns';
 import { TradeLink } from '../trades/cells';
 import {
   CARD,
@@ -154,6 +160,113 @@ function MistakeCell({ row }: { row: RecentTrade }): React.JSX.Element {
 }
 
 /**
+ * The open trades: when each opened, what is still held at what average
+ * entry, and what its exits so far booked. There is no unrealized P&L (Keel
+ * has no live prices), so a trade with no exit yet says None. Below `md` the
+ * time folds under the symbol; below `sm` Side hides.
+ */
+function OpenPositions({
+  open,
+  basis,
+  timeZone,
+}: {
+  open: readonly OpenPosition[];
+  basis: PnlBasis;
+  timeZone: string;
+}): React.JSX.Element {
+  const display = useDisplay();
+  if (open.length === 0)
+    return (
+      <p className="mt-3 pb-4 text-[13.5px] text-muted">No open positions.</p>
+    );
+  return (
+    <table
+      aria-label="Open positions"
+      className="mt-2 w-full table-fixed border-collapse text-[13.5px]"
+    >
+      <thead>
+        <tr>
+          <th scope="col" className={`${TH} w-28 max-md:hidden`}>
+            Opened
+          </th>
+          <th scope="col" className={`${TH} md:pl-4`}>
+            Instrument
+          </th>
+          <th scope="col" className={`${TH} ${GAP} w-[78px] max-sm:hidden`}>
+            Side
+          </th>
+          <th
+            scope="col"
+            className={`${TH} ${GAP} w-[60px] text-right sm:w-24`}
+          >
+            Quantity
+          </th>
+          <th
+            scope="col"
+            className={`${TH} ${GAP} w-[84px] text-right sm:w-28`}
+          >
+            Avg entry
+          </th>
+          <th
+            scope="col"
+            className={`${TH} ${GAP} w-[92px] text-right sm:w-32`}
+          >
+            Realized P&L
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {open.map(({ trade: t, openQty, realized }) => {
+          const time = shortTime(t.openedAt, timeZone);
+          return (
+            <tr
+              key={t.id}
+              className="border-t border-line/70 text-text transition-colors duration-200 ease-[var(--ease-glide)] first:border-t-0 hover:bg-sunken/60 md:h-[34px]"
+            >
+              <td className="max-md:hidden">
+                <TradeTime text={time} />
+              </td>
+              <td className="py-1.5 md:py-0 md:pl-4">
+                <TradeLink id={t.id}>
+                  <InstrumentName
+                    trade={t}
+                    timeZone={timeZone}
+                    showExpiry={false}
+                  />
+                </TradeLink>
+                <TradeTime text={time} className="block text-xs md:hidden" />
+              </td>
+              <td className={`${GAP} max-sm:hidden`}>
+                <SideChip side={t.direction} />
+              </td>
+              <td className={`${GAP} ${FIGURE} text-right`}>
+                {formatQty(openQty)}
+              </td>
+              <td className={`${GAP} ${FIGURE} text-right`}>
+                {price(t.avgEntry, t.instrument.tickSize)}
+              </td>
+              <td
+                className={`${GAP} ${FIGURE} text-right whitespace-nowrap ${realized === null ? 'text-faint' : signTone(realized)}`}
+              >
+                {realized === null ? (
+                  'None'
+                ) : (
+                  <FigureText f={display.cash(realized, true, t.pnlCurrency)} />
+                )}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+      <caption className="sr-only">
+        Realized {basis === 'gross' ? 'gross' : 'net'} P&L from partial exits.
+        Unrealized P&L is not shown.
+      </caption>
+    </table>
+  );
+}
+
+/**
  * Row 3: the newest closed trades in the filters, each with how it went
  * against its strategy's rules. Rules takes the width the fixed columns
  * leave, at least 280px from `xl`, where every row is one 34px line. Below
@@ -161,11 +274,14 @@ function MistakeCell({ row }: { row: RecentTrade }): React.JSX.Element {
  */
 export function RecentTrades({
   recent,
+  open,
   basis,
   timeZone,
   caption,
 }: {
   recent: readonly RecentTrade[];
+  /** The open trades in the filters, newest first. */
+  open: readonly OpenPosition[];
   basis: PnlBasis;
   timeZone: string;
   /** The range, e.g. "1-20 Nov". */
@@ -173,6 +289,7 @@ export function RecentTrades({
 }): React.JSX.Element {
   const headingId = useId();
   const display = useDisplay();
+  const [tab, setTab] = useState<'closed' | 'open'>('closed');
   // The Trades page opens on the same filters.
   const allTrades = navHref(TRADES, useSearchParams());
   return (
@@ -192,96 +309,119 @@ export function RecentTrades({
           </Link>
         }
       />
-      <table
-        aria-label="Recent trades"
-        className="mt-2 w-full table-fixed border-collapse text-[13.5px]"
-      >
-        <thead>
-          <tr>
-            <th scope="col" className={`${TH} w-24 max-md:hidden xl:w-28`}>
-              Time
-            </th>
-            <th
-              scope="col"
-              className={`${TH} w-[100px] md:w-32 md:pl-4 xl:w-[176px]`}
-            >
-              Instrument
-            </th>
-            <th scope="col" className={`${TH} ${GAP} w-[78px] max-sm:hidden`}>
-              Side
-            </th>
-            <th
-              scope="col"
-              // 90rem, not 1440px: Tailwind orders min-[...] against xl (80rem) only in the same unit.
-              className={`${TH} ${GAP} w-28 max-sm:hidden lg:w-32 xl:w-[136px] min-[90rem]:w-[208px]`}
-            >
-              Strategy
-            </th>
-            <th
-              scope="col"
-              className={`${TH} ${GAP} w-28 max-sm:hidden lg:w-32 xl:w-[136px] min-[90rem]:w-[172px]`}
-            >
-              Mistake
-            </th>
-            <th
-              scope="col"
-              className={`${TH} ${GAP} w-[92px] text-right sm:w-[104px]`}
-            >
-              {basis === 'gross' ? 'Gross P&L' : 'Net P&L'}
-            </th>
-            <th scope="col" className={`${TH} ${GAP}`}>
-              Rules
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {recent.map((row) => {
-            const t = row.trade;
-            const time = shortTime(t.closedAt ?? t.openedAt, timeZone);
-            const pnl = pnlOf(t, basis);
-            return (
-              <tr
-                key={t.id}
-                className="border-t border-line/70 text-text transition-colors duration-200 ease-[var(--ease-glide)] first:border-t-0 hover:bg-sunken/60 md:h-[34px]"
+      <Segmented
+        label="Recent trades view"
+        options={[
+          { value: 'closed', label: 'Closed' },
+          { value: 'open', label: 'Open positions' },
+        ]}
+        value={tab}
+        onChange={setTab}
+        coarseTargets
+        className="mt-3"
+      />
+      {tab === 'open' ? (
+        <OpenPositions open={open} basis={basis} timeZone={timeZone} />
+      ) : null}
+      {tab === 'closed' ? (
+        <table
+          aria-label="Recent trades"
+          className="mt-2 w-full table-fixed border-collapse text-[13.5px]"
+        >
+          <thead>
+            <tr>
+              <th scope="col" className={`${TH} w-24 max-md:hidden xl:w-28`}>
+                Time
+              </th>
+              <th
+                scope="col"
+                className={`${TH} w-[100px] md:w-32 md:pl-4 xl:w-[176px]`}
               >
-                <td className="max-md:hidden">
-                  <TradeTime text={time} />
-                </td>
-                <td className="py-1.5 md:pl-4 xl:py-0">
-                  <TradeLink id={t.id}>
-                    <InstrumentName
-                      trade={t}
-                      timeZone={timeZone}
-                      className="xl:flex-nowrap"
-                      detailClassName="max-md:hidden"
-                    />
-                  </TradeLink>
-                  <TradeTime text={time} className="block text-xs md:hidden" />
-                </td>
-                <td className={`${GAP} max-sm:hidden`}>
-                  <SideChip side={t.direction} />
-                </td>
-                <td className={`${GAP} max-sm:hidden`}>
-                  <StrategyCell row={row} />
-                </td>
-                <td className={`${GAP} max-sm:hidden`}>
-                  <MistakeCell row={row} />
-                </td>
-                <td
-                  className={`${GAP} ${FIGURE} text-right whitespace-nowrap ${signTone(pnl)}`}
+                Instrument
+              </th>
+              <th scope="col" className={`${TH} ${GAP} w-[78px] max-sm:hidden`}>
+                Side
+              </th>
+              <th
+                scope="col"
+                // 90rem, not 1440px: Tailwind orders min-[...] against xl (80rem) only in the same unit.
+                className={`${TH} ${GAP} w-28 max-sm:hidden lg:w-32 xl:w-[136px] min-[90rem]:w-[208px]`}
+              >
+                Strategy
+              </th>
+              <th
+                scope="col"
+                className={`${TH} ${GAP} w-28 max-sm:hidden lg:w-32 xl:w-[136px] min-[90rem]:w-[172px]`}
+              >
+                Mistake
+              </th>
+              <th
+                scope="col"
+                className={`${TH} ${GAP} w-[92px] text-right sm:w-[104px]`}
+              >
+                {basis === 'gross' ? 'Gross P&L' : 'Net P&L'}
+              </th>
+              <th scope="col" className={`${TH} ${GAP}`}>
+                Rules
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {recent.map((row) => {
+              const t = row.trade;
+              const time = shortTime(t.closedAt ?? t.openedAt, timeZone);
+              const pnl = pnlOf(t, basis);
+              return (
+                <tr
+                  key={t.id}
+                  className="border-t border-line/70 text-text transition-colors duration-200 ease-[var(--ease-glide)] first:border-t-0 hover:bg-sunken/60 md:h-[34px]"
                 >
-                  <FigureText
-                    f={display.figure(display.ofTrade(t), true, t.pnlCurrency)}
-                  />
-                </td>
-                <td className={`${GAP} py-1.5`}>
-                  <RulesCell rules={row.rules} />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                  <td className="max-md:hidden">
+                    <TradeTime text={time} />
+                  </td>
+                  <td className="py-1.5 md:pl-4 xl:py-0">
+                    <TradeLink id={t.id}>
+                      <InstrumentName
+                        trade={t}
+                        timeZone={timeZone}
+                        className="xl:flex-nowrap"
+                        detailClassName="max-md:hidden"
+                      />
+                    </TradeLink>
+                    <TradeTime
+                      text={time}
+                      className="block text-xs md:hidden"
+                    />
+                  </td>
+                  <td className={`${GAP} max-sm:hidden`}>
+                    <SideChip side={t.direction} />
+                  </td>
+                  <td className={`${GAP} max-sm:hidden`}>
+                    <StrategyCell row={row} />
+                  </td>
+                  <td className={`${GAP} max-sm:hidden`}>
+                    <MistakeCell row={row} />
+                  </td>
+                  <td
+                    className={`${GAP} ${FIGURE} text-right whitespace-nowrap ${signTone(pnl)}`}
+                  >
+                    <FigureText
+                      f={display.figure(
+                        display.ofTrade(t),
+                        true,
+                        t.pnlCurrency,
+                      )}
+                    />
+                  </td>
+                  <td className={`${GAP} py-1.5`}>
+                    <RulesCell rules={row.rules} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      ) : null}
     </section>
   );
 }

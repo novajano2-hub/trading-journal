@@ -7,6 +7,7 @@ import {
   MagnifyingGlass,
   Wallet,
 } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { DropdownMenu } from 'radix-ui';
 import { useId, useRef, useState, type ReactNode } from 'react';
 import { IconTile } from '@/components/ui/icon-tile';
@@ -268,6 +269,12 @@ export function AccountSwitcher(): React.JSX.Element {
               {archived.map((a) => accountItem(a.id, a.name, a.broker))}
             </LabelledGroup>
           ) : null}
+          <DropdownMenu.Separator className="-mx-1.5 my-1.5 h-px bg-line" />
+          <DropdownMenu.Item asChild>
+            <Link href="/app/settings/accounts" className={`${ITEM} pl-2`}>
+              Manage accounts
+            </Link>
+          </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
