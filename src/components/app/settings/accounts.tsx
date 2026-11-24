@@ -771,27 +771,34 @@ function AccountsBody(): React.JSX.Element {
           onConfirm={async () => {
             if (dialog?.kind !== 'bulk-delete') return;
             // One by one, and stop at the first failure so the words are exact.
-            const gone = new Set(rows?.map((r) => r.account.id));
-            const todo = dialog.remove.filter((r) => gone.has(r.account.id));
-            const done: string[] = [];
+            const present = new Set(rows?.map((r) => r.account.id));
+            const todo = dialog.remove.filter((r) => present.has(r.account.id));
+            const deleted: Row[] = [];
+            /** The selection as it was, minus what is gone: by id, never by name. */
+            const dropDeleted = () => {
+              const ids = new Set(deleted.map((x) => x.account.id));
+              setChosen(
+                (prev) => new Set([...prev].filter((id) => !ids.has(id))),
+              );
+            };
             for (const [i, r] of todo.entries()) {
               try {
                 await remove.mutateAsync(r.account.id);
-                done.push(r.account.name);
+                deleted.push(r);
               } catch (e) {
                 const reason = e instanceof Error ? e.message : 'unknown error';
                 const left = todo.slice(i + 1).map((x) => x.account.name);
-                const removed = new Set([...done]);
-                setChosen(
-                  new Set(
-                    todo
-                      .filter((x) => !removed.has(x.account.name))
-                      .map((x) => x.account.id),
-                  ),
-                );
+                dropDeleted();
+                // The list no longer shows what is gone.
+                setDialog({
+                  ...dialog,
+                  remove: todo.filter((x) => !deleted.includes(x)),
+                });
                 throw new ConfirmFailure(
                   [
-                    done.length > 0 ? `Deleted: ${done.join(', ')}.` : '',
+                    deleted.length > 0
+                      ? `Deleted: ${deleted.map((x) => x.account.name).join(', ')}.`
+                      : '',
                     `Couldn't delete: ${r.account.name} (${reason}).`,
                     left.length > 0 ? `Not attempted: ${left.join(', ')}.` : '',
                   ]
@@ -800,7 +807,7 @@ function AccountsBody(): React.JSX.Element {
                 );
               }
             }
-            setChosen(new Set());
+            dropDeleted();
           }}
           onClose={() => setDialog(null)}
         />

@@ -923,3 +923,50 @@ test('on a phone the checkbox leads each two-line row and the bar floats above t
   expect(screen.getByText('5 selected')).toBeTruthy();
   vi.restoreAllMocks();
 });
+
+test('after a partial failure the selection is what was selected minus what was deleted, by id, even with shared names and a kept account', async () => {
+  const r = await wideRepo();
+  // A second account with the same name as "Empty one".
+  await r.accounts.create('sample', { ...base, name: 'Empty one' });
+  let calls = 0;
+  const flaky = {
+    ...r,
+    accounts: {
+      ...r.accounts,
+      remove: async (ws: string, id: string) => {
+        calls += 1;
+        if (calls === 2) throw new Error('disk full');
+        return r.accounts.remove(ws, id);
+      },
+    },
+  };
+  renderApp(<AccountsSettings />, { repository: flaky, url: URL });
+  for (const box of await screen.findAllByRole('checkbox', {
+    name: 'Select Empty one',
+  }))
+    fireEvent.click(box);
+  // An account holding trades is selected too, and is not up for deletion.
+  fireEvent.click(
+    screen.getByRole('checkbox', { name: 'Select Futures main' }),
+  );
+  fireEvent.click(
+    within(screen.getByRole('toolbar')).getByRole('button', {
+      name: 'Delete 2',
+    }),
+  );
+  const dialog = await screen.findByRole('dialog');
+  fireEvent.click(
+    within(dialog).getByRole('button', { name: 'Delete accounts' }),
+  );
+  await within(dialog).findByRole('alert');
+  // The dialog no longer lists the account that is gone.
+  expect(dialog.querySelectorAll('li')).toHaveLength(2);
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(await screen.findByText('2 selected')).toBeTruthy();
+  const ticked = screen
+    .getAllByRole('checkbox')
+    .filter((c) => (c as HTMLInputElement).checked)
+    .map((c) => c.getAttribute('aria-label'));
+  expect(ticked.sort()).toEqual(['Select Empty one', 'Select Futures main']);
+});

@@ -17,6 +17,7 @@ import {
   useDailyNote,
   useEnsureTradeNote,
   useJournal,
+  useRemoveAccount,
   useRemoveTagCategory,
   useSetActiveWorkspace,
   useTagCategories,
@@ -293,4 +294,38 @@ test('a failed switch after a landed commit still invalidates, then rejects', as
   const ks = invalidatedKeys(spy);
   expect(ks).toContainEqual(['keel', 'ws', 'mine', 'trades']);
   expect(ks).toContainEqual(['keel', 'ws', 'mine', 'imports']);
+});
+
+test('a remove that lands but whose cache refresh fails still resolves: it was deleted', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+  });
+  vi.spyOn(queryClient, 'invalidateQueries').mockRejectedValue(
+    new Error('refresh failed'),
+  );
+  const Wrapper = ({ children }: { children: ReactNode }) => (
+    <DataProvider repository={repository} queryClient={queryClient}>
+      {children}
+    </DataProvider>
+  );
+  const { result } = renderHook(() => useRemoveAccount(), { wrapper: Wrapper });
+  const made = await repository.accounts.create('sample', {
+    name: 'Spare',
+    broker: '',
+    type: 'live',
+    currency: 'USD',
+    startingBalance: 0,
+    status: 'active',
+  });
+  await act(async () => {
+    await result.current.mutateAsync(made.id);
+  });
+  expect(
+    (await repository.accounts.list('sample')).map((a) => a.id),
+  ).not.toContain(made.id);
 });

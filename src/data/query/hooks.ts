@@ -286,7 +286,13 @@ function useWorkspaceWrite<TData, TVars>(
     mutationFn: async (vars) => {
       const ws = (await qc.ensureQueryData(activeWorkspaceQuery(repo))).id;
       const result = await write(repo, ws, vars);
-      await invalidate(kind, ws);
+      // The write has landed. A refresh that fails after it must not read as a
+      // failed write; the data refetches on its own next read.
+      try {
+        await invalidate(kind, ws);
+      } catch {
+        /* the write stands */
+      }
       return result;
     },
   });
