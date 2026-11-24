@@ -4,6 +4,7 @@ import { localDate } from '../time';
 import type { Cents, JournalEntry, Trade } from '../types';
 import { costBasis, inRange, type MetricContext } from './context';
 import { sizedRealizations } from './realized';
+import { unitOf } from './units';
 import { streaksOf, type StreakResult } from './streaks';
 
 /** `net` is the day's P&L on ctx.pnlBasis; `costBasis` is the sum of its trades' cost bases (percent-range ROI denominator). */
@@ -14,6 +15,17 @@ export interface DayStat {
   wins: number;
   losses: number;
   costBasis: Cents;
+  /**
+   * The day's P&L in `ctx.unit` (ticks, pips, points or R), only when the
+   * context has one: each trade's unit value shared among its exit days by
+   * exited size, as the cost basis is.
+   */
+  unit?: number;
+}
+
+/** The day's value as the figures of the Overview read it: in the unit when the context has one. */
+export function dayValue(d: DayStat, ctx: Pick<MetricContext, 'unit'>): number {
+  return ctx.unit ? (d.unit ?? 0) : d.net;
 }
 
 /** Classify a day's result against the breakeven range; a flat day is breakeven. */
@@ -47,7 +59,10 @@ export function dailyPnl(
     );
     // One bucket per local date for this trade.
     const parts = new Map<string, { value: Cents; qty: number }>();
-    for (const r of sizedRealizations(t)) {
+    const realized = sizedRealizations(t);
+    const realizedQty = realized.reduce((n, r) => n + r.qty, 0);
+    const tradeUnit = ctx.unit ? unitOf(t, ctx.unit, ctx.pnlBasis) : null;
+    for (const r of realized) {
       const date = localDate(r.time, ctx.timeZone);
       if (!inRange(date, ctx.range)) continue;
       const p = parts.get(date) ?? { value: 0, qty: 0 };
@@ -72,6 +87,13 @@ export function dailyPnl(
       const share = entryQty > 0 ? Math.min(1, p.qty / entryQty) : 1;
       const dayBasis = share === 1 ? basis : Math.round(basis * share);
       d.net += p.value;
+      if (ctx.unit) {
+        const share =
+          Number.isFinite(realizedQty) && realizedQty > 0
+            ? p.qty / realizedQty
+            : 1;
+        d.unit = (d.unit ?? 0) + (tradeUnit ?? 0) * share;
+      }
       d.costBasis += dayBasis;
       d.tradeCount += 1;
       const o = outcomeOf(
@@ -147,11 +169,14 @@ export function daySummary(
   avgRedDay: Cents | null;
   /** Trades exited per trading day; a trade counts on each day it exits. Null with no days. */
   tradesPerDay: number | null;
-  /** The mean P&L of every trading day, flat ones included; null with none. */
-  avgDailyPnl: Cents | null;
+  /** The mean P&L of every trading day, flat ones included (in `ctx.unit` when it has one); null with none. */
+  avgDailyPnl: number | null;
+  /** The mean green and red day in the unit under one, in cents otherwise; null with none. */
+  avgGreenValue: number | null;
+  avgRedValue: number | null;
   /** The average green day over the size of the average red day; null without both. */
   avgWinLoss: number | null;
-  /** The green day with the most won; null with no green day. */
+  /** The green day with the most won (in the unit, under one); null with no green day. */
   largestGreenDay: DayStat | null;
   /** The red day with the most lost; null with no red day. */
   largestRedDay: DayStat | null;
@@ -172,12 +197,23 @@ export function daySummary(
   }
   const avgGreenDay = mean(green);
   const avgRedDay = mean(red);
+  // The figures of the Overview read the unit when there is one: the days are
+  // still called green and red on their money, as the counts are.
+  const val = (d: DayStat) => dayValue(d, ctx);
+  const meanVal = (list: readonly DayStat[]) =>
+    list.length === 0
+      ? null
+      : list.reduce((n, d) => n + val(d), 0) / list.length;
+  const unitMean = (list: readonly DayStat[]) =>
+    ctx.unit ? meanVal(list) : mean(list);
+  const greenMean = unitMean(green);
+  const redMean = unitMean(red);
   const largestGreenDay = green.reduce<DayStat | null>(
-    (a, d) => (a === null || d.net > a.net ? d : a),
+    (a, d) => (a === null || val(d) > val(a) ? d : a),
     null,
   );
   const largestRedDay = red.reduce<DayStat | null>(
-    (a, d) => (a === null || d.net < a.net ? d : a),
+    (a, d) => (a === null || val(d) < val(a) ? d : a),
     null,
   );
   return {
@@ -189,11 +225,13 @@ export function daySummary(
     worst,
     avgGreenDay,
     avgRedDay,
-    avgDailyPnl: mean(days),
+    avgGreenValue: greenMean,
+    avgRedValue: redMean,
+    avgDailyPnl: unitMean(days),
     avgWinLoss:
-      avgGreenDay === null || avgRedDay === null || avgRedDay === 0
+      greenMean === null || redMean === null || redMean === 0
         ? null
-        : avgGreenDay / Math.abs(avgRedDay),
+        : greenMean / Math.abs(redMean),
     largestGreenDay,
     largestRedDay,
     tradesPerDay:
@@ -218,25 +256,29 @@ export function dayStreaks(
 
 /**
  * The best and the lowest month by P&L, and the mean over the months that have
- * trading days (a month with no trade is not a month traded). Months are the
+ * trading days (a month with no trade is not a month traded). In a unit the
+ * months are sums of the unit. Months are the
  * `YYYY-MM` of each day's date; ties go to the earlier month.
  */
-export function monthSummary(days: readonly DayStat[]): {
-  best: { month: string; net: Cents } | null;
-  lowest: { month: string; net: Cents } | null;
-  average: Cents | null;
+export function monthSummary(
+  days: readonly DayStat[],
+  ctx: Pick<MetricContext, 'unit'> = {},
+): {
+  best: { month: string; net: number } | null;
+  lowest: { month: string; net: number } | null;
+  average: number | null;
   months: number;
 } {
-  const byMonth = new Map<string, Cents>();
+  const byMonth = new Map<string, number>();
   for (const d of days) {
     const month = d.date.slice(0, 7);
-    byMonth.set(month, (byMonth.get(month) ?? 0) + d.net);
+    byMonth.set(month, (byMonth.get(month) ?? 0) + dayValue(d, ctx));
   }
   const list = [...byMonth]
     .map(([month, net]) => ({ month, net }))
     .sort((a, b) => (a.month < b.month ? -1 : 1));
-  let best: { month: string; net: Cents } | null = null;
-  let lowest: { month: string; net: Cents } | null = null;
+  let best: { month: string; net: number } | null = null;
+  let lowest: { month: string; net: number } | null = null;
   for (const m of list) {
     if (best === null || m.net > best.net) best = m;
     if (lowest === null || m.net < lowest.net) lowest = m;
@@ -247,7 +289,9 @@ export function monthSummary(days: readonly DayStat[]): {
     average:
       list.length === 0
         ? null
-        : roundHalfEven(list.reduce((n, m) => n + m.net, 0) / list.length),
+        : ctx.unit
+          ? list.reduce((n, m) => n + m.net, 0) / list.length
+          : roundHalfEven(list.reduce((n, m) => n + m.net, 0) / list.length),
     months: list.length,
   };
 }

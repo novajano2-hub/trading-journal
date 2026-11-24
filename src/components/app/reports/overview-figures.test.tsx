@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -12,6 +12,8 @@ import type { Execution, JournalEntry, Trade } from '@/domain/types';
 import { renderApp } from '../__fixtures__/render-app';
 import { reportsSample } from '../__fixtures__/reports-sample';
 import { OverviewView } from './overview';
+import { Stat } from './overview-stat';
+import type { ReportData } from './use-report-data';
 
 vi.mock('next/navigation', () => import('../__fixtures__/navigation'));
 MotionGlobalConfig.skipAnimations = true;
@@ -282,4 +284,132 @@ test('Privacy masks every new amount and keeps counts and ratios', async () => {
   expect(
     stat(within(root).getByRole('region', { name: 'Costs' }), 'commissions'),
   ).toContain('$•••');
+});
+
+/** The nine trades in ticks (ES, one lot each): Mon +8 -4, Tue +6 +3, Wed -5 0, Thu +4 -2 +2. */
+const TICKS = [8, -4, 6, 3, -5, 0, 4, -2, 2];
+async function ticksSample(): Promise<SampleWorkspace> {
+  const s = await figuresSample();
+  s.trades = s.trades.map((t, i) => {
+    const ticks = TICKS[i];
+    if (ticks === undefined || i === 0) return { ...t, initialRisk: 5000 };
+    const sign = t.direction === 'long' ? 1 : -1;
+    return {
+      ...t,
+      instrument: resolveInstrument('ESZ5')!,
+      avgEntry: 4500,
+      avgExit: 4500 + sign * ticks * 0.25,
+      initialRisk: 5000,
+    };
+  });
+  return s;
+}
+async function inUnit(unit: 'ticks' | 'r') {
+  const repo = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: ticksSample,
+  });
+  await repo.prefs.update({ displayUnit: unit });
+  return repo;
+}
+
+test('in Ticks the months, day averages and largest days read ticks, and still link to their days', async () => {
+  renderApp(<OverviewView />, {
+    repository: await inUnit('ticks'),
+    url: URL,
+  });
+  const root = await screen.findByTestId('reports-overview');
+  const months = within(root).getByRole('region', { name: 'Months' });
+  expect(stat(months, 'best-month')).toContain('+12.0 ticks');
+  expect(stat(months, 'avg-month')).toContain('+12.0 ticks');
+  const card = within(root).getByRole('region', { name: 'Day figures' });
+  // Days +4, +9, -5, +4 ticks: 12 over four days.
+  expect(stat(card, 'avg-daily-pnl')).toContain('+3.0 ticks');
+  // Green days average 5.67 ticks over the 5.0 of the red day.
+  expect(stat(card, 'avg-daily-win-loss')).toContain('1.13');
+  expect(stat(card, 'avg-daily-win-loss')).toContain('+5.7 ticks');
+  expect(stat(card, 'largest-green-day')).toContain('+9.0 ticks');
+  expect(stat(card, 'largest-red-day')).toContain('−5.0 ticks');
+  const link = (id: string) =>
+    card.querySelector<HTMLAnchorElement>(`[data-stat="${id}"] a`);
+  expect(link('largest-green-day')?.getAttribute('href')).toBe(
+    '/app/calendar?month=2026-11&day=2026-11-03',
+  );
+  expect(link('largest-red-day')?.getAttribute('href')).toBe(
+    '/app/calendar?month=2026-11&day=2026-11-04',
+  );
+  // Costs stay in money.
+  expect(
+    stat(within(root).getByRole('region', { name: 'Costs' }), 'commissions'),
+  ).toBe('$1.50');
+});
+
+test('in R the month and day figures read R', async () => {
+  renderApp(<OverviewView />, { repository: await inUnit('r'), url: URL });
+  const root = await screen.findByTestId('reports-overview');
+  const months = within(root).getByRole('region', { name: 'Months' });
+  expect(stat(months, 'best-month')).toContain('+2.86R');
+  const card = within(root).getByRole('region', { name: 'Day figures' });
+  expect(stat(card, 'largest-green-day')).toContain('+2.00R');
+  expect(stat(card, 'largest-red-day')).toContain('−1.20R');
+});
+
+test('logged days shows a loading state, not None, while the journal loads', async () => {
+  const repo = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: figuresSample,
+  });
+  const journal = { ...repo.journal, list: () => new Promise<never>(() => {}) };
+  renderApp(<OverviewView />, {
+    repository: { ...repo, journal } as typeof repo,
+    url: URL,
+  });
+  const root = await screen.findByTestId('reports-overview');
+  const cell = root.querySelector('[data-stat="logged-days"]')!;
+  expect(cell.textContent).not.toContain('None');
+  expect(
+    within(cell as HTMLElement)
+      .getByRole('status')
+      .getAttribute('aria-label'),
+  ).toBe('Loading logged days');
+});
+
+test('logged days says so when the journal fails to load', async () => {
+  const repo = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: figuresSample,
+  });
+  const journal = {
+    ...repo.journal,
+    list: () => Promise.reject(new Error('no journal')),
+  };
+  renderApp(<OverviewView />, {
+    repository: { ...repo, journal } as typeof repo,
+    url: URL,
+  });
+  const root = await screen.findByTestId('reports-overview');
+  await vi.waitFor(() =>
+    expect(
+      root.querySelector('[data-stat="logged-days"]')!.textContent,
+    ).toContain('Could not load'),
+  );
+});
+
+test('a figure of 0 keeps its link', () => {
+  const { container } = render(
+    <Stat
+      id="avg-daily-pnl"
+      data={{ basis: 'net' } as ReportData}
+      href="/app/calendar?day=2026-11-03"
+      linkLabel="Open the day"
+    >
+      {0}
+    </Stat>,
+  );
+  expect(container.querySelector('a')?.getAttribute('href')).toBe(
+    '/app/calendar?day=2026-11-03',
+  );
 });

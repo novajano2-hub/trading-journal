@@ -162,7 +162,7 @@ export function metricsByCurrency(
       // Sharpe and Sortino, daily returns on that balance.
       drawdown: ctx.unit ? { ...drawdown, pct: null } : drawdown,
       avgDrawdown: ctx.unit ? { ...avgDd, pct: null } : avgDd,
-      months: monthSummary(days),
+      months: monthSummary(days, ctx),
       holds: holdTimes(own, ctx),
       costs: costsOf(own),
       tradeStreaks: tradeStreaks(own, ctx),

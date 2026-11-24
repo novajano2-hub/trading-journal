@@ -6,6 +6,7 @@ import {
   costsOf,
   holdTimes,
   largestInUnit,
+  largestTrade,
   plannedR,
   riskFromStop,
   rExpectancy,
@@ -436,5 +437,18 @@ describe('costsOf', () => {
       executions: [fill(5, 20)],
     });
     expect(costsOf([open])).toEqual({ commissions: 0, fees: 0 });
+  });
+});
+
+describe('largestTrade', () => {
+  test('is the trade itself, so a link can name its id', () => {
+    const a = makeTrade({ net: 5000 });
+    const b = makeTrade({ net: 9000 });
+    const c = makeTrade({ net: -7000 });
+    const d = makeTrade({ net: -2000 });
+    const all = [a, b, c, d, makeTrade({ net: 0, status: 'open' })];
+    expect(largestTrade(all, ctx, 'win')?.id).toBe(b.id);
+    expect(largestTrade(all, ctx, 'loss')?.id).toBe(c.id);
+    expect(largestTrade([a], ctx, 'loss')).toBeUndefined();
   });
 });

@@ -215,6 +215,37 @@ describe('the sample under a narrowing unit, as TradeZella read it', () => {
     expect(m.avgDailyVolume).toBeCloseTo(1169 / 119, 2);
   });
 
+  test('Futures live in Ticks: the months, the day average and the largest days are in ticks', () => {
+    const m = metricsOf(picked(['sample-futures'], 'ticks'), 'ticks');
+    const days = m.days;
+    const total = days.reduce((n, d) => n + (d.unit ?? 0), 0);
+    // The days add up to the pinned +8,495 ticks, and so do the months.
+    expect(total).toBeCloseTo(8495, 6);
+    expect(m.months.average! * m.months.months).toBeCloseTo(8495, 6);
+    expect(m.daySummary.avgDailyPnl!).toBeCloseTo(8495 / 119, 6);
+    const byMonth = new Map<string, number>();
+    for (const d of days)
+      byMonth.set(
+        d.date.slice(0, 7),
+        (byMonth.get(d.date.slice(0, 7)) ?? 0) + (d.unit ?? 0),
+      );
+    expect(m.months.best!.net).toBeCloseTo(Math.max(...byMonth.values()), 6);
+    expect(m.months.lowest!.net).toBeCloseTo(Math.min(...byMonth.values()), 6);
+    // The largest green day is the green day with the most ticks.
+    const green = days.filter((d) => d.net > 0);
+    expect(m.daySummary.largestGreenDay!.unit).toBe(
+      Math.max(...green.map((d) => d.unit ?? 0)),
+    );
+    expect(m.daySummary.avgWinLoss).not.toBeNull();
+    expect(m.months.best).toEqual({ month: '2026-08', net: 3752 });
+    expect(m.months.lowest).toEqual({ month: '2026-10', net: -1018 });
+    expect(m.daySummary.avgDailyPnl!.toFixed(2)).toBe('71.39');
+    expect(m.daySummary.largestGreenDay).toMatchObject({
+      date: '2026-08-27',
+      unit: 1064,
+    });
+  });
+
   test('every account in Ticks keeps only the futures trades, in Points too', () => {
     for (const unit of ['ticks', 'points'] as const) {
       const trades = picked([], unit);

@@ -13,13 +13,8 @@ import { FigureText } from '@/components/product/figure-text';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { MetricId } from '@/content/metric-definitions';
 import { winsVsLosses } from '@/domain/metrics/breakdowns';
-import { pnlOf } from '@/domain/metrics/context';
 import { timeSeries } from '@/domain/metrics/series';
-import {
-  largestInUnit,
-  rExpectancy,
-  summarize,
-} from '@/domain/metrics/summary';
+import { largestTrade, rExpectancy, summarize } from '@/domain/metrics/summary';
 import { isClosed } from '@/domain/trade-status';
 import type { Trade } from '@/domain/types';
 import { formatUnitValue, useDisplay } from '@/lib/display';
@@ -31,7 +26,7 @@ import { OverviewDayFigures } from './overview-day-figures';
 import { OverviewDayCounts, OverviewTradeCounts } from './overview-counts';
 import { OverviewHold } from './overview-hold';
 import { OverviewMonths } from './overview-months';
-import { FigureLink, NONE, Stat } from './overview-stat';
+import { LinkedFigure, NONE, Stat } from './overview-stat';
 import { ReportScope } from './report-scope';
 import type { ReportData } from './use-report-data';
 
@@ -66,13 +61,9 @@ function Kpi({
       <div
         className={`mt-0.5 text-[20px] leading-[1.25] font-semibold tracking-[-0.03em] whitespace-nowrap tabular-nums ${tone}`}
       >
-        {href !== undefined && children ? (
-          <FigureLink href={href} label={linkLabel ?? id}>
-            {children}
-          </FigureLink>
-        ) : (
-          (children ?? NONE)
-        )}
+        <LinkedFigure href={href} label={linkLabel ?? id}>
+          {children}
+        </LinkedFigure>
       </div>
       <div className="mt-px truncate text-xs text-faint">{sub}</div>
     </div>
@@ -97,19 +88,13 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
   const expectancy =
     s.expectancy === null ? null : display.meanOfAll(s.expectancy);
   const outcomes = useMemo(() => winsVsLosses(p.trades, ctx), [p.trades, ctx]);
-  const tradeOf = (cents: number | null) =>
-    cents === null ? undefined : closed.find((c) => pnlOf(c, basis) === cents);
-  // In a unit, the trade largest in it; in money, the summary's.
-  const largest = (outcome: 'win' | 'loss', cents: number | null) => {
-    const t = largestInUnit(closed, ctx, outcome) ?? tradeOf(cents);
-    if (t) return { trade: t, figure: display.ofTrade(t) };
-    return {
-      trade: undefined,
-      figure: cents === null ? null : { money: cents },
-    };
+  // The trade that is the figure: its own id is the link, never a P&L match.
+  const largest = (outcome: 'win' | 'loss') => {
+    const t = largestTrade(closed, ctx, outcome);
+    return { trade: t, figure: t ? display.ofTrade(t) : null };
   };
-  const largestWin = largest('win', s.largestWin);
-  const largestLoss = largest('loss', s.largestLoss);
+  const largestWin = largest('win');
+  const largestLoss = largest('loss');
   const fig = (f: { money: number } | null) =>
     f === null ? null : <FigureText f={display.figure(f, true, currency)} />;
   const drawdown = p.drawdown;

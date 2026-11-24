@@ -39,7 +39,8 @@ export function OverviewDayCounts({
   data: ReportData;
 }): React.JSX.Element {
   const ds = data.partition.daySummary;
-  const entries = useJournal().data;
+  const journal = useJournal();
+  const entries = journal.data;
   const logged = useMemo(
     () => (entries ? loggedDays(entries, data.ctx.range) : null),
     [entries, data.ctx.range],
@@ -59,7 +60,17 @@ export function OverviewDayCounts({
         {ds.flatDays}
       </Stat>
       <Stat id="logged-days" data={data}>
-        {logged}
+        {logged !== null ? (
+          logged
+        ) : journal.isError ? (
+          <span className="font-medium text-faint">Could not load</span>
+        ) : (
+          <span
+            role="status"
+            aria-label="Loading logged days"
+            className="inline-block h-4 w-8 rounded-chip bg-sunken align-middle"
+          />
+        )}
       </Stat>
     </StatCard>
   );

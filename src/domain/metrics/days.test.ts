@@ -69,6 +69,8 @@ describe('days', () => {
       avgGreenDay: null,
       avgRedDay: null,
       tradesPerDay: null,
+      avgGreenValue: null,
+      avgRedValue: null,
       avgDailyPnl: null,
       avgWinLoss: null,
       largestGreenDay: null,
@@ -400,5 +402,53 @@ describe('loggedDays', () => {
         undefined,
       ),
     ).toBe(1);
+  });
+});
+
+describe('the day and month figures under a unit', () => {
+  const ticks = { ...ctx, unit: 'ticks' as const };
+  // ES: 0.25 a tick, so +2 points is 8 ticks a contract.
+  const es = (net: number, exit: number, day: string, qty = 1) =>
+    makeTrade({
+      net,
+      avgEntry: 4500,
+      avgExit: exit,
+      maxPosition: qty,
+      closedAt: `${day}T16:00:00Z`,
+    });
+  // Mon: +8 ticks for +$100 and -4 for -$10 (net +$90, +4 ticks); Tue -8 for +$5 (lose the sign in money).
+  const trades = [
+    es(10000, 4502, '2026-10-30'),
+    es(-1000, 4499, '2026-10-30'),
+    es(-20000, 4496, '2026-11-02', 2),
+    es(30000, 4503, '2026-11-03'),
+  ];
+  test('a day carries its trades ticks, a trade shared by exited size', () => {
+    const days = dailyPnl(trades, ticks);
+    expect(days.map((d) => [d.date, d.unit])).toEqual([
+      ['2026-10-30', 4],
+      ['2026-11-02', -32],
+      ['2026-11-03', 12],
+    ]);
+  });
+  test('in money a day has no unit value', () => {
+    expect(dailyPnl(trades, ctx)[0]).not.toHaveProperty('unit');
+  });
+  test('the day averages and the largest days read the unit', () => {
+    const s = daySummary(dailyPnl(trades, ticks), ticks);
+    expect(s.avgDailyPnl).toBeCloseTo((4 - 32 + 12) / 3);
+    // Green days 4 and 12 average 8, over the red day of 32.
+    expect(s.avgWinLoss).toBeCloseTo(8 / 32);
+    expect(s.largestGreenDay?.date).toBe('2026-11-03');
+    expect(s.largestRedDay?.date).toBe('2026-11-02');
+    expect(s.largestGreenDay?.unit).toBe(12);
+  });
+  test('the months read the unit', () => {
+    expect(monthSummary(dailyPnl(trades, ticks), ticks)).toEqual({
+      best: { month: '2026-10', net: 4 },
+      lowest: { month: '2026-11', net: -20 },
+      average: -8,
+      months: 2,
+    });
   });
 });

@@ -6,7 +6,7 @@ import { useId, type ReactNode } from 'react';
 import { FigureText } from '@/components/product/figure-text';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { MetricId } from '@/content/metric-definitions';
-import { useDisplay } from '@/lib/display';
+import { formatUnitValue, useDisplay } from '@/lib/display';
 import type { TileTone } from '@/components/ui/icon-tile';
 import { CARD, CARD_PAD, CardHeader } from '../dashboard/shared';
 import type { ReportData } from './use-report-data';
@@ -37,6 +37,28 @@ export function FigureLink({
   );
 }
 
+/**
+ * A figure, or None when it is null; a link to the trade or the day behind it
+ * when `href` is given. A figure of 0 is a figure.
+ */
+export function LinkedFigure({
+  href,
+  label,
+  children,
+}: {
+  href?: string;
+  label?: string;
+  children: ReactNode;
+}): React.JSX.Element {
+  if (children === null || children === undefined) return NONE;
+  if (href === undefined) return <>{children}</>;
+  return (
+    <FigureLink href={href} label={label ?? 'Open'}>
+      {children}
+    </FigureLink>
+  );
+}
+
 /** One label and its figure on a hairline row; a null figure reads None. */
 export function Stat({
   id,
@@ -60,7 +82,6 @@ export function Stat({
   /** The figure; null reads None. */
   children: ReactNode;
 }): React.JSX.Element {
-  const figure = children ?? NONE;
   return (
     <div className="flex items-baseline justify-between gap-3 border-b border-line/70 py-2.5 last:border-b-0">
       <span className="text-[13.5px] text-muted">
@@ -72,13 +93,9 @@ export function Stat({
         data-stat={id}
         className={`text-right font-semibold tabular-nums ${tone}`}
       >
-        {href !== undefined && children ? (
-          <FigureLink href={href} label={linkLabel ?? id}>
-            {figure}
-          </FigureLink>
-        ) : (
-          figure
-        )}
+        <LinkedFigure href={href} label={linkLabel ?? id}>
+          {children}
+        </LinkedFigure>
         {sub ? (
           <small className="ml-1.5 text-xs font-normal text-faint">{sub}</small>
         ) : null}
@@ -119,4 +136,22 @@ export function useMoney(
     );
   }
   return money;
+}
+
+/**
+ * A day or month figure: cents as money, or, when the display unit narrowed
+ * the trades (`ctx.unit`), the unit's own number. Null stays null (None).
+ */
+export function useDayValue(
+  data: ReportData,
+): (value: number | null) => ReactNode {
+  const money = useMoney(data);
+  const unit = data.ctx.unit;
+  function show(value: number | null): ReactNode {
+    if (value === null) return null;
+    return unit
+      ? formatUnitValue(unit, value, { currency: data.currency, signed: true })
+      : money(value);
+  }
+  return show;
 }

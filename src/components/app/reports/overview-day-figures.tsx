@@ -1,11 +1,12 @@
 'use client';
 
 import { CalendarBlank } from '@phosphor-icons/react/dist/ssr';
+import { dayValue } from '@/domain/metrics/days';
 import { calendarHref } from '@/data/report-links';
-import { formatPct, plural } from '@/lib/format';
+import { formatPct, formatQty, plural } from '@/lib/format';
 import { signTone } from '../dashboard/shared';
 import { periodText } from './report-chart';
-import { Stat, StatCard, useMoney } from './overview-stat';
+import { Stat, StatCard, useDayValue, useMoney } from './overview-stat';
 import type { ReportData } from './use-report-data';
 
 /**
@@ -21,6 +22,7 @@ export function OverviewDayFigures({
   const ds = p.daySummary;
   const dd = p.avgDrawdown;
   const money = useMoney(data);
+  const value = useDayValue(data);
   const green = ds.largestGreenDay;
   const red = ds.largestRedDay;
   const open = (day: string) => `Open ${periodText(day)} on the calendar`;
@@ -32,15 +34,15 @@ export function OverviewDayFigures({
         tone={signTone(ds.avgDailyPnl ?? 0)}
         sub={`${p.days.length} ${plural(p.days.length, 'day')}`}
       >
-        {money(ds.avgDailyPnl)}
+        {value(ds.avgDailyPnl)}
       </Stat>
       <Stat
         id="avg-daily-win-loss"
         data={data}
         sub={
-          ds.avgGreenDay === null || ds.avgRedDay === null ? undefined : (
+          ds.avgGreenValue === null || ds.avgRedValue === null ? undefined : (
             <>
-              {money(ds.avgGreenDay)} over {money(ds.avgRedDay)}
+              {value(ds.avgGreenValue)} over {value(ds.avgRedValue)}
             </>
           )
         }
@@ -55,7 +57,7 @@ export function OverviewDayFigures({
         href={green ? calendarHref(data.filters, green.date) : undefined}
         linkLabel={green ? open(green.date) : undefined}
       >
-        {money(green?.net ?? null)}
+        {value(green ? dayValue(green, data.ctx) : null)}
       </Stat>
       <Stat
         id="largest-red-day"
@@ -65,16 +67,16 @@ export function OverviewDayFigures({
         href={red ? calendarHref(data.filters, red.date) : undefined}
         linkLabel={red ? open(red.date) : undefined}
       >
-        {money(red?.net ?? null)}
+        {value(red ? dayValue(red, data.ctx) : null)}
       </Stat>
       <Stat
         id="avg-daily-volume"
         data={data}
-        sub={`${Number(p.volume.toFixed(2)).toLocaleString('en-US')} in all`}
+        sub={`${formatQty(p.volume)} in all`}
       >
         {p.avgDailyVolume === null
           ? null
-          : Number(p.avgDailyVolume.toFixed(2)).toLocaleString('en-US')}
+          : formatQty(Number(p.avgDailyVolume.toFixed(2)))}
       </Stat>
       <Stat
         id="avg-drawdown"

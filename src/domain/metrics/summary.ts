@@ -149,6 +149,28 @@ export function largestInUnit(
 }
 
 /**
+ * The closed trade `classify` calls a win (or a loss) with the largest result:
+ * in `ctx.unit` the most ticks, pips, points or R, otherwise the highest (or
+ * lowest) P&L on the basis. The trade itself, so a link can name it by id.
+ */
+export function largestTrade(
+  trades: readonly Trade[],
+  ctx: MetricContext,
+  outcome: 'win' | 'loss',
+): Trade | undefined {
+  if (ctx.unit) return largestInUnit(trades, ctx, outcome);
+  let best: { t: Trade; v: number } | undefined;
+  for (const t of trades) {
+    if (!isClosed(t)) continue;
+    const c = classify(t, ctx);
+    if (c.outcome !== outcome) continue;
+    if (!best || (outcome === 'win' ? c.value > best.v : c.value < best.v))
+      best = { t, v: c.value };
+  }
+  return best?.t;
+}
+
+/**
  * Aggregate closed trades. The input must be a single-currency set (the data layer
  * partitions by pnlCurrency first); `currencies` lets the UI warn when it is not.
  */
