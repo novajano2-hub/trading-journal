@@ -5,37 +5,44 @@ import { MagnifyingGlass } from '@phosphor-icons/react/dist/ssr';
 import { EMPTY_FILTERS } from '@/data/filters';
 import { AccountSwitcher } from './account-switcher';
 import { AppSearch } from './app-search';
-import { BasisSwitch } from './basis-switch';
+import { DisplayMenu } from './display-menu';
 import { FilterBar, FilterBarView } from './filter-bar';
 import { MobileNav } from './mobile-nav';
 import { SampleLabel } from './sample-label';
 import { Sidebar } from './sidebar';
+import { AppearanceSync } from './appearance';
+import { TabBar } from './tab-bar';
 import { TopBar } from './top-bar';
+import { UnitNotice } from './unit-notice';
 
 /** The chips as prerendered, before the URL is read: all unset and inert. */
 const FILTERS_FALLBACK = (
   <FilterBarView
     filters={EMPTY_FILTERS}
-    options={{ symbols: [], strategies: [], tags: [] }}
+    options={{ symbols: [], strategies: [], tags: [], categories: [] }}
     today=""
     onChange={() => {}}
     disabled
   />
 );
 
-/** The search before the URL is read: its resting icon (34px, 40px on a phone), inert, holding the bar's place. */
+/** The search before the URL is read: its resting icon (34px; a plain 44px glyph on a phone), inert, holding the bar's place. */
 function SearchFallback(): React.JSX.Element {
   return (
     <span
       aria-hidden="true"
-      className="inline-flex size-[34px] flex-none items-center justify-center rounded-control border border-line bg-surface-1 text-muted pointer-coarse:size-11 max-sm:size-10 max-sm:pointer-coarse:size-11"
+      className="inline-flex size-[34px] flex-none items-center justify-center rounded-control border border-line bg-surface-1 text-muted pointer-coarse:size-11 max-sm:size-11 max-sm:border-transparent max-sm:bg-transparent"
     >
       <MagnifyingGlass size={18} />
     </span>
   );
 }
 
-/** Every /app page: the sidebar (a drawer below `lg`), the top bar, then the page. */
+/**
+ * Every /app page: the sidebar (a drawer from `sm` to `lg`), the top bar, then
+ * the page. Below `sm` the tab bar at the foot replaces both sidebar and
+ * drawer, and the page keeps clear of it.
+ */
 export function AppShell({
   children,
 }: {
@@ -49,6 +56,7 @@ export function AppShell({
       >
         Skip to content
       </a>
+      <AppearanceSync />
       <Sidebar switcher={<AccountSwitcher />} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
@@ -63,17 +71,23 @@ export function AppShell({
               <AppSearch />
             </Suspense>
           }
-          basis={<BasisSwitch />}
+          basis={<DisplayMenu />}
           label={<SampleLabel />}
+          badge={<SampleLabel badge />}
         />
+        {/* How many trades the display unit leaves out of the page, when it narrows them. */}
+        <Suspense fallback={null}>
+          <UnitNotice />
+        </Suspense>
         <main
           id="content"
           tabIndex={-1}
-          className="flex min-w-0 flex-1 flex-col outline-none"
+          className="flex min-w-0 flex-1 flex-col pb-(--tab-bar) outline-none"
         >
           {children}
         </main>
       </div>
+      <TabBar switcher={<AccountSwitcher appearance={false} />} />
     </div>
   );
 }

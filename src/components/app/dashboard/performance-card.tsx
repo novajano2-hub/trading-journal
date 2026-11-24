@@ -1,7 +1,6 @@
 'use client';
 
 import { useId } from 'react';
-import { ChartLineUp } from '@phosphor-icons/react/dist/ssr';
 import {
   formatTicker,
   NumberTicker,
@@ -13,15 +12,16 @@ import { metricDefinition, type MetricId } from '@/content/metric-definitions';
 import type { DashboardModel } from '@/data/dashboard';
 import type { MetricContext } from '@/domain/metrics/context';
 import type { DayStat } from '@/domain/metrics/days';
-import { summarize } from '@/domain/metrics/summary';
+import { summarize, type Summary } from '@/domain/metrics/summary';
 import { closedInOrder } from '@/domain/trade-status';
 import type { Cents, PnlBasis, Trade } from '@/domain/types';
-import { formatMoney, formatPnl } from '@/lib/format';
-import { CARD, CARD_PAD, CardHeader } from './shared';
-
-/** A balance: unsigned, unless it has gone below zero. */
-const balance = (cents: Cents, currency: string) =>
-  cents < 0 ? formatPnl(cents, currency) : formatMoney(cents, currency);
+import { UNIT_SCOPE } from '@/content/display-units';
+import { isTradeUnit } from '@/domain/metrics/units';
+import { leftOutIn, useDisplay, type TickerSpec } from '@/lib/display';
+import { FigureText } from '@/components/product/figure-text';
+import { formatPct, plural } from '@/lib/format';
+import { RatioText } from '../ratio-text';
+import { CARD, CARD_PAD, CardHeader, signTone } from './shared';
 
 /** How each KPI moved through the range, each point over a trailing window. */
 export interface KpiTrends {
@@ -58,6 +58,8 @@ export const trendWindow = (closed: number): number =>
 export function kpiTrends(
   trades: readonly Trade[],
   ctx: MetricContext,
+  /** Reads a window's expectancy in a display unit, from its trades and its summary; default: the summary's, in cents. */
+  expectancyIn?: (window: readonly Trade[], summary: Summary) => number | null,
 ): KpiTrends {
   const closed = closedInOrder(trades);
   const size = trendWindow(closed.length);
@@ -73,10 +75,12 @@ export function kpiTrends(
   };
   for (let i = 0; i < points; i++) {
     const end = size + Math.round((i * span) / (points - 1));
-    const s = summarize(closed.slice(end - size, end), ctx);
+    const window = closed.slice(end - size, end);
+    const s = summarize(window, ctx);
     if (s.winRate !== null) trends.winRate.push(s.winRate);
     if (s.profitFactor !== null) trends.profitFactor.push(s.profitFactor);
-    if (s.expectancy !== null) trends.expectancy.push(s.expectancy);
+    const expectancy = expectancyIn ? expectancyIn(window, s) : s.expectancy;
+    if (expectancy !== null) trends.expectancy.push(expectancy);
   }
   return trends;
 }
@@ -117,6 +121,7 @@ function Kpi({
   id,
   value,
   kind,
+  spec,
   basis,
   currency,
   trend,
@@ -125,14 +130,25 @@ function Kpi({
   id: MetricId;
   value: number | null;
   kind: TickerKind;
+  /** A money KPI in the chosen display unit: its number and how it reads. */
+  spec?: TickerSpec;
   basis: PnlBasis;
   currency: string;
   trend: readonly number[];
   /** Closed trades behind each trend point. */
   windowSize: number;
 }): React.JSX.Element {
-  const fmt = (v: number) => formatTicker(kind, v, { digits: 1, currency });
-  const text = value === null ? 'None yet' : fmt(value);
+  const display = useDisplay();
+  // The profit factor is built from money, so Privacy hides it, its trend's words included.
+  const masked = kind === 'ratio' && display.unit === 'privacy';
+  const fmt = (v: number) =>
+    masked
+      ? display.ratio(v).text
+      : spec
+        ? spec.format(v)
+        : formatTicker(kind, v, { digits: 1, currency });
+  const shown = spec && value !== null ? spec.value : value;
+  const text = shown === null ? 'None' : fmt(shown);
   const hasTrend = trend.length >= 2;
   // Says what the line is: a rolling window, not the range's figure beside it.
   const trendLabel = hasTrend
@@ -154,14 +170,18 @@ function Kpi({
           className="min-w-0 flex-1 leading-[1.25] font-semibold tracking-[-0.03em] whitespace-nowrap"
           style={{ fontSize: figureSize(text.length) }}
         >
-          {value === null ? (
-            <span className="font-medium text-faint">None yet</span>
+          {shown === null ? (
+            <span className="font-medium text-faint">None</span>
+          ) : masked ? (
+            <FigureText f={display.ratio(shown)} />
           ) : (
             <NumberTicker
-              value={value}
+              value={shown}
               kind={kind}
               digits={1}
               currency={currency}
+              format={spec?.format}
+              label={spec?.label}
             />
           )}
         </div>
@@ -173,6 +193,41 @@ function Kpi({
             className="mr-1 mb-1 h-6 w-12 flex-none @max-[7rem]:hidden"
           />
         ) : null}
+      </div>
+    </div>
+  );
+}
+
+/** A figure that reads on two lines: its value, and a quiet line of counts or amounts beneath. */
+function Stat({
+  id,
+  basis,
+  value,
+  sub,
+}: {
+  id: MetricId;
+  basis: PnlBasis;
+  /** Null reads None. */
+  value: React.ReactNode | null;
+  sub: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <div
+      data-kpi={id}
+      className="min-w-0 border-t border-line pt-2.5 not-first:border-l not-first:pl-3.5"
+    >
+      <div className="text-xs leading-4 text-faint pointer-coarse:-my-3.5">
+        <MetricTip id={id} basis={basis} />
+      </div>
+      <div className="mt-0.5 text-[20px] leading-[1.25] font-semibold tracking-[-0.03em] whitespace-nowrap tabular-nums">
+        {value === null ? (
+          <span className="font-medium text-faint">None</span>
+        ) : (
+          value
+        )}
+      </div>
+      <div className="mt-0.5 text-xs leading-[1.4] text-muted tabular-nums">
+        {sub}
       </div>
     </div>
   );
@@ -199,8 +254,41 @@ export function PerformanceCard({
 }): React.JSX.Element {
   const headingId = useId();
   const { equity } = performance;
-  const start = balance(equity[0] ?? 0, currency);
-  const end = balance(equity[equity.length - 1] ?? 0, currency);
+  const display = useDisplay();
+  // A balance is an amount, never a return: dollars, or hidden.
+  const balance = (cents: Cents) =>
+    display.figure({ money: cents }, false, currency);
+  const start = balance(equity[0] ?? 0);
+  const end = balance(equity[equity.length - 1] ?? 0);
+  // A balance means nothing in R, ticks, pips or points: it has no value there.
+  const noBalance = isTradeUnit(display.unit)
+    ? UNIT_SCOPE[display.unit].name
+    : null;
+  const pnl = display.ofAll(performance.pnl);
+  const pnlTicker = display.ticker(pnl, currency);
+  const leftOut = leftOutIn(pnl, display.unit);
+  const expectancy =
+    performance.expectancy === null
+      ? undefined
+      : display.ticker(display.expectancy(performance.expectancy), currency);
+
+  // Under a unit the two averages read in it, like the figures above.
+  const avgWin =
+    performance.avgWin === null
+      ? undefined
+      : display.figure(
+          display.meanOfTrades(performance.winIds, performance.avgWin),
+          true,
+          currency,
+        );
+  const avgLoss =
+    performance.avgLoss === null
+      ? undefined
+      : display.figure(
+          display.meanOfTrades(performance.lossIds, performance.avgLoss),
+          true,
+          currency,
+        );
 
   return (
     <section
@@ -208,8 +296,6 @@ export function PerformanceCard({
       className={`${CARD} ${CARD_PAD} flex h-full flex-col`}
     >
       <CardHeader
-        icon={ChartLineUp}
-        tone="accent"
         headingId={headingId}
         title="Performance"
         end={
@@ -224,10 +310,17 @@ export function PerformanceCard({
               }
               className="pointer-coarse:-my-3.5"
             />{' '}
-            {/* The line's own label already says this to a screen reader. */}
-            <span aria-hidden="true" className="whitespace-nowrap tabular-nums">
-              {start} to {end}
-            </span>
+            {noBalance !== null ? (
+              <span className="font-medium">None</span>
+            ) : (
+              // The line's own label already says this to a screen reader.
+              <span
+                aria-hidden="true"
+                className="whitespace-nowrap tabular-nums"
+              >
+                {start.text} to {end.text}
+              </span>
+            )}
           </span>
         }
       />
@@ -242,23 +335,37 @@ export function PerformanceCard({
             aria-hidden="true"
             className="invisible col-start-1 row-start-1"
           >
-            {formatTicker('money', performance.pnl, { currency })}
+            {pnlTicker.format(pnlTicker.value)}
           </span>
           <NumberTicker
-            value={performance.pnl}
+            value={pnlTicker.value}
             kind="money"
             currency={currency}
+            format={pnlTicker.format}
+            label={pnlTicker.label}
             className="col-start-1 row-start-1 min-w-0!"
           />
         </span>
         <span className="text-[12.5px] text-faint">
           <MetricTip id="pnl" basis={basis} />
         </span>
+        {leftOut > 0 ? (
+          // The figure's spoken label already says it.
+          <span aria-hidden="true" className="text-[12.5px] text-faint">
+            {leftOut} {plural(leftOut, 'trade')} left out
+          </span>
+        ) : null}
       </div>
       <Sparkline
         series={line.points}
-        label={`Equity, from ${start} to ${end}`}
-        className="mt-1.5 mb-2.5"
+        label={
+          noBalance !== null
+            ? `Equity line, the balance has no value in ${noBalance}`
+            : `Equity, from ${start.label} to ${end.label}`
+        }
+        // From xl the card stands as tall as the two beside it: the line takes the height.
+        className="mt-1.5 mb-2.5 h-20 xl:h-auto xl:min-h-20 xl:flex-1"
+        fill
       />
       <div className="mt-auto grid grid-cols-3 border-t border-line">
         <Kpi
@@ -283,10 +390,51 @@ export function PerformanceCard({
           id="expectancy"
           value={performance.expectancy}
           kind="money"
+          spec={expectancy}
           basis={basis}
           currency={currency}
           trend={trends.expectancy}
           windowSize={trends.window}
+        />
+      </div>
+      <div className="grid grid-cols-2">
+        <Stat
+          id="daily-win-rate"
+          basis={basis}
+          value={
+            performance.dayWin.rate === null
+              ? null
+              : formatPct(performance.dayWin.rate, 1)
+          }
+          sub={`${performance.dayWin.green} green, ${performance.dayWin.red} red, ${performance.dayWin.flat} flat`}
+        />
+        <Stat
+          id="avg-win-loss"
+          basis={basis}
+          value={
+            performance.winLossRatio === null ? null : (
+              <RatioText value={performance.winLossRatio} />
+            )
+          }
+          sub={
+            avgWin === undefined || avgLoss === undefined ? (
+              'None'
+            ) : (
+              <>
+                <span
+                  className={`whitespace-nowrap ${signTone(performance.avgWin ?? 0)}`}
+                >
+                  <FigureText f={avgWin} />
+                </span>{' '}
+                /{' '}
+                <span
+                  className={`whitespace-nowrap ${signTone(performance.avgLoss ?? 0)}`}
+                >
+                  <FigureText f={avgLoss} />
+                </span>
+              </>
+            )
+          }
         />
       </div>
     </section>

@@ -23,6 +23,7 @@ export function makeTrade(p: Partial<Trade> & { net: Cents }): Trade {
     pnlCurrency: 'USD',
     gross: p.net + (p.fees ?? 0),
     fees: 0,
+    strategyIds: [],
     tagIds: [],
     ruleChecks: [],
     ...p,

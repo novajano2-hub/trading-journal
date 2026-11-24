@@ -86,13 +86,32 @@ describe('planImport', () => {
     ).toEqual([2]);
   });
 
+  test('an open manual trade is never merged into an import', () => {
+    const manual: Trade = {
+      ...plan(H + '2026-11-16 09:41:00,AAPL,Buy,10,190\n').trades[0]!,
+      id: 'manual-1',
+      serial: 4,
+      source: 'manual',
+      importId: undefined,
+    };
+    const p = plan(
+      H + '2026-11-17 10:00:00,AAPL,Sell,10,195\n',
+      ctx({ nextSerial: 5, openTrades: [manual] }),
+    );
+    expect(p.replacedTrades).toEqual([]);
+    expect(p.trades.map((t) => t.id)).not.toContain('manual-1');
+    expect(p.trades.every((t) => t.source !== 'manual')).toBe(true);
+    expect(p.trades.map((t) => t.serial)).toEqual([5]);
+  });
+
   test('a position closed by a later import is one trade keeping id, serial and tags (Review Focus 2)', () => {
     const open: Trade = {
       ...plan(H + '2026-11-16 09:41:00,ESZ5,Buy,2,6010\n').trades[0]!,
       serial: 7,
       tagIds: ['t1'],
-      strategyId: 's1',
+      strategyIds: ['s1', 's2'],
       rating: 4,
+      reviewed: true,
       ruleChecks: [{ ruleId: 'r1', followed: true }],
       noteId: 'n1',
       plannedStop: 6000,
@@ -111,8 +130,9 @@ describe('planImport', () => {
         id: open.id,
         serial: 7,
         tagIds: ['t1'],
-        strategyId: 's1',
+        strategyIds: ['s1', 's2'],
         rating: 4,
+        reviewed: true,
         ruleChecks: [{ ruleId: 'r1', followed: true }],
         noteId: 'n1',
         plannedStop: 6000,
@@ -223,7 +243,7 @@ describe('planImport', () => {
     test('a merge that flips the direction keeps identity and journaling, not the plan', () => {
       const journaled: Trade = {
         ...open,
-        strategyId: 's1',
+        strategyIds: ['s1'],
         rating: 4,
         ruleChecks: [{ ruleId: 'r1', followed: false }],
         noteId: 'n1',
@@ -242,7 +262,7 @@ describe('planImport', () => {
         id: open.id,
         serial: 7,
         tagIds: ['t1'],
-        strategyId: 's1',
+        strategyIds: ['s1'],
         rating: 4,
         ruleChecks: [{ ruleId: 'r1', followed: false }],
         noteId: 'n1',
@@ -253,6 +273,26 @@ describe('planImport', () => {
       expect(t).not.toHaveProperty('plannedStop');
       expect(t).not.toHaveProperty('plannedTarget');
       expect(t).not.toHaveProperty('initialRisk');
+    });
+
+    test('a merge that flips the direction raises one direction-flipped flag; one that keeps it raises none (E32)', () => {
+      const flipped = later(
+        '2026-11-16 09:30:00,ESZ5,Sell,2,6020\n2026-11-16 09:41:00,ESZ5,Buy,2,6010\n',
+      );
+      expect(
+        flipped.flags.filter((f) => f.code === 'direction-flipped'),
+      ).toEqual([
+        {
+          tradeId: open.id,
+          code: 'direction-flipped',
+          was: 'long',
+          now: 'short',
+        },
+      ]);
+      const kept = later(
+        '2026-11-16 09:30:00,ESZ5,Buy,1,6000\n2026-11-16 09:41:00,ESZ5,Buy,2,6010\n',
+      );
+      expect(kept.flags).toEqual([]);
     });
   });
 
@@ -377,6 +417,13 @@ describe('planImport', () => {
       pnlCurrency: 'USD',
       gross: 12500,
       net: 12500,
+    });
+    // Every trade the file gave a P&L for keeps that figure, matching or not.
+    expect(p.filePnl).toEqual({
+      [p.trades[0]!.id]: 20000,
+      [p.trades[1]!.id]: 19500,
+      [p.trades[2]!.id]: 20002,
+      [p.trades[3]!.id]: 12500,
     });
   });
 

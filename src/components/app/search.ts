@@ -5,7 +5,8 @@ export type SearchResult =
   | { kind: 'module'; id: AppModuleId; label: string }
   | { kind: 'symbol'; value: string; label: string }
   | { kind: 'strategy'; id: string; label: string }
-  | { kind: 'tag'; id: string; label: string; category: TagCategory };
+  /** `category` is the tag's category name. */
+  | { kind: 'tag'; id: string; label: string; category: string };
 
 export const MAX_RESULTS = 8;
 
@@ -20,6 +21,7 @@ export function searchApp(
     symbols: readonly string[];
     strategies: readonly Strategy[];
     tags: readonly Tag[];
+    categories: readonly TagCategory[];
   },
 ): SearchResult[] {
   const q = query.trim().toLowerCase();
@@ -42,9 +44,15 @@ export function searchApp(
     if (s.name.toLowerCase().includes(q))
       out.push({ kind: 'strategy', id: s.id, label: s.name });
   }
+  const categoryName = new Map(src.categories.map((c) => [c.id, c.name]));
   for (const t of src.tags) {
     if (t.name.toLowerCase().includes(q))
-      out.push({ kind: 'tag', id: t.id, label: t.name, category: t.category });
+      out.push({
+        kind: 'tag',
+        id: t.id,
+        label: t.name,
+        category: categoryName.get(t.categoryId) ?? '',
+      });
   }
   return out.slice(0, MAX_RESULTS);
 }

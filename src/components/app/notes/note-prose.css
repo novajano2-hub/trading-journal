@@ -1,0 +1,287 @@
+/*
+ * How a note reads. Token colours only; the type follows DESIGN.md's ramp
+ * (comp 10: 15px / 1.65 body, 15px semibold prompts, larger headings above).
+ */
+.note-prose {
+  margin-top: 6px;
+  max-width: 68ch;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text);
+  outline: none;
+  overflow-wrap: anywhere;
+}
+.note-prose:focus-visible {
+  outline: none;
+}
+.note-prose > * + * {
+  margin-top: 4px;
+}
+.note-prose p {
+  margin: 2px 0 0;
+}
+.note-prose p.is-editor-empty:first-child::before,
+.note-prose p.is-empty::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--faint);
+}
+.note-prose h1 {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin-top: 22px;
+}
+.note-prose h2 {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  margin-top: 20px;
+}
+.note-prose h3 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-top: 16px;
+}
+.note-prose > :first-child {
+  margin-top: 0;
+}
+.note-prose strong {
+  font-weight: 600;
+}
+.note-prose s {
+  color: var(--muted);
+}
+.note-prose a {
+  color: var(--accent-ink);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.note-prose code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: var(--sunken);
+}
+.note-prose pre {
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--sunken);
+  overflow-x: auto;
+}
+.note-prose pre code {
+  padding: 0;
+  background: none;
+}
+.note-prose ul,
+.note-prose ol {
+  padding-left: 20px;
+  margin-top: 2px;
+}
+.note-prose ul {
+  list-style: disc;
+}
+.note-prose ol {
+  list-style: decimal;
+}
+.note-prose li::marker {
+  color: var(--faint);
+}
+.note-prose blockquote {
+  margin: 8px 0;
+  padding-left: 14px;
+  border-left: 3px solid var(--line-2);
+  color: var(--muted);
+}
+.note-prose hr {
+  border: 0;
+  border-top: 1px solid var(--line-2);
+  margin: 18px 0;
+}
+
+/* Checklists wear the TaskCheckbox look. */
+.note-prose ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0;
+}
+.note-prose ul[data-type='taskList'] ul[data-type='taskList'] {
+  padding-left: 26px;
+}
+.note-prose li[data-type='taskItem'] {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.note-prose li[data-type='taskItem'] > label {
+  flex: none;
+  display: grid;
+  place-items: center;
+  height: 1.65em;
+  user-select: none;
+}
+.note-prose li[data-type='taskItem'] > div {
+  flex: 1;
+  min-width: 0;
+}
+.note-prose li[data-type='taskItem'] input[type='checkbox'] {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  background: var(--surface-1);
+  box-shadow: var(--shadow-chip);
+  cursor: pointer;
+  transition:
+    background-color 240ms var(--ease-glide),
+    border-color 240ms var(--ease-glide);
+}
+.note-prose li[data-type='taskItem'] input[type='checkbox']:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+}
+.note-prose li[data-type='taskItem'] input[type='checkbox']:checked {
+  border-color: var(--gain-fill, var(--gain));
+  background:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 18 18' xmlns='http://www.w3.org/2000/svg' fill='none'%3E%3Cpath d='M4.75 9.5l3 3 5.5-6.5' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      center / 18px 18px no-repeat,
+    var(--gain-fill, var(--gain));
+}
+.note-prose li[data-type='taskItem'] input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.note-prose li[data-type='taskItem'][data-checked='true'] > div {
+  color: var(--muted);
+}
+@media (pointer: coarse) {
+  .note-prose li[data-type='taskItem'] > label {
+    width: 44px;
+    margin: -0.5em 0 -0.5em -13px;
+    height: 2.65em;
+  }
+}
+
+/* Collapsible sections: a caret button, a title, the content. */
+.note-prose div[data-type='details'] {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  margin: 10px 0;
+  padding: 4px 0;
+  border-top: 1px solid var(--line);
+}
+.note-prose div[data-type='details'] > button {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
+  width: 24px;
+  height: 28px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.note-prose div[data-type='details'] > button:hover {
+  background: var(--sunken);
+  color: var(--text);
+}
+/* A right-pointing caret that turns down when open. */
+.note-prose div[data-type='details'] > button::before {
+  content: '';
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M181.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L164.69,128,90.34,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181.66,133.66Z'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M181.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L164.69,128,90.34,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181.66,133.66Z'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  transition: transform 160ms var(--ease-glide);
+}
+.note-prose div[data-type='details'].is-open > button::before {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .note-prose div[data-type='details'] > button::before {
+    transition: none;
+  }
+}
+@media (pointer: coarse) {
+  .note-prose div[data-type='details'] {
+    grid-template-columns: 44px 1fr;
+  }
+  .note-prose div[data-type='details'] > button {
+    width: 44px;
+    height: 44px;
+    margin-top: 0;
+  }
+}
+.note-prose div[data-type='details'] > div {
+  display: contents;
+}
+.note-prose div[data-type='detailsSummary'],
+.note-prose summary {
+  display: block;
+  list-style: none;
+  grid-column: 2;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+  padding: 6px 0;
+}
+.note-prose div[data-type='detailsContent'] {
+  grid-column: 2;
+}
+.note-prose div[data-type='detailsContent'][hidden] {
+  display: none;
+}
+
+/* Tables take the app's table style: quiet header, hairline rows. */
+.note-prose .tableWrapper {
+  overflow-x: auto;
+  margin: 10px 0;
+}
+.note-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.note-prose th,
+.note-prose td {
+  min-width: 90px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.note-prose th {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--faint);
+  background: var(--sunken);
+}
+.note-prose th p,
+.note-prose td p {
+  margin: 0;
+}
+.note-prose .selectedCell {
+  background: var(--accent-soft);
+}
+
+.note-prose div[data-type='detailsContent'] h3 {
+  margin-top: 10px;
+}

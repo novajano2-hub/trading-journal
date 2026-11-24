@@ -8,7 +8,6 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { MODULES } from '@/content/modules';
 import { enter, exit } from '@/lib/motion';
 import { Chip } from '@/components/ui/chip';
-import { IconTile } from '@/components/ui/icon-tile';
 import { MODULE_ICONS } from './module-icons';
 
 export function ProductMenu({
@@ -74,6 +73,7 @@ export function ProductMenu({
     >
       {items.map((m) => {
         const planned = m.status === 'in-development';
+        const Glyph = MODULE_ICONS[m.slug];
         return (
           <li key={m.slug}>
             <Link
@@ -85,10 +85,11 @@ export function ProductMenu({
               }}
               className="flex h-full gap-3 rounded-control p-3 text-text no-underline transition-colors duration-200 ease-(--ease-glide) hover:bg-sunken"
             >
-              {/* Live modules in ultramarine; a planned one is an outline. */}
-              <IconTile
-                icon={MODULE_ICONS[m.slug]}
-                tone={planned ? 'faint' : 'accent'}
+              {/* A plain glyph at text size; a planned module's is fainter. */}
+              <Glyph
+                size={18}
+                aria-hidden="true"
+                className={`mt-px flex-none ${planned ? 'text-faint' : 'text-muted'}`}
               />
               <span className="min-w-0">
                 <span className="flex flex-wrap items-center gap-2 text-[14.5px] font-medium">

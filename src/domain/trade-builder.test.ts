@@ -203,6 +203,30 @@ describe('buildTrades', () => {
     ).trades[0];
     expect(gbp).toMatchObject({ pnlCurrency: 'GBP', gross: 6000 });
   });
+  test('a USD-base forex trade with several exits converts each exit at its own rate and rounds once (E71)', () => {
+    // Short 2 @ 153.757, covered 1 @ 154.098 and 1 @ 154.026, commission 14.00.
+    const t = build(
+      [
+        fill('f1', 'sell', 2, 153.757, T1, 700),
+        fill('f2', 'buy', 1, 154.098, T2, 350),
+        fill('f3', 'buy', 1, 154.026, T3, 350),
+      ],
+      'USDJPY',
+    ).trades[0];
+    // -34,100 / 154.098 + -26,900 / 154.026 = -395.934, not -221.29 - 174.65.
+    expect(t).toMatchObject({ gross: -39593, fees: 1400, net: -40993 });
+  });
+  test('the net rounds once, half away from zero, and gross = net + fees (E71, crypto)', () => {
+    // ETHUSD short 0.7 @ 3380.13 covered @ 3291.98, fees 4.67: gross 61.705, net 57.035.
+    const t = build(
+      [
+        fill('f1', 'sell', 0.7, 3380.13, T1, 233),
+        fill('f2', 'buy', 0.7, 3291.98, T2, 234),
+      ],
+      'ETHUSD',
+    ).trades[0];
+    expect(t).toMatchObject({ net: 5704, fees: 467, gross: 6171 });
+  });
   test('accounts never mix, serials follow openedAt, unknown symbols are reported', () => {
     const r = buildTrades(
       [

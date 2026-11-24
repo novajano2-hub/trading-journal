@@ -49,10 +49,24 @@ function subscribe(listener: () => void): () => void {
 const snapshot = () => committed;
 
 export function useSearchParams(): URLSearchParams {
-  const { search } = useSyncExternalStore(subscribe, snapshot);
+  const { search } = useSyncExternalStore(subscribe, snapshot, snapshot);
   return useMemo(() => new URLSearchParams(search), [search]);
 }
 
 export function usePathname(): string {
-  return useSyncExternalStore(subscribe, snapshot).pathname;
+  return useSyncExternalStore(subscribe, snapshot, snapshot).pathname;
+}
+
+/** `router.push` and `replace` write the address bar, as a client navigation does. */
+export function useRouter(): {
+  push(url: string): void;
+  replace(url: string): void;
+} {
+  return useMemo(
+    () => ({
+      push: (url: string) => window.history.pushState(null, '', url),
+      replace: (url: string) => window.history.replaceState(null, '', url),
+    }),
+    [],
+  );
 }

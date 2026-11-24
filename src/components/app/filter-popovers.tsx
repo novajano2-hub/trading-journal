@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from 'react';
 import { RAISED } from '@/components/ui/button-styles';
+import { usePrefs } from '@/data/query/hooks';
 import { DATE_PRESETS, type DatePreset, type DateRange } from '@/data/filters';
 import type { Strategy, Tag, TagCategory } from '@/domain/types';
 import { PRESET_LABELS } from '@/lib/range-label';
@@ -25,13 +26,6 @@ export const SIDE_OPTIONS = [
   { value: 'short', label: 'Short' },
 ] as const;
 
-export const TAG_GROUPS: readonly { category: TagCategory; label: string }[] = [
-  { category: 'setup', label: 'Setups' },
-  { category: 'mistake', label: 'Mistakes' },
-  { category: 'emotion', label: 'Emotions' },
-  { category: 'custom', label: 'Custom' },
-];
-
 /** The presets and All time apply at once; a custom From/To pair applies with Apply. */
 export function DateBody({
   range,
@@ -50,7 +44,8 @@ export function DateBody({
       : range.from === undefined && range.to === undefined
         ? 'all'
         : undefined;
-  const dates = datesOf(range, today);
+  const weekStart = usePrefs().data?.weekStart;
+  const dates = datesOf(range, today, weekStart);
   const shown = `${dates.from ?? ''}/${dates.to ?? ''}`;
   const [from, setFrom] = useState(dates.from ?? '');
   const [to, setTo] = useState(dates.to ?? '');
@@ -197,26 +192,28 @@ export function StrategyBody({
   );
 }
 
-/** Tags grouped by category. */
+/** Tags grouped by category, in the categories' order. */
 export function TagBody({
   tags,
+  categories,
   selected,
   onChange,
 }: {
   tags: readonly Tag[];
+  categories: readonly TagCategory[];
   selected: readonly string[];
   onChange(ids: string[]): void;
 }): React.JSX.Element {
   if (tags.length === 0) return <Empty>No tags yet.</Empty>;
   return (
     <div className="flex flex-col gap-1">
-      {TAG_GROUPS.map(({ category, label }) => {
-        const inGroup = tags.filter((t) => t.category === category);
+      {categories.map((category) => {
+        const inGroup = tags.filter((t) => t.categoryId === category.id);
         if (inGroup.length === 0) return null;
         return (
           <CheckRows
-            key={category}
-            legend={label}
+            key={category.id}
+            legend={category.name}
             legendVisible
             items={inGroup.map((t) => ({ id: t.id, label: t.name }))}
             selected={selected}

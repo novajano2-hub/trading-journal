@@ -41,6 +41,8 @@ export function MorphDialog({
   title,
   description,
   icon,
+  size = 'default',
+  footer,
   children,
 }: {
   open: boolean;
@@ -51,6 +53,10 @@ export function MorphDialog({
   description?: ReactNode;
   /** A decorative tile beside the title, as the card it grew from has. */
   icon?: ReactNode;
+  /** `full` fills the screen inside a small gutter, for a chart or a table that wants the room. */
+  size?: 'default' | 'full';
+  /** Pinned under the scrolling body, never inside it. */
+  footer?: ReactNode;
   children: ReactNode;
 }): React.JSX.Element | null {
   const reduced = useReducedMotion();
@@ -169,9 +175,16 @@ export function MorphDialog({
             event.preventDefault();
             returnFocus.current?.focus();
           }}
-          className="fixed inset-0 z-50 m-auto flex h-fit max-h-[80dvh] w-[calc(100%-32px)] max-w-[760px] flex-col overflow-hidden rounded-card border border-line bg-surface-1 shadow-[var(--shadow)] outline-none"
+          className={`fixed z-50 flex flex-col overflow-hidden rounded-card border border-line bg-surface-1 shadow-[var(--shadow)] outline-none ${
+            size === 'full'
+              ? 'inset-3 sm:inset-6'
+              : 'inset-0 m-auto h-fit max-h-[80dvh] w-[calc(100%-32px)] max-w-[760px]'
+          }`}
         >
-          <div ref={body} className="flex max-h-[80dvh] min-h-0 flex-col">
+          <div
+            ref={body}
+            className={`flex min-h-0 flex-col ${size === 'full' ? 'h-full' : 'max-h-[80dvh]'}`}
+          >
             <div className="flex items-start gap-3 border-b border-line px-5 pt-[18px] pb-4">
               {icon ? <div className="flex-none pt-px">{icon}</div> : null}
               <div className="min-w-0 flex-1">
@@ -193,9 +206,14 @@ export function MorphDialog({
                 <X size={18} aria-hidden="true" />
               </Dialog.Close>
             </div>
-            <div className="min-h-0 overflow-y-auto px-5 pt-2 pb-4">
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-2 pb-4">
               {children}
             </div>
+            {footer ? (
+              <div className="flex-none border-t border-line bg-surface-1 px-5 py-3">
+                {footer}
+              </div>
+            ) : null}
           </div>
         </Dialog.Content>
       </Dialog.Portal>

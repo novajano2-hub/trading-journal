@@ -17,3 +17,11 @@ export function roundHalfEven(x: number): number {
 export function toCents(amount: number): Cents {
   return roundHalfEven(amount * 100);
 }
+
+/** Round to the nearest integer; ties (within float tolerance) go away from zero, as TradeZella's backend does. */
+export function roundHalfAway(x: number): number {
+  const a = Math.abs(x);
+  const floor = Math.floor(a);
+  const r = a - floor >= 0.5 - EPS ? floor + 1 : floor;
+  return r === 0 ? 0 : x < 0 ? -r : r; // never -0
+}

@@ -1,8 +1,5 @@
-import type { Metadata } from 'next';
-import { ModulePlaceholder } from '@/components/app/module-placeholder';
-
-export const metadata: Metadata = { title: 'Settings' };
+import { redirect } from 'next/navigation';
 
 export default function SettingsPage() {
-  return <ModulePlaceholder module="settings" />;
+  redirect('/app/settings/profile');
 }

@@ -15,6 +15,10 @@ const DOTTED = new RegExp(
 const SLASHED = new RegExp(
   String.raw`^(\d{1,2})/(\d{1,2})/(\d{4})\s+${CLOCK}$`,
 );
+/** YYYY/MM/DD HH:MM[:SS]. */
+const SLASHED_YMD = new RegExp(
+  String.raw`^(\d{4})/(\d{1,2})/(\d{1,2})\s+${CLOCK}$`,
+);
 /** ISO date and 24-hour clock followed by Z or a +HH:MM offset. */
 const ZONED = new RegExp(
   String.raw`^(\d{4})-(\d{2})-(\d{2})(?:T|\s+)(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3})\d*)?)?\s*(?:(Z)|([+-])(\d{2}):?(\d{2}))$`,
@@ -25,7 +29,7 @@ function daysIn(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
-export type DateOrder = 'mdy' | 'dmy';
+export type DateOrder = 'mdy' | 'dmy' | 'ymd';
 
 export interface WallClock {
   year: number;
@@ -39,21 +43,25 @@ export interface WallClock {
 /**
  * The calendar date and clock exactly as written, or null when the shape is
  * not recognised or the values are not a real date and time. No timezone is
- * applied. Slashed dates read as month first ('mdy') or day first ('dmy').
+ * applied. Slashed dates read as month first ('mdy'), day first ('dmy') or
+ * year first ('ymd'); ISO and dotted year-first dates need no order.
  */
 export function parseWallClock(
   raw: string,
   dateOrder: DateOrder = 'mdy',
 ): WallClock | null {
   const s = raw.trim();
-  const ymd = ISO.exec(s) ?? DOTTED.exec(s);
+  const ymd =
+    ISO.exec(s) ??
+    DOTTED.exec(s) ??
+    (dateOrder === 'ymd' ? SLASHED_YMD.exec(s) : null);
   const slashed = ymd ? null : SLASHED.exec(s);
   const m = ymd ?? slashed;
   if (!m) return null;
 
   const [year, month, day] = ymd
     ? [Number(m[1]), Number(m[2]), Number(m[3])]
-    : dateOrder === 'mdy'
+    : dateOrder !== 'dmy'
       ? [Number(m[3]), Number(m[1]), Number(m[2])]
       : [Number(m[3]), Number(m[2]), Number(m[1])];
   let hour = Number(m[4]);
@@ -140,17 +148,27 @@ export function fillTimeToUtc(
 }
 
 /**
- * Day-first when a slashed sample's first number exceeds 12 and no sample's
- * second number does; month-first otherwise.
+ * The date order the samples prove, or null when they cannot tell. A slashed
+ * sample that opens with a four-digit year is year-first; one whose first number
+ * exceeds 12 (and no sample's second does) is day-first; the reverse is
+ * month-first. Samples that contradict each other prove nothing.
  */
-export function guessDateOrder(samples: readonly string[]): DateOrder {
+export function detectDateOrder(samples: readonly string[]): DateOrder | null {
   let firstOver12 = false;
   let secondOver12 = false;
   for (const raw of samples) {
-    const m = SLASHED.exec(raw.trim());
+    const s = raw.trim();
+    if (SLASHED_YMD.test(s)) return 'ymd';
+    const m = SLASHED.exec(s);
     if (!m) continue;
     if (Number(m[1]) > 12) firstOver12 = true;
     if (Number(m[2]) > 12) secondOver12 = true;
   }
-  return firstOver12 && !secondOver12 ? 'dmy' : 'mdy';
+  if (firstOver12 === secondOver12) return null;
+  return firstOver12 ? 'dmy' : 'mdy';
+}
+
+/** The order the samples prove, else month-first, which is what they read as when they cannot tell. */
+export function guessDateOrder(samples: readonly string[]): DateOrder {
+  return detectDateOrder(samples) ?? 'mdy';
 }

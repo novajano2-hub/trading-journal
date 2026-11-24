@@ -1,5 +1,5 @@
 import { pnlCurrencyFor, quoteToPnl } from './currency';
-import { roundHalfEven, toCents } from './money';
+import { roundHalfAway, roundHalfEven } from './money';
 import type { Direction, Execution, Instrument, Trade } from './types';
 
 export interface BuildOptions {
@@ -15,9 +15,38 @@ export interface BuildResult {
 
 const QTY_EPS = 1e-9;
 
-interface Lot {
+export interface Lot {
   qty: number;
   price: number;
+  /** Set by callers that need each entry's own cost and starting size (realized P&L by exit). */
+  fees?: number;
+  origQty?: number;
+}
+
+/**
+ * FIFO-match `closeQty` against the open lots, consuming them in place. Returns the
+ * quote-currency P&L (signed per direction, `sign` is 1 for long and -1 for short)
+ * and the pieces matched, so a caller can share per-lot figures by matched quantity.
+ */
+export function matchLots(
+  lots: Lot[],
+  closeQty: number,
+  exitPrice: number,
+  pointValue: number,
+  sign: 1 | -1,
+): { pnl: number; matched: { lot: Lot; qty: number }[] } {
+  let pnl = 0;
+  const matched: { lot: Lot; qty: number }[] = [];
+  let remaining = closeQty;
+  for (let lot = lots[0]; remaining > QTY_EPS && lot; lot = lots[0]) {
+    const m = Math.min(lot.qty, remaining);
+    pnl += (exitPrice - lot.price) * m * pointValue * sign;
+    matched.push({ lot, qty: m });
+    lot.qty -= m;
+    remaining -= m;
+    if (lot.qty <= QTY_EPS) lots.shift();
+  }
+  return { pnl, matched };
 }
 
 /** Mutable accumulator for the trade currently in progress. */
@@ -29,7 +58,7 @@ interface Draft {
   entryNotional: number;
   exitQty: number;
   exitNotional: number;
-  pnl: number; // quote-currency, per-direction signed, float until toCents
+  pnl: number; // P&L-currency, per-direction signed, each exit converted at its own rate, float until the trade's net is rounded
   maxPosition: number;
   openedAt: string;
   closedAt?: string;
@@ -63,13 +92,11 @@ function finalize(
   const acctCcy = opts.accountCurrency(accountId);
 
   const pnlCurrency = pnlCurrencyFor(inst, acctCcy);
-  // No exits means no realised P&L, so the rate is never needed then.
-  const gross = toCents(
-    avgExit === undefined
-      ? d.pnl
-      : quoteToPnl(d.pnl, inst, pnlCurrency, avgExit),
-  );
   const fees = d.executions.reduce((s, e) => s + e.fees + e.commission, 0);
+  // Each exit was already converted at its own rate. Round once, on the net
+  // (half away from zero, as TradeZella does), then gross = net + fees.
+  const net = roundHalfAway(d.pnl * 100 - fees);
+  const gross = net + fees;
 
   const trade: Trade = {
     id: `${accountId}:${canonicalSymbol(inst.symbol)}:${first.id}`,
@@ -86,7 +113,8 @@ function finalize(
     pnlCurrency,
     gross,
     fees,
-    net: gross - fees,
+    net,
+    strategyIds: [],
     tagIds: [],
     ruleChecks: [],
   };
@@ -102,6 +130,7 @@ function buildGroup(
   accountId: string,
   opts: BuildOptions,
 ): Trade[] {
+  const pnlCurrency = pnlCurrencyFor(inst, opts.accountCurrency(accountId));
   const trades: Trade[] = [];
   let position = 0; // signed
   let draft: Draft | null = null;
@@ -167,14 +196,14 @@ function buildGroup(
     }
     d.executions.push(closing);
 
-    let remaining = closeQty;
-    for (let lot = d.lots[0]; remaining > QTY_EPS && lot; lot = d.lots[0]) {
-      const m = Math.min(lot.qty, remaining);
-      d.pnl += (f.price - lot.price) * m * inst.pointValue * sign;
-      lot.qty -= m;
-      remaining -= m;
-      if (lot.qty <= QTY_EPS) d.lots.shift();
-    }
+    const quotePnl = matchLots(
+      d.lots,
+      closeQty,
+      f.price,
+      inst.pointValue,
+      sign,
+    ).pnl;
+    d.pnl += quoteToPnl(quotePnl, inst, pnlCurrency, f.price);
     d.exitQty += closeQty;
     d.exitNotional += closeQty * f.price;
     position -= sign * closeQty;

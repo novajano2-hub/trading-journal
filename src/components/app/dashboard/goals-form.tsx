@@ -181,17 +181,11 @@ export function GoalsForm({
         </p>
       ) : null}
       <div className="mt-4 flex gap-2">
-        <Button
-          type="submit"
-          size="sm"
-          disabled={saving}
-          className="pointer-coarse:h-11"
-        >
+        <Button type="submit" disabled={saving} className="pointer-coarse:h-11">
           Save
         </Button>
         <Button
           variant="secondary"
-          size="sm"
           disabled={saving}
           onClick={onClose}
           className="pointer-coarse:h-11"

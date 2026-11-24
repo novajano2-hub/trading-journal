@@ -9,6 +9,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
+import { MotionGlobalConfig } from 'motion/react';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { EMPTY_FILTERS } from '@/data/filters';
@@ -20,8 +21,14 @@ import { FilterBar, FilterBarView } from './filter-bar';
 import type { FilterOptions } from './filter-model';
 
 vi.mock('next/navigation', () => import('./__fixtures__/navigation'));
+MotionGlobalConfig.skipAnimations = true;
 
-const NO_OPTIONS: FilterOptions = { symbols: [], strategies: [], tags: [] };
+const NO_OPTIONS: FilterOptions = {
+  symbols: [],
+  strategies: [],
+  tags: [],
+  categories: [],
+};
 
 beforeEach(() => {
   window.history.replaceState(null, '', '/app/dashboard');
@@ -29,7 +36,7 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-test('five chips, each opening a dialog, and no "Clear filters" with nothing set', () => {
+test('five chips and More filters, each opening a dialog, and no "Clear filters" with nothing set', () => {
   render(
     <FilterBarView
       filters={EMPTY_FILTERS}
@@ -43,7 +50,12 @@ test('five chips, each opening a dialog, and no "Clear filters" with nothing set
       screen.getByRole('button', { name }).getAttribute('aria-haspopup'),
     ).toBe('dialog');
   }
-  expect(screen.getAllByRole('button')).toHaveLength(5);
+  expect(
+    screen
+      .getByRole('button', { name: 'More filters' })
+      .getAttribute('aria-haspopup'),
+  ).toBe('dialog');
+  expect(screen.getAllByRole('button')).toHaveLength(6);
   expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
 });
 
@@ -159,6 +171,23 @@ test('symbols are the workspace roots, and checking one filters by it', async ()
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 });
 
+test('tags group under their categories, by name', async () => {
+  renderBar('/app/dashboard');
+  fireEvent.click(await liveChip('Tags'));
+  const dialog = await screen.findByRole('dialog', { name: 'Tags' });
+  const groups = within(dialog).getAllByRole('group');
+  expect(groups.map((g) => g.querySelector('legend')!.textContent)).toEqual([
+    'Mistakes',
+    'Setups',
+  ]);
+  expect(
+    within(groups[0]!).getByRole('checkbox', { name: 'fomo' }),
+  ).toBeTruthy();
+  expect(
+    within(groups[1]!).getByRole('checkbox', { name: 'breakout' }),
+  ).toBeTruthy();
+});
+
 test('a custom date range applies from the date pair', async () => {
   renderBar('/app/dashboard');
   fireEvent.click(await liveChip('All time'));
@@ -201,7 +230,7 @@ test('a stale link never shows its unknown ids as chips', async () => {
   renderBar('/app/dashboard?side=long&strategy=gone&tag=ghost&tag=tag-fomo');
   await liveChip('Long');
   expect(screen.getByRole('button', { name: 'Strategy' })).toBeTruthy();
-  expect(screen.getByRole('button', { name: 'FOMO' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'fomo' })).toBeTruthy();
   expect(screen.queryByRole('button', { name: '2 tags' })).toBeNull();
   await waitFor(() =>
     expect(window.location.search).toBe('?side=long&tag=tag-fomo'),
@@ -234,4 +263,164 @@ test('back to the same page and filters before a write lands shows the URL', asy
   act(() => commitNavigation());
   expect(screen.getByRole('button', { name: 'Long' })).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Short' })).toBeNull();
+});
+
+test("a write lands on the address bar's page, not the one this render holds (E54)", async () => {
+  renderBar('/app/dashboard');
+  fireEvent.click(await liveChip('Side'));
+  const dialog = await screen.findByRole('dialog', { name: 'Side' });
+  // A navigation has landed in the address bar; React has not rendered it yet.
+  deferNavigation();
+  window.history.pushState(null, '', '/app/trades');
+  fireEvent.click(within(dialog).getByRole('radio', { name: 'Short' }));
+  expect(window.location.pathname).toBe('/app/trades');
+  expect(window.location.search).toBe('?side=short');
+});
+
+test('cleaning a stale link waits while a navigation is landing (E54)', async () => {
+  renderBar('/app/dashboard?side=long&tag=ghost');
+  deferNavigation();
+  window.history.pushState(null, '', '/app/trades?side=long&tag=ghost');
+  // The workspace loads while the router still renders the old page.
+  await new Promise((r) => setTimeout(r, 150));
+  expect(window.location.pathname).toBe('/app/trades');
+  expect(window.location.search).toBe('?side=long&tag=ghost');
+  act(() => commitNavigation());
+  await waitFor(() => expect(window.location.search).toBe('?side=long'));
+  expect(window.location.pathname).toBe('/app/trades');
+});
+
+/** The viewport the bar's `matchMedia` reads. */
+const viewport = (width: number) => {
+  window.innerWidth = width;
+};
+
+const OPTIONS: FilterOptions = {
+  symbols: ['ES', 'NQ'],
+  strategies: [],
+  tags: [],
+  categories: [],
+};
+
+test('below 640px the chips collapse into one Filters button counting the filters in use', () => {
+  viewport(390);
+  try {
+    render(
+      <FilterBarView
+        filters={{
+          ...EMPTY_FILTERS,
+          side: 'short',
+          symbols: ['ES'],
+          outcomes: ['win'],
+        }}
+        options={OPTIONS}
+        today="2026-11-20"
+        onChange={() => {}}
+      />,
+    );
+    const button = screen.getByRole('button', { name: 'Filters, 3 active' });
+    expect(button.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(screen.queryByRole('button', { name: 'Side' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Short' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Symbol' })).toBeNull();
+  } finally {
+    viewport(1024);
+  }
+});
+
+test('Filters with nothing set is named plainly', () => {
+  viewport(390);
+  try {
+    render(
+      <FilterBarView
+        filters={EMPTY_FILTERS}
+        options={OPTIONS}
+        today="2026-11-20"
+        onChange={() => {}}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Filters' })).toBeTruthy();
+  } finally {
+    viewport(1024);
+  }
+});
+
+test('the sheet holds the date, symbol, side, strategy and tags rows and More filters; a choice applies at once; Escape returns focus to the button', async () => {
+  viewport(390);
+  try {
+    const onChange = vi.fn();
+    render(
+      <FilterBarView
+        filters={EMPTY_FILTERS}
+        options={OPTIONS}
+        today="2026-11-20"
+        onChange={onChange}
+      />,
+    );
+    const trigger = screen.getByRole('button', { name: 'Filters' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const dialog = await screen.findByRole('dialog', { name: 'Filters' });
+    for (const name of ['Date', 'Symbol', 'Side', 'Strategy', 'Tags']) {
+      const row = within(dialog).getByRole('button', {
+        name: new RegExp(`^${name}`),
+      });
+      expect(row.getAttribute('aria-expanded')).toBe('false');
+    }
+    expect(
+      within(dialog).getByRole('button', { name: 'More filters' }),
+    ).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Side/ }));
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'Short' }));
+    expect(onChange).toHaveBeenCalledWith({ ...EMPTY_FILTERS, side: 'short' });
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(document.activeElement).toBe(trigger);
+  } finally {
+    viewport(1024);
+  }
+});
+
+test('in the sheet, Clear filters resets every filter', async () => {
+  viewport(390);
+  try {
+    const onChange = vi.fn();
+    render(
+      <FilterBarView
+        filters={{ ...EMPTY_FILTERS, side: 'short' }}
+        options={OPTIONS}
+        today="2026-11-20"
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Filters, 1 active' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Filters' });
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Clear filters' }),
+    );
+    expect(onChange).toHaveBeenCalledWith(EMPTY_FILTERS);
+  } finally {
+    viewport(1024);
+  }
+});
+
+test('with no trades the Filters button keeps its tab stop and opens nothing', () => {
+  viewport(390);
+  try {
+    render(
+      <FilterBarView
+        filters={EMPTY_FILTERS}
+        options={NO_OPTIONS}
+        today="2026-11-20"
+        onChange={() => {}}
+        noTrades
+      />,
+    );
+    const button = screen.getByRole('button', { name: 'Filters' });
+    expect(button.getAttribute('aria-disabled')).toBe('true');
+    fireEvent.click(button);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  } finally {
+    viewport(1024);
+  }
 });

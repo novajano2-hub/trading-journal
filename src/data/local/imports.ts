@@ -1,8 +1,9 @@
 import type { InstrumentOverrides } from '@/domain/import/mapping';
 import type { ImportPlan } from '@/domain/import/plan';
 import { canonicalSymbol } from '@/domain/trade-builder';
-import type { ImportJob, Trade } from '@/domain/types';
+import { strategyRules, type ImportJob, type Trade } from '@/domain/types';
 import {
+  ArchivedAccountError,
   ImportBlockedError,
   NotFoundError,
   StalePlanError,
@@ -12,6 +13,7 @@ import {
 import { USER_WORKSPACE } from '../workspaces';
 import type { LocalContext } from './context';
 import type { KeelDb } from './db';
+import { assertEditable } from './editable';
 import { META, type ImportJobRecord } from './schema';
 import { pruneJournalLinks } from './journal';
 import { rwTx } from './tx';
@@ -51,8 +53,11 @@ async function importRevision(db: KeelDb, ws: string): Promise<number> {
   return (value as number | undefined) ?? 0;
 }
 
-/** Returns the new revision. Call inside the rw transaction of the commit or undo. */
-async function bumpImportRevision(db: KeelDb, ws: string): Promise<number> {
+/** Returns the new revision. Call inside the rw transaction of the write that moved the import context (a commit, an undo, clearing an account). */
+export async function bumpImportRevision(
+  db: KeelDb,
+  ws: string,
+): Promise<number> {
   const next = (await importRevision(db, ws)) + 1;
   await db.meta.put({ key: META.importRevision(ws), value: next });
   return next;
@@ -125,7 +130,7 @@ async function withLiveReferences(
     [...new Set(ids)].map((id): [string, string] => [ws, id]);
   const tags = await db.tags.bulkGet(keys(trades.flatMap((t) => t.tagIds)));
   const strategies = await db.strategies.bulkGet(
-    keys(trades.flatMap((t) => t.strategyId ?? [])),
+    keys(trades.flatMap((t) => t.strategyIds)),
   );
   const notes = await db.journal.bulkGet(
     keys(trades.flatMap((t) => t.noteId ?? [])),
@@ -133,7 +138,9 @@ async function withLiveReferences(
   const tagIds = new Set(tags.flatMap((t) => (t ? [t.id] : [])));
   const noteIds = new Set(notes.flatMap((n) => (n ? [n.id] : [])));
   const ruleIds = new Map(
-    strategies.flatMap((s) => (s ? [[s.id, s.rules.map((r) => r.id)]] : [])),
+    strategies.flatMap((s) =>
+      s ? [[s.id, strategyRules(s).map((r) => r.id)] as const] : [],
+    ),
   );
 
   return trades.map((stored) => {
@@ -142,14 +149,11 @@ async function withLiveReferences(
       tagIds: stored.tagIds.filter((id) => tagIds.has(id)),
     };
     if (t.noteId !== undefined && !noteIds.has(t.noteId)) delete t.noteId;
-    if (t.strategyId !== undefined) {
-      const rules = ruleIds.get(t.strategyId);
-      if (rules)
-        t.ruleChecks = t.ruleChecks.filter((c) => rules.includes(c.ruleId));
-      else {
-        delete t.strategyId;
-        t.ruleChecks = [];
-      }
+    if (t.strategyIds.length > 0) {
+      // Only the live strategies stay, with the checks on their current rules.
+      t.strategyIds = t.strategyIds.filter((id) => ruleIds.has(id));
+      const rules = new Set(t.strategyIds.flatMap((id) => ruleIds.get(id)!));
+      t.ruleChecks = t.ruleChecks.filter((c) => rules.has(c.ruleId));
     }
     return t;
   });
@@ -188,7 +192,7 @@ export function localImports(ctx: LocalContext): ImportRepo {
           const openTrades = await db.trades
             .where('[workspaceId+accountId]')
             .equals([ws, accountId])
-            .filter((t) => t.status === 'open')
+            .filter((t) => t.status === 'open' && t.source !== 'manual')
             .toArray();
           const jobs = await db.imports
             .where('[workspaceId+accountId]')
@@ -291,11 +295,24 @@ export function localImports(ctx: LocalContext): ImportRepo {
       const db = await ctx.db();
       return rwTx(
         db,
-        [db.imports, db.trades, db.journal, db.tags, db.strategies, db.meta],
+        [
+          db.imports,
+          db.trades,
+          db.journal,
+          db.tags,
+          db.strategies,
+          db.meta,
+          db.accounts,
+        ],
         async (): Promise<UndoResult> => {
           const job = await db.imports.get([ws, jobId]);
           if (!job) throw new NotFoundError('import', jobId);
           if (job.status === 'undone') return { ok: true };
+          // An archived account is read-only: undo would delete and restore its trades.
+          const archived =
+            (await db.accounts.get([ws, job.accountId]))?.status === 'archived';
+          if (archived)
+            throw new ArchivedAccountError([job.accountId], job.tradeIds);
           // Trades the user has deleted since the import are simply not found.
           const built = await db.trades
             .where('[workspaceId+importId]')
@@ -308,6 +325,7 @@ export function localImports(ctx: LocalContext): ImportRepo {
           const restored = job.replacedTrades.filter(
             (t) => !wrote.has(t.id) || remaining.has(t.id),
           );
+          await assertEditable(db, ws, [...built, ...restored]);
           const blocker = await blockingImport(db, ws, job, restored);
           if (blocker)
             return {

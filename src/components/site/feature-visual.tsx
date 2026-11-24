@@ -1,18 +1,13 @@
-import {
-  ArrowsLeftRight,
-  ChartBar,
-  Hourglass,
-  ListChecks,
-} from '@phosphor-icons/react/dist/ssr';
+import { Hourglass } from '@phosphor-icons/react/dist/ssr';
 import { AppWindow } from '@/components/product/app-window';
 import { BreakdownChart } from '@/components/product/breakdown-chart';
 import { CostBand, PLAN_SURFACE } from '@/components/product/plan-surface';
 import { CARD, ProductCard } from '@/components/product/product-card';
-import { RuleList } from '@/components/product/rule-list';
+import { TickRuleList } from '@/components/site/landing/tick-rule-list';
 import { TradeDetailCard } from '@/components/product/trade-detail-card';
 import { TradeRows } from '@/components/product/trade-rows';
 import { Chip } from '@/components/ui/chip';
-import { IconTile } from '@/components/ui/icon-tile';
+import { StateGlyph } from '@/components/ui/state-glyph';
 import { formatMoney, formatPct, formatPnl } from '@/lib/format';
 import type { SampleView } from '@/lib/landing/sample-view';
 import { dayLabel, setupName } from '@/lib/landing/sample-labels';
@@ -43,13 +38,14 @@ function Journal({ view }: { view: SampleView }) {
   return (
     <>
       <AppWindow account="Futures (live)" range={view.weekLabel} basis="Net">
-        <ProductCard
-          icon={ArrowsLeftRight}
-          title="Recent trades"
-          className="pb-1"
-        >
+        <ProductCard title="Recent trades" className="pb-1">
           <div className="mt-2">
-            <TradeRows trades={rows} tags={view.tags} maxTags={1} />
+            <TradeRows
+              trades={rows}
+              tags={view.tags}
+              categories={view.tagCategories}
+              maxTags={1}
+            />
           </div>
         </ProductCard>
       </AppWindow>
@@ -63,7 +59,7 @@ function Journal({ view }: { view: SampleView }) {
 function Analytics({ view }: { view: SampleView }) {
   return (
     <AppWindow account="Futures (live)" range={view.weekLabel} basis="Net">
-      <ProductCard icon={ChartBar} tone="accent" title="Net P&L by hour">
+      <ProductCard title="Net P&L by hour">
         <div className="px-4 pt-5 pb-[18px] sm:px-5">
           <BreakdownChart
             rows={view.breakdowns.net.hour}
@@ -76,7 +72,7 @@ function Analytics({ view }: { view: SampleView }) {
   );
 }
 
-/** The app's "Your plan" card: the trade's rules on ultramarine, and their cost. */
+/** The app's "Your plan" card: the trade's rules, and what breaking them cost. */
 function Strategies({ view }: { view: SampleView }) {
   const graded = trade(view, FOCUS);
   const rules = view
@@ -84,13 +80,12 @@ function Strategies({ view }: { view: SampleView }) {
     .map((c) => ({ ...c, who: setupName(view, graded) }));
   return (
     <div className={`${PLAN_SURFACE} px-5 pt-4`}>
-      <div className="mb-2.5 flex items-center gap-2.5">
-        <IconTile icon={ListChecks} tone="on-accent" />
+      <div className="mb-2.5 flex min-h-7 items-center">
         <p className="text-[15px] font-semibold tracking-[-0.015em]">
           Your plan
         </p>
       </div>
-      <RuleList rules={rules} label={`Rules for trade ${FOCUS}`} onAccent />
+      <TickRuleList rules={rules} label={`Rules for trade ${FOCUS}`} bare />
       <CostBand label="Broken rules cost" bleed="-mx-5 px-5">
         {formatPnl(graded.net, graded.pnlCurrency)}
       </CostBand>
@@ -166,7 +161,7 @@ function Notebook({ view }: { view: SampleView }) {
 function Planned({ name }: { name: string }) {
   return (
     <div className="flex min-h-[220px] flex-col items-start justify-center gap-3 rounded-card border border-line-2 bg-surface-1 p-8">
-      <IconTile icon={Hourglass} tone="faint" />
+      <StateGlyph icon={Hourglass} />
       <p className="text-lg font-semibold tracking-[-0.02em]">
         {name} is planned.
       </p>

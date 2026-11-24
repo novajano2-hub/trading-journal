@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, parseISO } from 'date-fns';
+import { differenceInCalendarDays, format, parse, parseISO } from 'date-fns';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { defaultMetricContext } from '@/domain/metrics/context';
 import { dailyPnl } from '@/domain/metrics/days';
@@ -7,7 +7,8 @@ import { evaluateProp } from '@/domain/prop/evaluate';
 import { closedInOrder } from '@/domain/trade-status';
 import { toCents } from '@/domain/money';
 import { localDate, localParts } from '@/domain/time';
-import type { Trade } from '@/domain/types';
+import { mistakeTags } from '@/domain/metrics/mistakes';
+import { strategyRules, type Trade } from '@/domain/types';
 import {
   generateSampleWorkspace,
   SAMPLE_SEED,
@@ -21,6 +22,149 @@ describe('sample workspace generator', () => {
   let s: SampleWorkspace;
   beforeAll(() => {
     s = generateSampleWorkspace({ seed: SAMPLE_SEED, endDate: '2026-11-19' });
+  });
+
+  test("the first three accounts' trades and their totals are as Plan 4 pinned them", () => {
+    const first = new Set(s.accounts.slice(0, 3).map((a) => a.id));
+    const own = s.trades.filter((t) => first.has(t.accountId));
+    const total = (f: (t: Trade) => number) =>
+      own.reduce((sum, t) => sum + f(t), 0);
+    expect(own).toHaveLength(1233);
+    expect(own.filter((t) => t.status === 'closed')).toHaveLength(1229);
+    expect(total((t) => t.net)).toBe(1_646_295);
+    expect(total((t) => t.gross)).toBe(2_577_713);
+    expect(total((t) => t.fees)).toBe(931_418);
+    expect(total((t) => t.initialRisk ?? 0)).toBe(14_369_935);
+    expect(own.filter((t) => t.noteId !== undefined)).toHaveLength(40);
+  });
+
+  test('the net rounds once per trade (E71): the pinned USDJPY trade, the ETHUSD trade and the USDJPY total', () => {
+    const live = generateSampleWorkspace({
+      seed: SAMPLE_SEED,
+      endDate: '2026-11-20',
+    });
+    const jpy = live.trades.filter((t) => t.instrument.symbol === 'USDJPY');
+    const pinned = jpy.find((t) => t.avgEntry === 153.757)!;
+    expect([pinned.gross, pinned.fees, pinned.net]).toEqual([
+      -39593, 1400, -40993,
+    ]);
+    expect(jpy).toHaveLength(45);
+    expect(jpy.reduce((n, t) => n + t.net, 0)).toBe(-128_916);
+    const eth = live.trades.find(
+      (t) =>
+        t.instrument.symbol === 'ETHUSD' &&
+        t.avgEntry === 3380.13 &&
+        t.fees === 467,
+    )!;
+    expect(eth.net).toBe(5704);
+    for (const t of live.trades) expect(t.net).toBe(t.gross - t.fees);
+    const other = (sym: string) =>
+      live.trades
+        .filter((t) => t.instrument.symbol === sym)
+        .reduce((n, t) => n + t.net, 0);
+    expect([other('EURUSD'), other('GBPUSD'), other('AUDUSD')]).toEqual([
+      20900, 287710, 165560,
+    ]);
+  });
+
+  test('about 70% of trades closed a week or more before the end are reviewed', () => {
+    const daysBefore = (t: Trade) =>
+      differenceInCalendarDays(
+        parseISO('2026-11-19'),
+        parseISO(localDate(t.closedAt!, NY)),
+      );
+    const closed = s.trades.filter((t) => t.status === 'closed');
+    const old = closed.filter((t) => daysBefore(t) >= 7);
+    const share = old.filter((t) => t.reviewed === true).length / old.length;
+    expect(share).toBeGreaterThanOrEqual(0.6);
+    expect(share).toBeLessThanOrEqual(0.8);
+    expect(
+      s.trades.filter(
+        (t) => t.reviewed && (t.status === 'open' || daysBefore(t) < 7),
+      ),
+    ).toEqual([]);
+  });
+
+  test('some trades follow two strategies, graded on both', () => {
+    const withStrategy = s.trades.filter((t) => t.strategyIds.length > 0);
+    const two = withStrategy.filter((t) => t.strategyIds.length === 2);
+    expect(two.length / withStrategy.length).toBeGreaterThanOrEqual(0.1);
+    expect(two.length / withStrategy.length).toBeLessThanOrEqual(0.2);
+    expect(withStrategy.every((t) => t.strategyIds.length <= 2)).toBe(true);
+    const byId = new Map(s.strategies.map((x) => [x.id, x]));
+    for (const t of two) {
+      expect(new Set(t.strategyIds).size).toBe(2);
+      const checked = new Set(t.ruleChecks.map((c) => c.ruleId));
+      for (const id of t.strategyIds) {
+        const st = byId.get(id)!;
+        expect(st.assetClasses).toContain(t.instrument.assetClass);
+        for (const r of strategyRules(st))
+          if (r.showWhen === 'always') expect(checked.has(r.id)).toBe(true);
+      }
+    }
+  });
+
+  test('daily notes for the last 20 trading days, from the daily template', () => {
+    const daily = s.journal.filter((j) => j.kind === 'daily-review');
+    expect(daily).toHaveLength(20);
+    const dates = daily.map((j) => j.date!);
+    expect(new Set(dates).size).toBe(20);
+    expect(dates.sort().at(-1)).toBe('2026-11-19');
+    const tradingDays = [
+      ...new Set(s.trades.map((t) => localDate(t.openedAt, NY))),
+    ].sort();
+    expect(dates).toEqual(tradingDays.slice(-20));
+    for (const j of daily) {
+      const text = JSON.stringify(j.body);
+      for (const section of ['Preparation', 'Session log', 'End of day'])
+        expect(text).toContain(section);
+      expect(j.linkedTradeIds.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('strategies have titled groups, a loser rule, an icon and a tone', () => {
+    for (const st of s.strategies) {
+      expect(st.groups.map((g) => g.title)).toEqual([
+        'Entry',
+        'Exit',
+        'Risk',
+        'Management',
+      ]);
+      expect(strategyRules(st).filter((r) => r.showWhen === 'loser')).toEqual([
+        expect.objectContaining({
+          text: expect.stringMatching(/^Took the loss /),
+        }),
+      ]);
+      expect(st.icon).toBeDefined();
+      expect(st.tone).toBeDefined();
+    }
+  });
+
+  test('no two rules in the workspace share a wording', () => {
+    const texts = s.strategies.flatMap((st) =>
+      strategyRules(st).map((r) => r.text),
+    );
+    expect(new Set(texts).size).toBe(texts.length);
+  });
+
+  test('tags sit in Setups, Mistakes, Emotions and Custom tags', () => {
+    expect(s.tagCategories.map((c) => [c.name, c.builtIn, c.role])).toEqual([
+      ['Setups', false, undefined],
+      ['Mistakes', true, 'mistake'],
+      ['Emotions', false, undefined],
+      ['Custom tags', true, undefined],
+    ]);
+    const ids = new Set(s.tagCategories.map((c) => c.id));
+    for (const t of s.tags) expect(ids.has(t.categoryId)).toBe(true);
+    const mistakes = mistakeTags(s.tags, s.tagCategories);
+    expect(mistakes.map((t) => t.name)).toEqual([
+      'fomo entry',
+      'moved stop',
+      'oversized',
+      'early exit',
+      'revenge trade',
+    ]);
+    for (const t of mistakes) expect(t.description).toMatch(/\.$/);
   });
 
   test('deterministic in seed and end date', () => {
@@ -38,13 +182,13 @@ describe('sample workspace generator', () => {
     expect(sampleEndDate('2026-11-22T03:00:00.000Z')).toBe('2026-11-20');
   });
 
-  test('three accounts; the prop evaluation has rules and is not breached', () => {
-    expect(s.accounts.map((a) => [a.id, a.type])).toEqual([
+  test('the first three accounts; the prop evaluation has rules and is not breached', () => {
+    expect(s.accounts.slice(0, 3).map((a) => [a.id, a.type])).toEqual([
       ['sample-futures', 'live'],
       ['sample-forex-prop', 'prop-evaluation'],
       ['sample-multi', 'live'],
     ]);
-    expect(s.accounts.map((a) => a.startingBalance)).toEqual([
+    expect(s.accounts.slice(0, 3).map((a) => a.startingBalance)).toEqual([
       5_000_000, 10_000_000, 2_500_000,
     ]);
     const prop = s.accounts[1]!;
@@ -127,11 +271,11 @@ describe('sample workspace generator', () => {
     for (const c of latest) {
       const t = s.trades.find((x) => x.id === c.id)!;
       const graded = t.ruleChecks.filter((r) => r.followed !== null);
-      if (t.strategyId === undefined || graded.length === 0) ungraded += 1;
+      if (t.strategyIds.length === 0 || graded.length === 0) ungraded += 1;
       else if (graded.some((r) => r.followed === false)) {
         broken += 1;
         const mistakes = new Set(
-          s.tags.filter((x) => x.category === 'mistake').map((x) => x.id),
+          mistakeTags(s.tags, s.tagCategories).map((x) => x.id),
         );
         expect(t.tagIds.some((id) => mistakes.has(id))).toBe(true);
       } else kept += 1;
@@ -155,9 +299,10 @@ describe('sample workspace generator', () => {
     );
   });
 
-  test('about 1,200 trades over about six months, across five asset classes', () => {
-    expect(s.trades.length).toBeGreaterThanOrEqual(1100);
-    expect(s.trades.length).toBeLessThanOrEqual(1300);
+  test('about 1,500 trades over about six months, across five asset classes', () => {
+    // 1,233 on the first three accounts, and the prop accounts' own on top.
+    expect(s.trades.length).toBeGreaterThanOrEqual(1400);
+    expect(s.trades.length).toBeLessThanOrEqual(1650);
     expect(
       differenceInCalendarDays(
         parseISO('2026-11-19'),
@@ -254,44 +399,52 @@ describe('sample workspace generator', () => {
     // Strategies, tags and journal kinds are complete.
     expect(s.strategies).toHaveLength(4);
     for (const st of s.strategies) {
-      expect(new Set(st.rules.map((r) => r.group))).toEqual(
-        new Set(['entry', 'exit', 'risk', 'management']),
-      );
+      for (const g of st.groups) expect(g.rules.length).toBeGreaterThan(0);
       expect(st.checklist.length).toBeGreaterThanOrEqual(3);
       expect(st.checklist.length).toBeLessThanOrEqual(5);
       expect(st.workspaceId).toBe('sample');
     }
-    expect(new Set(s.tags.map((x) => x.category))).toEqual(
-      new Set(['setup', 'mistake', 'emotion', 'custom']),
-    );
+    expect(new Set(s.tags.map((x) => x.categoryId)).size).toBe(4);
     expect(new Set(s.journal.map((j) => j.kind))).toEqual(
-      new Set(['daily-review', 'pre-market', 'weekly-recap', 'note']),
+      new Set(['daily-review', 'pre-market', 'weekly-recap', 'trade-note']),
     );
     expect(
       s.journal.filter((j) => j.kind === 'weekly-recap').length,
     ).toBeGreaterThanOrEqual(20);
-    expect(new Set(s.journal.map((j) => j.folder))).toEqual(
-      new Set(['Daily reviews', 'Plans', 'Weekly recaps', 'Trade notes']),
-    );
+    for (const j of s.journal) expect(j.tags).toEqual([]);
 
-    // Trades.
-    const withStrategy = s.trades.filter((t) => t.strategyId !== undefined);
+    // Trades: a check per rule of the first strategy that applies, and only
+    // on rules of the trade's strategies.
+    const withStrategy = s.trades.filter((t) => t.strategyIds.length > 0);
     expect(withStrategy.length / s.trades.length).toBeGreaterThan(0.78);
     expect(withStrategy.length / s.trades.length).toBeLessThan(0.92);
     for (const t of s.trades) {
-      if (t.strategyId === undefined) {
+      if (t.strategyIds.length === 0) {
         expect(t.ruleChecks).toEqual([]);
       } else {
-        const st = strategies.get(t.strategyId)!;
-        expect(st).toBeDefined();
-        expect(t.ruleChecks.map((c) => c.ruleId)).toEqual(
-          st.rules.map((r) => r.id),
+        const own = t.strategyIds.map((id) => strategies.get(id)!);
+        expect(own.every((st) => st !== undefined)).toBe(true);
+        const ruleIds = own.flatMap((st) => strategyRules(st).map((r) => r.id));
+        const checked = t.ruleChecks.map((c) => c.ruleId);
+        expect(new Set(checked).size).toBe(checked.length);
+        for (const id of checked) expect(ruleIds).toContain(id);
+        for (const r of strategyRules(own[0]!))
+          if (r.showWhen === 'always') expect(checked).toContain(r.id);
+        // A loser rule is graded only on a loss.
+        const loserIds = new Set(
+          own.flatMap((st) =>
+            strategyRules(st)
+              .filter((r) => r.showWhen === 'loser')
+              .map((r) => r.id),
+          ),
         );
+        if (t.status !== 'closed' || t.net >= 0)
+          expect(checked.filter((id) => loserIds.has(id))).toEqual([]);
       }
       for (const id of t.tagIds) expect(tags.has(id)).toBe(true);
       if (t.noteId !== undefined) {
         const note = journal.get(t.noteId)!;
-        expect(note.kind).toBe('note');
+        expect(note.kind).toBe('trade-note');
         expect(note.linkedTradeIds).toEqual([t.id]);
       }
     }
@@ -302,13 +455,20 @@ describe('sample workspace generator', () => {
       expect(j.workspaceId).toBe('sample');
       expect((j.body as { type: string }).type).toBe('doc');
     }
-    const notes = s.journal.filter((j) => j.kind === 'note');
+    const notes = s.journal.filter((j) => j.kind === 'trade-note');
+    expect(s.journal.some((j) => j.kind === 'note')).toBe(false);
+    expect(s.journal.some((j) => 'folder' in j || 'folderId' in j)).toBe(false);
     expect(notes.length).toBeGreaterThanOrEqual(35);
     expect(notes.length).toBeLessThanOrEqual(45);
     for (const n of notes) {
       expect(n.linkedTradeIds).toHaveLength(1);
       const t = s.trades.find((x) => x.id === n.linkedTradeIds[0])!;
       expect(t.noteId).toBe(n.id);
+      // Titled as ensureTradeNote titles one: "{symbol} : {d MMM yyyy}", the day the trade opened.
+      const opened = localDate(t.openedAt, NY);
+      expect(n.title).toBe(
+        `${t.instrument.symbol} : ${format(parse(opened, 'yyyy-MM-dd', new Date(0)), 'd MMM yyyy')}`,
+      );
     }
     expect(s.trades.filter((t) => t.noteId !== undefined)).toHaveLength(
       notes.length,
@@ -353,5 +513,78 @@ describe('sample workspace generator', () => {
     expect(
       days.filter((d) => d.net < 0).length / days.length,
     ).toBeGreaterThanOrEqual(0.25);
+  });
+
+  describe('prop challenges', () => {
+    const NOW = '2026-11-19T22:00:00.000Z';
+    const accountOf = (id: string) => s.accounts.find((a) => a.id === id)!;
+    const stateOf = (id: string) => {
+      const a = accountOf(id);
+      return evaluateProp({
+        startingBalance: a.startingBalance,
+        rules: a.propRules!,
+        timeZone: NY,
+        now: NOW,
+        trades: s.trades.filter((t) => t.accountId === id),
+      });
+    };
+
+    test('three challenges: active, funded and active, and breached', () => {
+      expect(
+        s.challenges.map((c) => [c.name, c.steps, c.phase, c.status]),
+      ).toEqual([
+        ['Forex 100K', 2, 'evaluation', 'active'],
+        ['Futures 50K', 1, 'funded', 'active'],
+        ['Futures 100K', 1, 'evaluation', 'breached'],
+      ]);
+      const [forex, f50, f100] = s.challenges;
+      expect(forex!.phases.map((p) => [p.step, p.accountId])).toEqual([
+        ['step-1', 'sample-forex-prop'],
+        ['step-2', undefined],
+        ['funded', undefined],
+      ]);
+      expect(f50!.phases.map((p) => p.step)).toEqual(['step-1', 'funded']);
+      expect(f50!.phases.every((p) => p.accountId !== undefined)).toBe(true);
+      expect(
+        f100!.phases.map((p) => [p.step, p.accountId !== undefined]),
+      ).toEqual([
+        ['step-1', true],
+        ['funded', false],
+      ]);
+      for (const c of s.challenges)
+        for (const p of c.phases)
+          if (p.accountId) expect(accountOf(p.accountId)).toBeDefined();
+      expect(s.challenges.every((c) => c.evaluationFee! > 0)).toBe(true);
+    });
+
+    test('each outcome holds on its own stream', () => {
+      const [, f50, f100] = s.challenges;
+      const evalId = (c: typeof f50) => c!.phases[0]!.accountId!;
+      expect(stateOf(evalId(f50)).overall).toBe('target-reached');
+      const funded = stateOf(f50!.phases[1]!.accountId!);
+      expect(funded.overall).not.toBe('breached');
+      expect(accountOf(f50!.phases[1]!.accountId!)).toMatchObject({
+        type: 'prop-funded',
+        status: 'active',
+      });
+      const broken = stateOf(evalId(f100));
+      expect(broken.overall).toBe('breached');
+      expect(f100!.failureReason).toMatch(/ broken on \d+ \w{3} \(/);
+      expect(s.challenges.filter((c) => c.failureReason)).toHaveLength(1);
+    });
+
+    test('each new account trades 25 to 40 weekdays, from the futures specs', () => {
+      const added = s.accounts.slice(3);
+      expect(added.length).toBe(3);
+      for (const a of added) {
+        const own = s.trades.filter((t) => t.accountId === a.id);
+        const days = new Set(own.map((t) => localDate(t.openedAt, NY)));
+        expect(days.size).toBeGreaterThanOrEqual(25);
+        expect(days.size).toBeLessThanOrEqual(40);
+        expect(own.every((t) => t.instrument.assetClass === 'future')).toBe(
+          true,
+        );
+      }
+    });
   });
 });

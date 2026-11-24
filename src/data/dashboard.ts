@@ -1,5 +1,5 @@
 import type { MetricContext } from '@/domain/metrics/context';
-import { dailyPnl } from '@/domain/metrics/days';
+import type { DayStat } from '@/domain/metrics/days';
 import {
   dailyLossProgress,
   goalWeek,
@@ -7,20 +7,30 @@ import {
   type DailyLossProgress,
   type WeeklyGoalProgress,
 } from '@/domain/metrics/goals';
-import { mistakeCosts, type MistakeCost } from '@/domain/metrics/mistakes';
+import {
+  mistakeCosts,
+  mistakeTags,
+  type MistakeCost,
+} from '@/domain/metrics/mistakes';
 import {
   brokenRulesCost,
   ruleScorecard,
   type RuleScore,
 } from '@/domain/metrics/rules';
+import { sizedRealizations } from '@/domain/metrics/realized';
+import { realizedUnits, type TradeUnits } from '@/domain/metrics/units';
+import { winsVsLosses } from '@/domain/metrics/breakdowns';
+import { ruleApplies } from '@/domain/rule-applies';
 import { closedInOrder } from '@/domain/trade-status';
-import type {
-  Cents,
-  Goals,
-  PnlBasis,
-  Strategy,
-  Tag,
-  Trade,
+import {
+  strategyRules,
+  type Cents,
+  type Goals,
+  type PnlBasis,
+  type Strategy,
+  type Tag,
+  type TagCategory,
+  type Trade,
 } from '@/domain/types';
 import type { CurrencyMetrics } from './metrics';
 
@@ -36,20 +46,31 @@ export interface TradeRulesSummary {
   broken: string[];
 }
 
+/**
+ * A trade's grading against the rules that count for it: those of its own
+ * strategies that apply to its outcome, as the trade page counts them.
+ */
 export function tradeRulesSummary(
   trade: Trade,
-  ruleText: ReadonlyMap<string, string>,
+  strategies: readonly Strategy[],
+  ctx: Pick<MetricContext, 'pnlBasis' | 'breakevenRange'>,
 ): TradeRulesSummary {
+  const ruleText = new Map<string, string>();
+  for (const s of strategies)
+    if (trade.strategyIds.includes(s.id))
+      for (const r of strategyRules(s))
+        if (ruleApplies(r, trade, ctx) && !ruleText.has(r.id))
+          ruleText.set(r.id, r.text);
   let kept = 0;
   const broken: string[] = [];
   let brokenCount = 0;
   for (const c of trade.ruleChecks) {
-    if (c.followed === null) continue;
+    const text = ruleText.get(c.ruleId);
+    if (text === undefined || c.followed === null) continue;
     if (c.followed) kept += 1;
     else {
       brokenCount += 1;
-      const text = ruleText.get(c.ruleId);
-      if (text !== undefined) broken.push(text);
+      broken.push(text);
     }
   }
   const checked = kept + brokenCount;
@@ -63,14 +84,60 @@ export function tradeRulesSummary(
 
 export interface RecentTrade {
   trade: Trade;
-  strategyName: string | null;
+  /** The names of its known strategies, in the trade's order. */
+  strategyNames: string[];
   mistakes: string[];
   rules: TradeRulesSummary;
+}
+
+/** An open trade: what is still held, and what its exits so far booked. */
+export interface OpenPosition {
+  trade: Trade;
+  /** Contracts, shares or lots still held: the entry fills less the exit fills. */
+  openQty: number;
+  /** The exits' booked P&L on the basis; null before the first exit. No unrealized P&L: Keel has no live prices. */
+  realized: Cents | null;
+  /** The same booked exits in R, ticks, pips and points: ticks of the contracts closed so far. Null before the first exit. */
+  realizedUnits: TradeUnits | null;
+}
+
+/** The open trades, newest opened first, each with its open size and the P&L its partial exits booked. */
+export function openPositions(
+  trades: readonly Trade[],
+  ctx: Pick<MetricContext, 'pnlBasis'>,
+): OpenPosition[] {
+  return trades
+    .filter((t) => t.status === 'open')
+    .sort(
+      (a, b) =>
+        Date.parse(b.openedAt) - Date.parse(a.openedAt) || b.serial - a.serial,
+    )
+    .map((trade) => {
+      const long = trade.direction === 'long';
+      let held = 0;
+      for (const e of trade.executions)
+        held += (e.side === 'buy') === long ? e.qty : -e.qty;
+      const exits = sizedRealizations(trade);
+      const basis = ctx.pnlBasis;
+      return {
+        trade,
+        openQty: trade.executions.length === 0 ? trade.maxPosition : held,
+        realizedUnits: realizedUnits(trade, basis),
+        realized:
+          exits.length === 0
+            ? null
+            : exits.reduce(
+                (n, r) => n + (ctx.pnlBasis === 'gross' ? r.gross : r.net),
+                0,
+              ),
+      };
+    });
 }
 
 export interface DashboardEnv {
   strategies: readonly Strategy[];
   tags: readonly Tag[];
+  tagCategories: readonly TagCategory[];
   goals: Goals;
   /** Goals are in the base currency only. */
   baseCurrency: string;
@@ -78,6 +145,11 @@ export interface DashboardEnv {
   /** The resolved date range. */
   range: { from?: string; to?: string };
   today: string;
+  /**
+   * The net days the goals read, when they are not the bundle's own: under a
+   * display unit that narrows the set, goals still read every trade, in money.
+   */
+  goalDays?: readonly DayStat[];
 }
 
 export interface DashboardModel {
@@ -106,8 +178,23 @@ export interface DashboardModel {
     expectancy: Cents | null;
     /** Starting balance first, then the equity after each closed trade. */
     equity: Cents[];
+    /** Winning days over trading days, with the green, flat and red counts; null rate with no day. */
+    dayWin: {
+      rate: number | null;
+      green: number;
+      flat: number;
+      red: number;
+    };
+    /** Average win over average loss, from `Summary`; null without both. */
+    winLossRatio: number | null;
+    avgWin: Cents | null;
+    avgLoss: Cents | null;
+    /** The trades behind each average, so a display unit can read them. */
+    winIds: string[];
+    lossIds: string[];
   };
   recent: RecentTrade[];
+  open: OpenPosition[];
   tradesById: ReadonlyMap<string, Trade>;
 }
 
@@ -118,13 +205,9 @@ export function buildDashboard(
   const { summary } = m;
   const closed = closedInOrder(m.trades);
 
-  const ruleText = new Map<string, string>();
-  for (const s of env.strategies)
-    for (const r of s.rules)
-      if (!ruleText.has(r.id)) ruleText.set(r.id, r.text);
   const strategyName = new Map(env.strategies.map((s) => [s.id, s.name]));
   const mistakeTag = new Map(
-    env.tags.filter((t) => t.category === 'mistake').map((t) => [t.id, t.name]),
+    mistakeTags(env.tags, env.tagCategories).map((t) => [t.id, t.name]),
   );
 
   const rules = ruleScorecard(m.trades, env.strategies, env.ctx);
@@ -145,13 +228,10 @@ export function buildDashboard(
       unavailable: `Goals use your base currency (${env.baseCurrency}).`,
     };
   } else {
-    // m.days is already net when m was built on net; only gross needs a second pass.
-    // env.ctx must be the ctx that m was built with.
-    const days =
-      summary.basis === 'net'
-        ? m.days
-        : dailyPnl(m.trades, { ...env.ctx, pnlBasis: 'net' });
-    const window = goalWeek(env.range, env.today);
+    // Goals read the net days, whatever the basis shows, and every trade
+    // whatever the unit: they are money targets.
+    const days = env.goalDays ?? m.netDays;
+    const window = goalWeek(env.range, env.today, env.ctx.weekStart);
     goals = {
       weekly:
         env.goals.weeklyNet !== undefined && window !== null
@@ -165,18 +245,18 @@ export function buildDashboard(
     };
   }
 
+  const outcomes = winsVsLosses(m.trades, env.ctx);
   const recent = closed
     .slice()
     .reverse()
     .slice(0, RECENT_TRADE_COUNT)
     .map((trade) => ({
       trade,
-      strategyName:
-        trade.strategyId !== undefined
-          ? (strategyName.get(trade.strategyId) ?? null)
-          : null,
+      strategyNames: trade.strategyIds.flatMap(
+        (id) => strategyName.get(id) ?? [],
+      ),
       mistakes: trade.tagIds.flatMap((id) => mistakeTag.get(id) ?? []),
-      rules: tradeRulesSummary(trade, ruleText),
+      rules: tradeRulesSummary(trade, env.strategies, env.ctx),
     }));
 
   return {
@@ -189,7 +269,7 @@ export function buildDashboard(
       cost: brokenRulesCost(m.trades, env.strategies, env.ctx),
       rules,
     },
-    mistakes: mistakeCosts(m.trades, env.tags, env.ctx),
+    mistakes: mistakeCosts(m.trades, env.tags, env.tagCategories, env.ctx),
     goals,
     performance: {
       pnl: summary.basis === 'gross' ? summary.grossPnl : summary.netPnl,
@@ -197,8 +277,20 @@ export function buildDashboard(
       profitFactor: summary.profitFactor,
       expectancy: summary.expectancy,
       equity: [m.startingBalance, ...m.equity.map((p) => p.equity)],
+      dayWin: {
+        rate: m.daySummary.greenPct,
+        green: m.daySummary.greenDays,
+        flat: m.daySummary.flatDays,
+        red: m.daySummary.redDays,
+      },
+      winLossRatio: summary.winLossRatio,
+      avgWin: summary.avgWin,
+      avgLoss: summary.avgLoss,
+      winIds: outcomes.wins.tradeIds,
+      lossIds: outcomes.losses.tradeIds,
     },
     recent,
+    open: openPositions(m.trades, env.ctx),
     tradesById: new Map(m.trades.map((t) => [t.id, t])),
   };
 }

@@ -1,6 +1,14 @@
 import { quoteToPnl } from '../currency';
 import { toCents } from '../money';
-import type { BreakevenRange, Cents, PnlBasis, Trade } from '../types';
+import { outcomeOf } from '../outcome';
+import type {
+  BreakevenRange,
+  Cents,
+  PnlBasis,
+  Trade,
+  WeekStart,
+} from '../types';
+import type { TradeUnit } from './units';
 
 export type { BreakevenRange, PnlBasis } from '../types';
 
@@ -8,6 +16,32 @@ export interface MetricContext {
   timeZone: string;
   breakevenRange: BreakevenRange;
   pnlBasis: PnlBasis;
+  /**
+   * The date filter, resolved (inclusive local dates; an open end is open).
+   * Day-level figures take only the realizations and fills dated inside it;
+   * trade-level sets are already chosen by the filters.
+   */
+  range?: { from?: string; to?: string };
+  /**
+   * The display unit, when it is one that narrows the trade set (R, ticks,
+   * pips or points): the set holds only the trades that carry it, and the
+   * ratios of money totals (profit factor, the win/loss ratio) read in it.
+   * Classifying a trade as a win or a loss stays on its P&L.
+   */
+  unit?: TradeUnit;
+  /** The day weeks start on; undefined: Sunday. */
+  weekStart?: WeekStart;
+}
+
+/** Whether a local date falls inside `range` (always, when there is none). */
+export function inRange(
+  date: string,
+  range: { from?: string; to?: string } | undefined,
+): boolean {
+  if (!range) return true;
+  if (range.from !== undefined && date < range.from) return false;
+  if (range.to !== undefined && date > range.to) return false;
+  return true;
 }
 
 export function defaultMetricContext(timeZone: string): MetricContext {
@@ -33,4 +67,25 @@ export function costBasis(t: Trade): Cents {
       t.avgEntry,
     ),
   );
+}
+
+/**
+ * The one way a closed trade is classified: its P&L on the chosen basis against
+ * the breakeven range (percent ranges use Net ROI on the cost basis). `summarize`
+ * and the Outcome filter both call it, so they never disagree.
+ */
+export function classify(
+  t: Trade,
+  ctx: Pick<MetricContext, 'pnlBasis' | 'breakevenRange'>,
+): { value: Cents; outcome: 'win' | 'loss' | 'breakeven' } {
+  const value = pnlOf(t, ctx.pnlBasis);
+  const basis = costBasis(t);
+  return {
+    value,
+    outcome: outcomeOf(
+      value,
+      ctx.breakevenRange,
+      basis > 0 ? value / basis : undefined,
+    ),
+  };
 }

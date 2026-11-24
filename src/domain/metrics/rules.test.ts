@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { makeTrade } from '../__fixtures__/trades';
 import type { Rule, Strategy } from '../types';
-import { brokenRulesCost, ruleScorecard } from './rules';
+import { brokenRulesCost, ruleScorecard, ruleStats } from './rules';
 import { defaultMetricContext } from './context';
 import { summarize } from './summary';
 
@@ -10,7 +10,11 @@ const strat = (id: string, name: string, rules: Rule[]) =>
   ({
     id,
     name,
-    rules,
+    // The first two rules open the strategy's first group, the rest its second.
+    groups: [
+      { id: `${id}-a`, title: 'Risk', rules: rules.slice(0, 2) },
+      { id: `${id}-b`, title: 'Management', rules: rules.slice(2) },
+    ],
     workspaceId: 'w',
     description: '',
     assetClasses: [],
@@ -19,9 +23,17 @@ const strat = (id: string, name: string, rules: Rule[]) =>
   }) as Strategy;
 const strategies = [
   strat('s1', 'Range break', [
-    { id: 'r-stop', text: 'Stop stays where it was placed', group: 'risk' },
-    { id: 'r-size', text: 'Risk no more than 1R per trade', group: 'risk' },
-    { id: 'r-max', text: 'Max 6 trades a day', group: 'management' },
+    {
+      id: 'r-stop',
+      text: 'Stop stays where it was placed',
+      showWhen: 'always',
+    },
+    {
+      id: 'r-size',
+      text: 'Risk no more than 1R per trade',
+      showWhen: 'always',
+    },
+    { id: 'r-max', text: 'Max 6 trades a day', showWhen: 'always' },
   ]),
 ];
 const chk = (ruleId: string, followed: boolean | null) => ({
@@ -69,6 +81,7 @@ describe('ruleScorecard', () => {
     const [stop, size, max] = ruleScorecard(trades, strategies, ctx);
     expect(stop).toMatchObject({
       ruleId: 'r-stop',
+      group: 'Risk',
       strategyName: 'Range break',
       kept: 1,
       broken: 2,
@@ -85,11 +98,24 @@ describe('ruleScorecard', () => {
     });
     expect(max).toMatchObject({
       ruleId: 'r-max',
+      group: 'Management',
       kept: 3,
       broken: 0,
       brokenPnl: 0,
       adherence: 1,
     });
+  });
+
+  test('each row says when its rule is graded, so a losers-only rule can be told apart', () => {
+    const only = [
+      strat('s1', 'Range break', [
+        { id: 'r-stop', text: 'Stop stays', showWhen: 'loser' },
+        { id: 'r-size', text: 'Risk no more than 1R', showWhen: 'always' },
+      ]),
+    ];
+    const rows = ruleScorecard(trades, only, ctx);
+    expect(rows.find((r) => r.ruleId === 'r-stop')?.showWhen).toBe('loser');
+    expect(rows.find((r) => r.ruleId === 'r-size')?.showWhen).toBe('always');
   });
 
   test('unknown rule ids and open trades are ignored', () => {
@@ -120,10 +146,10 @@ describe('ruleScorecard', () => {
   test('never-broken rules follow broken ones, by adherence then text', () => {
     const ss = [
       strat('s1', 'S', [
-        { id: 'a', text: 'B rule', group: 'entry' },
-        { id: 'b', text: 'A rule', group: 'entry' },
-        { id: 'c', text: 'C rule', group: 'entry' },
-        { id: 'd', text: 'Broken', group: 'entry' },
+        { id: 'a', text: 'B rule', showWhen: 'always' },
+        { id: 'b', text: 'A rule', showWhen: 'always' },
+        { id: 'c', text: 'C rule', showWhen: 'always' },
+        { id: 'd', text: 'Broken', showWhen: 'always' },
       ]),
     ];
     const ts = [
@@ -170,7 +196,7 @@ describe('ruleScorecard', () => {
         {
           id: 'r2-stop',
           text: 'Stop stays where it was placed',
-          group: 'risk',
+          showWhen: 'always',
         },
       ]),
     ];
@@ -216,5 +242,85 @@ describe('brokenRulesCost', () => {
     expect(
       brokenRulesCost(trades, strategies, { ...ctx, pnlBasis: 'gross' }).pnl,
     ).toBe(-49500);
+  });
+});
+
+describe('ruleStats', () => {
+  const loserRule: Rule = {
+    id: 'r-loser',
+    text: 'No re-entry after a stop-out',
+    showWhen: 'loser',
+  };
+  const strategy = strat('s2', 'Fade', [loserRule]);
+  const at = (id: string, net: number, followed: boolean | null, p = {}) =>
+    makeTrade({
+      id,
+      net,
+      closedAt: '2026-11-18T15:00:00Z',
+      strategyIds: ['s2'],
+      ruleChecks: [chk('r-loser', followed)],
+      ...p,
+    });
+
+  test('a loser rule counts only the losses: kept on 2, broken on 1, with 3 wins present', () => {
+    const set = [
+      at('w1', 20000, true),
+      at('w2', 30000, false),
+      at('w3', 10000, true),
+      at('l1', -10000, true),
+      at('l2', -25000, true),
+      at('l3', -40000, false),
+    ];
+    const [row] = ruleStats(set, strategy, ctx);
+    expect(row).toMatchObject({
+      ruleId: 'r-loser',
+      applies: 3,
+      kept: 2,
+      broken: 1,
+      followedNet: -35000,
+      brokenNet: -40000,
+    });
+    expect(row!.followRate).toBeCloseTo(0.667, 3);
+  });
+
+  test('win rate and profit factor when followed read the trades that kept it; open trades never apply', () => {
+    const always = strat('s3', 'Plain', [
+      { id: 'r-a', text: 'Plan the trade', showWhen: 'always' },
+    ]);
+    const set = [
+      makeTrade({ id: 'x1', net: 30000, ruleChecks: [chk('r-a', true)] }),
+      makeTrade({ id: 'x2', net: -10000, ruleChecks: [chk('r-a', true)] }),
+      makeTrade({ id: 'x3', net: -5000, ruleChecks: [chk('r-a', false)] }),
+      makeTrade({
+        id: 'x4',
+        net: 9000,
+        status: 'open',
+        ruleChecks: [chk('r-a', true)],
+      }),
+      makeTrade({ id: 'x5', net: 1000, ruleChecks: [] }),
+    ];
+    const [row] = ruleStats(set, always, ctx);
+    expect(row).toMatchObject({
+      applies: 4,
+      kept: 2,
+      broken: 1,
+      followedNet: 20000,
+      followedWinRate: 0.5,
+      followedProfitFactor: 3,
+      brokenNet: -5000,
+    });
+    expect(row!.followRate).toBeCloseTo(2 / 3);
+  });
+
+  test('a rule that applies to no trade has no follow rate and no figures to divide', () => {
+    const [row] = ruleStats([at('w1', 100, null)], strategy, ctx);
+    expect(row).toMatchObject({
+      applies: 0,
+      followRate: null,
+      followedWinRate: null,
+      followedProfitFactor: null,
+      followedNet: 0,
+      brokenNet: 0,
+    });
   });
 });

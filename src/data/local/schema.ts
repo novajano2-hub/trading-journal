@@ -18,12 +18,16 @@ export const META = {
   prefs: 'prefs',
   /** Value: `SeedMeta`. */
   seed: 'seed:sample',
+  /** Value: true once the tag names have been lowercased and merged. */
+  tagNamesLowercased: 'tag-names-lowercased',
   overrides: (ws: string) => `overrides:${ws}`,
   /** Value: a number, bumped by every import commit and undo in the workspace. */
   importRevision: (ws: string) => `import-revision:${ws}`,
 } as const;
 
 export interface SeedMeta {
+  /** `SAMPLE_SEED_VERSION` when the sample was written; a record from before versions has none. */
+  version?: number;
   seed: number;
   endDate: string;
   seededAt: string;
@@ -46,4 +50,9 @@ export const DATA_TABLES = [
   'tags',
   'journal',
   'imports',
+  'tagCategories',
+  'templates',
+  'folders',
+  'cashflows',
+  'challenges',
 ] as const;

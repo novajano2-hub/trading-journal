@@ -3,6 +3,8 @@ import { resolveInstrument } from '@/domain/instruments';
 import {
   adherenceDigits,
   formatAdherence,
+  formatCount,
+  formatDuration,
   formatInstrument,
   formatMoney,
   formatPct,
@@ -14,6 +16,12 @@ import {
 } from './format';
 
 describe('format', () => {
+  test('formatCount puts a separator in a count over a thousand', () => {
+    expect(formatCount(1515)).toBe('1,515');
+    expect(formatCount(999)).toBe('999');
+    expect(formatCount(0)).toBe('0');
+  });
+
   test('formatPnl always signs gains and losses', () => {
     expect(formatPnl(421850)).toBe('+$4,218.50');
     expect(formatPnl(-31840)).toBe('−$318.40');
@@ -61,7 +69,7 @@ describe('format', () => {
   });
 
   describe('formatInstrument', () => {
-    const at = '2026-11-20T15:00:00Z';
+    const at = '2026-11-19T15:00:00Z';
     const of = (symbol: string, tradedAt = at) =>
       formatInstrument(resolveInstrument(symbol)!, tradedAt);
 
@@ -74,6 +82,23 @@ describe('format', () => {
         name: 'TSLA 385 Call',
         detail: '20 Nov',
       });
+    });
+    test('an option expiring the day it opened leaves the expiry out', () => {
+      expect(of('TSLA261120P00370000', '2026-11-20T15:00:00Z')).toEqual({
+        name: 'TSLA 370 Put',
+      });
+      // The day is the trader's: 23:30 on the 19th in New York is the 20th in UTC.
+      const ny = (tz: string) =>
+        formatInstrument(
+          resolveInstrument('TSLA261120P00370000')!,
+          '2026-11-20T04:30:00Z',
+          tz,
+        );
+      expect(ny('America/New_York')).toEqual({
+        name: 'TSLA 370 Put',
+        detail: '20 Nov',
+      });
+      expect(ny('UTC')).toEqual({ name: 'TSLA 370 Put' });
     });
     test('a fractional strike keeps its decimals; a single-digit day has no padding', () => {
       expect(of('AAPL261106P00277500')).toEqual({
@@ -143,5 +168,13 @@ describe('format', () => {
     expect(plural(2, 'day')).toBe('days');
     expect(plural(1, 'strategy', 'strategies')).toBe('strategy');
     expect(plural(3, 'strategy', 'strategies')).toBe('strategies');
+  });
+
+  test('formatDuration keeps the two largest units', () => {
+    expect(formatDuration(45_000)).toBe('45s');
+    expect(formatDuration(1_519_000)).toBe('25m 19s');
+    expect(formatDuration(5_640_000)).toBe('1h 34m');
+    expect(formatDuration(3 * 86_400_000 + 5 * 3_600_000)).toBe('3d 5h');
+    expect(formatDuration(0)).toBe('0s');
   });
 });

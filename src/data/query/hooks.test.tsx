@@ -13,10 +13,20 @@ import { USER_WORKSPACE } from '../workspaces';
 import {
   useActiveWorkspace,
   useCommitImport,
+  useCreateTagCategory,
+  useDailyNote,
+  useEnsureTradeNote,
+  useJournal,
+  useRemoveAccount,
+  useRemoveTagCategory,
   useSetActiveWorkspace,
+  useTagCategories,
+  useTags,
+  useTemplates,
   useTrade,
   useTrades,
   useUpdateTrade,
+  useUpdateTrades,
 } from './hooks';
 import { DataProvider } from './provider';
 
@@ -43,6 +53,88 @@ function wrapper() {
 test('useTrades loads the active workspace', async () => {
   const { result } = renderHook(() => useTrades(), { wrapper: wrapper() });
   await waitFor(() => expect(result.current.data).toHaveLength(3));
+});
+
+test('categories and templates load, and category writes refresh tags and trades', async () => {
+  const { result } = renderHook(
+    () => ({
+      categories: useTagCategories(),
+      templates: useTemplates(),
+      tags: useTags(),
+      trades: useTrades(),
+      create: useCreateTagCategory(),
+      remove: useRemoveTagCategory(),
+    }),
+    { wrapper: wrapper() },
+  );
+  await waitFor(() =>
+    expect(result.current.categories.data?.map((c) => c.name)).toEqual([
+      'Custom tags',
+      'Mistakes',
+      'Setups',
+    ]),
+  );
+  await waitFor(() => expect(result.current.templates.data).toHaveLength(3));
+  await waitFor(() => expect(result.current.trades.data).toHaveLength(3));
+  await act(async () => {
+    await result.current.create.mutateAsync({
+      name: 'Sessions',
+      color: '#0F766E',
+    });
+  });
+  await waitFor(() =>
+    expect(result.current.categories.data?.map((c) => c.name)).toContain(
+      'Sessions',
+    ),
+  );
+  await act(async () => {
+    await expect(result.current.remove.mutateAsync('mistakes')).rejects.toThrow(
+      'built-in category',
+    );
+    await result.current.remove.mutateAsync('setups');
+  });
+  await waitFor(() =>
+    expect(result.current.tags.data?.map((t) => t.id)).toEqual(['tag-fomo']),
+  );
+  expect(result.current.categories.data?.map((c) => c.id)).not.toContain(
+    'setups',
+  );
+});
+
+test('a bulk update, a trade note and a daily note refresh what they change', async () => {
+  const { result } = renderHook(
+    () => ({
+      trades: useTrades(),
+      journal: useJournal(),
+      updateMany: useUpdateTrades(),
+      ensureNote: useEnsureTradeNote(),
+      daily: useDailyNote(),
+    }),
+    { wrapper: wrapper() },
+  );
+  await waitFor(() => expect(result.current.journal.data).toHaveLength(1));
+  await act(async () => {
+    await result.current.updateMany.mutateAsync({
+      ids: ['f-1', 'f-2'],
+      patch: { reviewed: true },
+    });
+  });
+  await waitFor(() =>
+    expect(result.current.trades.data?.map((t) => t.reviewed)).toEqual([
+      true,
+      true,
+      undefined,
+    ]),
+  );
+  let noteId = '';
+  await act(async () => {
+    noteId = (await result.current.ensureNote.mutateAsync('f-2')).id;
+    await result.current.daily.mutateAsync('2026-11-19');
+  });
+  await waitFor(() => expect(result.current.journal.data).toHaveLength(3));
+  expect(result.current.trades.data?.find((t) => t.id === 'f-2')?.noteId).toBe(
+    noteId,
+  );
 });
 
 test('an update shows up in the list', async () => {
@@ -88,6 +180,35 @@ test('a missing trade reads as null', async () => {
     wrapper: wrapper(),
   });
   await waitFor(() => expect(result.current.data).toBeNull());
+});
+
+test('reading the journal refreshes the trades when the purge unlinked a note', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => {
+      const sample = fixtureSample();
+      // In Trash for far longer than 30 days.
+      sample.journal[0]!.deletedAt = '2026-01-01T00:00:00.000Z';
+      return sample;
+    },
+  });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+  });
+  const Wrapper = ({ children }: { children: ReactNode }) => (
+    <DataProvider repository={repository} queryClient={queryClient}>
+      {children}
+    </DataProvider>
+  );
+  const trades = renderHook(() => useTrades(), { wrapper: Wrapper });
+  const noteOf = () => trades.result.current.data?.find((t) => t.id === 'f-1');
+  await waitFor(() => expect(noteOf()).toBeDefined());
+  // Trades loaded first, still holding the id of a note about to be purged.
+  expect(noteOf()?.noteId).toBe('j-1');
+  const journal = renderHook(() => useJournal(), { wrapper: Wrapper });
+  await waitFor(() => expect(journal.result.current.data).toEqual([]));
+  await waitFor(() => expect(noteOf()?.noteId).toBeUndefined());
 });
 
 function commitWrapper(over: {
@@ -173,4 +294,38 @@ test('a failed switch after a landed commit still invalidates, then rejects', as
   const ks = invalidatedKeys(spy);
   expect(ks).toContainEqual(['keel', 'ws', 'mine', 'trades']);
   expect(ks).toContainEqual(['keel', 'ws', 'mine', 'imports']);
+});
+
+test('a remove that lands but whose cache refresh fails still resolves: it was deleted', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+  });
+  vi.spyOn(queryClient, 'invalidateQueries').mockRejectedValue(
+    new Error('refresh failed'),
+  );
+  const Wrapper = ({ children }: { children: ReactNode }) => (
+    <DataProvider repository={repository} queryClient={queryClient}>
+      {children}
+    </DataProvider>
+  );
+  const { result } = renderHook(() => useRemoveAccount(), { wrapper: Wrapper });
+  const made = await repository.accounts.create('sample', {
+    name: 'Spare',
+    broker: '',
+    type: 'live',
+    currency: 'USD',
+    startingBalance: 0,
+    status: 'active',
+  });
+  await act(async () => {
+    await result.current.mutateAsync(made.id);
+  });
+  expect(
+    (await repository.accounts.list('sample')).map((a) => a.id),
+  ).not.toContain(made.id);
 });

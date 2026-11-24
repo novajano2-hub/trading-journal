@@ -4,6 +4,7 @@ import { cleanup, renderHook, waitFor, act } from '@testing-library/react';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { readFileSync } from 'node:fs';
 import type { ReactNode } from 'react';
+import type { ImportPlan } from '@/domain/import/plan';
 import {
   afterEach,
   beforeEach,
@@ -15,15 +16,18 @@ import {
 import { parseCsv } from '@/domain/import/csv';
 import { guessMapping } from '@/domain/import/mapping';
 import { EMPTY_FILTERS } from '../filters';
+import { makeTrade } from '@/domain/__fixtures__/trades';
+import { resolveInstrument } from '@/domain/instruments';
 import { fixtureSample } from '../__fixtures__/sample';
 import { createLocalRepository } from '../local/local-repository';
 import type { Repository } from '../repository';
-import { USER_WORKSPACE } from '../workspaces';
+import { SAMPLE_WORKSPACE, USER_WORKSPACE } from '../workspaces';
 import {
   useGlobalFilters,
   useImportPlan,
   useMetrics,
   useTradeSet,
+  type Derived,
   type ImportInput,
 } from './derived';
 import { useCommitImport, useUndoImport } from './hooks';
@@ -37,11 +41,11 @@ vi.mock('next/navigation', () => ({
 beforeEach(() => window.history.replaceState(null, '', '/app/dashboard'));
 afterEach(cleanup);
 
-function setup() {
+function setup(sample = fixtureSample) {
   const repository = createLocalRepository({
     indexedDB: new IDBFactory(),
     IDBKeyRange,
-    sample: async () => fixtureSample(),
+    sample: async () => sample(),
   });
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
@@ -247,4 +251,248 @@ test('useImportPlan gives the same input a fresh id and time after every commit 
     [z.importId, 'active'],
     [x.importId, 'undone'],
   ]);
+});
+
+async function importFixture(
+  repository: Repository,
+  name: string,
+  csv: string,
+): Promise<ImportInput> {
+  const account = await repository.accounts.create(USER_WORKSPACE.id, {
+    name,
+    broker: 'x',
+    type: 'live',
+    currency: 'USD',
+    startingBalance: 0,
+    status: 'active',
+  });
+  const parsed = parseCsv(csv);
+  return {
+    parsed,
+    mapping: guessMapping(parsed, { sourceTimeZone: 'America/New_York' }),
+    accountId: account.id,
+    fileName: name + '.csv',
+  };
+}
+
+const TWO_FILLS =
+  'Date/Time,Symbol,Buy/Sell,Quantity,Price\n2026-11-16 09:41:00,ESZ5,Buy,1,6010\n2026-11-16 09:50:00,ESZ5,Sell,1,6011\n';
+
+test('useImportPlan: success always carries data, on every pass', async () => {
+  const { repository, Wrapper } = setup();
+  const a = await importFixture(repository, 'a', TWO_FILLS);
+  const b = await importFixture(repository, 'b', TWO_FILLS);
+  const passes: Derived<ImportPlan>[] = [];
+  const { result, rerender } = renderHook(
+    ({ i }: { i: ImportInput }) => {
+      const plan = useImportPlan(i);
+      passes.push(plan);
+      return {
+        plan,
+        commit: useCommitImport(),
+        undo: useUndoImport(),
+      };
+    },
+    { wrapper: Wrapper, initialProps: { i: a } },
+  );
+  const settled = async (fileName: string, not: readonly string[] = []) => {
+    await waitFor(() => {
+      expect(result.current.plan.status).toBe('success');
+      expect(result.current.plan.data!.fileName).toBe(fileName);
+      expect(not).not.toContain(result.current.plan.data!.importId);
+    });
+    return result.current.plan.data!;
+  };
+  await settled('a.csv');
+  rerender({ i: b });
+  const x = await settled('b.csv');
+  await act(() => result.current.commit.mutateAsync(x));
+  const y = await settled('b.csv', [x.importId]);
+  await act(() => result.current.undo.mutateAsync(x.importId));
+  await settled('b.csv', [x.importId, y.importId]);
+
+  for (const r of passes)
+    expect(r.status !== 'success' || r.data !== undefined).toBe(true);
+  expect(passes.some((r) => r.status === 'success')).toBe(true);
+});
+
+test('useImportPlan: a new input never shows a plan made for the old one', async () => {
+  const { repository, Wrapper } = setup();
+  const a = await importFixture(repository, 'a', TWO_FILLS);
+  const b = await importFixture(repository, 'b', TWO_FILLS);
+  const passes: Derived<ImportPlan>[] = [];
+  const { result, rerender } = renderHook(
+    ({ i }: { i: ImportInput }) => {
+      const plan = useImportPlan(i);
+      passes.push(plan);
+      return plan;
+    },
+    { wrapper: Wrapper, initialProps: { i: a } },
+  );
+  await waitFor(() => expect(result.current.status).toBe('success'));
+  const before = passes.length;
+  rerender({ i: b });
+  await waitFor(() => expect(result.current.data?.fileName).toBe('b.csv'));
+  for (const r of passes.slice(before))
+    expect(r.data === undefined || r.data.fileName === 'b.csv').toBe(true);
+});
+
+test('useImportPlan: an inline input object does not loop', async () => {
+  const { repository, Wrapper } = setup();
+  const input = await importFixture(repository, 'a', TWO_FILLS);
+  let renders = 0;
+  const { result } = renderHook(
+    () => {
+      renders += 1;
+      return useImportPlan({ ...input });
+    },
+    { wrapper: Wrapper },
+  );
+  await waitFor(() => expect(result.current.status).toBe('success'));
+  await new Promise((r) => setTimeout(r, 50));
+  expect(renders).toBeLessThan(10);
+  expect(result.current.data).toBeDefined();
+});
+
+test('useMetrics: day figures keep an exit dated inside the range when the open trade is matched outside it', async () => {
+  // ES long opened Fri 13 Nov; one lot sold Tue 17 Nov for -$1,000; one lot still open.
+  const held = makeTrade({
+    id: 'held',
+    workspaceId: SAMPLE_WORKSPACE.id,
+    accountId: 'acc-a',
+    status: 'open',
+    openedAt: '2026-11-13T15:00:00Z',
+    net: 0,
+    gross: 0,
+    maxPosition: 2,
+    avgEntry: 5000,
+    executions: [
+      {
+        id: 'e1',
+        accountId: 'acc-a',
+        symbol: 'ESZ5',
+        side: 'buy',
+        qty: 2,
+        price: 5000,
+        time: '2026-11-13T15:00:00Z',
+        fees: 0,
+        commission: 0,
+      },
+      {
+        id: 'e2',
+        accountId: 'acc-a',
+        symbol: 'ESZ5',
+        side: 'sell',
+        qty: 1,
+        price: 4980,
+        time: '2026-11-17T15:00:00Z',
+        fees: 0,
+        commission: 0,
+      },
+    ],
+  });
+  const { Wrapper } = setup(() => ({ ...fixtureSample(), trades: [held] }));
+  const { result } = renderHook(
+    () =>
+      useMetrics({
+        ...EMPTY_FILTERS,
+        range: { from: '2026-11-16', to: '2026-11-20' },
+      }),
+    { wrapper: Wrapper },
+  );
+  await waitFor(() => expect(result.current.status).toBe('success'));
+  const usd = result.current.data![0]!;
+  expect(usd.days.map((d) => [d.date, d.net])).toEqual([
+    ['2026-11-17', -100000],
+  ]);
+  expect(usd.netDays.map((d) => [d.date, d.net])).toEqual([
+    ['2026-11-17', -100000],
+  ]);
+});
+
+/** The fixture's two ES trades (f-1 with a stop), plus a forex and a stock trade on the same account. */
+function mixedSample() {
+  const base = fixtureSample();
+  const own = { workspaceId: SAMPLE_WORKSPACE.id, accountId: 'acc-a' };
+  return {
+    ...base,
+    trades: [
+      { ...base.trades[0]!, initialRisk: 10_000 },
+      base.trades[1]!,
+      makeTrade({
+        ...own,
+        id: 'fx-1',
+        serial: 4,
+        instrument: resolveInstrument('EURUSD')!,
+        openedAt: '2026-11-18T09:00:00Z',
+        closedAt: '2026-11-18T10:00:00Z',
+        avgEntry: 1.07483,
+        avgExit: 1.07688,
+        net: 20_500,
+      }),
+      makeTrade({
+        ...own,
+        id: 'st-1',
+        serial: 5,
+        instrument: resolveInstrument('AAPL')!,
+        openedAt: '2026-11-18T15:00:00Z',
+        closedAt: '2026-11-18T16:00:00Z',
+        avgEntry: 200,
+        avgExit: 201,
+        net: 10_000,
+        initialRisk: 5_000,
+      }),
+    ],
+  };
+}
+
+test.each([
+  ['dollar', ['f-1', 'f-2', 'fx-1', 'st-1']],
+  ['percent', ['f-1', 'f-2', 'fx-1', 'st-1']],
+  ['privacy', ['f-1', 'f-2', 'fx-1', 'st-1']],
+  ['ticks', ['f-1', 'f-2']],
+  ['points', ['f-1', 'f-2']],
+  ['pips', ['fx-1']],
+  ['r', ['f-1', 'st-1']],
+] as const)(
+  'under %s the trade set keeps %j, day trades too, and counts the rest as left out',
+  async (unit, kept) => {
+    const { Wrapper, repository } = setup(mixedSample);
+    await repository.prefs.update({ displayUnit: unit });
+    const { result } = renderHook(() => useTradeSet(EMPTY_FILTERS), {
+      wrapper: Wrapper,
+    });
+    await waitFor(() => expect(result.current.status).toBe('success'));
+    const set = result.current.data!;
+    const ids = (ts: { id: string }[]) => ts.map((t) => t.id).sort();
+    expect(ids(set.trades)).toEqual([...kept]);
+    expect(ids(set.dayTrades)).toEqual([...kept]);
+    expect(set.unitLeftOut).toBe(4 - kept.length);
+  },
+);
+
+test('the left-out count is of the trades the filters matched', async () => {
+  const { Wrapper, repository } = setup(mixedSample);
+  await repository.prefs.update({ displayUnit: 'pips' });
+  const { result } = renderHook(
+    () => useTradeSet({ ...EMPTY_FILTERS, symbols: ['ES', 'EURUSD'] }),
+    { wrapper: Wrapper },
+  );
+  await waitFor(() => expect(result.current.status).toBe('success'));
+  expect(result.current.data!.trades.map((t) => t.id)).toEqual(['fx-1']);
+  expect(result.current.data!.unitLeftOut).toBe(2);
+});
+
+test('useMetrics under Ticks reads only the futures trades, and its profit factor in ticks', async () => {
+  const { Wrapper, repository } = setup(mixedSample);
+  await repository.prefs.update({ displayUnit: 'ticks' });
+  const { result } = renderHook(() => useMetrics(EMPTY_FILTERS), {
+    wrapper: Wrapper,
+  });
+  await waitFor(() => expect(result.current.status).toBe('success'));
+  const usd = result.current.data![0]!;
+  expect(usd.summary).toMatchObject({ closedCount: 2, wins: 1, losses: 1 });
+  // f-1 made 5 points (20 ticks), f-2 lost 2.5 (10 ticks).
+  expect(usd.summary.profitFactor).toBeCloseTo(2, 10);
+  expect(usd.days.map((d) => d.date)).toEqual(['2026-11-16', '2026-11-17']);
 });

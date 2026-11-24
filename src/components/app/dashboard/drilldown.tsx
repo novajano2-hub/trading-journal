@@ -1,32 +1,64 @@
 'use client';
 
 import { useMemo, useState, type RefObject } from 'react';
+import { Popover } from 'radix-ui';
 import {
   CheckCircle,
-  ListChecks,
+  Tag as TagIcon,
   Warning,
   XCircle,
 } from '@phosphor-icons/react/dist/ssr';
 import { Chip, SideChip } from '@/components/ui/chip';
-import { IconTile } from '@/components/ui/icon-tile';
 import { MetricTip } from '@/components/ui/metric-tip';
 import { MorphDialog } from '@/components/ui/morph-dialog';
 import type { DashboardModel } from '@/data/dashboard';
-import { useUpdateTrade } from '@/data/query/hooks';
-import { withRuleCheck } from '@/data/trade-patch';
+import { useUpdateTrade, useUpdateTrades } from '@/data/query/hooks';
+import { withRuleCheck, withTagPick } from '@/data/trade-patch';
 import { pnlOf } from '@/domain/metrics/context';
-import type { Cents, Strategy, Tag, Trade } from '@/domain/types';
-import { formatPnl, keepHyphens, plural } from '@/lib/format';
+import { mistakeTags } from '@/domain/metrics/mistakes';
+import {
+  strategyRules,
+  type Cents,
+  type Strategy,
+  type Tag,
+  type TagCategory,
+  type Trade,
+} from '@/domain/types';
+import { useDisplay } from '@/lib/display';
+import { keepHyphens, plural } from '@/lib/format';
 import { shortTime } from '@/lib/time-format';
 import type { DrillTarget } from './dashboard-view';
+import { TagPicker } from '../tag-picker';
+import { TradeLink } from '../trades/cells';
 import { InstrumentName, signTone, TradeTime } from './shared';
 
-function Money({ cents, currency }: { cents: Cents; currency: string }) {
+/** An amount in the chosen unit: one trade's, a set's by id, or a bare sum (a percentage reads over the account's base, other units in dollars). */
+function Money({
+  cents,
+  currency,
+  trade,
+  ids,
+}: {
+  cents: Cents;
+  currency: string;
+  trade?: Trade;
+  ids?: readonly string[];
+}) {
+  const display = useDisplay();
+  const figure = trade
+    ? display.ofTrade(trade)
+    : ids
+      ? display.ofTrades(ids, cents)
+      : { money: cents };
+  const { text } =
+    trade || ids
+      ? display.figure(figure, true, currency)
+      : display.cash(cents, true, currency);
   return (
     <span
       className={`font-[550] whitespace-nowrap tabular-nums ${signTone(cents)}`}
     >
-      {formatPnl(cents, currency)}
+      {text}
     </span>
   );
 }
@@ -131,6 +163,7 @@ function TradesTable({
   timeZone,
   strategyName,
   mistakeName,
+  mistakeCategories,
 }: {
   target: DrillTarget;
   rows: readonly Trade[];
@@ -139,6 +172,7 @@ function TradesTable({
   timeZone: string;
   strategyName: ReadonlyMap<string, string>;
   mistakeName: ReadonlyMap<string, string>;
+  mistakeCategories: TagCategory[];
 }): React.JSX.Element {
   const [failed, setFailed] = useState(false);
   const rule = target.kind === 'rule' ? target.ruleId : null;
@@ -210,9 +244,9 @@ function TradesTable({
               const time = shortTime(t.closedAt ?? t.openedAt, timeZone);
               const mistakes = rowMistakes[i] ?? [];
               const strategy =
-                t.strategyId !== undefined
-                  ? strategyName.get(t.strategyId)
-                  : undefined;
+                t.strategyIds
+                  .flatMap((id) => strategyName.get(id) ?? [])
+                  .join(', ') || undefined;
               return (
                 <tr
                   key={t.id}
@@ -236,11 +270,14 @@ function TradesTable({
                   </td>
                   <td className={`${TD} ${symbolPad} py-1.5`}>
                     {/* The title and the Kept box's label keep the symbol as traded; below sm the time takes the expiry's place. */}
-                    <InstrumentName
-                      trade={t}
-                      className="sm:flex-nowrap"
-                      detailClassName="max-sm:hidden"
-                    />
+                    <TradeLink id={t.id}>
+                      <InstrumentName
+                        trade={t}
+                        timeZone={timeZone}
+                        className="sm:flex-nowrap"
+                        detailClassName="max-sm:hidden"
+                      />
+                    </TradeLink>
                     <TradeTime
                       text={time}
                       className="block text-xs sm:hidden"
@@ -250,12 +287,11 @@ function TradesTable({
                     <SideChip side={t.direction} />
                   </td>
                   <td className={`${TD} max-sm:hidden`}>
-                    {strategy ?? (
-                      <span className="text-faint">No strategy</span>
-                    )}
+                    {strategy ?? <span className="text-faint">None</span>}
                   </td>
                   <td className={`${TD} text-right whitespace-nowrap`}>
                     <Money
+                      trade={t}
                       cents={pnlOf(t, model.basis)}
                       currency={t.pnlCurrency}
                     />
@@ -271,7 +307,18 @@ function TradesTable({
                           ))}
                         </span>
                       ) : (
-                        <span className="text-faint">None</span>
+                        <span className="inline-flex items-center gap-2">
+                          <span className="text-faint">None</span>
+                          {mistakeCategories.length > 0 ? (
+                            <TagMissing
+                              trade={t}
+                              label={`Tag a mistake on ${t.instrument.symbol} ${time}`}
+                              categories={mistakeCategories}
+                              onSaving={() => setFailed(false)}
+                              onFailed={() => setFailed(true)}
+                            />
+                          ) : null}
+                        </span>
                       )}
                     </td>
                   ) : null}
@@ -282,6 +329,61 @@ function TradesTable({
         </table>
       </div>
     </>
+  );
+}
+
+/**
+ * "Tag" beside a trade that has no mistake: opens the tag picker, scoped to
+ * the mistake categories, and saves each pick on the trade. A failed save
+ * reports in the table's own alert.
+ */
+function TagMissing({
+  trade,
+  label,
+  categories,
+  onSaving,
+  onFailed,
+}: {
+  trade: Trade;
+  label: string;
+  categories: TagCategory[];
+  onSaving(): void;
+  onFailed(): void;
+}): React.JSX.Element {
+  const update = useUpdateTrades();
+  return (
+    <Popover.Root>
+      <Popover.Trigger
+        aria-label={label}
+        className="inline-flex h-6 items-center gap-1 rounded-chip px-1.5 text-xs font-medium text-accent-ink outline-offset-1 hover:bg-accent-soft focus-visible:outline-2 focus-visible:outline-accent data-[state=open]:bg-accent-soft pointer-coarse:h-11 pointer-coarse:px-3"
+      >
+        <TagIcon size={13} aria-hidden="true" />
+        Tag
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="start"
+          sideOffset={6}
+          collisionPadding={12}
+          className="z-[60] w-[280px] max-w-[calc(100vw-24px)] origin-(--radix-popover-content-transform-origin) rounded-[12px] border border-line bg-surface-1 p-3 text-text shadow-[var(--shadow)] outline-none motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in"
+        >
+          <TagPicker
+            manageLink={false}
+            label="Mistakes"
+            autoFocus
+            categories={categories}
+            selected={trade.tagIds}
+            onChange={(tagIds) => {
+              onSaving();
+              update.mutate(
+                { ids: [trade.id], patch: withTagPick(trade.tagIds, tagIds) },
+                { onError: onFailed },
+              );
+            }}
+          />
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
@@ -303,6 +405,7 @@ export function Drilldown({
   trades,
   strategies,
   tags,
+  categories,
 }: {
   /** Kept after closing, so the dialog can play its exit. */
   target: DrillTarget;
@@ -318,6 +421,7 @@ export function Drilldown({
   trades: readonly Trade[];
   strategies: readonly Strategy[];
   tags: readonly Tag[];
+  categories: readonly TagCategory[];
 }): React.JSX.Element | null {
   const byId = useMemo(() => new Map(trades.map((t) => [t.id, t])), [trades]);
   const strategyName = useMemo(
@@ -325,29 +429,37 @@ export function Drilldown({
     [strategies],
   );
   const mistakeName = useMemo(
-    () =>
-      new Map(
-        tags.filter((t) => t.category === 'mistake').map((t) => [t.id, t.name]),
-      ),
-    [tags],
+    () => new Map(mistakeTags(tags, categories).map((t) => [t.id, t.name])),
+    [tags, categories],
+  );
+  const mistakeCategories = useMemo(
+    () => categories.filter((c) => c.role === 'mistake'),
+    [categories],
   );
   const rows = tradeIds.flatMap((id) => byId.get(id) ?? []);
   const currency = model.currency;
 
   let title: string;
+  let ruleText = '';
   let description: React.ReactNode;
   if (target.kind === 'rule') {
     const score = model.plan.rules.find((r) => r.ruleId === target.ruleId);
-    title =
+    ruleText =
       score?.text ??
-      strategies.flatMap((s) => s.rules).find((r) => r.id === target.ruleId)
+      strategies.flatMap(strategyRules).find((r) => r.id === target.ruleId)
         ?.text ??
       '';
+    title = score ? `${ruleText} (${score.strategyName})` : ruleText;
     description = (
       <>
         Broken on <Count n={score?.broken ?? 0} />, {caption}. Cost when broken{' '}
-        <Money cents={score?.brokenPnl ?? 0} currency={currency} />. Trades that
-        kept it: <Money cents={score?.keptPnl ?? 0} currency={currency} />.
+        <Money
+          cents={score?.brokenPnl ?? 0}
+          currency={currency}
+          ids={score?.brokenTradeIds ?? []}
+        />
+        . Trades that kept it:{' '}
+        <Money cents={score?.keptPnl ?? 0} currency={currency} />.
       </>
     );
   } else {
@@ -356,7 +468,12 @@ export function Drilldown({
     description = (
       <>
         <Count n={cost?.tradeCount ?? 0} />, {caption},{' '}
-        <Money cents={cost?.pnl ?? 0} currency={currency} /> {model.basis}.
+        <Money
+          cents={cost?.pnl ?? 0}
+          currency={currency}
+          ids={cost?.tradeIds ?? []}
+        />{' '}
+        {model.basis}.
       </>
     );
   }
@@ -370,13 +487,6 @@ export function Drilldown({
       // A rule's title keeps "1-hour" whole on a narrow screen.
       title={target.kind === 'rule' ? keepHyphens(title) : title}
       description={description}
-      icon={
-        target.kind === 'rule' ? (
-          <IconTile icon={ListChecks} tone="accent" />
-        ) : (
-          <IconTile icon={Warning} tone="warn" />
-        )
-      }
     >
       <TradesTable
         key={
@@ -386,11 +496,12 @@ export function Drilldown({
         }
         target={target}
         rows={rows}
-        ruleText={title}
+        ruleText={ruleText}
         model={model}
         timeZone={timeZone}
         strategyName={strategyName}
         mistakeName={mistakeName}
+        mistakeCategories={mistakeCategories}
       />
     </MorphDialog>
   );

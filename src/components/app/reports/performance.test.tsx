@@ -1,0 +1,487 @@
+// @vitest-environment happy-dom
+import {
+  act,
+  cleanup,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import { MotionGlobalConfig } from 'motion/react';
+import { afterEach, expect, test, vi } from 'vitest';
+import {
+  SERIES_GROUPS,
+  SERIES_META,
+  SERIES_METRICS,
+} from '@/domain/metrics/series';
+import { commitNavigation, deferNavigation } from '../__fixtures__/navigation';
+import { renderApp } from '../__fixtures__/render-app';
+import {
+  newYorkRepository,
+  reportsSample,
+} from '../__fixtures__/reports-sample';
+import { PerformanceView } from './performance';
+
+vi.mock('next/navigation', () => import('../__fixtures__/navigation'));
+MotionGlobalConfig.skipAnimations = true;
+afterEach(cleanup);
+
+const URL = '/app/reports/performance';
+
+/** The catalogue lives in the "+ Metric" popover: open it, then read its groups. */
+const one = () => within(screen.getByRole('region', { name: 'Chart 1' }));
+
+async function picker() {
+  await screen.findByRole('region', { name: 'Chart 1' });
+  fireEvent.click(one().getByRole('button', { name: 'Add metric' }));
+  return within(await screen.findByRole('group', { name: 'Metrics' }));
+}
+
+test('choosing net (bar), win rate (line) and trades (bar) disables the rest', async () => {
+  renderApp(<PerformanceView />, { sample: reportsSample, url: URL });
+  const metrics = await picker();
+  // Net P&L is the default.
+  expect(
+    (metrics.getByRole('checkbox', { name: 'Net P&L' }) as HTMLInputElement)
+      .checked,
+  ).toBe(true);
+  fireEvent.click(metrics.getByRole('checkbox', { name: 'Win rate' }));
+  fireEvent.click(metrics.getByRole('checkbox', { name: 'Trades' }));
+
+  const chosen = ['Net P&L', 'Win rate', 'Trades'];
+  const boxes = metrics.getAllByRole('checkbox') as HTMLInputElement[];
+  expect(boxes).toHaveLength(SERIES_METRICS.length);
+  for (const box of boxes) {
+    const name = box.getAttribute('aria-label')!;
+    expect(box.checked, name).toBe(chosen.includes(name));
+    expect(box.disabled, name).toBe(!chosen.includes(name));
+    // A disabled box says why through the limit message.
+    const why = box.getAttribute('aria-describedby');
+    if (chosen.includes(name)) expect(why, name).toBeNull();
+    else
+      expect(document.getElementById(why!)?.textContent, name).toBe(
+        'Three metrics at most',
+      );
+  }
+  expect(screen.getByText('Three metrics at most')).toBeTruthy();
+
+  // Kinds: net a bar, win rate a line, trades a bar.
+  const kind = (m: string) =>
+    (
+      within(
+        one().getByRole('radiogroup', { name: `${m} chart type` }),
+      ).getByRole('radio', { checked: true }) as HTMLInputElement
+    ).value;
+  expect([kind('Net P&L'), kind('Win rate'), kind('Trades')]).toEqual([
+    'bar',
+    'line',
+    'bar',
+  ]);
+  // The choice is in the address bar, so it can be linked.
+  expect(new URLSearchParams(window.location.search).get('m')).toBe(
+    'net:bar:running,win-rate:line,trades:bar',
+  );
+
+  // Unchecking one frees the others again.
+  fireEvent.click(metrics.getByRole('checkbox', { name: 'Trades' }));
+  expect(
+    (metrics.getByRole('checkbox', { name: 'Fees' }) as HTMLInputElement)
+      .disabled,
+  ).toBe(false);
+  expect(screen.queryByText('Three metrics at most')).toBeNull();
+});
+
+test('the chart type and the bucket come from the link and change it', async () => {
+  renderApp(<PerformanceView />, {
+    sample: reportsSample,
+    url: `${URL}?m=net:line,trades:bar&bucket=week`,
+  });
+  const metrics = await picker();
+  expect(
+    (
+      within(
+        one().getByRole('radiogroup', { name: 'Net P&L chart type' }),
+      ).getByRole('radio', { checked: true }) as HTMLInputElement
+    ).value,
+  ).toBe('line');
+  const bucket = within(one().getByRole('radiogroup', { name: 'Group by' }));
+  expect(
+    (bucket.getByRole('radio', { checked: true }) as HTMLInputElement).value,
+  ).toBe('week');
+  fireEvent.click(bucket.getByRole('radio', { name: 'Month' }));
+  await waitFor(() =>
+    expect(new URLSearchParams(window.location.search).get('bucket')).toBe(
+      'month',
+    ),
+  );
+  fireEvent.click(
+    within(
+      one().getByRole('radiogroup', { name: 'Trades chart type' }),
+    ).getByRole('radio', { name: 'Line' }),
+  );
+  expect(new URLSearchParams(window.location.search).get('m')).toBe(
+    'net:line,trades:line',
+  );
+  expect(metrics.getAllByRole('checkbox')).toHaveLength(SERIES_METRICS.length);
+});
+
+test('the summary table has a column per chosen metric and sorts', async () => {
+  renderApp(<PerformanceView />, {
+    sample: reportsSample,
+    url: `${URL}?m=net:bar,trades:bar&bucket=day`,
+  });
+  const table = await screen.findByRole('table', { name: 'Summary by day' });
+  const heads = within(table).getAllByRole('columnheader');
+  expect(heads.map((h) => h.textContent)).toEqual([
+    'Period',
+    'Net P&L',
+    'Trades',
+  ]);
+  expect(heads[1]!.getAttribute('aria-sort')).toBe('none');
+  const first = () =>
+    within(within(table).getAllByRole('row')[1]!).getAllByRole('cell')[0]!
+      .textContent;
+  // Date order to begin with.
+  expect(first()).toBe('Mon 2 Nov');
+  fireEvent.click(
+    within(table).getByRole('button', { name: 'Sort by Net P&L' }),
+  );
+  expect(
+    within(table).getAllByRole('columnheader')[1]!.getAttribute('aria-sort'),
+  ).toBe('descending');
+  // Mon +$60, Tue +$100, Wed -$80, Thu +$45: Tue is the largest.
+  expect(first()).toBe('Tue 3 Nov');
+  fireEvent.click(
+    within(table).getByRole('button', { name: 'Sort by Net P&L' }),
+  );
+  expect(first()).toBe('Wed 4 Nov');
+});
+
+test('Cumulative P&L carries its own definition, not the Net P&L one', async () => {
+  renderApp(<PerformanceView />, { sample: reportsSample, url: URL });
+  const metrics = await picker();
+  const row = metrics
+    .getByRole('checkbox', { name: 'Cumulative P&L' })
+    .closest('div.min-h-10')!;
+  expect(
+    row.querySelector('[data-metric-tip="cumulative-pnl"]'),
+  ).not.toBeNull();
+  expect(row.querySelector('[data-metric-tip="pnl"]')).toBeNull();
+});
+
+test('the chart says the range and where each metric runs, and Privacy hides the amounts', async () => {
+  const { unmount } = renderApp(<PerformanceView />, {
+    sample: reportsSample,
+    url: `${URL}?m=net:bar&bucket=day`,
+  });
+  // Days: Nov 2 +$60.00, Nov 3 +$100.00, Nov 4 −$80.00, Nov 5 +$45.00.
+  expect(
+    await screen.findByRole('img', {
+      name: /^Net P&L by day, all time\. Net P&L runs from −\$80\.00 to \+\$100\.00/,
+    }),
+  ).toBeTruthy();
+  unmount();
+  const repository = await newYorkRepository();
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<PerformanceView />, {
+    repository,
+    url: `${URL}?m=net:bar&bucket=day`,
+  });
+  expect(
+    await screen.findByRole('img', {
+      name: /^Net P&L by day, all time\. Net P&L runs from hidden amount to hidden amount/,
+    }),
+  ).toBeTruthy();
+});
+
+test('the added metrics read in the address: counts as numbers, balance and averages as money, and Privacy hides the money', async () => {
+  const address = `${URL}?m=green-day-count:bar,avg-trade:bar,net-balance:line&bucket=day`;
+  const { unmount } = renderApp(<PerformanceView />, {
+    sample: reportsSample,
+    url: address,
+  });
+  const chart = await screen.findByRole('img', {
+    name: /Green days, Average trade P&L, Net account balance by day/,
+  });
+  // Days Nov 2 to Nov 5: three green days of four, and a count has no sign or unit.
+  expect(chart.getAttribute('aria-label')).toMatch(
+    /Green days runs from 0 to 1\./,
+  );
+  expect(chart.getAttribute('aria-label')).toMatch(
+    /Average trade P&L runs from −\$\d/,
+  );
+  expect(chart.getAttribute('aria-label')).toMatch(
+    /Net account balance runs from \$50,060\.00 to \$50,160\.00\./,
+  );
+  unmount();
+  const repository = await newYorkRepository();
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<PerformanceView />, { repository, url: address });
+  const hidden = await screen.findByRole('img', {
+    name: /Green days, Average trade P&L, Net account balance by day/,
+  });
+  const label = hidden.getAttribute('aria-label')!;
+  expect(label).toMatch(/Green days runs from 0 to 1\./);
+  expect(label).toMatch(
+    /Average trade P&L runs from hidden amount to hidden amount/,
+  );
+  expect(label).toMatch(
+    /Net account balance runs from hidden amount to hidden amount/,
+  );
+});
+
+test('under a unit the balance has no value and says why', async () => {
+  const repository = await newYorkRepository();
+  await repository.prefs.update({ displayUnit: 'ticks' });
+  renderApp(<PerformanceView />, {
+    repository,
+    url: `${URL}?m=net-balance:line&bucket=day`,
+  });
+  expect(
+    await screen.findByText(
+      /Net account balance has no value in R, ticks, pips or points\./,
+    ),
+  ).toBeTruthy();
+});
+
+test('under a unit the average trade reads the unit and the balance has no value', async () => {
+  const repository = await newYorkRepository();
+  await repository.prefs.update({ displayUnit: 'ticks' });
+  renderApp(<PerformanceView />, {
+    repository,
+    url: `${URL}?m=avg-trade:bar,net-balance:line&bucket=day`,
+  });
+  const chart = await screen.findByRole('img', {
+    name: /Average trade P&L, Net account balance by day/,
+  });
+  const label = chart.getAttribute('aria-label')!;
+  // Ticks have no dollar sign; the balance has no value to run from.
+  expect(label).toMatch(/Average trade P&L runs from/);
+  // A $ anywhere in the averages' sentence, whatever follows it, is money.
+  const averageSentence = label.match(
+    /Average trade P&L runs from[^]*?(?=Net account balance|$)/,
+  )![0];
+  expect(averageSentence).not.toContain('$');
+  expect(label).not.toMatch(/Net account balance runs/);
+});
+
+test('under the percent display the balance is a share of the base balance, unsigned (the percent rule)', async () => {
+  const repository = await newYorkRepository();
+  await repository.prefs.update({ displayUnit: 'percent' });
+  renderApp(<PerformanceView />, {
+    repository,
+    url: `${URL}?m=net-balance:line&bucket=day`,
+  });
+  const chart = await screen.findByRole('img', {
+    name: /Net account balance by day/,
+  });
+  // Money becomes a share under Percent, as every money figure does; a balance carries no sign.
+  expect(chart.getAttribute('aria-label')).toMatch(
+    /Net account balance runs from \d[\d,.]*% to \d[\d,.]*%\./,
+  );
+});
+
+test('under Privacy the chart axis ticks and the readout cells hide money, for a money series and for the balance', async () => {
+  const repository = await newYorkRepository();
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  const { container } = renderApp(<PerformanceView />, {
+    repository,
+    url: `${URL}?m=net:bar,net-balance:line&bucket=day`,
+  });
+  const chart = await screen.findByRole('img', {
+    name: /Net P&L, Net account balance by day/,
+  });
+  const svgText = Array.from(container.querySelectorAll('svg text'))
+    .map((n) => n.textContent ?? '')
+    .join(' ');
+  // The tick labels carry no dollar figure.
+  expect(svgText).not.toMatch(/\$\s?\d/);
+  expect(chart.getAttribute('aria-label')).not.toMatch(/\$\s?\d/);
+  // The table (the readout cells) is masked as well.
+  const tables = await screen.findAllByRole('table');
+  expect(tables.length).toBeGreaterThan(0);
+  for (const table of tables) expect(table.textContent).not.toMatch(/\$\s?\d/);
+  // And there is a tick to check: the axis labels exist, and are masked money.
+  expect(svgText).toMatch(/\$•/);
+});
+
+test('the journal is read only when a Logged days series is plotted (A-M6)', async () => {
+  const repository = await newYorkRepository();
+  const list = vi.spyOn(repository.journal, 'list');
+  const { unmount } = renderApp(<PerformanceView />, {
+    repository,
+    url: `${URL}?m=net:bar&bucket=day`,
+  });
+  await screen.findByRole('img', { name: /^Net P&L by day/ });
+  expect(list).not.toHaveBeenCalled();
+  unmount();
+  renderApp(<PerformanceView />, {
+    repository,
+    url: `${URL}?m=logged-days:bar&bucket=day`,
+  });
+  await screen.findByRole('img', { name: /^Logged days by day/ });
+  await waitFor(() => expect(list).toHaveBeenCalled());
+});
+
+test('the picker holds five groups, each with its metrics and their definitions', async () => {
+  renderApp(<PerformanceView />, { sample: reportsSample, url: URL });
+  const metrics = await picker();
+  for (const name of SERIES_GROUPS) {
+    const group = metrics.getByRole('group', { name });
+    const boxes = within(group).getAllByRole('checkbox');
+    expect(boxes.length, name).toBe(
+      SERIES_METRICS.filter((m) => SERIES_META[m].group === name).length,
+    );
+  }
+  expect(metrics.getAllByRole('checkbox')).toHaveLength(SERIES_METRICS.length);
+  // Every row's label opens its definition.
+  const tips = document.querySelectorAll(
+    '[role="group"][aria-label="Metrics"] [data-metric-tip]',
+  );
+  expect(tips).toHaveLength(SERIES_METRICS.length);
+});
+
+test('the search narrows every group, hides the empty ones and says when nothing matches', async () => {
+  renderApp(<PerformanceView />, { sample: reportsSample, url: URL });
+  const metrics = await picker();
+  const search = screen.getByRole('searchbox', { name: 'Search metrics' });
+  fireEvent.change(search, { target: { value: 'DRAWDOWN' } });
+  expect(
+    metrics.getAllByRole('checkbox').map((b) => b.getAttribute('aria-label')),
+  ).toEqual(['Max drawdown', 'Average drawdown', 'Daily drawdown']);
+  expect(metrics.queryByRole('group', { name: 'Profitability' })).toBeNull();
+  expect(metrics.getByRole('group', { name: 'Risk' })).toBeTruthy();
+  // Matches across groups.
+  fireEvent.change(search, { target: { value: 'win rate' } });
+  expect(
+    metrics.getAllByRole('checkbox').map((b) => b.getAttribute('aria-label')),
+  ).toEqual(['Win rate', 'Long win rate', 'Short win rate', 'Day win rate']);
+  fireEvent.change(search, { target: { value: 'zzz' } });
+  expect(metrics.queryAllByRole('checkbox')).toHaveLength(0);
+  expect(screen.getByText('No metric matches "zzz"')).toBeTruthy();
+  fireEvent.change(search, { target: { value: '' } });
+  expect(metrics.getAllByRole('checkbox')).toHaveLength(SERIES_METRICS.length);
+});
+
+test('a chosen metric stays chosen while the search hides it, and the cap still holds', async () => {
+  renderApp(<PerformanceView />, { sample: reportsSample, url: URL });
+  const metrics = await picker();
+  const search = screen.getByRole('searchbox', { name: 'Search metrics' });
+  fireEvent.click(metrics.getByRole('checkbox', { name: 'Win rate' }));
+  fireEvent.click(metrics.getByRole('checkbox', { name: 'Volume' }));
+  fireEvent.change(search, { target: { value: 'sharpe' } });
+  const sharpe = metrics.getByRole('checkbox', {
+    name: 'Sharpe ratio',
+  }) as HTMLInputElement;
+  expect(sharpe.disabled).toBe(true);
+  expect(new URLSearchParams(window.location.search).get('m')).toBe(
+    'net:bar:running,win-rate:line,volume:bar',
+  );
+});
+
+test('each chosen metric switches between a value per period and a running value', async () => {
+  renderApp(<PerformanceView />, {
+    sample: reportsSample,
+    url: `${URL}?m=net:bar&bucket=day`,
+  });
+  const metrics = await picker();
+  const mode = (m: string) =>
+    within(one().getByRole('radiogroup', { name: `${m} plotted` }));
+  expect(
+    (mode('Net P&L').getByRole('radio', { checked: true }) as HTMLInputElement)
+      .value,
+  ).toBe('period');
+  // Days: +$60, +$100, -$80, +$45. Running: 60, 160, 80, 125.
+  fireEvent.click(mode('Net P&L').getByRole('radio', { name: 'Running' }));
+  expect(new URLSearchParams(window.location.search).get('m')).toBe(
+    'net:bar:running',
+  );
+  expect(
+    await screen.findByRole('img', {
+      name: /^Net P&L \(running\) by day, all time\. Net P&L \(running\) runs from \+\$60\.00 to \+\$160\.00/,
+    }),
+  ).toBeTruthy();
+  // Not offered for a metric that is a total already.
+  fireEvent.click(metrics.getByRole('checkbox', { name: 'Cumulative P&L' }));
+  expect(
+    one().queryByRole('radiogroup', { name: 'Cumulative P&L plotted' }),
+  ).toBeNull();
+});
+
+test('the mode comes from the link and a bad one is ignored', async () => {
+  renderApp(<PerformanceView />, {
+    sample: reportsSample,
+    url: `${URL}?m=trades:bar:running,win-rate:line:sideways&bucket=day`,
+  });
+  await picker();
+  const checked = (m: string) =>
+    (
+      within(one().getByRole('radiogroup', { name: `${m} plotted` })).getByRole(
+        'radio',
+        { checked: true },
+      ) as HTMLInputElement
+    ).value;
+  expect(checked('Trades')).toBe('running');
+  expect(checked('Win rate')).toBe('period');
+  // The table's headers say which.
+  const table = await screen.findByRole('table', { name: 'Summary by day' });
+  expect(
+    within(table)
+      .getAllByRole('columnheader')
+      .map((h) => h.textContent),
+  ).toEqual(['Period', 'Trades (running)', 'Win rate']);
+});
+
+test('durations and quantities show in their own units in the table', async () => {
+  renderApp(<PerformanceView />, {
+    sample: reportsSample,
+    url: `${URL}?m=avg-hold-time:line,volume:bar&bucket=month`,
+  });
+  const table = await screen.findByRole('table', { name: 'Summary by month' });
+  const cells = within(within(table).getAllByRole('row')[1]!)
+    .getAllByRole('cell')
+    .map((c) => c.textContent);
+  // Every trade is held an hour; nine trades of one contract.
+  expect(cells).toEqual(['Nov 2026', '1h', '9']);
+});
+
+test('the catalogue is closed until + Metric opens it, and its ticks use the accent, not the gain colour', async () => {
+  renderApp(<PerformanceView />, { sample: reportsSample, url: URL });
+  await screen.findByRole('region', { name: 'Chart 1' });
+  const add = one().getByRole('button', { name: 'Add metric' });
+  expect(
+    screen.queryByRole('searchbox', { name: 'Search metrics' }),
+  ).toBeNull();
+  expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+  fireEvent.click(add);
+  const box = await screen.findByRole('checkbox', { name: 'Net P&L' });
+  expect(box.className).toContain('accent-[var(--accent)]');
+  expect(box.className).not.toContain('gain');
+  expect(
+    screen.getByRole('searchbox', { name: 'Search metrics' }),
+  ).toBeTruthy();
+  // The chosen metric row keeps its Bar/Line and Period/Running switches.
+  expect(
+    one().getByRole('radiogroup', { name: 'Net P&L plotted' }),
+  ).toBeTruthy();
+});
+
+test('two quick ticks before the address catches up both stick (I5)', async () => {
+  renderApp(<PerformanceView />, { sample: reportsSample, url: URL });
+  const metrics = await picker();
+  const box = (name: string) =>
+    metrics.getByRole('checkbox', { name }) as HTMLInputElement;
+  // The router delivers the address a beat after each write, as Next's transition does.
+  deferNavigation();
+  fireEvent.click(box('Win rate'));
+  expect(box('Win rate').checked).toBe(true);
+  fireEvent.click(box('Trades'));
+  expect(box('Win rate').checked).toBe(true);
+  expect(box('Trades').checked).toBe(true);
+  act(() => commitNavigation());
+  expect(new URLSearchParams(window.location.search).get('m')).toBe(
+    'net:bar:running,win-rate:line,trades:bar',
+  );
+  expect(box('Win rate').checked).toBe(true);
+  expect(box('Trades').checked).toBe(true);
+});

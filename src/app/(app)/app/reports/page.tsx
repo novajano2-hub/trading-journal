@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
-import { ModulePlaceholder } from '@/components/app/module-placeholder';
+import { ReportsPage } from '@/components/app/reports/reports-shell';
 
 export const metadata: Metadata = { title: 'Reports' };
 
-export default function ReportsPage() {
-  return <ModulePlaceholder module="reports" />;
+/** Static: the skeleton prerenders, and the report fills in on the client once it reads the URL. */
+export default function Page() {
+  return <ReportsPage report="overview" />;
 }

@@ -19,7 +19,7 @@ type Props = Omit<ComponentProps<typeof motion.button>, 'ref' | 'children'> & {
   size?: ButtonSize;
 };
 
-/** 44px button (38px for `sm`), 10px radius, pressed state with a soft ripple. */
+/** 34px button (30px for `sm`; 44px on touch), 10px radius, pressed state with a soft ripple. */
 export function Button({
   variant = 'primary',
   size = 'md',
@@ -42,7 +42,7 @@ export function Button({
       {...props}
       type={type}
       disabled={disabled}
-      className={`relative inline-flex ${BUTTON_SIZE[size]} select-none items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-control px-[18px] text-[15px] font-medium transition-colors duration-120 disabled:opacity-50 ${BUTTON_VARIANT[variant]} ${className}`}
+      className={`relative inline-flex ${BUTTON_SIZE[size]} select-none items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-control transition-colors duration-120 disabled:opacity-50 ${BUTTON_VARIANT[variant]} ${className}`}
       animate={{ scale: pressed && !reduced ? press.scale : 1 }}
       transition={{
         duration: reduced ? 0 : pressed ? press.down : press.up,

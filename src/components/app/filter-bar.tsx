@@ -13,6 +13,7 @@ import { EMPTY_FILTERS, type GlobalFilters } from '@/data/filters';
 import {
   usePrefs,
   useStrategies,
+  useTagCategories,
   useTags,
   useTrades,
 } from '@/data/query/hooks';
@@ -33,10 +34,18 @@ import {
   SymbolBody,
   TagBody,
 } from './filter-popovers';
+import { FilterSheet } from './filter-sheet';
+import { MoreFilters } from './more-filters';
+import { usePhone } from '@/lib/use-phone';
 import { symbolOptions } from './search';
 import { useShownFilters } from './use-shown-filters';
 
-const NO_OPTIONS: FilterOptions = { symbols: [], strategies: [], tags: [] };
+const NO_OPTIONS: FilterOptions = {
+  symbols: [],
+  strategies: [],
+  tags: [],
+  categories: [],
+};
 
 /**
  * How far each edge fade reaches into a row that scrolls. The end's is the
@@ -85,22 +94,20 @@ function fadeMask({ start, end }: { start: boolean; end: boolean }) {
 }
 
 /**
- * The top bar's filter chips: date, symbol, side, strategy and tags, then
- * "Clear filters" while any filter is set. The chips scroll sideways when the
+ * Below 640px the chips are one "Filters (n)" button and its sheet. The top bar's filter chips: date, symbol, side, strategy and tags, then
+ * "More filters" (which stays put after them, as "Clear filters" does) and "Clear filters" while any filter is set. The chips scroll sideways when the
  * bar is too narrow, fading at an edge with more past it; "Clear filters"
  * stays put after them. On a phone, with nothing after them, the row runs to
  * the screen's edge and fades out there, as a row that scrolls does. Every
  * choice calls `onChange` with the whole next filter set. In a workspace with no trades at all the chips stay in the tab
  * order but open nothing; a filter that matches nothing leaves them live.
  */
-export function FilterBarView({
-  filters: f,
-  options,
-  today,
-  onChange,
-  disabled = false,
-  noTrades = false,
-}: {
+export function FilterBarView(props: FilterBarProps): React.JSX.Element {
+  const phone = usePhone();
+  return phone ? <FilterSheet {...props} /> : <FilterRow {...props} />;
+}
+
+interface FilterBarProps {
   filters: GlobalFilters;
   options: FilterOptions;
   /** The trader's local date, YYYY-MM-DD; empty while unknown. */
@@ -110,7 +117,16 @@ export function FilterBarView({
   disabled?: boolean;
   /** The workspace has no trades to filter. */
   noTrades?: boolean;
-}): React.JSX.Element {
+}
+
+function FilterRow({
+  filters: f,
+  options,
+  today,
+  onChange,
+  disabled = false,
+  noTrades = false,
+}: FilterBarProps): React.JSX.Element {
   const noteId = useId();
   const unavailableNote = noTrades ? noteId : undefined;
   const first = useRef<HTMLButtonElement>(null);
@@ -157,7 +173,7 @@ export function FilterBarView({
           onFocus={(e) =>
             e.target.scrollIntoView({ block: 'nearest', inline: 'nearest' })
           }
-          className="flex w-max items-center gap-1.5"
+          className="flex w-max items-center gap-1"
         >
           <FilterChip
             label={rangeChipLabel(f.range, datesOf(f.range, today))}
@@ -242,6 +258,7 @@ export function FilterBarView({
             {() => (
               <TagBody
                 tags={options.tags}
+                categories={options.categories}
                 selected={f.tagIds}
                 onChange={(tagIds) => onChange({ ...f, tagIds })}
               />
@@ -249,6 +266,13 @@ export function FilterBarView({
           </FilterChip>
         </div>
       </div>
+      <MoreFilters
+        filters={f}
+        options={options}
+        onChange={onChange}
+        disabled={disabled}
+        unavailableNote={unavailableNote}
+      />
       {noTrades ? (
         <span id={noteId} hidden>
           No trades to filter yet.
@@ -283,14 +307,16 @@ export function FilterBar(): React.JSX.Element {
   const trades = useTrades().data;
   const strategies = useStrategies().data;
   const tags = useTags().data;
+  const categories = useTagCategories().data;
   const timeZone = usePrefs().data?.timeZone;
   const options = useMemo<FilterOptions>(
     () => ({
       symbols: symbolOptions(trades),
       strategies: strategies ?? [],
       tags: tags ?? [],
+      categories: categories ?? [],
     }),
-    [trades, strategies, tags],
+    [trades, strategies, tags, categories],
   );
 
   if (!shown || timeZone === undefined) {

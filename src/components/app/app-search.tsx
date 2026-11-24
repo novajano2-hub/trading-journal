@@ -5,7 +5,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ExpandingSearch } from '@/components/ui/expanding-search';
 import { serializeFilters } from '@/data/filters';
 import { useGlobalFilters } from '@/data/query/derived';
-import { useStrategies, useTags, useTrades } from '@/data/query/hooks';
+import {
+  useStrategies,
+  useTagCategories,
+  useTags,
+  useTrades,
+} from '@/data/query/hooks';
 import { useHydrated } from '@/lib/use-hydrated';
 import { activeItem, navHref, navItem } from './nav';
 import { toggleId } from './filter-model';
@@ -17,12 +22,6 @@ import {
 } from './search';
 
 const DETAIL = { module: 'Module', symbol: 'Symbol', strategy: 'Strategy' };
-const CATEGORY = {
-  setup: 'Setup tag',
-  mistake: 'Mistake tag',
-  emotion: 'Emotion tag',
-  custom: 'Tag',
-} as const;
 
 function keyOf(r: SearchResult): string {
   return r.kind === 'symbol' ? `symbol:${r.value}` : `${r.kind}:${r.id}`;
@@ -51,6 +50,7 @@ export function AppSearch(): React.JSX.Element {
   const trades = useTrades().data;
   const strategies = useStrategies().data;
   const tags = useTags().data;
+  const categories = useTagCategories().data;
   const hydrated = useHydrated();
   const platform =
     hydrated && /mac|iphone|ipad/i.test(navigator.platform) ? 'mac' : 'other';
@@ -85,15 +85,17 @@ export function AppSearch(): React.JSX.Element {
         symbols,
         strategies: strategies ?? [],
         tags: tags ?? [],
+        categories: categories ?? [],
       }),
-    [query, symbols, strategies, tags],
+    [query, symbols, strategies, tags, categories],
   );
   const results = useMemo(
     () =>
       found.map((r) => ({
         id: keyOf(r),
         label: r.label,
-        detail: r.kind === 'tag' ? CATEGORY[r.category] : DETAIL[r.kind],
+        // A tag reads as its category, e.g. "Mistakes".
+        detail: r.kind === 'tag' ? r.category || 'Tag' : DETAIL[r.kind],
       })),
     [found],
   );

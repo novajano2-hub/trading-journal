@@ -2,35 +2,35 @@
 import Link from 'next/link';
 import { useId, type ReactNode } from 'react';
 import {
+  Archive,
   ClockCounterClockwise,
   FunnelSimple,
-  ListChecks,
   Warning,
 } from '@phosphor-icons/react/dist/ssr';
 import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
-import { IconTile } from '@/components/ui/icon-tile';
+import { StateGlyph } from '@/components/ui/state-glyph';
+import { unitEmptyCopy } from '@/content/display-units';
 import { StorageUnavailableError } from '@/data/repository';
-import { CARD, CARD_PAD, HERO } from './shared';
+import type { TradeUnit } from '@/domain/metrics/units';
+import { CARD, CARD_PAD } from './shared';
 
 function Bar({ className }: { className: string }): React.JSX.Element {
   return <span className={`block rounded-chip bg-sunken ${className}`} />;
 }
 
-/** A card's header while it loads: the tile's place, then the title's. */
+/** A card's header while it loads: the title's place. */
 function HeaderBars({ title = 'w-28' }: { title?: string }): React.JSX.Element {
   return (
-    <div className="flex h-7 items-center gap-2.5">
-      <Bar className="size-7 rounded-lg" />
+    <div className="flex h-7 items-center">
       <Bar className={`h-3.5 ${title}`} />
     </div>
   );
 }
 
 /**
- * The Dashboard's shape while its data loads: the plan's hero and its rules,
- * the three cards of row 2 and the recent trades, without figures. The hero
- * is already ultramarine, so nothing changes colour when the figures land.
+ * The Dashboard's shape while its data loads: the plan card and its rules,
+ * the three cards of row 2 and the recent trades, without figures.
  */
 export function DashboardSkeleton(): React.JSX.Element {
   return (
@@ -44,15 +44,14 @@ export function DashboardSkeleton(): React.JSX.Element {
         className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)] min-[90rem]:grid-cols-[400px_minmax(0,1fr)]"
       >
         <div
-          className={`${HERO} flex min-h-[262px] flex-col overflow-hidden px-[22px] pt-[18px]`}
+          className={`${CARD} flex min-h-[262px] flex-col overflow-hidden px-[22px] pt-[18px]`}
         >
-          <div className="flex h-7 items-center gap-2.5">
-            <span className="size-7 rounded-lg bg-white/14" />
-            <span className="h-3.5 w-20 rounded-chip bg-white/18" />
+          <div className="flex h-7 items-center">
+            <Bar className="h-3.5 w-20" />
           </div>
-          <span className="mt-5 h-[72px] w-32 rounded-control bg-white/12" />
-          <span className="mt-[26px] h-2 rounded-[3px] bg-white/18" />
-          <div className="-mx-[22px] mt-auto h-[54px] border-t border-white/10 bg-[rgb(10_14_70/0.22)]" />
+          <Bar className="mt-5 h-[72px] w-32 rounded-control" />
+          <Bar className="mt-[26px] h-2 rounded-[3px]" />
+          <div className="-mx-[22px] mt-auto h-[54px] border-t border-line bg-sunken/60" />
         </div>
         <div className={`${CARD} flex flex-col px-5 pt-1.5 pb-4`}>
           <div className="flex h-[34px] items-center">
@@ -106,7 +105,7 @@ export function DashboardSkeleton(): React.JSX.Element {
   );
 }
 
-/** One state of the page: a tile (or a preview), what happened, what to do next. */
+/** One state of the page: a plain glyph (or a preview), what happened, what to do next. */
 function StateBlock({
   visual,
   title,
@@ -160,9 +159,8 @@ function PlanPreview(): React.JSX.Element {
     >
       <figcaption
         id={captionId}
-        className="flex items-center gap-2.5 text-[13.5px] leading-snug font-medium text-text"
+        className="text-[13.5px] leading-snug font-medium text-text"
       >
-        <IconTile icon={ListChecks} tone="accent" />
         Your rules and what breaking them costs will show here.
       </figcaption>
       {/* The last row fades: the list goes on. */}
@@ -193,25 +191,68 @@ function PlanPreview(): React.JSX.Element {
 }
 
 /**
+ * No closed trade the display unit reads: "No closed futures trades in these
+ * filters." The way back to Dollar is the line under the top bar, which says
+ * how many trades the unit left out.
+ */
+function UnitEmpty({
+  unit,
+  onClearFilters,
+}: {
+  unit: TradeUnit;
+  /** Given while a filter is set: the filters may be what left nothing. */
+  onClearFilters?: () => void;
+}): React.JSX.Element {
+  const { title, body } = unitEmptyCopy(unit);
+  return (
+    <StateBlock
+      visual={<StateGlyph icon={FunnelSimple} />}
+      title={title}
+      body={body}
+      actions={
+        onClearFilters ? (
+          <Button onClick={onClearFilters}>Clear filters</Button>
+        ) : undefined
+      }
+    />
+  );
+}
+
+/**
  * Why there is nothing to show, with the way out:
  * - `no-trades`: the workspace is empty, so Import or open the sample.
  * - `no-matches`: trades exist but the filters leave none, so Clear filters.
+ * - `archived`: every account is archived, so their trades are out of view
+ *   until one is unarchived or picked in the account filter.
  * - `no-closed`: every trade shown is still open. When `filtered`, it says
  *   the filters hold none closed and offers Clear filters.
+ * - `unit`: the display unit (`unit`) left out every closed trade the
+ *   filters matched; the line under the top bar switches back to Dollar.
+ *   When `filtered`, it offers Clear filters too.
  */
 export function DashboardEmpty({
   variant,
   filtered = false,
+  unit = 'r',
   onClearFilters,
   onOpenSample,
 }: {
-  variant: 'no-trades' | 'no-matches' | 'no-closed';
+  variant: 'no-trades' | 'no-matches' | 'no-closed' | 'archived' | 'unit';
   /** Any filter is set. */
   filtered?: boolean;
+  /** For `unit`: the unit that narrowed the trades. */
+  unit?: TradeUnit;
   onClearFilters(): void;
   onOpenSample(): void;
 }): React.JSX.Element {
   switch (variant) {
+    case 'unit':
+      return (
+        <UnitEmpty
+          unit={unit}
+          onClearFilters={filtered ? onClearFilters : undefined}
+        />
+      );
     case 'no-trades':
       return (
         <StateBlock
@@ -230,10 +271,26 @@ export function DashboardEmpty({
           }
         />
       );
+    case 'archived':
+      return (
+        <StateBlock
+          visual={<StateGlyph icon={Archive} />}
+          title="Your trades are in archived accounts."
+          body="Unarchive an account in Settings to see its trades here, or pick it in the account filter to look at them as they are."
+          actions={
+            <Link
+              href="/app/settings/accounts"
+              className={buttonClasses('primary')}
+            >
+              Open Accounts
+            </Link>
+          }
+        />
+      );
     case 'no-matches':
       return (
         <StateBlock
-          visual={<IconTile icon={FunnelSimple} />}
+          visual={<StateGlyph icon={FunnelSimple} />}
           title="No trades match these filters."
           actions={<Button onClick={onClearFilters}>Clear filters</Button>}
         />
@@ -241,7 +298,7 @@ export function DashboardEmpty({
     case 'no-closed':
       return (
         <StateBlock
-          visual={<IconTile icon={ClockCounterClockwise} />}
+          visual={<StateGlyph icon={ClockCounterClockwise} />}
           title={
             filtered
               ? 'No closed trades in these filters yet.'
@@ -273,7 +330,7 @@ export function DashboardError({
   return (
     <StateBlock
       role="alert"
-      visual={<IconTile icon={Warning} />}
+      visual={<StateGlyph icon={Warning} />}
       title={
         storage
           ? "Keel can't open storage in this browser, so your workspace can't load."

@@ -118,10 +118,30 @@ test('footer carries the legal and module links', async ({ page }) => {
   const footer = page.getByRole('contentinfo');
   for (const name of ['Terms', 'Privacy', 'Pricing', 'Journal'])
     await expect(footer.getByRole('link', { name })).toBeVisible();
-  await expect(
-    footer.getByRole('button', { name: /Switch to (dark|light) theme/ }),
-  ).toBeVisible();
+  // Appearance is a setting in the app; the site has no sun or moon toggle.
+  await expect(footer.getByRole('button')).toHaveCount(0);
   await expect(footer).toContainText('© 2026 Keel');
+});
+
+test('the phone menu button is a plain 44px glyph that opens a full-screen sheet', async ({
+  page,
+}) => {
+  test.skip(!isMobile(), 'mobile only');
+  await page.goto('/');
+  const menu = page.getByRole('banner').getByRole('button', { name: 'Menu' });
+  // No box, no words: an icon button, named for assistive tech.
+  await expect(menu).toHaveText('');
+  await expect(menu).toHaveCSS('border-top-width', '0px');
+  const box = (await menu.boundingBox())!;
+  expect(Math.round(box.width)).toBe(44);
+  expect(Math.round(box.height)).toBe(44);
+  await menu.click();
+  const sheet = page.locator('#mobile-sheet');
+  const s = (await sheet.boundingBox())!;
+  expect(Math.round(s.width)).toBe(390);
+  expect(Math.round(s.y + s.height)).toBe(844);
+  for (const name of ['Pricing', 'Log in', 'Get started'])
+    await expect(sheet.getByRole('link', { name })).toBeVisible();
 });
 
 for (const width of [390, 768, 1024, 1280, 1440, 1680]) {

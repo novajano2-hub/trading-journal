@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import { fillTimeToUtc, formatFillTime, guessDateOrder } from './fill-time';
+import {
+  detectDateOrder,
+  fillTimeToUtc,
+  formatFillTime,
+  guessDateOrder,
+} from './fill-time';
 
 describe('formatFillTime', () => {
   test('prints the brief examples in the clock format', () => {
@@ -134,5 +139,34 @@ describe('guessDateOrder', () => {
       'dmy',
     );
     expect(guessDateOrder(['2026-11-16 10:00', 'x'])).toBe('mdy');
+  });
+});
+
+test('year-first slashed dates read as written, and YMD is guessed from them', () => {
+  expect(
+    fillTimeToUtc('2026/11/19 09:30:00', {
+      timeZone: 'UTC',
+      dateOrder: 'ymd',
+    }),
+  ).toBe('2026-11-19T09:30:00.000Z');
+  expect(guessDateOrder(['2026/11/19 09:30:00'])).toBe('ymd');
+  // ISO dates need no order: the guess leaves them month first, as before.
+  expect(guessDateOrder(['2026-11-19 09:30:00'])).toBe('mdy');
+  // ISO dates read the same whatever the order says.
+  expect(
+    fillTimeToUtc('2026-11-19 09:30:00', { timeZone: 'UTC', dateOrder: 'dmy' }),
+  ).toBe('2026-11-19T09:30:00.000Z');
+});
+
+describe('detectDateOrder', () => {
+  test('says an order only when the samples prove one', () => {
+    expect(detectDateOrder(['19/11/2026 10:00'])).toBe('dmy');
+    expect(detectDateOrder(['11/19/2026 10:00'])).toBe('mdy');
+    expect(detectDateOrder(['2026/11/19 10:00'])).toBe('ymd');
+    // Both parts of a date at 12 or under: it cannot tell.
+    expect(detectDateOrder(['11/05/2026 10:00'])).toBeNull();
+    expect(detectDateOrder(['2026-11-19 10:00'])).toBeNull();
+    // Contradicting samples prove nothing.
+    expect(detectDateOrder(['19/11/2026', '11/19/2026'])).toBeNull();
   });
 });

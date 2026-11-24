@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
-import { ModulePlaceholder } from '@/components/app/module-placeholder';
 
 export const metadata: Metadata = { title: 'Notebook' };
 
+/** The view is in the layout, so it stays while notes open. */
 export default function NotebookPage() {
-  return <ModulePlaceholder module="notebook" />;
+  return null;
 }

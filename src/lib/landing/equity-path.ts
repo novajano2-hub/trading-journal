@@ -6,6 +6,8 @@ export interface PathBox {
   bottom: number;
   /** y of the baseline the area fill closes to. */
   floor: number;
+  /** The values the box spans, when several lines share one scale; default: this series' own extent. */
+  range?: { min: number; max: number };
 }
 
 export interface Point {
@@ -22,8 +24,12 @@ export function equityPath(
 ): { line: string; area: string; first: Point | null; last: Point | null } {
   if (series.length === 0)
     return { line: '', area: '', first: null, last: null };
-  const min = Math.min(...series);
-  const max = Math.max(...series);
+  const min = box.range
+    ? Math.min(box.range.min, ...series)
+    : Math.min(...series);
+  const max = box.range
+    ? Math.max(box.range.max, ...series)
+    : Math.max(...series);
   const span = max - min;
   const pts: Point[] = series.map((v, i) => ({
     x: r(series.length === 1 ? 0 : (i / (series.length - 1)) * box.xMax),

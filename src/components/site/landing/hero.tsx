@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
-import { ChartLineUp } from '@phosphor-icons/react/dist/ssr';
 import { AppWindow } from '@/components/product/app-window';
 import { EquityChart } from '@/components/product/equity-chart';
 import { KpiStrip } from '@/components/product/kpi-strip';
@@ -90,7 +89,7 @@ export function Hero({ view }: { view: SampleView }) {
             basis="Net"
             meta={<span className="text-xs text-faint">Sample data</span>}
           >
-            <ProductCard icon={ChartLineUp} tone="accent" title="Performance">
+            <ProductCard title="Performance">
               <KpiStrip summary={view.summary} tickerDelay={T.tickers / 1000} />
               <EquityChart
                 series={series}
@@ -100,7 +99,13 @@ export function Hero({ view }: { view: SampleView }) {
             </ProductCard>
             {/* Recent trades; the trade card below opens one of them. */}
             <div className={`${CARD} py-1`}>
-              <TradeRows trades={rows} tags={view.tags} maxTags={1} inset />
+              <TradeRows
+                trades={rows}
+                tags={view.tags}
+                categories={view.tagCategories}
+                maxTags={1}
+                inset
+              />
             </div>
           </AppWindow>
         </div>

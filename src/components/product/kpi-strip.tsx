@@ -36,7 +36,7 @@ export function KpiStrip({
             <dd className="mt-1 text-[22px] font-semibold tracking-[-0.03em] @md:text-[clamp(15px,3.6cqi,22px)]">
               {value === null ? (
                 <span className="font-mono text-[15px] font-normal tracking-normal text-faint">
-                  None yet
+                  None
                 </span>
               ) : (
                 <NumberTicker value={value} kind={kind} delay={tickerDelay} />

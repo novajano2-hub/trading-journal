@@ -25,8 +25,6 @@
   /* App-only tokens (theme.css, app scope). */
   --color-accent-deep: var(--accent-deep);
   --color-accent-tint: var(--accent-tint);
-  --color-on-accent-muted: var(--on-accent-muted);
-  --color-on-accent-loss: var(--on-accent-loss);
   --color-gain-fill: var(--gain-fill);
   --color-loss-fill: var(--loss-fill);
   --color-warn: var(--warn);
@@ -36,6 +34,7 @@
   --color-info-fill: var(--info-fill);
   --color-info-soft: var(--info-soft);
   --color-veil: var(--veil);
+  --color-track: var(--track);
   --radius-chip: var(--r-chip);
   --radius-control: var(--r-control);
   --radius-card: var(--r-card);
@@ -143,6 +142,17 @@ html {
   scrollbar-color: var(--line-2) var(--bg);
 }
 
+/*
+ * On a phone in the app, focus and in-page jumps land clear of the pinned top
+ * bar and the tab bar at the foot.
+ */
+@media (max-width: 639.98px) {
+  html:has([data-surface='app']) {
+    scroll-padding-top: 56px;
+    scroll-padding-bottom: calc(56px + env(safe-area-inset-bottom));
+  }
+}
+
 body {
   background: var(--bg);
   color: var(--text);
@@ -162,8 +172,28 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
+  outline: var(--focus-width) solid var(--accent);
+  outline-offset: var(--focus-offset);
+}
+
+/*
+ * A bare link, button or field gets the chip radius so its ring is not a hard
+ * rectangle. It sits in the base layer, under the utilities, so any element
+ * that sets its own radius (rounded-*) keeps it.
+ */
+@layer base {
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  summary:focus-visible,
+  [tabindex]:focus-visible,
+  [role='button']:focus-visible,
+  [role='tab']:focus-visible,
+  [role='menuitem']:focus-visible {
+    border-radius: var(--focus-radius);
+  }
 }
 
 a {

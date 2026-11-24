@@ -3,14 +3,24 @@ import type {
   ImportContext,
   ImportPlan,
 } from '@/domain/import/plan';
+import type { ManualTradeError } from '@/domain/manual-trade';
 import { isValidTimeZone } from '@/domain/time';
 import type {
   Account,
+  CashFlow,
+  Cents,
+  Challenge,
   ImportJob,
+  Instrument,
   JournalEntry,
+  NoteFolder,
+  NoteTemplate,
   Rule,
+  RuleGroup,
+  Side,
   Strategy,
   Tag,
+  TagCategory,
   Trade,
   UserPrefs,
   Workspace,
@@ -47,6 +57,11 @@ export function defaultPrefs(): UserPrefs {
     baseCurrency: 'USD',
     breakevenRange: { unit: 'amount', from: 0, to: 0 },
     pnlBasis: 'net',
+    displayUnit: 'dollar',
+    hideTradeSummary: false,
+    calendarStats: ['net', 'trades', 'winRate', 'rating'],
+    instrumentsTraded: [],
+    settleExpiredOptions: true,
   };
 }
 
@@ -58,9 +73,9 @@ export interface WorkspacesRepo {
   getActive(): Promise<Workspace>;
   /** Throws NotFoundError for an unknown id. */
   setActive(id: string): Promise<void>;
-  /** Regenerates the sample workspace; My workspace is untouched. */
+  /** Regenerates the sample workspace, with the built-in templates; My workspace is untouched. */
   resetSample(): Promise<void>;
-  /** Deletes everything in My workspace; the sample is untouched. */
+  /** Deletes everything in My workspace, then gives it back its built-in tag categories and templates; the sample is untouched. */
   clearUser(): Promise<void>;
 }
 
@@ -72,9 +87,14 @@ export interface PrefsRepo {
    * patch names replaces that workspace's goals whole, and the others are kept,
    * so `{ goals: { [id]: {} } }` clears one workspace (see `withGoals`).
    * Throws RangeError for an unknown time zone, a breakeven range with
-   * from > to, or a goals entry that isn't an object of positive whole cents.
+   * from > to, a goals entry that isn't an object of positive whole cents,
+   * an unknown display unit, or calendar stats that aren't 1 to 3 known ones.
    */
   update(patch: Partial<UserPrefs>): Promise<UserPrefs>;
+  /** Only the prefs the user has set: the rest follow the defaults (the browser's time zone, say). */
+  saved(): Promise<Partial<UserPrefs>>;
+  /** Forgets the saved value of each key, so it follows the default again. Returns the prefs as they are then. */
+  unset(keys: readonly (keyof UserPrefs)[]): Promise<UserPrefs>;
 }
 
 // Workspace-scoped repositories: every call takes the workspace id.
@@ -97,11 +117,69 @@ export class OpenImportedTradeError extends Error {
   }
 }
 
+/**
+ * The trades belong to an archived account, which is read-only: nothing in
+ * `tradeIds` was changed. Unarchive the account to edit them.
+ */
+export class ArchivedAccountError extends Error {
+  override name = 'ArchivedAccountError';
+  constructor(
+    readonly accountIds: readonly string[],
+    readonly tradeIds: readonly string[] = [],
+  ) {
+    super(`Account ${accountIds.join(', ')} is archived and read-only`);
+  }
+}
+
+/** The fills of a manual trade cannot make one trade; `error` says why, `fillIndex` which fill (0-based) when it is one. */
+export class ManualTradeRejected extends Error {
+  override name = 'ManualTradeRejected';
+  constructor(
+    readonly error: ManualTradeError,
+    readonly fillIndex?: number,
+  ) {
+    super(`Manual trade rejected: ${error}`);
+  }
+}
+
+/** A trade entered by hand: its own fills, never merged with imported ones. */
+export interface ManualTradeInput {
+  accountId: string;
+  instrument: Instrument;
+  fills: {
+    time: string /* UTC ISO */;
+    side: Side;
+    qty: number;
+    price: number;
+    commission: Cents;
+    fees: Cents;
+  }[];
+  plannedStop?: number;
+  plannedTarget?: number;
+}
+
 export interface TradesRepo {
   /** In serial order. */
   list(ws: string): Promise<Trade[]>;
   get(ws: string, id: string): Promise<Trade | undefined>;
+  /** Leaving a strategy drops the checks of its rules, unless the patch sets `ruleChecks`. */
   update(ws: string, id: string, patch: TradePatch): Promise<Trade>;
+  /**
+   * `update` on each id in one transaction, in the order given; a function
+   * patch is called with each stored trade. Throws NotFoundError, writing
+   * nothing, when any id is missing.
+   */
+  updateMany(
+    ws: string,
+    ids: readonly string[],
+    patch: TradePatch | ((t: Trade) => TradePatch),
+  ): Promise<Trade[]>;
+  createManual(ws: string, input: ManualTradeInput): Promise<Trade>;
+  replaceManual(
+    ws: string,
+    id: string,
+    input: ManualTradeInput,
+  ): Promise<Trade>;
   /**
    * Also drops the ids from journal links. Missing ids are ignored. Throws
    * OpenImportedTradeError, deleting nothing, when any of them is an open
@@ -117,12 +195,20 @@ export interface AccountsRepo {
   list(ws: string): Promise<Account[]>;
   create(ws: string, input: NewAccount): Promise<Account>;
   update(ws: string, id: string, patch: AccountPatch): Promise<Account>;
-  /** Also deletes the account's trades (and their journal links) and import jobs. */
+  /** Also deletes the account's cash flows. Throws `Error('account has trades')` while it has any: clear or archive it first. */
   remove(ws: string, id: string): Promise<void>;
+  /** Removes its trades (and their journal links) and import jobs; returns the count of trades. */
+  clearTrades(ws: string, id: string): Promise<number>;
 }
 
-export type NewStrategy = Omit<Strategy, 'id' | 'workspaceId' | 'rules'> & {
-  rules: (Omit<Rule, 'id'> & { id?: string })[];
+/** A rule or group without an id gets one. */
+export type RuleDraft = Omit<Rule, 'id'> & { id?: string };
+export type RuleGroupDraft = Omit<RuleGroup, 'id' | 'rules'> & {
+  id?: string;
+  rules: RuleDraft[];
+};
+export type NewStrategy = Omit<Strategy, 'id' | 'workspaceId' | 'groups'> & {
+  groups: RuleGroupDraft[];
 };
 export type StrategyPatch = Partial<NewStrategy>;
 export interface StrategiesRepo {
@@ -130,15 +216,15 @@ export interface StrategiesRepo {
   list(ws: string): Promise<Strategy[]>;
   get(ws: string, id: string): Promise<Strategy | undefined>;
   create(ws: string, input: NewStrategy): Promise<Strategy>;
-  /** Rules without an id get one; changing rules drops stale RuleChecks on its trades. */
+  /** Groups and rules without an id get one; a rule that leaves drops its RuleChecks on its trades. */
   update(ws: string, id: string, patch: StrategyPatch): Promise<Strategy>;
-  /** Clears `strategyId` and `ruleChecks` on its trades. */
+  /** Takes it out of its trades' `strategyIds` and drops the checks of its rules there. */
   remove(ws: string, id: string): Promise<void>;
 }
 
 export type NewTag = Omit<Tag, 'id' | 'workspaceId'>;
 export type TagPatch = Partial<NewTag>;
-/** A tag with this name (ignoring case) already exists in the workspace and category. */
+/** A tag (in its category) or a category with this name, ignoring case, already exists in the workspace. */
 export class DuplicateNameError extends Error {
   override name = 'DuplicateNameError';
   constructor(readonly duplicate: string) {
@@ -146,12 +232,63 @@ export class DuplicateNameError extends Error {
   }
 }
 export interface TagsRepo {
-  /** By category, then name. */
+  /** By category name, then name. */
   list(ws: string): Promise<Tag[]>;
-  /** Names are trimmed. Throws DuplicateNameError. */
+  /**
+   * Names are trimmed and stored lowercase. A tag of that name already in the
+   * category is returned as it is. Throws NotFoundError for an unknown category.
+   */
   create(ws: string, input: NewTag): Promise<Tag>;
+  /** Throws DuplicateNameError when the name is taken in the category. */
   update(ws: string, id: string, patch: TagPatch): Promise<Tag>;
   /** Drops the id from every trade's `tagIds`. */
+  remove(ws: string, id: string): Promise<void>;
+}
+
+export interface TagCategoriesRepo {
+  /** By name. */
+  list(ws: string): Promise<TagCategory[]>;
+  /** Names are trimmed. Throws RangeError unless the colour is #RRGGBB, DuplicateNameError for a taken name. */
+  create(
+    ws: string,
+    input: { name: string; color: string },
+  ): Promise<TagCategory>;
+  update(
+    ws: string,
+    id: string,
+    patch: { name?: string; color?: string },
+  ): Promise<TagCategory>;
+  /** Refuses a built-in category (`Error('built-in category')`); removes its tags from trades, then the tags. */
+  remove(ws: string, id: string): Promise<void>;
+}
+
+export type TemplateDraft = Omit<
+  NoteTemplate,
+  'id' | 'workspaceId' | 'builtIn'
+> & { id?: string };
+export interface TemplatesRepo {
+  /** By kind, then name. */
+  list(ws: string): Promise<NoteTemplate[]>;
+  /**
+   * Creates when `id` is absent, otherwise replaces (a built-in keeps its
+   * kind). The kind keeps one default: saving a default clears the others,
+   * and a kind left without one falls back to its built-in template.
+   */
+  save(ws: string, t: TemplateDraft): Promise<NoteTemplate>;
+  /** Refuses a built-in template (`Error('built-in template')`). Removing the default makes the kind's built-in template the default. */
+  remove(ws: string, id: string): Promise<void>;
+  /** Clears `isDefault` on the kind's other templates. */
+  setDefault(ws: string, id: string): Promise<void>;
+}
+
+export interface FoldersRepo {
+  /** By name. */
+  list(ws: string): Promise<NoteFolder[]>;
+  /** The name is trimmed. Throws RangeError for an empty one and DuplicateNameError for one a folder already has, ignoring case. */
+  create(ws: string, name: string): Promise<NoteFolder>;
+  /** As `create` for the name; a folder keeps its id. Throws NotFoundError for a missing folder. */
+  rename(ws: string, id: string, name: string): Promise<NoteFolder>;
+  /** Moves the folder's notes, Trash included, to no folder (My notes). Throws NotFoundError for a missing folder. */
   remove(ws: string, id: string): Promise<void>;
 }
 
@@ -160,14 +297,30 @@ export type JournalDraft = Omit<
   'id' | 'workspaceId' | 'updatedAt'
 > & { id?: string };
 export interface JournalRepo {
-  /** Date descending, undated last, then `updatedAt` descending. */
+  /**
+   * Date descending, undated last, then `updatedAt` descending, Trash
+   * included. Purges entries trashed more than 30 days ago first, clearing
+   * `noteId` on the trades whose trade note it deletes.
+   */
   list(ws: string): Promise<JournalEntry[]>;
   get(ws: string, id: string): Promise<JournalEntry | undefined>;
+  /** The entries linked to the trade that are out of Trash. */
   listForTrade(ws: string, tradeId: string): Promise<JournalEntry[]>;
   /** Creates when `id` is absent, otherwise replaces; stamps `updatedAt`. */
   save(ws: string, draft: JournalDraft): Promise<JournalEntry>;
-  /** Clears `noteId` on trades pointing at it. */
+  /** Deletes for good and clears `noteId` on trades pointing at it. */
   remove(ws: string, id: string): Promise<void>;
+  /** Moves it to Trash (`deletedAt`). */
+  trash(ws: string, id: string): Promise<void>;
+  restore(ws: string, id: string): Promise<void>;
+  /**
+   * The trade's note: its linked entry while that is out of Trash, else a new
+   * `trade-note` entry titled "{symbol} : {d MMM yyyy}", created and set as
+   * `trade.noteId` in one transaction. Throws NotFoundError for a missing trade.
+   */
+  ensureTradeNote(ws: string, tradeId: string): Promise<JournalEntry>;
+  /** Opens the day's note or creates it from the default daily template. */
+  dailyNote(ws: string, date: string): Promise<JournalEntry>;
 }
 
 /** The plan is blocked (`plan.blocked`), so there is nothing to commit. */
@@ -214,9 +367,45 @@ export interface ImportRepo {
    * strategies, rules and notes deleted since. Refused while a later active
    * import in the account rebuilt one of its trades or has trades in the
    * symbol of a trade the undo would restore. Throws NotFoundError for a
-   * missing job; an undone job is left as it is.
+   * missing job, and ArchivedAccountError, changing nothing, when the job's
+   * account (or an account of a trade it would delete or restore) is
+   * archived; an undone job is left as it is.
    */
   undo(ws: string, jobId: string): Promise<UndoResult>;
+}
+
+export type NewCashFlow = Omit<CashFlow, 'id' | 'workspaceId'>;
+export type CashFlowPatch = Partial<NewCashFlow>;
+export interface CashFlowsRepo {
+  /** Newest date first. */
+  list(ws: string): Promise<CashFlow[]>;
+  /**
+   * The note is trimmed (an empty one is left out). Throws NotFoundError for
+   * an unknown account and RangeError for a date that isn't a real
+   * YYYY-MM-DD or an amount that isn't a nonzero whole number of cents.
+   */
+  create(ws: string, input: NewCashFlow): Promise<CashFlow>;
+  /** As `create` for what it sets; a `note` of undefined keeps it, an empty one clears it. */
+  update(ws: string, id: string, patch: CashFlowPatch): Promise<CashFlow>;
+  remove(ws: string, id: string): Promise<void>;
+}
+
+export type NewChallenge = Omit<Challenge, 'id' | 'workspaceId'>;
+export type ChallengePatch = Partial<NewChallenge>;
+export interface ChallengesRepo {
+  /** By name. */
+  list(ws: string): Promise<Challenge[]>;
+  /**
+   * Throws RangeError for a blank name or firm, phases that aren't `step-1`,
+   * then `step-2` for a two-step challenge, then `funded`, fees that aren't
+   * whole non-negative cents, or a start date that isn't a real YYYY-MM-DD;
+   * NotFoundError for a linked account that isn't in the workspace; and
+   * RangeError for one account linked to two phases.
+   */
+  create(ws: string, input: NewChallenge): Promise<Challenge>;
+  /** As `create` for what it sets; a key set to undefined is left unchanged, except `failureReason` and the fees, which it clears. Throws NotFoundError for an unknown id. */
+  update(ws: string, id: string, patch: ChallengePatch): Promise<Challenge>;
+  remove(ws: string, id: string): Promise<void>;
 }
 
 export interface Repository {
@@ -224,8 +413,13 @@ export interface Repository {
   prefs: PrefsRepo;
   trades: TradesRepo;
   accounts: AccountsRepo;
+  cashFlows: CashFlowsRepo;
+  challenges: ChallengesRepo;
   strategies: StrategiesRepo;
   tags: TagsRepo;
+  tagCategories: TagCategoriesRepo;
+  templates: TemplatesRepo;
+  folders: FoldersRepo;
   journal: JournalRepo;
   imports: ImportRepo;
 }

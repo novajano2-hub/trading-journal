@@ -11,12 +11,22 @@ async function ready(page: Page) {
   });
 }
 
-test('filters change the numbers and the URL', async ({ page }) => {
+test('filters change the numbers and the URL', async ({ page }, info) => {
+  const mobile = info.project.name === 'mobile';
   await page.goto('/app/dashboard');
   await ready(page);
   const pnl = page.getByTestId('kpi-pnl');
   const all = await pnl.innerText();
-  await page.getByRole('button', { name: 'Side', exact: true }).click();
+  // Below sm the chips are one Filters button and a sheet of rows.
+  const sheet = page.getByRole('dialog', { name: 'Filters' });
+  const row = async (name: string, exact = true) => {
+    if (mobile) {
+      if (!(await sheet.isVisible()))
+        await page.getByRole('button', { name: /^Filters/ }).click();
+      await sheet.getByRole('button', { name: new RegExp(`^${name}`) }).click();
+    } else await page.getByRole('button', { name, exact }).click();
+  };
+  await row('Side');
   await page.getByRole('radio', { name: 'Short' }).check();
   await expect(page).toHaveURL(/[?&]side=short(&|$)/);
   await expect.poll(() => pnl.innerText()).not.toBe(all);
@@ -24,11 +34,13 @@ test('filters change the numbers and the URL', async ({ page }) => {
   await page.reload();
   await ready(page);
   await expect.poll(() => pnl.innerText()).toBe(short);
-  await page.getByRole('button', { name: 'All time', exact: true }).click();
+  await row(mobile ? 'Date' : 'All time');
   await page.getByRole('radio', { name: 'Last week' }).check();
   await expect(page).toHaveURL(/range=last-week/);
+  // The sheet is a modal: close it to read the page behind.
+  if (mobile) await page.keyboard.press('Escape');
   await expect(
-    page.getByRole('heading', { name: 'Your plan, 9-15 Nov' }),
+    page.getByRole('heading', { name: 'Your plan, 8-14 Nov' }),
   ).toBeVisible();
 });
 
@@ -39,9 +51,7 @@ test('the account switcher writes the account filter (desktop)', async ({
   await page.goto('/app/dashboard');
   await ready(page);
   await page.getByRole('button', { name: /Sample workspace/ }).click();
-  await page
-    .getByRole('menuitemcheckbox', { name: 'Futures live', exact: true })
-    .click();
+  await page.getByRole('menuitemcheckbox', { name: /^Futures live/ }).click();
   await expect(page).toHaveURL(/[?&]account=sample-futures(&|$)/);
   await page.keyboard.press('Escape');
   await expect(
@@ -84,16 +94,32 @@ test('Gross/Net relabels P&L', async ({ page }) => {
   await ready(page);
   const pnl = page.getByTestId('kpi-pnl');
   await expect(pnl).toContainText('Net P&L');
-  await page
-    .getByRole('radiogroup', { name: 'P&L basis' })
-    .locator('label', { hasText: 'Gross' })
-    .click();
+  const display = page.getByRole('button', { name: /show as / });
+  await display.click();
+  await page.getByRole('menuitemradio', { name: 'Gross' }).click();
   await expect(pnl).toContainText('Gross P&L');
-  await page
-    .getByRole('radiogroup', { name: 'P&L basis' })
-    .locator('label', { hasText: 'Net' })
-    .click();
+  await page.getByRole('menuitemradio', { name: 'Net' }).click();
   await expect(pnl).toContainText('Net P&L');
+  await page.keyboard.press('Escape');
+});
+
+test('the Display menu hides every amount under Privacy and brings them back', async ({
+  page,
+}) => {
+  await page.goto('/app/dashboard');
+  await ready(page);
+  await page.getByRole('button', { name: /show as / }).click();
+  await page.getByRole('menuitemradio', { name: 'Privacy' }).click();
+  await page.keyboard.press('Escape');
+  await expect(
+    page.getByRole('button', { name: 'Net, show as Privacy' }),
+  ).toBeFocused();
+  await expect(page.getByTestId('kpi-pnl')).toContainText('$•••');
+  expect(await page.locator('body').innerText()).not.toMatch(/\$\d/);
+  await page.getByRole('button', { name: /show as / }).click();
+  await page.getByRole('menuitemradio', { name: 'Dollar' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('kpi-pnl')).toContainText(/\$\d/);
 });
 
 test('goals edit in place and keep the saved amount', async ({ page }) => {
@@ -123,8 +149,9 @@ test('a filter that matches nothing and an empty workspace each show their own w
     .getByRole('heading', { name: 'No trades match these filters.' })
     .locator('..');
   await expect(empty).toBeVisible({ timeout: 20_000 });
+  // Below sm the top bar's chips are a button, so its Clear filters waits in the sheet.
   await expect(page.getByRole('button', { name: 'Clear filters' })).toHaveCount(
-    2,
+    info.project.name === 'mobile' ? 1 : 2,
   );
   await empty.getByRole('button', { name: 'Clear filters' }).click();
   await expect(page).not.toHaveURL(/symbol=/);

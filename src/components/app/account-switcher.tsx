@@ -4,17 +4,19 @@ import {
   ArrowClockwise,
   CaretUpDown,
   Check,
-  Wallet,
+  MagnifyingGlass,
 } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { DropdownMenu } from 'radix-ui';
-import { useId, type ReactNode } from 'react';
-import { IconTile } from '@/components/ui/icon-tile';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import {
   useAccounts,
   useActiveWorkspace,
   useSetActiveWorkspace,
   useWorkspaces,
 } from '@/data/query/hooks';
+import { AppearanceMenuGroup } from './appearance';
+import { FIELD } from './filter-chip';
 import { SwitcherPlaceholder } from './sidebar';
 import { useShownFilters } from './use-shown-filters';
 import {
@@ -28,11 +30,11 @@ const ITEM =
 const LABEL = 'px-2 pt-2 pb-1 text-[12px] font-medium text-faint';
 /**
  * A white card on the canvas, its edge a hairline that firms on hover and
- * while open. Its gaps and the caret's are tight so "Sample workspace" fits
- * whole in the 220px sidebar.
+ * while open: the workspace's name over what it shows, and a caret. No glyph:
+ * the words are the identity.
  */
 const BOX =
-  'flex h-[52px] w-full items-center gap-2 rounded-[12px] border border-line bg-surface-1 py-2 pl-2 text-left shadow-[var(--shadow-chip)] transition-[border-color] duration-200 ease-(--ease-glide) hover:border-line-2';
+  'flex h-[52px] w-full items-center gap-2 rounded-[12px] border border-line bg-surface-1 py-2 pl-3 text-left shadow-[var(--shadow-chip)] transition-[border-color] duration-200 ease-(--ease-glide) hover:border-line-2';
 
 function Indicator(): React.JSX.Element {
   return (
@@ -67,7 +69,12 @@ function LabelledGroup({
  * place and the menu stays open. A workspace that can't load says so, and
  * clicking it reloads the page.
  */
-export function AccountSwitcher(): React.JSX.Element {
+export function AccountSwitcher({
+  appearance = true,
+}: {
+  /** The Appearance choice at the menu's foot: on desktop. The phone's More sheet has its own. */
+  appearance?: boolean;
+} = {}): React.JSX.Element {
   const { filters, shown: clean, setFilters } = useShownFilters();
   const workspaces = useWorkspaces().data ?? [];
   const activeQuery = useActiveWorkspace();
@@ -75,6 +82,8 @@ export function AccountSwitcher(): React.JSX.Element {
   const accounts = useAccounts().data;
   const setActive = useSetActiveWorkspace();
   const workspaceLabel = useId();
+  const [query, setQuery] = useState('');
+  const list = useRef<HTMLDivElement>(null);
 
   if (!active && activeQuery.error) {
     return (
@@ -83,9 +92,8 @@ export function AccountSwitcher(): React.JSX.Element {
         // Storage that failed to open never recovers in place; a fresh page tries again.
         onClick={() => window.location.reload()}
         // Nothing sits at the right end here: the words take its room.
-        className={`${BOX} pr-1`}
+        className={`${BOX} pr-3`}
       >
-        <IconTile icon={ArrowClockwise} tone="neutral" />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-[13.5px] leading-[1.25] font-semibold text-text">
             Workspace unavailable
@@ -94,6 +102,11 @@ export function AccountSwitcher(): React.JSX.Element {
             Try again
           </span>
         </span>
+        <ArrowClockwise
+          size={16}
+          aria-hidden="true"
+          className="flex-none text-muted"
+        />
       </button>
     );
   }
@@ -109,13 +122,21 @@ export function AccountSwitcher(): React.JSX.Element {
       : filters.accountIds.length === 0
         ? 'All accounts'
         : '\u00a0';
-  const live = (accounts ?? []).filter((a) => a.status === 'active');
-  const archived = (accounts ?? []).filter((a) => a.status === 'archived');
+  // The search matches an account's name or its broker.
+  const needle = query.trim().toLowerCase();
+  const found = (accounts ?? []).filter(
+    (a) =>
+      needle === '' ||
+      a.name.toLowerCase().includes(needle) ||
+      a.broker.toLowerCase().includes(needle),
+  );
+  const live = found.filter((a) => a.status === 'active');
+  const archived = found.filter((a) => a.status === 'archived');
   const writeAccounts = (accountIds: string[]) => {
     if (clean) setFilters({ ...clean, accountIds });
   };
 
-  const accountItem = (id: string, name: string) => (
+  const accountItem = (id: string, name: string, broker: string) => (
     <DropdownMenu.CheckboxItem
       key={id}
       checked={selected.includes(id)}
@@ -128,15 +149,19 @@ export function AccountSwitcher(): React.JSX.Element {
     >
       <Indicator />
       <span className="min-w-0 truncate">{name}</span>
+      {broker ? (
+        <span className="ml-2 min-w-0 flex-none truncate text-[12px] text-faint">
+          {broker}
+        </span>
+      ) : null}
     </DropdownMenu.CheckboxItem>
   );
 
   return (
-    <DropdownMenu.Root>
+    <DropdownMenu.Root onOpenChange={(open) => !open && setQuery('')}>
       <DropdownMenu.Trigger
         className={`${BOX} pr-2 data-[state=open]:border-line-2`}
       >
-        <IconTile icon={Wallet} tone="accent" />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-[13.5px] leading-[1.25] font-semibold text-text">
             {active.name}
@@ -145,11 +170,10 @@ export function AccountSwitcher(): React.JSX.Element {
             {summary}
           </span>
         </span>
-        {/* The glyph has air of its own inside its box: 4px is enough beside the words. */}
         <CaretUpDown
           size={14}
           aria-hidden="true"
-          className="-ml-1 flex-none text-faint"
+          className="flex-none text-faint"
         />
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
@@ -190,29 +214,82 @@ export function AccountSwitcher(): React.JSX.Element {
           </DropdownMenu.RadioGroup>
           <DropdownMenu.Separator className="-mx-1.5 my-1.5 h-px bg-line" />
           <LabelledGroup label="Accounts">
-            <DropdownMenu.CheckboxItem
-              checked={selected.length === 0}
-              disabled={!clean}
-              onSelect={(e) => {
-                e.preventDefault();
-                writeAccounts([]);
-              }}
-              className={ITEM}
-            >
-              <Indicator />
-              All accounts
-            </DropdownMenu.CheckboxItem>
-            {live.map((a) => accountItem(a.id, a.name))}
-            {accounts && accounts.length === 0 ? (
-              <p className="px-2 py-1.5 text-[13px] text-muted">
-                No accounts yet.
-              </p>
+            {(accounts?.length ?? 0) > 1 ? (
+              <div className="relative px-1 pb-1.5">
+                <MagnifyingGlass
+                  size={14}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute top-[11px] left-3.5 text-faint"
+                />
+                <input
+                  type="search"
+                  aria-label="Search accounts"
+                  placeholder="Search accounts"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    // The menu would take a typed letter as a jump to an item.
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      list.current
+                        ?.querySelector<HTMLElement>(
+                          '[role="menuitemcheckbox"]',
+                        )
+                        ?.focus();
+                    }
+                    if (e.key !== 'Escape' && e.key !== 'Tab')
+                      e.stopPropagation();
+                  }}
+                  className={`${FIELD} pl-8 text-[13.5px] placeholder:text-faint`}
+                />
+              </div>
             ) : null}
+            <div ref={list}>
+              <DropdownMenu.CheckboxItem
+                checked={selected.length === 0}
+                disabled={!clean}
+                onSelect={(e) => {
+                  e.preventDefault();
+                  writeAccounts([]);
+                }}
+                className={ITEM}
+              >
+                <Indicator />
+                All accounts
+              </DropdownMenu.CheckboxItem>
+              {live.map((a) => accountItem(a.id, a.name, a.broker))}
+              {accounts && accounts.length === 0 ? (
+                <p className="px-2 py-1.5 text-[13px] text-muted">
+                  No accounts yet.
+                </p>
+              ) : null}
+              {accounts && accounts.length > 0 && found.length === 0 ? (
+                <p className="px-2 py-1.5 text-[13px] text-muted">
+                  No accounts match.
+                </p>
+              ) : null}
+            </div>
           </LabelledGroup>
           {archived.length > 0 ? (
             <LabelledGroup label="Archived">
-              {archived.map((a) => accountItem(a.id, a.name))}
+              {archived.map((a) => accountItem(a.id, a.name, a.broker))}
             </LabelledGroup>
+          ) : null}
+          <DropdownMenu.Separator className="-mx-1.5 my-1.5 h-px bg-line" />
+          <DropdownMenu.Item asChild>
+            <Link href="/app/settings/accounts" className={`${ITEM} pl-2`}>
+              Manage accounts
+            </Link>
+          </DropdownMenu.Item>
+          {appearance ? (
+            <>
+              <DropdownMenu.Separator className="-mx-1.5 my-1.5 h-px bg-line" />
+              <AppearanceMenuGroup
+                itemClassName={ITEM}
+                labelClassName={LABEL}
+                indicator={<Indicator />}
+              />
+            </>
           ) : null}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>

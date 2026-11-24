@@ -57,15 +57,16 @@ export function MobileMenu() {
         type="button"
         aria-expanded={open}
         aria-controls="mobile-sheet"
+        aria-label="Menu"
         onClick={() => setOpen((o) => !o)}
-        className={`${CTA_SECONDARY} h-11 cursor-pointer gap-2 px-3.5 text-[14.5px]`}
+        // A plain glyph, no box: 44px, its edge on the gutter.
+        className="-mr-2.5 inline-flex size-11 cursor-pointer items-center justify-center rounded-control text-text transition-colors duration-200 ease-(--ease-glide) hover:bg-sunken"
       >
         {open ? (
-          <X aria-hidden="true" size={18} />
+          <X aria-hidden="true" size={22} />
         ) : (
-          <List aria-hidden="true" size={18} />
+          <List aria-hidden="true" size={22} />
         )}
-        Menu
       </button>
       <AnimatePresence>
         {open && (

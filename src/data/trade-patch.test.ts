@@ -1,14 +1,20 @@
 import { expect, test } from 'vitest';
 import { makeTrade } from '@/domain/__fixtures__/trades';
-import { applyTradePatch, withRuleCheck } from './trade-patch';
+import { applyTradePatch, withRuleCheck, withTagPick } from './trade-patch';
 
 const t = makeTrade({
   net: 0,
   avgEntry: 4500,
   maxPosition: 2,
-  strategyId: 's1',
-  ruleChecks: [{ ruleId: 'r1', followed: true }],
+  strategyIds: ['s1', 's2'],
+  ruleChecks: [
+    { ruleId: 'r1', followed: true },
+    { ruleId: 'r2', followed: false },
+  ],
 });
+/** s1 owns r1, s2 owns r2. */
+const RULES: Record<string, string[]> = { s1: ['r1'], s2: ['r2'] };
+const rulesOf = (id: string) => RULES[id];
 
 test('a stop sets risk from the stop', () =>
   expect(applyTradePatch(t, { plannedStop: 4490 }).initialRisk).toBe(100000));
@@ -31,16 +37,33 @@ test('clearing the stop keeps a risk the patch sets', () => {
   expect(r.initialRisk).toBe(700);
 });
 
-test('a new strategy drops old rule checks; the same one keeps them', () => {
-  expect(applyTradePatch(t, { strategyId: 's2' }).ruleChecks).toEqual([]);
-  expect(applyTradePatch(t, { strategyId: 's1' }).ruleChecks).toHaveLength(1);
+test("leaving a strategy drops its rule checks; the others' stay", () => {
   expect(
-    applyTradePatch(t, {
-      strategyId: 's2',
-      ruleChecks: [{ ruleId: 'x', followed: null }],
-    }).ruleChecks,
+    applyTradePatch(t, { strategyIds: ['s2'] }, rulesOf).ruleChecks,
+  ).toEqual([{ ruleId: 'r2', followed: false }]);
+  expect(
+    applyTradePatch(t, { strategyIds: ['s1', 's2', 's3'] }, rulesOf).ruleChecks,
+  ).toEqual(t.ruleChecks);
+  expect(applyTradePatch(t, { strategyIds: undefined }, rulesOf)).toMatchObject(
+    { strategyIds: [], ruleChecks: [] },
+  );
+  // Explicit checks win; without a rule lookup nothing is dropped.
+  expect(
+    applyTradePatch(
+      t,
+      { strategyIds: [], ruleChecks: [{ ruleId: 'x', followed: null }] },
+      rulesOf,
+    ).ruleChecks,
   ).toEqual([{ ruleId: 'x', followed: null }]);
+  expect(applyTradePatch(t, { strategyIds: [] }).ruleChecks).toEqual(
+    t.ruleChecks,
+  );
 });
+
+test('strategies dedupe', () =>
+  expect(
+    applyTradePatch(t, { strategyIds: ['s2', 's2', 's1'] }).strategyIds,
+  ).toEqual(['s2', 's1']));
 
 test('tags dedupe; input untouched', () => {
   expect(applyTradePatch(t, { tagIds: ['a', 'b', 'a'] }).tagIds).toEqual([
@@ -52,9 +75,13 @@ test('tags dedupe; input untouched', () => {
 });
 
 test('a key present with undefined removes the field', () => {
-  const rated = applyTradePatch(t, { rating: 3, noteId: 'n' });
-  const r = applyTradePatch(rated, { rating: undefined, noteId: undefined });
-  expect('rating' in r || 'noteId' in r).toBe(false);
+  const rated = applyTradePatch(t, { rating: 3, noteId: 'n', reviewed: true });
+  const r = applyTradePatch(rated, {
+    rating: undefined,
+    noteId: undefined,
+    reviewed: undefined,
+  });
+  expect('rating' in r || 'noteId' in r || 'reviewed' in r).toBe(false);
 });
 
 test('withRuleCheck sets one rule and leaves the others; a new rule is appended', () => {
@@ -77,4 +104,21 @@ test('withRuleCheck sets one rule and leaves the others; a new rule is appended'
     { ruleId: 'r3', followed: false },
   ]);
   expect(graded.ruleChecks[0]!.followed).toBe(false);
+});
+
+test('a tag pick applies to the stored list, so two picks from one stale list both land', () => {
+  const stale: string[] = [];
+  const stored = makeTrade({ net: 0, tagIds: ['a'] });
+  // The second pick was made before the first save came back.
+  const patch = withTagPick(stale, ['b'])(stored);
+  expect(patch.tagIds).toEqual(['a', 'b']);
+  // A removal drops only that tag.
+  expect(
+    withTagPick(
+      ['a', 'c'],
+      ['a'],
+    )(makeTrade({ net: 0, tagIds: ['a', 'c', 'd'] })).tagIds,
+  ).toEqual(['a', 'd']);
+  // Picking what is already stored adds nothing twice.
+  expect(withTagPick([], ['a'])(stored).tagIds).toEqual(['a']);
 });

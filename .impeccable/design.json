@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-21T00:00:00Z",
+  "generatedAt": "2026-11-24T00:00:00Z",
   "title": "Design System: Keel",
   "extensions": {
     "colorMeta": {
@@ -16,13 +16,13 @@
           "#1f278c",
           "#dcdff8",
           "#eeeffc",
-          "#2c336e",
-          "#22285a"
+          "#2a2f5e",
+          "#1c1d2e"
         ]
       },
       "bg": {
         "role": "neutral",
-        "displayName": "Periwinkle Canvas",
+        "displayName": "Periwinkle Canvas (Graphite in dark)",
         "canonical": "#eceef8",
         "tonalRamp": [
           "#ffffff",
@@ -30,9 +30,11 @@
           "#eceef8",
           "#e7e9f3",
           "#d5d8ea",
-          "#0c0e1c",
-          "#151831",
-          "#1b1f3b"
+          "#0b0b0b",
+          "#141414",
+          "#1b1b1b",
+          "#252525",
+          "#313131"
         ]
       },
       "text": {
@@ -43,8 +45,9 @@
           "#121633",
           "#4b5175",
           "#636889",
-          "#aeb2d2",
-          "#eceefb"
+          "#ededed",
+          "#a3a3a3",
+          "#878787"
         ]
       },
       "gain": {
@@ -57,7 +60,7 @@
           "#19a672",
           "#2fb27f",
           "#ddf3e8",
-          "#10291f"
+          "#10261c"
         ]
       },
       "loss": {
@@ -69,7 +72,7 @@
           "#c22e3a",
           "#e5484d",
           "#fceced",
-          "#2e1620"
+          "#2b1517"
         ]
       },
       "warn": {
@@ -81,7 +84,7 @@
           "#9a5700",
           "#e9a21a",
           "#fcf1dc",
-          "#2d2210"
+          "#2a2010"
         ]
       },
       "info": {
@@ -93,7 +96,7 @@
           "#0a6f94",
           "#1693be",
           "#e0f1f8",
-          "#0e2533"
+          "#0d2330"
         ]
       },
       "veil": {
@@ -102,7 +105,16 @@
         "canonical": "rgba(18, 22, 51, 0.36)",
         "tonalRamp": [
           "rgba(18, 22, 51, 0.36)",
-          "rgba(4, 5, 14, 0.66)"
+          "rgba(0, 0, 0, 0.62)"
+        ]
+      },
+      "track": {
+        "role": "neutral",
+        "displayName": "Track",
+        "canonical": "color-mix(in srgb, #2b35af 8%, transparent)",
+        "tonalRamp": [
+          "color-mix(in srgb, #2b35af 8%, transparent)",
+          "rgb(255 255 255 / 0.05)"
         ]
       }
     },
@@ -113,7 +125,7 @@
       },
       "display-page": {
         "displayName": "Page display",
-        "purpose": "Page and auth h1."
+        "purpose": "Page h1."
       },
       "section-heading": {
         "displayName": "Section heading",
@@ -176,7 +188,7 @@
       {
         "name": "card",
         "value": "0 1px 2px rgba(18,22,51,0.05), 0 4px 10px -6px rgba(34,42,150,0.1), 0 18px 34px -22px rgba(34,42,150,0.38)",
-        "purpose": "--shadow-card: every white card. Dark: 0 1px 2px rgba(0,0,0,0.45), 0 18px 34px -22px rgba(0,0,0,0.8)."
+        "purpose": "--shadow-card: every white card, the plan card included. Dark: 0 1px 2px rgba(0,0,0,0.4); in graphite the surface lift and the hairline carry depth."
       },
       {
         "name": "shadow",
@@ -187,11 +199,6 @@
         "name": "chip",
         "value": "0 1px 2px rgba(18,22,51,0.06), 0 2px 6px -2px rgba(34,42,150,0.1)",
         "purpose": "--shadow-chip: chosen segment or tab, current nav row, account box, secondary site CTA. Dark: 0 1px 2px rgba(0,0,0,0.45)."
-      },
-      {
-        "name": "hero",
-        "value": "0 2px 4px rgba(31,39,140,0.18), 0 22px 40px -18px rgba(31,39,140,0.55)",
-        "purpose": "--shadow-hero with an inset 1px white highlight at 18%: the ultramarine Your plan surface. Dark: 0 2px 4px rgba(0,0,0,0.4), 0 22px 40px -18px rgba(43,53,175,0.55)."
       },
       {
         "name": "raised-primary",
@@ -340,33 +347,33 @@
       "name": "Segmented Control",
       "kind": "custom",
       "refersTo": "segmented",
-      "description": "Recessed accent-tinted track with a white chosen pill. Tabs share the look and slide the fill.",
+      "description": "Recessed track (`--track`: the accent at 8% in light, white at 5% in graphite) with a white chosen pill. Tabs share the look and slide the fill. Appearance (System, Light, Dark) uses it.",
       "html": "<div class=\"ds-seg\"><span class=\"ds-seg-on\">Net</span><span>Gross</span></div>",
-      "css": ".ds-seg{display:inline-flex;padding:3px;border-radius:11px;background:color-mix(in oklab,var(--accent) 8%,transparent);box-shadow:inset 0 1px 2px rgb(18 22 51/.07);font:500 13.5px var(--font-keel),system-ui,sans-serif;color:var(--muted);}.ds-seg span{display:inline-flex;align-items:center;height:28px;padding:0 13px;border-radius:8px;cursor:pointer;}.ds-seg span:hover{color:var(--text);}.ds-seg .ds-seg-on{background:var(--surface-1);color:var(--text);font-weight:600;box-shadow:var(--shadow-chip);}"
+      "css": ".ds-seg{display:inline-flex;padding:3px;border-radius:11px;background:var(--track);box-shadow:inset 0 1px 2px rgb(18 22 51/.07);font:500 13.5px var(--font-keel),system-ui,sans-serif;color:var(--muted);}.ds-seg span{display:inline-flex;align-items:center;height:28px;padding:0 13px;border-radius:8px;cursor:pointer;}.ds-seg span:hover{color:var(--text);}.ds-seg .ds-seg-on{background:var(--surface-1);color:var(--text);font-weight:600;box-shadow:var(--shadow-chip);}"
     },
     {
-      "name": "Card with Icon Tile",
+      "name": "Card",
       "kind": "card",
       "refersTo": "card",
-      "description": "White 16px card with the card shadow; header is a 28px duotone tile in the card's job tone and a 15px/600 title.",
-      "html": "<div class=\"ds-card\"><div class=\"ds-ch\"><span class=\"ds-tile ds-tile-warn\">M</span><b>Mistakes</b><span class=\"ds-cap\">1-20 Nov</span></div><p>Content</p></div>",
-      "css": ".ds-card{width:280px;padding:18px 20px 16px;background:var(--surface-1);border:1px solid var(--line);border-radius:var(--r-card);box-shadow:var(--shadow-card);color:var(--muted);font:400 13px var(--font-keel),system-ui,sans-serif;}.ds-ch{display:flex;align-items:center;gap:10px;min-height:28px;color:var(--text);}.ds-ch b{font:600 15px var(--font-keel),system-ui,sans-serif;letter-spacing:-.015em;}.ds-cap{margin-left:auto;font-size:12.5px;color:var(--faint);}.ds-tile{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;font:600 13px var(--font-keel),system-ui,sans-serif;background:var(--sunken);}.ds-tile-warn{background:var(--warn-soft);color:var(--warn);}"
+      "description": "White 16px card with the card shadow; the header is a 15px/600 title with an optional faint caption. No glyph, no tile.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-ch\"><b>Mistakes by cost</b><span class=\"ds-cap\">1-20 Nov</span></div><p>Content</p></div>",
+      "css": ".ds-card{width:280px;padding:18px 20px 16px;background:var(--surface-1);border:1px solid var(--line);border-radius:var(--r-card);box-shadow:var(--shadow-card);color:var(--muted);font:400 13px var(--font-keel),system-ui,sans-serif;}.ds-ch{display:flex;align-items:center;gap:10px;min-height:28px;color:var(--text);}.ds-ch b{font:600 15px var(--font-keel),system-ui,sans-serif;letter-spacing:-.015em;}.ds-cap{font-size:12.5px;color:var(--faint);}"
     },
     {
-      "name": "Icon Tiles",
+      "name": "State Glyph",
       "kind": "custom",
-      "refersTo": "icon-tile",
-      "description": "28px, 8px radius tiles by tone: accent, marigold, cyan, neutral, faint outline, on-accent.",
-      "html": "<span class=\"ds-t ds-t-accent\">P</span> <span class=\"ds-t ds-t-warn\">M</span> <span class=\"ds-t ds-t-info\">G</span> <span class=\"ds-t\">N</span>",
-      "css": ".ds-t{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;font:600 13px var(--font-keel),system-ui,sans-serif;background:var(--sunken);color:var(--text);}.ds-t-accent{background:var(--accent-soft);color:var(--accent-ink);}.ds-t-warn{background:var(--warn-soft);color:var(--warn);}.ds-t-info{background:var(--info-soft);color:var(--info);}"
+      "refersTo": "state-glyph",
+      "description": "The one glyph a state block may carry: 28px, regular weight, faint, nothing behind it. Icon tiles are retired.",
+      "html": "<div class=\"ds-state\"><svg width=\"28\" height=\"28\" viewBox=\"0 0 256 256\" aria-hidden=\"true\"><path d=\"M230.6 49.53A15.81 15.81 0 0 0 216 40H40a16 16 0 0 0-11.81 26.76l.08.09L96 139.17V216a16 16 0 0 0 24.87 13.32l32-21.34a16 16 0 0 0 7.13-13.32v-55.49l67.74-72.32.08-.09a15.8 15.8 0 0 0 2.78-17.23Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"16\"/></svg><b>No trades match these filters.</b></div>",
+      "css": ".ds-state{display:flex;flex-direction:column;align-items:center;gap:16px;width:280px;color:var(--faint);font-family:var(--font-keel),system-ui,sans-serif;}.ds-state b{font:600 17px var(--font-keel),system-ui,sans-serif;color:var(--text);letter-spacing:-.015em;text-align:center;}"
     },
     {
-      "name": "Your Plan Hero",
+      "name": "Your Plan Card",
       "kind": "card",
-      "refersTo": "hero-surface",
-      "description": "The one coloured surface: ultramarine gradient, 88px adherence numeral, kept/broken split bar and a cost band.",
-      "html": "<div class=\"ds-hero\"><div class=\"ds-hh\">Your plan</div><div class=\"ds-num\">87<small>%</small></div><div class=\"ds-split\"><i></i><i></i></div><div class=\"ds-band\"><span>Broken rules cost</span><b>-$8,581.08</b></div></div>",
-      "css": ".ds-hero{width:320px;overflow:hidden;padding:18px 22px 0;border-radius:var(--r-card);background:linear-gradient(155deg,#3440c2 0%,#2b35af 45%,#232b98 100%);color:#fff;box-shadow:inset 0 1px 0 rgb(255 255 255/.18),var(--shadow-hero);font-family:var(--font-keel),system-ui,sans-serif;}.ds-hh{font:600 15px var(--font-keel),system-ui,sans-serif;letter-spacing:-.015em;}.ds-num{margin-top:14px;font:600 88px/.82 var(--font-keel),system-ui,sans-serif;letter-spacing:-.05em;font-stretch:88%;font-variant-numeric:tabular-nums;}.ds-num small{font-size:.42em;margin-left:4px;vertical-align:top;color:var(--on-accent-muted);}.ds-split{display:flex;gap:3px;height:8px;margin:22px 0 18px;}.ds-split i{display:block;border-radius:3px;}.ds-split i:first-child{flex:87;background:rgb(255 255 255/.92);}.ds-split i:last-child{flex:13;background:var(--on-accent-loss);}.ds-band{display:flex;align-items:center;justify-content:space-between;min-height:54px;margin:0 -22px;padding:8px 22px;border-top:1px solid rgb(255 255 255/.1);background:rgb(10 14 70/.22);font-size:13.5px;}.ds-band b{font:600 21px var(--font-keel),system-ui,sans-serif;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--on-accent-loss);}"
+      "refersTo": "plan-card",
+      "description": "A neutral card like the rest: the 88px adherence numeral in ink, a kept/broken split bar (the accent on kept, the card's one accent touch) and a sunken cost band.",
+      "html": "<div class=\"ds-plan\"><div class=\"ds-hh\">Your plan</div><div class=\"ds-num\">87<small>%</small></div><div class=\"ds-split\"><i></i><i></i></div><div class=\"ds-band\"><span>Broken rules cost</span><b>-$8,581.08</b></div></div>",
+      "css": ".ds-plan{width:320px;overflow:hidden;padding:18px 22px 0;border-radius:var(--r-card);background:var(--surface-1);border:1px solid var(--line);color:var(--text);box-shadow:var(--shadow-card);font-family:var(--font-keel),system-ui,sans-serif;}.ds-hh{font:600 15px var(--font-keel),system-ui,sans-serif;letter-spacing:-.015em;}.ds-num{margin-top:14px;font:600 88px/.82 var(--font-keel),system-ui,sans-serif;letter-spacing:-.05em;font-stretch:88%;font-variant-numeric:tabular-nums;}.ds-num small{font-size:.42em;margin-left:4px;vertical-align:top;color:var(--faint);}.ds-split{display:flex;gap:3px;height:8px;margin:22px 0 18px;}.ds-split i{display:block;border-radius:3px;}.ds-split i:first-child{flex:87;background:var(--accent);}.ds-split i:last-child{flex:13;background:var(--loss-fill);}.ds-band{display:flex;align-items:center;justify-content:space-between;min-height:54px;margin:0 -22px;padding:8px 22px;border-top:1px solid var(--line);background:color-mix(in srgb,var(--sunken) 60%,transparent);font-size:13.5px;color:var(--muted);}.ds-band b{font:600 21px var(--font-keel),system-ui,sans-serif;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--loss);}"
     },
     {
       "name": "Rule Row",
@@ -380,7 +387,7 @@
       "name": "Nav Row (three looks)",
       "kind": "nav",
       "refersTo": "surface",
-      "description": "Sidebar row on the canvas: current is a white pill, other modules muted, not-live faint. No tiles.",
+      "description": "Sidebar row on the canvas: current is a white pill with an accent-ink glyph (regular weight), other modules muted, not-live faint. No tiles.",
       "html": "<div class=\"ds-nav\"><a class=\"ds-nav-row ds-on\">Dashboard</a><a class=\"ds-nav-row\">Trades</a><a class=\"ds-nav-row ds-quiet\">Backtesting</a></div>",
       "css": ".ds-nav{width:196px;display:flex;flex-direction:column;gap:2px;padding:8px;background:var(--bg);}.ds-nav-row{display:flex;align-items:center;height:34px;padding:0 10px;border-radius:9px;font:500 13.5px var(--font-keel),system-ui,sans-serif;color:var(--muted);text-decoration:none;}.ds-nav-row:hover{background:color-mix(in oklab,var(--surface-1) 60%,transparent);color:var(--text);}.ds-on{background:var(--surface-1);color:var(--text);font-weight:600;box-shadow:var(--shadow-chip);}.ds-quiet{color:var(--faint);}"
     },
@@ -439,23 +446,82 @@
       "description": "The marketing product shot: 16px window on the canvas, a bar of white controls, then the app's own cards.",
       "html": "<div class=\"ds-win\"><div class=\"ds-bar\"><span class=\"ds-sel\">Main account</span><span class=\"ds-sel\">Last 30 days</span><span class=\"ds-meta\">Sample data</span></div><div class=\"ds-body\">Content</div></div>",
       "css": ".ds-win{overflow:hidden;border:1px solid color-mix(in oklab,var(--line-2) 80%,transparent);border-radius:var(--r-card);background:var(--bg);box-shadow:inset 0 1px 0 rgb(255 255 255/.6),var(--shadow);}.ds-bar{display:flex;align-items:center;gap:6px;min-height:52px;padding:10px 12px;font:500 12.5px var(--font-keel),system-ui,sans-serif;color:var(--muted);}.ds-sel{display:inline-flex;align-items:center;height:30px;padding:0 10px;border:1px solid var(--line);border-radius:var(--r-control);background:var(--surface-1);box-shadow:0 1px 1px rgb(18 22 51/.04);}.ds-meta{margin-left:auto;color:var(--faint);}.ds-body{padding:0 12px 12px;color:var(--muted);}"
+    },
+    {
+      "name": "Two-line Phone Row",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Below 640px: line one is instrument, time and signed net; line two is 12.5px muted facts. One link, 60px minimum.",
+      "html": "<div class=\"ds-pr\"><span class=\"ds-p1\"><b>TSLA 370 Put</b><span class=\"ds-pm\">09:41</span><b class=\"ds-pg\">+$1,204.00</b></span><span class=\"ds-p2\">Long, +1.25R, 4 of 5 kept</span></div>",
+      "css": ".ds-pr{display:flex;flex-direction:column;justify-content:center;gap:4px;min-height:60px;padding:8px 16px;border-top:1px solid color-mix(in oklab,var(--line) 70%,transparent);background:var(--surface-1);font:400 13px var(--font-keel),system-ui,sans-serif;font-variant-numeric:tabular-nums;}.ds-p1{display:flex;align-items:baseline;gap:10px;font-size:14px;}.ds-p1 b{font-weight:600;}.ds-pm{color:var(--muted);font-size:12.5px;}.ds-pg{margin-left:auto;color:var(--gain);}.ds-p2{color:var(--muted);font-size:12.5px;}"
+    },
+    {
+      "name": "Summary Strip Figure",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Metric label, 22px/600 tabular figure, 12.5px faint second line; five across from lg, four in a 2 by 2 on phones.",
+      "html": "<div class=\"ds-sf\"><span class=\"ds-sl\">Win rate</span><b>58.3%</b><small>12 won, 2 breakeven, 5 lost</small></div>",
+      "css": ".ds-sf{width:200px;padding:4px 0;font-family:var(--font-keel),system-ui,sans-serif;}.ds-sl{display:block;font-size:12.5px;color:var(--faint);}.ds-sf b{display:block;margin-top:4px;font-size:22px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--text);}.ds-sf small{display:block;margin-top:2px;font-size:12.5px;color:var(--faint);}"
+    },
+    {
+      "name": "Calendar Day Cell",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "58px cell (92px wide) toned by day: gain-soft, loss-soft, accent-soft flat, surface none; 3px tone bar; one compact unit figure on small cells.",
+      "html": "<div class=\"ds-cc\"><span class=\"ds-cd\">19</span><b>+64t</b><i></i></div>",
+      "css": ".ds-cc{position:relative;display:flex;flex-direction:column;width:72px;min-height:58px;padding:6px;border-radius:10px;background:var(--gain-soft);box-shadow:inset 0 0 0 1px color-mix(in oklab,var(--gain-fill) 28%,transparent);font-family:var(--font-keel),system-ui,sans-serif;}.ds-cd{font-size:12.5px;font-weight:600;color:var(--muted);}.ds-cc b{margin-top:auto;padding-bottom:7px;font-size:11.5px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--gain);}.ds-cc i{position:absolute;left:6px;bottom:6px;width:60%;height:3px;border-radius:2px;background:var(--gain-fill);}"
+    },
+    {
+      "name": "Tag Count and Outcome Chips",
+      "kind": "chip",
+      "refersTo": "card",
+      "description": "Outcome chip is neutral (Open is accent). Tag count chip is neutral, or marigold when a mistake is among the tags.",
+      "html": "<span class=\"ds-oc\">Win</span> <span class=\"ds-oc ds-oa\">Open</span> <span class=\"ds-oc ds-ow\">3 tags</span>",
+      "css": ".ds-oc{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;background:var(--sunken);color:var(--muted);font:550 12px var(--font-keel),system-ui,sans-serif;font-variant-numeric:tabular-nums;}.ds-oa{background:var(--accent-soft);color:var(--accent-ink);}.ds-ow{background:var(--warn-soft);color:var(--warn);}"
+    },
+    {
+      "name": "Tab Bar",
+      "kind": "nav",
+      "refersTo": "tab-bar",
+      "description": "Below sm: fixed to the foot, canvas fill, a hairline above, safe-area padding. Dashboard, Trades, Calendar, Reports, More: a plain 22px glyph over an 11px label, 56px tall, no pill; the current tab in accent ink with its glyph filled. More opens a bottom sheet with the switcher, the other modules, Settings, Not live yet and Appearance.",
+      "html": "<nav class=\"ds-tabs\"><a class=\"ds-tab ds-tab-on\"><i></i>Dashboard</a><a class=\"ds-tab\"><i></i>Trades</a><a class=\"ds-tab\"><i></i>Calendar</a><a class=\"ds-tab\"><i></i>Reports</a><a class=\"ds-tab\"><i></i>More</a></nav>",
+      "css": ".ds-tabs{display:flex;width:390px;background:var(--bg);border-top:1px solid var(--line);font-family:var(--font-keel),system-ui,sans-serif;}.ds-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:56px;font:500 11px var(--font-keel),system-ui,sans-serif;color:var(--faint);text-decoration:none;}.ds-tab i{display:block;width:20px;height:20px;border:1.6px solid currentColor;border-radius:5px;}.ds-tab-on{color:var(--accent-ink);font-weight:600;}.ds-tab-on i{background:currentColor;}"
+    },
+    {
+      "name": "Auth Page",
+      "kind": "custom",
+      "refersTo": "auth-column",
+      "description": "Log in and Sign up: the Keel mark centred on top, a 400px centred card with the centred title, note, fields, primary and the sample-workspace secondary, the switch link centred under it, Privacy and Terms at the foot. No site navigation.",
+      "html": "<div class=\"ds-auth\"><b class=\"ds-auth-mark\">Keel</b><div class=\"ds-auth-card\"><h1>Log in to Keel</h1><p>Accounts open with the app release.</p><span class=\"ds-auth-field\"></span><span class=\"ds-auth-btn\">Log in</span></div><p>New to Keel? <a>Sign up</a></p></div>",
+      "css": ".ds-auth{display:flex;flex-direction:column;align-items:center;gap:20px;width:440px;padding:24px 0;background:var(--bg);font-family:var(--font-keel),system-ui,sans-serif;color:var(--muted);font-size:14px;}.ds-auth-mark{font:650 19px var(--font-keel),system-ui,sans-serif;color:var(--text);}.ds-auth-card{width:400px;box-sizing:border-box;padding:32px;background:var(--surface-1);border:1px solid var(--line);border-radius:var(--r-card);box-shadow:var(--shadow-card);text-align:center;display:flex;flex-direction:column;gap:12px;}.ds-auth-card h1{margin:0;font:600 26px/1.15 var(--font-keel),system-ui,sans-serif;letter-spacing:-.03em;color:var(--text);}.ds-auth-card p{margin:0;}.ds-auth-field{height:44px;border:1px solid var(--line-2);border-radius:var(--r-control);}.ds-auth-btn{height:44px;display:flex;align-items:center;justify-content:center;border-radius:var(--r-control);background:var(--accent);color:var(--accent-fg);font-weight:600;}.ds-auth a{color:var(--accent-ink);font-weight:600;}"
     }
   ],
   "narrative": {
     "northStar": "Daylight Premium",
-    "overview": "**Creative North Star: \"Daylight Premium\"** names a register, not a metaphor world. Keel looks like a premium product used in daylight: a periwinkle canvas, white cards that lift on brand-tinted shadows, one deep brand hue (Keel Ultramarine), and one family, Instrument Sans, whose tabular figures set every number. The trader's plan is the one coloured surface: an ultramarine \"Your plan\" hero. The product itself is the illustration: real-looking app windows made of the app's own cards, with labelled sample data, carry the marketing pages.\n\nThe whole product wears one world. The app (`/app/*`) and the marketing site share the same tokens, face, cards and product-shot components; the approved comp is `.impeccable/mocks/rebrand-app/c-daylight-premium.html`. The `:root` tokens and the app-scoped (`:has([data-surface='app'])`) tokens in `src/styles/theme.css` hold the same values, so a Radix portal or page background follows the app while one is mounted.\n\nLight is the default regardless of OS. Dark is an explicit toggle (`data-theme=\"dark\"` on `<html>`, saved as `keel-theme`, applied before first paint). It is a designed deep navy, not an inversion: its own surfaces, lifted accent, brighter data hues and neutral shadows, with the hero surface staying ultramarine.\n\nRejected, and recorded so they are not rebuilt: metaphor worlds (the earlier trading-floor tickets and stamps), dark mesh hero clichés, editorial serif display type, the earlier flat grey-and-cobalt Geist look (replaced by this system; do not bring it back), and anything that reads as AI-generated.",
+    "overview": "**Creative North Star: \"Daylight Premium\"** names a register, not a metaphor world. Keel looks like a premium product used in daylight: a periwinkle canvas, white cards that lift on brand-tinted shadows, one deep brand hue (Keel Ultramarine) spent sparingly, and one family, Instrument Sans, whose tabular figures set every number. Every card is a neutral surface, the \"Your plan\" card included; the accent marks only what acts or is chosen. The product itself is the illustration: real-looking app windows made of the app's own cards, with labelled sample data, carry the marketing pages. The bar is the pro trading platforms (Kraken Pro, Coinbase Advanced, Gemini ActiveTrader, Public): no icon tiles, no boxed hamburger, no generated-looking theme.\n\nThe whole product wears one world. The app (`/app/*`) and the marketing site share the same tokens, face, cards and product-shot components. The tokens live once, on `:root`, in `src/styles/theme.css`.\n\n**Appearance** is a setting: System (the default), Light or Dark, saved in the prefs (`UserPrefs.appearance`) and chosen in Settings, Profile, in the workspace menu on desktop and in the More sheet on a phone. A script in `<head>` resolves it before first paint from a mirrored copy (`keel-appearance` in localStorage), sets `data-appearance` (the choice) and `data-theme` (light or dark) on `<html>`, and keeps System in step with `prefers-color-scheme`. Once the prefs load, they win. Dark is a neutral **graphite**, the family pro terminals use: near-black canvas, surfaces lifted a step at a time, hairline borders, grey text, every grey with equal red, green and blue so nothing reads blue. There is no sun or moon toggle anywhere.\n\nRejected, and recorded so they are not rebuilt: metaphor worlds (the earlier trading-floor tickets and stamps), dark mesh hero clichés, editorial serif display type, the earlier flat grey-and-cobalt Geist look, the navy-tinted dark palette, the ultramarine \"Your plan\" hero, coloured icon tiles, the phone drawer behind a boxed hamburger, and anything that reads as AI-generated.",
     "keyCharacteristics": [
-      "Periwinkle canvas, white cards, brand-tinted shadows; depth comes from the card shadow and a hairline.",
-      "One brand hue: Keel Ultramarine. Data hues have fixed jobs: marigold for mistakes, cyan for goal progress, green and red for signed money and kept or broken.",
+      "Periwinkle canvas, white cards, brand-tinted shadows; depth comes from the card shadow and a hairline. In graphite dark, depth is the surface lift and the hairline.",
+      "One brand hue: Keel Ultramarine, spent on primary actions, the active state, focus and series 1 only. Data hues have fixed jobs: marigold for mistakes, cyan for goal progress, green and red for signed money and kept or broken.",
       "Instrument Sans for everything, with tabular figures wherever a number is read.",
       "Tight negative tracking on large type, generous leading on body.",
       "Motion is short and decelerating; it announces arrival and selection, then stops.",
-      "The app (`/app`) is the same system at working density: a labelled sidebar on the canvas, a top bar, a \"Plan vs actual\" Dashboard led by the ultramarine \"Your plan\" hero. Its direction is the trader's own plan as the yardstick: adherence and the cost of broken rules lead, performance follows."
+      "No icon tiles. A card's header is its title; a glyph appears only where it carries meaning, plain and at text size.",
+      "The app (`/app`) is the same system at working density: a labelled sidebar on the canvas (a tab bar at a phone's foot), a top bar, a \"Plan vs actual\" Dashboard led by the \"Your plan\" card. Its direction is the trader's own plan as the yardstick: adherence and the cost of broken rules lead, performance follows."
     ],
     "rules": [
       {
         "name": "The One Brand Hue Rule",
         "body": "Ultramarine is the only brand colour. Never use it for money, and never add another hue for brand, emphasis or decoration.",
+        "section": "colors"
+      },
+      {
+        "name": "The Accent Restraint Rule",
+        "body": "The accent marks what acts or is chosen: primary actions, the active state (current tab, nav glyph, selected segment), focus, and series 1 in a chart. It never fills a panel or a card, in either theme; the \"Your plan\" card is a neutral surface with the accent on its kept bar alone.",
+        "section": "colors"
+      },
+      {
+        "name": "The Neutral Graphite Rule",
+        "body": "Dark greys carry no hue: canvas, surfaces, lines and text each have equal red, green and blue.",
         "section": "colors"
       },
       {
@@ -470,7 +536,7 @@
       },
       {
         "name": "The Never Colour Alone Rule",
-        "body": "Sign and state also carry text or an icon (a leading sign in the figure, \"Kept\" and \"Broken\" for screen readers and the hero's Kept and Broken labels, \"Broke:\" in a trade's rules cell). Long and Short are neutral words, never a result colour.",
+        "body": "Sign and state also carry text or an icon (a leading sign in the figure, \"Kept\" and \"Broken\" for screen readers and the plan card's Kept and Broken labels, \"Broke:\" in a trade's rules cell). Long and Short are neutral words, never a result colour.",
         "section": "colors"
       },
       {
@@ -490,25 +556,32 @@
       },
       {
         "name": "The Tinted Lift Rule",
-        "body": "Shadows are soft, diffuse and brand-tinted (neutral black in dark). Hard offset shadows never.",
+        "body": "Shadows are soft, diffuse and brand-tinted (neutral black in dark, where the lift does the work). Hard offset shadows never.",
         "section": "elevation"
       }
     ],
     "dos": [
-      "**Do** use Keel Ultramarine (#2b35af) as the one brand hue, for primary action, selection, focus, adherence, the account's own line and the hero surface.",
+      "**Do** use Keel Ultramarine (#2b35af) as the one brand hue, sparingly: primary action, the active state, focus, adherence bars and series 1.",
       "**Do** give each data hue its one job: marigold for mistakes, cyan for goal progress, green and red for signed money and kept or broken.",
       "**Do** set every number with tabular figures, and colour only signed P&L green or red.",
       "**Do** use the three radii: 6 chips, 10 buttons and inner panels, 16 cards, and only the documented role exceptions beside them.",
-      "**Do** put cards on the canvas as white surfaces with the card shadow and a hairline; keep the \"Your plan\" hero the only coloured surface.",
+      "**Do** put cards on the canvas as white surfaces with the card shadow and a hairline, the \"Your plan\" card included.",
       "**Do** show the product as a real app window built from live components, and label it \"Sample data. Not a real account.\" wherever invented figures appear.",
-      "**Do** write copy with commas, periods and colons. Use hyphens only inside words.",
+      "**Do** write copy with commas, periods and colons. Use hyphens only inside words and in date ranges (\"1-20 Nov\").",
       "**Do** use Phosphor icons at 18px, with Motion durations and curves from `src/lib/motion.ts`.",
-      "**Do** keep light as the default and design dark as the navy palette with its own tokens, the hero staying ultramarine.",
-      "**Do** put card-header icons in 28px duotone tiles toned to the card's job: accent, marigold or cyan; outline-only faint when the module is not live.",
+      "**Do** default Appearance to System, and design dark as the neutral graphite palette with its own tokens.",
+      "**Do** head a card with its title alone; set a meaningful glyph plain, muted and at text size; give a state block at most the 28px faint state glyph.",
+      "**Do** navigate a phone from the bottom tab bar (Dashboard, Trades, Calendar, Reports, More) and keep every page clear of it.",
+      "**Do** centre the auth pages: the mark on top, one 400px column, the switch link under it, no site navigation.",
       "**Do** give every metric a MetricTip definition, keep 8px between a tip and adjacent controls, and keep goals net and in the base currency.",
       "**Do** open a rule's or a mistake's exact trades through the Morph dialog, and return focus to the opener.",
       "**Do** show loading failures neutrally, and show Long and Short as neutral words.",
-      "**Do** keep every adherence figure honest: never 100% or 0% unless exact."
+      "**Do** keep every adherence figure honest: never 100% or 0% unless exact.",
+      "**Do** give chart series one job each: series 1 accent, series 2 ink (`muted`), series 3 the accent tint, dashed. Cyan stays with goals and marigold with mistakes, so a chart never takes either.",
+      "**Do** replace a desktop table with two-line rows below `sm`, carrying the same facts, link and figures.",
+      "**Do** keep a dialog's body in a scroller and its actions in a fixed footer (Choose figures, the expanded chart).",
+      "**Do** set every number with a thousands separator and its unit suffix, write an absent value as \"None\", and write numeric ranges as \"a to b\" (date ranges keep the hyphen).",
+      "**Do** keep the outcome chip neutral (Open is the accent) and the tag count chip neutral until a mistake is among the tags, then marigold."
     ],
     "donts": [
       "**Don't** add eyebrows, kickers or small-caps labels above headings.",
@@ -520,8 +593,15 @@
       "**Don't** use hard offset shadows, glassmorphism or side-stripe borders.",
       "**Don't** introduce font sizes outside the ramp above, or bring back Geist, Geist Mono or the cobalt (#2550e0) look.",
       "**Don't** use loss red for an error state, marigold for a warning state, or colour a side (Long or Short) as a result.",
-      "**Don't** tint a \"not live yet\" module; its glyph stays an outline.",
-      "**Don't** reach for a library tooltip, modal or search box that bypasses the HorizonX-adapted ones."
+      "**Don't** tint a \"not live yet\" module; its glyph stays faint.",
+      "**Don't** put an icon in a tinted rounded square, anywhere. Logo tile, avatars and chips are the only filled marks.",
+      "**Don't** fill a panel or card with the accent, in either theme.",
+      "**Don't** give dark greys a hue: no navy or blue cast in canvas, surfaces, lines or text.",
+      "**Don't** add a sun or moon toggle, a boxed hamburger, a phone drawer, or a stack of bordered controls in a phone header.",
+      "**Don't** reach for a library tooltip, modal or search box that bypasses the HorizonX-adapted ones.",
+      "**Don't** stack a desktop table's columns into cells on a phone, or scroll it sideways there.",
+      "**Don't** give a chart series cyan or marigold, or tell series apart by colour alone: the third is dashed.",
+      "**Don't** write a numeric range with a hyphen or dash (\"$100-$500\", \"2-3\"); write \"$100 to $500\", \"2 to 3\". A date range keeps its hyphen (\"1-20 Nov\")."
     ]
   }
 }

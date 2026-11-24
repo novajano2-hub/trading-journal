@@ -5,7 +5,7 @@ import {
   canonicalSymbol,
   type BuildOptions,
 } from '../trade-builder';
-import type { Cents, Trade } from '../types';
+import type { Cents, Direction, Trade } from '../types';
 import type { ParsedCsv } from './csv';
 import {
   expiryCloseUtc,
@@ -38,7 +38,14 @@ export interface ImportContext {
 export type TradeFlag =
   | { tradeId: string; code: 'unconverted-currency'; currency: string }
   | { tradeId: string; code: 'pnl-mismatch'; file: Cents; keel: Cents }
-  | { tradeId: string; code: 'expired-worthless'; expiry: string };
+  | { tradeId: string; code: 'expired-worthless'; expiry: string }
+  /** An overlapping export rebuilt a stored trade in the other direction. */
+  | {
+      tradeId: string;
+      code: 'direction-flipped';
+      was: Direction;
+      now: Direction;
+    };
 
 export type ImportBlock = 'no-rows' | 'unresolved-symbols' | 'nothing-new';
 
@@ -61,6 +68,8 @@ export interface ImportPlan {
   fingerprints: string[];
   unresolvedKeys: string[];
   flags: TradeFlag[];
+  /** The P&L the file gave each closed-trade row, by trade id, matching Keel's or not. Empty when blocked. */
+  filePnl: Record<string, Cents>;
   blocked: ImportBlock | null;
   /** `ImportContext.importRevision` of the context it was planned from. */
   importRevision: number;
@@ -79,6 +88,7 @@ interface Built {
   merged: Trade[];
   expired: ExpiredOption[];
   pnlFlags: TradeFlag[];
+  filePnl: Record<string, Cents>;
 }
 
 /**
@@ -122,9 +132,11 @@ function buildFills(
 ): Built {
   const { kept, duplicateRows } = dedupe(fills, ctx.fingerprints);
   const symbols = new Set(kept.map((f) => canonicalSymbol(f.execution.symbol)));
+  // Hand-entered trades never merge with an import, not even to settle an expiry.
   const merged = ctx.openTrades.filter(
     (t) =>
       t.status === 'open' &&
+      t.source !== 'manual' &&
       (symbols.has(canonicalSymbol(t.instrument.symbol)) || expiredBy(t, now)),
   );
   const { executions, expired } = settleExpiredOptions(
@@ -139,6 +151,7 @@ function buildFills(
     merged,
     expired,
     pnlFlags: [],
+    filePnl: {},
   };
 }
 
@@ -152,6 +165,7 @@ function buildTrips(
   const trades: Trade[] = [];
   const unresolvedSymbols: string[] = [];
   const pnlFlags: TradeFlag[] = [];
+  const filePnl: Record<string, Cents> = {};
   for (const trip of kept) {
     const built = buildTrades([trip.entry, trip.exit], opts);
     unresolvedSymbols.push(...built.unresolvedSymbols);
@@ -160,6 +174,7 @@ function buildTrips(
     trades.push(t);
     const file = trip.filePnl;
     if (file === undefined) continue;
+    filePnl[t.id] = file;
     if (t.pnlCurrency !== ctx.accountCurrency) {
       // A pair without the account currency: the file's figure is the conversion.
       t.gross = file;
@@ -185,6 +200,7 @@ function buildTrips(
     merged: [],
     expired: [],
     pnlFlags,
+    filePnl,
   };
 }
 
@@ -247,11 +263,12 @@ function inherit(built: Trade, stored: Trade): Trade {
     ...built,
     id: stored.id,
     serial: stored.serial,
+    strategyIds: [...stored.strategyIds],
     tagIds: [...stored.tagIds],
     ruleChecks: stored.ruleChecks.map((r) => ({ ...r })),
   };
-  if (stored.strategyId !== undefined) t.strategyId = stored.strategyId;
   if (stored.rating !== undefined) t.rating = stored.rating;
+  if (stored.reviewed !== undefined) t.reviewed = stored.reviewed;
   if (stored.noteId !== undefined) t.noteId = stored.noteId;
   if (built.direction !== stored.direction) return t;
   if (stored.plannedStop !== undefined) t.plannedStop = stored.plannedStop;
@@ -269,9 +286,19 @@ function tradeFlags(
   accountCurrency: string,
   expired: readonly ExpiredOption[],
   pnlFlags: readonly TradeFlag[],
+  replaced: readonly Trade[],
 ): TradeFlag[] {
   const flags: TradeFlag[] = [...pnlFlags];
+  const before = new Map(replaced.map((t) => [t.id, t]));
   for (const t of trades) {
+    const stored = before.get(t.id);
+    if (stored && stored.direction !== t.direction)
+      flags.push({
+        tradeId: t.id,
+        code: 'direction-flipped',
+        was: stored.direction,
+        now: t.direction,
+      });
     if (t.pnlCurrency !== accountCurrency)
       flags.push({
         tradeId: t.id,
@@ -351,8 +378,9 @@ export function planImport(
 
   // A blocked plan is never committed, so it carries nothing to write.
   const writes = blocked
-    ? { trades: [], replacedTrades: [], flags: [] }
+    ? { trades: [], replacedTrades: [], flags: [], filePnl: {} }
     : {
+        filePnl: built.filePnl,
         trades,
         replacedTrades: built.merged,
         flags: tradeFlags(
@@ -360,6 +388,7 @@ export function planImport(
           ctx.accountCurrency,
           built.expired,
           built.pnlFlags,
+          built.merged,
         ),
       };
 

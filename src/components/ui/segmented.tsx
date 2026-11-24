@@ -6,8 +6,8 @@ export type SegmentedOption<T extends string> = { value: T; label: string };
 
 /**
  * Radio-style segmented control. Arrow keys move through the group natively.
- * The track is recessed: the accent at 8% over whatever it sits on, with an
- * inner shadow along its top. The chosen option is a white pill (a lighter
+ * The track is recessed (`bg-track`: the accent at 8% in light, a neutral
+ * lift in graphite dark), with an inner shadow along its top. The chosen option is a white pill (a lighter
  * line on a dark ground), its words a step bolder; an invisible bold twin
  * holds each option's width, so choosing one never nudges its neighbours.
  */
@@ -36,7 +36,7 @@ export function Segmented<T extends string>({
       role="radiogroup"
       aria-label={label}
       aria-disabled={disabled || undefined}
-      className={`inline-flex rounded-[11px] bg-accent/8 p-[3px] shadow-[inset_0_1px_2px_rgb(18_22_51/0.07)] [[data-theme=dark]_&]:shadow-[inset_0_1px_2px_rgb(0_0_0/0.35)] ${className}`}
+      className={`inline-flex rounded-[11px] bg-track p-[3px] shadow-[inset_0_1px_2px_rgb(18_22_51/0.07)] [[data-theme=dark]_&]:shadow-[inset_0_1px_2px_rgb(0_0_0/0.35)] ${className}`}
     >
       {options.map((o) => (
         <label

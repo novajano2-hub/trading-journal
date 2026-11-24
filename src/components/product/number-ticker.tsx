@@ -68,6 +68,8 @@ export function NumberTicker({
   delay = 0,
   digits,
   currency,
+  format,
+  label,
   className = '',
 }: {
   value: number;
@@ -78,6 +80,13 @@ export function NumberTicker({
   digits?: number;
   /** ISO code for money (default USD). */
   currency?: string;
+  /**
+   * Reads each frame instead of `kind`'s formatter, for a figure in a display
+   * unit (a percentage, R, a hidden amount). The tone follows the value's sign.
+   */
+  format?: (value: number) => string;
+  /** What a screen reader gets in place of the final text ("hidden amount", "n trades left out"). */
+  label?: string;
   className?: string;
 }) {
   const reduced = useReducedMotion();
@@ -87,10 +96,10 @@ export function NumberTicker({
   // What is on screen now, so a later value counts from here and not from zero.
   const shownRef = useRef(0);
   const fmt = { digits, currency };
-  const final = formatTicker(kind, value, fmt);
-  const frame = tickerFrame(kind, value, fmt);
+  const final = format ? format(value) : formatTicker(kind, value, fmt);
+  const frame = format ? format : tickerFrame(kind, value, fmt);
   const tone =
-    kind === 'money' && Math.round(value) !== 0
+    kind === 'money' && (format ? value !== 0 : Math.round(value) !== 0)
       ? value > 0
         ? 'text-gain'
         : 'text-loss'
@@ -123,7 +132,7 @@ export function NumberTicker({
       <noscript>
         <style>{NO_SCRIPT_CSS}</style>
       </noscript>
-      <span className="sr-only">{final}</span>
+      <span className="sr-only">{label ?? final}</span>
       <span aria-hidden="true" className="ticker-count motion-reduce:hidden">
         {frame(shown)}
       </span>

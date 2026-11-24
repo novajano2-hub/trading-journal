@@ -1,3 +1,5 @@
+import { FILL_SYNONYMS } from './mapping';
+
 export type PreviewField = 'time' | 'symbol' | 'side' | 'qty' | 'price';
 
 const FIELDS: readonly PreviewField[] = [
@@ -7,52 +9,6 @@ const FIELDS: readonly PreviewField[] = [
   'qty',
   'price',
 ];
-
-const SYNONYMS: Record<PreviewField, readonly string[]> = {
-  time: [
-    'time',
-    'date',
-    'datetime',
-    'date time',
-    'timestamp',
-    'fill time',
-    'filled time',
-    'execution time',
-    'exec time',
-    'trade time',
-    'open time',
-  ],
-  symbol: [
-    'symbol',
-    'ticker',
-    'instrument',
-    'contract',
-    'market',
-    'product',
-    'security',
-  ],
-  side: ['side', 'action', 'buy sell', 'b s', 'direction'],
-  qty: [
-    'qty',
-    'quantity',
-    'size',
-    'volume',
-    'lots',
-    'filled qty',
-    'filled',
-    'shares',
-    'contracts',
-  ],
-  price: [
-    'price',
-    'fill price',
-    'avg price',
-    'avg fill price',
-    'execution price',
-    'exec price',
-    'trade price',
-  ],
-};
 
 const BUY = new Set([
   'buy',
@@ -121,7 +77,8 @@ export function matchColumns<F extends string>(
 export function guessColumns(
   headers: readonly string[],
 ): Partial<Record<PreviewField, number>> {
-  return matchColumns(headers, FIELDS, SYNONYMS);
+  // The one synonym list lives in mapping.ts.
+  return matchColumns(headers, FIELDS, FILL_SYNONYMS);
 }
 
 export function normalizeSide(value: string): 'buy' | 'sell' | null {

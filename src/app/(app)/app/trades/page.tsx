@@ -1,8 +1,14 @@
 import type { Metadata } from 'next';
-import { ModulePlaceholder } from '@/components/app/module-placeholder';
+import { Suspense } from 'react';
+import { TradesView } from '@/components/app/trades/trades-view';
 
 export const metadata: Metadata = { title: 'Trades' };
 
+/** Static: the view fills in on the client once it reads the URL. */
 export default function TradesPage() {
-  return <ModulePlaceholder module="trades" />;
+  return (
+    <Suspense fallback={null}>
+      <TradesView />
+    </Suspense>
+  );
 }

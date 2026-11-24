@@ -2,9 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { CTA_MD, CTA_PRIMARY } from '@/components/site/cta';
 import { SectionHeading } from '@/components/site/landing/section-heading';
-import { MODULE_ICONS } from '@/components/site/module-icons';
 import { START_HREF } from '@/components/site/nav-links';
-import { IconTile } from '@/components/ui/icon-tile';
 import { MODULES } from '@/content/modules';
 
 export const metadata: Metadata = {
@@ -53,7 +51,6 @@ export default function PricingPage() {
                 className="border-t border-line p-6 sm:p-8 md:nth-[-n+2]:border-t-0 md:odd:last:col-span-2"
               >
                 <p className="flex items-center gap-2.5 text-[17px] font-semibold tracking-[-0.015em]">
-                  <IconTile icon={MODULE_ICONS[m.slug]} tone="accent" />
                   {m.name}
                 </p>
                 <p className="mt-2 max-w-[52ch] text-[15.5px] leading-[1.65] text-muted">

@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { parseCsv } from './csv';
-import { guessMapping, missingFields } from './mapping';
+import {
+  applySavedMapping,
+  detectDecimal,
+  guessMapping,
+  missingFields,
+} from './mapping';
 
 const ny = { sourceTimeZone: 'America/New_York' };
 const g = (text: string) => guessMapping(parseCsv(text), ny);
@@ -142,4 +147,91 @@ test('mixed evidence keeps the delimiter rule', () => {
   expect(
     g('Time;Symbol;Side;Qty;Price\n2026-11-16 09:41;ESZ5;Buy;1.5;6010,25\n'),
   ).toMatchObject({ decimal: ',' });
+});
+
+test('a header like "Exit Strategy" does not turn a fills file into closed trades (E36)', () => {
+  const m = g('Date/Time,Symbol,Buy/Sell,Quantity,Price,Exit Strategy\n');
+  expect(m.kind).toBe('fills');
+  expect(m.columns).toEqual({ time: 0, symbol: 1, side: 2, qty: 3, price: 4 });
+});
+
+test('a bare "Exit" column still marks closed trades', () => {
+  expect(g('Open Time,Symbol,Side,Qty,Entry,Exit,Close Time\n').kind).toBe(
+    'closed-trades',
+  );
+});
+
+test('the kind can be forced, and the columns follow it', () => {
+  const parsed = parseCsv('Time,Symbol,Side,Qty,Price\n');
+  expect(guessMapping(parsed, ny).kind).toBe('fills');
+  const forced = guessMapping(parsed, { ...ny, kind: 'closed-trades' });
+  expect(forced.kind).toBe('closed-trades');
+  expect(forced.columns.symbol).toBe(1);
+});
+
+test('year-first dates are detected as YMD', () => {
+  const m = g(
+    'Time,Symbol,Side,Qty,Price\n2026/11/19 09:30:00,ESZ6,Buy,1,5000\n',
+  );
+  expect(m.dateOrder).toBe('ymd');
+});
+
+const saved = guessMapping(parseCsv('Time,Symbol,Side,Qty,Price\n'), {
+  sourceTimeZone: 'Europe/London',
+});
+
+test('a saved mapping applies when the headers it was saved with are in the file', () => {
+  const withHeaders = {
+    ...saved,
+    headers: ['Time', 'Symbol', 'Side', 'Qty', 'Price'],
+  };
+  expect(
+    applySavedMapping(withHeaders, ['Time', 'Symbol', 'Side', 'Qty', 'Price']),
+  ).toEqual(withHeaders);
+  // The same columns in another order are found by name.
+  const moved = applySavedMapping(withHeaders, [
+    'Price',
+    'Qty',
+    'Side',
+    'Symbol',
+    'Time',
+    'Extra',
+  ]);
+  expect(moved?.columns).toEqual({
+    time: 4,
+    symbol: 3,
+    side: 2,
+    qty: 1,
+    price: 0,
+  });
+});
+
+test('a saved mapping does not apply when one of its columns is gone', () => {
+  const withHeaders = {
+    ...saved,
+    headers: ['Time', 'Symbol', 'Side', 'Qty', 'Price'],
+  };
+  expect(
+    applySavedMapping(withHeaders, ['Time', 'Symbol', 'Side', 'Qty']),
+  ).toBeNull();
+  expect(
+    applySavedMapping(withHeaders, ['Date', 'Symbol', 'Side', 'Qty', 'Fill']),
+  ).toBeNull();
+});
+
+test('a saved mapping with no headers is never applied by position', () => {
+  expect(applySavedMapping(saved, ['a', 'b', 'c', 'd', 'e'])).toBeNull();
+  expect(
+    applySavedMapping(saved, ['Time', 'Symbol', 'Side', 'Qty', 'Price']),
+  ).toBeNull();
+});
+
+test('detectDecimal reads a mark off the mapped numeric columns, or says it cannot', () => {
+  const dot = parseCsv('Time,Symbol,Side,Qty,Price\nx,ES,Buy,1,5000.25\n');
+  const comma = parseCsv('Time,Symbol,Side,Qty,Price\nx,ES,Buy,1,"5000,25"\n');
+  const none = parseCsv('Time,Symbol,Side,Qty,Price\nx,ES,Buy,1,5000\n');
+  const m = guessMapping(dot, ny);
+  expect(detectDecimal(dot, m)).toBe('.');
+  expect(detectDecimal(comma, m)).toBe(',');
+  expect(detectDecimal(none, m)).toBeNull();
 });

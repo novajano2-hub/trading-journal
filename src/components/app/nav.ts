@@ -106,7 +106,7 @@ export const APP_NAV: readonly NavItem[] = [
     href: '/app/strategies',
     icon: Strategy,
     group: 'modules',
-    filterScoped: false,
+    filterScoped: true,
     built: false,
     summary:
       'Your strategies with their rules and checklists, and how each one performs.',
@@ -139,7 +139,7 @@ export const APP_NAV: readonly NavItem[] = [
     icon: ShieldCheck,
     group: 'modules',
     filterScoped: false,
-    built: false,
+    built: true,
     summary:
       'Your prop accounts against their profit target, loss limits, drawdown and trading days.',
   },
@@ -234,3 +234,53 @@ export function activeItem(pathname: string): NavItem | undefined {
 export function pageTitle(pathname: string): string {
   return activeItem(pathname)?.label ?? 'Keel';
 }
+
+/** The trade id when `pathname` is one trade's page (not the log, the new-trade form or an edit), decoded. */
+export function tradePageId(pathname: string): string | undefined {
+  const m = /^\/app\/trades\/([^/]+)$/.exec(pathname);
+  if (!m || m[1] === 'new') return undefined;
+  try {
+    return decodeURIComponent(m[1]!);
+  } catch {
+    return m[1];
+  }
+}
+
+const decoded = (raw: string): string => {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+};
+
+/** The strategy id when `pathname` is one strategy's page (not the list, the new form or the editor), decoded. */
+export function strategyPageId(pathname: string): string | undefined {
+  const m = /^\/app\/strategies\/([^/]+)$/.exec(pathname);
+  return !m || m[1] === 'new' ? undefined : decoded(m[1]!);
+}
+
+/** The strategy id when `pathname` is one strategy's editor, decoded. */
+export function strategyEditId(pathname: string): string | undefined {
+  const m = /^\/app\/strategies\/([^/]+)\/edit$/.exec(pathname);
+  return m ? decoded(m[1]!) : undefined;
+}
+
+/**
+ * Whether the global filters drive this page: Dashboard, the trade log, Calendar,
+ * Strategies (the list and one strategy) and Reports, except Compare, whose two groups each own their filters.
+ * Elsewhere the bar shows no chips.
+ */
+export function filtersApply(pathname: string): boolean {
+  return (
+    /^\/app\/(dashboard|trades|calendar|strategies)$/.test(pathname) ||
+    (/^\/app\/strategies\/[^/]+$/.test(pathname) &&
+      pathname !== '/app/strategies/new') ||
+    (/^\/app\/reports(\/|$)/.test(pathname) &&
+      !/^\/app\/reports\/compare\/?$/.test(pathname))
+  );
+}
+
+/** The page where each group of trades has its own filters rather than the global ones. */
+export const isComparePage = (pathname: string): boolean =>
+  /^\/app\/reports\/compare\/?$/.test(pathname);

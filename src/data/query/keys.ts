@@ -7,13 +7,19 @@ export const keys = {
   workspaces: () => ['keel', 'workspaces'] as const,
   activeWorkspace: () => ['keel', 'active-workspace'] as const,
   prefs: () => ['keel', 'prefs'] as const,
+  prefsSaved: () => ['keel', 'prefs', 'saved'] as const,
   workspace: (ws: string) => W(ws),
   trades: (ws: string) => [...W(ws), 'trades'] as const,
   trade: (ws: string, id: string) => [...W(ws), 'trades', id] as const,
   accounts: (ws: string) => [...W(ws), 'accounts'] as const,
+  cashFlows: (ws: string) => [...W(ws), 'cash-flows'] as const,
+  challenges: (ws: string) => [...W(ws), 'challenges'] as const,
   strategies: (ws: string) => [...W(ws), 'strategies'] as const,
   strategy: (ws: string, id: string) => [...W(ws), 'strategies', id] as const,
   tags: (ws: string) => [...W(ws), 'tags'] as const,
+  tagCategories: (ws: string) => [...W(ws), 'tag-categories'] as const,
+  templates: (ws: string) => [...W(ws), 'templates'] as const,
+  folders: (ws: string) => [...W(ws), 'folders'] as const,
   journal: (ws: string) => [...W(ws), 'journal'] as const,
   journalEntry: (ws: string, id: string) =>
     [...W(ws), 'journal', 'entry', id] as const,
@@ -30,18 +36,41 @@ export type WriteKind =
   | 'workspaces.clearUser'
   | 'prefs.update'
   | 'trades.update'
+  | 'trades.updateMany'
+  | 'trades.createManual'
+  | 'trades.replaceManual'
   | 'trades.remove'
   | 'accounts.create'
   | 'accounts.update'
   | 'accounts.remove'
+  | 'accounts.clearTrades'
+  | 'cashFlows.create'
+  | 'cashFlows.update'
+  | 'cashFlows.remove'
+  | 'challenges.create'
+  | 'challenges.update'
+  | 'challenges.remove'
   | 'strategies.create'
   | 'strategies.update'
   | 'strategies.remove'
   | 'tags.create'
   | 'tags.update'
   | 'tags.remove'
+  | 'tagCategories.create'
+  | 'tagCategories.update'
+  | 'tagCategories.remove'
+  | 'templates.save'
+  | 'templates.remove'
+  | 'templates.setDefault'
+  | 'folders.create'
+  | 'folders.rename'
+  | 'folders.remove'
   | 'journal.save'
   | 'journal.remove'
+  | 'journal.trash'
+  | 'journal.restore'
+  | 'journal.ensureTradeNote'
+  | 'journal.dailyNote'
   | 'imports.commit'
   | 'imports.undo';
 
@@ -59,12 +88,18 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
     // Writes that change an account, its open trades or their journaling also
     // make the import context stale (keys.imports covers it): the plan is remade.
     case 'trades.update':
+    case 'trades.updateMany':
+    case 'trades.createManual':
+    case 'trades.replaceManual':
       return [keys.trades(ws), keys.imports(ws)];
     case 'trades.remove':
     case 'journal.remove':
       return [keys.trades(ws), keys.journal(ws), keys.imports(ws)];
     case 'imports.undo':
+    case 'accounts.clearTrades':
       return [keys.trades(ws), keys.journal(ws), keys.imports(ws)];
+    case 'journal.ensureTradeNote':
+      return [keys.journal(ws), keys.trades(ws), keys.imports(ws)];
     case 'accounts.create':
       return [keys.accounts(ws)];
     case 'accounts.update':
@@ -75,7 +110,17 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
         keys.trades(ws),
         keys.journal(ws),
         keys.imports(ws),
+        keys.cashFlows(ws),
+        keys.challenges(ws),
       ];
+    case 'challenges.create':
+    case 'challenges.update':
+    case 'challenges.remove':
+      return [keys.challenges(ws)];
+    case 'cashFlows.create':
+    case 'cashFlows.update':
+    case 'cashFlows.remove':
+      return [keys.cashFlows(ws)];
     case 'strategies.create':
       return [keys.strategies(ws)];
     case 'strategies.update':
@@ -86,7 +131,32 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
       return [keys.tags(ws)];
     case 'tags.remove':
       return [keys.tags(ws), keys.trades(ws), keys.imports(ws)];
+    case 'tagCategories.create':
+      return [keys.tagCategories(ws)];
+    // Tags sort by their category's name.
+    case 'tagCategories.update':
+      return [keys.tagCategories(ws), keys.tags(ws)];
+    case 'tagCategories.remove':
+      return [
+        keys.tagCategories(ws),
+        keys.tags(ws),
+        keys.trades(ws),
+        keys.imports(ws),
+      ];
+    case 'templates.save':
+    case 'templates.remove':
+    case 'templates.setDefault':
+      return [keys.templates(ws)];
+    case 'folders.create':
+    case 'folders.rename':
+      return [keys.folders(ws)];
+    // Its notes move to no folder.
+    case 'folders.remove':
+      return [keys.folders(ws), keys.journal(ws)];
     case 'journal.save':
+    case 'journal.trash':
+    case 'journal.restore':
+    case 'journal.dailyNote':
       return [keys.journal(ws)];
     case 'imports.commit':
       return [keys.imports(ws), keys.trades(ws)];

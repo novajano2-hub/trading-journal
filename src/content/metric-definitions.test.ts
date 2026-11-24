@@ -31,3 +31,31 @@ test('the basis shows in the label and the definitions that use it', () => {
     'Always net',
   );
 });
+
+test('cumulative P&L has its own definition, apart from the period P&L', () => {
+  const cumulative = metricDefinition('cumulative-pnl', 'net');
+  expect(cumulative.label).toBe('Cumulative P&L');
+  expect(cumulative.definition).toContain('running total');
+  expect(cumulative.definition).not.toBe(
+    metricDefinition('pnl', 'net').definition,
+  );
+});
+
+test('the figures a narrowing unit changes say how they read in it', () => {
+  // Balance figures have no value there; the largest trades read the unit.
+  for (const id of ['sharpe', 'sortino', 'equity', 'max-drawdown'] as const) {
+    const { definition } = metricDefinition(id, 'net');
+    expect(definition, id).toMatch(/no value/);
+    expect(definition, id).toMatch(/R, ticks, pips or points/);
+  }
+  for (const id of [
+    'largest-win',
+    'largest-loss',
+    'avg-win',
+    'avg-loss',
+    'profit-factor',
+  ] as const)
+    expect(metricDefinition(id, 'net').definition, id).toMatch(
+      /R, ticks, pips or points/,
+    );
+});

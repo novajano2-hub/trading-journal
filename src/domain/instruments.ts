@@ -104,6 +104,8 @@ function resolveFuture(
     };
     // 6E (Euro FX) is quoted in USD per EUR; record the base for reference.
     if (root === '6E') inst.baseCurrency = 'EUR';
+    // An override that makes a futures symbol an option is an option on a future.
+    if (inst.assetClass === 'option') inst.optionOn = 'future';
     return inst;
   }
   return null;

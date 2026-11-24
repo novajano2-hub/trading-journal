@@ -1,5 +1,6 @@
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { expect, test } from 'vitest';
+import type { UserPrefs } from '@/domain/types';
 import { fixtureSample } from '../__fixtures__/sample';
 import { goalsFor, withGoals } from '../goals';
 import { defaultPrefs } from '../repository';
@@ -91,3 +92,74 @@ test.each([null, 5, 'x'])(
     ).rejects.toBeInstanceOf(RangeError);
   },
 );
+
+test('display prefs persist', async () => {
+  const indexedDB = new IDBFactory();
+  await open(indexedDB).prefs.update({
+    displayUnit: 'privacy',
+    calendarStats: ['net', 'winRate', 'fees'],
+  });
+  expect(await open(indexedDB).prefs.get()).toMatchObject({
+    displayUnit: 'privacy',
+    calendarStats: ['net', 'winRate', 'fees'],
+    hideTradeSummary: false,
+  });
+});
+
+test.each([
+  { displayUnit: 'yen' },
+  { calendarStats: [] },
+  { calendarStats: ['net', 'net'] },
+  { calendarStats: ['volume'] },
+])('invalid display pref %j is refused with RangeError', async (p) => {
+  const repo = open(new IDBFactory());
+  await expect(
+    repo.prefs.update(p as Partial<UserPrefs>),
+  ).rejects.toBeInstanceOf(RangeError);
+  expect(await repo.prefs.get()).toEqual(defaultPrefs());
+});
+
+test('any number of the calendar stats is kept, in the order chosen', async () => {
+  const all = [
+    'pips',
+    'net',
+    'trades',
+    'winRate',
+    'rating',
+    'r',
+    'fees',
+    'ticks',
+    'points',
+  ] as const;
+  const repo = open(new IDBFactory());
+  await repo.prefs.update({ calendarStats: [...all] });
+  expect((await repo.prefs.get()).calendarStats).toEqual(all);
+});
+
+test('weekStart saves Sunday or Monday and refuses anything else', async () => {
+  const repo = open(new IDBFactory());
+  expect((await repo.prefs.get()).weekStart).toBeUndefined();
+  await repo.prefs.update({ weekStart: 'monday' });
+  expect((await repo.prefs.get()).weekStart).toBe('monday');
+  await expect(
+    repo.prefs.update({ weekStart: 'friday' as never }),
+  ).rejects.toBeInstanceOf(RangeError);
+});
+
+test('the hidden Overview figures persist, and only a list of strings is stored', async () => {
+  const indexedDB = new IDBFactory();
+  await open(indexedDB).prefs.update({
+    overviewHidden: ['costs:commissions', 'hold:hold-time'],
+  });
+  expect((await open(indexedDB).prefs.get()).overviewHidden).toEqual([
+    'costs:commissions',
+    'hold:hold-time',
+  ]);
+  // An empty list is a choice too: everything shows.
+  await open(indexedDB).prefs.update({ overviewHidden: [] });
+  expect((await open(indexedDB).prefs.get()).overviewHidden).toEqual([]);
+  for (const bad of ['costs:commissions', [1], [null]])
+    await expect(
+      open(indexedDB).prefs.update({ overviewHidden: bad as never }),
+    ).rejects.toBeInstanceOf(RangeError);
+});

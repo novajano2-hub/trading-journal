@@ -10,7 +10,10 @@ import { localDate } from '@/domain/time';
 import {
   applyFilters,
   mergeFilterParams,
+  narrowToUnit,
   parseFilters,
+  queryString,
+  resolveRange,
   sanitizeFilters,
   selectedAccounts,
   serializeFilters,
@@ -23,6 +26,7 @@ import {
 } from '../metrics';
 import {
   useAccounts,
+  useCashFlows,
   useImportContext,
   usePrefs,
   useStrategies,
@@ -107,22 +111,26 @@ export function useGlobalFilters(): {
     [raw, accounts, strategies, tags],
   );
 
-  const write = useCallback(
-    (next: GlobalFilters) => {
-      const qs = mergeFilterParams(
-        new URLSearchParams(window.location.search),
-        next,
-      ).toString();
-      window.history.replaceState(null, '', pathname + (qs ? '?' + qs : ''));
-    },
-    [pathname],
-  );
+  // Writes go to the address bar's own pathname: the one this render holds
+  // can be a page behind a navigation that has landed since (E54).
+  const write = useCallback((next: GlobalFilters) => {
+    const qs = queryString(
+      mergeFilterParams(new URLSearchParams(window.location.search), next),
+    );
+    window.history.replaceState(
+      null,
+      '',
+      window.location.pathname + (qs ? '?' + qs : ''),
+    );
+  }, []);
 
   const dirty =
     serializeFilters(raw).toString() !== serializeFilters(filters).toString();
   useEffect(() => {
-    if (dirty) write(filters);
-  }, [dirty, filters, write]);
+    // While the address bar and this render disagree on the page, a navigation
+    // is landing: a write now would put the cleaned filters on the wrong page.
+    if (dirty && pathname === window.location.pathname) write(filters);
+  }, [dirty, filters, write, pathname]);
 
   return { filters, setFilters: write };
 }
@@ -130,9 +138,19 @@ export function useGlobalFilters(): {
 export interface TradeSet {
   /** The filters as applied: cleaned of ids the workspace doesn't have. Chips read these. */
   filters: GlobalFilters;
+  /** The trades the filters match that the display unit reads. */
   trades: Trade[];
+  /** The same filters except the date, narrowed the same way: what the day figures are built from. */
+  dayTrades: Trade[];
+  /**
+   * `dayTrades` before the display unit narrows them. Money targets (the
+   * Dashboard's goals) read these under every unit, as Prop firms do.
+   */
+  moneyDayTrades: Trade[];
   /** The selected accounts: the active ones when no account is filtered. */
   accounts: Account[];
+  /** The trades the filters matched that the display unit leaves out (R, ticks, pips, points); 0 otherwise. */
+  unitLeftOut: number;
 }
 
 /**
@@ -146,9 +164,16 @@ export interface TradeSet {
  * - With no account filter only active accounts count; an archived account
  *   counts only when it is selected.
  * - A date range matches a trade's day: the local date of `closedAt`, or of
- *   `openedAt` while it is open, in the prefs timezone (`today` too). For a
- *   closed trade that is the day `dailyPnl` buckets it by, so filtered totals
- *   equal the sum of the daily bars.
+ *   `openedAt` while it is open, in the prefs timezone (`today` too). That
+ *   picks the trades for the log, win rate and profit factor. Day figures
+ *   (calendar, daily bars, day stats, goals) take instead the exits dated
+ *   inside the range (`MetricContext.range`), so a trade held over several
+ *   days books each exit on its own day and only those in the range. They
+ *   are built from `dayTrades` (every filter but the date), so an exit in the
+ *   range counts even when its trade is matched outside it.
+ * - The display unit narrows both sets (Part 2, U1): Ticks and Points keep the
+ *   futures trades, Pips the forex trades, R those with an initial risk.
+ *   `unitLeftOut` counts the matched trades it drops.
  */
 export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
   const trades = useTrades();
@@ -160,6 +185,7 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
 
   const filterKey = serializeFilters(filters).toString();
   const timeZone = prefs.data?.timeZone;
+  const unit = prefs.data?.displayUnit ?? 'dollar';
   const today =
     timeZone === undefined
       ? undefined
@@ -181,14 +207,24 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
       strategies.data,
       tags.data,
     );
+    const env = {
+      timeZone,
+      today,
+      accounts: accounts.data,
+      breakevenRange: prefs.data?.breakevenRange,
+      pnlBasis: prefs.data?.pnlBasis,
+      weekStart: prefs.data?.weekStart,
+    };
+    const matched = applyFilters(trades.data, clean, env);
+    const kept = narrowToUnit(matched, unit);
+    const dayMatched = applyFilters(trades.data, { ...clean, range: {} }, env);
     return {
       filters: clean,
-      trades: applyFilters(trades.data, clean, {
-        timeZone,
-        today,
-        accounts: accounts.data,
-      }),
+      trades: kept,
+      dayTrades: narrowToUnit(dayMatched, unit),
+      moneyDayTrades: dayMatched,
       accounts: selectedAccounts(accounts.data, clean),
+      unitLeftOut: matched.length - kept.length,
     };
   }, [
     trades.data,
@@ -198,6 +234,10 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
     timeZone,
     today,
     filterKey,
+    prefs.data?.breakevenRange,
+    prefs.data?.pnlBasis,
+    prefs.data?.weekStart,
+    unit,
   ]);
 
   return { ...state, data: state.status === 'success' ? data : undefined };
@@ -212,18 +252,32 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
 export function useMetrics(filters: GlobalFilters): Derived<CurrencyMetrics[]> {
   const set = useTradeSet(filters);
   const prefs = usePrefs().data;
+  const flows = useCashFlows();
+  const everyTrade = useTrades().data;
+  const state = combine([set, flows]);
   const data = useMemo(
     () =>
-      set.data && prefs
+      set.data && prefs && flows.data
         ? metricsByCurrency(set.data.trades, {
+            dayTrades: set.data.dayTrades,
             accounts: set.data.accounts,
-            ctx: metricContextOf(prefs),
+            flows: flows.data,
+            balanceTrades: everyTrade,
+            // Day figures count only the exits dated inside the date range.
+            ctx: {
+              ...metricContextOf(prefs),
+              range: resolveRange(
+                set.data.filters.range,
+                localDate(new Date().toISOString(), prefs.timeZone),
+                prefs.weekStart,
+              ),
+            },
             baseCurrency: prefs.baseCurrency,
           })
         : undefined,
-    [set.data, prefs],
+    [set.data, prefs, flows.data, everyTrade],
   );
-  return { status: set.status, error: set.error, data };
+  return { ...state, data: state.status === 'success' ? data : undefined };
 }
 
 export interface ImportInput {
@@ -253,13 +307,30 @@ function newPlanIdentity(
   };
 }
 
+/** Inputs are the same file and mapping when their fields are: the object may be rebuilt every render. */
+function sameInput(a: ImportInput | null, b: ImportInput | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.parsed === b.parsed &&
+    a.mapping === b.mapping &&
+    a.accountId === b.accountId &&
+    a.fileName === b.fileName
+  );
+}
+
 /**
- * The plan for a file. Its id and time hold while the `input` object and the
- * workspace's import revision stay the same, so re-renders and refetches keep
- * one plan identity. A new input, or an import committed or undone since,
- * makes a new plan with a new id: a commit never reuses an id in the history.
- * Keep `input` one object while the file and mapping are unchanged (state or a
- * memo): a new object on every render would re-plan without end.
+ * The plan for a file. Its id and time hold while the input's fields (`parsed`,
+ * `mapping`, `accountId`, `fileName`, compared by reference, so an inline
+ * object is fine) and the workspace's import revision stay the same, so
+ * re-renders and refetches keep one plan identity. A new input, or an import
+ * committed or undone since, makes a new plan with a new id: a commit never
+ * reuses an id in the history. Keep `parsed` and `mapping` stable (state or a
+ * memo) while the file and mapping are unchanged.
+ *
+ * The plan is made from the stored identity's input, and the status stays
+ * `pending` until that identity matches the current input and revision, so no
+ * render pass reports `success` without data or with a plan for an old input.
  */
 export function useImportPlan(input: ImportInput | null): Derived<ImportPlan> {
   const context = useImportContext(input?.accountId);
@@ -268,22 +339,29 @@ export function useImportPlan(input: ImportInput | null): Derived<ImportPlan> {
     newPlanIdentity(input, revision),
   );
   // Adjusting state while rendering: React re-renders at once with the new identity.
-  const current = identity.input === input && identity.revision === revision;
+  const current =
+    sameInput(identity.input, input) && identity.revision === revision;
   if (!current) setIdentity(newPlanIdentity(input, revision));
+  const planInput = identity.input;
   const data = useMemo(
     () =>
-      current && input && context.data
-        ? planImport(input.parsed, input.mapping, context.data, {
+      current && planInput && context.data
+        ? planImport(planInput.parsed, planInput.mapping, context.data, {
             importId: identity.importId,
             now: identity.now,
-            fileName: input.fileName,
+            fileName: planInput.fileName,
           })
         : undefined,
-    [current, input, context.data, identity],
+    [current, planInput, context.data, identity],
   );
+  // A failure wins even before the identity catches up.
+  const state =
+    current || context.status === 'error'
+      ? context
+      : { status: 'pending' as const, error: null };
   return {
-    status: context.status,
-    error: context.error,
+    status: state.status === 'success' && !data ? 'pending' : state.status,
+    error: state.error,
     data,
   };
 }

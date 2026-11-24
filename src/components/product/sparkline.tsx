@@ -18,11 +18,17 @@ export function Sparkline({
   label,
   className = '',
   variant = 'area',
+  range,
+  fill = false,
 }: {
   series: readonly number[];
   label?: string;
   className?: string;
   variant?: 'area' | 'line';
+  /** Lines that sit side by side share one scale: the values the drawing box spans. */
+  range?: { min: number; max: number };
+  /** Fills the box `className` gives it (which then sets the height), rather than the fixed 80px. */
+  fill?: boolean;
 }): React.JSX.Element | null {
   const gradientId = `eq${useId().replace(/[^\w-]/g, '')}`;
   const a11y = label
@@ -65,6 +71,7 @@ export function Sparkline({
     top: 7,
     bottom: 74,
     floor: H,
+    range,
   });
   if (!line || !first || !last) return null;
   // Fills arrive once the line is mostly drawn.
@@ -76,7 +83,7 @@ export function Sparkline({
         {...a11y}
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="none"
-        className="block h-20 w-full overflow-visible"
+        className={`block w-full overflow-visible ${fill ? 'absolute inset-0 h-full' : 'h-20'}`}
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">

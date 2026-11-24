@@ -1,6 +1,7 @@
 import { defaultMetricContext } from '../metrics/context';
 import { dailyPnl } from '../metrics/days';
 import { localDate } from '../time';
+import { sizedRealizations } from '../metrics/realized';
 import { closedInOrder, isClosed } from '../trade-status';
 import type { Cents, DrawdownType, PropRuleSet, Trade } from '../types';
 
@@ -17,6 +18,8 @@ export interface PropStatus {
     remaining: Cents;
     state: RuleState;
     breachedOn?: string;
+    /** The day's running net at the trade that broke it. */
+    breachedNet?: Cents;
     worstDay: { date: string; net: Cents } | null;
   };
   drawdown: {
@@ -25,15 +28,42 @@ export interface PropStatus {
     remaining: Cents;
     state: RuleState;
     breachedAt?: string;
+    /** The equity and the limit in force at the trade that broke it. */
+    breachedEquity?: Cents;
+    breachedFloor?: Cents;
   };
   tradingDays: { count: number; min: number; met: boolean };
   consistency: {
     bestDayShare: number | null;
     limitPct: number;
     met: boolean;
+    bestDay: { date: string; net: Cents } | null;
   } | null;
+  /** Null when the rules set no period, or no start is known yet (no trades, no start date). */
+  period: {
+    start: string;
+    /** Day `periodDays` counting the start as day 1. */
+    lastDay: string;
+    /** Days after `now`'s local day up to the last day, 0 on it and after it. */
+    daysLeft: number;
+    /** `now` is past the last day. */
+    ended: boolean;
+  } | null;
+  /** 'breached' also covers a period that ended with the target unmet. */
   overall: 'in-progress' | 'breached' | 'target-reached';
 }
+
+/** `date` (YYYY-MM-DD) moved by `n` days. */
+function addDays(date: string, n: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+const daysBetween = (from: string, to: string): number =>
+  Math.round(
+    (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) /
+      86_400_000,
+  );
 
 function ruleState(
   breached: boolean,
@@ -54,29 +84,58 @@ export function evaluateProp(input: {
   trades: readonly Trade[];
   timeZone: string;
   now: string;
+  /** The phase's first day (YYYY-MM-DD), where the period starts; default the first trade's day. */
+  startDate?: string;
+  /** The local day to read "today" as (default: `now`'s), for a caller that holds a date, not an instant. */
+  today?: string;
 }): PropStatus {
   const { startingBalance: start, rules, timeZone, now } = input;
   const nowMs = Date.parse(now);
-  const trades = input.trades.filter(
-    (t) => isClosed(t) && Date.parse(t.closedAt) <= nowMs,
+  const today = input.today ?? localDate(now, timeZone);
+  const closed = closedInOrder(
+    input.trades.filter((t) => isClosed(t) && Date.parse(t.closedAt) <= nowMs),
   );
 
-  // Floor in force before a trade, from the peak *before* that trade.
+  // The period runs from its start to `periodDays` days on; later trades don't count.
+  // A period of 0 or fewer days is no period.
+  const periodDays =
+    rules.periodDays !== undefined && rules.periodDays > 0
+      ? rules.periodDays
+      : undefined;
+  const periodStart =
+    periodDays === undefined
+      ? undefined
+      : (input.startDate ??
+        (closed[0] ? localDate(closed[0].closedAt, timeZone) : undefined));
+  const lastDay =
+    periodStart === undefined || periodDays === undefined
+      ? undefined
+      : addDays(periodStart, periodDays - 1);
+  const trades =
+    lastDay === undefined
+      ? closed
+      : closed.filter((t) => localDate(t.closedAt, timeZone) <= lastDay);
+
+  // Floor in force before a trade, from the peak *before* that trade. A trailing
+  // drawdown follows the peak up and locks at `drawdownFloor` (the starting
+  // balance unless set); a static one ignores it.
+  const lock = rules.drawdownFloor ?? start;
   const floorFor = (peak: Cents): Cents =>
     rules.drawdownType === 'static'
       ? start - rules.maxDrawdown
-      : Math.min(peak - rules.maxDrawdown, start);
+      : Math.min(peak - rules.maxDrawdown, lock);
 
   let equity = start;
   let peak = start; // trailing: peak of equity; eod-trailing: peak of prior days' end-of-day equity
   let currentDay: string | undefined;
   let breachedAt: string | undefined;
   let breachedOn: string | undefined;
-  let dayRunning = 0; // closed-trade net so far on currentDay
+  let breachedNet: Cents | undefined;
+  let breachedEquity: Cents | undefined;
+  let breachedFloor: Cents | undefined;
 
-  for (const t of closedInOrder(trades)) {
+  for (const t of trades) {
     const day = localDate(t.closedAt, timeZone);
-    if (day !== currentDay) dayRunning = 0;
     if (
       rules.drawdownType === 'eod-trailing' &&
       currentDay !== undefined &&
@@ -86,16 +145,35 @@ export function evaluateProp(input: {
     }
     currentDay = day;
     equity += t.net;
-    dayRunning += t.net;
-    // Daily loss breaches the first time the running day net touches the limit.
-    if (breachedOn === undefined && dayRunning <= -rules.dailyLossLimit)
-      breachedOn = day;
-    if (breachedAt === undefined && equity <= floorFor(peak))
+    if (breachedAt === undefined && equity <= floorFor(peak)) {
       breachedAt = t.closedAt;
+      breachedEquity = equity;
+      breachedFloor = floorFor(peak);
+    }
     if (rules.drawdownType === 'trailing') peak = Math.max(peak, equity);
   }
+  // Daily loss breaches the first time a local day's running net, booked by
+  // exit fill as the daily-loss track is, touches the limit.
+  const exits = trades
+    .flatMap((t) =>
+      sizedRealizations(t).map((r) => ({
+        at: Date.parse(r.time),
+        serial: t.serial,
+        net: r.net,
+        day: localDate(r.time, timeZone),
+      })),
+    )
+    .sort((a, b) => a.at - b.at || a.serial - b.serial);
+  const running = new Map<string, Cents>();
+  for (const x of exits) {
+    const sum = (running.get(x.day) ?? 0) + x.net;
+    running.set(x.day, sum);
+    if (breachedOn === undefined && sum <= -rules.dailyLossLimit) {
+      breachedOn = x.day;
+      breachedNet = sum;
+    }
+  }
   // eod-trailing: the last trading day's close counts once that day has ended.
-  const today = localDate(now, timeZone);
   if (
     rules.drawdownType === 'eod-trailing' &&
     currentDay !== undefined &&
@@ -123,9 +201,15 @@ export function evaluateProp(input: {
 
   let consistency: PropStatus['consistency'] = null;
   if (rules.consistencyPct !== undefined) {
-    const best = days.reduce((m, d) => Math.max(m, d.net), -Infinity);
+    const bestDay = days.reduce<{ date: string; net: Cents } | null>(
+      (b, d) =>
+        b === null || d.net > b.net ? { date: d.date, net: d.net } : b,
+      null,
+    );
+    const best = bestDay?.net ?? -Infinity;
     const share = profitCurrent > 0 ? best / profitCurrent : null;
     consistency = {
+      bestDay,
       bestDayShare: share,
       limitPct: rules.consistencyPct,
       met: share !== null && share <= rules.consistencyPct,
@@ -134,12 +218,25 @@ export function evaluateProp(input: {
 
   const dailyBreached = breachedOn !== undefined;
   const ddBreached = breachedAt !== undefined;
+  // A funded phase has no target to reach.
+  const targetReached =
+    rules.phase === 'evaluation' &&
+    profitCurrent >= rules.profitTarget &&
+    daysMet &&
+    (consistency === null || consistency.met);
+  const period: PropStatus['period'] =
+    periodStart === undefined || lastDay === undefined
+      ? null
+      : {
+          start: periodStart,
+          lastDay,
+          daysLeft: Math.max(0, daysBetween(today, lastDay)),
+          ended: today > lastDay,
+        };
   const overall: PropStatus['overall'] =
-    dailyBreached || ddBreached
+    dailyBreached || ddBreached || (period?.ended === true && !targetReached)
       ? 'breached'
-      : profitCurrent >= rules.profitTarget &&
-          daysMet &&
-          (consistency === null || consistency.met)
+      : targetReached
         ? 'target-reached'
         : 'in-progress';
 
@@ -148,14 +245,20 @@ export function evaluateProp(input: {
     profit: {
       current: profitCurrent,
       target: rules.profitTarget,
-      progress: Math.max(0, profitCurrent) / rules.profitTarget,
+      progress:
+        rules.profitTarget > 0
+          ? Math.max(0, profitCurrent) / rules.profitTarget
+          : 0,
     },
     dailyLoss: {
       todayNet,
       limit: rules.dailyLossLimit,
       remaining: dlRemaining,
       state: ruleState(dailyBreached, dlRemaining, rules.dailyLossLimit),
-      ...(breachedOn !== undefined && { breachedOn }),
+      ...(breachedOn !== undefined && {
+        breachedOn,
+        breachedNet,
+      }),
       worstDay: worst,
     },
     drawdown: {
@@ -163,7 +266,11 @@ export function evaluateProp(input: {
       floor,
       remaining: ddRemaining,
       state: ruleState(ddBreached, ddRemaining, rules.maxDrawdown),
-      ...(breachedAt !== undefined && { breachedAt }),
+      ...(breachedAt !== undefined && {
+        breachedAt,
+        breachedEquity,
+        breachedFloor,
+      }),
     },
     tradingDays: {
       count: tradingDayCount,
@@ -171,6 +278,7 @@ export function evaluateProp(input: {
       met: daysMet,
     },
     consistency,
+    period,
     overall,
   };
 }

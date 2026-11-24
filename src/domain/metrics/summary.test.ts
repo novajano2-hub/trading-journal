@@ -2,7 +2,20 @@ import { describe, expect, test } from 'vitest';
 import { makeTrade } from '../__fixtures__/trades';
 import { resolveInstrument } from '../instruments';
 import { costBasis, defaultMetricContext, pnlOf } from './context';
-import { plannedR, riskFromStop, summarize } from './summary';
+import {
+  costsOf,
+  expectancyIn,
+  expectancyOf,
+  holdTimes,
+  largestInUnit,
+  largestTrade,
+  plannedR,
+  riskFromStop,
+  rExpectancy,
+  summarize,
+  tradeVolume,
+  volumeOf,
+} from './summary';
 
 const ctx = defaultMetricContext('America/New_York');
 
@@ -231,5 +244,248 @@ describe('summarize', () => {
       avgPlannedR: null,
       plannedRTradeCount: 0,
     });
+  });
+});
+
+describe('netRoi', () => {
+  test('net over cost basis of closed trades; null when empty', () => {
+    const a = makeTrade({ net: 10000 });
+    const b = makeTrade({ net: -4000 });
+    expect(summarize([a, b], ctx).netRoi).toBeCloseTo(
+      6000 / (costBasis(a) + costBasis(b)),
+      10,
+    );
+    expect(summarize([], ctx).netRoi).toBeNull();
+  });
+});
+
+describe('rExpectancy', () => {
+  test('is win share times average win R plus loss share times average loss R', () => {
+    const r = (net: number, initialRisk?: number) =>
+      makeTrade({ net, ...(initialRisk ? { initialRisk } : {}) });
+    // 3R, 1R, -1R, a breakeven, and a trade with no stop: 2 wins at 2R on average, 1 loss at -1R.
+    const out = rExpectancy(
+      [r(3000, 1000), r(1000, 1000), r(-1000, 1000), r(0, 1000), r(5000)],
+      defaultMetricContext('America/New_York'),
+    );
+    expect(out.count).toBe(3);
+    expect(out.value).toBeCloseTo((2 / 3) * 2 + (1 / 3) * -1, 10);
+    // One formula: the value is expectancyIn's, not a second copy.
+    expect(out.value).toBe(
+      expectancyIn(
+        [r(3000, 1000), r(1000, 1000), r(-1000, 1000), r(0, 1000), r(5000)],
+        defaultMetricContext('America/New_York'),
+        'r',
+      ),
+    );
+    expect(rExpectancy([r(100)], defaultMetricContext('UTC'))).toEqual({
+      value: null,
+      count: 0,
+    });
+  });
+});
+
+describe('in a trade unit', () => {
+  // ES: 4 ticks a point. Wins of 8 and 4 ticks, a loss of 6: the money differs.
+  const es = (net: number, avgExit: number, maxPosition = 1) =>
+    makeTrade({ net, avgEntry: 4500, avgExit, maxPosition });
+  const set = [es(30000, 4502), es(100, 4501), es(-20000, 4498.5)];
+
+  test('profit factor and the win/loss ratio read the unit, the counts stay on money', () => {
+    const money = summarize(set, ctx);
+    expect(money.profitFactor).toBeCloseTo(30100 / 20000, 10);
+    const ticks = summarize(set, { ...ctx, unit: 'ticks' });
+    expect(ticks.profitFactor).toBeCloseTo(12 / 6, 10);
+    expect(ticks.winLossRatio).toBeCloseTo(6 / 6, 10);
+    // Wins and losses are classified on the P&L, as the win rate is.
+    expect(ticks).toMatchObject({ wins: 2, losses: 1, winRate: 2 / 3 });
+    expect(ticks.avgWin).toBe(money.avgWin);
+  });
+  test('ticks count every contract: two contracts double the move', () => {
+    const s = summarize([es(30000, 4502, 2), es(-20000, 4498.5)], {
+      ...ctx,
+      unit: 'ticks',
+    });
+    expect(s.profitFactor).toBeCloseTo(16 / 6, 10);
+  });
+  test('no loss in the unit has no profit factor', () => {
+    const s = summarize([es(30000, 4502)], { ...ctx, unit: 'points' });
+    expect(s.profitFactor).toBeNull();
+    expect(s.winLossRatio).toBeNull();
+  });
+  test('the largest win and loss are the largest in the unit, not in money', () => {
+    // A one-lot +$300 win of 8 ticks against a three-lot +$200 win of 12.
+    const one = es(30000, 4502);
+    const three = es(20000, 4501, 3);
+    const loss = es(-20000, 4498.5);
+    const set2 = [one, three, loss];
+    expect(summarize(set2, ctx).largestWin).toBe(30000);
+    expect(largestInUnit(set2, { ...ctx, unit: 'ticks' }, 'win')).toBe(three);
+    expect(largestInUnit(set2, { ...ctx, unit: 'ticks' }, 'loss')).toBe(loss);
+    expect(largestInUnit(set2, ctx, 'win')).toBeUndefined();
+    expect(largestInUnit([one], { ...ctx, unit: 'ticks' }, 'loss')).toBe(
+      undefined,
+    );
+  });
+  test('R reads realized R', () => {
+    const s = summarize(
+      [
+        makeTrade({ net: 3000, initialRisk: 1000 }),
+        makeTrade({ net: -2000, initialRisk: 4000 }),
+      ],
+      { ...ctx, unit: 'r' },
+    );
+    expect(s.profitFactor).toBeCloseTo(3 / 0.5, 10);
+  });
+});
+
+describe('volume', () => {
+  const fill = (side: 'buy' | 'sell', qty: number) => ({
+    id: `${side}-${qty}`,
+    accountId: 'a1',
+    symbol: 'ESZ5',
+    side,
+    qty,
+    price: 4500,
+    time: '2026-03-02T15:00:00Z',
+    fees: 0,
+    commission: 0,
+  });
+  test('a trade counts its quantity once: the side it opened, not every fill', () => {
+    const t = makeTrade({
+      net: 0,
+      maxPosition: 3,
+      executions: [fill('buy', 2), fill('buy', 1), fill('sell', 3)],
+    });
+    expect(tradeVolume(t)).toBe(3);
+    const short = makeTrade({
+      net: 0,
+      direction: 'short',
+      executions: [fill('sell', 2), fill('buy', 1), fill('buy', 1)],
+    });
+    expect(tradeVolume(short)).toBe(2);
+  });
+  test('a trade without fills counts its size', () => {
+    expect(tradeVolume(makeTrade({ net: 0, maxPosition: 4 }))).toBe(4);
+  });
+  test('lots add without binary noise: 1.8, 1.5, 1.6 and 1.9 make 6.8', () => {
+    const lots = [1.7999999999999998, 1.5, 1.6, 1.9].map((maxPosition) =>
+      makeTrade({ net: 0, maxPosition }),
+    );
+    expect(volumeOf(lots)).toBe(6.8);
+    expect(volumeOf([])).toBe(0);
+  });
+});
+
+describe('holdTimes', () => {
+  const held = (net: number, minutes: number) =>
+    makeTrade({
+      net,
+      openedAt: '2026-03-02T15:00:00Z',
+      closedAt: new Date(
+        Date.parse('2026-03-02T15:00:00Z') + minutes * 60_000,
+      ).toISOString(),
+    });
+  test('averages the minutes held over all closed trades, winners, losers and breakevens', () => {
+    const trades = [
+      held(100, 10),
+      held(100, 30),
+      held(-100, 60),
+      held(0, 5),
+      makeTrade({ net: 0, status: 'open' }),
+    ];
+    expect(holdTimes(trades, ctx)).toEqual({
+      all: 26.25,
+      wins: 20,
+      losses: 60,
+      breakevens: 5,
+    });
+  });
+  test('a side with no trades has none', () => {
+    expect(holdTimes([held(100, 10)], ctx)).toEqual({
+      all: 10,
+      wins: 10,
+      losses: null,
+      breakevens: null,
+    });
+    expect(holdTimes([], ctx).all).toBeNull();
+  });
+});
+
+describe('costsOf', () => {
+  const fill = (fees: number, commission: number) => ({
+    id: 'e',
+    accountId: 'a1',
+    symbol: 'ESZ5',
+    side: 'buy' as const,
+    qty: 1,
+    price: 4500,
+    time: '2026-03-02T15:00:00Z',
+    fees,
+    commission,
+  });
+  test('adds the commissions and the fees of the fills apart', () => {
+    const a = makeTrade({
+      net: 0,
+      fees: 450,
+      executions: [fill(50, 100), fill(100, 200)],
+    });
+    const b = makeTrade({ net: 0, fees: 25, executions: [fill(5, 20)] });
+    expect(costsOf([a, b])).toEqual({ commissions: 320, fees: 155 });
+  });
+  test('a trade with no fills carries its total as fees', () => {
+    expect(costsOf([makeTrade({ net: 0, fees: 40 })])).toEqual({
+      commissions: 0,
+      fees: 40,
+    });
+  });
+  test('open trades are left out, as in gross to net', () => {
+    const open = makeTrade({
+      net: 0,
+      status: 'open',
+      fees: 25,
+      executions: [fill(5, 20)],
+    });
+    expect(costsOf([open])).toEqual({ commissions: 0, fees: 0 });
+  });
+});
+
+describe('largestTrade', () => {
+  test('is the trade itself, so a link can name its id', () => {
+    const a = makeTrade({ net: 5000 });
+    const b = makeTrade({ net: 9000 });
+    const c = makeTrade({ net: -7000 });
+    const d = makeTrade({ net: -2000 });
+    const all = [a, b, c, d, makeTrade({ net: 0, status: 'open' })];
+    expect(largestTrade(all, ctx, 'win')?.id).toBe(b.id);
+    expect(largestTrade(all, ctx, 'loss')?.id).toBe(c.id);
+    expect(largestTrade([a], ctx, 'loss')).toBeUndefined();
+  });
+});
+
+describe('expectancy: one definition, in money and in every unit', () => {
+  // ES, tick 0.25: a win of 8 ticks, a loss of 4, and a breakeven that moved
+  // 1 tick but netted nothing. Each risked $100.
+  const es = (net: number, avgExit: number) =>
+    makeTrade({ net, avgEntry: 4500, avgExit, initialRisk: 10000 });
+  const set = [es(10000, 4502), es(-5000, 4499), es(0, 4500.25)];
+
+  test('expectancyOf is win rate times average win plus loss rate times average loss', () => {
+    expect(expectancyOf({ n: 2, sum: 300 }, { n: 1, sum: -60 })).toBe(80);
+    expect(expectancyOf({ n: 0, sum: 0 }, { n: 1, sum: -60 })).toBe(-60);
+    expect(expectancyOf({ n: 0, sum: 0 }, { n: 0, sum: 0 })).toBeNull();
+  });
+
+  test('the summary reads it over the decided trades, a breakeven left out', () => {
+    // (100 - 50) / 2, not (100 - 50 + 0) / 3.
+    expect(summarize(set, ctx).expectancy).toBe(2500);
+  });
+
+  test('in a unit it reads the same decided trades: +8 and -4 ticks are +2, never the average trade', () => {
+    expect(expectancyIn(set, ctx, 'ticks')).toBe(2);
+    expect(expectancyIn(set, ctx, 'r')).toBe(0.25);
+    // No forex trade: no pips.
+    expect(expectancyIn(set, ctx, 'pips')).toBeNull();
+    expect(expectancyIn([es(0, 4500.25)], ctx, 'ticks')).toBeNull();
   });
 });

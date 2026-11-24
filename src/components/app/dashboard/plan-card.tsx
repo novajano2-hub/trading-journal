@@ -1,18 +1,19 @@
 'use client';
 
 import { useEffect, useId, useRef, useState, type RefObject } from 'react';
-import { ArrowDown, ListChecks } from '@phosphor-icons/react/dist/ssr';
+import { ArrowDown } from '@phosphor-icons/react/dist/ssr';
 import { animate, useInView, useReducedMotion } from 'motion/react';
 import { formatTicker, tickerFrame } from '@/components/product/number-ticker';
 import { Chip } from '@/components/ui/chip';
-import { IconTile } from '@/components/ui/icon-tile';
 import { MetricTip } from '@/components/ui/metric-tip';
 import { RULES_SHOWN, type DashboardModel } from '@/data/dashboard';
 import type { RuleScore } from '@/domain/metrics/rules';
 import type { PnlBasis } from '@/domain/types';
-import { formatAdherence, formatPnl, keepHyphens } from '@/lib/format';
+import { useDisplay } from '@/lib/display';
+import { FigureText } from '@/components/product/figure-text';
+import { formatAdherence, keepHyphens } from '@/lib/format';
 import { EASING_POINTS } from '@/lib/motion';
-import { CARD, CardHeader, HERO, signTone } from './shared';
+import { CARD, CardHeader, signTone } from './shared';
 
 /** The rule's adherence: a 6px ultramarine bar on its soft rail. */
 function Track({
@@ -76,13 +77,25 @@ function RuleRow({
   onOpen(button: HTMLButtonElement): void;
 }): React.JSX.Element {
   const button = useRef<HTMLButtonElement>(null);
+  const display = useDisplay();
+  const cost = display.figure(
+    display.ofTrades(rule.brokenTradeIds, rule.brokenPnl),
+    true,
+    currency,
+  );
   const total = rule.kept + rule.broken;
   const pct = formatAdherence(rule.adherence);
   const broken = rule.broken > 0;
   const text = (
-    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      <span className="line-clamp-2">{keepHyphens(rule.text)}</span>
-      {costliest ? <Chip tone="warn">Costliest</Chip> : null}
+    <span className="flex flex-col items-start">
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="line-clamp-2">{keepHyphens(rule.text)}</span>
+        {costliest ? <Chip tone="warn">Costliest</Chip> : null}
+      </span>
+      {/* Each rule belongs to a playbook, as in TradeZella. */}
+      <span className="text-xs font-normal text-muted">
+        {rule.strategyName}
+      </span>
     </span>
   );
 
@@ -108,7 +121,7 @@ function RuleRow({
           <button
             ref={button}
             type="button"
-            aria-label={`${rule.text}. Kept ${rule.kept} of ${total}, ${pct}. Cost when broken ${formatPnl(rule.brokenPnl, currency)}. Show the trades.`}
+            aria-label={`${rule.text}. Kept ${rule.kept} of ${total}, ${pct}. Cost when broken ${cost.label}. Show the trades.`}
             onClick={(e) => onOpen(e.currentTarget)}
             className="flex min-h-9 w-full items-center rounded-chip py-1.5 text-left text-[13.5px] font-medium text-text outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
           >
@@ -139,7 +152,7 @@ function RuleRow({
       >
         {broken ? (
           <span className={signTone(rule.brokenPnl)}>
-            {formatPnl(rule.brokenPnl, currency)}
+            <FigureText f={cost} />
           </span>
         ) : (
           <span className="font-normal text-faint">none</span>
@@ -163,7 +176,7 @@ function Numeral({ text }: { text: string }): React.JSX.Element {
     <>
       <span>{number}</span>
       {number !== text ? (
-        <span className="mt-1 ml-1 text-[0.42em] leading-none tracking-[-0.02em] text-on-accent-muted">
+        <span className="mt-1 ml-1 text-[0.42em] leading-none tracking-[-0.02em] text-faint">
           %
         </span>
       ) : null}
@@ -206,7 +219,7 @@ function AdherenceNumeral({ value }: { value: number }): React.JSX.Element {
   const figure =
     'items-start text-[88px] leading-[0.82] font-semibold tracking-[-0.05em] tabular-nums [font-stretch:88%] sm:text-[104px]';
   return (
-    <span ref={ref} className="inline-grid text-white">
+    <span ref={ref} className="inline-grid text-text">
       <noscript>
         <style>{NO_SCRIPT_CSS}</style>
       </noscript>
@@ -234,12 +247,8 @@ function AdherenceNumeral({ value }: { value: number }): React.JSX.Element {
   );
 }
 
-/** A definition's label on the ultramarine card: its underline (on hover and focus) and focus ring in white. */
-const ON_ACCENT_TIP =
-  'hover:decoration-white/85! focus-visible:decoration-white/85! focus-visible:outline-white!';
-
 /**
- * Row 1, "Your plan": the ultramarine hero (how many rule checks were kept,
+ * Row 1, "Your plan": the plan card (how many rule checks were kept,
  * and what the trades that broke a rule cost, each trade once) beside every
  * rule by its cost when broken. A broken rule's row opens its trades.
  */
@@ -264,6 +273,7 @@ export function PlanCard({
   onOpenRule(ruleId: string, button: HTMLButtonElement): void;
 }): React.JSX.Element {
   const headingId = useId();
+  const display = useDisplay();
   const [all, setAll] = useState(false);
 
   if (plan.checks === 0 || plan.adherence === null) {
@@ -274,13 +284,8 @@ export function PlanCard({
         aria-labelledby={headingId}
         className={`${CARD} px-5 pt-[18px] pb-5 outline-none`}
       >
-        <CardHeader
-          icon={ListChecks}
-          tone="accent"
-          headingId={headingId}
-          title={`Your plan, ${caption}`}
-        />
-        <div className="mt-3 pl-[38px]">
+        <CardHeader headingId={headingId} title={`Your plan, ${caption}`} />
+        <div className="mt-3">
           <p className="text-[14px] font-medium text-text">
             No graded trades in this range.
           </p>
@@ -294,7 +299,20 @@ export function PlanCard({
   }
 
   const shown = all ? plan.rules : plan.rules.slice(0, RULES_SHOWN);
+  // Rules come costliest first. A losers-only rule's broken trades are losers by definition, so it never takes the flag.
+  const first = plan.rules.find((r) => r.showWhen !== 'loser');
+  const costliestId =
+    first && first.broken > 0 && first.brokenPnl < 0 ? first.ruleId : undefined;
   const cost = plan.cost.pnl;
+  // Each trade once, as the cost counts them.
+  const costed = display.figure(
+    display.ofTrades(
+      [...new Set(plan.rules.flatMap((r) => r.brokenTradeIds))],
+      cost,
+    ),
+    true,
+    currency,
+  );
   const kept = plan.adherence;
 
   return (
@@ -304,12 +322,11 @@ export function PlanCard({
       aria-labelledby={headingId}
       className="grid gap-4 outline-none xl:grid-cols-[340px_minmax(0,1fr)] min-[90rem]:grid-cols-[400px_minmax(0,1fr)]"
     >
-      {/* The one coloured surface: Keel Ultramarine, the same in both themes. */}
+      {/* A neutral card like the rest: the accent is spent on the kept bar alone. */}
       <div
-        className={`${HERO} relative flex min-w-0 flex-col overflow-hidden px-[22px] pt-[18px]`}
+        className={`${CARD} relative flex min-w-0 flex-col overflow-hidden px-[22px] pt-[18px]`}
       >
         <div className="flex h-7 items-center gap-2.5">
-          <IconTile icon={ListChecks} tone="on-accent" />
           <h2
             id={headingId}
             // The range is in the name; on screen it sits at the card's right.
@@ -320,56 +337,51 @@ export function PlanCard({
           </h2>
           <span
             aria-hidden="true"
-            className="ml-auto inline-block text-[12.5px] whitespace-nowrap text-on-accent-muted first-letter:uppercase"
+            className="ml-auto inline-block text-[12.5px] whitespace-nowrap text-faint first-letter:uppercase"
           >
             {caption}
           </span>
         </div>
-        <div className="mt-3.5 flex flex-wrap items-end gap-x-3.5 gap-y-2">
-          <AdherenceNumeral value={kept} />
-          <span className="pb-[3px] text-[15px] leading-[1.3] text-white/85">
-            <MetricTip
-              id="rule-adherence"
-              basis={basis}
-              className={ON_ACCENT_TIP}
-            >
-              of rule checks kept
-            </MetricTip>
-          </span>
-        </div>
-        {/* Kept and broken checks as one whole; a part at zero draws nothing. */}
-        <div aria-hidden="true" className="mt-[22px] mb-[18px]">
-          <div className="flex h-2 gap-[3px]">
-            {kept > 0 ? (
-              <span
-                className="rounded-[3px] bg-white/92"
-                style={{ flex: `${kept} 1 0` }}
-              />
-            ) : null}
-            {kept < 1 ? (
-              <span
-                className="rounded-[3px] bg-on-accent-loss"
-                style={{ flex: `${1 - kept} 1 0` }}
-              />
-            ) : null}
+        {/* The card stands as tall as the rules beside it: the numeral and the bar share the spare height, centred, so no band is left above the footer. */}
+        <div className="flex flex-1 flex-col justify-center">
+          <div className="mt-3.5 flex flex-wrap items-end gap-x-3.5 gap-y-2">
+            <AdherenceNumeral value={kept} />
+            <span className="pb-[3px] text-[15px] leading-[1.3] text-muted">
+              <MetricTip id="rule-adherence" basis={basis}>
+                of rule checks kept
+              </MetricTip>
+            </span>
           </div>
-          <div className="mt-[7px] flex justify-between text-xs text-on-accent-muted">
-            <span>Kept</span>
-            <span>Broken</span>
+          {/* Kept and broken checks as one whole; a part at zero draws nothing. */}
+          <div aria-hidden="true" className="mt-[22px] mb-[18px]">
+            <div className="flex h-2 gap-[3px]">
+              {kept > 0 ? (
+                <span
+                  className="rounded-[3px] bg-accent"
+                  style={{ flex: `${kept} 1 0` }}
+                />
+              ) : null}
+              {kept < 1 ? (
+                <span
+                  className="rounded-[3px] bg-loss-fill"
+                  style={{ flex: `${1 - kept} 1 0` }}
+                />
+              ) : null}
+            </div>
+            <div className="mt-[7px] flex justify-between text-xs text-faint">
+              <span>Kept</span>
+              <span>Broken</span>
+            </div>
           </div>
         </div>
-        <div className="-mx-[22px] mt-auto flex min-h-[54px] flex-wrap items-center justify-between gap-x-3 border-t border-white/10 bg-[rgb(10_14_70/0.22)] px-[22px] py-2">
-          <span className="text-[13.5px] text-white/85">
-            <MetricTip
-              id="broken-rules-cost"
-              basis={basis}
-              className={ON_ACCENT_TIP}
-            />
+        <div className="-mx-[22px] mt-auto flex min-h-[54px] flex-wrap items-center justify-between gap-x-3 border-t border-line bg-sunken/60 px-[22px] py-2">
+          <span className="text-[13.5px] text-muted">
+            <MetricTip id="broken-rules-cost" basis={basis} />
           </span>
           <span
-            className={`text-[21px] font-semibold tracking-[-0.02em] whitespace-nowrap tabular-nums ${cost < 0 ? 'text-on-accent-loss' : 'text-white'}`}
+            className={`text-[21px] font-semibold tracking-[-0.02em] whitespace-nowrap tabular-nums ${signTone(cost)}`}
           >
-            {formatPnl(cost, currency)}
+            <FigureText f={costed} />
           </span>
         </div>
       </div>
@@ -426,11 +438,11 @@ export function PlanCard({
             </tr>
           </thead>
           <tbody>
-            {shown.map((rule, i) => (
+            {shown.map((rule) => (
               <RuleRow
                 key={rule.ruleId}
                 rule={rule}
-                costliest={i === 0 && rule.broken > 0 && rule.brokenPnl < 0}
+                costliest={rule.ruleId === costliestId}
                 currency={currency}
                 onOpen={(button) => onOpenRule(rule.ruleId, button)}
               />

@@ -1,0 +1,233 @@
+import { expect, test } from '@playwright/test';
+
+test.use({ timezoneId: 'America/New_York' });
+
+test.beforeEach(async ({ page }, info) => {
+  test.skip(
+    info.project.name !== 'desktop' && !info.title.startsWith('at 390'),
+    'journeys run at desktop width',
+  );
+  await page.clock.setFixedTime(new Date('2026-11-20T15:00:00Z'));
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+});
+
+test("open 19 Nov, see the day's trades, write its daily note and find it after a reload", async ({
+  page,
+}) => {
+  await page.goto('/app/calendar');
+  await expect(page.getByTestId('calendar-ready')).toBeVisible({
+    timeout: 30_000,
+  });
+  await page.getByRole('button', { name: /^Thu 19 Nov/ }).click();
+  await expect(page).toHaveURL(/day=2026-11-19/);
+
+  // The day's panel: three trades exited on it.
+  const panel = page.getByRole('complementary', { name: /Thu 19 Nov/ });
+  await expect(panel).toContainText('Red day');
+  const exits = panel.getByRole('table', {
+    name: 'Trades that exited on Thu 19 Nov',
+  });
+  await expect(exits.locator('tbody tr')).toHaveCount(3);
+  await expect(exits).toContainText('ES Dec 26');
+  await expect(exits).toContainText('AUDUSD');
+
+  // Its daily note: typed in, saved by itself.
+  await panel.getByRole('link', { name: 'Open daily note' }).click();
+  await expect(page).toHaveURL(/\/app\/notebook\/daily\/2026-11-19/);
+  const editor = page.locator('[contenteditable="true"]').first();
+  await expect(editor).toBeVisible({ timeout: 20_000 });
+  await editor.click();
+  const text = 'Slow day, kept to the plan after the first loss.';
+  await page.keyboard.type(text);
+  await expect(page.getByText(/^Saved/)).toBeVisible();
+
+  // After a reload the text is still there.
+  await page.reload();
+  await expect(page.getByText(text)).toBeVisible({ timeout: 20_000 });
+});
+
+test('with every stat ticked, a 1440 cell stacks every line without clipping and the row follows the tallest cell', async ({
+  page,
+}) => {
+  await page.goto('/app/calendar?month=2026-11');
+  await expect(page.getByTestId('calendar-ready')).toBeVisible({
+    timeout: 30_000,
+  });
+  await page.getByRole('button', { name: 'Stats shown' }).click();
+  const list = page.getByRole('list', { name: 'Stats shown' });
+  for (const name of [
+    'Trades',
+    'Win rate',
+    'R',
+    'Fees',
+    'Ticks',
+    'Pips',
+    'Points',
+  ]) {
+    const box = list.getByRole('checkbox', { name, exact: true });
+    if (!(await box.isChecked())) {
+      await list.getByText(name, { exact: true }).click();
+      await expect(box).toBeChecked();
+    }
+  }
+  await expect(list.getByRole('checkbox', { name: 'Points' })).toBeChecked();
+  await page.keyboard.press('Escape');
+
+  const grid = page.getByRole('grid', { name: 'November 2026' });
+  const cell = grid.getByRole('button', { name: /^Thu 19 Nov/ });
+  await expect(cell).toContainText('fees');
+  await expect(cell).toContainText('ticks');
+  // No line is cut off, ellipsized or spilling out of its cell. (The grid's
+  // rows are `display: contents`, so each cell is measured on its own; the
+  // phone's compact figure is hidden at this width and is not measured.)
+  await page.evaluate(() => document.fonts.ready);
+  const cut = await grid.getByRole('button').evaluateAll((buttons) => {
+    const problems: string[] = [];
+    for (const b of buttons) {
+      const cell = b.getBoundingClientRect();
+      const walk = document.createTreeWalker(b, NodeFilter.SHOW_TEXT);
+      for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+        const text = n.textContent?.trim() ?? '';
+        let box = n.parentElement;
+        while (box && getComputedStyle(box).display === 'inline')
+          box = box.parentElement;
+        if (
+          !text ||
+          !box ||
+          box.closest('.sr-only, [data-testid="day-compact"]')
+        )
+          continue;
+        const range = document.createRange();
+        range.selectNodeContents(n);
+        const ink = range.getBoundingClientRect();
+        if (ink.width === 0) continue;
+        const where = `${b.getAttribute('aria-label')}: "${text}"`;
+        if (/(…|\.\.\.)$/.test(text))
+          problems.push(`${where} ends in an ellipsis`);
+        if (box.scrollWidth > box.clientWidth + 0.5)
+          problems.push(`${where} is wider than its line`);
+        if (
+          ink.left < cell.left - 0.5 ||
+          ink.right > cell.right + 0.5 ||
+          ink.top < cell.top - 0.5 ||
+          ink.bottom > cell.bottom + 0.5
+        )
+          problems.push(`${where} spills past its cell`);
+      }
+    }
+    return problems;
+  });
+  expect(cut).toEqual([]);
+  // Nothing hides under the cell's own clip: the cell is as tall as its content.
+  const clipped = await grid
+    .getByRole('button')
+    .evaluateAll(
+      (buttons) =>
+        buttons.filter((b) => b.scrollHeight > b.clientHeight + 1).length,
+    );
+  expect(clipped).toBe(0);
+  // The row follows its tallest cell: every cell of a week is as tall.
+  const heights = await grid
+    .getByTestId('week-row')
+    .nth(2)
+    .getByRole('button')
+    .evaluateAll((els) =>
+      els.map((e) => Math.round(e.getBoundingClientRect().height)),
+    );
+  expect(new Set(heights).size).toBe(1);
+  expect(heights[0]).toBeGreaterThan(92);
+});
+
+test('at 390 with every stat ticked the compact cell shows the lead stat only and nothing clips', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'mobile', 'the phone width');
+  await page.goto('/app/calendar?month=2026-11');
+  await expect(page.getByTestId('calendar-ready')).toBeVisible({
+    timeout: 30_000,
+  });
+  await page.getByRole('button', { name: 'Stats shown' }).click();
+  const list = page.getByRole('list', { name: 'Stats shown' });
+  for (const name of [
+    'Trades',
+    'Win rate',
+    'R',
+    'Fees',
+    'Ticks',
+    'Pips',
+    'Points',
+  ]) {
+    const box = list.getByRole('checkbox', { name, exact: true });
+    if (!(await box.isChecked())) {
+      await list.getByText(name, { exact: true }).click();
+      await expect(box).toBeChecked();
+    }
+  }
+  await page.keyboard.press('Escape');
+  const grid = page.getByRole('grid', { name: 'November 2026' });
+  const cell = grid.getByRole('button', { name: /^Thu 19 Nov/ });
+  // The stacked lines are hidden; the compact figure is the lead stat (net).
+  await expect(cell.getByTestId('day-compact')).toBeVisible();
+  await expect(cell.getByTestId('day-compact')).toContainText(/[+\u2212]/);
+  // What is on screen (innerText skips the hidden lines): the day number and one figure.
+  const seen = await cell.evaluate((b) => (b as HTMLElement).innerText);
+  expect(seen).not.toMatch(/fees|ticks|trades|win rate|pips|pts/);
+  expect(seen.split('\n').filter(Boolean)).toHaveLength(2);
+  // Nothing clips: every cell is as tall as its content, and the page does not scroll sideways.
+  const clipped = await grid
+    .getByRole('button')
+    .evaluateAll(
+      (bs) => bs.filter((b) => b.scrollHeight > b.clientHeight + 1).length,
+    );
+  expect(clipped).toBe(0);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - innerWidth,
+    ),
+  ).toBeLessThanOrEqual(0);
+  const tooWide = await grid
+    .getByTestId('day-compact')
+    .evaluateAll(
+      (els) => els.filter((e) => e.scrollWidth > e.clientWidth + 0.5).length,
+    );
+  expect(tooWide).toBe(0);
+});
+
+test('at 1680 with every stat ticked no cell clips its content, and the full values show', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1680, height: 1000 });
+  await page.goto('/app/calendar?month=2026-11');
+  await expect(page.getByTestId('calendar-ready')).toBeVisible({
+    timeout: 30_000,
+  });
+  await page.getByRole('button', { name: 'Stats shown' }).click();
+  for (const name of [
+    'Net P&L',
+    'Trades',
+    'Win rate',
+    'R',
+    'Fees',
+    'Ticks',
+    'Pips',
+    'Points',
+  ]) {
+    const box = page.getByRole('checkbox', { name, exact: true });
+    if (!(await box.isChecked()))
+      await box.evaluate((el) => (el as HTMLElement).click());
+  }
+  await page.keyboard.press('Escape');
+  const cells = page.locator('button[data-date]');
+  await expect(cells.first()).toBeVisible();
+  const clipped = await cells.evaluateAll((els) =>
+    els
+      .filter((el) => el.scrollWidth > el.clientWidth)
+      .map((el) => (el as HTMLElement).dataset.date),
+  );
+  expect(clipped).toEqual([]);
+  // Wide enough for the full forms: a fees line reads "-$154.xx fees", not the short form.
+  const cell = page.getByRole('button', { name: /^Mon 2 Nov/ });
+  await expect(
+    cell.locator('span:visible', { hasText: /fees$/ }).first(),
+  ).toContainText('$');
+});

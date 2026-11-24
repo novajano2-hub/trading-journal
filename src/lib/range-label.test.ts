@@ -40,6 +40,7 @@ test('preset labels', () => {
     'This month',
     'Last month',
     'Last 30 days',
+    'This quarter',
     'Year to date',
   ]);
 });

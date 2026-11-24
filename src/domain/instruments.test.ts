@@ -92,6 +92,16 @@ describe('resolveInstrument', () => {
       }),
     ).toMatchObject({ root: 'XYZ', assetClass: 'future', pointValue: 10 });
   });
+  test('an override that makes a futures symbol an option marks it an option on a future', () => {
+    expect(
+      resolveInstrument('XYZZ5', {
+        overrides: {
+          XYZ: { pointValue: 10, tickSize: 0.1, assetClass: 'option' },
+        },
+      }),
+    ).toMatchObject({ assetClass: 'option', optionOn: 'future' });
+    expect(resolveInstrument('ESZ5')!.optionOn).toBeUndefined();
+  });
   test('garbage resolves to null', () => {
     expect(resolveInstrument('')).toBeNull();
     expect(resolveInstrument('12345')).toBeNull();
