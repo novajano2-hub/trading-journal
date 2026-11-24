@@ -133,6 +133,23 @@ export function LeftOutNote({
   );
 }
 
+/**
+ * Said where "View N trades" is not offered: the filters name other strategies
+ * (any of them), and the log cannot ask for this one inside that choice.
+ */
+export function NoLogView({
+  className = '',
+}: {
+  className?: string;
+}): React.JSX.Element {
+  return (
+    <p className={`text-[12.5px] leading-[1.45] text-faint ${className}`}>
+      The log cannot list these trades: your filters ask for other strategies,
+      any of them, and one log filter cannot say both.
+    </p>
+  );
+}
+
 /** A failed archive or unarchive: neutral, since nothing here is money. */
 export function ArchiveFailed({
   name,

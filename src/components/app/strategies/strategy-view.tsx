@@ -31,6 +31,7 @@ import {
   ArchiveFailed,
   HiddenTrades,
   LeftOutNote,
+  NoLogView,
   NoStrategy,
   StrategyError,
   StrategySkeleton,
@@ -485,6 +486,9 @@ function Header({
         )}
       </div>
       <LeftOutNote count={leftOut} className="basis-full" />
+      {tradesHref === undefined && tradeCount > 0 ? (
+        <NoLogView className="basis-full" />
+      ) : null}
       {update.isError ? (
         <ArchiveFailed
           name={s.name}

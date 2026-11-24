@@ -308,6 +308,42 @@ test('the trade link carries the filters, with this strategy', async () => {
   );
 });
 
+/** str-1's second trade also has str-2; str-3 exists; the first trade has only str-1. */
+async function withStrategies(): Promise<SampleWorkspace> {
+  const fx = await sample();
+  fx.strategies.push(
+    { ...fx.strategies[0]!, id: 'str-2', name: 'Pullback' },
+    { ...fx.strategies[0]!, id: 'str-3', name: 'Reversal' },
+  );
+  fx.trades[1]!.strategyIds = ['str-1', 'str-2'];
+  return fx;
+}
+
+test('View n trades never goes quiet: with one other strategy in the filters it links with both (E142)', async () => {
+  renderApp(<StrategyView id="str-1" />, {
+    sample: withStrategies,
+    url: '/app/strategies/str-1?strategy=str-2',
+  });
+  const view = await screen.findByRole('link', { name: 'View 1 trade' });
+  const p = new URL(view.getAttribute('href')!, 'http://x').searchParams;
+  expect(p.get('strategy')!.split(',').sort()).toEqual(['str-1', 'str-2']);
+  expect(p.get('stratmatch')).toBe('all');
+  expect(screen.queryByText(/The log cannot list these trades/)).toBeNull();
+});
+
+test('with two other strategies in the filters no log filter says both, and the page says so in one line (E142)', async () => {
+  renderApp(<StrategyView id="str-1" />, {
+    sample: withStrategies,
+    url: '/app/strategies/str-1?strategy=str-2,str-3',
+  });
+  expect(
+    await screen.findByText(/The log cannot list these trades/),
+  ).toBeTruthy();
+  expect(screen.queryByRole('link', { name: /^View \d+ trade/ })).toBeNull();
+  // The other buttons stay.
+  expect(screen.getByRole('link', { name: 'Edit strategy' })).toBeTruthy();
+});
+
 test('with no trade in the filters it says the filters hide them, and Clear filters brings them back', async () => {
   openAt('?from=2030-01-01&to=2030-01-31');
   expect(
