@@ -1,5 +1,14 @@
 import { describe, expect, test } from 'vitest';
-import { timeSeries, type SeriesMetric } from '../domain/metrics/series';
+import type { MetricContext } from '../domain/metrics/context';
+import {
+  bucketSpan,
+  timeSeries,
+  type SeriesMetric,
+} from '../domain/metrics/series';
+import { tradeStreaks } from '../domain/metrics/streaks';
+import { holdTimes, longestHold, summarize } from '../domain/metrics/summary';
+import { localDate } from '../domain/time';
+import { isClosed } from '../domain/trade-status';
 import { defaultPrefs } from './repository';
 import { applyFilters, EMPTY_FILTERS, narrowToUnit } from './filters';
 import { metricContextOf, metricsByCurrency } from './metrics';
@@ -60,7 +69,11 @@ describe('the last running value is the figure of the whole range', () => {
   });
 
   test('activity and time', () => {
-    expect(last('volume')).toBe(1169 - openVolume());
+    // As the Overview counts it: every trade matched, the two open ones too.
+    expect(last('volume')).toBe(1169);
+    expect(last('volume')).toBe(m.volume);
+    expect(last('avg-daily-volume')).toBeCloseTo(m.avgDailyVolume!, 10);
+    expect(last('avg-daily-volume')!.toFixed(2)).toBe('9.82');
     expect(last('trades')).toBe(m.summary.closedCount);
     expect(last('avg-hold-time')).toBeCloseTo(m.holds.all!, 8);
     expect(last('longest-day')).toBe(m.dayDurations.longest);
@@ -77,16 +90,84 @@ describe('the last running value is the figure of the whole range', () => {
   });
 });
 
-/** The bundle's volume counts the two open trades too; the series counts closed trades. */
-function openVolume(): number {
-  return trades
-    .filter((t) => t.status !== 'closed')
-    .reduce((n, t) => n + t.maxPosition, 0);
-}
+describe('running values equal a summary of everything so far', () => {
+  const closed = trades.filter(isClosed);
+  const weeks = timeSeries(trades, ctx, 'trades', 'week').map((p) => p.key);
+  const upTo = (key: string, c: MetricContext) =>
+    closed.filter(
+      (t) => localDate(t.closedAt, c.timeZone) <= bucketSpan(key, 'week').to,
+    );
+  const unitCtx = { ...ctx, unit: 'ticks' as const };
+  test.each([
+    ['dollar', ctx, trades],
+    ['ticks', unitCtx, narrowToUnit(trades, 'ticks')],
+  ] as const)('in %s, at every week', (_name, c, set) => {
+    const inUnit = c.unit !== undefined;
+    for (const key of weeks) {
+      const sum = summarize(upTo(key, c), c);
+      const at = (metric: SeriesMetric) =>
+        timeSeries(set, c, metric, 'week', { mode: 'running' }).find(
+          (p) => p.key === key,
+        )?.value;
+      expect(at('win-rate')).toBe(sum.winRate);
+      expect(at('profit-factor')).toBe(sum.profitFactor);
+      expect(at('win-loss-ratio')).toBe(sum.winLossRatio);
+      expect(at('wins')).toBe(sum.wins);
+      expect(at('losses')).toBe(sum.losses);
+      expect(at('breakevens')).toBe(sum.breakevens);
+      expect(at('avg-realized-r')).toBe(sum.avgRealizedR);
+      expect(at('avg-planned-r')).toBe(sum.avgPlannedR);
+      expect(at('trades')).toBe(sum.closedCount);
+      expect(at('avg-hold-time')).toBeCloseTo(
+        holdTimes(upTo(key, c), c).all!,
+        8,
+      );
+      expect(at('longest-trade')).toBe(longestHold(upTo(key, c)));
+      expect(at('win-streak')).toBe(tradeStreaks(upTo(key, c), c).maxWin);
+      expect(at('loss-streak')).toBe(tradeStreaks(upTo(key, c), c).maxLoss);
+      if (!inUnit) {
+        expect(at('avg-win')).toBe(sum.avgWin);
+        expect(at('avg-loss')).toBe(sum.avgLoss);
+        expect(at('expectancy')).toBe(sum.expectancy);
+        expect(at('largest-win')).toBe(sum.largestWin);
+        expect(at('largest-loss')).toBe(sum.largestLoss);
+      }
+    }
+  });
+});
 
-test('three running metrics over a year of days stay inside the budget', () => {
+describe('Futures live in Ticks, as TradeZella read it', () => {
+  const tctx = metricContextOf({
+    ...defaultPrefs(),
+    timeZone: 'America/New_York',
+    displayUnit: 'ticks',
+  });
+  const set = narrowToUnit(trades, 'ticks');
+  const lastIn = (metric: SeriesMetric) =>
+    timeSeries(set, tctx, metric, 'week', { mode: 'running' }).at(-1)!.value;
+  test('574 trades, +8,495 ticks, average win 109.09, average loss -81.38', () => {
+    // 572 closed and 2 open.
+    expect(lastIn('trades')).toBe(572);
+    expect(lastIn('open-trades')).toBe(2);
+    expect(lastIn('net')).toBeCloseTo(8495, 6);
+    expect(lastIn('avg-win')).toBeCloseTo(109.09, 2);
+    expect(lastIn('avg-loss')).toBeCloseTo(-81.38, 2);
+    expect(lastIn('profit-factor')).toBeCloseTo(1.3689, 4);
+    expect(lastIn('sharpe')).toBeNull();
+  });
+});
+
+test('three heavy running metrics by day recompute inside 50 ms', () => {
+  // The full sample, one currency, the date range as the report holds it.
+  const all = ws.trades.filter((t) => t.pnlCurrency === 'USD');
+  const c = { ...ctx, range: { to: '2026-11-20' } };
+  const balance = { start: m.riskStart, flows: m.riskFlows };
+  const run = () => {
+    for (const metric of ['sharpe', 'avg-drawdown', 'win-streak'] as const)
+      timeSeries(all, c, metric, 'day', { mode: 'running', balance });
+  };
+  run();
   const t0 = performance.now();
-  for (const metric of ['win-rate', 'avg-win', 'long-win-rate'] as const)
-    timeSeries(trades, ctx, metric, 'day', { mode: 'running' });
-  expect(performance.now() - t0).toBeLessThan(450);
+  run();
+  expect(performance.now() - t0).toBeLessThan(50);
 });

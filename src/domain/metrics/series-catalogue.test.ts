@@ -215,10 +215,50 @@ describe('per period and running', () => {
   });
 
   test('max drawdown by day is the deepest fall, below zero', () => {
-    expect(values(all, 'max-drawdown', 'week')).toEqual([0, -15000, -5000]);
+    // The peak is carried from the range start: week 3 opens 20,000 under it.
+    expect(values(all, 'max-drawdown', 'week')).toEqual([0, -15000, -20000]);
     expect(values(all, 'max-drawdown', 'week', 'running')).toEqual([
       0, -15000, -20000,
     ]);
+  });
+
+  test('a period that opens in a drawdown reads it from the peak before it', () => {
+    // Equity by day: 5000, 5000, 25000, 10000, 5000, peak 25000 from 11-12.
+    expect(values(all, 'max-drawdown', 'day')).toEqual([
+      0, 0, 0, -15000, -20000,
+    ]);
+    expect(values(all, 'avg-drawdown', 'week')).toEqual([null, -15000, -20000]);
+    expect(values(all, 'avg-drawdown', 'month')).toEqual([-17500]);
+  });
+
+  test('volume counts the open trades the Overview counts', () => {
+    const open = makeTrade({
+      net: 0,
+      status: 'open',
+      maxPosition: 3,
+      openedAt: '2026-11-16T18:00:00Z',
+    });
+    expect(values([...all, open], 'volume', 'day', 'running')).toEqual([
+      2, 4, 5, 6, 10,
+    ]);
+    expect(values([...all, open], 'volume', 'day')).toEqual([2, 2, 1, 1, 4]);
+    expect(
+      values([...all, open], 'avg-daily-volume', 'day', 'running'),
+    ).toEqual([2, 2, 5 / 3, 6 / 4, 10 / 5]);
+    // An open trade on a day with no exit adds a bucket for volume only.
+    const later = makeTrade({
+      net: 0,
+      status: 'open',
+      maxPosition: 1,
+      openedAt: '2026-11-18T15:00:00Z',
+    });
+    expect(timeSeries([...all, later], ctx, 'volume', 'day').at(-1)).toEqual({
+      key: '2026-11-18',
+      value: 1,
+    });
+    expect(
+      timeSeries([...all, later], ctx, 'win-rate', 'day').map((p) => p.key),
+    ).toEqual(DAYS);
   });
 
   test('average drawdown is the mean of the days under a peak', () => {

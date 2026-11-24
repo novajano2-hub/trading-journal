@@ -298,6 +298,9 @@ test('durations and quantities show in their own units in the table', async () =
     url: `${URL}?m=avg-hold-time:line,volume:bar&bucket=month`,
   });
   const table = await screen.findByRole('table', { name: 'Summary by month' });
-  const row = within(table).getAllByRole('row')[1]!.textContent!;
-  expect(row).toMatch(/\d+(h|m)/);
+  const cells = within(within(table).getAllByRole('row')[1]!)
+    .getAllByRole('cell')
+    .map((c) => c.textContent);
+  // Every trade is held an hour; nine trades of one contract.
+  expect(cells).toEqual(['Nov 2026', '1h', '9']);
 });

@@ -549,3 +549,18 @@ test('a cross-analysis cell links to the trades in both buckets', async () => {
   expect(['long', 'short']).toContain(url.searchParams.get('side'));
   expect(cell.getAttribute('aria-label')).toMatch(/open in the trade log$/);
 });
+
+test('a running mode in a breakdown link is dropped, so its URLs stay clean', async () => {
+  renderApp(<SymbolsView />, {
+    sample: breakdownSample,
+    url: '/app/reports/symbols?m=net:bar:running,win-rate:line:running',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const chips = within(
+    await within(page).findByRole('group', { name: 'Chart metrics' }),
+  );
+  fireEvent.click(chips.getByRole('button', { name: /^Net P&L, bars/ }));
+  expect(new URLSearchParams(window.location.search).get('m')).toBe(
+    'net:line,win-rate:line',
+  );
+});

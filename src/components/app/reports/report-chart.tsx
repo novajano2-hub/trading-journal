@@ -231,33 +231,34 @@ const multiple = (v: number, digits: number): string =>
 export function formatterOf(display: Display, currency: string): Formatter {
   const unitText = (v: number, compact: boolean, signed: boolean) =>
     formatUnitValue(display.unit, v, { currency, signed, compact });
+  const text = (unit: SeriesUnit, v: number): string => {
+    switch (unit) {
+      case 'money':
+        return display.cash(v, true, currency).label;
+      case 'tradeunit':
+        return unitText(v, false, true);
+      case 'pct':
+        return formatPct(v, 1);
+      case 'ratio':
+        return v.toFixed(2);
+      case 'multiple':
+        return multiple(v, 2);
+      case 'count':
+        return String(Math.round(v));
+      case 'qty':
+        return formatQty(v);
+      case 'minutes':
+        return formatMinutes(v);
+    }
+  };
   return {
     node(unit, v) {
       if (v === null) return 'None';
       if (unit === 'money')
         return <FigureText f={display.cash(v, true, currency)} />;
-      return this.text(unit, v);
+      return text(unit, v);
     },
-    text(unit, v) {
-      switch (unit) {
-        case 'money':
-          return display.cash(v, true, currency).label;
-        case 'tradeunit':
-          return unitText(v, false, true);
-        case 'pct':
-          return formatPct(v, 1);
-        case 'ratio':
-          return v.toFixed(2);
-        case 'multiple':
-          return multiple(v, 2);
-        case 'count':
-          return String(Math.round(v));
-        case 'qty':
-          return formatQty(v);
-        case 'minutes':
-          return formatMinutes(v);
-      }
-    },
+    text,
     tick(unit, v) {
       switch (unit) {
         case 'money':

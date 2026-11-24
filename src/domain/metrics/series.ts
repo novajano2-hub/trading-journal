@@ -1,3 +1,4 @@
+import { roundHalfEven } from '../money';
 import { localDate } from '../time';
 import { closedInOrder, isClosed } from '../trade-status';
 import type { Cents, Trade } from '../types';
@@ -10,18 +11,10 @@ import {
   dayValue,
   type DayStat,
 } from './days';
-import { avgDrawdown, maxDrawdown } from './equity';
+import { drawdownSeries } from './equity';
 import { sizedRealizations } from './realized';
 import { riskRatios } from './risk';
-import { tradeStreaks } from './streaks';
-import {
-  holdTimes,
-  largestInUnit,
-  longestHold,
-  summarize,
-  volumeOf,
-  type Summary,
-} from './summary';
+import { plannedR, rOf, tradeVolume } from './summary';
 import { unitOf } from './units';
 
 export type SeriesMetric =
@@ -250,37 +243,258 @@ export interface SeriesOptions {
 
 const mean = (xs: readonly number[]): number | null =>
   xs.length === 0 ? null : xs.reduce((a, b) => a + b, 0) / xs.length;
+const ratio = (n: number, d: number): number | null => (d === 0 ? null : n / d);
+const clean = (n: number) => Math.round(n * 1e6) / 1e6;
 
-/** The money figures of a set of closed trades read in `ctx.unit`: the unit values of the wins and the losses. */
-function unitFigures(
-  closed: readonly Trade[],
-  ctx: MetricContext,
-): {
-  avgWin: number | null;
-  avgLoss: number | null;
-  expectancy: number | null;
-} {
-  const wins: number[] = [];
-  const losses: number[] = [];
-  for (const t of closed) {
-    const v = ctx.unit ? unitOf(t, ctx.unit, ctx.pnlBasis) : null;
-    if (v === null) continue;
-    const { outcome } = classify(t, ctx);
-    if (outcome === 'win') wins.push(v);
-    else if (outcome === 'loss') losses.push(v);
-  }
-  const decisive = wins.length + losses.length;
-  const avgWin = mean(wins);
-  const avgLoss = mean(losses);
-  return {
-    avgWin,
-    avgLoss,
-    expectancy:
-      decisive === 0
-        ? null
-        : (wins.length / decisive) * (avgWin ?? 0) +
-          (losses.length / decisive) * (avgLoss ?? 0),
+/** What one closed trade adds to every trade-level figure, read once. */
+interface Fact {
+  date: string;
+  key: string;
+  trade: Trade;
+  outcome: 'win' | 'loss' | 'breakeven';
+  value: Cents;
+  /** The trade in `ctx.unit`, when there is one and the trade has it. */
+  unit: number | null;
+  realizedR: number | undefined;
+  plannedR: number | undefined;
+  held: number;
+  volume: number;
+}
+
+/** The sums a running figure is read from, carried from bucket to bucket. */
+interface Acc {
+  n: number;
+  wins: number;
+  losses: number;
+  winSum: number;
+  lossSum: number;
+  winU: { n: number; sum: number; best: number | null };
+  lossU: { n: number; sum: number; worst: number | null };
+  best: number | null;
+  worst: number | null;
+  rSum: number;
+  rN: number;
+  pSum: number;
+  pN: number;
+  holdSum: number;
+  holdMax: number | null;
+  long: Side;
+  short: Side;
+  streak: {
+    kind: 'win' | 'loss' | null;
+    length: number;
+    maxWin: number;
+    maxLoss: number;
   };
+}
+interface Side {
+  n: number;
+  wins: number;
+  losses: number;
+}
+
+const emptyAcc = (): Acc => ({
+  n: 0,
+  wins: 0,
+  losses: 0,
+  winSum: 0,
+  lossSum: 0,
+  winU: { n: 0, sum: 0, best: null },
+  lossU: { n: 0, sum: 0, worst: null },
+  best: null,
+  worst: null,
+  rSum: 0,
+  rN: 0,
+  pSum: 0,
+  pN: 0,
+  holdSum: 0,
+  holdMax: null,
+  long: { n: 0, wins: 0, losses: 0 },
+  short: { n: 0, wins: 0, losses: 0 },
+  streak: { kind: null, length: 0, maxWin: 0, maxLoss: 0 },
+});
+
+function add(acc: Acc, f: Fact): void {
+  acc.n += 1;
+  const side = f.trade.direction === 'long' ? acc.long : acc.short;
+  side.n += 1;
+  if (f.outcome === 'win') {
+    acc.wins += 1;
+    side.wins += 1;
+    acc.winSum += f.value;
+    acc.best = acc.best === null ? f.value : Math.max(acc.best, f.value);
+    if (f.unit !== null) {
+      acc.winU.n += 1;
+      acc.winU.sum += f.unit;
+      acc.winU.best =
+        acc.winU.best === null ? f.unit : Math.max(acc.winU.best, f.unit);
+    }
+  } else if (f.outcome === 'loss') {
+    acc.losses += 1;
+    side.losses += 1;
+    acc.lossSum += f.value;
+    acc.worst = acc.worst === null ? f.value : Math.min(acc.worst, f.value);
+    if (f.unit !== null) {
+      acc.lossU.n += 1;
+      acc.lossU.sum += f.unit;
+      acc.lossU.worst =
+        acc.lossU.worst === null ? f.unit : Math.min(acc.lossU.worst, f.unit);
+    }
+  }
+  if (f.realizedR !== undefined) {
+    acc.rSum += f.realizedR;
+    acc.rN += 1;
+  }
+  if (f.plannedR !== undefined) {
+    acc.pSum += f.plannedR;
+    acc.pN += 1;
+  }
+  acc.holdSum += f.held;
+  acc.holdMax = acc.holdMax === null ? f.held : Math.max(acc.holdMax, f.held);
+  // A breakeven neither extends nor breaks a streak.
+  if (f.outcome !== 'breakeven') {
+    const s = acc.streak;
+    s.length = f.outcome === s.kind ? s.length + 1 : 1;
+    s.kind = f.outcome;
+    if (f.outcome === 'win') s.maxWin = Math.max(s.maxWin, s.length);
+    else s.maxLoss = Math.max(s.maxLoss, s.length);
+  }
+}
+
+/**
+ * The trade-level figures of the sums, as `summarize` reads them (the parity
+ * test holds them to it at every bucket): money in cents, or the unit's own
+ * numbers for the metrics that read it under `ctx.unit`.
+ */
+function accValue(
+  metric: SeriesMetric,
+  a: Acc,
+  unit: boolean,
+): number | null | undefined {
+  const decisive = a.wins + a.losses;
+  const avgWin = ratio(a.winSum, a.wins);
+  const avgLoss = ratio(a.lossSum, a.losses);
+  const uWin = ratio(a.winU.sum, a.winU.n);
+  const uLoss = ratio(a.lossU.sum, a.lossU.n);
+  switch (metric) {
+    case 'avg-win':
+      return unit ? uWin : avgWin === null ? null : roundHalfEven(avgWin);
+    case 'avg-loss':
+      return unit ? uLoss : avgLoss === null ? null : roundHalfEven(avgLoss);
+    case 'win-loss-ratio':
+      return unit
+        ? uWin === null || uLoss === null || uLoss >= 0
+          ? null
+          : uWin / -uLoss
+        : avgWin === null || avgLoss === null || avgLoss === 0
+          ? null
+          : avgWin / Math.abs(avgLoss);
+    case 'profit-factor':
+      return unit
+        ? a.lossU.n === 0 || a.lossU.sum >= 0
+          ? null
+          : a.winU.sum / -a.lossU.sum
+        : a.losses === 0
+          ? null
+          : ratio(a.winSum, Math.abs(a.lossSum));
+    case 'expectancy': {
+      if (unit) {
+        const d = a.winU.n + a.lossU.n;
+        return d === 0
+          ? null
+          : (a.winU.n / d) * (uWin ?? 0) + (a.lossU.n / d) * (uLoss ?? 0);
+      }
+      return decisive === 0
+        ? null
+        : roundHalfEven(
+            (a.wins / decisive) * (avgWin ?? 0) +
+              (a.losses / decisive) * (avgLoss ?? 0),
+          );
+    }
+    case 'largest-win':
+      return unit ? a.winU.best : a.best;
+    case 'largest-loss':
+      return unit ? a.lossU.worst : a.worst;
+    case 'avg-planned-r':
+      return ratio(a.pSum, a.pN);
+    case 'avg-realized-r':
+      return ratio(a.rSum, a.rN);
+    case 'avg-hold-time':
+      return ratio(a.holdSum, a.n);
+    case 'longest-trade':
+      return a.holdMax;
+    case 'trades':
+      return a.n;
+    case 'wins':
+      return a.wins;
+    case 'losses':
+      return a.losses;
+    case 'breakevens':
+      return a.n - a.wins - a.losses;
+    case 'long-trades':
+      return a.long.n;
+    case 'short-trades':
+      return a.short.n;
+    case 'win-rate':
+      return ratio(a.wins, decisive);
+    case 'long-win-rate':
+      return ratio(a.long.wins, a.long.wins + a.long.losses);
+    case 'short-win-rate':
+      return ratio(a.short.wins, a.short.wins + a.short.losses);
+    case 'win-streak':
+      return a.streak.maxWin;
+    case 'loss-streak':
+      return a.streak.maxLoss;
+    default:
+      return undefined;
+  }
+}
+
+/** What a series needs of a trade set under one context, read once and shared by the metrics that plot it. */
+interface Base {
+  days: DayStat[];
+  /** The days' distance under their running peak, from the range start. */
+  under: number[];
+  facts: Fact[];
+  lengths?: { date: string; minutes: number }[];
+  netDays?: DayStat[];
+  /** Volume by date: closed trades by close, open ones by open. */
+  volume?: { date: string; value: number; open: boolean }[];
+}
+
+const cache = new WeakMap<readonly Trade[], WeakMap<MetricContext, Base>>();
+
+function baseOf(trades: readonly Trade[], ctx: MetricContext): Base {
+  let byCtx = cache.get(trades);
+  if (!byCtx) cache.set(trades, (byCtx = new WeakMap()));
+  const hit = byCtx.get(ctx);
+  if (hit) return hit;
+  const days = dailyPnl(trades, ctx);
+  const facts: Fact[] = [];
+  for (const t of closedInOrder(trades)) {
+    const date = localDate(t.closedAt, ctx.timeZone);
+    if (!inRange(date, ctx.range)) continue;
+    const c = classify(t, ctx);
+    facts.push({
+      date,
+      key: date,
+      trade: t,
+      outcome: c.outcome,
+      value: c.value,
+      unit: ctx.unit ? unitOf(t, ctx.unit, ctx.pnlBasis) : null,
+      realizedR: rOf(t, ctx.pnlBasis),
+      plannedR: plannedR(t),
+      held: (Date.parse(t.closedAt) - Date.parse(t.openedAt)) / 60000,
+      volume: tradeVolume(t),
+    });
+  }
+  const base: Base = {
+    days,
+    under: drawdownSeries(days).map((d) => d.value),
+    facts,
+  };
+  byCtx.set(ctx, base);
+  return base;
 }
 
 /**
@@ -292,14 +506,17 @@ function unitFigures(
  * hold times) go on the local date a trade closed. Pass the trades with every
  * filter but the date, and the date range in `ctx.range`: both kinds then
  * count only what is dated inside it. A bucket with exits but no trade closed
- * in it has no win rate (null); trades and fees are 0. The input must be a
- * single-currency set.
+ * in it has no win rate (null); trades and fees are 0. Volume counts open
+ * trades too, dated by their open, as the Overview's does. The input must be
+ * a single-currency set.
  *
  * In `running` mode each bucket holds the metric over everything from the
- * range start to the bucket's end (the win rate of all trades so far), not
- * only that bucket's own. Under a narrowing `ctx.unit` the sums and averages
- * are numbers in that unit; fees and drawdown stay in cents, and Sharpe and
- * Sortino, which read the balance, have no value.
+ * range start to the bucket's end (the win rate of all trades so far), read
+ * in one pass in time order with the sums carried from bucket to bucket. The
+ * drawdowns carry their peak from the range start in both modes. Under a
+ * narrowing `ctx.unit` the sums and averages are numbers in that unit; fees
+ * and drawdown stay in cents, and Sharpe and Sortino, which read the balance,
+ * have no value.
  */
 export function timeSeries(
   trades: readonly Trade[],
@@ -311,8 +528,10 @@ export function timeSeries(
   const info = SERIES_META[metric];
   const running = info.running === true || opts.mode === 'running';
   const keyOf = (date: string) => bucketKey(date, bucket);
+  const base = baseOf(trades, ctx);
+  const { days, facts } = base;
+  for (const f of facts) f.key = keyOf(f.date);
 
-  const days = dailyPnl(trades, ctx);
   const fees = new Map<string, number>();
   if (metric === 'fees')
     for (const t of trades)
@@ -322,151 +541,127 @@ export function timeSeries(
         const key = keyOf(date);
         fees.set(key, (fees.get(key) ?? 0) + r.fees);
       }
-  const closed: { date: string; key: string; trade: Trade }[] = [];
-  for (const t of closedInOrder(trades)) {
-    const date = localDate(t.closedAt, ctx.timeZone);
-    if (inRange(date, ctx.range))
-      closed.push({ date, key: keyOf(date), trade: t });
-  }
-  // An open trade is dated by its open, and only its own metric shows it.
-  const opened = new Map<string, number>();
-  if (metric === 'open-trades')
+  // Open trades are dated by their open, and only their own metrics show them.
+  const wantsOpen =
+    metric === 'open-trades' ||
+    metric === 'volume' ||
+    metric === 'avg-daily-volume';
+  const opened: { date: string; key: string; trade: Trade }[] = [];
+  if (wantsOpen)
     for (const t of trades) {
       if (isClosed(t)) continue;
       const date = localDate(t.openedAt, ctx.timeZone);
-      if (!inRange(date, ctx.range)) continue;
-      const key = keyOf(date);
-      opened.set(key, (opened.get(key) ?? 0) + 1);
+      if (inRange(date, ctx.range))
+        opened.push({ date, key: keyOf(date), trade: t });
     }
+  opened.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
   const keys = [
     ...new Set([
       ...days.map((d) => keyOf(d.date)),
       ...fees.keys(),
-      ...closed.map((c) => c.key),
-      ...opened.keys(),
+      ...facts.map((f) => f.key),
+      ...opened.map((o) => o.key),
     ]),
   ].sort();
 
-  // What each metric reads, by bucket or from the start to the bucket's end.
   const needsLengths = metric === 'avg-day-length' || metric === 'longest-day';
-  const lengths = needsLengths ? dayLengths(trades, ctx) : [];
+  if (needsLengths && !base.lengths) base.lengths = dayLengths(trades, ctx);
   const needsNet = metric === 'sharpe' || metric === 'sortino';
-  const netDays = !needsNet
-    ? []
-    : ctx.pnlBasis === 'net'
-      ? days
-      : dailyPnl(trades, { ...ctx, pnlBasis: 'net' });
+  if (needsNet && !base.netDays)
+    base.netDays =
+      ctx.pnlBasis === 'net'
+        ? days
+        : dailyPnl(trades, { ...ctx, pnlBasis: 'net' });
+  const lengths = base.lengths ?? [];
+  const netDays = base.netDays ?? [];
+  const volumeItems = [
+    ...facts.map((f) => ({ date: f.date, value: f.volume })),
+    ...opened.map((o) => ({ date: o.date, value: tradeVolume(o.trade) })),
+  ].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
-  const within = <T extends { date: string }>(
-    list: readonly T[],
-    span: { from: string; to: string },
-  ): T[] =>
-    list.filter(
-      (x) => x.date <= span.to && (running ? true : x.date >= span.from),
-    );
+  // Each list is in date order: a bucket's slice is two moving indices.
+  const cursor = (list: readonly { date: string }[]) => {
+    let lo = 0;
+    let hi = 0;
+    return (span: { from: string; to: string }) => {
+      while (hi < list.length && list[hi]!.date <= span.to) hi += 1;
+      if (!running) while (lo < hi && list[lo]!.date < span.from) lo += 1;
+      return [lo, hi] as const;
+    };
+  };
+  const dayAt = cursor(days);
+  const netAt = cursor(netDays);
+  const lenAt = cursor(lengths);
+  const factAt = cursor(facts);
+  const volAt = cursor(volumeItems);
+  const openAt = cursor(opened);
 
+  const acc = emptyAcc();
+  let added = 0;
+  const negative = (n: number | null) => (n === null ? null : n === 0 ? 0 : -n);
   let feeTotal = 0;
-  let openTotal = 0;
   return keys.map((key): SeriesPoint => {
     const span = bucketSpan(key, bucket);
-    const scopeDays: DayStat[] = within(days, span);
-    const group = within(closed, span).map((c) => c.trade);
-    const summary = (): Summary => summarize(group, ctx);
-    const inUnit = ctx.unit !== undefined && info.inUnit === true;
-    const unitSet = () => unitFigures(group, ctx);
-    const rate = (side: 'long' | 'short') =>
-      summarize(
-        group.filter((t) => t.direction === side),
-        ctx,
-      ).winRate;
-    const negative = (n: number | null) =>
-      n === null ? null : n === 0 ? 0 : -n;
+    const [d0, d1] = dayAt(span);
+    const [f0, f1] = factAt(span);
+    const scopeDays = days.slice(d0, d1);
+    // The sums: carried when running, rebuilt over the bucket otherwise.
+    let sums = acc;
+    if (running) {
+      for (; added < f1; added += 1) add(acc, facts[added]!);
+    } else {
+      sums = emptyAcc();
+      for (let i = f0; i < f1; i += 1) add(sums, facts[i]!);
+    }
+    const sumOf = (
+      list: readonly { value: number }[],
+      [a, b]: readonly [number, number],
+    ) => {
+      let n = 0;
+      for (let i = a; i < b; i += 1) n += list[i]!.value;
+      return clean(n);
+    };
     const value = (): number | null => {
+      const fromSums = accValue(metric, sums, ctx.unit !== undefined);
+      if (fromSums !== undefined) return fromSums;
       switch (metric) {
         case 'net':
         case 'cumulative-net':
           return scopeDays.reduce((n, d) => n + dayValue(d, ctx), 0);
         case 'avg-daily-net':
           return daySummary(scopeDays, ctx).avgDailyPnl;
-        case 'avg-win':
-          return inUnit ? unitSet().avgWin : summary().avgWin;
-        case 'avg-loss':
-          return inUnit ? unitSet().avgLoss : summary().avgLoss;
-        case 'win-loss-ratio':
-          return summary().winLossRatio;
-        case 'expectancy':
-          return inUnit ? unitSet().expectancy : summary().expectancy;
-        case 'largest-win':
-        case 'largest-loss': {
-          const side = metric === 'largest-win' ? 'win' : 'loss';
-          if (!ctx.unit)
-            return side === 'win'
-              ? summary().largestWin
-              : summary().largestLoss;
-          const t = largestInUnit(group, ctx, side);
-          return t ? unitOf(t, ctx.unit, ctx.pnlBasis) : null;
-        }
-        case 'profit-factor':
-          return summary().profitFactor;
         case 'fees':
           if (!running) return fees.get(key) ?? 0;
           feeTotal += fees.get(key) ?? 0;
           return feeTotal;
-        case 'avg-planned-r':
-          return summary().avgPlannedR;
-        case 'avg-realized-r':
-          return summary().avgRealizedR;
         case 'max-drawdown':
           return scopeDays.length === 0
             ? null
-            : negative(maxDrawdown(scopeDays, 0).amount);
-        case 'avg-drawdown':
-          return negative(avgDrawdown(scopeDays, 0).amount);
-        case 'avg-hold-time':
-          return holdTimes(group, ctx).all;
-        case 'longest-trade':
-          return longestHold(group);
+            : negative(-Math.min(0, ...base.under.slice(d0, d1)));
+        case 'avg-drawdown': {
+          const depths = base.under.slice(d0, d1).filter((v) => v < 0);
+          const m = mean(depths);
+          return m === null ? null : roundHalfEven(m);
+        }
         case 'avg-day-length':
-          return mean(within(lengths, span).map((l) => l.minutes));
+          return mean(lengths.slice(...lenAt(span)).map((l) => l.minutes));
         case 'longest-day': {
-          const m = within(lengths, span).map((l) => l.minutes);
+          const m = lengths.slice(...lenAt(span)).map((l) => l.minutes);
           return m.length === 0 ? null : Math.max(...m);
         }
-        case 'trades':
-          return group.length;
-        case 'wins':
-          return summary().wins;
-        case 'losses':
-          return summary().losses;
-        case 'breakevens':
-          return summary().breakevens;
-        case 'open-trades':
-          if (!running) return opened.get(key) ?? 0;
-          openTotal += opened.get(key) ?? 0;
-          return openTotal;
-        case 'long-trades':
-          return group.filter((t) => t.direction === 'long').length;
-        case 'short-trades':
-          return group.filter((t) => t.direction === 'short').length;
+        case 'open-trades': {
+          const [a, b] = openAt(span);
+          return b - a;
+        }
         case 'volume':
-          return volumeOf(group);
+          return sumOf(volumeItems, volAt(span));
         case 'avg-daily-volume':
           return scopeDays.length === 0
             ? null
-            : volumeOf(group) / scopeDays.length;
-        case 'win-rate':
-          return summary().winRate;
-        case 'long-win-rate':
-          return rate('long');
-        case 'short-win-rate':
-          return rate('short');
+            : sumOf(volumeItems, volAt(span)) / scopeDays.length;
         case 'green-days':
           return daySummary(scopeDays, ctx).greenPct;
-        case 'win-streak':
-          return tradeStreaks(group, ctx).maxWin;
-        case 'loss-streak':
-          return tradeStreaks(group, ctx).maxLoss;
         case 'green-day-streak':
           return dayStreaks(scopeDays, ctx).maxWin;
         case 'red-day-streak':
@@ -474,22 +669,21 @@ export function timeSeries(
         case 'sharpe':
         case 'sortino': {
           if (ctx.unit || !opts.balance) return null;
-          const own = within(netDays, span);
-          // A period starts from the balance the earlier days left.
+          const [n0, n1] = netAt(span);
           const start =
             opts.balance.start +
-            (running
-              ? 0
-              : netDays
-                  .filter((d) => d.date < span.from)
-                  .reduce((n, d) => n + d.net, 0));
-          const r = riskRatios(own, start, opts.balance.flows);
+            (running ? 0 : netDays.slice(0, n0).reduce((n, d) => n + d.net, 0));
+          const r = riskRatios(
+            netDays.slice(n0, n1),
+            start,
+            opts.balance.flows,
+          );
           return metric === 'sharpe' ? r.sharpe : r.sortino;
         }
+        default:
+          return null;
       }
     };
-    const v = value();
-    // A bucket with nothing closed in it has no average, rate or ratio; counts stay 0.
-    return { key, value: v };
+    return { key, value: value() };
   });
 }

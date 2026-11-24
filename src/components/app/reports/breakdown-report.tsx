@@ -361,7 +361,12 @@ export function BreakdownCards({
   const bestRow = best[0];
   const worstRow = best.length > 1 ? best[best.length - 1] : undefined;
   const picks = useMemo(
-    () => parsePicks(params.get('m'), DEFAULT_PICKS, CHART_METRICS),
+    () =>
+      // A breakdown has no time to run along: a running mode in the link is dropped.
+      parsePicks(params.get('m'), DEFAULT_PICKS, CHART_METRICS).map((x) => ({
+        ...x,
+        mode: 'period' as const,
+      })),
     [params],
   );
   const setPicks = (next: Pick[]) => writeParam('m', formatPicks(next));
