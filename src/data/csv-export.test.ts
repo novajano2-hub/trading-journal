@@ -108,3 +108,19 @@ describe('tradesCsv', () => {
     ]);
   });
 });
+
+test('a name a spreadsheet would run as a formula exports as text; negative money stays a number (E83)', () => {
+  const evil = {
+    ...env,
+    strategies: [{ ...fx.strategies[0]!, name: '=HYPERLINK("http://x")' }],
+  };
+  const t = makeTrade({
+    id: 'e',
+    net: -12_345,
+    strategyIds: [fx.strategies[0]!.id],
+    openedAt: '2026-03-02T15:00:00Z',
+    closedAt: '2026-03-02T15:05:30Z',
+  });
+  const [, row] = tradesCsv([t], ['strategies', 'net'], evil).split('\r\n');
+  expect(row).toBe(`"'=HYPERLINK(""http://x"")",-123.45`);
+});

@@ -204,7 +204,7 @@ Deferred minors from the Plan 5 module reviews, one line each, and the TradeZell
 | E80 | Previous/Next on the trade page include open trades while the log defaults to Closed, and read "No earlier trade" while loading | Trades |
 | E81 | Stop and target blur saves the rounded text over a more precise stored value | Trades |
 | E82 | The manual form opens for archived accounts, forex suggestions are hard-coded, a future without a contract month is accepted, and a re-entry after flat gets the "reverse" sentence | Trades |
-| E83 | CSV export: R is always net, open trades get an R, times drop seconds, and there is no formula-injection guard on cells starting with `=`, `+`, `-` or `@` | Trades |
+| E83 | CSV export: R is always net, open trades get an R, and times drop seconds. ~~There is no formula-injection guard on cells starting with `=`, `+`, `-` or `@`~~. Done in the Plan 5 final fix wave: both exports write through `csvField`, which puts `'` before a text cell starting with `=`, `+`, `-`, `@`, a tab or a carriage return and never before a number | Trades |
 | E84 | The time-zone test is not tied to a fixed process zone | Trades |
 | E85 | Large files and duplicated helpers: `trade-view.tsx` (1153 lines), `manual-trade-form.tsx` (1012), `trades-view.tsx` (837); `decoded`, `StateBlock` and `Message`, `tone`, `pnlTone` and `signTone`, `listOf`, `TagChip` and `TagToken`; price and qty formatting in `columns.tsx`; `domain/manual-trade.ts` imports from `data/repository` | Trades |
 | E86 | Raw colours remain (`!text-white` in the confirm dialog, a `#6B7280` fallback); two `h1`s on the manual form; `aria-selected` on table rows; the status chip tone; the fills chart label and ticks; "Saved" without a time; "per point" for forex | Trades |

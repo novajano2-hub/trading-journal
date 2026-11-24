@@ -1,6 +1,18 @@
-/** One CSV field, quoted when it holds a comma, a quote or a line break. */
-function quote(field: string): string {
-  return /[",\r\n]/.test(field) ? `"${field.replace(/"/g, '""')}"` : field;
+/** A plain number, as the exports write one: -123.45, 0.50, 1e-7. */
+const NUMBER = /^[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?$/;
+/** What a spreadsheet would read as the start of a formula. */
+const FORMULA = /^[=+\-@\t\r]/;
+
+/**
+ * One CSV field: text a spreadsheet would run as a formula (a cell starting
+ * with `=`, `+`, `-`, `@`, a tab or a carriage return) gains a leading `'`
+ * so it opens as text, and a number never does, so negative money stays a
+ * number (E83). Then quoted when it holds a comma, a quote or a line break.
+ * Every export writes its fields through this.
+ */
+export function csvField(field: string): string {
+  const safe = FORMULA.test(field) && !NUMBER.test(field) ? `'${field}` : field;
+  return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
 /** A header and rows as CSV text, lines ending in CRLF. */
@@ -9,7 +21,7 @@ export function csvText(
   rows: readonly (readonly (string | number | null)[])[],
 ): string {
   return [header, ...rows]
-    .map((r) => r.map((f) => quote(f === null ? '' : String(f))).join(','))
+    .map((r) => r.map((f) => csvField(f === null ? '' : String(f))).join(','))
     .join('\r\n');
 }
 

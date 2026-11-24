@@ -1,4 +1,5 @@
 import { localParts } from '@/domain/time';
+import { csvField, decimalOf } from '@/lib/csv';
 import type { Trade } from '@/domain/types';
 import { COLUMN_LABELS, type ColumnId } from './trade-columns';
 import {
@@ -22,19 +23,8 @@ function clock(iso: string, timeZone: string): string {
   return `${p.date} ${two(p.hour)}:${two(p.minute)}`;
 }
 
-/** Cents as a plain decimal: -123.45. */
-function decimal(cents: number): string {
-  const sign = cents < 0 ? '-' : '';
-  const abs = Math.abs(Math.round(cents));
-  return `${sign}${Math.floor(abs / 100)}.${two(abs % 100)}`;
-}
-
 const fixed = (n: number | undefined, digits: number) =>
   n === undefined ? '' : n.toFixed(digits);
-
-function quote(field: string): string {
-  return /[",\r\n]/.test(field) ? `"${field.replace(/"/g, '""')}"` : field;
-}
 
 /**
  * The trades as CSV, one column per id, in that order. The values are the real
@@ -67,11 +57,11 @@ export function tradesCsv(
       case 'exit':
         return t.avgExit === undefined ? '' : String(t.avgExit);
       case 'gross':
-        return decimal(t.gross);
+        return decimalOf(t.gross);
       case 'fees':
-        return decimal(t.fees);
+        return decimalOf(t.fees);
       case 'net':
-        return decimal(t.net);
+        return decimalOf(t.net);
       case 'roi': {
         const roi = netRoiOf(t);
         return fixed(roi === undefined ? undefined : roi * 100, 2);
@@ -107,10 +97,10 @@ export function tradesCsv(
   };
   const header = columns.map((id) => {
     const l = COLUMN_LABELS[id];
-    return quote(l.csv ?? l.label);
+    return csvField(l.csv ?? l.label);
   });
   const rows = trades.map((t) =>
-    columns.map((id) => quote(value(t, id))).join(','),
+    columns.map((id) => csvField(value(t, id))).join(','),
   );
   return [header.join(','), ...rows].join('\r\n');
 }
