@@ -526,3 +526,25 @@ test('on one of several currencies the largest-day links open the calendar on it
     ),
   ).toBe('EUR');
 });
+
+test('the cumulative and daily P&L cards share a row from xl up, in equal halves', async () => {
+  renderApp(<OverviewView />, { sample: reportsSample, url: URL });
+  const page = await ready();
+  const cumulative = within(page).getByRole('region', {
+    name: 'Cumulative P&L',
+  });
+  const daily = within(page).getByRole('region', { name: 'Daily P&L' });
+  const row = cumulative.parentElement!;
+  expect(daily.parentElement).toBe(row);
+  expect(row.children).toHaveLength(2);
+  // Stacked below xl, two equal columns from it.
+  expect(row.className).toContain('xl:grid-cols-2');
+  expect(row.className).not.toMatch(/(^|\s)grid-cols-2/);
+  // Each keeps its own Expand in its header.
+  expect(
+    within(cumulative).getByRole('button', { name: 'Expand chart' }),
+  ).toBeTruthy();
+  expect(
+    within(daily).getByRole('button', { name: 'Expand chart' }),
+  ).toBeTruthy();
+});

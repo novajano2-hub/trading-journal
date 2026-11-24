@@ -97,7 +97,7 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | ID | Feature | Keel today | Goes |
 |---|---|---|---|
 | RE1 | Overview, plus reports by day and time, symbol, strategy, tags and mistakes, side, duration, R-distribution | Spec | P5, Done |
-| RE2 | Up to three chart metrics per report (bar or line), a sortable summary table, and a second dimension to cross-analyse by | Gap 10 | P5, Done |
+| RE2 | Up to three chart metrics per report (bar or line); on Performance two independent chart slots, each with up to three metrics, its own grouping, Expand and Remove (Add chart restores one); a sortable summary table, and a second dimension to cross-analyse by | Gap 10 | P5, Done |
 | RE3 | Wins vs losses: the same stats for winners and losers side by side | Gap 10 | P5, Done |
 | RE4 | Compare: two groups, each defined by its own filters, side by side | Gap 10 | P5, Done |
 | RE5 | Risk report: position size, R-multiple buckets, drawdown | Gap 10 | P5, Done |

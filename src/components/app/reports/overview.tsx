@@ -628,102 +628,110 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
       />
       {keyFigures}
 
-      <section aria-labelledby={cumulativeId} className={`${CARD} ${CARD_PAD}`}>
-        <CardHeader
-          headingId={cumulativeId}
-          title="Cumulative P&L"
-          after={
-            <span className="text-[12.5px] text-faint">
-              By realization date, {days.length} trading{' '}
-              {plural(days.length, 'day')}, {data.caption}
-            </span>
-          }
-          end={
-            <>
-              {ends === undefined || ends === null ? null : (
-                <span className="mr-2 text-[12.5px] text-faint">
-                  Ends at{' '}
-                  <b className={`font-semibold ${signTone(ends)}`}>
-                    {fmt.node(plotUnit, ends)}
-                  </b>
-                </span>
-              )}
-              <span ref={setCumSlot} className="flex" />
-            </>
-          }
-        />
-        <div className="mt-3">
-          <ReportChart
-            label={cumulativeName}
-            expandSlot={cumSlot}
-            currency={currency}
-            height={280}
-            shade={shade}
-            extra={[
-              {
-                label: 'That day',
-                text: (key) => {
-                  const d = dayOf.get(key);
-                  return plotText(d ? dayValue(d, ctx) : 0);
+      <div className="grid gap-4 xl:grid-cols-2">
+        <section
+          aria-labelledby={cumulativeId}
+          className={`${CARD} ${CARD_PAD} min-w-0`}
+        >
+          <CardHeader
+            headingId={cumulativeId}
+            title="Cumulative P&L"
+            after={
+              <span className="text-[12.5px] text-faint">
+                By realization date, {days.length} trading{' '}
+                {plural(days.length, 'day')}, {data.caption}
+              </span>
+            }
+            end={
+              <>
+                {ends === undefined || ends === null ? null : (
+                  <span className="mr-2 text-[12.5px] text-faint">
+                    Ends at{' '}
+                    <b className={`font-semibold ${signTone(ends)}`}>
+                      {fmt.node(plotUnit, ends)}
+                    </b>
+                  </span>
+                )}
+                <span ref={setCumSlot} className="flex" />
+              </>
+            }
+          />
+          <div className="mt-3">
+            <ReportChart
+              label={cumulativeName}
+              expandSlot={cumSlot}
+              currency={currency}
+              height={280}
+              shade={shade}
+              extra={[
+                {
+                  label: 'That day',
+                  text: (key) => {
+                    const d = dayOf.get(key);
+                    return plotText(d ? dayValue(d, ctx) : 0);
+                  },
                 },
-              },
-              {
-                label: 'Trades',
-                text: (key) => String(dayOf.get(key)?.tradeCount ?? 0),
-              },
-            ]}
-            series={[
-              {
-                label: 'Cumulative P&L',
-                kind: 'line',
-                unit: plotUnit,
-                points: seriesIn.cumulative,
-              },
-            ]}
-          />
-        </div>
-      </section>
+                {
+                  label: 'Trades',
+                  text: (key) => String(dayOf.get(key)?.tradeCount ?? 0),
+                },
+              ]}
+              series={[
+                {
+                  label: 'Cumulative P&L',
+                  kind: 'line',
+                  unit: plotUnit,
+                  points: seriesIn.cumulative,
+                },
+              ]}
+            />
+          </div>
+        </section>
 
-      <section aria-labelledby={dailyId} className={`${CARD} ${CARD_PAD}`}>
-        <CardHeader
-          headingId={dailyId}
-          title="Daily P&L"
-          after={
-            <span className="text-[12.5px] text-faint">
-              {ds.greenDays} green {plural(ds.greenDays, 'day')}, {ds.redDays}{' '}
-              red {plural(ds.redDays, 'day')}
-            </span>
-          }
-          end={
-            <>
-              {ds.best && ds.worst ? (
-                <span className="mr-2 text-[12.5px] text-faint">
-                  Best {periodText(ds.best.date)}, worst{' '}
-                  {periodText(ds.worst.date)}
-                </span>
-              ) : null}
-              <span ref={setDaySlot} className="flex" />
-            </>
-          }
-        />
-        <div className="mt-3">
-          <ReportChart
-            label={dailyName}
-            expandSlot={daySlot}
-            currency={currency}
-            height={220}
-            labelExtremes
-            series={[
-              {
-                label: 'Daily P&L',
-                kind: 'bar',
-                unit: plotUnit,
-                points: seriesIn.daily,
-              },
-            ]}
+        <section
+          aria-labelledby={dailyId}
+          className={`${CARD} ${CARD_PAD} min-w-0`}
+        >
+          <CardHeader
+            headingId={dailyId}
+            title="Daily P&L"
+            after={
+              <span className="text-[12.5px] text-faint">
+                {ds.greenDays} green {plural(ds.greenDays, 'day')}, {ds.redDays}{' '}
+                red {plural(ds.redDays, 'day')}
+              </span>
+            }
+            end={
+              <>
+                {ds.best && ds.worst ? (
+                  <span className="mr-2 text-[12.5px] text-faint">
+                    Best {periodText(ds.best.date)}, worst{' '}
+                    {periodText(ds.worst.date)}
+                  </span>
+                ) : null}
+                <span ref={setDaySlot} className="flex" />
+              </>
+            }
           />
-        </div>
-      </section>
+          <div className="mt-3">
+            <ReportChart
+              label={dailyName}
+              expandSlot={daySlot}
+              currency={currency}
+              height={280}
+              labelExtremes
+              series={[
+                {
+                  label: 'Daily P&L',
+                  kind: 'bar',
+                  unit: plotUnit,
+                  points: seriesIn.daily,
+                },
+              ]}
+            />
+          </div>
+        </section>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         {grossToNet}

@@ -95,3 +95,21 @@ test('Calendar day sheet opens on its heading; the import stepper is one line', 
   ).toBeVisible();
   await expect(page.getByRole('list', { name: 'Import steps' })).toBeHidden();
 });
+
+test('Performance at 390: the two chart slots stack, each the full width', async ({
+  page,
+}) => {
+  await page.goto('/app/reports/performance');
+  await expect(page.getByTestId('reports-performance')).toBeVisible({
+    timeout: 30_000,
+  });
+  const one = page.getByRole('region', { name: 'Chart 1', exact: true });
+  const two = page.getByRole('region', { name: 'Chart 2', exact: true });
+  await expect(one.getByRole('img')).toBeVisible();
+  const [a, b] = await Promise.all([one.boundingBox(), two.boundingBox()]);
+  // One above the other, and neither narrower than the other.
+  expect(b!.y).toBeGreaterThanOrEqual(a!.y + a!.height - 1);
+  expect(Math.abs(a!.x - b!.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(a!.width - b!.width)).toBeLessThanOrEqual(1);
+  expect(await noOverflow(page)).toBeLessThanOrEqual(0);
+});

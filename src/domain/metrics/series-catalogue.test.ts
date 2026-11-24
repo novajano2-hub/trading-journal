@@ -106,11 +106,37 @@ describe('the catalogue', () => {
     }
     const inGroup = (g: string) =>
       SERIES_METRICS.filter((m) => SERIES_META[m].group === g);
-    expect(inGroup('Profitability')).toHaveLength(11);
+    expect(inGroup('Profitability')).toHaveLength(12);
     expect(inGroup('Risk')).toHaveLength(4);
     expect(inGroup('Time')).toHaveLength(4);
     expect(inGroup('Activity')).toHaveLength(9);
     expect(inGroup('Consistency')).toHaveLength(10);
+  });
+});
+
+describe('average daily win/loss', () => {
+  test('is the Overview figure: the average green day over the average red day', () => {
+    // Greens 5000 and 20000 average 12500; reds -15000 and -5000 average -10000.
+    expect(values(all, 'avg-daily-win-loss', 'month')).toEqual([1.25]);
+    expect(SERIES_META['avg-daily-win-loss']).toMatchObject({
+      group: 'Profitability',
+      unit: 'moneyratio',
+    });
+  });
+
+  test('is empty until a period has both a green and a red day, and reads on running', () => {
+    // A day alone has one colour; the flat day has none.
+    expect(values(all, 'avg-daily-win-loss')).toEqual([
+      null,
+      null,
+      null,
+      null,
+      null,
+    ]);
+    const running = values(all, 'avg-daily-win-loss', 'day', 'running');
+    expect(running.slice(0, 3)).toEqual([null, null, null]);
+    expect(running[3]).toBeCloseTo(12500 / 15000);
+    expect(running[4]).toBeCloseTo(1.25);
   });
 });
 

@@ -24,6 +24,7 @@ export type SeriesMetric =
   | 'net'
   | 'cumulative-net'
   | 'avg-daily-net'
+  | 'avg-daily-win-loss'
   | 'avg-win'
   | 'avg-loss'
   | 'win-loss-ratio'
@@ -123,6 +124,12 @@ export const SERIES_META: Record<SeriesMetric, SeriesMeta> = {
   'avg-daily-net': meta('Profitability', 'Average daily P&L', 'money', 'bar', {
     inUnit: true,
   }),
+  'avg-daily-win-loss': meta(
+    'Profitability',
+    'Average daily win/loss',
+    'moneyratio',
+    'line',
+  ),
   'avg-win': meta('Profitability', 'Average win', 'money', 'bar', {
     inUnit: true,
   }),
@@ -629,6 +636,8 @@ export function timeSeries(
           return scopeDays.reduce((n, d) => n + dayValue(d, ctx), 0);
         case 'avg-daily-net':
           return daySummary(scopeDays, ctx).avgDailyPnl;
+        case 'avg-daily-win-loss':
+          return daySummary(scopeDays, ctx).avgWinLoss;
         case 'fees':
           if (!running) return fees.get(key) ?? 0;
           feeTotal += fees.get(key) ?? 0;

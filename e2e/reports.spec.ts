@@ -42,7 +42,11 @@ test('the expanded chart fills its dialog: the plot reaches the bottom padding, 
   await expect(page.getByTestId('reports-performance')).toBeVisible({
     timeout: 30_000,
   });
-  await page.getByRole('button', { name: 'Expand chart' }).click();
+  // Two chart slots: this opens the first.
+  await page
+    .getByRole('region', { name: 'Chart 1', exact: true })
+    .getByRole('button', { name: 'Expand chart' })
+    .click();
   const dialog = page.getByRole('dialog');
   await expect(dialog.locator('[data-expanded-chart] svg')).toBeVisible();
   // Read at once, with no settling wait: the first frame must already fit.
@@ -57,6 +61,65 @@ test('the expanded chart fills its dialog: the plot reaches the bottom padding, 
   });
   expect(gap).toBeLessThanOrEqual(40);
   expect(gap).toBeGreaterThanOrEqual(-4);
+});
+
+test('Performance at 1440: two charts side by side, no sideways scroll, and Expand works on the second', async ({
+  page,
+}) => {
+  await page.goto('/app/reports/performance');
+  await expect(page.getByTestId('reports-performance')).toBeVisible({
+    timeout: 30_000,
+  });
+  const one = page.getByRole('region', { name: 'Chart 1', exact: true });
+  const two = page.getByRole('region', { name: 'Chart 2', exact: true });
+  await expect(one.getByRole('img')).toBeVisible();
+  await expect(two.getByRole('img')).toBeVisible();
+  const [a, b] = await Promise.all([one.boundingBox(), two.boundingBox()]);
+  // The same row, the first on the left, each about half the width.
+  expect(Math.abs(a!.y - b!.y)).toBeLessThanOrEqual(1);
+  expect(b!.x).toBeGreaterThan(a!.x + a!.width - 1);
+  expect(Math.abs(a!.width - b!.width)).toBeLessThanOrEqual(2);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - innerWidth,
+    ),
+  ).toBeLessThanOrEqual(0);
+
+  await two.getByRole('button', { name: 'Expand chart' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.locator('[data-expanded-chart] svg')).toBeVisible();
+  await expect(dialog).toContainText('Average daily win/loss');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+
+  // Remove the second: Add chart takes its place, and brings it back.
+  await two.getByRole('button', { name: 'Remove chart 2' }).click();
+  await expect(page).toHaveURL(/off=2/);
+  await expect(
+    page.getByRole('region', { name: 'Chart 2', exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole('button', { name: 'Add chart' }).click();
+  await expect(
+    page.getByRole('region', { name: 'Chart 2', exact: true }),
+  ).toBeVisible();
+  await expect(page).not.toHaveURL(/off=/);
+});
+
+test('the Overview at 1440 puts the two P&L charts side by side', async ({
+  page,
+}) => {
+  await openReports(page);
+  const cumulative = page.getByRole('region', { name: 'Cumulative P&L' });
+  const daily = page.getByRole('region', { name: 'Daily P&L' });
+  await expect(cumulative.getByRole('img')).toBeVisible();
+  await expect(daily.getByRole('img')).toBeVisible();
+  const [a, b] = await Promise.all([
+    cumulative.boundingBox(),
+    daily.boundingBox(),
+  ]);
+  expect(Math.abs(a!.y - b!.y)).toBeLessThanOrEqual(1);
+  expect(b!.x).toBeGreaterThan(a!.x + a!.width - 1);
+  expect(Math.abs(a!.width - b!.width)).toBeLessThanOrEqual(2);
 });
 
 test('Day & time: time of day in 15 minutes, by exit, cross-analysed by side', async ({

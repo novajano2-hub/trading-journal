@@ -47,6 +47,7 @@ const TIPS: Record<SeriesMetric, MetricId> = {
   net: 'pnl',
   'cumulative-net': 'cumulative-pnl',
   'avg-daily-net': 'avg-daily-pnl',
+  'avg-daily-win-loss': 'avg-daily-win-loss',
   'avg-win': 'avg-win',
   'avg-loss': 'avg-loss',
   'win-loss-ratio': 'avg-win-loss',
@@ -123,31 +124,132 @@ function seriesLabel(pick: Pick, basis: PnlBasis): string {
     : name;
 }
 
-function Body({ data }: { data: ReportData }): React.JSX.Element {
-  const { partition: p, ctx, basis, currency } = data;
+type SlotNumber = 1 | 2;
+
+/** What each chart opens on while its address says nothing: the running P&L, and the average green day over the red one. */
+const SLOT_DEFAULTS: Record<SlotNumber, readonly Pick[]> = {
+  1: [{ metric: 'net', kind: 'bar', mode: 'running' }],
+  2: [{ metric: 'avg-daily-win-loss', kind: 'line', mode: 'period' }],
+};
+/** Chart 1 keeps the first links' names (`m`, `bucket`); chart 2 adds a 2. */
+const SLOT_PARAMS: Record<SlotNumber, { picks: string; bucket: string }> = {
+  1: { picks: 'm', bucket: 'bucket' },
+  2: { picks: 'm2', bucket: 'bucket2' },
+};
+const OFF_PARAM = 'off';
+const NONE: Pick[] = [];
+
+/**
+ * `?off=2`: a chart that was removed. Both cannot be off, so the first stays;
+ * anything that is not 1 or 2 is ignored.
+ */
+function parseOff(param: string | null): SlotNumber[] {
+  const off = (param ?? '')
+    .split(',')
+    .filter((x): x is '1' | '2' => x === '1' || x === '2')
+    .map((x): SlotNumber => (x === '1' ? 1 : 2));
+  return off.includes(1) && off.includes(2) ? [2] : [...new Set(off)];
+}
+
+interface Slot {
+  n: SlotNumber;
+  picks: Pick[];
+  setPicks(next: Pick[]): void;
+  bucket: Bucket;
+  setBucket(next: Bucket): void;
+  keys: string[];
+  aligned: SeriesPoint[][];
+  series: ChartSeries[];
+}
+
+/**
+ * One chart's choice, read from its own part of the address. The ticks and the
+ * grouping flip at once and follow the address when it changes (the batch G
+ * pattern), so a second click before the address catches up keeps the first.
+ */
+function useSlot(data: ReportData, n: SlotNumber, active: boolean): Slot {
+  const { partition: p, ctx, basis } = data;
   const params = useSearchParams();
-  const param = params.get('m');
-  const fromAddress = useMemo(() => parsePicks(param), [param]);
-  // The ticks flip at once and follow the address when it changes, so a
-  // second tick before the address catches up keeps the first.
+  const names = SLOT_PARAMS[n];
+  const picksParam = params.get(names.picks);
+  const bucketParam = params.get(names.bucket);
+  const fromAddress = useMemo(
+    () => parsePicks(picksParam, SLOT_DEFAULTS[n]),
+    [picksParam, n],
+  );
   const [picks, setLocalPicks] = useAddressCopy(
     fromAddress,
-    JSON.stringify(param),
+    JSON.stringify(picksParam),
   );
-  const bucket = bucketOf(params.get('bucket'));
+  const [bucket, setLocalBucket] = useAddressCopy(
+    bucketOf(bucketParam),
+    JSON.stringify(bucketParam),
+  );
+  // A removed chart plots nothing, so it costs nothing.
+  const plotted = active ? picks : NONE;
+  const { keys, aligned } = useMemo(
+    () =>
+      align(
+        plotted.map((x) =>
+          timeSeries(p.dayTrades, ctx, x.metric, bucket, {
+            mode: modeOf(x),
+            balance: { start: p.riskStart, flows: p.riskFlows },
+          }),
+        ),
+      ),
+    [plotted, p.dayTrades, p.riskStart, p.riskFlows, ctx, bucket],
+  );
+  const series: ChartSeries[] = plotted.map((x, i) => ({
+    label: seriesLabel(x, basis),
+    kind: x.kind,
+    unit: seriesUnit(x.metric, ctx),
+    points: aligned[i]!,
+  }));
+  return {
+    n,
+    picks,
+    setPicks(next) {
+      setLocalPicks(next);
+      writeParam(names.picks, formatPicks(next));
+    },
+    bucket,
+    setBucket(next) {
+      setLocalBucket(next);
+      writeParam(names.bucket, next);
+    },
+    keys,
+    aligned,
+    series,
+  };
+}
+
+const GHOST =
+  'inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-control px-2 text-[12.5px] font-medium text-muted transition-colors duration-200 ease-(--ease-glide) hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 pointer-coarse:px-3';
+
+/**
+ * One chart slot: its metrics (up to three, each bars or a line, per period or
+ * running), its grouping, Expand and Remove, and the chart.
+ */
+function ChartSlot({
+  data,
+  slot,
+  onRemove,
+}: {
+  data: ReportData;
+  slot: Slot;
+  /** Absent for the last chart left, which cannot be removed. */
+  onRemove?(): void;
+}): React.JSX.Element {
+  const { basis, currency } = data;
+  const { picks, setPicks, bucket, series } = slot;
   const display = useDisplay();
   const fmt = formatterOf(display, currency);
   const metricsId = useId();
   const chartId = useId();
-  const tableId = useId();
   const [query, setQuery] = useState('');
   const full = picks.length >= MAX_METRICS;
   const [expandSlot, setExpandSlot] = useExpandSlot();
 
-  const setPicks = (next: Pick[]) => {
-    setLocalPicks(next);
-    writeParam('m', formatPicks(next));
-  };
   const toggle = (metric: SeriesMetric, on: boolean) =>
     setPicks(
       on
@@ -167,24 +269,6 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
     ),
   })).filter((g) => g.metrics.length > 0);
 
-  const { keys, aligned } = useMemo(
-    () =>
-      align(
-        picks.map((x) =>
-          timeSeries(p.dayTrades, ctx, x.metric, bucket, {
-            mode: modeOf(x),
-            balance: { start: p.riskStart, flows: p.riskFlows },
-          }),
-        ),
-      ),
-    [picks, p.dayTrades, p.riskStart, p.riskFlows, ctx, bucket],
-  );
-  const series: ChartSeries[] = picks.map((x, i) => ({
-    label: seriesLabel(x, basis),
-    kind: x.kind,
-    unit: seriesUnit(x.metric, ctx),
-    points: aligned[i]!,
-  }));
   const period = periodOf(bucket);
   /** Where each metric runs, so the label carries values as well as names. */
   const ranges = series
@@ -201,123 +285,84 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
     })
     .join('');
 
-  const rows = useMemo(
-    () =>
-      keys.map((key, i) => ({
-        key,
-        values: aligned.map((s) => s[i]!.value),
-      })),
-    [keys, aligned],
-  );
-  const columns: SummaryColumn<(typeof rows)[number]>[] = [
-    {
-      id: 'period',
-      header: 'Period',
-      value: (r) => r.key,
-      cell: (r) => period(r.key),
-      descFirst: false,
-    },
-    ...picks.map((x, i): SummaryColumn<(typeof rows)[number]> => {
-      const unit = series[i]!.unit;
-      return {
-        id: x.metric,
-        header: seriesLabel(x, basis),
-        tip: TIPS[x.metric],
-        align: 'right',
-        value: (r) => r.values[i],
-        cell: (r) => {
-          const v = r.values[i];
-          if (v === null || v === undefined)
-            return <span className="text-faint">None</span>;
-          if (unit === 'money' || unit === 'tradeunit')
-            return (
-              <span className={`font-[550] ${signTone(v)}`}>
-                {fmt.node(unit, v)}
-              </span>
-            );
-          return fmt.node(unit, v);
-        },
-      };
-    }),
-  ];
-
   return (
-    <>
-      <section aria-labelledby={metricsId} className={`${CARD} ${CARD_PAD}`}>
-        <CardHeader
-          headingId={metricsId}
-          title="Metrics"
-          after={
-            <span className="text-[12.5px] text-faint">
-              {full ? (
-                <span id={`${metricsId}-limit`}>Three metrics at most</span>
-              ) : (
-                'Up to three, each as bars or a line'
-              )}
-            </span>
-          }
-          end={
-            <Segmented
-              label="Group by"
-              options={[
-                { value: 'day', label: 'Day' },
-                { value: 'week', label: 'Week' },
-                { value: 'month', label: 'Month' },
-              ]}
-              value={bucket}
-              onChange={(b) => writeParam('bucket', b)}
-              coarseTargets
-            />
-          }
-        />
-        {picks.length > 0 ? (
-          <ul
-            aria-label="Plotted metrics"
-            className="mt-3 divide-y divide-line/60 rounded-control border border-line"
-          >
-            {picks.map((pick) => {
-              const label = labelOf(pick.metric, basis);
-              return (
-                <li
-                  key={pick.metric}
-                  className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-1.5"
-                >
-                  <span className="min-w-0 flex-1 text-[13.5px] font-medium text-text">
-                    {label}
-                  </span>
+    <section
+      aria-labelledby={chartId}
+      className={`${CARD} ${CARD_PAD} min-w-0`}
+    >
+      <CardHeader
+        headingId={chartId}
+        title={`Chart ${slot.n}`}
+        after={
+          <span className="text-[12.5px] text-faint">
+            By {bucket}, {data.caption}
+          </span>
+        }
+        end={
+          <>
+            <span ref={setExpandSlot} className="flex" />
+            {onRemove ? (
+              <button
+                type="button"
+                aria-label={`Remove chart ${slot.n}`}
+                onClick={onRemove}
+                className={GHOST}
+              >
+                Remove
+              </button>
+            ) : null}
+          </>
+        }
+      />
+      {picks.length > 0 ? (
+        <ul
+          aria-label="Plotted metrics"
+          className="mt-3 divide-y divide-line/60 rounded-control border border-line"
+        >
+          {picks.map((pick) => {
+            const label = labelOf(pick.metric, basis);
+            return (
+              <li
+                key={pick.metric}
+                className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-1.5"
+              >
+                <span className="min-w-0 flex-1 text-[13.5px] font-medium text-text">
+                  {label}
+                </span>
+                <Segmented
+                  label={`${label} chart type`}
+                  options={[
+                    { value: 'bar', label: 'Bar' },
+                    { value: 'line', label: 'Line' },
+                  ]}
+                  value={pick.kind}
+                  onChange={(kind) => change(pick, { kind })}
+                  coarseTargets
+                />
+                {SERIES_META[pick.metric].running ? null : (
                   <Segmented
-                    label={`${label} chart type`}
-                    options={[
-                      { value: 'bar', label: 'Bar' },
-                      { value: 'line', label: 'Line' },
-                    ]}
-                    value={pick.kind}
-                    onChange={(kind) => change(pick, { kind })}
+                    label={`${label} plotted`}
+                    options={MODES}
+                    value={pick.mode}
+                    onChange={(mode) => change(pick, { mode })}
                     coarseTargets
                   />
-                  {SERIES_META[pick.metric].running ? null : (
-                    <Segmented
-                      label={`${label} plotted`}
-                      options={MODES}
-                      value={pick.mode}
-                      onChange={(mode) => change(pick, { mode })}
-                      coarseTargets
-                    />
-                  )}
-                  <button
-                    type="button"
-                    aria-label={`Remove ${label}`}
-                    onClick={() => toggle(pick.metric, false)}
-                    className="inline-grid size-7 cursor-pointer place-items-center rounded-[7px] text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:size-11"
-                  >
-                    <X size={13} weight="bold" aria-hidden="true" />
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        ) : null}
-        <div className="mt-3">
+                )}
+                <button
+                  type="button"
+                  aria-label={`Remove ${label}`}
+                  onClick={() => toggle(pick.metric, false)}
+                  className="inline-grid size-7 cursor-pointer place-items-center rounded-[7px] text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:size-11"
+                >
+                  <X size={13} weight="bold" aria-hidden="true" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div className="flex items-center gap-2.5">
           <Popover.Root>
             <Popover.Trigger
               aria-label="Add metric"
@@ -412,39 +457,147 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
               </Popover.Content>
             </Popover.Portal>
           </Popover.Root>
+          <span className="text-[12.5px] text-faint">
+            {full ? (
+              <span id={`${metricsId}-limit`}>Three metrics at most</span>
+            ) : (
+              'Up to three'
+            )}
+          </span>
         </div>
-      </section>
-
-      <section aria-labelledby={chartId} className={`${CARD} ${CARD_PAD}`}>
-        <CardHeader
-          headingId={chartId}
-          title="Over time"
-          after={
-            <span className="text-[12.5px] text-faint">
-              By {bucket}, {data.caption}
-            </span>
-          }
-          end={<span ref={setExpandSlot} className="flex" />}
+        <Segmented
+          label="Group by"
+          options={[
+            { value: 'day', label: 'Day' },
+            { value: 'week', label: 'Week' },
+            { value: 'month', label: 'Month' },
+          ]}
+          value={bucket}
+          onChange={slot.setBucket}
+          coarseTargets
         />
-        <div className="mt-3">
-          {picks.length === 0 ? (
-            <p className="py-10 text-center text-[13.5px] text-faint">
-              Pick a metric to chart it.
-            </p>
-          ) : (
-            <ReportChart
-              expandSlot={expandSlot}
-              label={`${series.map((s) => s.label).join(', ')} by ${bucket}, ${data.caption}.${ranges}`}
-              series={series}
-              periodLabel={period}
-              currency={currency}
+      </div>
+      <div className="mt-3">
+        {picks.length === 0 ? (
+          <p className="py-10 text-center text-[13.5px] text-faint">
+            Pick a metric to chart it.
+          </p>
+        ) : (
+          <ReportChart
+            expandSlot={expandSlot}
+            label={`${series.map((s) => s.label).join(', ')} by ${bucket}, ${data.caption}.${ranges}`}
+            series={series}
+            periodLabel={period}
+            currency={currency}
+          />
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** Where a removed chart was: one press brings it back. */
+function AddChart({ onAdd }: { onAdd(): void }): React.JSX.Element {
+  return (
+    <div className="flex min-h-40 min-w-0 items-center justify-center rounded-card border border-dashed border-line-2 p-4">
+      <button
+        type="button"
+        onClick={onAdd}
+        className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-[9px] bg-surface-1 px-3 text-[13px] font-medium whitespace-nowrap text-muted shadow-[inset_0_0_0_1px_var(--line-2)] outline-offset-2 hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11"
+      >
+        <Plus size={14} weight="bold" aria-hidden="true" />
+        Add chart
+      </button>
+    </div>
+  );
+}
+
+function Body({ data }: { data: ReportData }): React.JSX.Element {
+  const { basis } = data;
+  const params = useSearchParams();
+  const offParam = params.get(OFF_PARAM);
+  const [off, setLocalOff] = useAddressCopy(
+    parseOff(offParam),
+    JSON.stringify(offParam),
+  );
+  const slots = {
+    1: useSlot(data, 1, !off.includes(1)),
+    2: useSlot(data, 2, !off.includes(2)),
+  };
+  const setOff = (next: SlotNumber[]) => {
+    setLocalOff(next);
+    writeParam(OFF_PARAM, next.length === 0 ? null : next.join(','));
+  };
+  const tableId = useId();
+  // The table follows the first chart that is still there.
+  const lead = off.includes(1) ? slots[2] : slots[1];
+  const { picks, bucket, series, keys, aligned } = lead;
+  const fmt = formatterOf(useDisplay(), data.currency);
+  const period = periodOf(bucket);
+
+  const rows = keys.map((key, i) => ({
+    key,
+    values: aligned.map((s) => s[i]!.value),
+  }));
+  const columns: SummaryColumn<(typeof rows)[number]>[] = [
+    {
+      id: 'period',
+      header: 'Period',
+      value: (r) => r.key,
+      cell: (r) => period(r.key),
+      descFirst: false,
+    },
+    ...picks.map((x, i): SummaryColumn<(typeof rows)[number]> => {
+      const unit = series[i]!.unit;
+      return {
+        id: x.metric,
+        header: seriesLabel(x, basis),
+        tip: TIPS[x.metric],
+        align: 'right',
+        value: (r) => r.values[i],
+        cell: (r) => {
+          const v = r.values[i];
+          if (v === null || v === undefined)
+            return <span className="text-faint">None</span>;
+          if (unit === 'money' || unit === 'tradeunit')
+            return (
+              <span className={`font-[550] ${signTone(v)}`}>
+                {fmt.node(unit, v)}
+              </span>
+            );
+          return fmt.node(unit, v);
+        },
+      };
+    }),
+  ];
+
+  return (
+    <>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {([1, 2] as const).map((n) =>
+          off.includes(n) ? (
+            <AddChart
+              key={n}
+              onAdd={() => setOff(off.filter((x) => x !== n))}
             />
-          )}
-        </div>
-      </section>
+          ) : (
+            <ChartSlot
+              key={n}
+              data={data}
+              slot={slots[n]}
+              onRemove={
+                off.length === 0 ? () => setOff([...off, n]) : undefined
+              }
+            />
+          ),
+        )}
+      </div>
 
       <section aria-labelledby={tableId} className={`${CARD} ${CARD_PAD}`}>
-        <CardHeader headingId={tableId} title={`By ${bucket}`} />
+        <CardHeader
+          headingId={tableId}
+          title={`By ${bucket}, chart ${lead.n}`}
+        />
         <div className="mt-2">
           <SummaryTable
             key={`${bucket}-${picks.map((x) => `${x.metric}${modeOf(x)}`).join()}`}
@@ -460,11 +613,13 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
 }
 
 /**
- * Reports, Performance: up to three metrics, each as bars or a line, over days,
- * weeks or months, with a sortable table of every period beneath. The choice is
- * in the address bar (`?m=net:bar,win-rate:line&bucket=week`) so it can be
- * linked. Day-level and trade-level figures follow `timeSeries`'s rules.
- * Render inside `<Suspense>`.
+ * Reports, Performance: two chart slots side by side (stacked below `lg`), each
+ * with up to three metrics as bars or a line, per period or running, over days,
+ * weeks or months, and under them a sortable table of every period of the
+ * first chart. Each slot's choice is in the address bar
+ * (`?m=net:bar,win-rate:line&bucket=week` for chart 1, `m2` and `bucket2` for
+ * chart 2, `off=2` for a removed chart) so it can be linked. Day-level and
+ * trade-level figures follow `timeSeries`'s rules. Render inside `<Suspense>`.
  */
 export function PerformanceView(): React.JSX.Element {
   return (

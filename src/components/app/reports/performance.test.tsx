@@ -29,8 +29,11 @@ afterEach(cleanup);
 const URL = '/app/reports/performance';
 
 /** The catalogue lives in the "+ Metric" popover: open it, then read its groups. */
+const one = () => within(screen.getByRole('region', { name: 'Chart 1' }));
+
 async function picker() {
-  fireEvent.click(await screen.findByRole('button', { name: 'Add metric' }));
+  await screen.findByRole('region', { name: 'Chart 1' });
+  fireEvent.click(one().getByRole('button', { name: 'Add metric' }));
   return within(await screen.findByRole('group', { name: 'Metrics' }));
 }
 
@@ -66,7 +69,7 @@ test('choosing net (bar), win rate (line) and trades (bar) disables the rest', a
   const kind = (m: string) =>
     (
       within(
-        screen.getByRole('radiogroup', { name: `${m} chart type` }),
+        one().getByRole('radiogroup', { name: `${m} chart type` }),
       ).getByRole('radio', { checked: true }) as HTMLInputElement
     ).value;
   expect([kind('Net P&L'), kind('Win rate'), kind('Trades')]).toEqual([
@@ -76,7 +79,7 @@ test('choosing net (bar), win rate (line) and trades (bar) disables the rest', a
   ]);
   // The choice is in the address bar, so it can be linked.
   expect(new URLSearchParams(window.location.search).get('m')).toBe(
-    'net:bar,win-rate:line,trades:bar',
+    'net:bar:running,win-rate:line,trades:bar',
   );
 
   // Unchecking one frees the others again.
@@ -97,11 +100,11 @@ test('the chart type and the bucket come from the link and change it', async () 
   expect(
     (
       within(
-        screen.getByRole('radiogroup', { name: 'Net P&L chart type' }),
+        one().getByRole('radiogroup', { name: 'Net P&L chart type' }),
       ).getByRole('radio', { checked: true }) as HTMLInputElement
     ).value,
   ).toBe('line');
-  const bucket = within(screen.getByRole('radiogroup', { name: 'Group by' }));
+  const bucket = within(one().getByRole('radiogroup', { name: 'Group by' }));
   expect(
     (bucket.getByRole('radio', { checked: true }) as HTMLInputElement).value,
   ).toBe('week');
@@ -113,7 +116,7 @@ test('the chart type and the bucket come from the link and change it', async () 
   );
   fireEvent.click(
     within(
-      screen.getByRole('radiogroup', { name: 'Trades chart type' }),
+      one().getByRole('radiogroup', { name: 'Trades chart type' }),
     ).getByRole('radio', { name: 'Line' }),
   );
   expect(new URLSearchParams(window.location.search).get('m')).toBe(
@@ -169,7 +172,7 @@ test('Cumulative P&L carries its own definition, not the Net P&L one', async () 
 test('the chart says the range and where each metric runs, and Privacy hides the amounts', async () => {
   const { unmount } = renderApp(<PerformanceView />, {
     sample: reportsSample,
-    url: `${URL}?bucket=day`,
+    url: `${URL}?m=net:bar&bucket=day`,
   });
   // Days: Nov 2 +$60.00, Nov 3 +$100.00, Nov 4 −$80.00, Nov 5 +$45.00.
   expect(
@@ -180,7 +183,10 @@ test('the chart says the range and where each metric runs, and Privacy hides the
   unmount();
   const repository = await newYorkRepository();
   await repository.prefs.update({ displayUnit: 'privacy' });
-  renderApp(<PerformanceView />, { repository, url: `${URL}?bucket=day` });
+  renderApp(<PerformanceView />, {
+    repository,
+    url: `${URL}?m=net:bar&bucket=day`,
+  });
   expect(
     await screen.findByRole('img', {
       name: /^Net P&L by day, all time\. Net P&L runs from hidden amount to hidden amount/,
@@ -240,18 +246,18 @@ test('a chosen metric stays chosen while the search hides it, and the cap still 
   }) as HTMLInputElement;
   expect(sharpe.disabled).toBe(true);
   expect(new URLSearchParams(window.location.search).get('m')).toBe(
-    'net:bar,win-rate:line,volume:bar',
+    'net:bar:running,win-rate:line,volume:bar',
   );
 });
 
 test('each chosen metric switches between a value per period and a running value', async () => {
   renderApp(<PerformanceView />, {
     sample: reportsSample,
-    url: `${URL}?bucket=day`,
+    url: `${URL}?m=net:bar&bucket=day`,
   });
   const metrics = await picker();
   const mode = (m: string) =>
-    within(screen.getByRole('radiogroup', { name: `${m} plotted` }));
+    within(one().getByRole('radiogroup', { name: `${m} plotted` }));
   expect(
     (mode('Net P&L').getByRole('radio', { checked: true }) as HTMLInputElement)
       .value,
@@ -269,7 +275,7 @@ test('each chosen metric switches between a value per period and a running value
   // Not offered for a metric that is a total already.
   fireEvent.click(metrics.getByRole('checkbox', { name: 'Cumulative P&L' }));
   expect(
-    screen.queryByRole('radiogroup', { name: 'Cumulative P&L plotted' }),
+    one().queryByRole('radiogroup', { name: 'Cumulative P&L plotted' }),
   ).toBeNull();
 });
 
@@ -281,9 +287,10 @@ test('the mode comes from the link and a bad one is ignored', async () => {
   await picker();
   const checked = (m: string) =>
     (
-      within(
-        screen.getByRole('radiogroup', { name: `${m} plotted` }),
-      ).getByRole('radio', { checked: true }) as HTMLInputElement
+      within(one().getByRole('radiogroup', { name: `${m} plotted` })).getByRole(
+        'radio',
+        { checked: true },
+      ) as HTMLInputElement
     ).value;
   expect(checked('Trades')).toBe('running');
   expect(checked('Win rate')).toBe('period');
@@ -311,7 +318,8 @@ test('durations and quantities show in their own units in the table', async () =
 
 test('the catalogue is closed until + Metric opens it, and its ticks use the accent, not the gain colour', async () => {
   renderApp(<PerformanceView />, { sample: reportsSample, url: URL });
-  const add = await screen.findByRole('button', { name: 'Add metric' });
+  await screen.findByRole('region', { name: 'Chart 1' });
+  const add = one().getByRole('button', { name: 'Add metric' });
   expect(
     screen.queryByRole('searchbox', { name: 'Search metrics' }),
   ).toBeNull();
@@ -325,7 +333,7 @@ test('the catalogue is closed until + Metric opens it, and its ticks use the acc
   ).toBeTruthy();
   // The chosen metric row keeps its Bar/Line and Period/Running switches.
   expect(
-    screen.getByRole('radiogroup', { name: 'Net P&L plotted' }),
+    one().getByRole('radiogroup', { name: 'Net P&L plotted' }),
   ).toBeTruthy();
 });
 
@@ -343,7 +351,7 @@ test('two quick ticks before the address catches up both stick (I5)', async () =
   expect(box('Trades').checked).toBe(true);
   act(() => commitNavigation());
   expect(new URLSearchParams(window.location.search).get('m')).toBe(
-    'net:bar,win-rate:line,trades:bar',
+    'net:bar:running,win-rate:line,trades:bar',
   );
   expect(box('Win rate').checked).toBe(true);
   expect(box('Trades').checked).toBe(true);
