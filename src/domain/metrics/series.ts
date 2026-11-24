@@ -71,13 +71,15 @@ export type SeriesMode = 'period' | 'running';
 /**
  * How a metric's values read: cents (`money`), a number in the display unit
  * (`tradeunit`: ticks, pips, points or R, when one narrows the trades), a 0..1
- * share, a plain ratio, a multiple of risk, a count, a quantity or minutes.
+ * share, a plain ratio, a ratio of money amounts (`moneyratio`: profit factor and
+ * average win to loss, which Privacy hides), a multiple of risk, a count, a quantity or minutes.
  */
 export type SeriesUnit =
   | 'money'
   | 'tradeunit'
   | 'pct'
   | 'ratio'
+  | 'moneyratio'
   | 'multiple'
   | 'count'
   | 'qty'
@@ -129,7 +131,7 @@ export const SERIES_META: Record<SeriesMetric, SeriesMeta> = {
   'win-loss-ratio': meta(
     'Profitability',
     'Average win to loss',
-    'ratio',
+    'moneyratio',
     'line',
   ),
   expectancy: meta('Profitability', 'Expectancy', 'money', 'bar', {
@@ -141,7 +143,7 @@ export const SERIES_META: Record<SeriesMetric, SeriesMeta> = {
   'largest-loss': meta('Profitability', 'Largest loss', 'money', 'bar', {
     inUnit: true,
   }),
-  'profit-factor': meta('Profitability', 'Profit factor', 'ratio', 'line'),
+  'profit-factor': meta('Profitability', 'Profit factor', 'moneyratio', 'line'),
   fees: meta('Profitability', 'Fees', 'money', 'bar'),
   'avg-planned-r': meta('Risk', 'Average planned R', 'multiple', 'line'),
   'avg-realized-r': meta('Risk', 'Average realized R', 'multiple', 'line'),

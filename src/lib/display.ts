@@ -229,6 +229,21 @@ function symbolOf(currency: string): string {
   return part?.value ?? currency;
 }
 
+/**
+ * A ratio built from money amounts (profit factor, average win to loss) as
+ * text and as the words a screen reader gets. Under Privacy it is dots, like
+ * the amounts it comes from; in every other unit it is the number.
+ */
+export function formatRatioFigure(
+  unit: DisplayUnit,
+  value: number,
+  digits = 2,
+): { text: string; label: string } {
+  if (unit === 'privacy') return { text: '•••', label: 'hidden ratio' };
+  const text = value.toFixed(digits);
+  return { text, label: text };
+}
+
 /** A hidden amount keeps the sign: `+$•••`, `−$•••`, `$•••`. */
 function hidden(money: Cents, currency: string, on: boolean): string {
   const sign = money < 0 ? '−' : money > 0 && on ? '+' : '';
@@ -373,6 +388,8 @@ export interface Display {
    * without `ids`), with `money` as the summary reports it: `expectancyFigure`.
    */
   expectancy(money: Cents, ids?: readonly string[]): Figure;
+  /** A ratio of money amounts (profit factor, average win to loss): hidden under Privacy, the number elsewhere. */
+  ratio(value: number, digits?: number): { text: string; label: string };
   /** The figure as a count-up's number and its formatter. */
   ticker(f: Figure, currency?: string): TickerSpec;
 }
@@ -457,6 +474,7 @@ export function useDisplay(): Display {
         pctBase,
       );
     },
+    ratio: (value, digits) => formatRatioFigure(unit, value, digits),
     ofTrade: (t) => tradeFigure(t, ctx),
     ofAll: (money) =>
       withMoney(

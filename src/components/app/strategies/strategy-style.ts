@@ -89,11 +89,6 @@ export function pctText(x: number | null, digits = 0): string {
   return x === null ? 'None' : `${(x * 100).toFixed(digits)}%`;
 }
 
-/** A profit factor to two places; "None" with no losing trade. */
-export function pfText(x: number | null): string {
-  return x === null ? 'None' : x.toFixed(2);
-}
-
 /** The delete confirmation's sentence, for the trades that lose the strategy. */
 export function deleteBody(n: number): string {
   return n === 1

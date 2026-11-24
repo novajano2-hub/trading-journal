@@ -25,13 +25,7 @@ import type { Rule, RuleGroup, Strategy } from '@/domain/types';
 import { FigureSourceContext, useDisplay } from '@/lib/display';
 import { plural } from '@/lib/format';
 import { CARD, CardHeader, Caption, signTone } from '../dashboard/shared';
-import {
-  ASSET_LABEL,
-  SHOW_WHEN_CHIP,
-  iconOf,
-  pctText,
-  pfText,
-} from './strategy-style';
+import { ASSET_LABEL, SHOW_WHEN_CHIP, iconOf, pctText } from './strategy-style';
 import { EquityLine } from './equity-line';
 import {
   ArchiveFailed,
@@ -46,6 +40,7 @@ import {
   type StrategyData,
   type StrategyFigures,
 } from './use-strategy-figures';
+import { RatioText } from '../ratio-text';
 
 const PAD = 'px-5 pt-[18px] pb-4';
 const TH =
@@ -138,7 +133,11 @@ function ruleCells(
       ),
     // A losers-only rule is kept only on losing trades: a win rate or profit factor of them says nothing.
     winRate: losersOnly ? LOSERS_ONLY : pctText(st.followedWinRate, 1),
-    pf: losersOnly ? LOSERS_ONLY : pfText(st.followedProfitFactor),
+    pf: losersOnly ? (
+      LOSERS_ONLY
+    ) : (
+      <RatioText value={st.followedProfitFactor} />
+    ),
     followedNet: st.followedNet,
     brokenNet: st.brokenNet,
   };
@@ -628,7 +627,7 @@ function StrategyBody({
               />
               <Stat
                 label={<MetricTip id="profit-factor" basis={basis} />}
-                value={pfText(summary.profitFactor)}
+                value={<RatioText value={summary.profitFactor} />}
                 sub={
                   avgWin === null ? undefined : (
                     <>

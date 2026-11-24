@@ -16,7 +16,8 @@ import { MetricTip } from '@/components/ui/metric-tip';
 import type { CalendarDay, DayExit, DayGrading } from '@/data/calendar';
 import { serializeFilters, type GlobalFilters } from '@/data/filters';
 import { formatUnitValue } from '@/lib/display';
-import { formatPct, formatQty, formatRatio, plural } from '@/lib/format';
+import { formatPct, formatQty, plural } from '@/lib/format';
+import { RatioText } from '../ratio-text';
 import { TradeLink } from '../trades/cells';
 import { CARD, InstrumentName } from '../dashboard/shared';
 import { dayLabel, TONE_INK, type FormatMoney } from './month-grid';
@@ -178,7 +179,7 @@ export function DayPanel({
         'Profit factor',
         'Here, what the day won over what it lost.',
       ),
-      day.profitFactor === null ? 'None' : formatRatio(day.profitFactor),
+      <RatioText key="pf" value={day.profitFactor} />,
     ],
     ['Fees', tip('fees', 'Fees'), <FigureText key="f" f={fmt(-day.fees)} />],
     [

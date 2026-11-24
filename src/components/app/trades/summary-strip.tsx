@@ -8,7 +8,8 @@ import type { MetricId } from '@/content/metric-definitions';
 import type { Summary } from '@/domain/metrics/summary';
 import type { PnlBasis } from '@/domain/types';
 import { usePhone } from '@/lib/use-phone';
-import { formatCount, formatPct, formatRatio, plural } from '@/lib/format';
+import { formatCount, formatPct, plural } from '@/lib/format';
+import { RatioText } from '../ratio-text';
 import { CARD, signTone } from '../dashboard/shared';
 
 /** A figure and how it reads, as `useDisplay().figure` gives it. */
@@ -164,7 +165,7 @@ export function SummaryStrip({
               'None'
             ) : (
               <span className="tabular-nums">
-                {formatRatio(summary.winLossRatio)}
+                <RatioText value={summary.winLossRatio} />
               </span>
             )}
           </span>
@@ -185,7 +186,7 @@ export function SummaryStrip({
       {summary.profitFactor === null ? (
         <span className="text-[15px] font-medium text-faint">None</span>
       ) : (
-        formatRatio(summary.profitFactor)
+        <RatioText value={summary.profitFactor} />
       )}
     </Kpi>
   );

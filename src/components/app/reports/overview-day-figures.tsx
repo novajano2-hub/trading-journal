@@ -8,6 +8,7 @@ import { signTone } from '../dashboard/shared';
 import { periodText } from './report-chart';
 import { Stat, StatCard, useDayValue, useMoney } from './overview-stat';
 import type { ReportData } from './use-report-data';
+import { RatioText } from '../ratio-text';
 
 /**
  * Overview: the day averages, the largest green and red days (each opens that
@@ -49,7 +50,7 @@ export function OverviewDayFigures({
           )
         }
       >
-        {ds.avgWinLoss === null ? null : ds.avgWinLoss.toFixed(2)}
+        {ds.avgWinLoss === null ? null : <RatioText value={ds.avgWinLoss} />}
       </Stat>
       <Stat
         id="largest-green-day"

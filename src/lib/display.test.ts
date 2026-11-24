@@ -8,6 +8,7 @@ import {
   meanFigure,
   pctBaseOf,
   sumFigures,
+  formatRatioFigure,
   tradeFigure,
   type Figure,
 } from './display';
@@ -355,5 +356,22 @@ describe('compact unit figures', () => {
       formatFigure({ money: 1, ticks: 64 }, { ...o('ticks'), compact: true })
         .label,
     ).toBe('+64.0 ticks');
+  });
+});
+
+describe('ratios built from money', () => {
+  test('read as the number, and as dots under Privacy, with words for a screen reader', () => {
+    expect(formatRatioFigure('dollar', 1.5)).toEqual({
+      text: '1.50',
+      label: '1.50',
+    });
+    expect(formatRatioFigure('r', 1.5, 1)).toEqual({
+      text: '1.5',
+      label: '1.5',
+    });
+    expect(formatRatioFigure('privacy', 1.5)).toEqual({
+      text: '•••',
+      label: 'hidden ratio',
+    });
   });
 });

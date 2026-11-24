@@ -20,7 +20,8 @@ import { UNIT_SCOPE } from '@/content/display-units';
 import { isTradeUnit } from '@/domain/metrics/units';
 import { leftOutIn, useDisplay, type TickerSpec } from '@/lib/display';
 import { FigureText } from '@/components/product/figure-text';
-import { formatPct, formatRatio, plural } from '@/lib/format';
+import { formatPct, plural } from '@/lib/format';
+import { RatioText } from '../ratio-text';
 import { CARD, CARD_PAD, CardHeader, signTone } from './shared';
 
 /** How each KPI moved through the range, each point over a trailing window. */
@@ -138,8 +139,15 @@ function Kpi({
   /** Closed trades behind each trend point. */
   windowSize: number;
 }): React.JSX.Element {
+  const display = useDisplay();
+  // The profit factor is built from money, so Privacy hides it, its trend's words included.
+  const masked = kind === 'ratio' && display.unit === 'privacy';
   const fmt = (v: number) =>
-    spec ? spec.format(v) : formatTicker(kind, v, { digits: 1, currency });
+    masked
+      ? display.ratio(v).text
+      : spec
+        ? spec.format(v)
+        : formatTicker(kind, v, { digits: 1, currency });
   const shown = spec && value !== null ? spec.value : value;
   const text = shown === null ? 'None' : fmt(shown);
   const hasTrend = trend.length >= 2;
@@ -165,6 +173,8 @@ function Kpi({
         >
           {shown === null ? (
             <span className="font-medium text-faint">None</span>
+          ) : masked ? (
+            <FigureText f={display.ratio(shown)} />
           ) : (
             <NumberTicker
               value={shown}
@@ -199,7 +209,7 @@ function Stat({
   id: MetricId;
   basis: PnlBasis;
   /** Null reads None. */
-  value: string | null;
+  value: React.ReactNode | null;
   sub: React.ReactNode;
 }): React.JSX.Element {
   return (
@@ -403,9 +413,9 @@ export function PerformanceCard({
           id="avg-win-loss"
           basis={basis}
           value={
-            performance.winLossRatio === null
-              ? null
-              : formatRatio(performance.winLossRatio)
+            performance.winLossRatio === null ? null : (
+              <RatioText value={performance.winLossRatio} />
+            )
           }
           sub={
             avgWin === undefined || avgLoss === undefined ? (

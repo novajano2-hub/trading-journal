@@ -24,13 +24,7 @@ import { FigureSourceContext, useDisplay } from '@/lib/display';
 import { plural } from '@/lib/format';
 import { ConfirmDialog } from '../confirm-dialog';
 import { CARD, signTone } from '../dashboard/shared';
-import {
-  ASSET_LABEL,
-  deleteBody,
-  iconOf,
-  pctText,
-  pfText,
-} from './strategy-style';
+import { ASSET_LABEL, deleteBody, iconOf, pctText } from './strategy-style';
 import {
   ArchiveFailed,
   HiddenTrades,
@@ -45,6 +39,7 @@ import {
   type StrategyData,
   type StrategyFigures,
 } from './use-strategy-figures';
+import { RatioText } from '../ratio-text';
 
 type Status = Strategy['status'];
 
@@ -181,7 +176,11 @@ function StrategyCard({
           label={<MetricTip id="pnl" basis={basis} />}
           value={<FigureText f={money} />}
           tone={signTone(f.pnl)}
-          sub={`PF ${pfText(summary.profitFactor)}`}
+          sub={
+            <>
+              PF <RatioText value={summary.profitFactor} />
+            </>
+          }
         />
         <Kpi
           label={<MetricTip id="win-rate" basis={basis} />}

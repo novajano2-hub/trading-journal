@@ -630,7 +630,7 @@ function Compared({
       case 'pct':
         return formatPct(v, 1);
       case 'ratio':
-        return v.toFixed(2);
+        return <FigureText f={display.ratio(v)} />;
       case 'r':
         return formatUnitValue('r', v, { currency, signed: true });
     }
@@ -654,7 +654,12 @@ function Compared({
       }
       case 'ratio': {
         const x = Number(d.toFixed(2));
-        return `${signOf(x)}${Math.abs(x).toFixed(2)}`;
+        // A difference of money ratios hides under Privacy like the ratios.
+        return display.unit === 'privacy' ? (
+          <FigureText f={display.ratio(x)} />
+        ) : (
+          `${signOf(x)}${Math.abs(x).toFixed(2)}`
+        );
       }
       case 'r':
         return formatUnitValue('r', d, { currency, signed: true });

@@ -250,6 +250,8 @@ export function formatterOf(display: Display, currency: string): Formatter {
         return formatPct(v, 1);
       case 'ratio':
         return v.toFixed(2);
+      case 'moneyratio':
+        return display.ratio(v).label;
       case 'multiple':
         return multiple(v, 2);
       case 'count':
@@ -265,6 +267,7 @@ export function formatterOf(display: Display, currency: string): Formatter {
       if (v === null) return 'None';
       if (unit === 'money')
         return <FigureText f={display.cash(v, true, currency)} />;
+      if (unit === 'moneyratio') return <FigureText f={display.ratio(v)} />;
       return text(unit, v);
     },
     text,
@@ -280,6 +283,12 @@ export function formatterOf(display: Display, currency: string): Formatter {
           return formatPct(v, 0);
         case 'ratio':
           return Number.isInteger(v) ? String(v) : v.toFixed(1);
+        case 'moneyratio':
+          return display.unit === 'privacy'
+            ? display.ratio(v).text
+            : Number.isInteger(v)
+              ? String(v)
+              : v.toFixed(1);
         case 'multiple':
           return v === 0 ? '0R' : multiple(v, Number.isInteger(v) ? 0 : 1);
         case 'count':

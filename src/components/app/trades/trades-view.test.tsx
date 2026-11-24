@@ -521,6 +521,24 @@ test('under Privacy no amount survives anywhere in the trade log', async () => {
   expect(within(t).getAllByText('hidden amount').length).toBeGreaterThan(0);
 });
 
+test('Privacy hides the profit factor and the average win to loss, and keeps the win rate and the counts', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: mixed(),
+  });
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<TradesView />, { repository, url: '/app/trades' });
+  const strip = await screen.findByRole('region', { name: 'Summary' });
+  const card = strip.querySelector('[data-kpi="profit-factor"]') as HTMLElement;
+  expect(card.textContent).not.toMatch(/\d\.\d\d/);
+  expect(card.textContent).toContain('•••');
+  expect(within(card).getAllByText('hidden ratio')).toHaveLength(2);
+  expect(strip.querySelector('[data-kpi="win-rate"]')!.textContent).toMatch(
+    /\d+(\.\d)?%/,
+  );
+});
+
 test('a failed cashFlows read shows the failure, not a loader or a false empty state', async () => {
   const real = createLocalRepository({
     indexedDB: new IDBFactory(),

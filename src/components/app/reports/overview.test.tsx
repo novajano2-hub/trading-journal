@@ -137,6 +137,24 @@ test('Privacy leaves no dollar amount anywhere on the page', async () => {
   expect(container.innerHTML).not.toMatch(/aria-label="[^"]*\$\d/);
 });
 
+test('Privacy hides the profit factor, keeps the win rate', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: reportsSample,
+  });
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<OverviewView />, { repository, url: URL });
+  const page = await ready();
+  const pf = page.querySelector('[data-kpi="profit-factor"]')!;
+  expect(pf.textContent).toContain('•••');
+  expect(pf.textContent).not.toMatch(/\d\.\d\d/);
+  expect(within(pf as HTMLElement).getByText('hidden ratio')).toBeTruthy();
+  expect(page.querySelector('[data-kpi="win-rate"]')!.textContent).toMatch(
+    /\d%/,
+  );
+});
+
 test('an empty workspace says so instead of drawing zeros', async () => {
   renderApp(<OverviewView />, {
     sample: async () => ({ ...(await reportsSample()), trades: [] }),

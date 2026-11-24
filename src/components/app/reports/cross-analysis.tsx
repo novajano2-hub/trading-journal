@@ -16,6 +16,8 @@ export interface CrossCell {
    * what the cell reads. It then shows this, and `tint` says gain or loss.
    */
   text?: string;
+  /** A ratio of money amounts (a profit factor): it reads as the number, and hides under Privacy. */
+  ratio?: true;
   /** Signed strength of the tint: positive gain, negative loss; default `value`. */
   tint?: number;
   /** Where the cell's trades are listed; the cell is then a link. */
@@ -56,7 +58,9 @@ export function CrossAnalysis({
       <span
         className={`block font-semibold ${(c.tint ?? c.value) > 0 ? 'text-gain' : (c.tint ?? c.value) < 0 ? 'text-loss' : 'text-text'}`}
       >
-        {c.text !== undefined ? (
+        {c.ratio ? (
+          <FigureText f={display.ratio(c.value)} />
+        ) : c.text !== undefined ? (
           c.text
         ) : (
           <FigureText
@@ -125,7 +129,7 @@ export function CrossAnalysis({
                       <Link
                         href={c.href}
                         prefetch={false}
-                        aria-label={`${r.label}, ${columns[ci]!.label}${c.text !== undefined ? `, ${c.text}` : ''}, ${c.count} ${plural(c.count, 'trade')}, open in the trade log`}
+                        aria-label={`${r.label}, ${columns[ci]!.label}${c.ratio ? `, ${display.ratio(c.value).label}` : c.text !== undefined ? `, ${c.text}` : ''}, ${c.count} ${plural(c.count, 'trade')}, open in the trade log`}
                         className="-mx-2 block rounded-[7px] px-2 py-1 outline-offset-0 hover:underline focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:py-2.5"
                       >
                         {figure(c)}

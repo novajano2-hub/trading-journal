@@ -60,6 +60,7 @@ import { SubTabs } from './sub-tabs';
 import { MenuSelect } from '@/components/ui/menu-select';
 import { SummaryTable, type SummaryColumn } from './summary-table';
 import { writeParam, type ReportData } from './use-report-data';
+import { RatioText } from '../ratio-text';
 
 /** A labelled dropdown: the report's small controls, the app's own menu rather than a native select. */
 export function ReportSelect({
@@ -677,9 +678,11 @@ export function BreakdownCards({
       align: 'right',
       value: (r) => r.summary.profitFactor,
       cell: (r) =>
-        r.summary.profitFactor === null
-          ? none
-          : r.summary.profitFactor.toFixed(2),
+        r.summary.profitFactor === null ? (
+          none
+        ) : (
+          <RatioText value={r.summary.profitFactor} />
+        ),
       csv: {
         value: (r) => r.summary.profitFactor?.toFixed(2) ?? null,
       },
@@ -1080,7 +1083,9 @@ export function BreakdownCards({
                   : {
                       value: v,
                       count,
-                      text: crossText(metric, v),
+                      ...(metric === 'profit-factor'
+                        ? { ratio: true as const }
+                        : { text: crossText(metric, v) }),
                       tint: tintOf(metric, v),
                       ...(href && { href }),
                     };

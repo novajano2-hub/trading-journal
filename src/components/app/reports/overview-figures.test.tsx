@@ -168,6 +168,21 @@ test('the day counts: trading, green, red and flat days, and the days with a dai
   await vi.waitFor(() => expect(stat(card, 'logged-days')).toBe('2'));
 });
 
+test('Privacy hides the average daily win to loss with the amounts beside it', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: figuresSample,
+  });
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<OverviewView />, { repository, url: URL });
+  const root = await screen.findByTestId('reports-overview');
+  const card = within(root).getByRole('region', { name: 'Day figures' });
+  expect(stat(card, 'avg-daily-win-loss')).toContain('•••');
+  expect(stat(card, 'avg-daily-win-loss')).not.toContain('1.13');
+  expect(stat(card, 'avg-daily-win-loss')).toContain('hidden ratio');
+});
+
 test('the day figures: averages, largest days, volume and the average drawdown', async () => {
   const root = await page();
   const card = within(root).getByRole('region', { name: 'Day figures' });
@@ -270,7 +285,7 @@ test('with no daily note, no loss and no fills the figures say None', async () =
   expect(stat(hold, 'hold-time-breakevens')).toContain('None');
 });
 
-test('Privacy masks every new amount and keeps counts and ratios', async () => {
+test('Privacy masks every new amount and the money ratios, and keeps the counts', async () => {
   const repo = createLocalRepository({
     indexedDB: new IDBFactory(),
     IDBKeyRange,
@@ -281,7 +296,9 @@ test('Privacy masks every new amount and keeps counts and ratios', async () => {
   const root = await screen.findByTestId('reports-overview');
   expect(root.textContent).not.toMatch(/\$\d/);
   const days = within(root).getByRole('region', { name: 'Day figures' });
-  expect(stat(days, 'avg-daily-win-loss')).toContain('1.13');
+  // The ratio is built from money, so Privacy hides it as it hides the amounts.
+  expect(stat(days, 'avg-daily-win-loss')).not.toContain('1.13');
+  expect(stat(days, 'avg-daily-win-loss')).toContain('•••');
   expect(
     stat(within(root).getByRole('region', { name: 'Costs' }), 'commissions'),
   ).toContain('$•••');

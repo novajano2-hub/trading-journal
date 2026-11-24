@@ -530,6 +530,31 @@ test('Privacy hides the Mistakes P&L in the panel too', async () => {
   expect(everyString(container).filter((x) => /\$\d/.test(x))).toEqual([]);
 });
 
+test('Privacy hides the day panel profit factor', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: GRADED,
+  });
+  const { unmount } = renderApp(<CalendarView />, {
+    repository,
+    url: url('&day=2026-11-19'),
+  });
+  const shown = await screen.findByRole('complementary', {
+    name: /Thu 19 Nov/,
+  });
+  expect(shown.textContent).toMatch(/Profit factor\s*\d+\.\d\d/);
+  unmount();
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<CalendarView />, { repository, url: url('&day=2026-11-19') });
+  const panel = await screen.findByRole('complementary', {
+    name: /Thu 19 Nov/,
+  });
+  await waitFor(() => expect(panel.textContent).toContain('hidden ratio'));
+  expect(panel.textContent).not.toMatch(/Profit factor\s*\d/);
+  expect(panel.textContent).toMatch(/Win rate\s*\d+(\.\d)?%/);
+});
+
 test('a failed cashFlows read shows the failure, not a loader or a false empty state', async () => {
   const real = createLocalRepository({
     indexedDB: new IDBFactory(),

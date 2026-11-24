@@ -140,6 +140,41 @@ test('with Privacy on, the readout, the axis and the hidden table show $••�
   expect(container.textContent).not.toMatch(/\$[\d,]+[kK]/);
 });
 
+test('with Privacy on, a profit factor series hides its readout, axis and table, and a Sharpe series does not', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  const points = [
+    { key: '2026-11-02', value: 1.5 },
+    { key: '2026-11-03', value: 2.25 },
+  ];
+  const { container } = renderApp(
+    <ReportChart
+      label="Ratios"
+      series={[
+        {
+          label: 'Profit factor',
+          kind: 'line' as const,
+          unit: 'moneyratio' as const,
+          points,
+        },
+      ]}
+    />,
+    { repository },
+  );
+  const chart = await screen.findByRole('img', { name: 'Ratios' });
+  act(() => chart.focus());
+  fireEvent.keyDown(chart, { key: 'ArrowRight' });
+  await vi.waitFor(() =>
+    expect(screen.getByRole('status').textContent).toContain('hidden ratio'),
+  );
+  expect(container.textContent).not.toMatch(/\d\.\d\d/);
+  expect(container.textContent).not.toContain('2.25');
+});
+
 test('named periods label the axis with their own words instead of dates', async () => {
   const { container } = renderApp(
     <ReportChart

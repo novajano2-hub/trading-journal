@@ -164,6 +164,25 @@ test('Privacy leaves no dollar amount in the table, the matrix or the chart', as
   expect(container.innerHTML).not.toMatch(/aria-label="[^"]*\$\d/);
 });
 
+test('Privacy hides the profit factor column', async () => {
+  const repository = await repositoryWith({ displayUnit: 'privacy' });
+  renderApp(<SymbolsView />, {
+    repository,
+    url: '/app/reports/symbols',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const table = within(page).getByRole('table', { name: 'Symbols summary' });
+  const head = within(table)
+    .getAllByRole('columnheader')
+    .findIndex((h) => /Profit factor/.test(h.textContent ?? ''));
+  expect(head).toBeGreaterThan(-1);
+  for (const row of within(table).getAllByRole('row').slice(1)) {
+    const cell = row.querySelectorAll('td, th')[head]!;
+    expect(cell.textContent).not.toMatch(/\d\.\d\d/);
+  }
+  expect(table.textContent).toContain('hidden ratio');
+});
+
 async function repositoryWith(
   prefs: Record<string, unknown>,
   sample: (now: Date) => Promise<SampleWorkspace> = breakdownSample,

@@ -43,6 +43,7 @@ import { OverviewMonths } from './overview-months';
 import { LinkedFigure, NONE, Stat, StatCard } from './overview-stat';
 import { ReportScope } from './report-scope';
 import type { ReportData } from './use-report-data';
+import { RatioText } from '../ratio-text';
 
 function Kpi({
   id,
@@ -180,7 +181,8 @@ function SideRow({
 const tradeHref = (t: Trade | undefined) =>
   t === undefined ? undefined : `/app/trades/${encodeURIComponent(t.id)}`;
 
-const ratio = (n: number | null) => (n === null ? null : n.toFixed(2));
+const ratio = (n: number | null) =>
+  n === null ? null : <RatioText value={n} />;
 
 function Body({ data }: { data: ReportData }): React.JSX.Element {
   const { partition: p, ctx, basis, currency } = data;
