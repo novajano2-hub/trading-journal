@@ -24,6 +24,7 @@ const CALENDAR_STATS: readonly CalendarStat[] = [
   'net',
   'trades',
   'winRate',
+  'rating',
   'r',
   'fees',
   'ticks',

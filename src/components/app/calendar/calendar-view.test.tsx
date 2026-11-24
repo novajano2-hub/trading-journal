@@ -11,6 +11,7 @@ import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { createLocalRepository } from '@/data/local/local-repository';
+import { defaultPrefs } from '@/data/repository';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import { resolveInstrument } from '@/domain/instruments';
@@ -974,4 +975,86 @@ test('Privacy masks money cells but unit cells still read in ticks and pips', as
   expect(es.textContent).not.toMatch(/\$\d/);
   const fx = screen.getByRole('button', { name: /^Tue 3 Nov/ });
   expect(fx.textContent).toContain('+12.0 pips');
+});
+
+const RATED = [
+  ['2026-11-02', 102093, { rating: 5 }],
+  ['2026-11-03', -72763, { rating: undefined }],
+  ['2026-11-19', 4405, { rating: 5 }],
+  ['2026-11-19', 1000, { rating: 4 }],
+  ['2026-11-19', -500, { rating: 4 }],
+  ['2026-11-19', 200, { rating: undefined }],
+] as [string, number, object?][];
+
+test('Day rating: the cell shows the average of the rated trades to one decimal with a star, unrated trades left out', async () => {
+  renderApp(<CalendarView />, { sample: withTrades(RATED), url: url() });
+  const cell = await screen.findByRole('button', { name: /^Thu 19 Nov/ });
+  // (5 + 4 + 4) / 3 = 4.33, and the unrated fourth trade is not a zero.
+  expect(cell.textContent).toContain('4.3★');
+  expect(cell.getAttribute('aria-label')).toContain('Day rating 4.3 of 5');
+  const one = await screen.findByRole('button', { name: /^Mon 2 Nov/ });
+  expect(one.textContent).toContain('5.0★');
+});
+
+test('Day rating: a traded day with nothing rated leaves the line out of the cell and says None in the panel', async () => {
+  renderApp(<CalendarView />, {
+    sample: withTrades(RATED),
+    url: url('&day=2026-11-03'),
+  });
+  const cell = await screen.findByRole('button', { name: /^Tue 3 Nov/ });
+  expect(cell.textContent).not.toContain('★');
+  expect(cell.getAttribute('aria-label')).not.toContain('Day rating');
+  const panel = await screen.findByRole('complementary', {
+    name: /Tue 3 Nov/,
+  });
+  const term = within(panel).getByText('Day rating');
+  expect(term.closest('div')!.textContent).toContain('None');
+});
+
+test('Day rating: the panel lists the average of the day', async () => {
+  renderApp(<CalendarView />, {
+    sample: withTrades(RATED),
+    url: url('&day=2026-11-19'),
+  });
+  const panel = await screen.findByRole('complementary', {
+    name: /Thu 19 Nov/,
+  });
+  expect(
+    within(panel).getByText('Day rating').closest('div')!.textContent,
+  ).toContain('4.3★');
+});
+
+test('Day rating: the new-prefs default is Net P&L, Trades and Day rating; the menu offers it', async () => {
+  expect(defaultPrefs().calendarStats).toEqual(['net', 'trades', 'rating']);
+  renderApp(<CalendarView />, { sample: withTrades(RATED), url: url() });
+  await screen.findByRole('grid', { name: 'November 2026' });
+  fireEvent.click(screen.getByRole('button', { name: 'Stats shown' }));
+  const box = (await screen.findByRole('checkbox', {
+    name: 'Day rating',
+  })) as HTMLInputElement;
+  expect(box.getAttribute('aria-checked') ?? String(box.checked)).toBe('true');
+});
+
+test('Day rating: an existing choice of stats is left alone, so no rating shows', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: withTrades(RATED),
+  });
+  await repository.prefs.update({ calendarStats: ['net', 'trades'] });
+  renderApp(<CalendarView />, { repository, url: url() });
+  const cell = await screen.findByRole('button', { name: /^Thu 19 Nov/ });
+  expect(cell.textContent).not.toContain('★');
+});
+
+test('Day rating: Privacy leaves the rating readable, it is not money', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: withTrades(RATED),
+  });
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<CalendarView />, { repository, url: url('&day=2026-11-19') });
+  const cell = await screen.findByRole('button', { name: /^Thu 19 Nov/ });
+  expect(cell.textContent).toContain('4.3★');
 });

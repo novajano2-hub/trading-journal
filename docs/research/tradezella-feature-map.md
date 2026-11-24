@@ -160,7 +160,7 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | AC3 | Archive an account, which makes it read-only; clear an account's trades after a confirmation | Gap 13 | P5, Done |
 | AC4 | Each account's own time zone, used for manual entry and as the import default | New | P5, Done |
 | AC5 | Cost method per account (FIFO today; LIFO or average later) | Research "Later" | P6 |
-| AC6 | Search the accounts list by name or broker, filter it, and select several rows | New (recording) | B#59 |
+| AC6 | Search the accounts list by name or broker, filter it, and select several rows | New (recording) | P5, Done (B#59) |
 
 ## Prop firms (`/app/prop-firms`)
 

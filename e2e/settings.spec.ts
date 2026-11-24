@@ -15,7 +15,7 @@ test('add a withdrawal, archive an account, and read one of its trades read-only
   const accounts = page.getByRole('table', { name: /^Accounts/ });
   await expect(accounts).toBeVisible({ timeout: 30_000 });
   const row = (name: string) =>
-    accounts.getByRole('row', { name: new RegExp(`^${name}`) });
+    accounts.getByRole('row', { name: new RegExp(`^Select ${name}`) });
   await expect(row('Futures live')).toContainText('$60,860.55');
 
   // A withdrawal on one account moves its balance on its date.
@@ -96,8 +96,46 @@ test('Accounts fits the card at 1440: Prop rules whole, clear of the actions', a
   // The sample workspace shows no Last import line: imports never land there. The broker still reads whole (two lines, no ellipsis).
   await expect(table.getByText(/^Last import/)).toHaveCount(0);
   const broker = await table
-    .getByRole('row', { name: /^Futures live/ })
+    .getByRole('row', { name: /^Select Futures live/ })
     .locator('td:nth-child(2) span')
     .evaluate((e) => e.scrollHeight <= e.clientHeight);
   expect(broker).toBe(true);
+});
+
+test('Accounts with the selection box in the Name cell still fits at 1440, and the bulk bar sits clear of the table', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop', 'checked at desktop width');
+  await page.goto('/app/settings/accounts');
+  const table = page.getByRole('table', { name: /^Accounts/ });
+  await expect(table).toBeVisible({ timeout: 30_000 });
+  await page
+    .getByRole('checkbox', { name: 'Select all accounts' })
+    .check({ force: true });
+  const bar = page.getByRole('toolbar', { name: /selected$/ });
+  await expect(bar).toBeVisible();
+  const fit = await table.evaluate((t) => ({
+    scroll: t.parentElement!.scrollWidth - t.parentElement!.clientWidth,
+    page:
+      document.documentElement.scrollWidth -
+      document.documentElement.clientWidth,
+  }));
+  expect(fit).toEqual({ scroll: 0, page: 0 });
+});
+
+test('Accounts search and filters live in the address and survive a reload', async ({
+  page,
+}) => {
+  await page.goto('/app/settings/accounts?q=futures&status=active');
+  const table = page.getByRole('table', { name: /^Accounts/ });
+  await expect(table).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByRole('searchbox', { name: 'Search accounts' }),
+  ).toHaveValue('futures');
+  await expect(
+    page.getByRole('button', { name: 'Clear filter Status: Active' }),
+  ).toBeVisible();
+  await page.getByRole('searchbox', { name: 'Search accounts' }).fill('zzz');
+  await expect(page).toHaveURL(/q=zzz/);
+  await expect(page.getByText('No account matches.')).toBeVisible();
 });

@@ -109,7 +109,7 @@ Found by comparing a recorded TradeZella account with Keel (Part 2 of Plan 5). E
 | 56 | Choose which fields the trade page lists | TZ | Low value: Keel already shows every field | None |
 | 57 | Share a trade by link, as a read-only page (like the note share in the feature map, NB10) | TZ | Needs a backend | #1 |
 | 58 | Opt-in support access to the user's data, off by default | TZ | Needs a backend and accounts | #1, #2 |
-| 59 | Accounts list: search by name or broker, a filter and bulk select | TZ | Low value with a handful of accounts | None |
+| 59 | ~~Accounts list: search by name or broker, a filter and bulk select~~. Done in the last two gaps: search and Filter by (type, status, currency) in the address, a select-all and row boxes, and a bulk bar with Archive, Unarchive and Delete | TZ | Done | Done |
 
 ## Engineering follow-ups (from Plan 1 reviews)
 

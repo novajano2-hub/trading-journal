@@ -157,6 +157,29 @@ describe('calendarMonth', () => {
     expect(m.summary.best).toBeNull();
   });
 
+  test("a day's rating is the average of its rated trades, unrated ones left out", () => {
+    const t = [
+      makeTrade({ net: 100, rating: 5, closedAt: '2026-11-02T15:00:00Z' }),
+      makeTrade({ net: 100, rating: 4, closedAt: '2026-11-02T16:00:00Z' }),
+      makeTrade({ net: 100, rating: 4, closedAt: '2026-11-02T17:00:00Z' }),
+      makeTrade({ net: 100, closedAt: '2026-11-02T18:00:00Z' }),
+      makeTrade({ net: 100, closedAt: '2026-11-03T15:00:00Z' }),
+    ];
+    const m = calendarMonth(t, [], '2026-11', ctx);
+    expect(dayOf(m, '2026-11-02')!.rating).toBeCloseTo(13 / 3, 10);
+    expect(dayOf(m, '2026-11-02')!.trades).toBe(4);
+    // Traded but nothing rated, and a day with no trade: no rating.
+    expect(dayOf(m, '2026-11-03')!.rating).toBeNull();
+    expect(dayOf(m, '2026-11-04')!.rating).toBeNull();
+  });
+
+  test('a rated trade held over two exit days counts once on each', () => {
+    const [held] = heldTwoDays();
+    const m = calendarMonth([{ ...held!, rating: 2 }], [], '2026-11', ctx);
+    expect(dayOf(m, '2026-11-16')!.rating).toBe(2);
+    expect(dayOf(m, '2026-11-17')!.rating).toBe(2);
+  });
+
   test('hasNote is true on a date with a live daily note only', () => {
     const m = calendarMonth(
       [],

@@ -125,6 +125,7 @@ test('any number of the calendar stats is kept, in the order chosen', async () =
     'net',
     'trades',
     'winRate',
+    'rating',
     'r',
     'fees',
     'ticks',

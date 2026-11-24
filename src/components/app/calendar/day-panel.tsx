@@ -14,7 +14,7 @@ import { formatPct, formatQty, plural } from '@/lib/format';
 import { RatioText } from '../ratio-text';
 import { TradeLink } from '../trades/cells';
 import { CARD, InstrumentName } from '../dashboard/shared';
-import { dayLabel, TONE_INK, type FormatMoney } from './month-grid';
+import { dayLabel, ratingText, TONE_INK, type FormatMoney } from './month-grid';
 
 const TONE_CHIP = { gain: 'gain', loss: 'loss', flat: 'accent' } as const;
 const TONE_WORD = { gain: 'Green day', loss: 'Red day', flat: 'Flat day' };
@@ -166,6 +166,11 @@ export function DayPanel({
       decided === 0 ? 'None decided' : formatPct(day.wins / decided, 1),
     ],
     ['Volume', tip('volume', 'Volume'), formatQty(day.volume)],
+    [
+      'Day rating',
+      'Day rating',
+      day.rating === null ? 'None' : `${ratingText(day.rating)}★`,
+    ],
     [
       'Profit factor',
       tip(

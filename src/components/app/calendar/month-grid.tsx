@@ -54,12 +54,16 @@ export const STAT_LABELS: Record<CalendarStat, string> = {
   net: 'Net P&L',
   trades: 'Trades',
   winRate: 'Win rate',
+  rating: 'Day rating',
   r: 'R',
   fees: 'Fees',
   ticks: 'Ticks',
   pips: 'Pips',
   points: 'Points',
 };
+
+/** One decimal: 4.3. */
+export const ratingText = (rating: number): string => rating.toFixed(1);
 
 /** A line under the lead reads short in a narrow cell and in full once the cell is wide enough to hold it. */
 const FULL_FROM_HIDE = '@[1000px]/cal:hidden';
@@ -118,6 +122,20 @@ function linesOf(
             text: `${rate} win rate`,
             compact: `${rate} win`,
             label: `${rate} win rate`,
+          },
+        ];
+      }
+      case 'rating': {
+        // Nothing rated, nothing shown: the cell omits the line.
+        if (day.rating === null) return [];
+        const text = `${ratingText(day.rating)}★`;
+        return [
+          {
+            key,
+            toned: false,
+            node: text,
+            text,
+            label: `Day rating ${ratingText(day.rating)} of 5`,
           },
         ];
       }

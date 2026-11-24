@@ -137,3 +137,21 @@ test('Performance at 390: Remove and Add chart work, and Back restores the chart
     page.getByRole('region', { name: 'Chart 2', exact: true }),
   ).toHaveCount(0);
 });
+
+test('Accounts at 390: a box leads each two-line row and the bulk bar floats above the tab bar', async ({
+  page,
+}) => {
+  await page.goto('/app/settings/accounts');
+  const first = page.getByRole('checkbox', { name: /^Select (?!all)/ }).first();
+  await expect(first).toBeAttached({ timeout: 30_000 });
+  await first.check({ force: true });
+  const bar = page.getByRole('toolbar', { name: /selected$/ });
+  await expect(bar).toBeVisible();
+  expect(await noOverflow(page)).toBeLessThanOrEqual(0);
+  const box = (await bar.boundingBox())!;
+  const tabs = (await page
+    .getByRole('navigation', { name: /primary|main/i })
+    .last()
+    .boundingBox())!;
+  expect(box.y + box.height).toBeLessThanOrEqual(tabs.y);
+});

@@ -49,6 +49,8 @@ export interface CalendarDay {
   points: number | null;
   /** The day's volume as `dayVolumes` shares it: what the exits closed, and what an open trade still holds on the day it opened. */
   volume: number;
+  /** The average star rating (1 to 5) of the day's rated trades, each counted once; unrated trades are left out. Null when none is rated. */
+  rating: number | null;
   /**
    * Won over lost by the summary's own profit factor: wins and losses by the
    * breakeven range, in the display unit when it narrows. Null without a loss.
@@ -121,6 +123,7 @@ const noFigures = () => ({
   pips: null,
   points: null,
   volume: 0,
+  rating: null,
   profitFactor: null,
 });
 
@@ -186,6 +189,19 @@ function bookDays(
         if (v !== null) day[u] = (day[u] ?? 0) + v;
       }
     }
+  // The day's rating: the mean of its rated trades, a trade counted once on each day it exits.
+  const stars = new Map<string, number[]>();
+  for (const t of trades) {
+    if (t.rating === undefined) continue;
+    const dates = new Set(
+      exitUnits(t, ctx.pnlBasis).map((x) => localDate(x.time, ctx.timeZone)),
+    );
+    for (const date of dates)
+      if (out.has(date))
+        stars.set(date, [...(stars.get(date) ?? []), t.rating]);
+  }
+  for (const [date, list] of stars)
+    out.get(date)!.rating = list.reduce((a, b) => a + b, 0) / list.length;
   // Volume, as every page shares it among the days (`dayVolumes`).
   const held = new Map<string, number>();
   for (const v of dayVolumes(trades, scoped)) {

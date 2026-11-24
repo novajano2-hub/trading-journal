@@ -284,7 +284,7 @@ test('default prefs use the browser zone, else New York', () => {
     pnlBasis: 'net',
     displayUnit: 'dollar',
     hideTradeSummary: false,
-    calendarStats: ['net', 'trades'],
+    calendarStats: ['net', 'trades', 'rating'],
     instrumentsTraded: [],
     settleExpiredOptions: true,
   });

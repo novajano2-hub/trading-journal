@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import type { ImportJob } from '@/domain/types';
+import { commitNavigation } from '../__fixtures__/navigation';
 import { renderApp } from '../__fixtures__/render-app';
 import { AccountsSettings } from './accounts';
 
@@ -35,8 +36,9 @@ const dollars = (text: string) =>
   Number(text.replace(/[$,]/g, '').replace('−', '-'));
 
 async function rowOf(name: string): Promise<HTMLElement> {
+  // A row's name starts with its selection box's: "Select Futures main".
   const row = await screen.findByRole('row', {
-    name: new RegExp(`^${name}`),
+    name: new RegExp(`^Select ${name}`),
   });
   return row;
 }
@@ -320,7 +322,7 @@ test('Delete is offered only to an account with no trades', async () => {
     within(dialog).getByRole('button', { name: 'Delete account' }),
   );
   await waitFor(() =>
-    expect(screen.queryByRole('row', { name: /^Empty one/ })).toBeNull(),
+    expect(screen.queryByRole('row', { name: /^Select Empty one/ })).toBeNull(),
   );
   expect((await r.accounts.list('sample')).map((a) => a.name)).toEqual([
     'Futures main',
@@ -570,4 +572,292 @@ test('in My workspace Last import reads None, or the newest import not undone', 
   expect(lastImport(await rowOf('Mine b')).textContent).toBe(
     'Last import 15 Nov 2026',
   );
+});
+
+// ---- Search, filter by, and bulk select ----
+
+const base = {
+  broker: '',
+  type: 'live' as const,
+  currency: 'USD',
+  startingBalance: 0,
+  status: 'active' as const,
+};
+
+/** The fixture's two accounts, plus a prop evaluation, a euro prop funded and an empty live one. */
+async function wideRepo() {
+  const r = repo();
+  await r.accounts.create('sample', {
+    ...base,
+    name: 'Apex 50K',
+    broker: 'Apex Trader Funding',
+    type: 'prop-evaluation',
+  });
+  await r.accounts.create('sample', {
+    ...base,
+    name: 'Euro desk',
+    broker: 'Darwinex',
+    type: 'prop-funded',
+    currency: 'EUR',
+  });
+  await r.accounts.create('sample', { ...base, name: 'Empty one' });
+  await r.cashFlows.create('sample', {
+    accountId: (await r.accounts.list('sample')).find(
+      (a) => a.name === 'Empty one',
+    )!.id,
+    date: '2026-11-02',
+    amount: 100_000,
+  });
+  return r;
+}
+
+const names = () =>
+  [...document.querySelectorAll('tbody tr')].map(
+    (r) => r.querySelector('[data-account-name]')?.textContent,
+  );
+const search = () =>
+  screen.findByRole('searchbox', { name: 'Search accounts' });
+
+async function pickFilter(...labels: string[]) {
+  fireEvent.click(await screen.findByRole('button', { name: /^Filter by/ }));
+  for (const l of labels)
+    fireEvent.click(await screen.findByRole('checkbox', { name: l }));
+  fireEvent.keyDown(document.activeElement ?? document.body, {
+    key: 'Escape',
+  });
+}
+
+test('search matches the name or the broker as you type, in any case', async () => {
+  renderApp(<AccountsSettings />, { repository: await wideRepo(), url: URL });
+  const box = await search();
+  await waitFor(() => expect(names()).toHaveLength(5));
+  fireEvent.change(box, { target: { value: 'APEX' } });
+  await waitFor(() => expect(names()).toEqual(['Apex 50K']));
+  fireEvent.change(box, { target: { value: 'darwin' } });
+  await waitFor(() => expect(names()).toEqual(['Euro desk']));
+  expect(window.location.search).toBe('?q=darwin');
+});
+
+test('a search with no match says so and offers Clear search', async () => {
+  renderApp(<AccountsSettings />, { repository: await wideRepo(), url: URL });
+  fireEvent.change(await search(), { target: { value: 'zzz' } });
+  expect(await screen.findByText('No account matches.')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+  await waitFor(() => expect(names()).toHaveLength(5));
+  expect((await search()).getAttribute('value') ?? '').toBe('');
+  expect(window.location.search).toBe('');
+});
+
+test('Filter by type, status and currency each narrow the list and show as clearable chips', async () => {
+  renderApp(<AccountsSettings />, { repository: await wideRepo(), url: URL });
+  await pickFilter('Prop evaluation', 'Prop funded');
+  await waitFor(() => expect(names()).toEqual(['Apex 50K', 'Euro desk']));
+  expect(window.location.search).toBe('?type=prop-evaluation%2Cprop-funded');
+  // Clearing one chip leaves the other.
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Clear filter Type: Prop evaluation' }),
+  );
+  await waitFor(() => expect(names()).toEqual(['Euro desk']));
+
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Clear filter Type: Prop funded' }),
+  );
+  await pickFilter('Archived');
+  await waitFor(() => expect(names()).toEqual(['Old demo']));
+  expect(window.location.search).toBe('?status=archived');
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Clear filter Status: Archived' }),
+  );
+
+  await pickFilter('EUR');
+  await waitFor(() => expect(names()).toEqual(['Euro desk']));
+  expect(window.location.search).toBe('?ccy=EUR');
+  fireEvent.click(screen.getByRole('button', { name: 'Clear all filters' }));
+  await waitFor(() => expect(names()).toHaveLength(5));
+  expect(window.location.search).toBe('');
+});
+
+test('the currency filter is offered only where accounts span more than one', async () => {
+  renderApp(<AccountsSettings />, { repository: repo(), url: URL });
+  fireEvent.click(await screen.findByRole('button', { name: /^Filter by/ }));
+  await screen.findByRole('checkbox', { name: 'Archived' });
+  expect(screen.queryByRole('checkbox', { name: 'USD' })).toBeNull();
+});
+
+test('the search and filters come back from the address, and survive Back', async () => {
+  renderApp(<AccountsSettings />, {
+    repository: await wideRepo(),
+    url: `${URL}?q=desk&type=prop-funded&status=active&ccy=EUR`,
+  });
+  await waitFor(() => expect(names()).toEqual(['Euro desk']));
+  expect(((await search()) as HTMLInputElement).value).toBe('desk');
+  for (const chip of [
+    'Clear filter Type: Prop funded',
+    'Clear filter Status: Active',
+    'Clear filter Currency: EUR',
+  ])
+    expect(screen.getByRole('button', { name: chip })).toBeTruthy();
+  // Back to the entry before: the writes that follow replace it, a clear does not leave the state behind.
+  window.history.replaceState(null, '', URL);
+  commitNavigation();
+  await waitFor(() => expect(names()).toHaveLength(5));
+});
+
+test('select all ticks the visible rows, is indeterminate for some, and follows the filter', async () => {
+  renderApp(<AccountsSettings />, { repository: await wideRepo(), url: URL });
+  const all = (await screen.findByRole('checkbox', {
+    name: 'Select all accounts',
+  })) as HTMLInputElement;
+  expect(all.checked).toBe(false);
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Select Apex 50K' }));
+  expect(all.indeterminate).toBe(true);
+  expect(
+    await screen.findByRole('toolbar', { name: '1 account selected' }),
+  ).toBeTruthy();
+  fireEvent.click(all);
+  expect(all.indeterminate).toBe(false);
+  expect(all.checked).toBe(true);
+  expect(screen.getByText('5 selected')).toBeTruthy();
+  fireEvent.click(all);
+  expect(screen.queryByRole('toolbar')).toBeNull();
+  // Select all takes only what the filter lets through.
+  fireEvent.change(await search(), { target: { value: 'apex' } });
+  await waitFor(() => expect(names()).toEqual(['Apex 50K']));
+  fireEvent.click(all);
+  expect(screen.getByText('1 selected')).toBeTruthy();
+  // A row the filter hides is not acted on: widening the search shows it unticked.
+  fireEvent.change(await search(), { target: { value: '' } });
+  await waitFor(() => expect(names()).toHaveLength(5));
+  expect(
+    (
+      screen.getByRole('checkbox', {
+        name: 'Select Euro desk',
+      }) as HTMLInputElement
+    ).checked,
+  ).toBe(false);
+});
+
+test('bulk Archive archives the active ones and Unarchive brings archived ones back', async () => {
+  const r = await wideRepo();
+  renderApp(<AccountsSettings />, { repository: r, url: URL });
+  fireEvent.click(
+    await screen.findByRole('checkbox', { name: 'Select Apex 50K' }),
+  );
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Select Euro desk' }));
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Select Old demo' }));
+  const bar = await screen.findByRole('toolbar', {
+    name: '3 accounts selected',
+  });
+  // Archive counts the active two, Unarchive the archived one.
+  fireEvent.click(within(bar).getByRole('button', { name: 'Archive 2' }));
+  await waitFor(async () =>
+    expect(
+      (await r.accounts.list('sample'))
+        .filter((a) => a.status === 'archived')
+        .map((a) => a.name)
+        .sort(),
+    ).toEqual(['Apex 50K', 'Euro desk', 'Old demo']),
+  );
+  const again = await screen.findByRole('toolbar', { name: /selected/ });
+  // Now all three are archived: Archive is gone, Unarchive takes them.
+  expect(within(again).queryByRole('button', { name: /^Archive/ })).toBeNull();
+  fireEvent.click(within(again).getByRole('button', { name: 'Unarchive 3' }));
+  await waitFor(async () =>
+    expect(
+      (await r.accounts.list('sample')).filter((a) => a.status === 'archived'),
+    ).toHaveLength(0),
+  );
+});
+
+test('bulk Delete lists what goes, keeps accounts that hold trades, and asks the single delete’s confirmation', async () => {
+  const r = await wideRepo();
+  renderApp(<AccountsSettings />, { repository: r, url: URL });
+  fireEvent.click(
+    await screen.findByRole('checkbox', { name: 'Select Empty one' }),
+  );
+  fireEvent.click(
+    screen.getByRole('checkbox', { name: 'Select Futures main' }),
+  );
+  fireEvent.click(
+    within(await screen.findByRole('toolbar')).getByRole('button', {
+      name: 'Delete 1',
+    }),
+  );
+  const dialog = await screen.findByRole('dialog');
+  expect(within(dialog).getByText('Delete 1 account?')).toBeTruthy();
+  const text = dialog.textContent!;
+  expect(text).toContain('Empty one');
+  expect(text).toContain('0 trades, 1 deposit or withdrawal');
+  expect(text).toContain('Futures main');
+  expect(text).toContain('holds 2 trades');
+  expect(text).toContain("This can't be undone.");
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  expect(await r.accounts.list('sample')).toHaveLength(5);
+  // Confirmed: only the empty one goes, with its deposit.
+  fireEvent.click(
+    within(screen.getByRole('toolbar')).getByRole('button', {
+      name: 'Delete 1',
+    }),
+  );
+  fireEvent.click(
+    within(await screen.findByRole('dialog')).getByRole('button', {
+      name: 'Delete account',
+    }),
+  );
+  await waitFor(async () =>
+    expect((await r.accounts.list('sample')).map((a) => a.name)).not.toContain(
+      'Empty one',
+    ),
+  );
+  expect((await r.accounts.list('sample')).map((a) => a.name)).toContain(
+    'Futures main',
+  );
+  expect(await r.cashFlows.list('sample')).toHaveLength(0);
+});
+
+test('Delete in the bar is off when every selected account holds trades, with the reason', async () => {
+  renderApp(<AccountsSettings />, { repository: repo(), url: URL });
+  fireEvent.click(
+    await screen.findByRole('checkbox', { name: 'Select Futures main' }),
+  );
+  const del = within(await screen.findByRole('toolbar')).getByRole('button', {
+    name: 'Delete',
+  }) as HTMLButtonElement;
+  expect(del.disabled).toBe(true);
+  expect(del.title).toBe('An account with trades needs Clear trades first.');
+});
+
+test('an archived account is read-only: no bulk Archive for it, only Unarchive', async () => {
+  renderApp(<AccountsSettings />, { repository: repo(), url: URL });
+  fireEvent.click(
+    await screen.findByRole('checkbox', { name: 'Select Old demo' }),
+  );
+  const bar = await screen.findByRole('toolbar');
+  expect(within(bar).queryByRole('button', { name: /^Archive/ })).toBeNull();
+  expect(within(bar).getByRole('button', { name: 'Unarchive 1' })).toBeTruthy();
+});
+
+test('on a phone the checkbox leads each two-line row and the bar floats above the tab bar', async () => {
+  vi.spyOn(window, 'matchMedia').mockImplementation(
+    (q) =>
+      ({
+        matches: !q.includes('min-width: 640px'),
+        media: q,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }) as unknown as MediaQueryList,
+  );
+  renderApp(<AccountsSettings />, { repository: await wideRepo(), url: URL });
+  const row = (await screen.findByText('Apex 50K')).closest('li')!;
+  const first = row.firstElementChild!;
+  expect(first.querySelector('input[type="checkbox"]')).not.toBeNull();
+  expect(row.querySelectorAll('[data-line]')).toHaveLength(2);
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Select Apex 50K' }));
+  const bar = await screen.findByRole('toolbar');
+  expect(bar.parentElement!.className).toContain('bottom-[calc(var(--tab-bar)');
+  fireEvent.click(
+    screen.getByRole('checkbox', { name: 'Select all accounts' }),
+  );
+  expect(screen.getByText('5 selected')).toBeTruthy();
+  vi.restoreAllMocks();
 });

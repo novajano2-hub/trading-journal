@@ -54,6 +54,6 @@ test('create a 1-step challenge on a new prop account and see its card', async (
   // And the account it made is in Settings, as a prop account.
   await page.goto('/app/settings/accounts');
   await expect(
-    page.getByRole('row', { name: /^E2E 25K eval.*Prop evaluation/ }),
+    page.getByRole('row', { name: /^Select E2E 25K eval.*Prop evaluation/ }),
   ).toBeVisible({ timeout: 30_000 });
 });
