@@ -1,5 +1,6 @@
 import { ASSET_CLASS_LABELS } from '../asset-class';
 import { localDate, localParts } from '../time';
+import { rotateFromWeekStart } from '../week';
 import { isClosed, type ClosedTrade } from '../trade-status';
 import { roundHalfEven } from '../money';
 import type { AssetClass, Cents, Trade, WeekStart } from '../types';
@@ -88,9 +89,7 @@ const SUNDAY_FIRST: Bucket[] = [
 ];
 /** The weekday rows from the day the week starts on (Sunday unless `weekStart` says Monday). */
 const weekdaysFrom = (weekStart: WeekStart | undefined): Bucket[] =>
-  weekStart === 'monday'
-    ? [...SUNDAY_FIRST.slice(1), SUNDAY_FIRST[0]!]
-    : SUNDAY_FIRST;
+  rotateFromWeekStart(SUNDAY_FIRST, weekStart);
 const HOURS: Bucket[] = Array.from({ length: 24 }, (_, h) => [
   String(h),
   `${String(h).padStart(2, '0')}:00`,

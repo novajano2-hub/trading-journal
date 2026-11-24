@@ -183,6 +183,27 @@ test('Privacy hides the profit factor column', async () => {
   expect(table.textContent).toContain('hidden ratio');
 });
 
+test('Privacy hides the profit factor cells of the matrix and their labels, and keeps the trade counts', async () => {
+  const repository = await repositoryWith({ displayUnit: 'privacy' });
+  renderApp(<SymbolsView />, {
+    repository,
+    url: '/app/reports/symbols?x=side&xm=profit-factor',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const matrix = within(page).getByRole('table', { name: 'Symbols by side' });
+  expect(matrix.textContent).toContain('hidden ratio');
+  expect(matrix.textContent).not.toMatch(/\d\.\d\d/);
+  const labels = within(matrix)
+    .getAllByRole('link')
+    .map((a) => a.getAttribute('aria-label') ?? '');
+  expect(labels.length).toBeGreaterThan(0);
+  for (const l of labels) {
+    expect(l).toContain('hidden ratio');
+    expect(l).not.toMatch(/\d\.\d\d/);
+    expect(l).toMatch(/\d+ trades?/);
+  }
+});
+
 async function repositoryWith(
   prefs: Record<string, unknown>,
   sample: (now: Date) => Promise<SampleWorkspace> = breakdownSample,

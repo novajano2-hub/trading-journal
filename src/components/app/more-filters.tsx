@@ -23,6 +23,7 @@ import {
 } from '@/data/filters';
 import { ASSET_CLASSES, ASSET_CLASS_LABELS } from '@/domain/asset-class';
 import { usePrefs } from '@/data/query/hooks';
+import { rotateFromWeekStart } from '@/domain/week';
 import type { AssetClass, WeekStart } from '@/domain/types';
 import { enter, exit } from '@/lib/motion';
 import { FIELD } from './filter-chip';
@@ -44,20 +45,18 @@ function useWide(): boolean {
   );
 }
 
-const MONDAY_FIRST = [
+const SUNDAY_FIRST = [
+  [7, 'Sun', 'Sunday'],
   [1, 'Mon', 'Monday'],
   [2, 'Tue', 'Tuesday'],
   [3, 'Wed', 'Wednesday'],
   [4, 'Thu', 'Thursday'],
   [5, 'Fri', 'Friday'],
   [6, 'Sat', 'Saturday'],
-  [7, 'Sun', 'Sunday'],
 ] as const;
 /** The weekday pills from the day the week starts on (Sunday unless the preference says Monday). */
 const weekdaysFrom = (weekStart: WeekStart | undefined) =>
-  weekStart === 'monday'
-    ? MONDAY_FIRST
-    : ([MONDAY_FIRST[6], ...MONDAY_FIRST.slice(0, 6)] as const);
+  rotateFromWeekStart(SUNDAY_FIRST, weekStart);
 
 const MONTHS = [
   'January',

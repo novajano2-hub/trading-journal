@@ -137,6 +137,26 @@ test('under Privacy the equity line names no amount', async () => {
   expect(everyString(document.body).filter((t) => /\$\d/.test(t))).toEqual([]);
 });
 
+test('under Privacy the strategy page hides its profit factor and keeps the win rate and counts', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: sample,
+  });
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<StrategyView id="str-1" />, {
+    repository,
+    url: '/app/strategies/str-1',
+  });
+  await screen.findByRole('img', { name: /^Equity of / });
+  const pf = document.querySelector('[data-metric-tip="profit-factor"]')!;
+  const card = pf.closest('div')!.parentElement!;
+  expect(card.textContent).toContain('hidden ratio');
+  expect(card.textContent).not.toMatch(/\d\.\d\d/);
+  const rate = document.querySelector('[data-metric-tip="win-rate"]')!;
+  expect(rate.closest('div')!.parentElement!.textContent).toMatch(/\d%/);
+});
+
 test('focusing the equity line reads a point, and the arrow keys move along it', async () => {
   open();
   const line = await screen.findByRole('img', { name: /^Equity of / });

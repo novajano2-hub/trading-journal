@@ -742,7 +742,11 @@ export function TradesView(): React.JSX.Element {
         />
       )}
 
-      <ActiveFilters filters={filters} onChange={setFilters} />
+      <ActiveFilters
+        filters={filters}
+        onChange={setFilters}
+        weekStart={prefs.weekStart}
+      />
 
       {result ? (
         <div

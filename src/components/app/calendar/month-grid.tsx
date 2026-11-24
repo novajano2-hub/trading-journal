@@ -11,6 +11,7 @@ import {
   type UnitSums,
 } from '@/data/calendar';
 import type { CalendarStat, Cents, WeekStart } from '@/domain/types';
+import { rotateFromWeekStart } from '@/domain/week';
 import { formatUnitValue } from '@/lib/display';
 import { formatPct, plural } from '@/lib/format';
 import { onTradingDate, weekdayOf } from '@/lib/time-format';
@@ -332,9 +333,7 @@ function WeekTotal({
 const SUNDAY_FIRST = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 /** The column headers, from the day the week starts on. */
 const weekdayHeaders = (weekStart: WeekStart) =>
-  weekStart === 'monday'
-    ? [...SUNDAY_FIRST.slice(1), SUNDAY_FIRST[0]!]
-    : SUNDAY_FIRST;
+  rotateFromWeekStart(SUNDAY_FIRST, weekStart);
 
 /**
  * The month as a grid of week rows, from the preferred first day, with a week column. One day is

@@ -16,6 +16,7 @@ import type {
   TagCategory,
   WeekStart,
 } from '@/domain/types';
+import { weekStartsOn } from '@/domain/week';
 import { plural } from '@/lib/format';
 
 /** The top bar's chips other than the date. Accounts live in the sidebar switcher. */
@@ -255,7 +256,10 @@ const windowText = (w: TimeWindow) => `${w.from ?? 'start'}-${w.to ?? 'end'}`;
  * own switches in the log, and the date, symbol, side, strategy and tags have
  * chips in the top bar.
  */
-export function detailChips(f: GlobalFilters): DetailChip[] {
+export function detailChips(
+  f: GlobalFilters,
+  weekStart?: WeekStart,
+): DetailChip[] {
   const out: DetailChip[] = [];
   const add = (
     on: boolean,
@@ -266,8 +270,13 @@ export function detailChips(f: GlobalFilters): DetailChip[] {
     if (on)
       out.push({ id, label: label(), clear: (g) => ({ ...g, ...clear }) });
   };
+  // Weekdays are 1 (Monday) to 7 (Sunday); they read from the week's first day.
+  const place = (n: number) => (n % 7) - weekStartsOn(weekStart) + 7;
   const days = (xs: readonly number[]) =>
-    xs.map((n) => DAY_NAMES[n - 1]).join(', ');
+    [...xs]
+      .sort((a, b) => (place(a) % 7) - (place(b) % 7))
+      .map((n) => DAY_NAMES[n - 1])
+      .join(', ');
   const months = (xs: readonly number[]) =>
     xs.map((n) => MONTH_NAMES[n - 1]).join(', ');
   add(f.currency !== undefined, 'currency', () => `Currency: ${f.currency}`, {

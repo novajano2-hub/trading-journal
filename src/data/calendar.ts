@@ -11,6 +11,7 @@ import { summarize } from '@/domain/metrics/summary';
 import { isClosed } from '@/domain/trade-status';
 import { exitUnits } from '@/domain/metrics/units';
 import { localDate } from '@/domain/time';
+import { weekIndexOf } from '@/domain/week';
 import type {
   Cents,
   JournalEntry,
@@ -106,10 +107,8 @@ function addDays(date: string, n: number): string {
 }
 
 /** 0 for the day the week starts on to 6 for the day before it; Sunday-first unless `weekStart` says Monday. */
-const weekIndex = (date: string, weekStart: WeekStart = 'sunday') => {
-  const dow = utc(date).getUTCDay();
-  return weekStart === 'monday' ? (dow + 6) % 7 : dow;
-};
+const weekIndex = (date: string, weekStart: WeekStart = 'sunday') =>
+  weekIndexOf(date, weekStart);
 
 function daysInMonth(month: string): number {
   const [y, m] = month.split('-').map(Number) as [number, number];

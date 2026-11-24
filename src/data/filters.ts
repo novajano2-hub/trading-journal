@@ -11,6 +11,7 @@ import {
   subMonths,
 } from 'date-fns';
 import { ASSET_CLASSES } from '../domain/asset-class';
+import { weekStartsOn as weekStartsOnOf } from '../domain/week';
 import { classify } from '../domain/metrics/context';
 import { rOf, unitKeeps } from '../domain/metrics/units';
 import { localDate, localParts } from '../domain/time';
@@ -474,7 +475,7 @@ export function resolveRange(
 ): { from?: string; to?: string } {
   if (!('preset' in range)) return { ...range };
   const t = toDate(today);
-  const weekStartsOn = weekStart === 'monday' ? 1 : 0;
+  const weekStartsOn = weekStartsOnOf(weekStart);
   switch (range.preset) {
     case 'today':
       return { from: today, to: today };

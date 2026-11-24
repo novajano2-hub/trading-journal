@@ -1,5 +1,6 @@
 import { format, parseISO, startOfWeek } from 'date-fns';
 import type { Cents, WeekStart } from '../types';
+import { weekStartsOn } from '../week';
 import type { DayStat } from './days';
 
 /*
@@ -24,7 +25,7 @@ export function goalWeek(
   const anchor = range.to !== undefined && range.to < today ? range.to : today;
   const first = iso(
     startOfWeek(parseISO(anchor), {
-      weekStartsOn: weekStart === 'monday' ? 1 : 0,
+      weekStartsOn: weekStartsOn(weekStart),
     }),
   );
   const from =

@@ -3,7 +3,10 @@ import { expect, test } from '@playwright/test';
 test.use({ timezoneId: 'America/New_York' });
 
 test.beforeEach(async ({ page }, info) => {
-  test.skip(info.project.name !== 'desktop', 'journeys run at desktop width');
+  test.skip(
+    info.project.name !== 'desktop' && !info.title.startsWith('at 390'),
+    'journeys run at desktop width',
+  );
   await page.clock.setFixedTime(new Date('2026-11-20T15:00:00Z'));
   await page.emulateMedia({ reducedMotion: 'reduce' });
 });
@@ -133,4 +136,59 @@ test('with every stat ticked, a 1440 cell stacks every line without clipping and
     );
   expect(new Set(heights).size).toBe(1);
   expect(heights[0]).toBeGreaterThan(92);
+});
+
+test('at 390 with every stat ticked the compact cell shows the lead stat only and nothing clips', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'mobile', 'the phone width');
+  await page.goto('/app/calendar?month=2026-11');
+  await expect(page.getByTestId('calendar-ready')).toBeVisible({
+    timeout: 30_000,
+  });
+  await page.getByRole('button', { name: 'Stats shown' }).click();
+  const list = page.getByRole('list', { name: 'Stats shown' });
+  for (const name of [
+    'Trades',
+    'Win rate',
+    'R',
+    'Fees',
+    'Ticks',
+    'Pips',
+    'Points',
+  ]) {
+    const box = list.getByRole('checkbox', { name, exact: true });
+    if (!(await box.isChecked())) {
+      await list.getByText(name, { exact: true }).click();
+      await expect(box).toBeChecked();
+    }
+  }
+  await page.keyboard.press('Escape');
+  const grid = page.getByRole('grid', { name: 'November 2026' });
+  const cell = grid.getByRole('button', { name: /^Thu 19 Nov/ });
+  // The stacked lines are hidden; the compact figure is the lead stat (net).
+  await expect(cell.getByTestId('day-compact')).toBeVisible();
+  await expect(cell.getByTestId('day-compact')).toContainText(/[+\u2212]/);
+  // What is on screen (innerText skips the hidden lines): the day number and one figure.
+  const seen = await cell.evaluate((b) => (b as HTMLElement).innerText);
+  expect(seen).not.toMatch(/fees|ticks|trades|win rate|pips|pts/);
+  expect(seen.split('\n').filter(Boolean)).toHaveLength(2);
+  // Nothing clips: every cell is as tall as its content, and the page does not scroll sideways.
+  const clipped = await grid
+    .getByRole('button')
+    .evaluateAll(
+      (bs) => bs.filter((b) => b.scrollHeight > b.clientHeight + 1).length,
+    );
+  expect(clipped).toBe(0);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - innerWidth,
+    ),
+  ).toBeLessThanOrEqual(0);
+  const tooWide = await grid
+    .getByTestId('day-compact')
+    .evaluateAll(
+      (els) => els.filter((e) => e.scrollWidth > e.clientWidth + 0.5).length,
+    );
+  expect(tooWide).toBe(0);
 });

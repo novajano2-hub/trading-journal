@@ -2,6 +2,7 @@
 
 import { X } from '@phosphor-icons/react/dist/ssr';
 import type { GlobalFilters } from '@/data/filters';
+import type { WeekStart } from '@/domain/types';
 import { detailChips } from '../filter-model';
 
 /**
@@ -12,11 +13,14 @@ import { detailChips } from '../filter-model';
 export function ActiveFilters({
   filters,
   onChange,
+  weekStart,
 }: {
   filters: GlobalFilters;
+  /** The day weekdays read from: the chip lists them in that order. */
+  weekStart?: WeekStart;
   onChange(next: GlobalFilters): void;
 }): React.JSX.Element | null {
-  const chips = detailChips(filters);
+  const chips = detailChips(filters, weekStart);
   if (chips.length === 0) return null;
   return (
     <ul aria-label="Other filters in use" className="flex flex-wrap gap-2">

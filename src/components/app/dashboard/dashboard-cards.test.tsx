@@ -60,6 +60,8 @@ async function renderDashboard(
   opts: {
     graded?: boolean;
     prefs?: Partial<UserPrefs>;
+    /** Leave weekStart unset: the default, Sunday weeks. */
+    defaultWeek?: boolean;
     edit?: (s: SampleWorkspace) => void;
     url?: string;
     patch?: (repo: Repository) => Partial<Repository>;
@@ -76,7 +78,7 @@ async function renderDashboard(
   });
   await base.prefs.update({
     timeZone: 'America/New_York',
-    weekStart: 'monday',
+    ...(opts.defaultWeek ? {} : { weekStart: 'monday' as const }),
     goals: { sample: { weeklyNet: 10000, dailyLossLimit: 30000 } },
     ...opts.prefs,
   });
@@ -147,6 +149,14 @@ test('goals are money targets: under every narrowing unit they read every trade,
     expect(goals.textContent, displayUnit).toContain('Kept 1 of 2 days');
     cleanup();
   }
+});
+
+test('goals with the default Sunday weeks: the week and its caption start on Sunday 15 Nov', async () => {
+  await renderDashboard({ defaultWeek: true });
+  const goals = await goalsCard();
+  expect(goals.textContent).toContain('Weekly net goal');
+  expect(goals.textContent).toContain('+$200.00 this week, 15-20 Nov');
+  expect(goals.textContent).not.toContain('16-20 Nov');
 });
 
 test('goals: a week in progress, and a limit kept every day', async () => {

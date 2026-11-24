@@ -550,6 +550,68 @@ test('Move to folder files the note in a user folder', async () => {
   );
 });
 
+/** The first day of this week under Sunday-first (0) or Monday-first (1) weeks, from the real clock. */
+function weekFirst(weekStartsOn: 0 | 1): string {
+  const d = new Date();
+  const back = (d.getDay() - weekStartsOn + 7) % 7;
+  d.setDate(d.getDate() - back);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+async function newWeeklyRecap() {
+  fireEvent.keyDown(await screen.findByRole('button', { name: 'New' }), {
+    key: 'Enter',
+  });
+  fireEvent.click(
+    await screen.findByRole('menuitem', { name: 'Weekly recap' }),
+  );
+}
+
+test('New > Weekly recap keys a new note on the Sunday week start by default', async () => {
+  const { repo } = await openWith('/app/notebook');
+  const before = (await repo.journal.list(WS)).filter(
+    (e) => e.kind === 'weekly-recap',
+  ).length;
+  await newWeeklyRecap();
+  await waitFor(() =>
+    expect(window.location.pathname).toMatch(/^\/app\/notebook\/[^/]+$/),
+  );
+  const made = (await repo.journal.list(WS)).filter(
+    (e) => e.kind === 'weekly-recap',
+  );
+  expect(made).toHaveLength(before + 1);
+  const fresh = made.find((e) => e.date === weekFirst(0))!;
+  expect(fresh).toBeTruthy();
+  expect(fresh.title).toMatch(/^Week of /);
+});
+
+test("New > Weekly recap opens the week's Monday-keyed note under Sunday weeks, and makes no second one", async () => {
+  const { repo } = await openWith('/app/notebook', {
+    prepare: async (r) => {
+      await r.journal.save(WS, {
+        kind: 'weekly-recap',
+        date: weekFirst(1),
+        title: 'Legacy week',
+        body: { type: 'doc', content: [{ type: 'paragraph' }] },
+        linkedTradeIds: [],
+        tags: [],
+      });
+    },
+  });
+  const before = (await repo.journal.list(WS)).filter(
+    (e) => e.kind === 'weekly-recap',
+  );
+  await newWeeklyRecap();
+  const legacy = before.find((e) => e.title === 'Legacy week')!;
+  await waitFor(() =>
+    expect(window.location.pathname).toBe(`/app/notebook/${legacy.id}`),
+  );
+  expect(
+    (await repo.journal.list(WS)).filter((e) => e.kind === 'weekly-recap'),
+  ).toHaveLength(before.length);
+});
+
 test('New > Note makes a note and opens it', async () => {
   const { repo } = await openWith('/app/notebook');
   fireEvent.keyDown(await screen.findByRole('button', { name: 'New' }), {

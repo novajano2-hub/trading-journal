@@ -103,6 +103,31 @@ test('Privacy leaves no dollar amount on the page', async () => {
   expect(container.textContent).not.toMatch(/\$\d/);
 });
 
+test('Privacy hides the profit factor and its difference in Compare, and keeps the counts and win rates', async () => {
+  const url = '/app/reports/compare?a=symbol%3DES&b=symbol%3DNQ';
+  const { unmount } = renderApp(<CompareView />, {
+    sample: breakdownSample,
+    url,
+  });
+  const shown = within(await screen.findByTestId('reports-compare')).getByRole(
+    'table',
+    { name: 'Comparison' },
+  );
+  const open = row(shown, /^Profit factor/);
+  expect(open.some((c) => /\d\.\d\d/.test(c ?? ''))).toBe(true);
+  unmount();
+  renderApp(<CompareView />, { repository: await inUnit('privacy'), url });
+  const table = within(await screen.findByTestId('reports-compare')).getByRole(
+    'table',
+    { name: 'Comparison' },
+  );
+  const cells = row(table, /^Profit factor/);
+  expect(cells.join(' ')).not.toMatch(/\d\.\d\d/);
+  expect(cells.join(' ')).toContain('hidden ratio');
+  expect(row(table, /^Trades/).slice(0, 2)).toEqual(['2', '2']);
+  expect(row(table, /^Win rate/).join(' ')).toMatch(/\d+(\.\d)?%/);
+});
+
 async function inUnit(displayUnit: 'r' | 'percent' | 'privacy' | 'ticks') {
   const { createLocalRepository } =
     await import('@/data/local/local-repository');

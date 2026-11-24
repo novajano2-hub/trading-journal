@@ -226,6 +226,18 @@ test('a filter with no chip of its own gets one in the log, and the chip clears 
     'Size: over 100',
     'Realized R: -1 to under 0',
   ]);
+  // The chip lists days from the week start: Sunday first by default.
+  const sundayFirst = detailChips({
+    ...f,
+    weekdays: [1, 7],
+    exitWeekdays: [],
+  }).map((c) => c.label);
+  expect(sundayFirst).toContain('Entry weekday: Sun, Mon');
+  expect(
+    detailChips({ ...f, weekdays: [1, 7], exitWeekdays: [] }, 'monday').map(
+      (c) => c.label,
+    ),
+  ).toContain('Entry weekday: Mon, Sun');
   const weekday = chips.find((c) => c.id === 'weekdays')!;
   const next = weekday.clear(f);
   expect(next.weekdays).toEqual([]);

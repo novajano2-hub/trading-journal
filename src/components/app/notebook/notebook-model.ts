@@ -8,7 +8,8 @@ import {
   Star,
   TrendUp,
 } from '@phosphor-icons/react/dist/ssr';
-import type { JournalEntry, JournalKind } from '@/domain/types';
+import type { JournalEntry, JournalKind, WeekStart } from '@/domain/types';
+import { weekFirstDay } from '@/domain/week';
 import { docText } from '@/lib/note-text';
 
 export type BuiltInFolder =
@@ -76,6 +77,34 @@ export function folderOfKind(kind: JournalKind): FolderKey {
     case 'note':
       return 'my-notes';
   }
+}
+
+/**
+ * The weekly recap for the week `date` falls in: the live recap keyed on a day
+ * of that week, so one keyed on the week's first day under the current setting
+ * and one keyed on the Monday inside it (the key notes were stored under) are
+ * both found, and a setting changed back finds the same notes. The earliest key
+ * wins when there are two.
+ */
+export function weeklyRecapFor(
+  entries: readonly JournalEntry[],
+  date: string,
+  weekStart?: WeekStart,
+): JournalEntry | undefined {
+  const first = weekFirstDay(date, weekStart);
+  const end = new Date(Date.parse(`${first}T00:00:00Z`) + 6 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  return entries
+    .filter(
+      (e) =>
+        e.kind === 'weekly-recap' &&
+        e.deletedAt === undefined &&
+        e.date !== undefined &&
+        e.date >= first &&
+        e.date <= end,
+    )
+    .sort((a, b) => a.date!.localeCompare(b.date!))[0];
 }
 
 /** The day an entry is about: its date, else the day it was last written. */

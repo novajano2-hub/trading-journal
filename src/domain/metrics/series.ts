@@ -1,5 +1,6 @@
 import { roundHalfEven } from '../money';
 import { localDate } from '../time';
+import { weekFirstDay } from '../week';
 import { closedInOrder, isClosed } from '../trade-status';
 import type { Cents, Trade, WeekStart } from '../types';
 import { classify, inRange, type MetricContext } from './context';
@@ -215,10 +216,7 @@ export function bucketKey(
 ): string {
   if (bucket === 'day') return date;
   if (bucket === 'month') return date.slice(0, 7);
-  const d = new Date(`${date}T00:00:00Z`);
-  const back = weekStart === 'monday' ? (d.getUTCDay() + 6) % 7 : d.getUTCDay();
-  d.setUTCDate(d.getUTCDate() - back);
-  return d.toISOString().slice(0, 10);
+  return weekFirstDay(date, weekStart);
 }
 
 /** The first and the last local date a bucket holds. */

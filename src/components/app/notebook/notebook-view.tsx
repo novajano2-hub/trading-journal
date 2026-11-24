@@ -29,9 +29,10 @@ import {
   useTrashJournalEntry,
 } from '@/data/query/hooks';
 import { StorageUnavailableError } from '@/data/repository';
-import { dayLabel, mondayOf } from '@/data/seed/calendar';
+import { dayLabel } from '@/data/seed/calendar';
 import { localDate } from '@/domain/time';
-import type { JournalEntry, JournalKind } from '@/domain/types';
+import type { JournalEntry, JournalKind, WeekStart } from '@/domain/types';
+import { weekFirstDay } from '@/domain/week';
 import { plural } from '@/lib/format';
 import { ConfirmDialog } from '../confirm-dialog';
 import { CARD } from '../dashboard/shared';
@@ -48,6 +49,7 @@ import {
   newestFirst,
   selectionOf,
   textIndex,
+  weeklyRecapFor,
   userFolderKey,
   type FolderKey,
 } from './notebook-model';
@@ -61,12 +63,16 @@ const MENU_ITEM =
   'flex min-h-9 cursor-pointer items-center rounded-[8px] px-2.5 text-[13.5px] outline-none data-[highlighted]:bg-sunken pointer-coarse:min-h-11';
 
 /** What a new note of each kind (but a daily note) is called, on `today`. */
-function titleFor(kind: JournalKind, today: string): string {
+function titleFor(
+  kind: JournalKind,
+  today: string,
+  weekStart: WeekStart | undefined,
+): string {
   switch (kind) {
     case 'pre-market':
       return `Plan for ${dayLabel(today)}`;
     case 'weekly-recap':
-      return `Week of ${dayLabel(mondayOf(today), false)}`;
+      return `Week of ${dayLabel(weekFirstDay(today, weekStart), false)}`;
     default:
       return 'Untitled note';
   }
@@ -330,6 +336,14 @@ export function NotebookView(): React.JSX.Element {
       router.push(`/app/notebook/daily/${today}`);
       return;
     }
+    if (kind === 'weekly-recap') {
+      // This week's recap is one note, whichever day its key sits on.
+      const existing = weeklyRecapFor(entries, today, prefs?.weekStart);
+      if (existing) {
+        router.push(`/app/notebook/${encodeURIComponent(existing.id)}`);
+        return;
+      }
+    }
     const template = templates.data.find((t) => t.kind === kind && t.isDefault);
     const inUserFolder = current.startsWith('folder:')
       ? current.slice('folder:'.length)
@@ -337,8 +351,12 @@ export function NotebookView(): React.JSX.Element {
     try {
       const made = await save.mutateAsync({
         kind,
-        date: today,
-        title: titleFor(kind, today),
+        // A weekly recap is keyed on its week's first day; the rest on today.
+        date:
+          kind === 'weekly-recap'
+            ? weekFirstDay(today, prefs?.weekStart)
+            : today,
+        title: titleFor(kind, today, prefs?.weekStart),
         body: structuredClone(template?.body ?? EMPTY_DOC),
         linkedTradeIds: [],
         tags: [],
