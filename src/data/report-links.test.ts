@@ -246,14 +246,20 @@ describe('the Task 29 buckets link to exactly their trades', () => {
   });
 
   test('with two currencies the link names one and the counts still agree', () => {
-    const rows = breakdown(ws.trades, 'instrument', ctxOf());
-    const first = rows[0]!;
-    const href = bucketHref(
-      { ...EMPTY_FILTERS, currency: 'USD' },
-      'instrument',
-      first.key,
-    )!;
-    expect(new URL(href, 'http://x').searchParams.get('ccy')).toBe('USD');
+    // Every third trade is in euros: the report reads the dollar ones.
+    const mixed = ws.trades.map((t, i) =>
+      i % 3 === 0 ? { ...t, pnlCurrency: 'EUR' } : t,
+    );
+    const usd = mixed.filter((t) => t.pnlCurrency === 'USD');
+    const base = { ...EMPTY_FILTERS, currency: 'USD' };
+    const rows = breakdown(usd, 'instrument', ctxOf());
+    expect(rows.length).toBeGreaterThan(1);
+    for (const row of rows) {
+      const href = bucketHref(base, 'instrument', row.key)!;
+      expect(new URL(href, 'http://x').searchParams.get('ccy')).toBe('USD');
+      // The log lists every currency; the link's own count is the bucket's.
+      expect(logIds(href, mixed)).toEqual([...row.tradeIds].sort());
+    }
   });
 });
 

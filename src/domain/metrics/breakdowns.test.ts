@@ -673,22 +673,35 @@ describe('the Task 29 dimensions', () => {
     expect(row.tradingDays).toBe(2);
   });
 
-  test('highlights: the most active bucket and the best win rate, ties to the busier', () => {
-    const t = [
-      fx('a1', 'ESZ5', 100),
-      fx('a1', 'ESZ5', -100),
-      fx('a1', 'ESZ5', -100),
-      fx('a1', 'NQZ5', 100),
-      fx('a1', 'NQZ5', 100),
-      fx('a1', 'CLZ5', 100),
+  test('highlights: the most active bucket and the best win rate among buckets with 5 decided trades', () => {
+    const many = (sym: string, wins: number, losses: number) => [
+      ...Array.from({ length: wins }, () => fx('a1', sym, 100)),
+      ...Array.from({ length: losses }, () => fx('a1', sym, -100)),
     ];
-    const rows = breakdown(t, 'symbol', ctx);
-    const h = highlights(rows);
+    // A 1-trade 100% bucket, a 6-trade 67% bucket, a 9-trade 56% bucket.
+    const t = [
+      ...many('CLZ5', 1, 0),
+      ...many('NQZ5', 4, 2),
+      ...many('ESZ5', 5, 4),
+    ];
+    const h = highlights(breakdown(t, 'symbol', ctx));
     expect(h.mostActive?.key).toBe('ES');
-    // NQ and CL both win every trade; NQ has more.
     expect(h.bestWinRate?.key).toBe('NQ');
+    // Ties go to the busier bucket.
+    const tie = [...many('ESZ5', 6, 6), ...many('NQZ5', 3, 3)];
+    expect(highlights(breakdown(tie, 'symbol', ctx)).bestWinRate?.key).toBe(
+      'ES',
+    );
+    // No bucket with 5 decided trades: no best win rate, but still a most active.
+    const sparse = highlights(breakdown(many('ESZ5', 2, 2), 'symbol', ctx));
+    expect(sparse.bestWinRate).toBeNull();
+    expect(sparse.mostActive?.key).toBe('ES');
     expect(highlights([])).toEqual({ mostActive: null, bestWinRate: null });
-    const noDecided = breakdown([fx('a1', 'ESZ5', 0)], 'symbol', ctx);
-    expect(highlights(noDecided).bestWinRate).toBeNull();
+    // Breakeven trades are not decided.
+    const flat = [
+      ...many('ESZ5', 3, 1),
+      ...Array.from({ length: 4 }, () => fx('a1', 'ESZ5', 0)),
+    ];
+    expect(highlights(breakdown(flat, 'symbol', ctx)).bestWinRate).toBeNull();
   });
 });

@@ -88,6 +88,19 @@ export function ReportSelect({
   );
 }
 
+/**
+ * Account names by id. Until the accounts load every account reads "Loading",
+ * so a row never flashes a raw id.
+ */
+export function accountNamesOf(
+  accounts: readonly { id: string; name: string }[] | undefined,
+  ids: readonly string[],
+): Record<string, string> {
+  if (accounts === undefined)
+    return Object.fromEntries(ids.map((id) => [id, 'Loading']));
+  return Object.fromEntries(accounts.map((a) => [a.id, a.name]));
+}
+
 /** The names the strategy and tag breakdowns label their rows with. */
 export function useNames(): {
   options: BreakdownOptions;
@@ -363,12 +376,13 @@ export function BreakdownCards({
   const merged = useMemo(
     () => ({
       ...ctx,
-      accountNames: Object.fromEntries(
-        (accounts ?? []).map((a) => [a.id, a.name]),
+      accountNames: accountNamesOf(
+        accounts,
+        p.trades.map((t) => t.accountId),
       ),
       ...options,
     }),
-    [ctx, options, accounts],
+    [ctx, options, accounts, p.trades],
   );
   const describe = labelOf ?? ((r: BreakdownRow) => r.label);
   // A bucket's link adds its filter to the page's, on the date the breakdown buckets by.
@@ -668,7 +682,7 @@ export function BreakdownCards({
     },
     {
       id: 'avg-win',
-      header: 'Average win',
+      header: 'Avg win',
       tip: 'avg-win',
       align: 'right',
       value: (r) => meanOf(r, 'win')?.sort ?? null,
@@ -683,7 +697,7 @@ export function BreakdownCards({
     },
     {
       id: 'avg-loss',
-      header: 'Average loss',
+      header: 'Avg loss',
       tip: 'avg-loss',
       align: 'right',
       value: (r) => meanOf(r, 'loss')?.sort ?? null,
@@ -732,7 +746,7 @@ export function BreakdownCards({
     },
     {
       id: 'avg-daily-volume',
-      header: 'Average daily volume',
+      header: 'Avg daily vol',
       tip: 'avg-daily-volume',
       align: 'right',
       value: (r) => dailyVolume(r),
@@ -740,7 +754,7 @@ export function BreakdownCards({
         const v = dailyVolume(r);
         return v === null ? none : formatQty(v);
       },
-      csv: { value: (r) => dailyVolume(r) },
+      csv: { header: 'Average daily volume', value: (r) => dailyVolume(r) },
     },
   ];
   // The name (and the tag's category) always show; the others follow the address.
@@ -893,7 +907,7 @@ export function BreakdownCards({
               ))}
             </ol>
           )}
-          {picked.mostActive && picked.bestWinRate ? (
+          {picked.mostActive ? (
             <ul
               aria-label="Highlights"
               className="mt-2 border-t border-line pt-2"
@@ -910,14 +924,20 @@ export function BreakdownCards({
               </li>
               <li className="flex flex-wrap items-baseline gap-x-2 py-1 text-[13px]">
                 <span className="text-faint">Best win rate</span>
-                <b className="font-semibold text-text">
-                  {describe(picked.bestWinRate)}
-                </b>
-                <span className="text-muted tabular-nums">
-                  {formatPct(picked.bestWinRate.summary.winRate ?? 0, 0)} won,{' '}
-                  {picked.bestWinRate.summary.closedCount}{' '}
-                  {plural(picked.bestWinRate.summary.closedCount, 'trade')}
-                </span>
+                {picked.bestWinRate ? (
+                  <>
+                    <b className="font-semibold text-text">
+                      {describe(picked.bestWinRate)}
+                    </b>
+                    <span className="text-muted tabular-nums">
+                      {formatPct(picked.bestWinRate.summary.winRate ?? 0, 0)}{' '}
+                      won, {picked.bestWinRate.summary.closedCount}{' '}
+                      {plural(picked.bestWinRate.summary.closedCount, 'trade')}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-faint">None</span>
+                )}
               </li>
             </ul>
           ) : null}

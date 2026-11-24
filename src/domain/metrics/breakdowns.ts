@@ -470,11 +470,14 @@ export function breakdown(
   return sorted;
 }
 
+/** The decided trades (wins plus losses) a bucket needs to be the best win rate. */
+export const MIN_DECIDED = 5;
+
 /** What a breakdown singles out besides its best and worst by net. */
 export interface Highlights {
   /** The bucket with the most closed trades. */
   mostActive: BreakdownRow | null;
-  /** The bucket with the highest win rate; the busier one when they tie. */
+  /** The bucket with the highest win rate among those with `MIN_DECIDED` decided trades; the busier one when they tie. */
   bestWinRate: BreakdownRow | null;
 }
 
@@ -493,7 +496,9 @@ export function highlights(rows: readonly BreakdownRow[]): Highlights {
   );
   const bestWinRate = traded.reduce<BreakdownRow | null>((best, r) => {
     const rate = r.summary.winRate;
-    if (rate === null) return best;
+    // A rate over a handful of trades is noise: it needs enough decided ones.
+    if (rate === null || r.summary.wins + r.summary.losses < MIN_DECIDED)
+      return best;
     if (best === null) return r;
     const top = best.summary.winRate!;
     if (rate > top) return r;

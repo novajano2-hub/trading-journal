@@ -12,7 +12,12 @@ import type { SampleWorkspace } from '@/data/seed/generate';
 import { breakdown2D } from '@/domain/metrics/breakdowns';
 import { breakdownSample } from '../__fixtures__/breakdown-sample';
 import { renderApp } from '../__fixtures__/render-app';
-import { StrategiesView, SymbolsView, TagsView } from './breakdown-report';
+import {
+  accountNamesOf,
+  StrategiesView,
+  SymbolsView,
+  TagsView,
+} from './breakdown-report';
 
 vi.mock('next/navigation', () => import('../__fixtures__/navigation'));
 vi.mock('@/domain/metrics/breakdowns', async (original) => {
@@ -579,17 +584,17 @@ test('the table has Average win, Average loss and Average daily volume columns',
   const page = await screen.findByTestId('reports-symbols');
   const table = within(page).getByRole('table', { name: 'Symbols summary' });
   const heads = headsOf(table);
-  for (const name of ['Average win', 'Average loss', 'Average daily volume'])
+  for (const name of ['Avg win', 'Avg loss', 'Avg daily vol'])
     expect(heads).toContain(name);
   const cell = (row: RegExp, head: string) =>
     rowOf(table, row).getAllByRole('cell')[heads.indexOf(head)]!.textContent;
   // ES: one win of 100.00 and one loss of 40.00; 3 lots (2 and 1) on one day.
-  expect(cell(/^ES/, 'Average win')).toBe('+$100.00');
-  expect(cell(/^ES/, 'Average loss')).toBe('−$40.00');
-  expect(cell(/^ES/, 'Average daily volume')).toBe('3');
+  expect(cell(/^ES/, 'Avg win')).toBe('+$100.00');
+  expect(cell(/^ES/, 'Avg loss')).toBe('−$40.00');
+  expect(cell(/^ES/, 'Avg daily vol')).toBe('3');
   // SPY has one win (30.00) and two losses (10.00, 5.00): average loss 7.50.
-  expect(cell(/^SPY/, 'Average win')).toBe('+$30.00');
-  expect(cell(/^SPY/, 'Average loss')).toBe('−$7.50');
+  expect(cell(/^SPY/, 'Avg win')).toBe('+$30.00');
+  expect(cell(/^SPY/, 'Avg loss')).toBe('−$7.50');
   // A bucket with no win shows None.
   cleanup();
   renderApp(<SymbolsView />, {
@@ -610,8 +615,8 @@ test('Average win and Average loss read in the display unit', async () => {
   const heads = headsOf(table);
   // ES: b-1 is +2R and b-2 is -1R.
   const es = rowOf(table, /^ES/).getAllByRole('cell');
-  expect(es[heads.indexOf('Average win')]!.textContent).toContain('+2.00R');
-  expect(es[heads.indexOf('Average loss')]!.textContent).toContain('−1.00R');
+  expect(es[heads.indexOf('Avg win')]!.textContent).toContain('+2.00R');
+  expect(es[heads.indexOf('Avg loss')]!.textContent).toContain('−1.00R');
 });
 
 test('the column chooser: toggles write cols to the address and Reset clears it', async () => {
@@ -645,7 +650,7 @@ test('a link with cols shows just those columns, and the export writes the same'
   });
   const page = await screen.findByTestId('reports-symbols');
   const table = within(page).getByRole('table', { name: 'Symbols summary' });
-  expect(headsOf(table)).toEqual(['Symbol', 'Trades', 'Average win']);
+  expect(headsOf(table)).toEqual(['Symbol', 'Trades', 'Avg win']);
   const saved = captureDownload();
   fireEvent.click(
     await within(page).findByRole('button', { name: 'Export CSV' }),
@@ -679,9 +684,48 @@ test('highlights add the most active bucket and the best win rate beside best an
   expect(h.getByText(/Most active/).closest('li')!.textContent).toMatch(
     /SPY.*3 trades/,
   );
-  // ES and NQ both won 1 of 2; the first of them leads.
+  // No symbol has 5 decided trades here, so the line reads None, and Most active still shows.
+  expect(h.getByText(/Best win rate/).closest('li')!.textContent).toBe(
+    'Best win rateNone',
+  );
+});
+
+/** Twelve ES trades: 8 wins and 4 losses, and one lone winning NQ trade. */
+async function sparseWinRates(): Promise<SampleWorkspace> {
+  const s = await breakdownSample();
+  const { resolveInstrument } = await import('@/domain/instruments');
+  const base = s.trades[0]!;
+  s.trades = [
+    ...Array.from({ length: 12 }, (_, i) => ({
+      ...base,
+      id: `e-${i}`,
+      net: i < 8 ? 1000 : -1000,
+      gross: i < 8 ? 1000 : -1000,
+      strategyIds: [],
+      tagIds: [],
+    })),
+    {
+      ...base,
+      id: 'n-1',
+      instrument: resolveInstrument('NQZ5')!,
+      net: 1000,
+      gross: 1000,
+      strategyIds: [],
+      tagIds: [],
+    },
+  ];
+  return s;
+}
+
+test('the best win rate skips a lone trade at 100% for a bucket with enough trades', async () => {
+  renderApp(<SymbolsView />, {
+    sample: sparseWinRates,
+    url: '/app/reports/symbols',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const h = within(within(page).getByRole('list', { name: 'Highlights' }));
   expect(h.getByText(/Best win rate/).closest('li')!.textContent).toMatch(
-    /ES.*50%.*2 trades/,
+    /ES.*67%.*12 trades/,
   );
 });
 
@@ -878,4 +922,14 @@ test('the limiter shows all, the top 10 or the bottom 10 symbols by net', async 
   expect(bottom).toHaveLength(10);
   // The worst first.
   expect(bottom[0]!.textContent).toMatch(/^ES/);
+});
+
+test('account labels are a quiet placeholder until the accounts load, then their names', () => {
+  expect(accountNamesOf(undefined, ['acc-1', 'acc-2'])).toEqual({
+    'acc-1': 'Loading',
+    'acc-2': 'Loading',
+  });
+  expect(
+    accountNamesOf([{ id: 'acc-1', name: 'Live' } as never], ['acc-1']),
+  ).toEqual({ 'acc-1': 'Live' });
 });

@@ -36,9 +36,7 @@ describe('the breakdown column choice in the address', () => {
   test('toggling keeps the table order and always leaves one column on', () => {
     expect(toggleColumn(ALL, 'average')).not.toContain('average');
     expect(toggleColumn(['trades'], 'net')).toEqual(['trades', 'net']);
-    expect(
-      toggleColumn(['net', 'trades'].length ? ['trades', 'net'] : [], 'net'),
-    ).toEqual(['trades']);
+    expect(toggleColumn(['trades', 'net'], 'net')).toEqual(['trades']);
     expect(toggleColumn(['trades'], 'trades')).toEqual(['trades']);
   });
 });

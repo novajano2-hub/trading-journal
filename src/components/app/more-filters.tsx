@@ -21,12 +21,12 @@ import {
   type Rating,
   type TimeWindow,
 } from '@/data/filters';
+import { ASSET_CLASSES, ASSET_CLASS_LABELS } from '@/domain/asset-class';
+import type { AssetClass } from '@/domain/types';
 import { enter, exit } from '@/lib/motion';
 import { FIELD } from './filter-chip';
 import type { FilterOptions } from './filter-model';
 import { toggleId } from './filter-model';
-import { ASSET_CLASSES, ASSET_CLASS_LABELS } from '@/domain/asset-class';
-import type { AssetClass } from '@/domain/types';
 
 const MD = '(min-width: 768px)';
 

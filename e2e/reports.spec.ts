@@ -180,3 +180,36 @@ test('an instrument row opens the log with exactly its trades and a chip, and th
   ).toBeChecked();
   await expect(page.getByText(`Instrument: ${name}`)).toBeVisible();
 });
+
+for (const [path, table] of [
+  ['/app/reports/day-time?tab=weekday', 'Weekday summary'],
+  ['/app/reports/symbols', 'Symbols summary'],
+] as const)
+  test(`the ${table} fits at 1440 with its default columns, no sideways scroll`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openReports(page);
+    await page.goto(path);
+    const t = page.getByRole('table', { name: table });
+    await expect(t).toBeVisible({ timeout: 30_000 });
+    const widths = await t.evaluate((el) => {
+      const box = el.parentElement!;
+      // The columns' own width, with the table not stretched to the card.
+      const t = el as HTMLElement;
+      t.style.width = 'auto';
+      const natural = t.offsetWidth;
+      t.style.width = '';
+      return {
+        scroll: box.scrollWidth,
+        client: box.clientWidth,
+        natural,
+      };
+    });
+    expect(widths.scroll, JSON.stringify(widths)).toBeLessThanOrEqual(
+      widths.client,
+    );
+    expect(widths.natural, JSON.stringify(widths)).toBeLessThanOrEqual(
+      widths.client,
+    );
+  });
