@@ -14,7 +14,11 @@ export default function AppGroupLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div data-surface="app" className="flex flex-1 flex-col">
+    // `--tab-bar`: how much of a phone's foot the tab bar takes, kept clear by the page.
+    <div
+      data-surface="app"
+      className="flex flex-1 flex-col [--tab-bar:0px] max-sm:[--tab-bar:calc(56px+env(safe-area-inset-bottom))]"
+    >
       <DataProvider>
         <AppShell>{children}</AppShell>
       </DataProvider>

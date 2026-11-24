@@ -131,11 +131,82 @@ test('sidebar by keyboard keeps the filters (desktop)', async ({
   ).toHaveAttribute('aria-current', 'page');
 });
 
-test('mobile drawer opens, closes on Escape, and returns focus (mobile)', async ({
+test('below sm a tab bar navigates: Dashboard, Trades, Calendar, Reports and More (mobile)', async ({
   page,
 }, info) => {
   test.skip(info.project.name !== 'mobile');
+  await page.goto('/app/dashboard?side=long');
+  await ready(page);
+  // No hamburger and no drawer on a phone.
+  await expect(
+    page.getByRole('button', { name: 'Open navigation' }),
+  ).toBeHidden();
+  const tabs = page.getByRole('navigation', { name: 'Main' });
+  await expect(tabs.getByRole('listitem')).toHaveText([
+    'Dashboard',
+    'Trades',
+    'Calendar',
+    'Reports',
+    'More',
+  ]);
+  // Pinned to the foot, every target at least 44px.
+  const bar = (await tabs.boundingBox())!;
+  expect(Math.round(bar.y + bar.height)).toBe(844);
+  for (const item of await tabs.getByRole('listitem').all()) {
+    const box = (await item.locator('a, button').boundingBox())!;
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    expect(box.width).toBeGreaterThanOrEqual(44);
+  }
+  await expect(tabs.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await tabs.getByRole('link', { name: 'Calendar' }).click();
+  await expect(page).toHaveURL(/\/app\/calendar\?side=long$/);
+  await expect(tabs.getByRole('link', { name: 'Calendar' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+
+  const more = tabs.getByRole('button', { name: 'More' });
+  await more.click();
+  const sheet = page.getByRole('dialog', { name: 'More' });
+  await expect(
+    sheet.getByRole('button', { name: /Sample workspace/ }),
+  ).toBeVisible();
+  for (const name of [
+    'Strategies',
+    'Notebook',
+    'Import',
+    'Prop firms',
+    'Settings',
+  ])
+    await expect(sheet.getByRole('link', { name, exact: true })).toBeVisible();
+  await expect(
+    sheet.getByRole('list', { name: 'Not live yet' }).getByRole('link'),
+  ).toHaveCount(4);
+  await expect(
+    sheet.getByRole('radiogroup', { name: 'Appearance' }),
+  ).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(sheet).toBeHidden();
+  await expect(more).toBeFocused();
+
+  await more.click();
+  await sheet.getByRole('link', { name: 'Settings', exact: true }).click();
+  await expect(page).toHaveURL(/\/app\/settings\/profile$/);
+  await expect(sheet).toBeHidden();
+  // More holds the current page, so it reads as the current tab.
+  await expect(more).toHaveClass(/text-accent-ink/);
+});
+
+test('from sm to lg the drawer still opens, closes on Escape, and returns focus (mobile)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'mobile');
+  await page.setViewportSize({ width: 768, height: 1024 });
   await page.goto('/app/trades');
+  await expect(page.getByRole('navigation', { name: 'Main' })).toBeHidden();
   const trigger = page.getByRole('button', { name: 'Open navigation' });
   await trigger.click();
   await expect(
@@ -170,47 +241,76 @@ test('search opens on a click of its icon and finds a module (mobile)', async ({
   await expect(page).toHaveURL(/\/app\/calendar/);
 });
 
-test('switching workspace in the drawer closes it (mobile)', async ({
+test('switching workspace in the More sheet closes it (mobile)', async ({
   page,
 }, info) => {
   test.skip(info.project.name !== 'mobile');
   await page.goto('/app/dashboard?side=long');
   await ready(page);
-  await page.getByRole('button', { name: 'Open navigation' }).click();
-  const sheet = page.getByRole('dialog', { name: 'Navigation' });
+  const more = page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('button', { name: 'More' });
+  await more.click();
+  const sheet = page.getByRole('dialog', { name: 'More' });
   await sheet.getByRole('button', { name: /Sample workspace/ }).click();
   await page.getByRole('menuitemradio', { name: 'My workspace' }).click();
   await expect(sheet).toBeHidden();
   await expect(page).toHaveURL(/\/app\/dashboard\?side=long$/);
-  await expect(
-    page.getByRole('button', { name: 'Open navigation' }),
-  ).toBeFocused();
+  await expect(more).toBeFocused();
 });
 
-test('below sm the menu and title stay put; the chips and controls scroll away (mobile)', async ({
+test('below sm the bar is one row pinned to the top, and the page scrolls clear of the tab bar (mobile)', async ({
   page,
 }, info) => {
   test.skip(info.project.name !== 'mobile');
   await page.goto('/app/dashboard');
   await ready(page);
-  await page.mouse.wheel(0, 700);
-  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(300);
   const bar = page.getByRole('banner');
-  for (const pinned of [
+  // One 56px row: the title with its badge, then plain icons. No Import, no theme.
+  const top = (await bar.boundingBox())!;
+  expect(Math.round(top.height)).toBe(56);
+  for (const control of [
     bar.getByRole('heading', { level: 1 }),
-    bar.getByRole('button', { name: 'Open navigation' }),
+    bar.getByRole('button', { name: /^Filters/ }),
+    bar.getByRole('combobox', { name: 'Search' }),
+    bar.getByRole('button', { name: /show as / }),
   ]) {
-    const box = (await pinned.boundingBox())!;
+    const box = (await control.boundingBox())!;
     expect(box.y).toBeGreaterThanOrEqual(0);
     expect(box.y + box.height).toBeLessThanOrEqual(56);
   }
-  for (const gone of [
+  await expect(bar.getByText('Sample', { exact: true })).toBeVisible();
+  await expect(bar.getByRole('link', { name: 'Import' })).toBeHidden();
+  // Icons, not boxes: no border on the resting controls.
+  for (const control of [
     bar.getByRole('button', { name: /^Filters/ }),
-    bar.getByRole('link', { name: 'Import' }),
-  ]) {
-    const box = (await gone.boundingBox())!;
-    expect(box.y + box.height).toBeLessThan(0);
-  }
+    bar.getByRole('button', { name: /show as / }),
+  ])
+    await expect(control).toHaveCSS('border-top-width', '0px');
+
+  await page.mouse.wheel(0, 700);
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(300);
+  const pinned = (await bar.getByRole('heading', { level: 1 }).boundingBox())!;
+  expect(pinned.y).toBeGreaterThanOrEqual(0);
+  expect(pinned.y + pinned.height).toBeLessThanOrEqual(56);
+
+  // At the very end, the last card sits above the tab bar.
+  await page.mouse.wheel(0, 100_000);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => innerHeight + scrollY >= document.body.scrollHeight - 1,
+      ),
+    )
+    .toBe(true);
+  const tabs = (await page
+    .getByRole('navigation', { name: 'Main' })
+    .boundingBox())!;
+  const last = await page
+    .locator('section')
+    .filter({ has: page.getByRole('heading', { name: 'Recent trades' }) })
+    .boundingBox();
+  expect(last!.y + last!.height).toBeLessThanOrEqual(tabs.y);
 });
 
 const BUSY =
@@ -273,18 +373,18 @@ test('Tab walks the top bar in the order it reads: title, chips, search, Display
   const filters = bar.getByRole('group', { name: 'Filters' });
   const chip = (name: string) =>
     filters.getByRole('button', { name, exact: true });
+  // A phone reaches Import from More, so its bar ends at Display.
   const tail = [
     bar.getByRole('combobox', { name: 'Search' }),
     bar.getByRole('button', { name: /show as / }),
-    bar.getByRole('link', { name: 'Import' }),
+    ...(mobile ? [] : [bar.getByRole('link', { name: 'Import' })]),
   ];
   // What comes before the bar: the skip link on phones, the sidebar's last link on desktop.
   const before = mobile
     ? page.getByRole('link', { name: 'Skip to content' })
     : page.getByRole('link', { name: 'Settings' });
-  const menu = mobile
-    ? [page.getByRole('button', { name: 'Open navigation' })]
-    : [];
+  // No menu button on a phone: the tab bar navigates.
+  const menu: Locator[] = [];
 
   await page.goto('/app/dashboard');
   await ready(page);

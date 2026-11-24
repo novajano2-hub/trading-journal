@@ -5,7 +5,6 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Dialog } from 'radix-ui';
 import { useId, useRef, useState, type ReactNode } from 'react';
 import { RAISED } from '@/components/ui/button-styles';
-import { Chip } from '@/components/ui/chip';
 import { EMPTY_FILTERS, type GlobalFilters } from '@/data/filters';
 import { enter, exit } from '@/lib/motion';
 import { rangeChipLabel } from '@/lib/range-label';
@@ -26,8 +25,9 @@ import {
 } from './filter-popovers';
 import { MoreFilters } from './more-filters';
 
+/** A plain 44px glyph in the phone's top bar, the count of filters in use on its shoulder. */
 const BUTTON =
-  'inline-flex h-11 flex-none cursor-pointer items-center gap-2 rounded-control border border-line bg-surface-1 px-3.5 text-[13.5px] font-semibold text-text shadow-[var(--shadow-chip)] transition-[border-color] duration-200 ease-(--ease-glide) enabled:hover:border-accent/35 data-[state=open]:border-accent/35 disabled:cursor-default';
+  'relative inline-flex size-11 flex-none cursor-pointer items-center justify-center rounded-control text-muted transition-colors duration-200 ease-(--ease-glide) data-[state=open]:bg-sunken disabled:cursor-default';
 
 type Key = 'date' | 'symbol' | 'side' | 'strategy' | 'tags';
 
@@ -125,18 +125,18 @@ export function FilterSheet({
   const face = (
     <>
       <Funnel
-        size={16}
+        size={20}
+        weight={count > 0 ? 'fill' : 'regular'}
         aria-hidden="true"
-        className="flex-none text-accent-ink"
+        className={`flex-none ${count > 0 ? 'text-accent-ink' : ''}`}
       />
-      <span>Filters</span>
       {count > 0 ? (
-        <Chip
-          tone="accent"
-          className="h-[18px] min-w-[18px] justify-center px-1 text-[11px]"
+        <span
+          aria-hidden="true"
+          className="absolute top-1 right-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[11px] leading-none font-semibold text-accent-fg tabular-nums"
         >
           {count}
-        </Chip>
+        </span>
       ) : null}
     </>
   );
@@ -150,7 +150,7 @@ export function FilterSheet({
           aria-disabled={noTrades ? 'true' : undefined}
           aria-describedby={noTrades ? noteId : undefined}
           aria-label={name}
-          className={`${BUTTON} ${noTrades ? 'border-dashed border-line-2 bg-transparent text-faint shadow-none' : ''}`}
+          className={`${BUTTON} ${noTrades ? 'text-faint' : ''}`}
         >
           {face}
         </button>

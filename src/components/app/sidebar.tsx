@@ -159,7 +159,7 @@ export function SwitcherSlot({
   );
 }
 
-/** The desktop column, from `lg` up. Below that, `MobileNav` carries the same links. */
+/** The desktop column, from `lg` up. From `sm` to `lg` `MobileNav` carries the same links; below `sm` the tab bar does. */
 export function Sidebar({
   switcher,
 }: {

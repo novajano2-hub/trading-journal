@@ -18,13 +18,21 @@ function open(name: RegExp | string) {
   return button;
 }
 
+/** What the button shows from `sm`, and what it shows on a phone. */
+const faces = (button: HTMLElement) => ({
+  wide: button.querySelector('[data-face="wide"]')?.textContent,
+  phone: button.querySelector('[data-face="phone"]')?.textContent,
+});
+
 test('the button names the unit and the basis, starts as Net, $, and its name contains its visible label', async () => {
   renderApp(<DisplayMenu />);
   const button = await screen.findByRole('button', {
     name: 'Net, $, show as Dollar',
   });
-  expect(button.textContent).toBe('Net, $');
-  expect(button.getAttribute('aria-label')).toContain(button.textContent);
+  // From sm the pair; on a phone the unit's mark alone, in a plain button.
+  expect(faces(button)).toEqual({ wide: 'Net, $', phone: '$' });
+  expect(button.getAttribute('aria-label')).toContain('Net, $');
+  expect(button.className).toContain('max-sm:border-0');
 });
 
 test('choosing Privacy saves displayUnit and renames the button', async () => {
@@ -57,7 +65,7 @@ test('Gross and Net save the basis, as the old switch did', async () => {
     name: 'Gross, $, show as Dollar',
     hidden: true,
   });
-  expect(renamed.textContent).toBe('Gross, $');
+  expect(faces(renamed).wide).toBe('Gross, $');
 });
 
 test('the units are one radio group, the basis another', async () => {

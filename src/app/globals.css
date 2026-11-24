@@ -142,6 +142,17 @@ html {
   scrollbar-color: var(--line-2) var(--bg);
 }
 
+/*
+ * On a phone in the app, focus and in-page jumps land clear of the pinned top
+ * bar and the tab bar at the foot.
+ */
+@media (max-width: 639.98px) {
+  html:has([data-surface='app']) {
+    scroll-padding-top: 56px;
+    scroll-padding-bottom: calc(56px + env(safe-area-inset-bottom));
+  }
+}
+
 body {
   background: var(--bg);
   color: var(--text);

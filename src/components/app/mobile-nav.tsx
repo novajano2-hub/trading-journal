@@ -15,8 +15,9 @@ const ICON_BUTTON =
   'inline-flex size-11 flex-none cursor-pointer items-center justify-center rounded-control text-text transition-colors duration-200 ease-(--ease-glide) hover:bg-surface-1';
 
 /**
- * Below `lg`, the sidebar as a sheet from the left, on the same canvas. It
- * traps focus, closes on
+ * From `sm` to `lg`, the sidebar as a sheet from the left, on the same canvas.
+ * (Below `sm` the tab bar and its More sheet navigate instead.) It traps
+ * focus, closes on
  * Escape, the veil, a link, any route change or a workspace switch, and hands
  * focus back to its trigger.
  */
@@ -43,14 +44,14 @@ export function MobileNav({
     if (moved || switched) setOpen(false);
   }
 
-  // Crossing into the desktop layout hides the trigger: close the sheet with it.
+  // Leaving the drawer's widths hides the trigger: close the sheet with it.
   useEffect(() => {
-    const lg = matchMedia('(min-width: 1024px)');
+    const drawer = matchMedia('(min-width: 640px) and (max-width: 1023.98px)');
     const onChange = (e: MediaQueryListEvent) => {
-      if (e.matches) setOpen(false);
+      if (!e.matches) setOpen(false);
     };
-    lg.addEventListener('change', onChange);
-    return () => lg.removeEventListener('change', onChange);
+    drawer.addEventListener('change', onChange);
+    return () => drawer.removeEventListener('change', onChange);
   }, []);
 
   const close = () => setOpen(false);
@@ -62,7 +63,7 @@ export function MobileNav({
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger
         aria-label="Open navigation"
-        className={`${ICON_BUTTON} -ml-2.5 lg:hidden`}
+        className={`${ICON_BUTTON} -ml-2.5 max-sm:hidden lg:hidden`}
       >
         <List size={20} aria-hidden="true" />
       </Dialog.Trigger>

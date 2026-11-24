@@ -27,8 +27,9 @@ const ITEM =
 const LABEL = 'px-2 pt-2 pb-1 text-[12px] font-medium text-faint';
 /** Under a unit's name, the trades it keeps. */
 const KEEPS = 'block text-[12px] leading-4 text-faint';
+/** From `sm` a white control naming the pair; on a phone a plain 44px button showing the unit's mark. */
 const TRIGGER =
-  'inline-flex h-[34px] flex-none items-center gap-1.5 rounded-control border border-line bg-surface-1 pr-2 pl-3 text-[13.5px] font-medium whitespace-nowrap text-text shadow-[0_1px_1px_rgb(18_22_51/0.04)] transition-[border-color] duration-200 ease-(--ease-glide) hover:border-accent/35 data-[state=open]:border-accent/35 pointer-coarse:h-11 pointer-coarse:pl-3.5';
+  'inline-flex h-[34px] flex-none items-center gap-1.5 rounded-control border border-line bg-surface-1 pr-2 pl-3 text-[13.5px] font-medium whitespace-nowrap text-text shadow-[0_1px_1px_rgb(18_22_51/0.04)] transition-[border-color] duration-200 ease-(--ease-glide) hover:border-accent/35 data-[state=open]:border-accent/35 pointer-coarse:h-11 pointer-coarse:pl-3.5 max-sm:size-11 max-sm:justify-center max-sm:border-0 max-sm:bg-transparent max-sm:p-0 max-sm:shadow-none max-sm:data-[state=open]:bg-sunken';
 
 const upper = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -72,21 +73,34 @@ export function DisplayMenu(): React.JSX.Element {
         aria-label={`${face}, show as ${current.name}`}
         className={TRIGGER}
       >
-        {face}
-        {unit === 'privacy' ? (
-          <EyeSlash
-            size={15}
+        <span data-face="wide" className="contents max-sm:hidden">
+          {face}
+          {unit === 'privacy' ? (
+            <EyeSlash
+              size={15}
+              weight="bold"
+              aria-hidden="true"
+              className="-mr-0.5 flex-none text-muted"
+            />
+          ) : null}
+          <CaretDown
+            size={12}
             weight="bold"
             aria-hidden="true"
-            className="-mr-0.5 flex-none text-muted"
+            className="flex-none text-faint"
           />
-        ) : null}
-        <CaretDown
-          size={12}
-          weight="bold"
+        </span>
+        <span
+          data-face="phone"
           aria-hidden="true"
-          className="flex-none text-faint"
-        />
+          className="text-muted sm:hidden"
+        >
+          {unit === 'privacy' ? (
+            <EyeSlash size={20} />
+          ) : (
+            <span className="text-[15px] font-semibold">{current.short}</span>
+          )}
+        </span>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content

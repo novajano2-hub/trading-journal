@@ -86,15 +86,13 @@ test('Compare shows no chips, and says the groups own their filters', () => {
   const bar = renderBar('/app/reports/compare');
   expect(screen.queryByTestId('chips')).toBeNull();
   expect(bar.dataset.chips).toBeUndefined();
-  // From sm it joins the bar's row; on a phone it follows the toolbar row, never between the title and the toolbar.
-  const [wide, phone] = within(bar).getAllByText(
-    'Each group has its own filters',
-  );
+  // From sm it joins the bar's row; on a phone, where the bar is one row, it sits under the bar.
+  const [wide, phone] = screen.getAllByText('Each group has its own filters');
+  expect(bar.contains(wide!)).toBe(true);
   expect(wide!.className).toContain('max-sm:hidden');
+  expect(bar.contains(phone!)).toBe(false);
   expect(phone!.className).toContain('sm:hidden');
-  expect(
-    phone!.previousElementSibling!.contains(screen.getByLabelText('Import')),
-  ).toBe(true);
+  expect(phone!.previousElementSibling).toBe(bar);
   cleanup();
   renderBar('/app/reports/symbols');
   expect(screen.queryAllByText('Each group has its own filters')).toHaveLength(
@@ -113,19 +111,21 @@ test('chips that need more than the room take their own row', () => {
   expect(renderBar().dataset.chips).toBe('wrapped');
 });
 
-test('below sm the chips always have their own row, under the pinned first row', () => {
+test('below sm the bar is one 56px row pinned to the top, unmeasured', () => {
   vi.spyOn(window, 'matchMedia').mockImplementation(
     (query: string) => ({ matches: false, media: query }) as MediaQueryList,
   );
   layOut({ titleWidth: 115, chipsWidth: 100 });
   const bar = renderBar();
   expect(bar.dataset.chips).toBe('unknown');
-  expect(
-    screen.getByRole('heading', { level: 1 }).parentElement!.className,
-  ).toContain('max-sm:fixed');
+  expect(bar.className).toMatch(/(^|\s)sticky(\s|$)/);
+  expect(bar.className).toContain('max-sm:h-14');
+  // Nothing in it is fixed apart: the chips, search and controls share the title's row.
+  expect(bar.innerHTML).not.toContain('max-sm:fixed');
+  expect(bar.innerHTML).not.toContain('max-sm:pt-');
 });
 
-test('the source reads as the bar does: menu, title, chips, search, label, Display menu, Import; none reordered by CSS', () => {
+test('the source reads as the bar does: menu, title, badge, chips, search, label, Display menu, Import; none reordered by CSS', () => {
   layOut({ titleWidth: 115, chipsWidth: 100 });
   render(
     <TopBar
@@ -133,6 +133,7 @@ test('the source reads as the bar does: menu, title, chips, search, label, Displ
       filters={<div data-testid="chips" />}
       search={<button data-testid="search">Search</button>}
       label={<span data-testid="label" />}
+      badge={<span data-testid="badge" />}
       basis={<div data-testid="basis" />}
     />,
   );
@@ -149,6 +150,7 @@ test('the source reads as the bar does: menu, title, chips, search, label, Displ
   expect(order).toEqual([
     'menu',
     'title',
+    'badge',
     'chips',
     'search',
     'label',
@@ -160,18 +162,27 @@ test('the source reads as the bar does: menu, title, chips, search, label, Displ
   expect(bar.innerHTML).not.toMatch(/\border-/);
 });
 
-test('below sm the pinned row holds only the menu and the title', () => {
+test('below sm the title keeps the menu slot and the sample badge beside it, and Import leaves the bar', () => {
   render(
     <TopBar
       menu={<button data-testid="menu">Menu</button>}
       filters={<div data-testid="chips" />}
       search={<button data-testid="search">Search</button>}
+      badge={<span data-testid="badge" />}
     />,
   );
-  const pinned = screen.getByRole('heading', { level: 1 }).parentElement!;
-  expect(pinned.className).toContain('max-sm:fixed');
-  expect(pinned.children).toHaveLength(2);
-  expect(pinned.firstElementChild).toBe(screen.getByTestId('menu'));
+  const group = screen.getByRole('heading', { level: 1 }).parentElement!;
+  expect([...group.children].map((el) => el.tagName)).toEqual([
+    'BUTTON',
+    'H1',
+    'SPAN',
+  ]);
+  expect(group.firstElementChild).toBe(screen.getByTestId('menu'));
+  expect(group.lastElementChild).toBe(screen.getByTestId('badge'));
+  // A phone reaches Import from More.
+  expect(screen.getByRole('link', { name: 'Import' }).className).toContain(
+    'max-sm:hidden',
+  );
 });
 
 test('a trade page titles the bar "Trades" then the trade number, and shows no filter chips', async () => {

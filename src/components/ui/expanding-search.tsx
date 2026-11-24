@@ -15,13 +15,14 @@ export interface SearchOption {
 }
 
 /**
- * Wide enough for the longest option, and never past the bar's edges. On a
- * phone the field starts its row and grows right across all of it, inside
- * the gutters; from `sm` it ends the bar and grows left, capped from `sm` to
- * `md` (where it sits furthest left) so its ring keeps a gutter.
+ * Wide enough for the longest option, and never past the bar's edges. It
+ * grows left from where it rests. On a phone, where the Display button is
+ * the one control after it, it reaches the left gutter, over the title; from
+ * `sm` to `md` (where it sits furthest left) it is capped so its ring keeps a
+ * gutter.
  */
 const EXPANDED =
-  'data-[open=true]:w-[280px] max-sm:data-[open=true]:w-[calc(100vw-2.5rem)] sm:max-md:data-[open=true]:w-[248px]';
+  'data-[open=true]:w-[280px] max-sm:data-[open=true]:w-[calc(100vw-4.625rem)] sm:max-md:data-[open=true]:w-[248px]';
 
 /**
  * The search field and its results. At rest only the magnifier shows; it
@@ -86,17 +87,17 @@ export function ExpandingSearch({
   }
 
   return (
-    // 34px at rest, level with the bar's controls; 40px on a phone.
-    <div className="relative size-[34px] flex-none pointer-coarse:size-11 max-sm:size-10 max-sm:pointer-coarse:size-11">
+    // 34px at rest, level with the bar's controls. On a phone a plain 44px glyph, no box until it opens.
+    <div className="relative size-[34px] flex-none pointer-coarse:size-11 max-sm:size-11">
       <div
         data-open={focused}
-        className={`absolute top-0 left-0 z-10 w-full sm:right-0 sm:left-auto transition-[width] duration-[var(--dur-glide)] ease-[var(--ease-glide)] motion-reduce:transition-none ${EXPANDED}`}
+        className={`absolute top-0 right-0 z-10 w-full transition-[width] duration-[var(--dur-glide)] ease-[var(--ease-glide)] motion-reduce:transition-none ${EXPANDED}`}
       >
-        <div className="relative h-[34px] overflow-hidden rounded-control border border-line bg-surface-1 transition-[border-color,box-shadow] duration-200 ease-(--ease-glide) hover:border-accent/35 focus-within:border-accent/35 focus-within:shadow-[var(--shadow-chip)] focus-within:outline-2 focus-within:outline-offset-3 focus-within:outline-accent pointer-coarse:h-11 max-sm:h-10 max-sm:pointer-coarse:h-11">
+        <div className="relative h-[34px] overflow-hidden rounded-control border border-line bg-surface-1 transition-[border-color,box-shadow,background-color] duration-200 ease-(--ease-glide) hover:border-accent/35 focus-within:border-accent/35 focus-within:shadow-[var(--shadow-chip)] focus-within:outline-2 focus-within:outline-offset-3 focus-within:outline-accent pointer-coarse:h-11 max-sm:h-11 max-sm:border-transparent max-sm:bg-transparent max-sm:focus-within:border-line max-sm:focus-within:bg-surface-1">
           <MagnifyingGlass
             size={18}
             aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 left-[7px] -translate-y-1/2 text-muted pointer-coarse:left-[12px] max-sm:left-[10px] max-sm:pointer-coarse:left-[12px]"
+            className="pointer-events-none absolute top-1/2 left-[7px] -translate-y-1/2 text-muted pointer-coarse:left-[12px] max-sm:left-[12px] max-sm:size-5"
           />
           <input
             ref={inputRef}

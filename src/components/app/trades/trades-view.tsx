@@ -1134,7 +1134,7 @@ export function TradesView(): React.JSX.Element {
 
       {selected.length > 0 ? (
         // In the flow, so the last row is never under it; it sticks to the viewport's foot.
-        <div className="pointer-events-none sticky bottom-4 z-30 flex justify-center pt-2">
+        <div className="pointer-events-none sticky bottom-[calc(var(--tab-bar)+16px)] z-30 flex justify-center pt-2">
           <BulkBar
             trades={selected}
             archivedAccountIds={archivedAccountIds}
