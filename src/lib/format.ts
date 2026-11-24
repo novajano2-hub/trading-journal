@@ -202,3 +202,22 @@ export function formatMinutes(minutes: number): string {
   if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
   return `${m}m`;
 }
+
+/** Decimals in a tick size: 0.25 is 2, 0.00001 is 5. */
+function tickDecimals(tick: number): number {
+  if (!(tick > 0)) return 6;
+  const text = tick.toString();
+  const exp = /e-(\d+)$/.exec(text);
+  if (exp) return Number(exp[1]);
+  const dot = text.indexOf('.');
+  return dot < 0 ? 0 : text.length - dot - 1;
+}
+
+/** A price to its instrument's tick: 6,227.25, 1.10254. At least two decimals, so averages never run on. */
+export const price = (n: number, tick: number) => {
+  const digits = Math.max(2, Math.min(6, tickDecimals(tick)));
+  return n.toLocaleString('en-US', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+};

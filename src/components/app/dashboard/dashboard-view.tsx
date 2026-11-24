@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Segmented } from '@/components/ui/segmented';
-import { buildDashboard, pickPartition } from '@/data/dashboard';
+import { buildDashboard, openPositions, pickPartition } from '@/data/dashboard';
 import { EMPTY_FILTERS, resolveRange } from '@/data/filters';
 import { goalsFor, withGoals } from '@/data/goals';
 import { metricContextOf } from '@/data/metrics';
@@ -129,7 +129,8 @@ function LastImport({
           : a,
       undefined,
     );
-  if (!latest) return null;
+  // Held until the account name is known, so the line never changes under the eye.
+  if (!latest || accounts === undefined) return null;
   const account = accounts?.find((a) => a.id === latest.accountId);
   return (
     <p className="text-[13px] text-muted">
@@ -173,6 +174,8 @@ export function DashboardView(): React.JSX.Element {
   const userAccounts = useUserAccounts().data;
 
   const [currency, setCurrency] = useState<string>();
+  // Chosen here, not in the card: a filter change remounts the card. Until chosen, whichever list has rows.
+  const [recentTab, setRecentTab] = useState<'closed' | 'open'>();
   const [drill, setDrill] = useState<Drill | null>(null);
   const anchors = useDrillAnchors();
   const planRegion = useRef<HTMLElement>(null);
@@ -363,7 +366,12 @@ export function DashboardView(): React.JSX.Element {
             : filtered && set.data?.trades.length === 0
               ? 'no-matches'
               : 'no-closed';
-    return (
+    // Open trades but no closed one: the empty state, and the open positions beneath it.
+    const openOnly =
+      variant === 'no-closed' && set.data
+        ? openPositions(set.data.trades, metricContextOf(prefs!))
+        : [];
+    const empty = (
       <DashboardEmpty
         variant={variant}
         filtered={filtered}
@@ -383,6 +391,23 @@ export function DashboardView(): React.JSX.Element {
           );
         }}
       />
+    );
+    if (openOnly.length === 0) return empty;
+    return (
+      <FigureSourceContext.Provider value={null}>
+        {empty}
+        <div className="px-5 pb-5">
+          <RecentTrades
+            recent={[]}
+            open={openOnly}
+            tab={recentTab ?? 'open'}
+            onTab={setRecentTab}
+            basis={prefs?.pnlBasis ?? 'net'}
+            timeZone={timeZone}
+            caption={view.caption}
+          />
+        </div>
+      </FigureSourceContext.Provider>
     );
   }
 
@@ -486,6 +511,11 @@ export function DashboardView(): React.JSX.Element {
         <RecentTrades
           recent={m.recent}
           open={m.open}
+          tab={
+            recentTab ??
+            (m.recent.length === 0 && m.open.length > 0 ? 'open' : 'closed')
+          }
+          onTab={setRecentTab}
           basis={m.basis}
           timeZone={timeZone}
           caption={caption}

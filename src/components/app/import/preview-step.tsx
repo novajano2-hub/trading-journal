@@ -9,7 +9,7 @@ import {
   InstrumentName,
   TradeTime,
 } from '@/components/app/dashboard/shared';
-import { price } from '@/components/app/trades/columns';
+import { price } from '@/lib/format';
 import { clock } from '@/components/app/trades/trade-time';
 import { FigureText } from '@/components/product/figure-text';
 import { buttonClasses } from '@/components/ui/button-styles';

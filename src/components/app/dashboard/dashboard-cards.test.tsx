@@ -774,7 +774,7 @@ test('open positions: each open trade with its quantity, entry and realized P&L 
     'Side',
     'Quantity',
     'Avg entry',
-    'Realized P&L',
+    'Realized, net',
   ]);
   const rows = within(table).getAllByRole('row').slice(1);
   expect(rows).toHaveLength(1);
@@ -807,12 +807,88 @@ test('an open trade with no exit yet has no realized P&L, and says None', async 
 
 test('open positions with none open says so', async () => {
   await renderDashboard();
-  await openTab().catch(() => undefined);
-  const group = screen.getByRole('radiogroup', { name: 'Recent trades view' });
+  const group = await screen.findByRole('radiogroup', {
+    name: 'Recent trades view',
+  });
   fireEvent.click(within(group).getByRole('radio', { name: 'Open positions' }));
   const region = screen.getByRole('region', { name: 'Recent trades' });
-  expect(region.textContent).toContain('No open positions.');
+  await waitFor(() =>
+    expect(region.textContent).toContain('No open positions.'),
+  );
   expect(screen.queryByRole('table', { name: 'Open positions' })).toBeNull();
+});
+
+test('open positions read the display unit: ticks of the contracts closed so far', async () => {
+  await renderDashboard({
+    prefs: { displayUnit: 'ticks' },
+    edit: (s) => {
+      s.trades.push(openTrade('o-1', 1));
+    },
+  });
+  const table = await openTab();
+  const cell = within(table).getAllByRole('cell')[5]!;
+  // One contract closed 2 points up on a 0.25 tick.
+  expect(cell.textContent).toContain('+8.0 ticks');
+  expect(cell.textContent).not.toContain('$');
+});
+
+test('open positions read R when R is shown', async () => {
+  await renderDashboard({
+    prefs: { displayUnit: 'r' },
+    edit: (s) => {
+      const t = openTrade('o-1', 1);
+      t.initialRisk = 5_000;
+      for (const x of s.trades) x.initialRisk = 10_000;
+      s.trades.push(t);
+    },
+  });
+  const table = await openTab();
+  // ++$100.00 booked over $50.00 risked.
+  expect(within(table).getAllByRole('cell')[5]!.textContent).toContain(
+    '+2.00R',
+  );
+});
+
+test('on a phone the open positions are two-line rows that link to the trade', async () => {
+  await renderDashboard({
+    edit: (s) => {
+      s.trades.push(openTrade('o-1', 1));
+    },
+  });
+  await openTab();
+  const list = screen.getByRole('list', { name: 'Open positions' });
+  expect(list.className).toContain('sm:hidden');
+  const row = within(list).getAllByRole('listitem')[0]!;
+  const link = within(row).getByRole('link');
+  expect(link.getAttribute('href')).toContain('/app/trades/o-1');
+  const one = row.querySelector('[data-line="1"]')!.textContent!;
+  expect(one).toContain('20 Nov 09:00');
+  expect(one).toContain('+$100.00');
+  const two = row.querySelector('[data-line="2"]')!.textContent!;
+  expect(two).toContain('Long');
+  expect(two).toContain('2');
+  expect(two).toContain('6,000.00');
+  // The table keeps from 640px up.
+  expect(
+    screen.getByRole('table', { name: 'Open positions' }).className,
+  ).toContain('max-sm:hidden');
+});
+
+test('open trades with no closed one still open on their tab', async () => {
+  await renderDashboard({
+    edit: (s) => {
+      s.trades = [openTrade('o-1', 1)];
+    },
+  });
+  const table = await screen.findByRole('table', { name: 'Open positions' });
+  expect(table.textContent).toContain('+$100.00');
+  expect(
+    (
+      screen.getByRole('radio', {
+        name: 'Open positions',
+      }) as HTMLInputElement
+    ).checked,
+  ).toBe(true);
 });
 
 test('the performance card adds the day win rate and the average win to loss', async () => {
@@ -846,6 +922,28 @@ test('with no loss the average win to loss reads None', async () => {
     .closest('[data-kpi]')!;
   expect(wl.textContent).toContain('None');
   expect(wl.textContent).not.toMatch(/NaN|Infinity/);
+});
+
+test('the win to loss ratio is the two amounts beside it, in the unit', async () => {
+  // In ticks: a 20-tick loser (f-1) and a 10-tick winner (f-2); in dollars 600 over 400.
+  await renderDashboard({
+    prefs: { displayUnit: 'ticks' },
+    edit: (s) => {
+      const f1 = s.trades.find((t) => t.id === 'f-1')!;
+      f1.avgExit = 5995;
+      const f2 = s.trades.find((t) => t.id === 'f-2')!;
+      f2.avgEntry = 6010;
+      f2.avgExit = 6007.5;
+    },
+  });
+  const perf = await screen.findByRole('region', { name: 'Performance' });
+  const wl = within(perf)
+    .getByRole('button', { name: 'Average win to loss' })
+    .closest('[data-kpi]')!;
+  expect(wl.textContent).toContain('+10.0 ticks');
+  expect(wl.textContent).toContain('−20.0 ticks');
+  expect(wl.textContent).toContain('0.50');
+  expect(wl.textContent).not.toContain('1.50');
 });
 
 const job = (p: Partial<ImportJob>): ImportJob => ({
@@ -921,4 +1019,22 @@ test('with no import, or only undone ones, there is no last import line', async 
   expect(
     within(ready).queryByRole('link', { name: 'Import history' }),
   ).toBeNull();
+});
+
+test('the last import line waits for the account name instead of jumping', async () => {
+  await renderDashboard({
+    patch: (repo) => ({
+      imports: { ...repo.imports, list: async () => [job({})] },
+      accounts: {
+        ...repo.accounts,
+        list: async (ws: string) =>
+          ws === USER_WORKSPACE.id
+            ? new Promise<never>(() => {})
+            : repo.accounts.list(ws),
+      },
+    }),
+  });
+  const ready = await screen.findByTestId('dashboard-ready');
+  await new Promise((r) => setTimeout(r, 30));
+  expect(ready.textContent).not.toContain('Last import');
 });

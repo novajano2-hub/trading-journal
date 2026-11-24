@@ -413,11 +413,15 @@ export function PerformanceCard({
               'None'
             ) : (
               <>
-                <span className={signTone(performance.avgWin ?? 0)}>
+                <span
+                  className={`whitespace-nowrap ${signTone(performance.avgWin ?? 0)}`}
+                >
                   <FigureText f={avgWin} />
                 </span>{' '}
                 /{' '}
-                <span className={signTone(performance.avgLoss ?? 0)}>
+                <span
+                  className={`whitespace-nowrap ${signTone(performance.avgLoss ?? 0)}`}
+                >
                   <FigureText f={avgLoss} />
                 </span>
               </>

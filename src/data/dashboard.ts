@@ -18,6 +18,7 @@ import {
   type RuleScore,
 } from '@/domain/metrics/rules';
 import { sizedRealizations } from '@/domain/metrics/realized';
+import { realizedUnits, type TradeUnits } from '@/domain/metrics/units';
 import { winsVsLosses } from '@/domain/metrics/breakdowns';
 import { ruleApplies } from '@/domain/rule-applies';
 import { closedInOrder } from '@/domain/trade-status';
@@ -96,6 +97,8 @@ export interface OpenPosition {
   openQty: number;
   /** The exits' booked P&L on the basis; null before the first exit. No unrealized P&L: Keel has no live prices. */
   realized: Cents | null;
+  /** The same booked exits in R, ticks, pips and points: ticks of the contracts closed so far. Null before the first exit. */
+  realizedUnits: TradeUnits | null;
 }
 
 /** The open trades, newest opened first, each with its open size and the P&L its partial exits booked. */
@@ -115,9 +118,11 @@ export function openPositions(
       for (const e of trade.executions)
         held += (e.side === 'buy') === long ? e.qty : -e.qty;
       const exits = sizedRealizations(trade);
+      const basis = ctx.pnlBasis;
       return {
         trade,
         openQty: trade.executions.length === 0 ? trade.maxPosition : held,
+        realizedUnits: realizedUnits(trade, basis),
         realized:
           exits.length === 0
             ? null

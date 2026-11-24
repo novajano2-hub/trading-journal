@@ -1,5 +1,6 @@
 import type { DisplayUnit, Trade } from '../types';
 import { pnlOf, type PnlBasis } from './context';
+import { sizedRealizations } from './realized';
 
 /** The units a figure can carry besides money, a percentage and Privacy. */
 export type TradeUnit = 'r' | 'ticks' | 'pips' | 'points';
@@ -111,4 +112,29 @@ export function unitOf(
 export function moneyPerPip(t: Trade): number | null {
   const pips = tradeUnits(t, 'gross').pips;
   return pips === null || pips === 0 ? null : Math.round(t.gross / pips);
+}
+
+/**
+ * An open trade in each unit, over the exits booked so far: the move from its
+ * average entry to the average price of its exit fills, on the contracts
+ * those fills closed; R is the booked P&L over the initial risk. Null before
+ * the first exit.
+ */
+export function realizedUnits(t: Trade, basis: PnlBasis): TradeUnits | null {
+  const exits = sizedRealizations(t);
+  if (exits.length === 0) return null;
+  const fills = t.executions.filter(
+    (e) => (e.side === 'buy') !== (t.direction === 'long'),
+  );
+  const qty = fills.reduce((n, e) => n + e.qty, 0);
+  const avgExit =
+    qty > 0 ? fills.reduce((n, e) => n + e.price * e.qty, 0) / qty : undefined;
+  const booked = {
+    gross: exits.reduce((n, r) => n + r.gross, 0),
+    fees: exits.reduce((n, r) => n + r.fees, 0),
+    net: exits.reduce((n, r) => n + r.net, 0),
+  };
+  const part: Trade = { ...t, ...booked };
+  if (avgExit !== undefined) part.avgExit = avgExit;
+  return tradeUnits(part, basis);
 }

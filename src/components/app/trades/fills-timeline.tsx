@@ -5,7 +5,8 @@ import { FigureText } from '@/components/product/figure-text';
 import type { Execution, Trade } from '@/domain/types';
 import type { Display } from '@/lib/display';
 import { plural } from '@/lib/format';
-import { price, qty } from './columns';
+import { price } from '@/lib/format';
+import { qty } from './columns';
 import { clock, clockOnDay } from './trade-time';
 
 const MARGIN = { top: 14, bottom: 26, left: 10 };
