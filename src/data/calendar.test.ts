@@ -13,6 +13,7 @@ import type {
 import { dailyPnl, daySummary } from '@/domain/metrics/days';
 import { exitShare } from '@/domain/metrics/realized';
 import { summarize } from '@/domain/metrics/summary';
+import { timeSeries } from '@/domain/metrics/series';
 import { calendarMonth, calendarYear, dayExits, dayGrading } from './calendar';
 
 const ctx = defaultMetricContext('America/New_York');
@@ -494,6 +495,41 @@ describe('Task 30 fix round 1', () => {
       .flatMap((w) => w.days)
       .reduce((n, d) => n + (d?.volume ?? 0), 0);
     expect(total).toBe(2);
+  });
+
+  test('an open trade across days books its still-held volume on its open date, as the Performance series does (E141)', () => {
+    // Two ES contracts bought Mon 16 Nov, one sold Tue 17 Nov, one still held.
+    const open = buildTrades(
+      [
+        fill('o1', 'buy', 2, 5000, '2026-11-16T15:00:00Z', 300),
+        fill('o2', 'sell', 1, 5010, '2026-11-17T15:00:00Z', 150),
+      ],
+      {
+        workspaceId: 'w',
+        startSerial: 1,
+        resolve: () => resolveInstrument('ESZ5'),
+        accountCurrency: () => 'USD',
+      },
+    ).trades;
+    expect(open[0]!.status).toBe('open');
+    const m = calendarMonth(open, [], '2026-11', ctx);
+    // Mon has no exit, but holds the contract still open; Tue's exit closed the other.
+    expect(dayOf(m, '2026-11-16')!.volume).toBe(1);
+    expect(dayOf(m, '2026-11-17')!.volume).toBe(1);
+    // Mon is not a trading day for it: no trades, no tone, and the month counts one.
+    expect(dayOf(m, '2026-11-16')!).toMatchObject({ trades: 0, tone: 'none' });
+    expect(m.summary.tradingDays).toBe(1);
+    // Every day's volume is the series' volume for that day.
+    const series = timeSeries(open, ctx, 'volume', 'day');
+    expect(series.map((p) => [p.key, p.value])).toEqual([
+      ['2026-11-16', 1],
+      ['2026-11-17', 1],
+    ]);
+    for (const p of series)
+      expect(dayOf(m, p.key)!.volume, p.key).toBe(p.value);
+    // The year grid reads the same.
+    const year = calendarYear(open, 2026, ctx)[10]!;
+    expect(year.days[15]!.volume).toBe(1);
   });
 
   test('a quantity that is not finite or is zero splits equally, never in full', () => {

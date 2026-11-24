@@ -146,7 +146,12 @@ function bookDays(
   notes: readonly JournalEntry[],
   ctx: MetricContext,
   range: { from: string; to: string },
-): { out: Map<string, CalendarDay>; stats: DayStat[] } {
+): {
+  out: Map<string, CalendarDay>;
+  stats: DayStat[];
+  /** Volume on dates with no exit (what an open trade still holds on the day it opened): such a day is not a trading day, but carries it. */
+  held: Map<string, number>;
+} {
   const scoped: MetricContext = { ...ctx, range };
   const noted = notedDates(notes);
   const out = new Map<string, CalendarDay>();
@@ -182,14 +187,16 @@ function bookDays(
       }
     }
   // Volume, as every page shares it among the days (`dayVolumes`).
+  const held = new Map<string, number>();
   for (const v of dayVolumes(trades, scoped)) {
     const day = out.get(v.date);
     if (day) day.volume = v.value;
+    else held.set(v.date, v.value);
   }
   for (const day of out.values())
     for (const u of ['ticks', 'pips', 'points'] as const)
       if (day[u] !== null) day[u] = Math.round(day[u] * 1e6) / 1e6;
-  return { out, stats };
+  return { out, stats, held };
 }
 
 function toneOf(
@@ -205,7 +212,11 @@ function toneOf(
   return o === 'win' ? 'gain' : o === 'loss' ? 'loss' : 'flat';
 }
 
-const emptyDay = (date: string, notes: ReadonlySet<string>): CalendarDay => ({
+const emptyDay = (
+  date: string,
+  notes: ReadonlySet<string>,
+  volume = 0,
+): CalendarDay => ({
   date,
   net: 0,
   gross: 0,
@@ -215,6 +226,7 @@ const emptyDay = (date: string, notes: ReadonlySet<string>): CalendarDay => ({
   losses: 0,
   r: null,
   ...noFigures(),
+  volume,
   tone: 'none',
   hasNote: notes.has(date),
 });
@@ -250,7 +262,11 @@ export function calendarMonth(
   const last = `${month}-${pad(count)}`;
   const from = first;
   const to = last;
-  const { out: booked, stats } = bookDays(trades, notes, ctx, { from, to });
+  const {
+    out: booked,
+    stats,
+    held,
+  } = bookDays(trades, notes, ctx, { from, to });
   const noted = notedDates(notes);
   const weeks: CalendarWeek[] = [];
   for (
@@ -262,7 +278,7 @@ export function calendarMonth(
       const date = addDays(start, i);
       return date < first || date > last
         ? null
-        : (booked.get(date) ?? emptyDay(date, noted));
+        : (booked.get(date) ?? emptyDay(date, noted, held.get(date)));
     });
     const live = days.filter((d): d is CalendarDay => d !== null);
     weeks.push({
@@ -328,7 +344,7 @@ export function calendarYear(
   year: number,
   ctx: MetricContext,
 ): CalendarYearMonth[] {
-  const { out: booked } = bookDays(trades, [], ctx, {
+  const { out: booked, held } = bookDays(trades, [], ctx, {
     from: `${year}-01-01`,
     to: `${year}-12-31`,
   });
@@ -337,7 +353,7 @@ export function calendarYear(
     const month = `${year}-${pad(i + 1)}`;
     const days = Array.from({ length: daysInMonth(month) }, (_, d) => {
       const date = `${month}-${pad(d + 1)}`;
-      return booked.get(date) ?? emptyDay(date, none);
+      return booked.get(date) ?? emptyDay(date, none, held.get(date));
     });
     return {
       month,
