@@ -443,10 +443,12 @@ export function AccountsSettings(): React.JSX.Element {
                             Read-only
                           </small>
                         ) : null}
-                        <LastImport
-                          job={lastImport.get(a.id)}
-                          timeZone={timeZone ?? 'UTC'}
-                        />
+                        {workspace?.kind === 'user' ? (
+                          <LastImport
+                            job={lastImport.get(a.id)}
+                            timeZone={timeZone ?? 'UTC'}
+                          />
+                        ) : null}
                       </td>
                       <td
                         className={`${TD} max-w-[160px] text-muted`}

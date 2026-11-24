@@ -64,7 +64,7 @@ import {
   tradeFigure,
   useDisplay,
 } from '@/lib/display';
-import { plural } from '@/lib/format';
+import { formatCount, plural } from '@/lib/format';
 import { docText } from '@/lib/note-text';
 import { rangeCaption } from '@/lib/range-label';
 import { usePhone } from '@/lib/use-phone';
@@ -771,8 +771,11 @@ export function TradesView(): React.JSX.Element {
             coarseTargets
             value={status}
             options={[
-              { value: 'closed', label: `Closed ${model.closedCount}` },
-              { value: 'open', label: `Open ${model.openCount}` },
+              {
+                value: 'closed',
+                label: `Closed ${formatCount(model.closedCount)}`,
+              },
+              { value: 'open', label: `Open ${formatCount(model.openCount)}` },
             ]}
             onChange={(next) => {
               setFilters({
@@ -789,9 +792,12 @@ export function TradesView(): React.JSX.Element {
               { value: 'all', label: 'All' },
               {
                 value: 'unreviewed',
-                label: `Not reviewed ${model.unreviewedCount}`,
+                label: `Not reviewed ${formatCount(model.unreviewedCount)}`,
               },
-              { value: 'reviewed', label: `Reviewed ${model.reviewedCount}` },
+              {
+                value: 'reviewed',
+                label: `Reviewed ${formatCount(model.reviewedCount)}`,
+              },
             ]}
             onChange={(next) =>
               setFilters({
@@ -800,7 +806,7 @@ export function TradesView(): React.JSX.Element {
               })
             }
           />
-          <label className="relative min-w-[180px] flex-1 sm:max-w-[280px]">
+          <label className="relative min-w-[140px] flex-1 sm:max-w-[280px]">
             <MagnifyingGlass
               size={15}
               aria-hidden="true"
@@ -839,7 +845,7 @@ export function TradesView(): React.JSX.Element {
                 aria-hidden="true"
                 className="text-faint"
               />
-              Export CSV
+              Export<span className="max-[1359px]:sr-only"> CSV</span>
             </button>
             <Link
               href="/app/trades/new"

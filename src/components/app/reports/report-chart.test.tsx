@@ -8,6 +8,7 @@ import {
 } from '@testing-library/react';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
+import { useState } from 'react';
 import { afterEach, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
@@ -52,7 +53,10 @@ test('the chart is an image with its label, and a hidden table holds the values'
   const table = screen.getByRole('table', {
     name: 'Net P&L and win rate by day',
   });
-  expect(table.classList.contains('sr-only')).toBe(true);
+  // The clip sits on a box around the table: overflow does nothing on a table,
+  // so a clipped table would still stretch the page's scroll height.
+  expect(table.parentElement!.classList.contains('sr-only')).toBe(true);
+  expect(table.classList.contains('sr-only')).toBe(false);
   const rows = within(table).getAllByRole('row');
   expect(rows).toHaveLength(4);
   expect(rows[1]!.textContent).toContain('Mon 2 Nov');
@@ -441,4 +445,57 @@ test('ratios of risk, quantities and counts have their own formats', async () =>
   expect(rows[1]).toContain('6.8');
   expect(rows[2]).toContain('−0.50R');
   expect(rows[2]).toContain('1,169');
+});
+
+const THREE = ['Net P&L', 'Win rate', 'Trades'].map((label, i) => ({
+  label,
+  kind: 'line' as const,
+  unit: 'pct' as const,
+  points: [
+    { key: '2026-11-02', value: 0.2 + i * 0.1 },
+    { key: '2026-11-03', value: 0.5 - i * 0.1 },
+    { key: '2026-11-04', value: 0.4 },
+  ],
+}));
+
+test('series colours keep the hue jobs: accent, ink, then a dashed tint; never cyan or marigold', async () => {
+  const { container } = renderApp(
+    <ReportChart label="Three lines" series={THREE} />,
+  );
+  await screen.findByRole('img', { name: 'Three lines' });
+  const strokes = [
+    ...container.querySelectorAll('[data-mark="line"] path'),
+  ].map((p) => ({
+    stroke: p.getAttribute('stroke') ?? '',
+    dash: p.getAttribute('stroke-dasharray'),
+  }));
+  expect(strokes).toHaveLength(3);
+  expect(strokes[0]).toEqual({ stroke: 'var(--accent)', dash: null });
+  expect(strokes[1]).toEqual({ stroke: 'var(--muted)', dash: null });
+  expect(strokes[2]!.stroke).toContain('var(--accent)');
+  expect(strokes[2]!.dash).not.toBeNull();
+  expect(container.innerHTML).not.toMatch(/info-fill|warn-fill/);
+});
+
+test('Expand sits in the card header slot when the card gives one', async () => {
+  function Card() {
+    const [slot, setSlot] = useState<HTMLElement | null>(null);
+    return (
+      <>
+        <header data-testid="head">
+          <span ref={setSlot} />
+        </header>
+        <ReportChart label="Slotted" series={SERIES} expandSlot={slot} />
+      </>
+    );
+  }
+  renderApp(<Card />);
+  await screen.findByRole('img', { name: 'Slotted' });
+  const head = screen.getByTestId('head');
+  expect(
+    await within(head).findByRole('button', { name: 'Expand chart' }),
+  ).toBeTruthy();
+  expect(screen.getAllByRole('button', { name: 'Expand chart' })).toHaveLength(
+    1,
+  );
 });

@@ -57,3 +57,32 @@ test('the close button closes it and is labelled', async () => {
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   expect(document.activeElement).toBe(opener);
 });
+
+test('a footer is pinned under the scrolling body, never inside it', async () => {
+  function WithFooter() {
+    const ref = useRef<HTMLButtonElement>(null);
+    return (
+      <>
+        <button ref={ref}>Open</button>
+        <MorphDialog
+          open
+          onOpenChange={() => {}}
+          origin={ref}
+          returnFocus={ref}
+          title="Choose"
+          footer={<button>Save</button>}
+        >
+          <p>rows</p>
+        </MorphDialog>
+      </>
+    );
+  }
+  render(<WithFooter />);
+  const dialog = await screen.findByRole('dialog');
+  const save = screen.getByRole('button', { name: 'Save' });
+  const scroller = screen.getByText('rows').parentElement!;
+  expect(scroller.className).toContain('overflow-y-auto');
+  expect(scroller.contains(save)).toBe(false);
+  expect(dialog.contains(save)).toBe(true);
+  expect(scroller.parentElement).toBe(save.parentElement!.parentElement);
+});

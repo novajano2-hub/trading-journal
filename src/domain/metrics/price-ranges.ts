@@ -28,9 +28,9 @@ const LINEAR_RATIO = 30;
 
 const grouped = new Intl.NumberFormat('en-US', { maximumFractionDigits: 8 });
 
-/** "1,000-2,500", with a hyphen. */
+/** "1,000 to 2,500": a range reads with "to", never a hyphen or a dash. */
 export function priceLabel(from: number, to: number): string {
-  return `${grouped.format(from)}-${grouped.format(to)}`;
+  return `${grouped.format(from)} to ${grouped.format(to)}`;
 }
 
 const places = (step: number) => Math.max(0, 2 - Math.floor(Math.log10(step)));

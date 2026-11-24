@@ -16,6 +16,25 @@ async function openReports(page: Page) {
   });
 }
 
+test('the Overview at 1440 ends at its last card: no blank tail under it', async ({
+  page,
+}) => {
+  await openReports(page);
+  // Let every chart draw before the page is measured.
+  await expect(page.getByRole('img').first()).toBeVisible();
+  const gap = await page.evaluate(() => {
+    const root = document.scrollingElement!;
+    const cards = [
+      ...document.querySelectorAll('[data-testid="reports-overview"] section'),
+    ];
+    const bottom = Math.max(
+      ...cards.map((c) => c.getBoundingClientRect().bottom + window.scrollY),
+    );
+    return root.scrollHeight - bottom;
+  });
+  expect(gap).toBeLessThanOrEqual(120);
+});
+
 test('Day & time: time of day in 15 minutes, by exit, cross-analysed by side', async ({
   page,
 }) => {

@@ -68,6 +68,7 @@ import {
 import { formatDuration, formatInstrument, plural } from '@/lib/format';
 import { CARD, CardHeader, InstrumentName } from '../dashboard/shared';
 import { ConfirmDialog } from '../confirm-dialog';
+import { ManageTagsLink } from '../tag-picker';
 import type { NoteEditorHandle } from '../notes/note-editor';
 import { price } from '@/lib/format';
 import { StatusChip } from './cells';
@@ -1144,6 +1145,7 @@ function TradePage({
               tone="warn"
               headingId="tags-h"
               title="Tags and rating"
+              end={<ManageTagsLink header />}
             />
             <TagRows
               categories={categories}

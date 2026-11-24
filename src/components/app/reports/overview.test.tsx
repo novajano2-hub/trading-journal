@@ -108,7 +108,7 @@ test('every metric on the page has a definition, and the five held back from the
     expect(ids.has(id), id).toBe(true);
 });
 
-test('the daily win rate is shown once, as green days: the winning-day share with the green, red and flat counts', async () => {
+test('the day win rate is shown once, as Day win rate: the winning-day share with the green, red and flat counts', async () => {
   renderApp(<OverviewView />, { sample: reportsSample, url: URL });
   const page = await ready();
   // Mon +60, Tue +100, Wed -80, Thu +45: three winning days of four.
@@ -169,6 +169,29 @@ test('Gross to net shows gross, fees and net, and how much the fees took', async
   expect(within(card).getByText(/Fees took 3\.8% of gross/)).toBeTruthy();
   for (const id of ['gross-pnl', 'fees', 'net-pnl'])
     expect(page.querySelector(`[data-metric-tip="${id}"]`), id).not.toBeNull();
+});
+
+test('the cost rows say what they are: Commissions and fees in Gross to net, Commissions and Fees in Costs, signed in overview-figures', async () => {
+  renderApp(<OverviewView />, { sample: withFees, url: URL });
+  const page = await ready();
+  const gross = within(page).getByRole('region', { name: 'Gross to net' });
+  expect(within(gross).getByText('Commissions and fees')).toBeTruthy();
+  expect(within(gross).queryByText('Fees')).toBeNull();
+  const costs = within(page).getByRole('region', { name: 'Costs' });
+  const labels = [...costs.querySelectorAll('[data-stat]')].map((el) =>
+    el.previousElementSibling?.textContent?.trim(),
+  );
+  expect(labels).toEqual(['Commissions', 'Fees']);
+});
+
+test('trade and day counts read in neutral ink: gain and loss colour are for signed money', async () => {
+  renderApp(<OverviewView />, { sample: reportsSample, url: URL });
+  const page = await ready();
+  for (const id of ['winners', 'losers', 'green-day-count', 'red-day-count']) {
+    const el = page.querySelector(`[data-stat="${id}"]`)!;
+    expect(el, id).not.toBeNull();
+    expect(el.className, id).not.toMatch(/text-(gain|loss)/);
+  }
 });
 
 test('Risk in R shows planned and realized R, trades without a stop, and R expectancy', async () => {

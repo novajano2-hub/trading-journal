@@ -47,7 +47,7 @@ import {
   parsePicks,
   type Pick,
 } from './metric-chips';
-import { ReportChart, type ChartSeries } from './report-chart';
+import { ReportChart, useExpandSlot, type ChartSeries } from './report-chart';
 import {
   COLUMNS_PARAM,
   formatColumns,
@@ -365,6 +365,7 @@ export function BreakdownCards({
   const params = useSearchParams();
   const display = useDisplay();
   const chartId = useId();
+  const [expandSlot, setExpandSlot] = useExpandSlot();
   const rankId = useId();
   const tableId = useId();
   const cross = CROSS_DIMS.find(
@@ -826,6 +827,7 @@ export function BreakdownCards({
                 <span className="text-[12.5px] text-faint">{caption}</span>
               ) : undefined
             }
+            end={<span ref={setExpandSlot} className="flex" />}
           />
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {controls}
@@ -840,6 +842,7 @@ export function BreakdownCards({
           </div>
           <div className="mt-3">
             <ReportChart
+              expandSlot={expandSlot}
               label={chartName}
               series={series}
               currency={currency}

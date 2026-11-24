@@ -90,7 +90,11 @@ test('a day cell shows net and trades by default, and the summary reads the mont
   const cell = await screen.findByRole('button', { name: /^Mon 2 Nov/ });
   expect(cell.textContent).toContain('+$1,020.93');
   expect(cell.textContent).toContain('1 trade');
-  expect(await screen.findByText('2 of 3 green days')).toBeTruthy();
+  // The green and red days read once, under Trading days; no second tile repeats them.
+  expect(
+    await screen.findByText(/^\d+ green, \d+ red, \d+ flat$/),
+  ).toBeTruthy();
+  expect(screen.queryByText(/green days$/)).toBeNull();
 });
 
 test('selecting 19 Nov lists its trades and links the daily note', async () => {
@@ -435,13 +439,7 @@ test('every metric label on the page carries a metric tip', async () => {
     name: /Thu 19 Nov/,
   });
   const page = panel.closest('[data-testid="calendar-ready"]')!;
-  for (const id of [
-    'pnl',
-    'trading-days',
-    'green-days',
-    'best-day',
-    'worst-day',
-  ])
+  for (const id of ['pnl', 'trading-days', 'best-day', 'worst-day'])
     expect(page.querySelector(`[data-metric-tip="${id}"]`), id).not.toBeNull();
   for (const id of ['trades', 'win-rate', 'fees', 'gross-pnl'])
     expect(panel.querySelector(`[data-metric-tip="${id}"]`), id).not.toBeNull();

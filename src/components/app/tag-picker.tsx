@@ -5,6 +5,7 @@ import { Check, Plus, X } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { useCreateTag, useTagCategories, useTags } from '@/data/query/hooks';
 import type { Tag, TagCategory } from '@/domain/types';
+import { HEADER_LINK } from './dashboard/shared';
 
 /** The built-in category a tag lands in when the picker is not scoped. */
 const CUSTOM_CATEGORY_ID = 'custom-tags';
@@ -27,13 +28,20 @@ function Swatch({ color }: { color: string }): React.JSX.Element {
 /** Where tags are made, renamed and recoloured. */
 export function ManageTagsLink({
   className = '',
+  header = false,
 }: {
   className?: string;
+  /** Drawn as a card header's link ("Edit goals" style), for the right of a title. */
+  header?: boolean;
 }): React.JSX.Element {
   return (
     <Link
       href="/app/settings/tags"
-      className={`inline-block rounded-chip text-[13px] font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:py-3 ${className}`}
+      className={
+        header
+          ? HEADER_LINK
+          : `inline-block rounded-chip text-[13px] font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:py-3 ${className}`
+      }
     >
       Manage tags
     </Link>

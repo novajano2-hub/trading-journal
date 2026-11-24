@@ -2,6 +2,7 @@
 
 import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
+import { createPortal } from 'react-dom';
 import {
   memo,
   useContext,
@@ -40,7 +41,15 @@ export interface ChartSeries {
 }
 
 /** Each series' own colour when a chart holds several. */
-const COLOURS = ['var(--accent)', 'var(--info-fill)', 'var(--warn-fill)'];
+// Accent, then ink, then a lighter accent tint drawn dashed: cyan and marigold
+// are the hues of goals and mistakes, so a series never takes them.
+const COLOURS = [
+  'var(--accent)',
+  'var(--muted)',
+  'color-mix(in srgb, var(--accent) 55%, var(--surface-1))',
+];
+/** The third series' line is dashed, so it reads apart from the first two without colour. */
+const DASHES = [undefined, undefined, '5 4'] as const;
 
 const PAD_R = 12;
 const PAD_Y = 8;
@@ -524,6 +533,7 @@ const Plot = memo(function Plot({
                 band={band}
                 top={top}
                 colour={colour}
+                dash={DASHES[si % DASHES.length]}
                 area={series.length === 1}
                 gradientId={`${gradientId}-${si}`}
               />
@@ -591,6 +601,7 @@ function Line({
   band,
   top,
   colour,
+  dash,
   area,
   gradientId,
 }: {
@@ -599,6 +610,8 @@ function Line({
   band: Band;
   top: number;
   colour: string;
+  /** A dash pattern: the line is dashed and its markers hollow. */
+  dash?: string;
   area: boolean;
   gradientId: string;
 }) {
@@ -650,6 +663,7 @@ function Line({
             d={path(r)}
             stroke={colour}
             strokeWidth={1.75}
+            strokeDasharray={dash}
             strokeLinejoin="round"
             strokeLinecap="round"
           />
@@ -659,7 +673,15 @@ function Line({
         ? solid
             .flat()
             .map((p) => (
-              <circle key={p.x} cx={p.x} cy={p.y} r={2.5} fill={colour} />
+              <circle
+                key={p.x}
+                cx={p.x}
+                cy={p.y}
+                r={2.5}
+                fill={dash ? 'var(--surface-1)' : colour}
+                stroke={dash ? colour : undefined}
+                strokeWidth={dash ? 1.5 : undefined}
+              />
             ))
         : null}
     </g>
@@ -703,29 +725,33 @@ const ValuesTable = memo(function ValuesTable({
   fmt: Formatter;
   periodLabel: (key: string) => string;
 }) {
+  // The clip goes on a box around the table: `overflow` does nothing on a table,
+  // so a clipped table's rows would still stretch the page's scroll height.
   return (
-    <table aria-label={label} className="sr-only">
-      <thead>
-        <tr>
-          <th scope="col">Period</th>
-          {series.map((s) => (
-            <th key={s.label} scope="col">
-              {s.label}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {series[0]!.points.map((p, i) => (
-          <tr key={p.key}>
-            <th scope="row">{periodLabel(p.key)}</th>
+    <div className="sr-only">
+      <table aria-label={label}>
+        <thead>
+          <tr>
+            <th scope="col">Period</th>
             {series.map((s) => (
-              <td key={s.label}>{fmt.node(s.unit, s.points[i]!.value)}</td>
+              <th key={s.label} scope="col">
+                {s.label}
+              </th>
             ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {series[0]!.points.map((p, i) => (
+            <tr key={p.key}>
+              <th scope="row">{periodLabel(p.key)}</th>
+              {series.map((s) => (
+                <td key={s.label}>{fmt.node(s.unit, s.points[i]!.value)}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 });
 
@@ -1107,40 +1133,120 @@ function titleOf(label: string): string {
 }
 
 /**
+ * Where a chart card's header holds the Expand action: put `<ExpandSlot />` in
+ * the header's `end` and pass `slot` to the chart as `expandSlot`.
+ */
+export function useExpandSlot(): [
+  slot: HTMLElement | null,
+  setSlot: (el: HTMLElement | null) => void,
+] {
+  return useState<HTMLElement | null>(null);
+}
+
+/**
+ * The chart in its full-screen dialog: it measures the dialog's body and sets
+ * the plot height so the chart fills down to the body's bottom padding.
+ */
+function FilledChart({
+  start,
+  bands,
+  ...props
+}: ComponentProps<typeof ChartBody> & {
+  start: number;
+  bands: number;
+}): React.JSX.Element {
+  const wrap = useRef<HTMLDivElement>(null);
+  const [h, setH] = useState(start);
+  // Each size of the dialog gets a few passes to settle, so a scrollbar that
+  // appears and vanishes can never make the plot hunt.
+  const passes = useRef(0);
+  const seen = useRef('');
+  useLayoutEffect(() => {
+    const el = wrap.current;
+    const scroller = el?.parentElement;
+    if (!el || !scroller) return;
+    const fit = () => {
+      const cs = getComputedStyle(scroller);
+      const room =
+        scroller.clientHeight -
+        parseFloat(cs.paddingTop) -
+        parseFloat(cs.paddingBottom) -
+        2;
+      const size = `${scroller.clientWidth}x${scroller.clientHeight}`;
+      if (size !== seen.current) {
+        seen.current = size;
+        passes.current = 0;
+      }
+      const diff = room - el.offsetHeight;
+      if (room <= 0 || Math.abs(diff) < 2 || passes.current >= 4) return;
+      passes.current += 1;
+      // From the height this pass measured, so a repeat of it lands on the same value.
+      setH(Math.max(120, Math.round(h + diff / bands)));
+    };
+    // After the frame, so the height the chart was just given is laid out.
+    let raf = requestAnimationFrame(fit);
+    const observer =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => {
+            cancelAnimationFrame(raf);
+            raf = requestAnimationFrame(fit);
+          });
+    observer?.observe(scroller);
+    return () => {
+      cancelAnimationFrame(raf);
+      observer?.disconnect();
+    };
+  }, [h, bands]);
+  return (
+    <div ref={wrap} data-expanded-chart="">
+      <ChartBody {...props} height={h} />
+    </div>
+  );
+}
+
+/**
  * Bars and lines over one shared x axis (see `ChartBody`), with an Expand
  * action that opens the same chart full screen over a taller plot. Escape or
  * Close returns to the page, and focus goes back to Expand.
  */
-export function ReportChart(
-  props: ComponentProps<typeof ChartBody>,
-): React.JSX.Element {
+export function ReportChart({
+  expandSlot,
+  ...props
+}: ComponentProps<typeof ChartBody> & {
+  /** The card header's slot for Expand; without one it sits above the plot. */
+  expandSlot?: HTMLElement | null;
+}): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const filled = (props.series[0]?.points.length ?? 0) > 0;
   const bands = props.overlay ? 1 : props.series.length;
   // The plot grows by four fifths of what it had; the dialog scrolls if the bands outgrow it.
   const taller = Math.round((props.height ?? (bands === 1 ? 260 : 150)) * 1.8);
+  const slotted = expandSlot !== undefined;
+  const expandButton = (
+    <button
+      ref={trigger}
+      type="button"
+      aria-label="Expand chart"
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      onClick={() => setOpen(true)}
+      className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-control px-2 text-[12.5px] font-medium text-muted transition-colors duration-200 ease-(--ease-glide) hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 pointer-coarse:px-3"
+    >
+      <ArrowsOut size={14} aria-hidden="true" />
+      Expand
+    </button>
+  );
   return (
     <>
       <ChartBody
         {...props}
-        expand={
-          filled ? (
-            <button
-              ref={trigger}
-              type="button"
-              aria-label="Expand chart"
-              aria-haspopup="dialog"
-              aria-expanded={open}
-              onClick={() => setOpen(true)}
-              className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-control px-2 text-[12.5px] font-medium text-muted transition-colors duration-200 ease-(--ease-glide) hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 pointer-coarse:px-3"
-            >
-              <ArrowsOut size={14} aria-hidden="true" />
-              Expand
-            </button>
-          ) : null
-        }
+        expand={slotted ? undefined : filled ? expandButton : null}
       />
+      {slotted && filled && expandSlot
+        ? createPortal(expandButton, expandSlot)
+        : null}
       {filled ? (
         <MorphDialog
           open={open}
@@ -1150,7 +1256,7 @@ export function ReportChart(
           title={titleOf(props.label)}
           size="full"
         >
-          <ChartBody {...props} height={taller} />
+          <FilledChart {...props} start={taller} bands={bands} />
         </MorphDialog>
       ) : null}
     </>

@@ -93,8 +93,8 @@ test('Accounts fits the card at 1440: Prop rules whole, clear of the actions', a
     .first()
     .boundingBox();
   expect(rules!.x + rules!.width).toBeLessThanOrEqual(actions!.x);
-  // Last import sits under each name, and the broker still reads whole (two lines, no ellipsis).
-  await expect(table.getByText('Last import None').first()).toBeVisible();
+  // The sample workspace shows no Last import line: imports never land there. The broker still reads whole (two lines, no ellipsis).
+  await expect(table.getByText(/^Last import/)).toHaveCount(0);
   const broker = await table
     .getByRole('row', { name: /^Futures live/ })
     .locator('td:nth-child(2) span')

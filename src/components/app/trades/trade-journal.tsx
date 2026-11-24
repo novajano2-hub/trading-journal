@@ -22,7 +22,7 @@ import type {
 import { localDate } from '@/domain/time';
 import { dayLabel } from './trade-time';
 import { NoteEditor, type NoteEditorHandle } from '../notes/note-editor';
-import { ManageTagsLink, TagPicker } from '../tag-picker';
+import { TagPicker } from '../tag-picker';
 
 /** How long typing rests before the note is saved. */
 export const NOTE_SAVE_DELAY_MS = 600;
@@ -220,7 +220,6 @@ export function TagRows({
 }): React.JSX.Element {
   return (
     <div className="mt-1.5">
-      <ManageTagsLink className="mb-0.5" />
       {categories.map((c) => (
         <CategoryRow
           key={c.id}

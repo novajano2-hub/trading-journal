@@ -202,3 +202,20 @@ test('Show all turns every figure back on in the draft, and applies only at Save
     expect((await repo.prefs.get()).overviewHidden).toEqual([]),
   );
 });
+
+test('the footer is a sibling after the scrolling list, so rows never run past it', async () => {
+  renderApp(<OverviewView />, { sample: reportsSample, url: URL });
+  const root = await screen.findByTestId('reports-overview');
+  fireEvent.click(within(root).getByRole('button', { name: 'Choose figures' }));
+  const dialog = await screen.findByRole('dialog', { name: 'Choose figures' });
+  const save = within(dialog).getByRole('button', { name: 'Save' });
+  const firstRow = dialog.querySelector('[data-choice]')!;
+  let scroller: HTMLElement | null = firstRow.parentElement;
+  while (scroller && !scroller.className.includes('overflow-y-auto'))
+    scroller = scroller.parentElement;
+  expect(scroller).not.toBeNull();
+  expect(scroller!.contains(save)).toBe(false);
+  expect(scroller!.className).toContain('min-h-0');
+  expect(scroller!.className).toContain('flex-1');
+  expect(save.closest('.sticky')).toBeNull();
+});

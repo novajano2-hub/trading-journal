@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, type ReactNode } from 'react';
+import { ScrollFade } from '@/components/ui/scroll-fade';
 import { panelId, Tabs, tabId, type TabOption } from '@/components/ui/tabs';
 import { writeParam } from './use-report-data';
 
@@ -25,14 +26,16 @@ export function SubTabs<T extends string>({
   const id = useId();
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <Tabs
-        id={id}
-        label={label}
-        options={options}
-        value={value}
-        onChange={(v) => writeParam(param, v)}
-        coarseTargets
-      />
+      <ScrollFade tone="bg" className="pb-1 [scrollbar-width:none]">
+        <Tabs
+          id={id}
+          label={label}
+          options={options}
+          value={value}
+          onChange={(v) => writeParam(param, v)}
+          coarseTargets
+        />
+      </ScrollFade>
       <div
         role="tabpanel"
         id={panelId(id)}

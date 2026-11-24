@@ -3,6 +3,7 @@
 import {
   ChartBar,
   MagnifyingGlass,
+  Plus,
   Sliders,
   Table,
   X,
@@ -10,9 +11,9 @@ import {
 import { format, parseISO } from 'date-fns';
 import { useSearchParams } from 'next/navigation';
 import { useId, useMemo, useState } from 'react';
+import { Popover } from 'radix-ui';
 import { MetricTip } from '@/components/ui/metric-tip';
 import { Segmented } from '@/components/ui/segmented';
-import { TaskCheckbox } from '@/components/ui/task-checkbox';
 import type { MetricId } from '@/content/metric-definitions';
 import type { PnlBasis } from '@/domain/types';
 import {
@@ -39,6 +40,7 @@ import {
   formatterOf,
   periodText,
   ReportChart,
+  useExpandSlot,
   type ChartSeries,
 } from './report-chart';
 import { ReportScope } from './report-scope';
@@ -139,6 +141,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
   const tableId = useId();
   const [query, setQuery] = useState('');
   const full = picks.length >= MAX_METRICS;
+  const [expandSlot, setExpandSlot] = useExpandSlot();
 
   const setPicks = (next: Pick[]) => writeParam('m', formatPicks(next));
   const toggle = (metric: SeriesMetric, on: boolean) =>
@@ -312,72 +315,101 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
             })}
           </ul>
         ) : null}
-        <div className="relative mt-3">
-          <MagnifyingGlass
-            size={15}
-            aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-faint"
-          />
-          <input
-            type="search"
-            aria-label="Search metrics"
-            placeholder="Search metrics"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="h-9 w-full rounded-control border border-line bg-surface-1 pr-3 pl-9 text-[13.5px] text-text outline-none placeholder:text-faint focus-visible:border-accent/60 focus-visible:outline-2 focus-visible:outline-accent sm:max-w-xs pointer-coarse:h-11"
-          />
-        </div>
-        <div
-          role="group"
-          aria-label="Metrics"
-          className="mt-2 max-h-[22rem] overflow-y-auto pr-1"
-        >
-          {groups.length === 0 ? (
-            <p
-              role="status"
-              className="py-6 text-center text-[13.5px] text-faint"
+        <div className="mt-3">
+          <Popover.Root>
+            <Popover.Trigger
+              aria-label="Add metric"
+              className="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-[9px] bg-surface-1 px-2.5 text-[13px] font-medium whitespace-nowrap text-muted shadow-[inset_0_0_0_1px_var(--line-2)] outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11"
             >
-              {`No metric matches "${query.trim()}"`}
-            </p>
-          ) : null}
-          {groups.map(({ group, metrics }) => (
-            <div key={group} role="group" aria-label={group} className="mt-2">
-              <h3 className="py-1 text-[12.5px] font-semibold text-muted">
-                {group}
-              </h3>
-              <div className="grid gap-x-6 gap-y-0.5 sm:grid-cols-2 xl:grid-cols-3">
-                {metrics.map((metric) => {
-                  const pick = picks.find((x) => x.metric === metric);
-                  const label = labelOf(metric, basis);
-                  return (
-                    <div
-                      key={metric}
-                      className="flex min-h-10 items-center gap-2.5 border-b border-line/60 py-1"
+              <Plus size={14} weight="bold" aria-hidden="true" />
+              Metric
+            </Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Content
+                align="start"
+                sideOffset={6}
+                collisionPadding={12}
+                aria-label="Choose metrics"
+                className="z-50 flex max-h-[min(72dvh,30rem)] w-[min(calc(100vw-24px),640px)] flex-col rounded-control border border-line bg-surface-1 shadow-[var(--shadow)] outline-none"
+              >
+                <div className="relative flex-none border-b border-line p-2">
+                  <MagnifyingGlass
+                    size={15}
+                    aria-hidden="true"
+                    className="pointer-events-none absolute top-1/2 left-5 -translate-y-1/2 text-faint"
+                  />
+                  <input
+                    type="search"
+                    aria-label="Search metrics"
+                    placeholder="Search metrics"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    className="h-9 w-full rounded-control border border-line bg-surface-1 pr-3 pl-9 text-[13.5px] text-text outline-none placeholder:text-faint focus-visible:border-accent/60 focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11"
+                  />
+                </div>
+                <div
+                  role="group"
+                  aria-label="Metrics"
+                  className="min-h-0 flex-1 overflow-y-auto px-3 pb-2"
+                >
+                  {groups.length === 0 ? (
+                    <p
+                      role="status"
+                      className="py-6 text-center text-[13.5px] text-faint"
                     >
-                      <TaskCheckbox
-                        checked={pick !== undefined}
-                        disabled={pick === undefined && full}
-                        aria-label={label}
-                        aria-describedby={
-                          pick === undefined && full
-                            ? `${metricsId}-limit`
-                            : undefined
-                        }
-                        onCheckedChange={(on) => toggle(metric, on)}
-                      />
-                      <span
-                        className={`text-[13.5px] ${pick || !full ? 'text-text' : 'text-faint'}`}
-                      >
-                        <MetricTip id={TIPS[metric]} basis={basis}>
-                          {label}
-                        </MetricTip>
-                      </span>
+                      {`No metric matches "${query.trim()}"`}
+                    </p>
+                  ) : null}
+                  {groups.map(({ group, metrics }) => (
+                    <div
+                      key={group}
+                      role="group"
+                      aria-label={group}
+                      className="mt-2"
+                    >
+                      <h3 className="py-1 text-[12.5px] font-semibold text-muted">
+                        {group}
+                      </h3>
+                      <div className="grid gap-x-6 gap-y-0.5 sm:grid-cols-2">
+                        {metrics.map((metric) => {
+                          const pick = picks.find((x) => x.metric === metric);
+                          const label = labelOf(metric, basis);
+                          const off = pick === undefined && full;
+                          return (
+                            <div
+                              key={metric}
+                              className="flex min-h-10 items-center gap-2.5 border-b border-line/60 py-1 pointer-coarse:min-h-11"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={pick !== undefined}
+                                disabled={off}
+                                aria-label={label}
+                                aria-describedby={
+                                  off ? `${metricsId}-limit` : undefined
+                                }
+                                onChange={(e) =>
+                                  toggle(metric, e.target.checked)
+                                }
+                                className="size-4 flex-none accent-[var(--accent)]"
+                              />
+                              <span
+                                className={`text-[13.5px] ${off ? 'text-faint' : 'text-text'}`}
+                              >
+                                <MetricTip id={TIPS[metric]} basis={basis}>
+                                  {label}
+                                </MetricTip>
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+                  ))}
+                </div>
+              </Popover.Content>
+            </Popover.Portal>
+          </Popover.Root>
         </div>
       </section>
 
@@ -392,6 +424,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
               By {bucket}, {data.caption}
             </span>
           }
+          end={<span ref={setExpandSlot} className="flex" />}
         />
         <div className="mt-3">
           {picks.length === 0 ? (
@@ -400,6 +433,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
             </p>
           ) : (
             <ReportChart
+              expandSlot={expandSlot}
               label={`${series.map((s) => s.label).join(', ')} by ${bucket}, ${data.caption}.${ranges}`}
               series={series}
               periodLabel={period}

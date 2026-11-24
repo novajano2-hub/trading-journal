@@ -202,8 +202,9 @@ test('the hold times: all trades, winners, losers and breakevens', async () => {
 test('the costs: commissions and fees as separate totals', async () => {
   const root = await page();
   const card = within(root).getByRole('region', { name: 'Costs' });
-  expect(stat(card, 'commissions')).toBe('$1.50');
-  expect(stat(card, 'fill-fees')).toBe('$0.50');
+  // Costs are signed negative, as the rest of the page signs them.
+  expect(stat(card, 'commissions')).toBe('−$1.50');
+  expect(stat(card, 'fill-fees')).toBe('−$0.50');
 });
 
 test('every new label carries its definition', async () => {
@@ -342,7 +343,7 @@ test('in Ticks the months, day averages and largest days read ticks, and still l
   // Costs stay in money.
   expect(
     stat(within(root).getByRole('region', { name: 'Costs' }), 'commissions'),
-  ).toBe('$1.50');
+  ).toBe('−$1.50');
 });
 
 test('in R the month and day figures read R', async () => {

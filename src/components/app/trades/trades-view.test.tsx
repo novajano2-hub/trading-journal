@@ -36,10 +36,11 @@ const START = Date.UTC(2026, 10, 2, 14, 0);
  * (121 - n) x $10, so the newest open is the smallest net. Even serials follow
  * Opening range breakout; serial 7 carries the breakout tag.
  */
-function sample(opts: { open?: number } = {}) {
+function sample(opts: { open?: number; closed?: number } = {}) {
   return async (): Promise<SampleWorkspace> => {
     const fx = fixtureSample();
-    const closed = Array.from({ length: 120 }, (_, i) => {
+    const count = opts.closed ?? 120;
+    const closed = Array.from({ length: count }, (_, i) => {
       const n = i + 1;
       const openedAt = START + i * 600_000;
       return makeTrade({
@@ -49,7 +50,7 @@ function sample(opts: { open?: number } = {}) {
         accountId: 'acc-a',
         openedAt: new Date(openedAt).toISOString(),
         closedAt: new Date(openedAt + 300_000).toISOString(),
-        net: (121 - n) * 1000,
+        net: (count + 1 - n) * 1000,
         strategyIds: n % 2 === 0 ? ['str-1'] : [],
         tagIds: n === 7 ? ['tag-setup'] : [],
       });
@@ -91,6 +92,34 @@ test('the summary strip counts the filtered closed trades', async () => {
   // Net: sum of 10..1200 dollars.
   expect(strip.textContent).toContain('+$72,600.00');
   expect(within(strip).getByRole('button', { name: 'Win rate' })).toBeTruthy();
+});
+
+test('counts over a thousand read with a separator, in the strip and on the Closed tab', async () => {
+  renderApp(<TradesView />, {
+    sample: sample({ closed: 1200, open: 3 }),
+    url: '/app/trades',
+  });
+  const strip = await screen.findByRole('region', { name: 'Summary' });
+  expect(within(strip).getByText('1,200')).toBeTruthy();
+  expect(screen.getByRole('radio', { name: 'Closed 1,200' })).toBeTruthy();
+});
+
+test('a signed amount never breaks between its sign and its digits, and the note sits under the cards below 1360px', async () => {
+  renderApp(<TradesView />, { sample: sample(), url: '/app/trades' });
+  const strip = await screen.findByRole('region', { name: 'Summary' });
+  const amounts = [...strip.querySelectorAll('span')].filter((el) =>
+    /^[+\u2212]\$[\d,.]+$/.test(el.textContent ?? ''),
+  );
+  expect(amounts.length).toBeGreaterThan(0);
+  for (const el of amounts)
+    expect(
+      el.closest('.whitespace-nowrap'),
+      el.textContent ?? '',
+    ).not.toBeNull();
+  const note = strip.querySelector('p')!.parentElement!;
+  expect(note.className).toContain('col-span-full');
+  expect(note.className).toContain('min-[1360px]:col-span-1');
+  expect(strip.className).toContain('min-[1360px]:grid-cols-');
 });
 
 test('Hide summary saves the preference and leaves a way back', async () => {

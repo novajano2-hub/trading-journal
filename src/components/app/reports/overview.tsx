@@ -20,7 +20,12 @@ import type { Trade } from '@/domain/types';
 import { formatUnitValue, useDisplay } from '@/lib/display';
 import { formatDuration, formatPct, plural } from '@/lib/format';
 import { CARD, CARD_PAD, CardHeader, signTone } from '../dashboard/shared';
-import { periodText, ReportChart, type Shade } from './report-chart';
+import {
+  periodText,
+  ReportChart,
+  useExpandSlot,
+  type Shade,
+} from './report-chart';
 import {
   ChoiceRow,
   ChoiceScope,
@@ -273,6 +278,8 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
   }`;
   const cumulativeId = useId();
   const dailyId = useId();
+  const [cumSlot, setCumSlot] = useExpandSlot();
+  const [daySlot, setDaySlot] = useExpandSlot();
   const durations = p.dayDurations;
   const sideRows: {
     id: MetricId;
@@ -640,19 +647,23 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
             </span>
           }
           end={
-            ends === undefined || ends === null ? undefined : (
-              <span className="text-[12.5px] text-faint">
-                Ends at{' '}
-                <b className={`font-semibold ${signTone(ends)}`}>
-                  <FigureText f={display.cash(ends, true, currency)} />
-                </b>
-              </span>
-            )
+            <>
+              {ends === undefined || ends === null ? null : (
+                <span className="mr-2 text-[12.5px] text-faint">
+                  Ends at{' '}
+                  <b className={`font-semibold ${signTone(ends)}`}>
+                    <FigureText f={display.cash(ends, true, currency)} />
+                  </b>
+                </span>
+              )}
+              <span ref={setCumSlot} className="flex" />
+            </>
           }
         />
         <div className="mt-3">
           <ReportChart
             label={cumulativeName}
+            expandSlot={cumSlot}
             currency={currency}
             height={280}
             shade={shade}
@@ -692,17 +703,21 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
             </span>
           }
           end={
-            ds.best && ds.worst ? (
-              <span className="text-[12.5px] text-faint">
-                Best {periodText(ds.best.date)}, worst{' '}
-                {periodText(ds.worst.date)}
-              </span>
-            ) : undefined
+            <>
+              {ds.best && ds.worst ? (
+                <span className="mr-2 text-[12.5px] text-faint">
+                  Best {periodText(ds.best.date)}, worst{' '}
+                  {periodText(ds.worst.date)}
+                </span>
+              ) : null}
+              <span ref={setDaySlot} className="flex" />
+            </>
           }
         />
         <div className="mt-3">
           <ReportChart
             label={dailyName}
+            expandSlot={daySlot}
             currency={currency}
             height={220}
             labelExtremes

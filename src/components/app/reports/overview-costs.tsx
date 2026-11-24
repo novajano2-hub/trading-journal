@@ -15,10 +15,10 @@ export function OverviewCosts({
   return (
     <StatCard group="costs" title="Costs" icon={Receipt}>
       <Stat id="commissions" data={data}>
-        {money(c.commissions, false)}
+        {money(c.commissions === 0 ? 0 : -c.commissions)}
       </Stat>
       <Stat id="fill-fees" data={data}>
-        {money(c.fees, false)}
+        {money(c.fees === 0 ? 0 : -c.fees)}
       </Stat>
     </StatCard>
   );

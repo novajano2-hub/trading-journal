@@ -16,10 +16,10 @@ export function OverviewTradeCounts({
   const s = data.partition.summary;
   return (
     <StatCard group="trade-counts" title="Trade counts" icon={ListNumbers}>
-      <Stat id="winners" data={data} tone="text-gain">
+      <Stat id="winners" data={data}>
         {s.wins}
       </Stat>
-      <Stat id="losers" data={data} tone="text-loss">
+      <Stat id="losers" data={data}>
         {s.losses}
       </Stat>
       <Stat id="breakevens" data={data}>
@@ -50,10 +50,10 @@ export function OverviewDayCounts({
       <Stat id="trading-days" data={data}>
         {data.partition.days.length}
       </Stat>
-      <Stat id="green-day-count" data={data} tone="text-gain">
+      <Stat id="green-day-count" data={data}>
         {ds.greenDays}
       </Stat>
-      <Stat id="red-day-count" data={data} tone="text-loss">
+      <Stat id="red-day-count" data={data}>
         {ds.redDays}
       </Stat>
       <Stat id="flat-day-count" data={data}>

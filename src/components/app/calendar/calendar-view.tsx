@@ -615,14 +615,6 @@ export function CalendarView(): React.JSX.Element {
             {summary.tradingDays}
           </Kpi>
           <Kpi
-            label={<MetricTip id="green-days" basis={ctx.pnlBasis} />}
-            small={`${summary.greenDays} of ${summary.tradingDays} green days`}
-          >
-            {summary.tradingDays === 0
-              ? 'None'
-              : formatPct(summary.greenDays / summary.tradingDays, 1)}
-          </Kpi>
-          <Kpi
             label={
               <MetricTip id="win-rate" basis={ctx.pnlBasis}>
                 Trade win rate

@@ -515,24 +515,45 @@ const job = (over: Partial<ImportJob>): ImportJob => ({
 const lastImport = (row: HTMLElement) =>
   row.querySelector('[data-last-import]') as HTMLElement;
 
-test('Last import reads None, or the newest import not undone', async () => {
+test('the sample workspace shows no Last import line: imports never land there', async () => {
   const r = repo();
   renderApp(<AccountsSettings />, { repository: r, url: URL });
-  const none = await rowOf('Futures main');
-  expect(lastImport(none).textContent).toBe('Last import None');
+  const row = await rowOf('Futures main');
+  expect(lastImport(row)).toBeNull();
+});
+
+test('in My workspace Last import reads None, or the newest import not undone', async () => {
+  const r = repo();
+  const mk = (name: string) =>
+    r.accounts.create('mine', {
+      name,
+      broker: 'Broker',
+      type: 'live',
+      currency: 'USD',
+      startingBalance: 100_000,
+      status: 'active',
+    });
+  const a = await mk('Mine a');
+  const b = await mk('Mine b');
+  await r.workspaces.setActive('mine');
+  renderApp(<AccountsSettings />, { repository: r, url: URL });
+  expect(lastImport(await rowOf('Mine a')).textContent).toBe(
+    'Last import None',
+  );
   cleanup();
 
   const jobs = [
-    job({ id: 'a', createdAt: '2026-11-10T15:00:00.000Z' }),
+    job({ id: 'a', accountId: a.id, createdAt: '2026-11-10T15:00:00.000Z' }),
     job({
       id: 'b',
+      accountId: a.id,
       fileName: 'newer.csv',
       createdAt: '2026-11-12T15:00:00.000Z',
       status: 'undone',
     }),
     job({
       id: 'c',
-      accountId: 'acc-b',
+      accountId: b.id,
       fileName: 'other.csv',
       createdAt: '2026-11-15T15:00:00.000Z',
     }),
@@ -541,12 +562,12 @@ test('Last import reads None, or the newest import not undone', async () => {
     repository: { ...r, imports: { ...r.imports, list: async () => jobs } },
     url: URL,
   });
-  const row = await rowOf('Futures main');
+  const row = await rowOf('Mine a');
   await waitFor(() =>
     expect(lastImport(row).textContent).toBe('Last import 10 Nov 2026'),
   );
   expect(lastImport(row).getAttribute('title')).toBe('fills.csv');
-  expect(lastImport(await rowOf('Old demo')).textContent).toBe(
+  expect(lastImport(await rowOf('Mine b')).textContent).toBe(
     'Last import 15 Nov 2026',
   );
 });

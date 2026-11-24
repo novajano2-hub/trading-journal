@@ -898,7 +898,7 @@ test('the performance card adds the day win rate and the average win to loss', a
   await renderDashboard();
   const perf = await screen.findByRole('region', { name: 'Performance' });
   const day = within(perf)
-    .getByRole('button', { name: 'Daily win rate' })
+    .getByRole('button', { name: 'Day win rate' })
     .closest('[data-kpi]')!;
   // 18 Nov green, 19 Nov red.
   expect(day.textContent).toContain('50.0%');

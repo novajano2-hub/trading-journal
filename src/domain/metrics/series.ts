@@ -162,7 +162,7 @@ export const SERIES_META: Record<SeriesMetric, SeriesMeta> = {
   'win-rate': meta('Consistency', 'Win rate', 'pct', 'line'),
   'long-win-rate': meta('Consistency', 'Long win rate', 'pct', 'line'),
   'short-win-rate': meta('Consistency', 'Short win rate', 'pct', 'line'),
-  'green-days': meta('Consistency', 'Daily win rate', 'pct', 'line'),
+  'green-days': meta('Consistency', 'Day win rate', 'pct', 'line'),
   'win-streak': meta('Consistency', 'Longest win streak', 'count', 'bar'),
   'loss-streak': meta('Consistency', 'Longest loss streak', 'count', 'bar'),
   'green-day-streak': meta(

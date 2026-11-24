@@ -789,6 +789,10 @@ test('the tags card links to Settings > Tags, and so does the picker', async () 
   renderApp(<TradeView id="t-c" />, { sample: sample(), url: URL_C });
   const links = await screen.findAllByRole('link', { name: 'Manage tags' });
   expect(links[0]!.getAttribute('href')).toBe('/app/settings/tags');
+  // The first sits at the right of the card header, beside the title.
+  expect(
+    links[0]!.parentElement!.parentElement!.querySelector('h2')?.textContent,
+  ).toBe('Tags and rating');
   fireEvent.click(screen.getByRole('button', { name: 'Add to Setups' }));
   await waitFor(() =>
     expect(screen.getAllByRole('link', { name: 'Manage tags' })).toHaveLength(

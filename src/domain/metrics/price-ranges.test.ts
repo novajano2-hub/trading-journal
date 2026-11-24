@@ -91,7 +91,7 @@ describe('price ranges suit the prices in the set', () => {
   });
 
   test('labels use a hyphen and group thousands', () => {
-    expect(priceLabel(1000, 2500)).toBe('1,000-2,500');
-    expect(priceLabel(1.05, 1.06)).toBe('1.05-1.06');
+    expect(priceLabel(1000, 2500)).toBe('1,000 to 2,500');
+    expect(priceLabel(1.05, 1.06)).toBe('1.05 to 1.06');
   });
 });

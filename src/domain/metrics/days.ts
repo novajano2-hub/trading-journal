@@ -188,7 +188,7 @@ export function daySummary(
   redDays: number;
   flatDays: number;
   /**
-   * The daily win rate: winning (green) days over trading days, flat days
+   * The day win rate: winning (green) days over trading days, flat days
    * counted as trading days (Part 2, R2). Null with no days.
    */
   greenPct: number | null;

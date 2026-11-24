@@ -310,40 +310,44 @@ export function ChooseFigures({
         returnFocus={trigger}
         title="Choose figures"
         description="Tick the figures the Overview shows. Each shows its value now."
+        footer={
+          <>
+            {failed ? (
+              <p role="alert" className="mb-2 text-[13px] text-loss">
+                Keel couldn&apos;t save this. Try again.
+              </p>
+            ) : null}
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setDraft(new Set())}
+                className="mr-auto"
+              >
+                Show all
+              </Button>
+              <Button variant="secondary" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() =>
+                  update.mutate(
+                    { overviewHidden: [...draft] },
+                    {
+                      onSuccess: () => setOpen(false),
+                      onError: () => setFailed(true),
+                    },
+                  )
+                }
+              >
+                Save
+              </Button>
+            </div>
+          </>
+        }
       >
         <ChoiceContext.Provider value={{ mode: 'list', hidden: draft, toggle }}>
           <div className="grid gap-4 sm:grid-cols-2">{groups}</div>
         </ChoiceContext.Provider>
-        {failed ? (
-          <p role="alert" className="mt-3 text-[13px] text-loss">
-            Keel couldn&apos;t save this. Try again.
-          </p>
-        ) : null}
-        <div className="sticky bottom-0 -mx-5 -mb-4 mt-4 flex justify-end gap-2 border-t border-line bg-surface-1 px-5 py-3">
-          <Button
-            variant="ghost"
-            onClick={() => setDraft(new Set())}
-            className="mr-auto"
-          >
-            Show all
-          </Button>
-          <Button variant="secondary" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button
-            onClick={() =>
-              update.mutate(
-                { overviewHidden: [...draft] },
-                {
-                  onSuccess: () => setOpen(false),
-                  onError: () => setFailed(true),
-                },
-              )
-            }
-          >
-            Save
-          </Button>
-        </div>
       </MorphDialog>
     </div>
   );

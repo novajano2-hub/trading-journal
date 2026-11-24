@@ -3,6 +3,7 @@ import { resolveInstrument } from '@/domain/instruments';
 import {
   adherenceDigits,
   formatAdherence,
+  formatCount,
   formatDuration,
   formatInstrument,
   formatMoney,
@@ -15,6 +16,12 @@ import {
 } from './format';
 
 describe('format', () => {
+  test('formatCount puts a separator in a count over a thousand', () => {
+    expect(formatCount(1515)).toBe('1,515');
+    expect(formatCount(999)).toBe('999');
+    expect(formatCount(0)).toBe('0');
+  });
+
   test('formatPnl always signs gains and losses', () => {
     expect(formatPnl(421850)).toBe('+$4,218.50');
     expect(formatPnl(-31840)).toBe('−$318.40');

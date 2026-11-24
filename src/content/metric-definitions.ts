@@ -247,9 +247,9 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
       'Days with at least one trade exit. A trade is booked on the date it exits, so a trade held over two days counts on both.',
   },
   'green-days': {
-    label: 'Green days',
+    label: 'Day win rate',
     definition:
-      'The daily win rate: trading days that ended in profit, outside your breakeven range, as a share of all trading days, shown with the green, red and flat days. Flat days count as trading days.',
+      'The day win rate: trading days that ended in profit, outside your breakeven range, as a share of all trading days, shown with the green, red and flat days. Flat days count as trading days.',
   },
   'best-day': {
     label: 'Best day',
@@ -275,7 +275,7 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
       'Closed trades per trading day. A trade is booked on each date it exits, so one held over two days counts on both.',
   },
   fees: {
-    label: 'Fees',
+    label: 'Commissions and fees',
     definition:
       'Fees and commissions paid on the exits booked here. The entry fee is split across the exits of the trade.',
   },
@@ -519,9 +519,9 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
       'Win rate of the short trades alone: wins divided by wins plus losses, breakevens left out.',
   },
   'daily-win-rate': {
-    label: 'Daily win rate',
+    label: 'Day win rate',
     definition:
-      'Trading days that ended in profit, outside your breakeven range, as a share of all trading days. Flat days count as trading days.',
+      'The day win rate: trading days that ended in profit, outside your breakeven range, as a share of all trading days. Flat days count as trading days.',
   },
   'green-day-streak': {
     label: 'Longest green day streak',

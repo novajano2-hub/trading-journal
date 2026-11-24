@@ -26,7 +26,9 @@ afterEach(cleanup);
 
 const URL = '/app/reports/performance';
 
+/** The catalogue lives in the "+ Metric" popover: open it, then read its groups. */
 async function picker() {
+  fireEvent.click(await screen.findByRole('button', { name: 'Add metric' }));
   return within(await screen.findByRole('group', { name: 'Metrics' }));
 }
 
@@ -216,7 +218,7 @@ test('the search narrows every group, hides the empty ones and says when nothing
   fireEvent.change(search, { target: { value: 'win rate' } });
   expect(
     metrics.getAllByRole('checkbox').map((b) => b.getAttribute('aria-label')),
-  ).toEqual(['Win rate', 'Long win rate', 'Short win rate', 'Daily win rate']);
+  ).toEqual(['Win rate', 'Long win rate', 'Short win rate', 'Day win rate']);
   fireEvent.change(search, { target: { value: 'zzz' } });
   expect(metrics.queryAllByRole('checkbox')).toHaveLength(0);
   expect(screen.getByText('No metric matches "zzz"')).toBeTruthy();
@@ -303,4 +305,24 @@ test('durations and quantities show in their own units in the table', async () =
     .map((c) => c.textContent);
   // Every trade is held an hour; nine trades of one contract.
   expect(cells).toEqual(['Nov 2026', '1h', '9']);
+});
+
+test('the catalogue is closed until + Metric opens it, and its ticks use the accent, not the gain colour', async () => {
+  renderApp(<PerformanceView />, { sample: reportsSample, url: URL });
+  const add = await screen.findByRole('button', { name: 'Add metric' });
+  expect(
+    screen.queryByRole('searchbox', { name: 'Search metrics' }),
+  ).toBeNull();
+  expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+  fireEvent.click(add);
+  const box = await screen.findByRole('checkbox', { name: 'Net P&L' });
+  expect(box.className).toContain('accent-[var(--accent)]');
+  expect(box.className).not.toContain('gain');
+  expect(
+    screen.getByRole('searchbox', { name: 'Search metrics' }),
+  ).toBeTruthy();
+  // The chosen metric row keeps its Bar/Line and Period/Running switches.
+  expect(
+    screen.getByRole('radiogroup', { name: 'Net P&L plotted' }),
+  ).toBeTruthy();
 });

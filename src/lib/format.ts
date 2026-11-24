@@ -168,6 +168,11 @@ export function keepHyphens(text: string): string {
   return text.replace(/(?<=[\p{L}\p{N}])-(?=[\p{L}\p{N}])/gu, '\u2011');
 }
 
+/** A whole count with thousands separators: 1,515. */
+export function formatCount(n: number): string {
+  return n.toLocaleString('en-US');
+}
+
 /** The noun for `n` of a thing: `one` for exactly one, else `many` ("trade", "trades"). */
 export function plural(n: number, one: string, many = `${one}s`): string {
   return n === 1 ? one : many;

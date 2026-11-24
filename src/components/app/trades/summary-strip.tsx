@@ -8,7 +8,7 @@ import type { MetricId } from '@/content/metric-definitions';
 import type { Summary } from '@/domain/metrics/summary';
 import type { PnlBasis } from '@/domain/types';
 import { usePhone } from '@/lib/use-phone';
-import { formatPct, formatRatio, plural } from '@/lib/format';
+import { formatCount, formatPct, formatRatio, plural } from '@/lib/format';
 import { CARD, signTone } from '../dashboard/shared';
 
 /** A figure and how it reads, as `useDisplay().figure` gives it. */
@@ -31,7 +31,7 @@ function Kpi({
   return (
     <div
       data-kpi={id}
-      className="min-w-0 py-1 not-first:lg:border-l not-first:lg:border-line not-first:lg:pl-5"
+      className="min-w-0 py-1 not-first:lg:border-l not-first:lg:border-line not-first:lg:pl-5 lg:pr-1"
     >
       <div className="flex items-center justify-between gap-2 text-[12.5px] leading-4 text-faint pointer-coarse:-my-3">
         <MetricTip id={id} basis={basis} />
@@ -96,7 +96,7 @@ export function SummaryStrip({
           : plural(summary.closedCount, 'closed trade')
       }
     >
-      {summary.closedCount}
+      {formatCount(summary.closedCount)}
     </Kpi>
   );
   const kPnl = (
@@ -146,19 +146,27 @@ export function SummaryStrip({
         // The sentence "won for every 1 lost" gives way: the card's room goes to the
         // average win to loss, which wraps to a second line holding both amounts.
         <>
-          <MetricTip id="avg-win-loss" basis={basis}>
-            Avg win/loss
-          </MetricTip>{' '}
-          {summary.winLossRatio === null ? (
-            'None'
-          ) : (
-            <span className="tabular-nums">
-              {formatRatio(summary.winLossRatio)}
-            </span>
-          )}
+          <span className="block">
+            <MetricTip id="avg-win-loss" basis={basis}>
+              Avg win/loss
+            </MetricTip>{' '}
+            {summary.winLossRatio === null ? (
+              'None'
+            ) : (
+              <span className="tabular-nums">
+                {formatRatio(summary.winLossRatio)}
+              </span>
+            )}
+          </span>
           {avgWin !== null && avgLoss !== null ? (
             <span className="block tabular-nums">
-              <FigureText f={avgWin} /> / <FigureText f={avgLoss} />
+              <span className="whitespace-nowrap">
+                <FigureText f={avgWin} />
+              </span>{' '}
+              /{' '}
+              <span className="whitespace-nowrap">
+                <FigureText f={avgLoss} />
+              </span>
             </span>
           ) : null}
         </>
@@ -185,7 +193,7 @@ export function SummaryStrip({
   return (
     <section
       aria-label="Summary"
-      className={`${CARD} grid grid-cols-2 items-start gap-x-5 gap-y-3 px-5 py-4 sm:grid-cols-3 sm:gap-y-4 lg:grid-cols-[repeat(5,minmax(0,1fr))_auto]`}
+      className={`${CARD} grid grid-cols-2 items-start gap-x-5 gap-y-3 px-5 py-4 sm:grid-cols-3 sm:gap-y-4 lg:grid-cols-5 min-[1360px]:grid-cols-[repeat(5,minmax(0,1fr))_auto]`}
     >
       {phone ? (
         <>
@@ -203,7 +211,7 @@ export function SummaryStrip({
           {kExp}
         </>
       )}
-      <div className="col-span-full flex items-start gap-4 border-line text-[12.5px] leading-[1.5] text-faint lg:col-span-1 lg:w-[236px] lg:border-l lg:pl-5">
+      <div className="col-span-full flex items-start gap-4 border-line text-[12.5px] leading-[1.5] text-faint lg:border-t lg:pt-3 min-[1360px]:col-span-1 min-[1360px]:w-[236px] min-[1360px]:border-t-0 min-[1360px]:border-l min-[1360px]:pt-0 min-[1360px]:pl-5">
         <p className="min-w-0 flex-1">
           Figures cover the closed trades in your filters, {scope}.
           {otherCurrencies > 0
