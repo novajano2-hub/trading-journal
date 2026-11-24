@@ -439,6 +439,38 @@
       "description": "The marketing product shot: 16px window on the canvas, a bar of white controls, then the app's own cards.",
       "html": "<div class=\"ds-win\"><div class=\"ds-bar\"><span class=\"ds-sel\">Main account</span><span class=\"ds-sel\">Last 30 days</span><span class=\"ds-meta\">Sample data</span></div><div class=\"ds-body\">Content</div></div>",
       "css": ".ds-win{overflow:hidden;border:1px solid color-mix(in oklab,var(--line-2) 80%,transparent);border-radius:var(--r-card);background:var(--bg);box-shadow:inset 0 1px 0 rgb(255 255 255/.6),var(--shadow);}.ds-bar{display:flex;align-items:center;gap:6px;min-height:52px;padding:10px 12px;font:500 12.5px var(--font-keel),system-ui,sans-serif;color:var(--muted);}.ds-sel{display:inline-flex;align-items:center;height:30px;padding:0 10px;border:1px solid var(--line);border-radius:var(--r-control);background:var(--surface-1);box-shadow:0 1px 1px rgb(18 22 51/.04);}.ds-meta{margin-left:auto;color:var(--faint);}.ds-body{padding:0 12px 12px;color:var(--muted);}"
+    },
+    {
+      "name": "Two-line Phone Row",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Below 640px: line one is instrument, time and signed net; line two is 12.5px muted facts. One link, 60px minimum.",
+      "html": "<div class=\"ds-pr\"><span class=\"ds-p1\"><b>TSLA 370 Put</b><span class=\"ds-pm\">09:41</span><b class=\"ds-pg\">+$1,204.00</b></span><span class=\"ds-p2\">Long, +1.25R, 4 of 5 kept</span></div>",
+      "css": ".ds-pr{display:flex;flex-direction:column;justify-content:center;gap:4px;min-height:60px;padding:8px 16px;border-top:1px solid color-mix(in oklab,var(--line) 70%,transparent);background:var(--surface-1);font:400 13px var(--font-keel),system-ui,sans-serif;font-variant-numeric:tabular-nums;}.ds-p1{display:flex;align-items:baseline;gap:10px;font-size:14px;}.ds-p1 b{font-weight:600;}.ds-pm{color:var(--muted);font-size:12.5px;}.ds-pg{margin-left:auto;color:var(--gain);}.ds-p2{color:var(--muted);font-size:12.5px;}"
+    },
+    {
+      "name": "Summary Strip Figure",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Metric label, 22px/600 tabular figure, 12.5px faint second line; five across from lg, four in a 2 by 2 on phones.",
+      "html": "<div class=\"ds-sf\"><span class=\"ds-sl\">Win rate</span><b>58.3%</b><small>12 won, 2 breakeven, 5 lost</small></div>",
+      "css": ".ds-sf{width:200px;padding:4px 0;font-family:var(--font-keel),system-ui,sans-serif;}.ds-sl{display:block;font-size:12.5px;color:var(--faint);}.ds-sf b{display:block;margin-top:4px;font-size:22px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--text);}.ds-sf small{display:block;margin-top:2px;font-size:12.5px;color:var(--faint);}"
+    },
+    {
+      "name": "Calendar Day Cell",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "58px cell (92px wide) toned by day: gain-soft, loss-soft, accent-soft flat, surface none; 3px tone bar; one compact unit figure on small cells.",
+      "html": "<div class=\"ds-cc\"><span class=\"ds-cd\">19</span><b>+64t</b><i></i></div>",
+      "css": ".ds-cc{position:relative;display:flex;flex-direction:column;width:72px;min-height:58px;padding:6px;border-radius:10px;background:var(--gain-soft);box-shadow:inset 0 0 0 1px color-mix(in oklab,var(--gain-fill) 28%,transparent);font-family:var(--font-keel),system-ui,sans-serif;}.ds-cd{font-size:12.5px;font-weight:600;color:var(--muted);}.ds-cc b{margin-top:auto;padding-bottom:7px;font-size:11.5px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--gain);}.ds-cc i{position:absolute;left:6px;bottom:6px;width:60%;height:3px;border-radius:2px;background:var(--gain-fill);}"
+    },
+    {
+      "name": "Tag Count and Outcome Chips",
+      "kind": "chip",
+      "refersTo": "card",
+      "description": "Outcome chip is neutral (Open is accent). Tag count chip is neutral, or marigold when a mistake is among the tags.",
+      "html": "<span class=\"ds-oc\">Win</span> <span class=\"ds-oc ds-oa\">Open</span> <span class=\"ds-oc ds-ow\">3 tags</span>",
+      "css": ".ds-oc{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;background:var(--sunken);color:var(--muted);font:550 12px var(--font-keel),system-ui,sans-serif;font-variant-numeric:tabular-nums;}.ds-oa{background:var(--accent-soft);color:var(--accent-ink);}.ds-ow{background:var(--warn-soft);color:var(--warn);}"
     }
   ],
   "narrative": {
@@ -492,6 +524,21 @@
         "name": "The Tinted Lift Rule",
         "body": "Shadows are soft, diffuse and brand-tinted (neutral black in dark). Hard offset shadows never.",
         "section": "elevation"
+      },
+      {
+        "name": "The Series Hue Rule",
+        "body": "Chart series take accent, then ink, then the accent tint dashed. Cyan is for goals and marigold for mistakes, so a series never wears them. Signed money bars keep gain and loss.",
+        "section": "components"
+      },
+      {
+        "name": "The No Stacked Tables Rule",
+        "body": "Below 640px a desktop table becomes two-line rows with the same facts. Columns are never stacked into cells or scrolled sideways.",
+        "section": "components"
+      },
+      {
+        "name": "The Range Words Rule",
+        "body": "Ranges are written \"a to b\", absent values \"None\", numbers with thousands separators and unit suffixes (+64t, +12.5p, +3.5pt). Copy has no em or en dashes.",
+        "section": "components"
       }
     ],
     "dos": [
@@ -508,7 +555,12 @@
       "**Do** give every metric a MetricTip definition, keep 8px between a tip and adjacent controls, and keep goals net and in the base currency.",
       "**Do** open a rule's or a mistake's exact trades through the Morph dialog, and return focus to the opener.",
       "**Do** show loading failures neutrally, and show Long and Short as neutral words.",
-      "**Do** keep every adherence figure honest: never 100% or 0% unless exact."
+      "**Do** keep every adherence figure honest: never 100% or 0% unless exact.",
+      "**Do** give chart series one job each: series 1 accent, series 2 ink (`muted`), series 3 the accent tint, dashed. Cyan stays with goals and marigold with mistakes, so a chart never takes either.",
+      "**Do** replace a desktop table with two-line rows below `sm`, carrying the same facts, link and figures.",
+      "**Do** keep a dialog's body in a scroller and its actions in a fixed footer (Choose figures, the expanded chart).",
+      "**Do** set every number with a thousands separator and its unit suffix, write an absent value as \"None\", and write ranges as \"a to b\".",
+      "**Do** keep the outcome chip neutral (Open is the accent) and the tag count chip neutral until a mistake is among the tags, then marigold."
     ],
     "donts": [
       "**Don't** add eyebrows, kickers or small-caps labels above headings.",
@@ -521,7 +573,10 @@
       "**Don't** introduce font sizes outside the ramp above, or bring back Geist, Geist Mono or the cobalt (#2550e0) look.",
       "**Don't** use loss red for an error state, marigold for a warning state, or colour a side (Long or Short) as a result.",
       "**Don't** tint a \"not live yet\" module; its glyph stays an outline.",
-      "**Don't** reach for a library tooltip, modal or search box that bypasses the HorizonX-adapted ones."
+      "**Don't** reach for a library tooltip, modal or search box that bypasses the HorizonX-adapted ones.",
+      "**Don't** stack a desktop table's columns into cells on a phone, or scroll it sideways there.",
+      "**Don't** give a chart series cyan or marigold, or tell series apart by colour alone: the third is dashed.",
+      "**Don't** write a range with a hyphen or dash (\"1-20 Nov\"); write \"1 to 20 Nov\"."
     ]
   }
 }

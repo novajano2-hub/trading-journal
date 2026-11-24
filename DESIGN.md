@@ -557,6 +557,71 @@ Every card follows Cards above, with a tile in its tone.
 - **Performance** (accent tile). The P&L at 31px/600 counted up by the ticker with its metric tip, the equity area (see Charts) from the starting balance through each trading day's close, then a three-column strip under a hairline: win rate, profit factor, expectancy, each a 12px faint metric-tip label over a 20px/600 figure with its rolling sparkline, columns divided by hairlines; missing values read "None yet". The header shows the start and end balance in faint, tabular.
 - **Recent trades.** A table of the newest closed trades with columns Time, Symbol, Side, Strategy, P&L, Rules at 13.5px, rows on `line` at 70% that lift to sunken at 60% on hover. The instrument is written in words: "TSLA 370 Put" with the root in 600 and the contract muted, its expiry faint beside it ("20 Nov"), futures as "ES Dec 26"; the title keeps the traded symbol. Time shows the date muted and the clock time in 600. Where the table folds the time under the symbol (below `md`) the expiry is hidden so two dates never stack. Side uses the neutral side chip. Widths: Time 96px (112 from `xl`), Symbol 100px (128 from `md`, 176 from `xl`), Side 78px, Strategy 128px (144 from `lg`, 180 from `xl`, 272 from 1440), P&L 92px (104 from `sm`); **Rules flexes** and from `xl` every row is one 34px line. Strategy cells carry a warn chip for the first mistake and a neutral "+n" chip for the rest. Rules cell: "n of m kept" muted with a `gain-fill` mark, "Not graded" in faint, or a 14px `loss-fill` XCircle with a loss "Broke:" and the rule text, plus a "+n" loss chip. The "+n" chip sits inline after the rule text from `xl`, and under the text below it, where the rule text clamps to two lines (one line, truncated, from `xl`). Below `sm` Side and Strategy hide.
 
+#### Plan 5 components
+
+Recorded from the shipped code in `src/components/app/**` and `src/components/ui/**`. Token names here are the Tailwind names from `src/app/globals.css`: `surface-1` (the white card fill, "surface" above), `line` and `line-2` (the strong hairline, "line-strong" above), `sunken`, `faint`, `accent-ink`, `accent-soft`, `gain-fill`, `loss-fill`, `warn-soft`, `info-fill`, `veil`. Radii are `rounded-chip` 6px, `rounded-control` 10px, `rounded-card` 16px, with the role exceptions in Shapes.
+
+##### Filter bar, active chips, More filters, unit notice
+
+- **Bar chips** are the filter chips above. Filters the top bar has no chip for (weekday, time, duration, size, R, outcome, rating and the like) appear as **active-filter chips** in a row above the log (`ActiveFilters`, `aria-label="Other filters in use"`): 32px high (44px coarse), `rounded-control`, `line` border, `surface-1` fill, 13.5px/600 text with a 1px rest shadow, the label truncating, then a 28px close button (44px coarse) with a 13px bold X, `aria-label="Clear <label>"`, muted, sunken on hover. A link from a report arrives with these set, so they show where its count comes from.
+- **More filters** is a button at the end of the filter row (a SlidersHorizontal glyph, "More filters", a count chip when any advanced filter is set). From `md` it opens a Radix popover; below `md` it opens a bottom sheet. Inside, choices are pill toggles over native checkboxes (32px, 44px coarse, `line` border, full radius; checked takes `accent-soft` fill, `accent-ink` 13px/600 text and an accent border at 35%) and single choices are a Segmented control with an "Any" option under a 12px faint legend. Ranges are number or date pairs with a ghost "Clear" in `accent-ink`.
+- **Phone:** below `sm` the chips collapse into one "Filters (n)" button (44px, funnel glyph, count chip). It opens a sheet from the bottom edge: `fixed inset-x-0 bottom-0`, `max-h-[88dvh]`, top corners 16px, `line` top border, `--shadow`, over the `veil`. The header holds a 15px/600 title and a 44px close; the body scrolls. Each filter is a row at least 48px high showing its name (72px column, 14px/600) and what it is set to (13.5px, `text` and 600 when set, `faint` when not) with a caret; a row opens in place, a choice applies at once, and a "Clear <name>" ghost sits under a set row. More filters is the last row. Focus returns to the button on close.
+- **Unit notice:** one quiet line under the top bar of every page the global filters drive (Dashboard, Trades, Calendar, Reports, Compare). It is a polite live region, silent under Dollar, Percentage and Privacy and when the unit keeps every trade. Otherwise one 12.5px `faint` sentence, "Ticks counts futures trades only, so 12 trades are left out.", with an `accent-ink` 600 "Switch to Dollar" button beside it (44px coarse). The number carries a thousands separator.
+
+##### Summary strip
+
+The Trades page's `SummaryStrip`: a card (see Cards) with 20px side padding and 16px vertical padding, holding a grid of figures over the closed trades in the filters: closed count, P&L (with a 32 by 16 running sparkline beside the label), win rate, profit factor, expectancy.
+
+- **Figure:** a 12.5px `faint` MetricTip label, a 22px/600 figure with -0.02em tracking, tabular, never wrapping, then a **secondary line** at 12.5px `faint`. P&L reads "after $1,204.00 fees" (or "before" under Gross); trades reads "closed" or "closed, 3 still open"; win rate reads "12 won, 2 breakeven, 5 lost" with each count keeping its word; profit factor reads "Avg win/loss 1.42" over a second line "$310.00 / -$218.00". Only P&L and expectancy take sign colour. An absent figure is "None" at 15px/500 `faint`.
+- **Columns:** two on phones, three from `sm`, five from `lg`; from 1360px the note column sits at the end as a sixth, 236px, behind a hairline. Figures are divided by a `line` hairline from `lg`.
+- **Phone 2 by 2:** below `sm` the strip shows four figures in two rows, in the order P&L, win rate, profit factor, closed trades. Expectancy is left out. Net leads because it is the first thing read.
+- **Note:** "Figures cover the closed trades in your filters, 1 to 20 Nov." plus, when it applies, how many trades in other currencies are left out, then an `accent-ink` "Hide summary" button. The strip is the only place this sentence lives.
+
+##### Two-line phone rows
+
+Below `sm` (the `usePhone` hook, 640px) a list that is a table on desktop becomes a list of **two-line rows**. A row is at least 60px high, with a `line` at 70% hairline above every row but the first.
+
+- **Line one:** the instrument (14px, root in 600) and the time (12.5px muted) on the left, the signed net (14px, tabular, sign colour) on the right, baseline aligned.
+- **Line two:** 12.5px muted facts at 12px gaps: side as a plain word, R, the rules cell, and a tag count chip when the trade has tags.
+- **Row:** one link to the detail, `active:bg-sunken/60`, focus ring inset by 2px. A selected row takes `accent-soft` at 70%. Where rows are selectable the checkbox sits beside the link, not inside it.
+- **Used by:** the trade log (`PhoneRows`), the Dashboard's open positions (`sm:hidden` list beside the `max-sm:hidden` table) and Settings, Accounts (name and balance on line one, status chips and counts on line two).
+- **The rule:** no stacked desktop tables on phone. A table is never squeezed, scrolled sideways or folded into stacked cells below `sm`; it is replaced by two-line rows that carry the same facts, with the same link and the same figures.
+
+##### Report cards
+
+Every report section is a card (see Cards) with a 28px header: an icon tile in the card's tone (accent for charts, neutral for tables), a 15px/600 title, a 12.5px `faint` caption ("By week, 1 to 20 Nov"), and controls at the right.
+
+- **Chart card header:** the **Expand** action sits at the right of the header, in a slot (`useExpandSlot`) the chart portals into. It is a 28px ghost button (44px coarse), `rounded-control`, 12.5px/500 muted, an ArrowsOut glyph at 14px, `aria-haspopup="dialog"`, `aria-label="Expand chart"`. Where a chart has no header slot, Expand sits above the plot.
+- **Expanded-chart dialog:** a `MorphDialog` with `size="full"` (inset 12px, 24px from `sm`, `rounded-card`, `line` border, `--shadow`, over the `veil`) that grows from the Expand button and returns focus to it. The plot is 1.8 times the card's height and re-fits to the dialog; a chart with several bands scrolls inside. Under reduced motion the plot's own transitions are off so the fit measures the final size.
+- **Chart series treatment:** series 1 is `accent`, series 2 is `muted` (ink), series 3 is the accent mixed 55% into `surface-1` and **drawn dashed** (`5 4`) so it reads apart without colour. A bar series that is signed money keeps `gain-fill` and `loss-fill`. Chart series never take cyan or marigold. The legend swatch matches the series.
+- **"+ Metric" popover** (Performance report): a trigger chip (30px, 9px radius, `line-2` inset ring, muted 13px/500, a bold Plus at 14px, "Metric"; 44px coarse) opening a Radix popover, `min(100vw - 24px, 640px)` wide, `max-h-[min(72dvh,30rem)]`, `rounded-control`, `--shadow`. A fixed search field sits on top (36px, a 15px magnifier, "Search metrics"), then a scrolling body of **groups**: each a 12.5px/600 muted heading and a two-column grid from `sm` of rows (40px, 44px coarse) holding a checkbox in `accent` and the metric's MetricTip label. A metric past the limit of three is disabled and faint, and says why through `aria-describedby`. No match reads `No metric matches "x"` in a status line.
+- **Chosen-metric chips:** each chosen metric is a row in a bordered list (`rounded-control`, `line` border, dividers at 60%): the metric name at 13.5px/500, a **Bar/Line** Segmented, a **Period/Running** Segmented (absent for a metric that is already a running total), and a 28px remove button with a 13px bold X. The Breakdown reports use the compact form (`MetricChips`): a 30px chip, 9px radius, with a chart-type mark in `accent`, the name, and a remove button; pressing the chip flips bars and line.
+- **Column chooser:** a "Columns" trigger (30px, `rounded-control`, `line` border, hairline shadow, Columns glyph in `faint`) opening a 240px popover (12px radius, `--shadow`, `pop-in`): a checkbox list at 36px rows (44px coarse, 8px radius, sunken on hover; an unchecked name is muted) and a footer under a hairline with "Reset to default" in `accent-ink` 13px/600. It changes nothing but the table's visible columns, and the choice is saved.
+- **Highlights list:** under a breakdown, past a hairline, a `ul` named "Highlights" of 13px lines: a `faint` label ("Most active", "Best win rate"), the bucket in 600 text, and a muted tabular fact ("62% won, 18 trades"). A highlight with nothing to show reads "None".
+- **Report bucket links:** a bucket's name (a symbol, a weekday, a strategy, a month) is a link to its trades in the log, with the report's filters carried and `prefetch` off. It is plain text with a hover underline, `aria-label="<name>, open 14 trades in the trade log"`, a 44px target on coarse pointers. A bucket with no link (no value to bucket by) is plain text. The link is never a button and never coloured as a link.
+- **Choose figures dialog:** the Overview's figure choice is a `MorphDialog` with a **scroller and a fixed footer**. The body (`min-h-0 flex-1 overflow-y-auto`, 20px side padding) holds fieldsets in two columns from `sm`, each with a 13px/600 legend and tick rows that show the figure's value now ("None" when empty). The footer (`flex-none`, `line` top border, `surface-1`) holds "Show all" as a left ghost, then "Cancel" (secondary) and "Save" (primary). A failed save shows a loss-toned alert line above the buttons.
+
+##### Calendar
+
+- **Month grid:** seven columns and, from 600px of card width (a container query on the card, not the viewport), an eighth week-total column (76 to 112px). A cell is `rounded-[10px]`, 58px high (92px from 600px), 6px padding, filled by day tone: gain-soft with a gain-fill hairline at 28%, loss-soft with loss-fill at 26%, `accent-soft` for a flat day, `surface-1` with a `line` hairline for none. A 3px bar at the foot carries the tone. Today has a 1.5px accent ring at 45%; the selected day a 2px accent ring and the chip shadow. Hover lifts 1px (not under reduced motion).
+- **Figures in a cell:** the day number at 12.5px/600 top left, the first chosen stat at 12 to 14.5px/600 tabular in the tone's ink, the rest at 11.5 to 12px muted. Below 600px a cell shows **one compact figure** only: "+1.1k" in dollars, "+64t" in ticks, "+12.5p" in pips, "+3.5pt" in points, "+1.25R" in R, a percentage to one decimal. The suffix is part of the figure and never spaced.
+- **Day panel:** at `xl` (1280px) and up it sits beside the grid; below that it is a bottom sheet that never opens by itself. A 15px/600 heading, the day's net at 30px/600 in tone, a three-column definition list under a hairline (12px faint terms, 15px/600 values), a by-exit-time strip, then the day's trades. A day with none says so in 14px muted.
+- **Month KPI strip:** under the header, `border-y` `line`, two columns on phones and a wrapping row from `sm`, columns divided by hairlines: a 12.5px `faint` MetricTip label, a 19px/600 tabular figure, a 12px muted second line (truncating) and, where useful, a link. Figures are in the display unit; an absent one is "None".
+
+##### Segmented controls, outcome chip, tag count chip
+
+- **Segmented** is the shared control above. Every filter choice, report switch (Bar/Line, Period/Running, Day/Week/Month, Gross/Net) and settings choice uses it; none builds its own. Pass `coarseTargets` wherever it sits in a page's body so options reach 44px on touch.
+- **Outcome chip** (`StatusChip`): the neutral chip reads Win, Loss or Breakeven, because they name a result and gain and loss ink belongs to the amounts. **Open** is the accent chip, the one state that is live.
+- **Tag count chip** (`TagCountCell`): "3 tags" in a pill with tabular figures, **neutral** while the trade has only tags and **warn (marigold)** when any of them is a mistake. The names are in text for screen readers ("Tags, with a mistake: Early exit, FOMO"); a trade with none reads "None". A mistakes cell instead shows the first mistake in a warn chip (88px max, truncating) and a "+n" chip for the rest.
+
+##### Number and copy formatting
+
+- **Thousands separators everywhere:** counts and amounts alike ("1,204 trades", "$12,480.00"), set through `formatCount` and the display formatter, never raw `toString`.
+- **Unit suffixes** go with the figure, unspaced: `%`, `R`, `t` (ticks), `p` (pips), `pt` (points). Money is signed with a leading `+` or `-` where sign matters; the minus on a chart axis is the true minus sign.
+- **Empty values:** "None", per Empty values below, in `faint` at the figure's size.
+- **Ranges are written "a to b":** "1 to 20 Nov", "$100 to $500", "5 to 10 trades". No hyphen, en dash or em dash between the ends.
+- **Copy has no em or en dashes**, anywhere in the app.
+
 #### Empty and error states
 
 - **No trades** (empty workspace): a ghosted "Your plan" preview (rule rows with empty tracks and no numbers, the last row fading out) captioned "Your rules and what breaking them costs will show here.", then the title, one line of body, Import and "Open the sample workspace". Chips are dashed and inert.
@@ -609,6 +674,11 @@ Tokens in `src/lib/motion.ts`, mirrored as CSS variables. Several patterns are a
 - **Do** open a rule's or a mistake's exact trades through the Morph dialog, and return focus to the opener.
 - **Do** show loading failures neutrally, and show Long and Short as neutral words.
 - **Do** keep every adherence figure honest: never 100% or 0% unless exact.
+- **Do** give chart series one job each: series 1 accent, series 2 ink (`muted`), series 3 the accent tint, dashed. Cyan stays with goals and marigold with mistakes, so a chart never takes either.
+- **Do** replace a desktop table with two-line rows below `sm`, carrying the same facts, link and figures.
+- **Do** keep a dialog's body in a scroller and its actions in a fixed footer (Choose figures, the expanded chart).
+- **Do** set every number with a thousands separator and its unit suffix, write an absent value as "None", and write ranges as "a to b".
+- **Do** keep the outcome chip neutral (Open is the accent) and the tag count chip neutral until a mistake is among the tags, then marigold.
 
 ### Don't:
 
@@ -623,6 +693,9 @@ Tokens in `src/lib/motion.ts`, mirrored as CSS variables. Several patterns are a
 - **Don't** use loss red for an error state, marigold for a warning state, or colour a side (Long or Short) as a result.
 - **Don't** tint a "not live yet" module; its glyph stays an outline.
 - **Don't** reach for a library tooltip, modal or search box that bypasses the HorizonX-adapted ones.
+- **Don't** stack a desktop table's columns into cells on a phone, or scroll it sideways there.
+- **Don't** give a chart series cyan or marigold, or tell series apart by colour alone: the third is dashed.
+- **Don't** write a range with a hyphen or dash ("1-20 Nov"); write "1 to 20 Nov".
 
 ## Empty values
 
