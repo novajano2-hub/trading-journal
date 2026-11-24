@@ -59,7 +59,7 @@ export function defaultPrefs(): UserPrefs {
     pnlBasis: 'net',
     displayUnit: 'dollar',
     hideTradeSummary: false,
-    calendarStats: ['net', 'trades', 'rating'],
+    calendarStats: ['net', 'trades', 'winRate', 'rating'],
     instrumentsTraded: [],
     settleExpiredOptions: true,
   };

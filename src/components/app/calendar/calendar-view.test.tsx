@@ -203,7 +203,13 @@ test('the currency is in the address: ?cur opens it, the switch writes it, and t
 });
 
 test('choosing Win rate as a third stat shows it in the cells', async () => {
-  renderApp(<CalendarView />, { sample: withTrades(NOV), url: url() });
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: withTrades(NOV),
+  });
+  await repository.prefs.update({ calendarStats: ['net', 'trades'] });
+  renderApp(<CalendarView />, { repository, url: url() });
   const cell = await screen.findByRole('button', { name: /^Thu 19 Nov/ });
   expect(cell.textContent).not.toContain('win rate');
   fireEvent.click(screen.getByRole('button', { name: 'Stats shown' }));
@@ -309,7 +315,10 @@ test('M6: a five-figure day reads short in a narrow cell, with the full value in
   ).toBe('−12k');
   // "+$951.10" fits as written: no second form.
   const small = screen.getByRole('button', { name: /^Fri 20 Nov/ });
-  expect(small.querySelector('span[title] [aria-hidden="true"]')).toBeNull();
+  // Only the lead line: the win rate under it has its own short form.
+  expect(
+    small.querySelector('span[title]')!.querySelector('[aria-hidden="true"]'),
+  ).toBeNull();
 });
 
 test('with Privacy on, the cells show $••• and no digit follows a $', async () => {
@@ -1024,8 +1033,13 @@ test('Day rating: the panel lists the average of the day', async () => {
   ).toContain('4.3★');
 });
 
-test('Day rating: the new-prefs default is Net P&L, Trades and Day rating; the menu offers it', async () => {
-  expect(defaultPrefs().calendarStats).toEqual(['net', 'trades', 'rating']);
+test('Day rating: the new-prefs default is Net P&L, Trades, Win rate and Day rating; the menu offers it', async () => {
+  expect(defaultPrefs().calendarStats).toEqual([
+    'net',
+    'trades',
+    'winRate',
+    'rating',
+  ]);
   renderApp(<CalendarView />, { sample: withTrades(RATED), url: url() });
   await screen.findByRole('grid', { name: 'November 2026' });
   fireEvent.click(screen.getByRole('button', { name: 'Stats shown' }));
