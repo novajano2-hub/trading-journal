@@ -933,3 +933,23 @@ test('account labels are a quiet placeholder until the accounts load, then their
     accountNamesOf([{ id: 'acc-1', name: 'Live' } as never], ['acc-1']),
   ).toEqual({ 'acc-1': 'Live' });
 });
+
+test('in R the chart plots each bucket in R, as the table beside it reads (I2)', async () => {
+  const repository = await repositoryWith({ displayUnit: 'r' });
+  renderApp(<SymbolsView />, {
+    repository,
+    url: '/app/reports/symbols?m=net:bar,expectancy:bar,avg-win:bar',
+  });
+  const page = await screen.findByTestId('reports-symbols');
+  const chart = await within(page).findByRole('img', {
+    name: /by symbol/,
+  });
+  act(() => chart.focus());
+  const readout = within(page).getAllByRole('status')[0]!;
+  // ES, the one bucket with a stop: +2R and -1R.
+  expect(readout.textContent).toContain('+1.00R');
+  expect(readout.textContent).toContain('+0.50R');
+  expect(readout.textContent).toContain('+2.00R');
+  expect(readout.textContent).not.toContain('$');
+  expect(chart.textContent).not.toContain('$');
+});

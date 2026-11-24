@@ -18,7 +18,8 @@ const SQUARE = {
 /**
  * Twelve small months of one year: a square per day in its tone (empty days
  * quiet) and the month's net. Each month links to that month on the Calendar.
- * `fmt` is the view's figure; alone it reads the display unit in dollars.
+ * `fmt` is the view's figure; alone it reads the display unit with no
+ * percentage base.
  */
 export function YearGrid({
   year,
@@ -32,7 +33,21 @@ export function YearGrid({
   hrefFor?: (month: string) => string;
 }): React.JSX.Element {
   const display = useDisplay();
-  const figure: FormatMoney = fmt ?? ((money) => display.figure({ money }));
+  const figure: FormatMoney =
+    fmt ??
+    ((money, r, compact, units) =>
+      display.figure(
+        {
+          money,
+          r: r ?? null,
+          ticks: units?.ticks ?? null,
+          pips: units?.pips ?? null,
+          points: units?.points ?? null,
+        },
+        true,
+        undefined,
+        compact,
+      ));
   return (
     <ol
       aria-label={`${year} by month`}
@@ -54,7 +69,7 @@ export function YearGrid({
                 <b
                   className={`text-[13.5px] font-semibold tabular-nums ${traded === 0 ? 'text-faint' : m.net < 0 ? 'text-loss' : m.net > 0 ? 'text-gain' : 'text-text'}`}
                 >
-                  <FigureText f={figure(m.net)} />
+                  <FigureText f={figure(m.net, m.r, false, m)} />
                 </b>
               </span>
               <span

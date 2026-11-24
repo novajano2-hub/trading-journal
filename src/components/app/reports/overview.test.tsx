@@ -428,3 +428,58 @@ test('when the unit leaves out every closed trade the page says so, and keeps Cl
   ).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
 });
+
+test('in Ticks both charts plot, name and read out ticks, never dollars (I2)', async () => {
+  renderApp(<OverviewView />, {
+    repository: await inUnit('ticks', ticksSample),
+    url: URL,
+  });
+  const page = await ready();
+  // Mon 2 Nov +12 ticks, Tue 3 Nov -6 ticks: the line ends at +6 ticks.
+  const cumulative = within(page).getByRole('img', {
+    name: /^Cumulative net P&L by day, all time\. Ends at \+6\.0 ticks\.$/,
+  });
+  expect(
+    within(page).getByRole('img', {
+      name: /^Daily net P&L bars, 2 days, all time\. Best .*\+12\.0 ticks, worst .*−6\.0 ticks\.$/,
+    }),
+  ).toBeTruthy();
+  const header = within(page)
+    .getByRole('heading', { name: 'Cumulative P&L' })
+    .closest('section')!;
+  expect(header.textContent).toContain('Ends at +6.0 ticks');
+  // Only the drawdown band stays in money, as the drawdown does.
+  expect(
+    header.textContent!.replace(/Max drawdown by day −\$[\d.,]+/, ''),
+  ).not.toContain('$');
+  const daily = within(page)
+    .getByRole('heading', { name: 'Daily P&L' })
+    .closest('section')!;
+  expect(daily.textContent).not.toContain('$');
+  // The axis ticks read in ticks too.
+  expect(cumulative.textContent).toMatch(/\dt/);
+  act(() => cumulative.focus());
+  fireEvent.keyDown(cumulative, { key: 'ArrowRight' });
+  const readout = within(cumulative.parentElement!.parentElement!).getByRole(
+    'status',
+  );
+  // Tue 3 Nov: the day lost 6 ticks; the line stands at +6.
+  expect(readout.textContent).toContain('Tue 3 Nov');
+  expect(readout.textContent).toMatch(/That day\s*−6\.0 ticks/);
+  expect(readout.textContent).toContain('+6.0 ticks');
+  expect(readout.textContent).not.toContain('$');
+});
+
+test('in R the cumulative line ends at +1.00R, not at a cent (I2)', async () => {
+  renderApp(<OverviewView />, {
+    repository: await inUnit('r'),
+    url: URL,
+  });
+  const page = await ready();
+  // b-1 +2R and b-2 -1R on Mon 2 Nov; the others have no stop.
+  expect(
+    within(page).getByRole('img', {
+      name: /^Cumulative net P&L by day, all time\. Ends at \+1\.00R\.$/,
+    }),
+  ).toBeTruthy();
+});

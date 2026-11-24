@@ -13,7 +13,8 @@ import { FigureText } from '@/components/product/figure-text';
 import { MetricTip } from '@/components/ui/metric-tip';
 import { metricDefinition, type MetricId } from '@/content/metric-definitions';
 import { winsVsLosses } from '@/domain/metrics/breakdowns';
-import { timeSeries } from '@/domain/metrics/series';
+import { dayValue } from '@/domain/metrics/days';
+import { seriesUnit, timeSeries } from '@/domain/metrics/series';
 import { largestTrade, rExpectancy, summarize } from '@/domain/metrics/summary';
 import { isClosed } from '@/domain/trade-status';
 import type { Trade } from '@/domain/types';
@@ -21,6 +22,7 @@ import { formatUnitValue, useDisplay } from '@/lib/display';
 import { formatDuration, formatPct, plural } from '@/lib/format';
 import { CARD, CARD_PAD, CardHeader, signTone } from '../dashboard/shared';
 import {
+  formatterOf,
   periodText,
   ReportChart,
   useExpandSlot,
@@ -214,6 +216,15 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
   );
   const dayOf = useMemo(() => new Map(days.map((d) => [d.date, d])), [days]);
   const ends = seriesIn.cumulative[seriesIn.cumulative.length - 1]?.value;
+  // The charts plot the display unit's own numbers when one narrows the
+  // trades, so the axis, the readout, the header and the names read in it.
+  const plotUnit = seriesUnit('net', ctx);
+  const fmt = formatterOf(display, currency);
+  const plotLabel = (v: number) => fmt.text(plotUnit, v);
+  const plotText = (v: number) =>
+    plotUnit === 'money'
+      ? display.cash(v, true, currency).text
+      : fmt.text(plotUnit, v);
   // The max drawdown, from its peak to its low, shaded on the cumulative line.
   const drawdownText =
     drawdown.amount > 0
@@ -256,9 +267,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
   });
 
   const cumulativeName = `Cumulative ${basis} P&L by day, ${data.caption}.${
-    ends === undefined || ends === null
-      ? ''
-      : ` Ends at ${display.cash(ends, true, currency).label}.`
+    ends === undefined || ends === null ? '' : ` Ends at ${plotLabel(ends)}.`
   }`;
   const extremes = seriesIn.daily.filter(
     (d): d is { key: string; value: number } => d.value !== null,
@@ -273,7 +282,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
   );
   const dailyName = `Daily ${basis} P&L bars, ${days.length} ${plural(days.length, 'day')}, ${data.caption}.${
     topDay && lowDay
-      ? ` Best ${periodText(topDay.key)} ${display.cash(topDay.value, true, currency).label}, worst ${periodText(lowDay.key)} ${display.cash(lowDay.value, true, currency).label}.`
+      ? ` Best ${periodText(topDay.key)} ${plotLabel(topDay.value)}, worst ${periodText(lowDay.key)} ${plotLabel(lowDay.value)}.`
       : ''
   }`;
   const cumulativeId = useId();
@@ -652,7 +661,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
                 <span className="mr-2 text-[12.5px] text-faint">
                   Ends at{' '}
                   <b className={`font-semibold ${signTone(ends)}`}>
-                    <FigureText f={display.cash(ends, true, currency)} />
+                    {fmt.node(plotUnit, ends)}
                   </b>
                 </span>
               )}
@@ -670,8 +679,10 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
             extra={[
               {
                 label: 'That day',
-                text: (key) =>
-                  display.cash(dayOf.get(key)?.net ?? 0, true, currency).text,
+                text: (key) => {
+                  const d = dayOf.get(key);
+                  return plotText(d ? dayValue(d, ctx) : 0);
+                },
               },
               {
                 label: 'Trades',
@@ -682,7 +693,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
               {
                 label: 'Cumulative P&L',
                 kind: 'line',
-                unit: 'money',
+                unit: plotUnit,
                 points: seriesIn.cumulative,
               },
             ]}
@@ -725,7 +736,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
               {
                 label: 'Daily P&L',
                 kind: 'bar',
-                unit: 'money',
+                unit: plotUnit,
                 points: seriesIn.daily,
               },
             ]}

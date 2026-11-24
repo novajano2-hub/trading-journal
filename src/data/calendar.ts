@@ -375,12 +375,20 @@ export function calendarMonth(
   };
 }
 
-/** The twelve months of `year`: each one's net and all of its dates (notes are not read). */
+/** One month of the year view: its net, its R and units summed as the Calendar's month does, and all of its dates. */
+export interface CalendarYearMonth extends UnitSums {
+  month: string;
+  net: Cents;
+  r: number | null;
+  days: CalendarDay[];
+}
+
+/** The twelve months of `year`: each one's net, R and units, and all of its dates (notes are not read). */
 export function calendarYear(
   trades: readonly Trade[],
   year: number,
   ctx: MetricContext,
-): { month: string; net: Cents; days: CalendarDay[] }[] {
+): CalendarYearMonth[] {
   const booked = bookDays(trades, [], ctx, {
     from: `${year}-01-01`,
     to: `${year}-12-31`,
@@ -392,7 +400,13 @@ export function calendarYear(
       const date = `${month}-${pad(d + 1)}`;
       return booked.get(date) ?? emptyDay(date, none);
     });
-    return { month, net: days.reduce((s, d) => s + d.net, 0), days };
+    return {
+      month,
+      net: days.reduce((s, d) => s + d.net, 0),
+      r: sumR(days.map((d) => d.r)),
+      ...sumUnits(days),
+      days,
+    };
   });
 }
 

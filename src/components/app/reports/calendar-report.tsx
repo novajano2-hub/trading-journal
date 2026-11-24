@@ -12,6 +12,7 @@ import { calendarYear } from '@/data/calendar';
 import { parseFilters, queryString, serializeFilters } from '@/data/filters';
 import { useDisplay } from '@/lib/display';
 import { CARD, CARD_PAD, CardHeader, signTone } from '../dashboard/shared';
+import type { FormatMoney } from '../calendar/month-grid';
 import { YearGrid } from '../calendar/year-grid';
 import { ReportScope } from './report-scope';
 import { writeParam, type ReportData } from './use-report-data';
@@ -36,6 +37,27 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
     [p.dayTrades, year, ctx],
   );
   const net = months.reduce((n, m) => n + m.net, 0);
+  // The year's R and units, summed as each month's are: a unit no month has stays empty.
+  const sum = (u: 'r' | 'ticks' | 'pips' | 'points') => {
+    const have = months.flatMap((m) => m[u] ?? []);
+    return have.length === 0 ? null : have.reduce((a, b) => a + b, 0);
+  };
+  const pctBase = data.source.pctBase;
+  // Each month and the year read in the display unit, as the Calendar's do.
+  const fmt: FormatMoney = (money, r, compact, units) =>
+    display.figure(
+      {
+        money,
+        pct: pctBase ? money / pctBase : null,
+        r: r ?? null,
+        ticks: units?.ticks ?? null,
+        pips: units?.pips ?? null,
+        points: units?.points ?? null,
+      },
+      true,
+      currency,
+      compact,
+    );
   const traded = months.reduce(
     (n, m) => n + m.days.filter((d) => d.trades > 0).length,
     0,
@@ -56,7 +78,13 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
           <span className="text-[12.5px] text-faint">
             {traded} trading {traded === 1 ? 'day' : 'days'}, net{' '}
             <b className={`font-semibold ${signTone(net)}`}>
-              <FigureText f={display.cash(net, true, currency)} />
+              <FigureText
+                f={fmt(net, sum('r'), false, {
+                  ticks: sum('ticks'),
+                  pips: sum('pips'),
+                  points: sum('points'),
+                })}
+              />
             </b>
           </span>
         }
@@ -85,7 +113,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
         <YearGrid
           year={year}
           months={months}
-          fmt={(money) => display.cash(money, true, currency)}
+          fmt={fmt}
           hrefFor={(month) =>
             `/app/calendar?month=${month}${filterQuery ? `&${filterQuery}` : ''}`
           }

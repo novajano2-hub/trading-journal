@@ -42,7 +42,7 @@ import {
 } from '@/data/query/hooks';
 import { StorageUnavailableError } from '@/data/repository';
 import { winsVsLosses } from '@/domain/metrics/breakdowns';
-import { timeSeries } from '@/domain/metrics/series';
+import { seriesUnit, timeSeries } from '@/domain/metrics/series';
 import { unitKeeps } from '@/domain/metrics/units';
 import { summarize, type Summary } from '@/domain/metrics/summary';
 import { localDate } from '@/domain/time';
@@ -90,7 +90,7 @@ import { ScrollFade } from '@/components/ui/scroll-fade';
 import { symbolOptions } from '../search';
 import { CARD, CARD_PAD, CardHeader, signTone } from '../dashboard/shared';
 import { UnitLeftOut } from '../unit-notice';
-import { ReportChart, type ChartSeries } from './report-chart';
+import { formatterOf, ReportChart, type ChartSeries } from './report-chart';
 import { ReportSkeleton, State } from './report-scope';
 import { writeParam } from './use-report-data';
 
@@ -570,10 +570,12 @@ function Compared({
   );
 
   const symbols = useMemo(() => symbolOptions(trades), [trades]);
+  // Under a unit that narrows the trades the lines are its own numbers.
+  const plotUnit = seriesUnit('cumulative-net', base);
   const series: ChartSeries[] = GROUPS.map((g, i) => ({
     label: g.name,
     kind: 'line',
-    unit: 'money',
+    unit: plotUnit,
     points: lines[i]!,
   }));
 
@@ -654,14 +656,16 @@ function Compared({
       end === undefined || end === null
         ? ''
         : `, ends at ${
-            display.figure(
-              {
-                money: end,
-                pct: source.pctBase ? end / source.pctBase : null,
-              },
-              true,
-              currency,
-            ).label
+            plotUnit === 'money'
+              ? display.figure(
+                  {
+                    money: end,
+                    pct: source.pctBase ? end / source.pctBase : null,
+                  },
+                  true,
+                  currency,
+                ).label
+              : formatterOf(display, currency).text(plotUnit, end)
           }`
     }`;
   }).join('. ')}.`;

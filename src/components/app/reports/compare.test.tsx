@@ -96,7 +96,7 @@ test('Privacy leaves no dollar amount on the page', async () => {
   expect(container.textContent).not.toMatch(/\$\d/);
 });
 
-async function inUnit(displayUnit: 'r' | 'percent' | 'privacy') {
+async function inUnit(displayUnit: 'r' | 'percent' | 'privacy' | 'ticks') {
   const { createLocalRepository } =
     await import('@/data/local/local-repository');
   const { IDBFactory, IDBKeyRange } = await import('fake-indexeddb');
@@ -226,4 +226,27 @@ test('the metric names are a sticky first column below lg', async () => {
       c.className.includes('max-lg:bg-surface-1'),
     ),
   ).toBe(true);
+});
+
+test('in R and Ticks the chart plots each group in the unit and says where it ends in it (I2)', async () => {
+  const url = '/app/reports/compare?a=symbol%3DES&b=symbol%3DNQ';
+  const { unmount } = renderApp(<CompareView />, {
+    repository: await inUnit('r'),
+    url,
+  });
+  const page = await screen.findByTestId('reports-compare');
+  // ES: +2R and -1R. NQ has no trade with a stop.
+  const chart = within(page).getByRole('img', {
+    name: /Group A, all time, ends at \+1\.00R\./,
+  });
+  expect(chart.textContent).not.toContain('$');
+  unmount();
+  renderApp(<CompareView />, { repository: await inUnit('ticks'), url });
+  const ticks = await screen.findByTestId('reports-compare');
+  // b-1 and b-2 have no exit price apart from their entry in the sample: 0 ticks each.
+  expect(
+    within(ticks).getByRole('img', {
+      name: /Group A, all time, ends at [+−]?[\d.,]+ ticks/,
+    }),
+  ).toBeTruthy();
 });

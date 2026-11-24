@@ -44,3 +44,25 @@ test('the global filters ride along to the Calendar, and the year steps back and
   expect(new URLSearchParams(window.location.search).get('year')).toBe('2025');
   expect(within(page).getAllByText('No trades')).toHaveLength(12);
 });
+
+test('in R the months and the year read in R, as the Calendar does (I2)', async () => {
+  const { createLocalRepository } =
+    await import('@/data/local/local-repository');
+  const { IDBFactory, IDBKeyRange } = await import('fake-indexeddb');
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: breakdownSample,
+  });
+  await repository.prefs.update({ displayUnit: 'r' });
+  renderApp(<CalendarReportView />, {
+    repository,
+    url: '/app/reports/calendar?year=2026',
+  });
+  const page = await screen.findByTestId('reports-calendar');
+  // b-1 +2R and b-2 -1R; no other trade has a stop.
+  const nov = within(page).getAllByTestId('year-month')[10]!;
+  expect(nov.textContent).toContain('+1.00R');
+  expect(nov.textContent).not.toContain('$');
+  expect(page.textContent).toContain('net +1.00R');
+});

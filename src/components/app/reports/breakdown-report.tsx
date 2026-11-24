@@ -22,7 +22,7 @@ import {
   type CrossMetric,
 } from '@/domain/metrics/breakdowns';
 import { classify, pnlOf } from '@/domain/metrics/context';
-import { SERIES_META, type SeriesMetric } from '@/domain/metrics/series';
+import { seriesUnit, type SeriesMetric } from '@/domain/metrics/series';
 import { largestInUnit } from '@/domain/metrics/summary';
 import { unitOf } from '@/domain/metrics/units';
 import { roundHalfEven } from '@/domain/money';
@@ -452,17 +452,6 @@ export function BreakdownCards({
 
   const names = new Map(chartRows.map((r) => [r.key, describe(r)]));
   const short = new Map(chartRows.map((r) => [r.key, r.label]));
-  // Named buckets are not a sequence: a line across them would join unrelated bars, so rates are markers sized by their trades.
-  const series: ChartSeries[] = picks.map((x) => ({
-    label: metricLabel(x.metric, basis),
-    kind: x.kind === 'bar' ? 'bar' : 'dots',
-    counts: chartRows.map((r) => r.summary.closedCount),
-    unit: SERIES_META[x.metric].unit,
-    points: chartRows.map((r) => ({
-      key: r.key,
-      value: chartValue(r, x.metric),
-    })),
-  }));
   const barHref = new Map(chartRows.map((r) => [r.key, hrefOfRow(r)]));
   const tradesIn = new Map(
     chartRows.map((r) => [r.key, r.summary.closedCount]),
@@ -501,6 +490,41 @@ export function BreakdownCards({
       ),
     [all, tradeById, merged],
   );
+  /**
+   * A bucket's plotted value: its summary's, or under a unit that narrows the
+   * trades the same figure in that unit (`seriesUnit` says which metrics),
+   * read as the table beside the chart reads it.
+   */
+  const plotted = (r: BreakdownRow, metric: SeriesMetric): number | null => {
+    const v = chartValue(r, metric);
+    const unit = merged.unit;
+    if (v === null || !unit || seriesUnit(metric, merged) !== 'tradeunit')
+      return v;
+    const own = outcomes.get(r.key);
+    switch (metric) {
+      case 'net':
+        return sumOf(r)[unit] ?? null;
+      case 'expectancy':
+        return display.expectancy(v, r.tradeIds)[unit] ?? null;
+      case 'avg-win':
+        return display.meanOfTrades(own?.wins ?? [], v)[unit] ?? null;
+      case 'avg-loss':
+        return display.meanOfTrades(own?.losses ?? [], v)[unit] ?? null;
+      default:
+        return v;
+    }
+  };
+  // Named buckets are not a sequence: a line across them would join unrelated bars, so rates are markers sized by their trades.
+  const series: ChartSeries[] = picks.map((x) => ({
+    label: metricLabel(x.metric, basis),
+    kind: x.kind === 'bar' ? 'bar' : 'dots',
+    counts: chartRows.map((r) => r.summary.closedCount),
+    unit: seriesUnit(x.metric, merged),
+    points: chartRows.map((r) => ({
+      key: r.key,
+      value: plotted(r, x.metric),
+    })),
+  }));
   /** A bucket's average win or loss: the mean in the unit over its winners (or losers). */
   const meanOf = (r: BreakdownRow, outcome: 'win' | 'loss') => {
     const cents = outcome === 'win' ? r.summary.avgWin : r.summary.avgLoss;
