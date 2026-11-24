@@ -722,3 +722,43 @@ test('+ Link picks from the day first, searches all trades, and links and unlink
   );
   expect(screen.queryByRole('button', { name: /^Unlink NQ/ })).toBeNull();
 });
+
+test('a malformed note row in storage never breaks the Notebook: it lists as an untitled note (re-review N1)', async () => {
+  await openWith('/app/notebook', {
+    edit: (fx) =>
+      fx.journal.push({
+        id: 'n-bare',
+        workspaceId: WS,
+        body: {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Bare row text' }],
+            },
+          ],
+        },
+        updatedAt: '2026-11-19T20:00:00.000Z',
+      } as unknown as (typeof fx.journal)[number]),
+  });
+  const folders = await screen.findByRole('navigation', { name: 'Folders' });
+  const listed = () =>
+    waitFor(() =>
+      expect(
+        listItems()
+          .map((li) => li.textContent)
+          .join(' '),
+      ).toContain('Untitled note'),
+    );
+  // A search looks through every note, so it reaches the bare row.
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Search notes' }), {
+    target: { value: 'bare row' },
+  });
+  await listed();
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Search notes' }), {
+    target: { value: '' },
+  });
+  // Read whole, it is a plain note in My notes.
+  fireEvent.click(within(folders).getByRole('button', { name: /My notes/ }));
+  await listed();
+});

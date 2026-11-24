@@ -344,6 +344,11 @@ function NoteBody({
     if (waiting.current === 0)
       note.current = entry ? Promise.resolve(entry) : null;
   }, [entry]);
+  // The latest `ensure`, for a save whose note was let go during the delay.
+  const ensureRef = useRef(ensure);
+  useEffect(() => {
+    ensureRef.current = ensure;
+  });
 
   const flush = () => {
     timer.current = undefined;
@@ -351,7 +356,16 @@ function NoteBody({
     waiting.current += 1;
     queue.current = queue.current.then(async () => {
       try {
-        const current = await note.current!;
+        // Always a whole note: one let go during the delay (trashed or
+        // deleted elsewhere) is made or found again, never saved as a body alone.
+        const pending = (note.current ??= ensureRef.current());
+        let current: JournalEntry;
+        try {
+          current = await pending;
+        } catch (e) {
+          if (note.current === pending) note.current = null;
+          throw e;
+        }
         const saved = await save.mutateAsync({ ...current, body });
         note.current = Promise.resolve(saved);
         onStatus('saved');

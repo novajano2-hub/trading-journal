@@ -43,6 +43,40 @@ export async function pruneJournalLinks(
   }
 }
 
+const KINDS: ReadonlySet<string> = new Set([
+  'daily-review',
+  'pre-market',
+  'weekly-recap',
+  'note',
+  'trade-note',
+]);
+
+/**
+ * A stored row as a whole entry: a row written without its kind, title,
+ * links or tags (an older bug, another build) reads as an untitled plain
+ * note with empty lists, so no page that lists notes can break on it.
+ */
+function whole(e: JournalEntry): JournalEntry {
+  const row = e as Partial<JournalEntry> & Pick<JournalEntry, 'id'>;
+  if (
+    KINDS.has(row.kind ?? '') &&
+    typeof row.title === 'string' &&
+    Array.isArray(row.linkedTradeIds) &&
+    Array.isArray(row.tags) &&
+    typeof row.updatedAt === 'string'
+  )
+    return e;
+  return {
+    ...e,
+    kind: KINDS.has(row.kind ?? '') ? row.kind! : 'note',
+    title: typeof row.title === 'string' ? row.title : '',
+    body: row.body ?? EMPTY_DOC,
+    linkedTradeIds: Array.isArray(row.linkedTradeIds) ? row.linkedTradeIds : [],
+    tags: Array.isArray(row.tags) ? row.tags : [],
+    updatedAt: typeof row.updatedAt === 'string' ? row.updatedAt : '',
+  };
+}
+
 /** Date descending, undated last, then most recently updated first. */
 function byRecency(a: JournalEntry, b: JournalEntry): number {
   if (a.date !== b.date) {
@@ -101,11 +135,12 @@ export function localJournal(ctx: LocalContext): JournalRepo {
         );
         rows = rows.filter((e) => !expired(e));
       }
-      return rows.sort(byRecency);
+      return rows.map(whole).sort(byRecency);
     },
 
     async get(ws, id) {
-      return (await ctx.db()).journal.get([ws, id]);
+      const row = await (await ctx.db()).journal.get([ws, id]);
+      return row === undefined ? undefined : whole(row);
     },
 
     async listForTrade(ws, tradeId) {
@@ -115,7 +150,7 @@ export function localJournal(ctx: LocalContext): JournalRepo {
         .equals(tradeId)
         .filter((e) => e.workspaceId === ws && e.deletedAt === undefined)
         .toArray();
-      return rows.sort(byRecency);
+      return rows.map(whole).sort(byRecency);
     },
 
     async save(ws, draft: JournalDraft) {

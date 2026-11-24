@@ -19,6 +19,7 @@ import type { Execution, Trade } from '@/domain/types';
 import { everyString } from '../__fixtures__/every-string';
 import { renderApp } from '../__fixtures__/render-app';
 import type { NoteEditorHandle } from '../notes/note-editor';
+import { NOTE_SAVE_DELAY_MS } from './trade-journal';
 import { TradeView } from './trade-view';
 
 vi.mock('next/navigation', () => import('../__fixtures__/navigation'));
@@ -807,6 +808,84 @@ test('a day note trashed in another tab is not brought back by the next keystrok
   );
   expect(live).toHaveLength(1);
   expect(JSON.stringify(live[0]!.body)).toContain('horizontalRule');
+});
+
+test('a note trashed elsewhere during the save delay is saved onto a whole note, never a body alone (re-review N1)', async () => {
+  // Hold the autosave's timer, so the trash lands inside the delay.
+  const held: (() => void)[] = [];
+  const realTimeout = globalThis.setTimeout;
+  const spy = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+    fn: () => void,
+    ms?: number,
+    ...rest: unknown[]
+  ) => {
+    if (ms === NOTE_SAVE_DELAY_MS) {
+      held.push(fn);
+      return 0;
+    }
+    return realTimeout(fn, ms, ...rest);
+  }) as typeof setTimeout);
+  try {
+    const handle: { current: NoteEditorHandle | null } = { current: null };
+    const { repo } = renderApp(<TradeView id="t-c" noteHandleRef={handle} />, {
+      sample: async () => {
+        const fx = await sample()();
+        fx.journal.push({
+          id: 'd-9',
+          workspaceId: WS,
+          kind: 'daily-review',
+          date: '2026-11-09',
+          title: 'Mon 9 Nov',
+          body: { type: 'doc', content: [] },
+          linkedTradeIds: [],
+          tags: [],
+          updatedAt: '2026-11-09T20:00:00.000Z',
+        });
+        return fx;
+      },
+      url: URL_C,
+    });
+    await screen.findByRole('textbox', { name: 'Trade note' });
+    fireEvent.click(screen.getByRole('radio', { name: 'Daily note' }));
+    await screen.findByRole('textbox', { name: 'Daily note' });
+    await waitFor(() => expect(handle.current).not.toBeNull());
+    // A keystroke: its save waits out the delay.
+    act(() => handle.current!.runSlashCommand('Divider'));
+    expect(held).toHaveLength(1);
+    // Inside the delay, another tab trashes the note and says so.
+    await repo.journal.trash(WS, 'd-9');
+    const other = new BroadcastChannel('keel-data');
+    other.postMessage({ keys: [['keel', 'ws', WS, 'journal']] });
+    other.close();
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole('link', { name: 'Open in the Notebook' })
+          .getAttribute('href'),
+      ).toBe('/app/notebook/daily/2026-11-09'),
+    );
+    // The delay ends.
+    act(() => held.at(-1)!());
+    await screen.findByText('Saved', undefined, { timeout: 3000 });
+    // Every stored note is whole, and the change went into a new day note.
+    const rows = await repo.journal.list(WS);
+    for (const row of rows) {
+      expect(row.kind, row.id).toBeDefined();
+      expect(Array.isArray(row.linkedTradeIds), row.id).toBe(true);
+      expect(Array.isArray(row.tags), row.id).toBe(true);
+    }
+    expect((await repo.journal.get(WS, 'd-9'))?.deletedAt).toBeDefined();
+    const live = rows.filter(
+      (e) =>
+        e.kind === 'daily-review' &&
+        e.date === '2026-11-09' &&
+        e.deletedAt === undefined,
+    );
+    expect(live).toHaveLength(1);
+    expect(JSON.stringify(live[0]!.body)).toContain('horizontalRule');
+  } finally {
+    spy.mockRestore();
+  }
 });
 
 test('a still-open trade takes the day note of its open date', async () => {
