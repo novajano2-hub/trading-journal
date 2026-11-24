@@ -4,9 +4,12 @@ import { ListChecks, Warning } from '@phosphor-icons/react/dist/ssr';
 import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { IconTile } from '@/components/ui/icon-tile';
+import { UNIT_SCOPE } from '@/content/display-units';
+import type { TradeUnit } from '@/domain/metrics/units';
 import { plural } from '@/lib/format';
 import { StorageUnavailableError } from '@/data/repository';
 import { CARD } from '../dashboard/shared';
+import type { HiddenWhy } from './use-strategy-figures';
 
 /** One state of a Strategies page: a tile, what happened, what to do next. */
 export function StateBlock({
@@ -148,6 +151,45 @@ export function ArchiveFailed({
       <Warning size={14} aria-hidden="true" className="flex-none text-muted" />
       {name} couldn&apos;t be {archiving ? 'archived' : 'unarchived'}. Try
       again.
+    </p>
+  );
+}
+
+/**
+ * Said where a strategy has trades but the filters (or the display unit) leave
+ * none of them. "Clear filters" shows only when a filter is what hides them.
+ */
+export function HiddenTrades({
+  why,
+  unit,
+  onClear,
+  className = '',
+}: {
+  why: HiddenWhy;
+  unit: TradeUnit | undefined;
+  onClear(): void;
+  className?: string;
+}): React.JSX.Element {
+  const text =
+    why === 'filters'
+      ? "Your filters hide this strategy's trades."
+      : why === 'unit' && unit
+        ? `${UNIT_SCOPE[unit].name} counts ${UNIT_SCOPE[unit].keeps} only, so none of this strategy's trades show.`
+        : "This strategy's trades are in archived accounts. Pick one in the account filter to see them.";
+  return (
+    <p
+      className={`flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13.5px] leading-[1.45] text-muted ${className}`}
+    >
+      <span>{text}</span>
+      {why === 'filters' ? (
+        <button
+          type="button"
+          onClick={onClear}
+          className="inline-flex items-center rounded-chip font-semibold text-accent-ink underline-offset-2 outline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
+        >
+          Clear filters
+        </button>
+      ) : null}
     </p>
   );
 }

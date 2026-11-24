@@ -11,6 +11,7 @@ import {
   ListChecks,
   Plus,
 } from '@phosphor-icons/react/dist/ssr';
+import { EMPTY_FILTERS } from '@/data/filters';
 import { FigureText } from '@/components/product/figure-text';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { Chip } from '@/components/ui/chip';
@@ -32,6 +33,7 @@ import {
 } from './strategy-style';
 import {
   ArchiveFailed,
+  HiddenTrades,
   LeftOutNote,
   StateBlock,
   StrategyError,
@@ -109,7 +111,11 @@ function StrategyCard({
   basis,
   onArchive,
   onDelete,
+  unit,
+  onClear,
 }: {
+  unit: StrategyData['unit'];
+  onClear(): void;
   f: StrategyFigures;
   /** The scale every card's line shares. */
   range?: { min: number; max: number };
@@ -240,7 +246,11 @@ function StrategyCard({
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
         </div>
-        {f.equity.length >= 3 ? (
+        {f.hidden ? (
+          <p className="flex h-20 items-center text-[13px] text-faint">
+            No trades to draw.
+          </p>
+        ) : f.equity.length >= 3 ? (
           <EquityLine f={f} scale={range} readoutClassName="min-h-[34px]" />
         ) : (
           <p className="flex h-20 items-center text-[13px] text-faint">
@@ -251,6 +261,14 @@ function StrategyCard({
           Cumulative {basis} P&amp;L by close
         </span>
       </div>
+      {f.hidden ? (
+        <HiddenTrades
+          why={f.hidden}
+          unit={unit}
+          onClear={onClear}
+          className="col-span-full -mt-1"
+        />
+      ) : null}
       <LeftOutNote count={f.leftOut} className="col-span-full -mt-1" />
     </article>
   );
@@ -285,9 +303,9 @@ function UnassignedNote({
   );
 }
 
-/** The strategies list: figures are all time, on the P&L basis, across all accounts. */
+/** The strategies list: figures read the trades in the filters, on the P&L basis. */
 export function StrategiesView(): React.JSX.Element {
-  const { data, error } = useStrategyData();
+  const { data, error, setFilters } = useStrategyData();
   const queryClient = useQueryClient();
   const update = useUpdateStrategy();
   const remove = useRemoveStrategy();
@@ -317,7 +335,7 @@ export function StrategiesView(): React.JSX.Element {
   const shown = all.filter((s) => s.status === status);
   const range = sharedRange(shown.map((s) => data.figures.get(s.id)!));
   const target = deleting ? all.find((s) => s.id === deleting) : undefined;
-  const targetTrades = target ? data.figures.get(target.id)!.tradeCount : 0;
+  const targetTrades = target ? data.figures.get(target.id)!.totalCount : 0;
   const { unassigned } = data;
 
   return (
@@ -335,7 +353,7 @@ export function StrategiesView(): React.JSX.Element {
             ]}
           />
           <span className="text-[12.5px] text-faint">
-            Figures are all time, on {data.basis} P&amp;L, across all accounts.
+            Figures follow the date range and accounts, on {data.basis} P&amp;L.
           </span>
           <span className="ml-auto">
             <NewStrategyLink />
@@ -374,6 +392,8 @@ export function StrategiesView(): React.JSX.Element {
                 })
               }
               onDelete={() => setDeleting(s.id)}
+              unit={data.unit}
+              onClear={() => setFilters(EMPTY_FILTERS)}
             />
           ))
         )}

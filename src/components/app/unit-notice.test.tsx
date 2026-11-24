@@ -86,6 +86,15 @@ test('nothing shows when the unit keeps every trade', async () => {
   expect(screen.queryByText(/left out/)).toBeNull();
 });
 
+test('Strategies reads the narrowed set, so it carries the line too', async () => {
+  await inUnit('pips', '/app/strategies');
+  expect(
+    await screen.findByText(
+      'Pips counts forex trades only, so 2 trades are left out.',
+    ),
+  ).toBeTruthy();
+});
+
 test('a page the filters do not drive shows no line, though its unit leaves trades out', async () => {
   const repository = createLocalRepository({
     indexedDB: new IDBFactory(),
@@ -98,7 +107,7 @@ test('a page the filters do not drive shows no line, though its unit leaves trad
       <UnitNotice />
       <Loaded />
     </>,
-    { repository, url: '/app/strategies' },
+    { repository, url: '/app/import' },
   );
   // Once the trade set has loaded (2 trades left out), a filtered page
   // would show the line: this one shows no region at all.

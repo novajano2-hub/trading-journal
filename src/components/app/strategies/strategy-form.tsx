@@ -21,6 +21,7 @@ import {
   useRemoveStrategy,
   useStrategy,
   useUpdateStrategy,
+  useTrades,
 } from '@/data/query/hooks';
 import type { NewStrategy } from '@/data/repository';
 import {
@@ -42,7 +43,6 @@ import {
   deleteBody,
 } from './strategy-style';
 import { NoStrategy, StrategySkeleton } from './strategy-states';
-import { useStrategyData } from './use-strategy-figures';
 
 const INPUT =
   'block h-[38px] w-full rounded-control border border-line-2 bg-surface-1 px-3 text-[14px] font-[550] text-text shadow-[var(--shadow-chip)] transition-[border-color,box-shadow] duration-200 ease-[var(--ease-glide)] outline-none placeholder:text-faint hover:border-faint focus-visible:border-accent focus-visible:shadow-[0_0_0_3px_var(--accent-soft)] aria-invalid:border-muted pointer-coarse:h-11';
@@ -135,7 +135,7 @@ function StrategyEditor({
   const create = useCreateStrategy();
   const update = useUpdateStrategy();
   const remove = useRemoveStrategy();
-  const { data: figures } = useStrategyData();
+  const trades = useTrades();
 
   const [name, setName] = useState(initial?.name ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
@@ -227,9 +227,10 @@ function StrategyEditor({
       : groups.find((g) => g.key === removingGroup);
   const removingRules = removing?.rules.length ?? 0;
   // Until the trades have loaded the count is unknown, and Delete waits.
-  const tradeCount = initial
-    ? figures?.figures.get(initial.id)?.tradeCount
-    : undefined;
+  const tradeCount =
+    initial && trades.data
+      ? trades.data.filter((t) => t.strategyIds.includes(initial.id)).length
+      : undefined;
   const back = initial
     ? `/app/strategies/${encodeURIComponent(initial.id)}`
     : '/app/strategies';

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { StrategyView } from '@/components/app/strategies/strategy-view';
 
 export const metadata: Metadata = { title: 'Strategy' };
@@ -19,5 +20,9 @@ export default async function StrategyPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <StrategyView id={decoded(id)} />;
+  return (
+    <Suspense fallback={null}>
+      <StrategyView id={decoded(id)} />
+    </Suspense>
+  );
 }

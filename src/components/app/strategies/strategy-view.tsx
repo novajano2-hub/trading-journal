@@ -18,6 +18,7 @@ import { Chip } from '@/components/ui/chip';
 import { IconTile } from '@/components/ui/icon-tile';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { MetricId } from '@/content/metric-definitions';
+import { EMPTY_FILTERS } from '@/data/filters';
 import { useStrategy, useUpdateStrategy } from '@/data/query/hooks';
 import type { RuleStat } from '@/domain/metrics/rules';
 import type { Rule, RuleGroup, Strategy } from '@/domain/types';
@@ -34,12 +35,17 @@ import {
 import { EquityLine } from './equity-line';
 import {
   ArchiveFailed,
+  HiddenTrades,
   LeftOutNote,
   NoStrategy,
   StrategyError,
   StrategySkeleton,
 } from './strategy-states';
-import { useStrategyData, type StrategyFigures } from './use-strategy-figures';
+import {
+  useStrategyData,
+  type StrategyData,
+  type StrategyFigures,
+} from './use-strategy-figures';
 
 const PAD = 'px-5 pt-[18px] pb-4';
 const TH =
@@ -403,10 +409,12 @@ function Stat({
 function Header({
   s,
   tradeCount,
+  tradesHref,
   leftOut,
 }: {
   s: Strategy;
   tradeCount: number;
+  tradesHref: string;
   leftOut: number;
 }): React.JSX.Element {
   const update = useUpdateStrategy();
@@ -468,10 +476,7 @@ function Header({
           <Archive size={16} aria-hidden="true" />
           {archived ? 'Unarchive' : 'Archive'}
         </Button>
-        <Link
-          href={`/app/trades?strategy=${encodeURIComponent(s.id)}`}
-          className={buttonClasses('primary')}
-        >
+        <Link href={tradesHref} className={buttonClasses('primary')}>
           <ListBullets size={16} aria-hidden="true" />
           View {tradeCount} {plural(tradeCount, 'trade')}
         </Link>
@@ -492,10 +497,14 @@ function StrategyBody({
   s,
   f,
   basis,
+  data,
+  onClear,
 }: {
   s: Strategy;
   f: StrategyFigures;
   basis: 'net' | 'gross';
+  data: StrategyData;
+  onClear(): void;
 }): React.JSX.Element {
   // Read inside the provider, so every figure knows its trades.
   const display = useDisplay();
@@ -519,7 +528,15 @@ function StrategyBody({
       >
         Back to strategies
       </Link>
-      <Header s={s} tradeCount={f.tradeCount} leftOut={f.leftOut} />
+      <Header
+        s={s}
+        tradeCount={f.tradeCount}
+        tradesHref={f.tradesHref}
+        leftOut={f.leftOut}
+      />
+      {f.hidden ? (
+        <HiddenTrades why={f.hidden} unit={data.unit} onClear={onClear} />
+      ) : null}
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
         <div className="flex min-w-0 flex-col gap-4">
           <section aria-labelledby="rules-h" className={`${CARD} ${PAD}`}>
@@ -588,7 +605,11 @@ function StrategyBody({
               tone="accent"
               headingId="stats-h"
               title="Stats"
-              end={<Caption>all time</Caption>}
+              end={
+                <Caption>
+                  {data.filtered ? 'in your filters' : 'all time'}
+                </Caption>
+              }
             />
             <div className="mt-2 grid grid-cols-2">
               <Stat
@@ -702,7 +723,7 @@ function StrategyBody({
 /** One strategy: its rules with what each is worth, its stats, equity and checklist. */
 export function StrategyView({ id }: { id: string }): React.JSX.Element {
   const found = useStrategy(id);
-  const { data, error } = useStrategyData();
+  const { data, error, setFilters } = useStrategyData();
   const queryClient = useQueryClient();
 
   const failure = error ?? found.error;
@@ -720,7 +741,13 @@ export function StrategyView({ id }: { id: string }): React.JSX.Element {
 
   return (
     <FigureSourceContext.Provider value={data.source}>
-      <StrategyBody s={found.data} f={f} basis={data.basis} />
+      <StrategyBody
+        s={found.data}
+        f={f}
+        basis={data.basis}
+        data={data}
+        onClear={() => setFilters(EMPTY_FILTERS)}
+      />
     </FigureSourceContext.Provider>
   );
 }

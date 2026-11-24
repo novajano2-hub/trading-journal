@@ -84,6 +84,7 @@ async function mixed(): Promise<SampleWorkspace> {
   const fx = await sample();
   fx.trades[2]!.strategyIds = ['str-1'];
   fx.trades[2]!.pnlCurrency = 'EUR';
+  fx.trades[2]!.accountId = 'acc-a';
   return fx;
 }
 
@@ -244,4 +245,74 @@ test('a losers-only rule says so in its kept win rate and profit factor, and is 
     .getByText('Wait for the 15-minute range to close')
     .closest('tr')!;
   expect(within(alwaysRow).queryByText('Losers')).toBeNull();
+});
+
+/** str-1 on f-1 (16 Nov) and f-2 (17 Nov) in acc-a, and f-3 (18 Nov) in the archived acc-b. */
+async function threeAccounts(): Promise<SampleWorkspace> {
+  const fx = await sample();
+  fx.trades[2]!.strategyIds = ['str-1'];
+  return fx;
+}
+
+const openAt = (query: string) =>
+  renderApp(<StrategyView id="str-1" />, {
+    sample: threeAccounts,
+    url: `/app/strategies/str-1${query}`,
+  });
+
+test('a date range narrows every figure to the trades inside it', async () => {
+  openAt('?from=2026-11-17&to=2026-11-17');
+  expect(
+    await screen.findByRole('link', { name: 'View 1 trade' }),
+  ).toBeTruthy();
+  expect(screen.getByText('1 closed, 0 open')).toBeTruthy();
+  // f-2 is the loser: the winner is out of the range.
+  expect(screen.getByText('0 won, 1 lost')).toBeTruthy();
+  expect(screen.getByText('on 0 trades')).toBeTruthy();
+});
+
+test('an account filter narrows the figures to that account, archived or not', async () => {
+  openAt('?account=acc-b');
+  expect(
+    await screen.findByRole('link', { name: 'View 1 trade' }),
+  ).toBeTruthy();
+  expect(screen.getByText('1 closed, 0 open')).toBeTruthy();
+});
+
+test('the trade link carries the filters, with this strategy', async () => {
+  openAt('?from=2026-11-17&to=2026-11-17');
+  const view = await screen.findByRole('link', { name: 'View 1 trade' });
+  expect(view.getAttribute('href')).toBe(
+    '/app/trades?from=2026-11-17&to=2026-11-17&strategy=str-1',
+  );
+});
+
+test('with no trade in the filters it says the filters hide them, and Clear filters brings them back', async () => {
+  openAt('?from=2030-01-01&to=2030-01-31');
+  expect(
+    await screen.findByText("Your filters hide this strategy's trades."),
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+  expect(
+    await screen.findByRole('link', { name: 'View 2 trades' }),
+  ).toBeTruthy();
+  expect(window.location.search).toBe('');
+});
+
+test('under a unit that keeps none of its trades the page says so', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: threeAccounts,
+  });
+  await repository.prefs.update({ displayUnit: 'pips' });
+  renderApp(<StrategyView id="str-1" />, {
+    repository,
+    url: '/app/strategies/str-1',
+  });
+  expect(
+    await screen.findByText(
+      "Pips counts forex trades only, so none of this strategy's trades show.",
+    ),
+  ).toBeTruthy();
 });

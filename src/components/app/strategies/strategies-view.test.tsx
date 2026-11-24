@@ -111,6 +111,7 @@ test('a card says when trades in another currency are left out of its figures', 
       const fx = await sample()();
       fx.trades[2]!.strategyIds = ['str-1'];
       fx.trades[2]!.pnlCurrency = 'EUR';
+      fx.trades[2]!.accountId = 'acc-a';
       return fx;
     },
     url: '/app/strategies',
@@ -167,7 +168,11 @@ test('the unassigned-trades note follows the display unit', async () => {
   const repository = createLocalRepository({
     indexedDB: new IDBFactory(),
     IDBKeyRange,
-    sample: sample(),
+    sample: async () => {
+      const fx = await sample()();
+      fx.trades[2]!.accountId = 'acc-a';
+      return fx;
+    },
   });
   await repository.prefs.update({ displayUnit: 'ticks' });
   renderApp(<StrategiesView />, { repository, url: '/app/strategies' });
@@ -233,4 +238,44 @@ test('every card draws its line on one scale, so a small strategy reads small be
   // On their own scales both would span the whole box (67 units).
   expect(big).toBeGreaterThan(40);
   expect(small).toBeLessThan(big / 3);
+});
+
+/** str-1 on f-1 (16 Nov) and f-2 (17 Nov) in acc-a. */
+const cardAt = async (query: string) => {
+  renderApp(<StrategiesView />, {
+    sample: sample(false),
+    url: `/app/strategies${query}`,
+  });
+  return (await screen.findByText('Opening range breakout')).closest(
+    'article',
+  )!;
+};
+
+test('a date range narrows each card to the trades inside it', async () => {
+  const card = await cardAt('?from=2026-11-17&to=2026-11-17');
+  await waitFor(() =>
+    expect(
+      within(card).getByText('Trades', { exact: false }).closest('div')
+        ?.textContent,
+    ).toContain('1'),
+  );
+  expect(within(card).getByText('0 won, 1 lost')).toBeTruthy();
+});
+
+test('an account filter that holds none of its trades says the filters hide them', async () => {
+  const card = await cardAt('?account=acc-b');
+  expect(
+    await within(card).findByText("Your filters hide this strategy's trades."),
+  ).toBeTruthy();
+  fireEvent.click(within(card).getByRole('button', { name: 'Clear filters' }));
+  await waitFor(() =>
+    expect(within(card).getByText('1 won, 1 lost')).toBeTruthy(),
+  );
+});
+
+test('the caption says figures follow the filters', async () => {
+  await cardAt('');
+  expect(
+    screen.getByText(/Figures follow the date range and accounts/),
+  ).toBeTruthy();
 });

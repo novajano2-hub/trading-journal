@@ -204,7 +204,7 @@ test('the trade log keeps its plain title and its chips', () => {
   expect(screen.getByTestId('chips')).toBeTruthy();
 });
 
-test('a strategy page titles the bar "Strategies" then the strategy name, with no chips', async () => {
+test('a strategy page titles the bar "Strategies" then the strategy name, with the filter chips', async () => {
   renderApp(
     <TopBar
       filters={<div data-testid="chips" />}
@@ -218,7 +218,7 @@ test('a strategy page titles the bar "Strategies" then the strategy name, with n
   await waitFor(() =>
     expect(title.textContent).toContain('Opening range breakout'),
   );
-  expect(screen.queryByTestId('chips')).toBeNull();
+  expect(screen.getByTestId('chips')).toBeTruthy();
 });
 
 test('the strategy editor reads "Strategies > name > Edit", the name linking back to the strategy', async () => {

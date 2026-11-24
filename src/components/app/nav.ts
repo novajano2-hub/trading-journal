@@ -106,7 +106,7 @@ export const APP_NAV: readonly NavItem[] = [
     href: '/app/strategies',
     icon: Strategy,
     group: 'modules',
-    filterScoped: false,
+    filterScoped: true,
     built: false,
     summary:
       'Your strategies with their rules and checklists, and how each one performs.',
@@ -267,13 +267,15 @@ export function strategyEditId(pathname: string): string | undefined {
 }
 
 /**
- * Whether the global filters drive this page: Dashboard, the trade log, Calendar
- * and Reports, except Compare, whose two groups each own their filters.
+ * Whether the global filters drive this page: Dashboard, the trade log, Calendar,
+ * Strategies (the list and one strategy) and Reports, except Compare, whose two groups each own their filters.
  * Elsewhere the bar shows no chips.
  */
 export function filtersApply(pathname: string): boolean {
   return (
-    /^\/app\/(dashboard|trades|calendar)$/.test(pathname) ||
+    /^\/app\/(dashboard|trades|calendar|strategies)$/.test(pathname) ||
+    (/^\/app\/strategies\/[^/]+$/.test(pathname) &&
+      pathname !== '/app/strategies/new') ||
     (/^\/app\/reports(\/|$)/.test(pathname) &&
       !/^\/app\/reports\/compare\/?$/.test(pathname))
   );

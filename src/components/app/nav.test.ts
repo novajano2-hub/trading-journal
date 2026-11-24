@@ -38,7 +38,10 @@ test('filter-scoped links carry the canonical filters, others none', () => {
   expect(navHref(item('dashboard'), p)).toBe(
     '/app/dashboard?range=this-week&side=long',
   );
-  expect(navHref(item('strategies'), p)).toBe('/app/strategies');
+  expect(navHref(item('strategies'), p)).toBe(
+    '/app/strategies?range=this-week&side=long',
+  );
+  expect(navHref(item('prop-firms'), p)).toBe('/app/prop-firms');
   expect(navHref(item('trades'), new URLSearchParams())).toBe('/app/trades');
 });
 
@@ -79,6 +82,8 @@ test('filtersApply is true only on the routes the global filters drive', () => {
     '/app/calendar',
     '/app/reports',
     '/app/reports/time',
+    '/app/strategies',
+    '/app/strategies/str-1',
   ])
     expect(filtersApply(p), p).toBe(true);
   for (const p of [
@@ -89,7 +94,8 @@ test('filtersApply is true only on the routes the global filters drive', () => {
     '/app/trades/t-c',
     '/app/trades/new',
     '/app/trades/t-c/edit',
-    '/app/strategies',
+    '/app/strategies/new',
+    '/app/strategies/str-1/edit',
     '/app/settings',
   ])
     expect(filtersApply(p), p).toBe(false);

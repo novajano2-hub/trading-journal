@@ -1,7 +1,14 @@
 'use client';
 
 import { useMemo } from 'react';
+import {
+  queryString,
+  resolveRange,
+  serializeFilters,
+  type GlobalFilters,
+} from '@/data/filters';
 import { metricContextOf } from '@/data/metrics';
+import { useGlobalFilters, useTradeSet } from '@/data/query/derived';
 import {
   useAccounts,
   useCashFlows,
@@ -10,6 +17,7 @@ import {
   useTrades,
 } from '@/data/query/hooks';
 import { classify, pnlOf } from '@/domain/metrics/context';
+import { isTradeUnit, type TradeUnit } from '@/domain/metrics/units';
 import { dailyPnl } from '@/domain/metrics/days';
 import { maxDrawdown } from '@/domain/metrics/equity';
 import { ruleStats, type RuleStat } from '@/domain/metrics/rules';
@@ -19,12 +27,22 @@ import { localDate } from '@/domain/time';
 import { closedInOrder } from '@/domain/trade-status';
 import type { Cents, Strategy, Trade } from '@/domain/types';
 import { pctBaseOf, type FigureSource } from '@/lib/display';
+import { hasActiveFilters } from '../filter-model';
 
-/** One strategy's figures: all time, all accounts, on the P&L basis, in the base currency. */
+/** Why a strategy that has trades shows none of them: the filters, the display unit, or only archived accounts. */
+export type HiddenWhy = 'filters' | 'unit' | 'archived';
+
+/** One strategy's figures: the trades in the filters (and the display unit), on the P&L basis, in the base currency. */
 export interface StrategyFigures {
   strategy: Strategy;
-  /** Every trade that has the strategy (many-to-many), whatever its currency. */
+  /** Every trade in the filters that has the strategy (many-to-many), whatever its currency. */
   tradeCount: number;
+  /** Every trade that has the strategy, whatever the filters. */
+  totalCount: number;
+  /** Set when the strategy has trades but the filters leave none of them. */
+  hidden: HiddenWhy | null;
+  /** The trade log for this strategy's trades, in the same filters. */
+  tradesHref: string;
   /** The trades the figures read: the strategy's, in the base currency. */
   trades: Trade[];
   summary: Summary;
@@ -58,19 +76,32 @@ export interface StrategyData {
   /** Closed trades with no strategy, and their P&L. */
   unassigned: { count: number; pnl: Cents; ids: string[] };
   basis: 'net' | 'gross';
+  /** The filters as applied, and whether any is set. */
+  filters: GlobalFilters;
+  filtered: boolean;
+  /** The display unit, when it narrows the trades. */
+  unit: TradeUnit | undefined;
 }
 
-/** Per-strategy figures over every trade; undefined until the data has loaded. */
+/**
+ * Per-strategy figures over the trades in the global filters (and the display
+ * unit's narrowing); undefined until the data has loaded. Needs a `<Suspense>`
+ * boundary above it: it reads the URL's filters.
+ */
 export function useStrategyData(): {
   data: StrategyData | undefined;
   error: Error | null;
+  setFilters(next: GlobalFilters): void;
 } {
+  const { filters: urlFilters, setFilters } = useGlobalFilters();
+  const set = useTradeSet(urlFilters);
   const trades = useTrades();
   const strategies = useStrategies();
   const prefs = usePrefs();
   const accounts = useAccounts();
   const flows = useCashFlows();
   const error =
+    set.error ??
     trades.error ??
     strategies.error ??
     prefs.error ??
@@ -79,6 +110,7 @@ export function useStrategyData(): {
 
   const data = useMemo(() => {
     if (
+      !set.data ||
       !trades.data ||
       !strategies.data ||
       !prefs.data ||
@@ -86,15 +118,23 @@ export function useStrategyData(): {
       !flows.data
     )
       return undefined;
-    // The display unit doesn't narrow these figures yet: they read every
-    // trade, so their ratios stay on money (the unit reads only the sums).
-    const ctx = { ...metricContextOf(prefs.data), unit: undefined };
+    // The filtered set is already narrowed to the display unit, so the ratios
+    // read in it (the context carries `unit`).
+    const ctx = metricContextOf(prefs.data);
     const base = prefs.data.baseCurrency;
+    const today = localDate(new Date().toISOString(), prefs.data.timeZone);
+    const { filters } = set.data;
+    const inSet = set.data.trades;
+    const filtered = hasActiveFilters(filters);
+    const unit = isTradeUnit(prefs.data.displayUnit)
+      ? prefs.data.displayUnit
+      : undefined;
     const figures = new Map<string, StrategyFigures>();
     for (const strategy of strategies.data) {
-      const own = trades.data.filter((t) =>
+      const own = inSet.filter((t) => t.strategyIds.includes(strategy.id));
+      const totalCount = trades.data.filter((t) =>
         t.strategyIds.includes(strategy.id),
-      );
+      ).length;
       const read = own.filter((t) => t.pnlCurrency === base);
       const closed = closedInOrder(read);
       let run = 0;
@@ -115,6 +155,16 @@ export function useStrategyData(): {
       figures.set(strategy.id, {
         strategy,
         tradeCount: own.length,
+        totalCount,
+        hidden:
+          own.length > 0 || totalCount === 0
+            ? null
+            : filtered
+              ? 'filters'
+              : unit
+                ? 'unit'
+                : 'archived',
+        tradesHref: tradesHref(filters, strategy.id),
         trades: read,
         summary: summarize(read, ctx),
         pnl: closed.reduce((n, t) => n + pnlOf(t, ctx.pnlBasis), 0),
@@ -153,9 +203,7 @@ export function useStrategyData(): {
       });
     }
     const loose = closedInOrder(
-      trades.data.filter(
-        (t) => t.strategyIds.length === 0 && t.pnlCurrency === base,
-      ),
+      inSet.filter((t) => t.strategyIds.length === 0 && t.pnlCurrency === base),
     );
     return {
       figures,
@@ -167,8 +215,9 @@ export function useStrategyData(): {
           accounts: accounts.data,
           flows: flows.data,
           trades: trades.data,
-          accountIds: [],
+          accountIds: filters.accountIds,
           currency: base,
+          from: resolveRange(filters.range, today).from,
           timeZone: prefs.data.timeZone,
         }),
       },
@@ -178,8 +227,32 @@ export function useStrategyData(): {
         ids: loose.map((t) => t.id),
       },
       basis: ctx.pnlBasis,
+      filters,
+      filtered,
+      unit,
     } satisfies StrategyData;
-  }, [trades.data, strategies.data, prefs.data, accounts.data, flows.data]);
+  }, [
+    set.data,
+    trades.data,
+    strategies.data,
+    prefs.data,
+    accounts.data,
+    flows.data,
+  ]);
 
-  return { data, error };
+  return { data, error, setFilters };
+}
+
+/** The trade log for one strategy, inside the filters the page reads. */
+function tradesHref(filters: GlobalFilters, strategyId: string): string {
+  const qs = queryString(
+    serializeFilters({
+      ...filters,
+      strategyIds: [strategyId],
+      excludeStrategyIds: [],
+      noStrategy: false,
+      strategyMatch: 'any',
+    }),
+  );
+  return `/app/trades${qs ? '?' + qs : ''}`;
 }
