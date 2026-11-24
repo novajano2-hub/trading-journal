@@ -575,7 +575,11 @@ export function TradesView(): React.JSX.Element {
     );
 
   const today = localDate(new Date().toISOString(), timeZone);
-  const range = resolveRange(set.data?.filters.range ?? {}, today);
+  const range = resolveRange(
+    set.data?.filters.range ?? {},
+    today,
+    prefs.weekStart,
+  );
   const filtered =
     hasActiveFilters(filters) ||
     filters.status !== undefined ||

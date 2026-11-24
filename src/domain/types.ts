@@ -247,6 +247,8 @@ export type BreakevenRange =
   | { unit: 'amount'; from: Cents; to: Cents }
   | { unit: 'percent'; from: number; to: number };
 export type PnlBasis = 'net' | 'gross';
+/** The first day of a week: TradeZella's Sunday, or Monday. */
+export type WeekStart = 'sunday' | 'monday';
 export type DisplayUnit =
   'dollar' | 'percent' | 'privacy' | 'r' | 'ticks' | 'pips' | 'points';
 export type CalendarStat =
@@ -271,7 +273,9 @@ export interface UserPrefs {
   /** Overview figures the user switched off, as `group:figure` keys; undefined or empty: all show. */
   overviewHidden?: string[];
   hideTradeSummary: boolean;
-  /** What a calendar day shows, at most 3. */
+  /** The day weeks start on, in the calendar, the weekly buckets, the week presets and the weekday order; undefined: Sunday. */
+  weekStart?: WeekStart;
+  /** What a calendar day shows: any number of the stats, in the order chosen. */
   calendarStats: CalendarStat[];
   instrumentsTraded: AssetClass[];
   settleExpiredOptions: boolean;

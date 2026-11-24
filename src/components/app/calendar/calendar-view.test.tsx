@@ -75,16 +75,37 @@ const NOV = [
 
 const url = (q = '') => `/app/calendar?month=2026-11${q}`;
 
-test('November 2026 renders six week rows, Monday first, with each week total', async () => {
+test('November 2026 renders five week rows, Sunday first, with each week total', async () => {
   renderApp(<CalendarView />, { sample: withTrades(NOV), url: url() });
+  const grid = await screen.findByRole('grid', { name: 'November 2026' });
+  expect(within(grid).getAllByTestId('week-row')).toHaveLength(5);
+  expect(
+    within(grid).getAllByText(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)$/)[0]!
+      .textContent,
+  ).toBe('Sun');
+  const w0 = within(grid).getAllByTestId('week-row')[0]!;
+  expect(w0.textContent).toContain('2 days');
+});
+
+test('with Monday weeks the grid has six rows, Monday first, and the week total follows', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: withTrades(NOV),
+  });
+  await repository.prefs.update({ weekStart: 'monday' });
+  renderApp(<CalendarView />, { repository, url: url() });
   const grid = await screen.findByRole('grid', { name: 'November 2026' });
   expect(within(grid).getAllByTestId('week-row')).toHaveLength(6);
   expect(
     within(grid).getAllByText(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)$/)[0]!
       .textContent,
   ).toBe('Mon');
-  const w1 = within(grid).getAllByTestId('week-row')[1]!;
-  expect(w1.textContent).toContain('2 days');
+  expect(
+    within(within(grid).getAllByTestId('week-row')[1]!).getByTestId(
+      'week-total',
+    ).textContent,
+  ).toContain('2 days');
 });
 
 test('a day cell shows net and trades by default, and the summary reads the month', async () => {
@@ -245,16 +266,16 @@ test('the month is a grid: weekday column headers, a row per week, a gridcell pe
   const grid = await screen.findByRole('grid', { name: 'November 2026' });
   const heads = within(grid).getAllByRole('columnheader');
   expect(heads.slice(0, 7).map((h) => h.textContent)).toEqual([
+    'Sun',
     'Mon',
     'Tue',
     'Wed',
     'Thu',
     'Fri',
     'Sat',
-    'Sun',
   ]);
-  // The header row and six weeks.
-  expect(within(grid).getAllByRole('row')).toHaveLength(7);
+  // The header row and five weeks.
+  expect(within(grid).getAllByRole('row')).toHaveLength(6);
   const cells = within(grid).getAllByRole('gridcell');
   const picked = cells.filter(
     (c) => c.getAttribute('aria-selected') === 'true',
@@ -293,14 +314,14 @@ test('one day is in the tab order; arrows, Home and End move between days', asyn
   fireEvent.keyDown(document.activeElement!, { key: 'ArrowLeft' });
   expect(focused()).toMatch(/^Thu 19 Nov/);
   fireEvent.keyDown(document.activeElement!, { key: 'Home' });
-  expect(focused()).toMatch(/^Mon 16 Nov/);
+  expect(focused()).toMatch(/^Sun 15 Nov/);
   fireEvent.keyDown(document.activeElement!, { key: 'End' });
-  expect(focused()).toMatch(/^Sun 22 Nov/);
-  // Right from Sunday goes on to Monday's cell; the month's last day stops.
+  expect(focused()).toMatch(/^Sat 21 Nov/);
+  // Right from Saturday goes on to the next row's Sunday; the month's last day stops.
   fireEvent.keyDown(document.activeElement!, { key: 'ArrowRight' });
-  expect(focused()).toMatch(/^Mon 23 Nov/);
+  expect(focused()).toMatch(/^Sun 22 Nov/);
   fireEvent.keyDown(await dayButton(/^Mon 30 Nov/), { key: 'ArrowRight' });
-  expect(focused()).toMatch(/^Mon 23 Nov|^Mon 30 Nov/);
+  expect(focused()).toMatch(/^Sun 22 Nov|^Mon 30 Nov/);
   fireEvent.keyDown(await dayButton(/^Sun 1 Nov/), { key: 'ArrowLeft' });
   fireEvent.keyDown(await dayButton(/^Sun 1 Nov/), { key: 'ArrowUp' });
   expect(tabbable()).toHaveLength(1);
@@ -627,7 +648,7 @@ test('each day cell carries a compact signed figure for the phone, and Privacy h
 test('the week cell keeps its days and trades on two lines, never wrapped mid-phrase', async () => {
   renderApp(<CalendarView />, { sample: withTrades(NOV), url: url() });
   await screen.findByRole('grid', { name: 'November 2026' });
-  const total = screen.getAllByTestId('week-total')[1]!;
+  const total = screen.getAllByTestId('week-total')[0]!;
   const lines = within(total).getByText('2 days');
   expect(lines.className).toContain('whitespace-nowrap');
   expect(within(total).getByText('2 trades').className).toContain(

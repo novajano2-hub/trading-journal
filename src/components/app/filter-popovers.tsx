@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from 'react';
 import { RAISED } from '@/components/ui/button-styles';
+import { usePrefs } from '@/data/query/hooks';
 import { DATE_PRESETS, type DatePreset, type DateRange } from '@/data/filters';
 import type { Strategy, Tag, TagCategory } from '@/domain/types';
 import { PRESET_LABELS } from '@/lib/range-label';
@@ -43,7 +44,8 @@ export function DateBody({
       : range.from === undefined && range.to === undefined
         ? 'all'
         : undefined;
-  const dates = datesOf(range, today);
+  const weekStart = usePrefs().data?.weekStart;
+  const dates = datesOf(range, today, weekStart);
   const shown = `${dates.from ?? ''}/${dates.to ?? ''}`;
   const [from, setFrom] = useState(dates.from ?? '');
   const [to, setTo] = useState(dates.to ?? '');

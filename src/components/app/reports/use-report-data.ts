@@ -99,7 +99,7 @@ export function useReportData(): ReportState {
     const today = localDate(new Date().toISOString(), prefs.timeZone);
     const withClosed = metrics.data.filter((m) => m.summary.closedCount > 0);
     if (withClosed.length === 0) return { today, none: true as const };
-    const range = resolveRange(shown.range, today);
+    const range = resolveRange(shown.range, today, prefs.weekStart);
     const partition = pickPartition(
       metrics.data,
       withClosed.some((m) => m.currency === chosen) ? chosen : undefined,

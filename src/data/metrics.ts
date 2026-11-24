@@ -44,6 +44,7 @@ export function metricContextOf(prefs: UserPrefs): MetricContext {
     timeZone: prefs.timeZone,
     breakevenRange: prefs.breakevenRange,
     pnlBasis: prefs.pnlBasis,
+    weekStart: prefs.weekStart ?? 'sunday',
     ...(isTradeUnit(prefs.displayUnit) ? { unit: prefs.displayUnit } : {}),
   };
 }

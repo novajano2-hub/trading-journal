@@ -52,7 +52,9 @@ const ZERO_OR_NAN = /(?<![\d.])0%|NaN/;
 
 /**
  * The Dashboard over `dashboardFixture`, in New York, with a $100 weekly net
- * goal and a $300 daily loss limit on the sample, and `prefs` on top.
+ * goal and a $300 daily loss limit on the sample, and `prefs` on top. Weeks
+ * start on Monday here (the goal week and its caption read as 16-20 Nov);
+ * the default Sunday week is pinned in data/dashboard.test.ts.
  */
 async function renderDashboard(
   opts: {
@@ -74,6 +76,7 @@ async function renderDashboard(
   });
   await base.prefs.update({
     timeZone: 'America/New_York',
+    weekStart: 'monday',
     goals: { sample: { weeklyNet: 10000, dailyLossLimit: 30000 } },
     ...opts.prefs,
   });

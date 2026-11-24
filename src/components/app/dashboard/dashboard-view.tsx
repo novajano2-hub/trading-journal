@@ -207,7 +207,7 @@ export function DashboardView(): React.JSX.Element {
     )
       return undefined;
     const withClosed = metrics.data.filter((m) => m.summary.closedCount > 0);
-    const range = resolveRange(shownFilters.range, today);
+    const range = resolveRange(shownFilters.range, today, prefs.weekStart);
     const caption = rangeCaption(range, today);
     const goals = goalsFor(prefs, workspace.data);
     if (withClosed.length === 0)
@@ -291,7 +291,7 @@ export function DashboardView(): React.JSX.Element {
     // "this week" while the goal week is today's; a range that ended earlier reads "that week".
     const week = model.goals.weekly?.window;
     const weekLabel = week
-      ? `${week.from >= goalWeek({}, today)!.from ? 'this' : 'that'} week, ${rangeCaption(week, today)}`
+      ? `${week.from >= goalWeek({}, today, prefs?.weekStart)!.from ? 'this' : 'that'} week, ${rangeCaption(week, today)}`
       : '';
     return {
       withClosed,

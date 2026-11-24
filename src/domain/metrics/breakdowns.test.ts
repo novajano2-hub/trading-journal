@@ -18,14 +18,20 @@ describe('breakdowns', () => {
   test('weekday and hour respect the user timezone', () => {
     const rows = breakdown([at('2026-03-09T13:45:00Z')], 'weekday', ctx);
     expect(rows.map((r) => r.key)).toEqual([
+      'sun',
       'mon',
       'tue',
       'wed',
       'thu',
       'fri',
       'sat',
-      'sun',
     ]);
+    expect(
+      breakdown([at('2026-03-09T13:45:00Z')], 'weekday', {
+        ...ctx,
+        weekStart: 'monday',
+      }).map((r) => r.key),
+    ).toEqual(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']);
     expect(rows.find((r) => r.key === 'mon')!.summary.closedCount).toBe(1);
     expect(
       breakdown([at('2026-03-09T16:00:00Z')], 'weekday', {

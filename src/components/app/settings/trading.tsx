@@ -6,7 +6,12 @@ import { CARD, CardHeader } from '@/components/app/dashboard/shared';
 import { HELP, INPUT, LABEL } from '@/components/app/import/styles';
 import { Segmented } from '@/components/ui/segmented';
 import { usePrefs, useUpdatePrefs } from '@/data/query/hooks';
-import type { AssetClass, BreakevenRange, PnlBasis } from '@/domain/types';
+import type {
+  AssetClass,
+  BreakevenRange,
+  PnlBasis,
+  WeekStart,
+} from '@/domain/types';
 import { SaveStatus } from './profile';
 import { FieldError } from './settings-ui';
 
@@ -306,6 +311,26 @@ export function TradingSettings(): React.JSX.Element {
             ]}
             coarseTargets
             onChange={(pnlBasis) => update.mutate({ pnlBasis })}
+          />
+        </div>
+        <div>
+          <span className="block text-[14px] font-medium text-text">
+            Weeks start on
+          </span>
+          <p className={HELP}>
+            The Calendar, the weekly totals, the This week and Last week dates
+            and the weekday reports all begin their weeks on this day.
+          </p>
+          <Segmented<WeekStart>
+            label="Weeks start on"
+            className="mt-3"
+            value={prefs.weekStart ?? 'sunday'}
+            options={[
+              { value: 'sunday', label: 'Sunday' },
+              { value: 'monday', label: 'Monday' },
+            ]}
+            coarseTargets
+            onChange={(weekStart) => update.mutate({ weekStart })}
           />
         </div>
         <SaveStatus saving={update.isPending} failed={update.isError} />

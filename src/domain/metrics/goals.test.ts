@@ -14,24 +14,40 @@ const day = (date: string, net: number) => ({
 });
 
 describe('goals', () => {
-  test('the goal week runs Monday to the range end or today, clipped to the range', () => {
+  test('the goal week runs from Sunday, or from Monday on request, to the range end or today, clipped to the range', () => {
     expect(goalWeek({}, '2026-11-20')).toEqual({
-      from: '2026-11-16',
+      from: '2026-11-15',
       to: '2026-11-20',
     });
     expect(goalWeek({}, '2026-11-22')).toEqual({
+      from: '2026-11-22',
+      to: '2026-11-22',
+    });
+    expect(goalWeek({}, '2026-11-20', 'monday')).toEqual({
+      from: '2026-11-16',
+      to: '2026-11-20',
+    });
+    expect(goalWeek({}, '2026-11-22', 'monday')).toEqual({
       from: '2026-11-16',
       to: '2026-11-22',
     });
-    expect(goalWeek({}, '2026-11-23')).toEqual({
+    expect(goalWeek({}, '2026-11-23', 'monday')).toEqual({
       from: '2026-11-23',
       to: '2026-11-23',
     });
     expect(
-      goalWeek({ from: '2026-11-01', to: '2026-11-13' }, '2026-11-20'),
+      goalWeek(
+        { from: '2026-11-01', to: '2026-11-13' },
+        '2026-11-20',
+        'monday',
+      ),
     ).toEqual({ from: '2026-11-09', to: '2026-11-13' });
     expect(
-      goalWeek({ from: '2026-11-18', to: '2026-11-30' }, '2026-11-20'),
+      goalWeek(
+        { from: '2026-11-18', to: '2026-11-30' },
+        '2026-11-20',
+        'monday',
+      ),
     ).toEqual({ from: '2026-11-18', to: '2026-11-20' });
     expect(goalWeek({ from: '2026-12-01' }, '2026-11-20')).toBeNull();
   });

@@ -127,7 +127,10 @@ export function useStrategyData(): {
     const { filters } = set.data;
     const inSet = set.data.trades;
     // Day figures take the exits inside the date range, as the reports' do.
-    const dayCtx = { ...ctx, range: resolveRange(filters.range, today) };
+    const dayCtx = {
+      ...ctx,
+      range: resolveRange(filters.range, today, prefs.data.weekStart),
+    };
     // The log lists closed trades unless the filters ask for open ones, in every currency unless named.
     const listed = (t: Trade) =>
       filters.status === 'open' ? t.status === 'open' : isClosed(t);
@@ -231,7 +234,7 @@ export function useStrategyData(): {
           trades: trades.data,
           accountIds: filters.accountIds,
           currency: base,
-          from: resolveRange(filters.range, today).from,
+          from: resolveRange(filters.range, today, prefs.data.weekStart).from,
           timeZone: prefs.data.timeZone,
         }),
       },

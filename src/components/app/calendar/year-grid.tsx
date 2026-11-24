@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { FigureText } from '@/components/product/figure-text';
 import type { calendarYear } from '@/data/calendar';
 import { useDisplay } from '@/lib/display';
-import { mondayIndex } from '@/data/calendar';
+import { weekIndex } from '@/data/calendar';
+import { usePrefs } from '@/data/query/hooks';
 import { onTradingDate } from '@/lib/time-format';
 import type { FormatMoney } from './month-grid';
 
@@ -33,6 +34,7 @@ export function YearGrid({
   hrefFor?: (month: string) => string;
 }): React.JSX.Element {
   const display = useDisplay();
+  const weekStart = usePrefs().data?.weekStart;
   const figure: FormatMoney =
     fmt ??
     ((money, r, compact, units) =>
@@ -55,7 +57,7 @@ export function YearGrid({
     >
       {months.map((m) => {
         const traded = m.days.filter((d) => d.trades > 0).length;
-        const lead = mondayIndex(`${m.month}-01`);
+        const lead = weekIndex(`${m.month}-01`, weekStart);
         return (
           <li key={m.month} data-testid="year-month">
             <Link

@@ -1,7 +1,13 @@
 import { quoteToPnl } from '../currency';
 import { toCents } from '../money';
 import { outcomeOf } from '../outcome';
-import type { BreakevenRange, Cents, PnlBasis, Trade } from '../types';
+import type {
+  BreakevenRange,
+  Cents,
+  PnlBasis,
+  Trade,
+  WeekStart,
+} from '../types';
 import type { TradeUnit } from './units';
 
 export type { BreakevenRange, PnlBasis } from '../types';
@@ -23,6 +29,8 @@ export interface MetricContext {
    * Classifying a trade as a win or a loss stays on its P&L.
    */
   unit?: TradeUnit;
+  /** The day weeks start on; undefined: Sunday. */
+  weekStart?: WeekStart;
 }
 
 /** Whether a local date falls inside `range` (always, when there is none). */

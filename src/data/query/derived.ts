@@ -213,6 +213,7 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
       accounts: accounts.data,
       breakevenRange: prefs.data?.breakevenRange,
       pnlBasis: prefs.data?.pnlBasis,
+      weekStart: prefs.data?.weekStart,
     };
     const matched = applyFilters(trades.data, clean, env);
     const kept = narrowToUnit(matched, unit);
@@ -235,6 +236,7 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
     filterKey,
     prefs.data?.breakevenRange,
     prefs.data?.pnlBasis,
+    prefs.data?.weekStart,
     unit,
   ]);
 
@@ -267,6 +269,7 @@ export function useMetrics(filters: GlobalFilters): Derived<CurrencyMetrics[]> {
               range: resolveRange(
                 set.data.filters.range,
                 localDate(new Date().toISOString(), prefs.timeZone),
+                prefs.weekStart,
               ),
             },
             baseCurrency: prefs.baseCurrency,

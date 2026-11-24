@@ -30,11 +30,9 @@ const env: FilterEnv = {
 };
 
 describe('global filters', () => {
-  test('presets resolve against today (weeks start Monday)', () => {
+  test('presets resolve against today', () => {
     const r = (preset: DatePreset) => resolveRange({ preset }, '2026-11-20');
     expect(r('today')).toEqual({ from: '2026-11-20', to: '2026-11-20' });
-    expect(r('this-week')).toEqual({ from: '2026-11-16', to: '2026-11-20' });
-    expect(r('last-week')).toEqual({ from: '2026-11-09', to: '2026-11-15' });
     expect(r('this-month')).toEqual({ from: '2026-11-01', to: '2026-11-20' });
     expect(r('last-month')).toEqual({ from: '2026-10-01', to: '2026-10-31' });
     expect(r('last-30-days')).toEqual({ from: '2026-10-22', to: '2026-11-20' });
@@ -43,6 +41,26 @@ describe('global filters', () => {
     expect(resolveRange({}, '2026-11-20')).toEqual({});
     expect(resolveRange({ from: '2026-01-01' }, '2026-11-20')).toEqual({
       from: '2026-01-01',
+    });
+  });
+
+  test('weeks start Sunday by default, Monday when the preference says so', () => {
+    const r = (preset: DatePreset, w?: 'sunday' | 'monday') =>
+      resolveRange({ preset }, '2026-11-20', w);
+    expect(r('this-week')).toEqual({ from: '2026-11-15', to: '2026-11-20' });
+    expect(r('last-week')).toEqual({ from: '2026-11-08', to: '2026-11-14' });
+    expect(r('this-week', 'monday')).toEqual({
+      from: '2026-11-16',
+      to: '2026-11-20',
+    });
+    expect(r('last-week', 'monday')).toEqual({
+      from: '2026-11-09',
+      to: '2026-11-15',
+    });
+    // On a Sunday, Sunday-first weeks begin that very day.
+    expect(resolveRange({ preset: 'this-week' }, '2026-11-22')).toEqual({
+      from: '2026-11-22',
+      to: '2026-11-22',
     });
   });
 
@@ -681,11 +699,15 @@ describe('previousRange', () => {
       from: '2026-08-31',
       to: '2026-09-30',
     });
-    // A preset that runs to today counts today in its length: Mon to Wed is three days.
+    // A preset that runs to today counts today in its length: Sun to Wed is four days.
     expect(previousRange({ preset: 'this-week' }, '2026-11-18')).toEqual({
-      from: '2026-11-13',
-      to: '2026-11-15',
+      from: '2026-11-11',
+      to: '2026-11-14',
     });
+    // Monday weeks: Mon to Wed is three days.
+    expect(
+      previousRange({ preset: 'this-week' }, '2026-11-18', 'monday'),
+    ).toEqual({ from: '2026-11-13', to: '2026-11-15' });
   });
   test('an open end runs to today, and no start has no previous period', () => {
     expect(previousRange({ from: '2026-11-19' }, '2026-11-20')).toEqual({

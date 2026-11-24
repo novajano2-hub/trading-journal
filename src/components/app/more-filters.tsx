@@ -22,7 +22,8 @@ import {
   type TimeWindow,
 } from '@/data/filters';
 import { ASSET_CLASSES, ASSET_CLASS_LABELS } from '@/domain/asset-class';
-import type { AssetClass } from '@/domain/types';
+import { usePrefs } from '@/data/query/hooks';
+import type { AssetClass, WeekStart } from '@/domain/types';
 import { enter, exit } from '@/lib/motion';
 import { FIELD } from './filter-chip';
 import type { FilterOptions } from './filter-model';
@@ -43,7 +44,7 @@ function useWide(): boolean {
   );
 }
 
-const WEEKDAYS = [
+const MONDAY_FIRST = [
   [1, 'Mon', 'Monday'],
   [2, 'Tue', 'Tuesday'],
   [3, 'Wed', 'Wednesday'],
@@ -52,6 +53,11 @@ const WEEKDAYS = [
   [6, 'Sat', 'Saturday'],
   [7, 'Sun', 'Sunday'],
 ] as const;
+/** The weekday pills from the day the week starts on (Sunday unless the preference says Monday). */
+const weekdaysFrom = (weekStart: WeekStart | undefined) =>
+  weekStart === 'monday'
+    ? MONDAY_FIRST
+    : ([MONDAY_FIRST[6], ...MONDAY_FIRST.slice(0, 6)] as const);
 
 const MONTHS = [
   'January',
@@ -361,6 +367,7 @@ function Panel({
   onClose(): void;
 }): React.JSX.Element {
   const [draft, setDraft] = useState(filters);
+  const WEEKDAYS = weekdaysFrom(usePrefs().data?.weekStart);
   // Bumped by Reset so the number fields drop what they were typing.
   const [round, setRound] = useState(0);
   const patch = (p: Partial<GlobalFilters>) =>

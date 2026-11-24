@@ -86,8 +86,10 @@ test('the URL holds the tab, the bucket and the basis, and the tabs are Weekday,
     .getAllByRole('row')
     .slice(1)
     .map((r) => [...r.querySelectorAll('td')].map((c) => c.textContent));
-  expect(nets[0]![0]).toBe('Mon');
-  expect(nets[0]![3]).toBe('+$60.00');
+  // Weeks start on Sunday: it leads, empty, and Monday follows.
+  expect(nets[0]![0]).toBe('Sun');
+  expect(nets[1]![0]).toBe('Mon');
+  expect(nets[1]![3]).toBe('+$60.00');
   // The bucket switch belongs to the time-of-day tab only.
   expect(within(page).queryByRole('radiogroup', { name: 'Bucket' })).toBeNull();
 });

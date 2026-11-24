@@ -112,7 +112,11 @@ test('metricContextOf maps prefs', () => {
     timeZone: 'Europe/London',
     breakevenRange: { unit: 'amount', from: -500, to: 500 },
     pnlBasis: 'gross',
+    weekStart: 'sunday',
   });
+  expect(metricContextOf({ ...prefs, weekStart: 'monday' }).weekStart).toBe(
+    'monday',
+  );
 });
 
 test('a unit that narrows the set rides in the context; the others do not', () => {

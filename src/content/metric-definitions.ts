@@ -154,7 +154,7 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'weekly-goal': {
     label: 'Weekly net goal',
     definition:
-      'Net P&L after fees of closed trades from Monday to today, or to the end of your date range, in your timezone. Always net.',
+      'Net P&L after fees of closed trades from the first day of your week to today, or to the end of your date range, in your timezone. Always net.',
   },
   'daily-loss-limit': {
     label: 'Daily loss limit',

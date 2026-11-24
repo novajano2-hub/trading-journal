@@ -74,20 +74,28 @@ describe('timeSeries', () => {
     ]);
   });
 
-  test('weeks start Monday and months are YYYY-MM', () => {
+  test('weeks start Sunday by default, Monday on request, and months are YYYY-MM', () => {
     const more = [
       ...three,
       makeTrade({ net: 1000, closedAt: '2026-11-09T16:00:00Z', serial: 4 }),
     ];
     expect(timeSeries(more, ctx, 'net', 'week')).toEqual([
+      { key: '2026-11-01', value: 13000 },
+      { key: '2026-11-08', value: 1000 },
+    ]);
+    expect(
+      timeSeries(more, { ...ctx, weekStart: 'monday' }, 'net', 'week'),
+    ).toEqual([
       { key: '2026-11-02', value: 13000 },
       { key: '2026-11-09', value: 1000 },
     ]);
     expect(timeSeries(more, ctx, 'net', 'month')).toEqual([
       { key: '2026-11', value: 14000 },
     ]);
-    expect(bucketKey('2026-11-08', 'week')).toBe('2026-11-02');
-    expect(bucketKey('2026-11-02', 'week')).toBe('2026-11-02');
+    expect(bucketKey('2026-11-08', 'week')).toBe('2026-11-08');
+    expect(bucketKey('2026-11-07', 'week')).toBe('2026-11-01');
+    expect(bucketKey('2026-11-08', 'week', 'monday')).toBe('2026-11-02');
+    expect(bucketKey('2026-11-02', 'week', 'monday')).toBe('2026-11-02');
   });
 
   test('fees come from the exits; an empty set has no points', () => {

@@ -126,3 +126,14 @@ test('settling expired options and the default basis are saved', async () => {
     }),
   );
 });
+
+test('weeks start on Sunday until Monday is chosen, and the choice saves', async () => {
+  const r = repo();
+  show(r);
+  const sunday = await screen.findByRole('radio', { name: 'Sunday' });
+  expect((sunday as HTMLInputElement).checked).toBe(true);
+  fireEvent.click(screen.getByRole('radio', { name: 'Monday' }));
+  await waitFor(async () =>
+    expect((await r.prefs.get()).weekStart).toBe('monday'),
+  );
+});

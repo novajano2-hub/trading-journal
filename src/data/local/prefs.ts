@@ -84,6 +84,12 @@ function validate(p: Partial<UserPrefs>): void {
     );
   if (p.displayUnit !== undefined && !DISPLAY_UNITS.includes(p.displayUnit))
     throw new RangeError(`Unknown display unit "${p.displayUnit}"`);
+  if (
+    p.weekStart !== undefined &&
+    p.weekStart !== 'sunday' &&
+    p.weekStart !== 'monday'
+  )
+    throw new RangeError(`Unknown week start "${String(p.weekStart)}"`);
   const hidden = p.overviewHidden;
   if (
     hidden !== undefined &&

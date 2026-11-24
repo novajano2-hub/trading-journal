@@ -18,6 +18,7 @@ import type {
   Tag,
   TagCategory,
   Trade,
+  WeekStart,
 } from '@/domain/types';
 import { tradeRulesSummary } from './dashboard';
 
@@ -67,9 +68,9 @@ export interface UnitSums {
 }
 
 export interface CalendarWeek extends UnitSums {
-  /** The Monday the week starts on (it can fall in the month before). */
+  /** The day the week starts on (it can fall in the month before). */
   start: string;
-  /** Monday to Sunday; a date outside the month is null. */
+  /** The week's seven days, first day first; a date outside the month is null. */
   days: (CalendarDay | null)[];
   net: Cents;
   r: number | null;
@@ -108,8 +109,11 @@ function addDays(date: string, n: number): string {
   return iso(d);
 }
 
-/** 0 for Monday to 6 for Sunday. */
-const mondayIndex = (date: string) => (utc(date).getUTCDay() + 6) % 7;
+/** 0 for the day the week starts on to 6 for the day before it; Sunday-first unless `weekStart` says Monday. */
+const weekIndex = (date: string, weekStart: WeekStart = 'sunday') => {
+  const dow = utc(date).getUTCDay();
+  return weekStart === 'monday' ? (dow + 6) % 7 : dow;
+};
 
 function daysInMonth(month: string): number {
   const [y, m] = month.split('-').map(Number) as [number, number];
@@ -240,7 +244,7 @@ function notedDates(notes: readonly JournalEntry[]): Set<string> {
 }
 
 /**
- * A month as Monday-to-Sunday weeks. Each in-month date is a day (`tone: 'none'`
+ * A month as weeks of seven days from the preferred first day (Sunday by default). Each in-month date is a day (`tone: 'none'`
  * when nothing exited); dates of the neighbouring months are null. `trades` is
  * the whole set: only exits dated inside the month and inside `ctx.range` (the
  * resolved global date range) count. A day outside the range is `outside`: it
@@ -267,7 +271,7 @@ export function calendarMonth(
   const outside = (date: string) => date < from || date > to;
   const weeks: CalendarWeek[] = [];
   for (
-    let start = addDays(first, -mondayIndex(first));
+    let start = addDays(first, -weekIndex(first, ctx.weekStart));
     start <= last;
     start = addDays(start, 7)
   ) {
@@ -443,4 +447,4 @@ export function dayGrading(
   return out;
 }
 
-export { addDays, mondayIndex, daysInMonth };
+export { addDays, weekIndex, daysInMonth };

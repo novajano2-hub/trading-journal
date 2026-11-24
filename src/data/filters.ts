@@ -22,6 +22,7 @@ import type {
   DisplayUnit,
   PnlBasis,
   Trade,
+  WeekStart,
 } from '../domain/types';
 
 export const DATE_PRESETS = [
@@ -469,16 +470,18 @@ export function mergeFilterParams(
 export function resolveRange(
   range: DateRange,
   today: string,
+  weekStart: WeekStart = 'sunday',
 ): { from?: string; to?: string } {
   if (!('preset' in range)) return { ...range };
   const t = toDate(today);
+  const weekStartsOn = weekStart === 'monday' ? 1 : 0;
   switch (range.preset) {
     case 'today':
       return { from: today, to: today };
     case 'this-week':
-      return { from: fmt(startOfWeek(t, { weekStartsOn: 1 })), to: today };
+      return { from: fmt(startOfWeek(t, { weekStartsOn })), to: today };
     case 'last-week': {
-      const start = addDays(startOfWeek(t, { weekStartsOn: 1 }), -7);
+      const start = addDays(startOfWeek(t, { weekStartsOn }), -7);
       return { from: fmt(start), to: fmt(addDays(start, 6)) };
     }
     case 'this-month':
@@ -504,8 +507,9 @@ export function resolveRange(
 export function previousRange(
   range: DateRange,
   today: string,
+  weekStart: WeekStart = 'sunday',
 ): { from: string; to: string } | undefined {
-  const { from, to = today } = resolveRange(range, today);
+  const { from, to = today } = resolveRange(range, today, weekStart);
   if (!from || to < from) return undefined;
   const days = differenceInCalendarDays(toDate(to), toDate(from)) + 1;
   const start = toDate(from);
@@ -531,6 +535,8 @@ export interface FilterEnv {
   breakevenRange?: BreakevenRange;
   /** The basis the outcome is read on, as `summarize` reads it; default net. */
   pnlBasis?: PnlBasis;
+  /** The day the week presets start on; default Sunday. */
+  weekStart?: WeekStart;
 }
 
 const NO_RANGE: BreakevenRange = { unit: 'amount', from: 0, to: 0 };
@@ -564,7 +570,7 @@ export function applyFilters(
   f: GlobalFilters,
   env: FilterEnv,
 ): Trade[] {
-  const { from, to } = resolveRange(f.range, env.today);
+  const { from, to } = resolveRange(f.range, env.today, env.weekStart);
   const accountIds = new Set(
     selectedAccounts(env.accounts, f).map((a) => a.id),
   );

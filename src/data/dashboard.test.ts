@@ -69,7 +69,7 @@ test('the dashboard is the engine, sorted by cost', () => {
   expect(d.performance.equity).toHaveLength(m.summary.closedCount + 1);
   expect(d.goals.unavailable).toBeNull();
   expect(d.goals.weekly!.window).toEqual({
-    from: '2026-11-16',
+    from: '2026-11-15',
     to: '2026-11-20',
   });
   expect(d.goals.dailyLoss!.limit).toBe(50000);
@@ -309,7 +309,7 @@ test('the sample at its default view: weekly goal in progress, loss limit kept t
   const ctx = defaultMetricContext(NY),
     d = buildDashboard(usd(ctx), { ...env(ctx), goals: SAMPLE_GOALS });
   const week = d.goals.weekly!;
-  expect(week.window).toEqual({ from: '2026-11-16', to: '2026-11-20' });
+  expect(week.window).toEqual({ from: '2026-11-15', to: '2026-11-20' });
   expect(week.reached).toBe(false);
   expect(week.net).toBe(12916);
   expect(week.fraction).toBeCloseTo(0.258, 3);

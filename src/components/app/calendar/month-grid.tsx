@@ -5,12 +5,12 @@ import { useRef, useState } from 'react';
 import { FigureText } from '@/components/product/figure-text';
 import {
   addDays,
-  mondayIndex,
+  weekIndex,
   type CalendarDay,
   type CalendarWeek,
   type UnitSums,
 } from '@/data/calendar';
-import type { CalendarStat, Cents } from '@/domain/types';
+import type { CalendarStat, Cents, WeekStart } from '@/domain/types';
 import { formatUnitValue } from '@/lib/display';
 import { formatPct, plural } from '@/lib/format';
 import { onTradingDate, weekdayOf } from '@/lib/time-format';
@@ -339,10 +339,15 @@ function WeekTotal({
   );
 }
 
-const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const SUNDAY_FIRST = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/** The column headers, from the day the week starts on. */
+const weekdayHeaders = (weekStart: WeekStart) =>
+  weekStart === 'monday'
+    ? [...SUNDAY_FIRST.slice(1), SUNDAY_FIRST[0]!]
+    : SUNDAY_FIRST;
 
 /**
- * The month as a grid of Monday-to-Sunday rows with a week column. One day is
+ * The month as a grid of week rows, from the preferred first day, with a week column. One day is
  * in the tab order; the arrows move by a day or a week, Home and End to the
  * row's ends, and Enter or Space picks (the day is a button). Below `sm` the
  * cells shrink to a day number over a coloured box and the weeks list under
@@ -358,6 +363,7 @@ export function MonthGrid({
   today,
   selected,
   onSelect,
+  weekStart = 'sunday',
 }: {
   label: string;
   weeks: readonly CalendarWeek[];
@@ -367,6 +373,7 @@ export function MonthGrid({
   today: string;
   selected: string | undefined;
   onSelect(date: string): void;
+  weekStart?: WeekStart;
 }): React.JSX.Element {
   const gridRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState<string>();
@@ -393,8 +400,8 @@ export function MonthGrid({
     return undefined;
   };
   const target = (from: string, key: string): string | undefined => {
-    const monday = addDays(from, -mondayIndex(from));
-    const row = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+    const first = addDays(from, -weekIndex(from, weekStart));
+    const row = Array.from({ length: 7 }, (_, i) => addDays(first, i));
     switch (key) {
       case 'ArrowRight':
         return step(from, 1);
@@ -432,7 +439,7 @@ export function MonthGrid({
         className="mt-3 grid grid-cols-7 gap-1 @[600px]/cal:grid-cols-[repeat(7,minmax(0,1fr))_minmax(76px,112px)] @[700px]/cal:gap-1.5"
       >
         <div role="row" className="contents">
-          {WEEKDAYS.map((w) => (
+          {weekdayHeaders(weekStart).map((w) => (
             <span
               key={w}
               role="columnheader"

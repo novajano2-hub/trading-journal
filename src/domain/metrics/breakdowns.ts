@@ -2,7 +2,7 @@ import { ASSET_CLASS_LABELS } from '../asset-class';
 import { localDate, localParts } from '../time';
 import { isClosed, type ClosedTrade } from '../trade-status';
 import { roundHalfEven } from '../money';
-import type { AssetClass, Cents, Trade } from '../types';
+import type { AssetClass, Cents, Trade, WeekStart } from '../types';
 import { classify, type MetricContext, type PnlBasis } from './context';
 import { priceBuckets, priceKeyOf } from './price-ranges';
 import { rOf, summarize, volumeOf, type Summary } from './summary';
@@ -77,15 +77,20 @@ export interface RBin {
 type Bucket = readonly [key: string, label: string];
 
 const NONE = '__none__';
-const WEEKDAYS: Bucket[] = [
+const SUNDAY_FIRST: Bucket[] = [
+  ['sun', 'Sun'],
   ['mon', 'Mon'],
   ['tue', 'Tue'],
   ['wed', 'Wed'],
   ['thu', 'Thu'],
   ['fri', 'Fri'],
   ['sat', 'Sat'],
-  ['sun', 'Sun'],
 ];
+/** The weekday rows from the day the week starts on (Sunday unless `weekStart` says Monday). */
+const weekdaysFrom = (weekStart: WeekStart | undefined): Bucket[] =>
+  weekStart === 'monday'
+    ? [...SUNDAY_FIRST.slice(1), SUNDAY_FIRST[0]!]
+    : SUNDAY_FIRST;
 const HOURS: Bucket[] = Array.from({ length: 24 }, (_, h) => [
   String(h),
   `${String(h).padStart(2, '0')}:00`,
@@ -326,7 +331,10 @@ function specOf(
   });
   switch (by) {
     case 'weekday':
-      return fixed(WEEKDAYS, (t) => WEEKDAY_KEYS[local(t).weekday]!);
+      return fixed(
+        weekdaysFrom(ctx.weekStart),
+        (t) => WEEKDAY_KEYS[local(t).weekday]!,
+      );
     case 'hour':
       return fixed(HOURS, (t) => String(local(t).hour));
     case 'time-of-day':

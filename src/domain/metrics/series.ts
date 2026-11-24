@@ -1,7 +1,7 @@
 import { roundHalfEven } from '../money';
 import { localDate } from '../time';
 import { closedInOrder, isClosed } from '../trade-status';
-import type { Cents, Trade } from '../types';
+import type { Cents, Trade, WeekStart } from '../types';
 import { classify, inRange, type MetricContext } from './context';
 import {
   dailyPnl,
@@ -205,12 +205,16 @@ export interface SeriesPoint {
   value: number | null;
 }
 
-/** The bucket a local date falls in: itself, the Monday of its week, or its month. */
-export function bucketKey(date: string, bucket: Bucket): string {
+/** The bucket a local date falls in: itself, the first day of its week (Sunday unless `weekStart` says Monday), or its month. */
+export function bucketKey(
+  date: string,
+  bucket: Bucket,
+  weekStart: WeekStart = 'sunday',
+): string {
   if (bucket === 'day') return date;
   if (bucket === 'month') return date.slice(0, 7);
   const d = new Date(`${date}T00:00:00Z`);
-  const back = (d.getUTCDay() + 6) % 7;
+  const back = weekStart === 'monday' ? (d.getUTCDay() + 6) % 7 : d.getUTCDay();
   d.setUTCDate(d.getUTCDate() - back);
   return d.toISOString().slice(0, 10);
 }
@@ -522,7 +526,7 @@ export function timeSeries(
 ): SeriesPoint[] {
   const info = SERIES_META[metric];
   const running = info.running === true || opts.mode === 'running';
-  const keyOf = (date: string) => bucketKey(date, bucket);
+  const keyOf = (date: string) => bucketKey(date, bucket, ctx.weekStart);
   const base = baseOf(trades, ctx);
   const { days, facts } = base;
   for (const f of facts) f.key = keyOf(f.date);

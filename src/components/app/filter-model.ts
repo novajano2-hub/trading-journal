@@ -9,7 +9,13 @@ import {
   type TimeWindow,
 } from '@/data/filters';
 import { ASSET_CLASSES, ASSET_CLASS_LABELS } from '@/domain/asset-class';
-import type { Account, Strategy, Tag, TagCategory } from '@/domain/types';
+import type {
+  Account,
+  Strategy,
+  Tag,
+  TagCategory,
+  WeekStart,
+} from '@/domain/types';
 import { plural } from '@/lib/format';
 
 /** The top bar's chips other than the date. Accounts live in the sidebar switcher. */
@@ -142,9 +148,10 @@ export function accountSummary(
 export function datesOf(
   range: DateRange,
   today: string,
+  weekStart?: WeekStart,
 ): { from?: string; to?: string } {
   if (!('preset' in range)) return range;
-  return today === '' ? {} : resolveRange(range, today);
+  return today === '' ? {} : resolveRange(range, today, weekStart);
 }
 
 /** A custom range from the From and To fields: either may be empty, and a reversed pair is swapped. */

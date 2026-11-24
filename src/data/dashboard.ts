@@ -231,7 +231,7 @@ export function buildDashboard(
     // Goals read the net days, whatever the basis shows, and every trade
     // whatever the unit: they are money targets.
     const days = env.goalDays ?? m.netDays;
-    const window = goalWeek(env.range, env.today);
+    const window = goalWeek(env.range, env.today, env.ctx.weekStart);
     goals = {
       weekly:
         env.goals.weeklyNet !== undefined && window !== null

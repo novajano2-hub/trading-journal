@@ -85,11 +85,23 @@ describe('calendarMonth', () => {
     expect(dayOf(m, '2026-11-17')).toMatchObject({ net: 99700, trades: 1 });
   });
 
-  test('November 2026 runs Monday to Sunday over six weeks, outside days empty', () => {
+  test('November 2026 runs Sunday to Saturday over five weeks by default', () => {
     const m = calendarMonth([], [], '2026-11', ctx);
-    expect(m.weeks).toHaveLength(6);
+    expect(m.weeks).toHaveLength(5);
     expect(m.weeks.every((w) => w.days.length === 7)).toBe(true);
-    // 1 Nov is a Sunday: the first week holds only it, in the last column.
+    // 1 Nov is a Sunday: it opens the first week, in the first column.
+    expect(m.weeks[0]!.days[0]!.date).toBe('2026-11-01');
+    expect(m.weeks[0]!.start).toBe('2026-11-01');
+    expect(m.weeks[4]!.days[1]!.date).toBe('2026-11-30');
+    expect(m.weeks[4]!.days.slice(2)).toEqual(Array(5).fill(null));
+  });
+
+  test('with Monday weeks, November 2026 has six rows, outside days empty', () => {
+    const m = calendarMonth([], [], '2026-11', {
+      ...ctx,
+      weekStart: 'monday',
+    });
+    expect(m.weeks).toHaveLength(6);
     expect(m.weeks[0]!.days.slice(0, 6)).toEqual(Array(6).fill(null));
     expect(m.weeks[0]!.days[6]!.date).toBe('2026-11-01');
     expect(m.weeks[5]!.days[0]!.date).toBe('2026-11-30');
@@ -122,7 +134,7 @@ describe('calendarMonth', () => {
     const m = calendarMonth(t, [], '2026-11', ctx);
     for (const w of m.weeks)
       expect(w.net).toBe(w.days.reduce((s, d) => s + (d?.net ?? 0), 0));
-    const week = m.weeks[3]!; // 16-22 Nov
+    const week = m.weeks[2]!; // 15-21 Nov, Sunday to Saturday
     expect(week.net).toBe(49700 - 2500 + 99700);
     expect(week.tradingDays).toBe(2);
     expect(dayOf(m, '2026-11-16')!.trades).toBe(2);

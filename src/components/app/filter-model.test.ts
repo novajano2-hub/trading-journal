@@ -120,6 +120,10 @@ test('account summary', () => {
 
 test('a range resolves to its dates, a preset only once today is known', () => {
   expect(datesOf({ preset: 'this-week' }, '2026-11-20')).toEqual({
+    from: '2026-11-15',
+    to: '2026-11-20',
+  });
+  expect(datesOf({ preset: 'this-week' }, '2026-11-20', 'monday')).toEqual({
     from: '2026-11-16',
     to: '2026-11-20',
   });

@@ -1,5 +1,5 @@
 import { format, parseISO, startOfWeek } from 'date-fns';
-import type { Cents } from '../types';
+import type { Cents, WeekStart } from '../types';
 import type { DayStat } from './days';
 
 /*
@@ -15,15 +15,20 @@ export interface DateWindow {
 
 const iso = (d: Date) => format(d, 'yyyy-MM-dd');
 
-/** Monday of the anchor's week (or the range start, if later) through the anchor; null when the range starts after today. */
+/** The first day of the anchor's week (Sunday unless `weekStart` says Monday), or the range start if later, through the anchor; null when the range starts after today. */
 export function goalWeek(
   range: { from?: string; to?: string },
   today: string,
+  weekStart: WeekStart = 'sunday',
 ): DateWindow | null {
   const anchor = range.to !== undefined && range.to < today ? range.to : today;
-  const monday = iso(startOfWeek(parseISO(anchor), { weekStartsOn: 1 }));
+  const first = iso(
+    startOfWeek(parseISO(anchor), {
+      weekStartsOn: weekStart === 'monday' ? 1 : 0,
+    }),
+  );
   const from =
-    range.from !== undefined && range.from > monday ? range.from : monday;
+    range.from !== undefined && range.from > first ? range.from : first;
   return from > anchor ? null : { from, to: anchor };
 }
 

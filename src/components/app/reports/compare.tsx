@@ -469,7 +469,7 @@ function Compared({
   const filters = useMemo(() => {
     const p = new URLSearchParams(search);
     const a = sanitizeFilters(groupFrom(p, 'a', global), known);
-    const before = previousRange(a.range, today);
+    const before = previousRange(a.range, today, prefs.weekStart);
     const seedB = before ? { ...a, range: before } : EMPTY_FILTERS;
     return [a, sanitizeFilters(groupFrom(p, 'b', seedB), known)];
     // `global` is the URL's filters as an object; `search` already covers it.
@@ -483,6 +483,7 @@ function Compared({
       accounts,
       breakevenRange: prefs.breakevenRange,
       pnlBasis: prefs.pnlBasis,
+      weekStart: prefs.weekStart,
     }),
     [prefs, today, accounts],
   );
@@ -500,7 +501,7 @@ function Compared({
             unit,
           ),
           leftOut: matched.filter((t) => !unitKeeps(unit, t)),
-          ctx: { ...base, range: resolveRange(f.range, today) },
+          ctx: { ...base, range: resolveRange(f.range, today, base.weekStart) },
         };
       }),
     [filters, trades, env, base, today, unit],

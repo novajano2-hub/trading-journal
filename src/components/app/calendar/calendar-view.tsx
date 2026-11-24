@@ -692,6 +692,7 @@ export function CalendarView(): React.JSX.Element {
         ) : null}
 
         <MonthGrid
+          weekStart={prefs.weekStart}
           label={monthName}
           weeks={weeks}
           stats={stats}
