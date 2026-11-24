@@ -1,13 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
-import {
-  queryString,
-  resolveRange,
-  serializeFilters,
-  type GlobalFilters,
-} from '@/data/filters';
+import { resolveRange, type GlobalFilters } from '@/data/filters';
 import { metricContextOf } from '@/data/metrics';
+import { strategyLogHref } from '@/data/report-links';
 import { useGlobalFilters, useTradeSet } from '@/data/query/derived';
 import {
   useAccounts,
@@ -24,7 +20,7 @@ import { ruleStats, type RuleStat } from '@/domain/metrics/rules';
 import { tradeStreaks, type StreakResult } from '@/domain/metrics/streaks';
 import { summarize, type Summary } from '@/domain/metrics/summary';
 import { localDate } from '@/domain/time';
-import { closedInOrder } from '@/domain/trade-status';
+import { closedInOrder, isClosed } from '@/domain/trade-status';
 import type { Cents, Strategy, Trade } from '@/domain/types';
 import { pctBaseOf, type FigureSource } from '@/lib/display';
 import { hasActiveFilters } from '../filter-model';
@@ -35,14 +31,14 @@ export type HiddenWhy = 'filters' | 'unit' | 'archived';
 /** One strategy's figures: the trades in the filters (and the display unit), on the P&L basis, in the base currency. */
 export interface StrategyFigures {
   strategy: Strategy;
-  /** Every trade in the filters that has the strategy (many-to-many), whatever its currency. */
+  /** The trades `tradesHref` lists: the strategy's in the filters and the base currency, closed ones unless the filters ask for open. */
   tradeCount: number;
   /** Every trade that has the strategy, whatever the filters. */
   totalCount: number;
   /** Set when the strategy has trades but the filters leave none of them. */
   hidden: HiddenWhy | null;
-  /** The trade log for this strategy's trades, in the same filters. */
-  tradesHref: string;
+  /** The trade log for this strategy's trades, in the same filters (and the base currency when they span more); undefined when the filters cannot say both. */
+  tradesHref: string | undefined;
   /** The trades the figures read: the strategy's, in the base currency. */
   trades: Trade[];
   summary: Summary;
@@ -73,8 +69,13 @@ export interface StrategyData {
   figures: Map<string, StrategyFigures>;
   source: FigureSource;
   strategies: Strategy[];
-  /** Closed trades with no strategy, and their P&L. */
-  unassigned: { count: number; pnl: Cents; ids: string[] };
+  /** Closed trades with no strategy in the base currency, their P&L, and the log that lists them under the same filters. */
+  unassigned: {
+    count: number;
+    pnl: Cents;
+    ids: string[];
+    href: string | undefined;
+  };
   basis: 'net' | 'gross';
   /** The filters as applied, and whether any is set. */
   filters: GlobalFilters;
@@ -125,6 +126,15 @@ export function useStrategyData(): {
     const today = localDate(new Date().toISOString(), prefs.data.timeZone);
     const { filters } = set.data;
     const inSet = set.data.trades;
+    // Day figures take the exits inside the date range, as the reports' do.
+    const dayCtx = { ...ctx, range: resolveRange(filters.range, today) };
+    // The log lists closed trades unless the filters ask for open ones, in every currency unless named.
+    const listed = (t: Trade) =>
+      filters.status === 'open' ? t.status === 'open' : isClosed(t);
+    const named = (some: readonly Trade[]) =>
+      some.some((t) => t.pnlCurrency !== base)
+        ? { ...filters, currency: base }
+        : filters;
     const filtered = hasActiveFilters(filters);
     const unit = isTradeUnit(prefs.data.displayUnit)
       ? prefs.data.displayUnit
@@ -145,8 +155,11 @@ export function useStrategyData(): {
       const brokenSet = new Set(brokenIds);
       // On the real balance of the accounts it traded in, as the reports read it.
       const accountIds = new Set(read.map((t) => t.accountId));
+      const dayRead = set.data.dayTrades.filter(
+        (t) => t.strategyIds.includes(strategy.id) && t.pnlCurrency === base,
+      );
       const drawdown = maxDrawdown(
-        dailyPnl(read, ctx),
+        dailyPnl(dayRead, dayCtx),
         accounts.data
           .filter((a) => accountIds.has(a.id))
           .reduce((n, a) => n + a.startingBalance, 0),
@@ -154,7 +167,7 @@ export function useStrategyData(): {
       );
       figures.set(strategy.id, {
         strategy,
-        tradeCount: own.length,
+        tradeCount: read.filter(listed).length,
         totalCount,
         hidden:
           own.length > 0 || totalCount === 0
@@ -164,7 +177,7 @@ export function useStrategyData(): {
               : unit
                 ? 'unit'
                 : 'archived',
-        tradesHref: tradesHref(filters, strategy.id),
+        tradesHref: strategyLogHref(named(own), strategy.id),
         trades: read,
         summary: summarize(read, ctx),
         pnl: closed.reduce((n, t) => n + pnlOf(t, ctx.pnlBasis), 0),
@@ -202,8 +215,9 @@ export function useStrategyData(): {
         streaks: tradeStreaks(read, ctx),
       });
     }
+    const unassigned = inSet.filter((t) => t.strategyIds.length === 0);
     const loose = closedInOrder(
-      inSet.filter((t) => t.strategyIds.length === 0 && t.pnlCurrency === base),
+      unassigned.filter((t) => t.pnlCurrency === base),
     );
     return {
       figures,
@@ -225,6 +239,7 @@ export function useStrategyData(): {
         count: loose.length,
         pnl: loose.reduce((n, t) => n + pnlOf(t, ctx.pnlBasis), 0),
         ids: loose.map((t) => t.id),
+        href: strategyLogHref(named(unassigned), null),
       },
       basis: ctx.pnlBasis,
       filters,
@@ -241,18 +256,4 @@ export function useStrategyData(): {
   ]);
 
   return { data, error, setFilters };
-}
-
-/** The trade log for one strategy, inside the filters the page reads. */
-function tradesHref(filters: GlobalFilters, strategyId: string): string {
-  const qs = queryString(
-    serializeFilters({
-      ...filters,
-      strategyIds: [strategyId],
-      excludeStrategyIds: [],
-      noStrategy: false,
-      strategyMatch: 'any',
-    }),
-  );
-  return `/app/trades${qs ? '?' + qs : ''}`;
 }

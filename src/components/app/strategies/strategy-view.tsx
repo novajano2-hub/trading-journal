@@ -414,7 +414,8 @@ function Header({
 }: {
   s: Strategy;
   tradeCount: number;
-  tradesHref: string;
+  /** Undefined when the filters cannot open the log on these trades alone. */
+  tradesHref: string | undefined;
   leftOut: number;
 }): React.JSX.Element {
   const update = useUpdateStrategy();
@@ -476,10 +477,12 @@ function Header({
           <Archive size={16} aria-hidden="true" />
           {archived ? 'Unarchive' : 'Archive'}
         </Button>
-        <Link href={tradesHref} className={buttonClasses('primary')}>
-          <ListBullets size={16} aria-hidden="true" />
-          View {tradeCount} {plural(tradeCount, 'trade')}
-        </Link>
+        {tradesHref === undefined ? null : (
+          <Link href={tradesHref} className={buttonClasses('primary')}>
+            <ListBullets size={16} aria-hidden="true" />
+            View {tradeCount} {plural(tradeCount, 'trade')}
+          </Link>
+        )}
       </div>
       <LeftOutNote count={leftOut} className="basis-full" />
       {update.isError ? (

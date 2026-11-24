@@ -252,6 +252,26 @@ export function tradeLogHref(f: GlobalFilters): string {
   return qs === '' ? '/app/trades' : `/app/trades?${qs}`;
 }
 
+/**
+ * The log's address for one strategy's trades, or for the trades with none
+ * (`strategyId` null), under the page's filters: the strategy breakdown's own
+ * bucket, so the log holds the trades the page counted, with the page's
+ * status kept. Undefined when one filter cannot say both (the page asks for
+ * other strategies, any of them).
+ */
+export function strategyLogHref(
+  base: GlobalFilters,
+  strategyId: string | null,
+): string | undefined {
+  const f = bucketFilters(
+    { ...base, status: undefined },
+    'strategy',
+    strategyId ?? NONE,
+  );
+  if (!f) return undefined;
+  return tradeLogHref(base.status ? { ...f, status: base.status } : f);
+}
+
 /** The log's address for one bucket, or undefined when the bucket is not a link. */
 export function bucketHref(
   base: GlobalFilters,

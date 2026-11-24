@@ -253,13 +253,32 @@ const cardAt = async (query: string) => {
 
 test('a date range narrows each card to the trades inside it', async () => {
   const card = await cardAt('?from=2026-11-17&to=2026-11-17');
+  const trades = () =>
+    card.querySelector('[data-metric-tip="trades"]')!.closest('div')!;
   await waitFor(() =>
-    expect(
-      within(card).getByText('Trades', { exact: false }).closest('div')
-        ?.textContent,
-    ).toContain('1'),
+    expect(trades().querySelector('b')!.textContent).toBe('1'),
   );
+  expect(trades().querySelector('small')!.textContent).toBe('none open');
   expect(within(card).getByText('0 won, 1 lost')).toBeTruthy();
+});
+
+test('Assign them in Trades opens the log on the same filters, with the trades that have no strategy (I7)', async () => {
+  renderApp(<StrategiesView />, {
+    sample: sample(false),
+    url: '/app/strategies?from=2026-11-16&to=2026-11-18&account=acc-a,acc-b',
+  });
+  const link = await screen.findByRole('link', {
+    name: 'Assign them in Trades',
+  });
+  // f-3 in acc-b has no strategy: one trade, and the link holds the page's filters.
+  expect(link.closest('p')!.textContent).toContain(
+    '1 closed trade has no strategy',
+  );
+  const params = new URLSearchParams(link.getAttribute('href')!.split('?')[1]);
+  expect(params.get('nostrat')).toBe('1');
+  expect(params.get('from')).toBe('2026-11-16');
+  expect(params.get('to')).toBe('2026-11-18');
+  expect(params.get('account')).toBe('acc-a,acc-b');
 });
 
 test('an account filter that holds none of its trades says the filters hide them', async () => {

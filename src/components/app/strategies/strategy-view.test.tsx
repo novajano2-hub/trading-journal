@@ -13,6 +13,7 @@ import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import type { SampleWorkspace } from '@/data/seed/generate';
 import { SAMPLE_WORKSPACE } from '@/data/workspaces';
+import { resolveInstrument } from '@/domain/instruments';
 import { everyString } from '../__fixtures__/every-string';
 import { renderApp } from '../__fixtures__/render-app';
 import { StrategyView } from './strategy-view';
@@ -93,9 +94,9 @@ test('trades in another currency are left out, and the page says so', async () =
     sample: mixed,
     url: '/app/strategies/str-1',
   });
-  expect(
-    await screen.findByRole('link', { name: 'View 3 trades' }),
-  ).toBeTruthy();
+  // The log lists what the figures read: the two base-currency trades, named by currency.
+  const view = await screen.findByRole('link', { name: 'View 2 trades' });
+  expect(view.getAttribute('href')).toBe('/app/trades?strategy=str-1&ccy=USD');
   expect(
     screen.getByText(
       '1 trade in another currency is left out of these figures.',
@@ -315,4 +316,172 @@ test('under a unit that keeps none of its trades the page says so', async () => 
       "Pips counts forex trades only, so none of this strategy's trades show.",
     ),
   ).toBeTruthy();
+});
+
+/** str-1 on f-1 and f-2, plus an open trade, a trade in euros and, with `held`, an ES trade out over 16 and 17 Nov. */
+function withOthers(held = false) {
+  return async (): Promise<SampleWorkspace> => {
+    const fx = await sample();
+    const base = fx.trades[1]!;
+    const open = { ...base };
+    delete open.closedAt;
+    delete open.avgExit;
+    const fill = (
+      id: string,
+      side: 'buy' | 'sell',
+      qty: number,
+      price: number,
+      time: string,
+    ) => ({
+      id,
+      accountId: 'acc-a',
+      symbol: 'ESZ5',
+      side,
+      qty,
+      price,
+      time,
+      fees: 0,
+      commission: 0,
+    });
+    fx.trades.push(
+      {
+        ...open,
+        id: 'm-open',
+        serial: 50,
+        status: 'open',
+        net: 0,
+        gross: 0,
+        ruleChecks: [],
+        openedAt: '2026-11-18T15:00:00.000Z',
+      },
+      { ...base, id: 'm-eur', serial: 51, pnlCurrency: 'EUR', ruleChecks: [] },
+    );
+    if (held)
+      // Long two ES: one out on 16 Nov at -$100, the other on 17 Nov at -$20.
+      fx.trades.push({
+        ...base,
+        id: 'm-held',
+        serial: 52,
+        direction: 'long',
+        avgEntry: 4500,
+        avgExit: 4498.8,
+        maxPosition: 2,
+        net: -12000,
+        gross: -12000,
+        fees: 0,
+        ruleChecks: [],
+        openedAt: '2026-11-16T15:00:00.000Z',
+        closedAt: '2026-11-17T16:00:00.000Z',
+        executions: [
+          fill('h1', 'buy', 2, 4500, '2026-11-16T15:00:00.000Z'),
+          fill('h2', 'sell', 1, 4498, '2026-11-16T16:00:00.000Z'),
+          fill('h3', 'sell', 1, 4499.6, '2026-11-17T16:00:00.000Z'),
+        ],
+      });
+    return fx;
+  };
+}
+
+test('View n trades counts what the log will list: closed trades in the base currency (I7)', async () => {
+  renderApp(<StrategyView id="str-1" />, {
+    sample: withOthers(),
+    url: '/app/strategies/str-1',
+  });
+  // f-1 and f-2: the open trade is not on the log's Closed list, the euro trade is named away.
+  const view = await screen.findByRole('link', { name: 'View 2 trades' });
+  expect(view.getAttribute('href')).toBe('/app/trades?strategy=str-1&ccy=USD');
+});
+
+test("the trade link keeps the page's strategy choice and exclusions (I7)", async () => {
+  renderApp(<StrategyView id="str-1" />, {
+    sample: async () => {
+      const fx = await sample();
+      fx.strategies.push({ ...fx.strategies[0]!, id: 'str-9', name: 'Other' });
+      return fx;
+    },
+    url: '/app/strategies/str-1?strategy=str-1&xstrat=str-9',
+  });
+  const view = await screen.findByRole('link', { name: /^View \d+ trades?$/ });
+  const params = new URLSearchParams(view.getAttribute('href')!.split('?')[1]);
+  expect(params.get('strategy')).toBe('str-1');
+  expect(params.get('xstrat')).toBe('str-9');
+});
+
+test('the max drawdown reads only the exits inside the date range (I7)', async () => {
+  renderApp(<StrategyView id="str-1" />, {
+    sample: withOthers(true),
+    url: '/app/strategies/str-1?from=2026-11-17&to=2026-11-17',
+  });
+  const stats = (await screen.findByRole('heading', { name: 'Stats' })).closest(
+    'section',
+  )!;
+  const dd = stats
+    .querySelector('[data-metric-tip="max-drawdown"]')!
+    .closest('div')!;
+  // 17 Nov: f-2 lost $129.50 and m-held's second exit $20; the $100 exit on 16 Nov is outside.
+  expect(dd.querySelector('b')!.textContent).toBe('−$149.50');
+});
+
+/** str-1 on two ES trades (+8 ticks for $100, -4 ticks for $500) and a euro-dollar win of $1,000 that carries its rule checks. */
+async function partlyInTicks(): Promise<SampleWorkspace> {
+  const fx = await sample();
+  const [a, b] = fx.trades;
+  Object.assign(a!, {
+    avgEntry: 4500,
+    avgExit: 4502,
+    net: 10000,
+    gross: 10000,
+    fees: 0,
+    ruleChecks: [],
+    executions: [],
+  });
+  Object.assign(b!, {
+    direction: 'long',
+    avgEntry: 4500,
+    avgExit: 4499,
+    net: -50000,
+    gross: -50000,
+    fees: 0,
+    ruleChecks: [],
+    executions: [],
+  });
+  fx.trades.push({
+    ...a!,
+    id: 'fx-1',
+    serial: 60,
+    instrument: resolveInstrument('EURUSD')!,
+    avgEntry: 1.07,
+    avgExit: 1.08,
+    net: 100000,
+    gross: 100000,
+    ruleChecks: [{ ruleId: 'r-1', followed: true }],
+  });
+  return fx;
+}
+
+test('under Ticks a strategy with forex and futures reads only the futures: profit factor in ticks, and its rules kept empty (Task 24 M1)', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: partlyInTicks,
+  });
+  await repository.prefs.update({ displayUnit: 'ticks' });
+  renderApp(<StrategyView id="str-1" />, {
+    repository,
+    url: '/app/strategies/str-1',
+  });
+  const stats = (await screen.findByRole('heading', { name: 'Stats' })).closest(
+    'section',
+  )!;
+  const value = (id: string) =>
+    stats
+      .querySelector(`[data-metric-tip="${id}"]`)!
+      .closest('div')!
+      .querySelector('b')!.textContent;
+  // 8 ticks won over 4 lost; in dollars it would be 100 over 500.
+  expect(value('profit-factor')).toBe('2.00');
+  expect(value('win-rate')).toBe('50.0%');
+  // The only trade with rule checks is the forex one, which Ticks leaves out.
+  expect(value('rule-adherence')).toBe('None');
+  expect(value('pnl')).toBe('+4.0 ticks');
 });

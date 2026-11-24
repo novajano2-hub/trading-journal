@@ -293,12 +293,14 @@ function UnassignedNote({
         {plural(unassigned.count, 'trade has', 'trades have')} no strategy,{' '}
         <FigureText f={pnl} /> {basis}.
       </span>
-      <Link
-        href="/app/trades?nostrat=1"
-        className="font-semibold text-accent-ink hover:text-accent-hover"
-      >
-        Assign them in Trades
-      </Link>
+      {unassigned.href === undefined ? null : (
+        <Link
+          href={unassigned.href}
+          className="font-semibold text-accent-ink hover:text-accent-hover"
+        >
+          Assign them in Trades
+        </Link>
+      )}
     </p>
   );
 }
