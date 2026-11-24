@@ -52,7 +52,6 @@ import { rowFacts, type RowFacts } from '@/data/trade-rows';
 import { summarize } from '@/domain/metrics/summary';
 import { isTradeUnit } from '@/domain/metrics/units';
 import { isClosed } from '@/domain/trade-status';
-import { ActiveFilters } from './active-filters';
 import { localDate } from '@/domain/time';
 import type { JournalEntry, Trade } from '@/domain/types';
 import {
@@ -68,6 +67,7 @@ import { rangeCaption } from '@/lib/range-label';
 import { usePhone } from '@/lib/use-phone';
 import { hasActiveFilters } from '../filter-model';
 import { CARD } from '../dashboard/shared';
+import { ActiveFilters } from './active-filters';
 import { BulkBar } from './bulk-bar';
 import { PhoneRows } from './phone-rows';
 import { SelectBox } from './select-box';

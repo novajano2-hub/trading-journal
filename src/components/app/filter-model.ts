@@ -179,6 +179,7 @@ export function unshownFilters(f: GlobalFilters): string[] {
     [f.exitPrice !== undefined, 'Exit price'],
     [f.size !== undefined, 'Size'],
     [f.r !== undefined, 'R'],
+    [f.currency !== undefined, 'Currency'],
     [f.strategyMatch === 'all', 'Strategies, all'],
     [f.tagMatch === 'all', 'Tags, all'],
   ];
@@ -260,6 +261,9 @@ export function detailChips(f: GlobalFilters): DetailChip[] {
     xs.map((n) => DAY_NAMES[n - 1]).join(', ');
   const months = (xs: readonly number[]) =>
     xs.map((n) => MONTH_NAMES[n - 1]).join(', ');
+  add(f.currency !== undefined, 'currency', () => `Currency: ${f.currency}`, {
+    currency: undefined,
+  });
   add(f.noStrategy, 'noStrategy', () => 'No strategy', { noStrategy: false });
   add(
     f.weekdays.length > 0,

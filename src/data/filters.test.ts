@@ -476,6 +476,7 @@ describe('the full filter set', () => {
       'rating=4,5',
       'wd=1,2',
       'mo=11',
+      'ccy=EUR',
       'xwd=5',
       'xmo=1,12',
       'entry=09:30-11:00,13:00-',
@@ -568,6 +569,14 @@ describe('the full filter set', () => {
     expect(runOn('net', { min: 1 })).toEqual([]);
     expect(runOn('gross', { min: 1 })).toEqual([t]);
     expect(runOn('net', { max: 0.9 })).toEqual([t]);
+  });
+
+  test('the currency filter keeps one P&L currency', () => {
+    const usd = trade({ pnlCurrency: 'USD' });
+    const eur = trade({ pnlCurrency: 'EUR' });
+    expect(run([usd, eur], { currency: 'EUR' })).toEqual([eur]);
+    expect(run([usd, eur], {})).toEqual([usd, eur]);
+    expect(advancedFilterCount({ ...EMPTY_FILTERS, currency: 'EUR' })).toBe(1);
   });
 
   test('the advanced count includes the exit day fields', () => {

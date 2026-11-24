@@ -124,6 +124,7 @@ export function CrossAnalysis({
                     c.href !== undefined ? (
                       <Link
                         href={c.href}
+                        prefetch={false}
                         aria-label={`${r.label}, ${columns[ci]!.label}${c.text !== undefined ? `, ${c.text}` : ''}, ${c.count} ${plural(c.count, 'trade')}, open in the trade log`}
                         className="-mx-2 block rounded-[7px] px-2 py-1 outline-offset-0 hover:underline focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:py-2.5"
                       >

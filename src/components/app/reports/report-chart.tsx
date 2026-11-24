@@ -968,9 +968,10 @@ export function ReportChart({
                   <Link
                     key={p.key}
                     href={href}
+                    prefetch={false}
                     tabIndex={-1}
                     aria-hidden="true"
-                    className="absolute top-0 block cursor-pointer pointer-coarse:hidden"
+                    className="absolute top-0 block cursor-pointer bg-accent/0 transition-colors duration-200 hover:bg-accent/[0.06] pointer-coarse:hidden"
                     style={{
                       left: layout.padL + layout.step * i,
                       width: layout.step,

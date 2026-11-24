@@ -1,4 +1,4 @@
-import type { BreakdownKey } from '../domain/metrics/breakdowns';
+import { bucketRange, type BreakdownKey } from '../domain/metrics/breakdowns';
 import {
   queryString,
   serializeFilters,
@@ -11,8 +11,6 @@ import {
 const NONE = '__none__';
 /** The cross-analysis column that folds the quietest columns together. */
 const FOLDED = 'Other';
-/** The breakdown's R clamp: the tails read "-5R or less" and "+5R or more". */
-const R_CLAMP = 5;
 
 /** What the time reports were set to when the bucket was drawn. */
 export interface BucketOptions {
@@ -29,40 +27,6 @@ const WEEKDAY_NUMBER: Record<string, number> = {
   sat: 6,
   sun: 7,
 };
-
-/**
- * Duration buckets as minutes. A bucket's upper edge belongs to the next one,
- * so it is out of this one (`maxExclusive`).
- */
-const DURATION: Record<string, NumRange> = {
-  'lt-1m': { max: 1, maxExclusive: true },
-  '1-5m': { min: 1, max: 5, maxExclusive: true },
-  '5-15m': { min: 5, max: 15, maxExclusive: true },
-  '15-60m': { min: 15, max: 60, maxExclusive: true },
-  '1-4h': { min: 60, max: 240, maxExclusive: true },
-  '4h-1d': { min: 240, max: 1440, maxExclusive: true },
-  'gt-1d': { min: 1440 },
-};
-
-/** Size buckets, as the breakdown's `sizeKey` cuts them (a size of exactly 100 is still 26-100). */
-const SIZE: Record<string, NumRange> = {
-  'lt-1': { max: 1, maxExclusive: true },
-  '1': { min: 1, max: 2, maxExclusive: true },
-  '2-3': { min: 2, max: 4, maxExclusive: true },
-  '4-5': { min: 4, max: 6, maxExclusive: true },
-  '6-10': { min: 6, max: 11, maxExclusive: true },
-  '11-25': { min: 11, max: 26, maxExclusive: true },
-  '26-100': { min: 26, max: 100 },
-  'gt-100': { min: 100, minExclusive: true },
-};
-
-function rRange(key: string): NumRange | null {
-  if (key === `le-${R_CLAMP}`) return { max: -R_CLAMP };
-  if (key === `ge${R_CLAMP}`) return { min: R_CLAMP };
-  if (!/^-?\d+$/.test(key)) return null;
-  const k = Number(key);
-  return { min: k, max: k + 1, maxExclusive: true };
-}
 
 /** The overlap of two ranges, or null when they share no value. */
 export function intersectRanges(
@@ -235,17 +199,17 @@ export function bucketFilters(
       return windows ? { ...base, [field]: windows } : null;
     }
     case 'duration': {
-      const range = DURATION[key];
+      const range = bucketRange('duration', key);
       const next = range && intersectRanges(base.duration, range);
       return next ? { ...base, duration: next } : null;
     }
     case 'size': {
-      const range = SIZE[key];
+      const range = bucketRange('size', key);
       const next = range && intersectRanges(base.size, range);
       return next ? { ...base, size: next } : null;
     }
     case 'r': {
-      const range = rRange(key);
+      const range = bucketRange('r', key);
       const next = range && intersectRanges(base.r, range);
       return next ? { ...base, r: next } : null;
     }

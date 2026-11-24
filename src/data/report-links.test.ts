@@ -6,6 +6,8 @@ import {
   type BreakdownOptions,
 } from '../domain/metrics/breakdowns';
 import type { MetricContext } from '../domain/metrics/context';
+import { makeTrade } from '../domain/__fixtures__/trades';
+import type { Trade } from '../domain/types';
 import { isClosed } from '../domain/trade-status';
 import {
   applyFilters,
@@ -342,4 +344,97 @@ describe('intersectRanges', () => {
     expect(intersectRanges({ min: 6 }, { max: 5 })).toBeNull();
     expect(intersectRanges(undefined, { min: 1 })).toEqual({ min: 1 });
   });
+});
+
+describe('with trades in two currencies', () => {
+  // Every third trade settles in EUR.
+  const mixed = ws.trades.map((t, i) =>
+    i % 3 === 0 ? { ...t, pnlCurrency: 'EUR' } : t,
+  );
+  for (const currency of ['USD', 'EUR'])
+    test(`${currency} buckets open only that currency's trades`, () => {
+      const own = mixed.filter((t) => t.pnlCurrency === currency);
+      const base = { ...EMPTY_FILTERS, currency };
+      for (const by of ['weekday', 'side', 'symbol'] as const)
+        for (const row of breakdown(own, by, ctxOf())) {
+          if (row.tradeIds.length === 0) continue;
+          const href = bucketHref(base, by, row.key)!;
+          expect(href).toContain(`ccy=${currency}`);
+          expect(logIds(href, mixed), `${by} ${row.key}`).toEqual(
+            [...row.tradeIds].sort(),
+          );
+        }
+    });
+});
+
+describe('a bucket edge belongs to one bucket', () => {
+  const rOf = (r: number) =>
+    makeTrade({
+      net: r * 100,
+      initialRisk: 100,
+      accountId: ws.accounts[0]!.id,
+    });
+  const filterOf = (by: BreakdownKey, key: string) =>
+    bucketFilters(EMPTY_FILTERS, by, key)!;
+  const hits = (t: Trade, by: BreakdownKey, keys: string[]) =>
+    keys.filter(
+      (k) =>
+        applyFilters([t], filterOf(by, k), {
+          ...env,
+          today: '2030-01-01',
+        }).length === 1,
+    );
+  const rKeys = ['le-5', '-5', '-4', '-1', '0', '1', '4', 'ge5'];
+  for (const r of [-5, -4, 0, 1, 4, 5])
+    test(`R of exactly ${r} is in one bucket, the one the report files it under`, () => {
+      const t = rOf(r);
+      const row = breakdown([t], 'r', ctxOf()).find(
+        (x) => x.tradeIds.length === 1,
+      )!;
+      expect(hits(t, 'r', rKeys.concat(['-3', '-2', '2', '3']))).toEqual([
+        row.key,
+      ]);
+    });
+
+  const spanOf = (minutes: number) =>
+    makeTrade({
+      net: 1,
+      accountId: ws.accounts[0]!.id,
+      openedAt: '2026-11-18T15:00:00Z',
+      closedAt: new Date(
+        Date.parse('2026-11-18T15:00:00Z') + minutes * 60000,
+      ).toISOString(),
+    });
+  const dKeys = ['lt-1m', '1-5m', '5-15m', '15-60m', '1-4h', '4h-1d', 'gt-1d'];
+  for (const m of [0.5, 1, 5, 15, 60, 240, 1440, 2000])
+    test(`a trade of ${m} minutes is in one duration bucket`, () => {
+      const t = spanOf(m);
+      const row = breakdown([t], 'duration', ctxOf()).find(
+        (x) => x.tradeIds.length === 1,
+      )!;
+      expect(hits(t, 'duration', dKeys)).toEqual([row.key]);
+    });
+
+  const sKeys = [
+    'lt-1',
+    '1',
+    '2-3',
+    '4-5',
+    '6-10',
+    '11-25',
+    '26-100',
+    'gt-100',
+  ];
+  for (const q of [0.5, 1, 2, 4, 6, 11, 26, 100, 101])
+    test(`a size of ${q} is in one size bucket`, () => {
+      const t = makeTrade({
+        net: 1,
+        maxPosition: q,
+        accountId: ws.accounts[0]!.id,
+      });
+      const row = breakdown([t], 'size', ctxOf()).find(
+        (x) => x.tradeIds.length === 1,
+      )!;
+      expect(hits(t, 'size', sKeys)).toEqual([row.key]);
+    });
 });

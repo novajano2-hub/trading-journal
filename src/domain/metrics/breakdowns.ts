@@ -89,14 +89,26 @@ const SIDES: Bucket[] = [
 const MIN = 60_000;
 const HOUR = 60 * MIN;
 
+/** A bucket's span: `from` is in it, `to` is not (the next bucket starts there); the last has no `to`. */
+type Edge = readonly [key: string, from: number, to?: number];
+
+/** Duration buckets in minutes. The one source of the keys and of the report links' ranges. */
+const DURATION_EDGES: readonly Edge[] = [
+  ['lt-1m', -Infinity, 1],
+  ['1-5m', 1, 5],
+  ['5-15m', 5, 15],
+  ['15-60m', 15, 60],
+  ['1-4h', 60, 240],
+  ['4h-1d', 240, 1440],
+  ['gt-1d', 1440],
+];
+
+function edgeKey(edges: readonly Edge[], v: number): string {
+  return (edges.find(([, , to]) => to === undefined || v < to) ?? edges[0]!)[0];
+}
+
 function durationKey(ms: number): string {
-  if (ms < MIN) return 'lt-1m';
-  if (ms < 5 * MIN) return '1-5m';
-  if (ms < 15 * MIN) return '5-15m';
-  if (ms < HOUR) return '15-60m';
-  if (ms < 4 * HOUR) return '1-4h';
-  if (ms < 24 * HOUR) return '4h-1d';
-  return 'gt-1d';
+  return edgeKey(DURATION_EDGES, ms / MIN);
 }
 
 function sessionKey(openedAt: string): string {
@@ -153,15 +165,21 @@ const SIZES: Bucket[] = [
   ['gt-100', '101+'],
 ];
 
+/** Size buckets: `to` is out, except the 26-100 bucket, whose 100 is in (see `sizeKey`). */
+const SIZE_EDGES: readonly Edge[] = [
+  ['lt-1', -Infinity, 1],
+  ['1', 1, 2],
+  ['2-3', 2, 4],
+  ['4-5', 4, 6],
+  ['6-10', 6, 11],
+  ['11-25', 11, 26],
+  ['26-100', 26],
+  ['gt-100', 100],
+];
+
 function sizeKey(size: number): string {
-  if (size < 1) return 'lt-1';
-  if (size < 2) return '1';
-  if (size < 4) return '2-3';
-  if (size < 6) return '4-5';
-  if (size < 11) return '6-10';
-  if (size < 26) return '11-25';
-  if (size <= 100) return '26-100';
-  return 'gt-100';
+  if (size > 100) return 'gt-100';
+  return edgeKey(SIZE_EDGES.slice(0, 7), size);
 }
 
 const DTES: Bucket[] = [
@@ -209,6 +227,50 @@ function rKey(r: number | undefined): string {
   if (r <= -R_CLAMP) return `le-${R_CLAMP}`;
   if (r >= R_CLAMP) return `ge${R_CLAMP}`;
   return String(Math.floor(r + 1e-9));
+}
+
+/** The values a bucket holds, as a filter would say them. */
+export interface BucketRange {
+  min?: number;
+  max?: number;
+  minExclusive?: boolean;
+  maxExclusive?: boolean;
+}
+
+/**
+ * The span of values a duration (minutes), size or R bucket holds, read from the
+ * same edges the buckets are cut by, so a link and its bucket cannot disagree.
+ * Null for a key that holds no span (R's "No stop").
+ */
+export function bucketRange(
+  by: 'duration' | 'size' | 'r',
+  key: string,
+): BucketRange | null {
+  if (by === 'r') {
+    if (key === `le-${R_CLAMP}`) return { max: -R_CLAMP };
+    // rKey files -5 under le-5 and 5 under ge5, so those are the tails' alone.
+    if (key === `ge${R_CLAMP}`) return { min: R_CLAMP };
+    if (!/^-?\d+$/.test(key)) return null;
+    const k = Number(key);
+    return {
+      min: k,
+      max: k + 1,
+      maxExclusive: true,
+      ...(k === -R_CLAMP && { minExclusive: true }),
+    };
+  }
+  const edges = by === 'duration' ? DURATION_EDGES : SIZE_EDGES;
+  const edge = edges.find(([k]) => k === key);
+  if (!edge) return null;
+  const [, from, to] = edge;
+  // The 26-100 bucket holds 100 itself, and 101+ starts after it.
+  if (by === 'size' && key === '26-100') return { min: 26, max: 100 };
+  if (by === 'size' && key === 'gt-100')
+    return { min: 100, minExclusive: true };
+  return {
+    ...(from !== -Infinity && { min: from }),
+    ...(to !== undefined && { max: to, maxExclusive: true }),
+  };
 }
 
 const basisPnl = (s: Summary) => (s.basis === 'gross' ? s.grossPnl : s.netPnl);

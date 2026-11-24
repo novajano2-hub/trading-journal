@@ -232,3 +232,10 @@ test('a filter with no chip of its own gets one in the log, and the chip clears 
   expect(rest.symbols).toEqual(['ES']);
   expect(rest.status).toBe('closed');
 });
+
+test('a currency filter has a chip that clears it', () => {
+  const f: GlobalFilters = { ...EMPTY_FILTERS, currency: 'EUR' };
+  const [chip] = detailChips(f);
+  expect(chip!.label).toBe('Currency: EUR');
+  expect(chip!.clear(f).currency).toBeUndefined();
+});

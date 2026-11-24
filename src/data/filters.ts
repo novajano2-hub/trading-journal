@@ -90,6 +90,8 @@ export interface GlobalFilters {
   size?: NumRange;
   /** Realized R. */
   r?: NumRange;
+  /** One P&L currency: what a report that reads one currency links to. */
+  currency?: string;
 }
 
 export const EMPTY_FILTERS: GlobalFilters = {
@@ -145,6 +147,7 @@ export const FILTER_PARAMS = [
   'xp',
   'size',
   'r',
+  'ccy',
 ] as const;
 
 const OUTCOMES: readonly Outcome[] = ['win', 'loss', 'breakeven'];
@@ -172,6 +175,7 @@ export function advancedFilterCount(f: GlobalFilters): number {
     f.exitPrice !== undefined,
     f.size !== undefined,
     f.r !== undefined,
+    f.currency !== undefined,
   ];
   return used.filter(Boolean).length;
 }
@@ -311,6 +315,8 @@ export function parseFilters(
   const exitPrice = rangeOf(params, 'xp');
   const size = rangeOf(params, 'size');
   const r = rangeOf(params, 'r');
+  const ccy = params.get('ccy')?.trim().toUpperCase();
+  const currency = ccy && /^[A-Z0-9]{2,10}$/.test(ccy) ? ccy : undefined;
   return {
     range,
     accountIds: uniqueValues(listOf(params, 'account')),
@@ -343,6 +349,7 @@ export function parseFilters(
     ...optional('exitPrice', exitPrice),
     ...optional('size', size),
     ...optional('r', r),
+    ...optional('currency', currency),
   };
 }
 
@@ -357,10 +364,15 @@ export function serializeFilters(f: GlobalFilters): URLSearchParams {
     if (values.length > 0) p.set(key, values.join(','));
   };
   const sorted = (values: readonly string[]) => [...new Set(values)].sort();
+  const bound = (
+    v: number | undefined,
+    out: boolean | undefined,
+    mark: string,
+  ) => (v === undefined ? '' : `${out ? mark : ''}${v}`);
   const span = (r: NumRange | undefined) =>
     r === undefined || (r.min === undefined && r.max === undefined)
       ? undefined
-      : `${r.min === undefined ? '' : `${r.minExclusive ? '>' : ''}${r.min}`}_${r.max === undefined ? '' : `${r.maxExclusive ? '<' : ''}${r.max}`}`;
+      : `${bound(r.min, r.minExclusive, '>')}_${bound(r.max, r.maxExclusive, '<')}`;
   const windows = (key: string, ws: readonly TimeWindow[]) =>
     list(
       key,
@@ -412,6 +424,7 @@ export function serializeFilters(f: GlobalFilters): URLSearchParams {
   range('xp', f.exitPrice);
   range('size', f.size);
   range('r', f.r);
+  if (f.currency) p.set('ccy', f.currency);
   return p;
 }
 
@@ -642,6 +655,7 @@ export function applyFilters(
       if (t.avgExit === undefined || !closed) return false;
       if (!within(t.avgExit, f.exitPrice)) return false;
     }
+    if (f.currency !== undefined && t.pnlCurrency !== f.currency) return false;
     if (!within(t.maxPosition, f.size)) return false;
     if (f.r !== undefined) {
       // The same R every report buckets by: on the basis the figures read.

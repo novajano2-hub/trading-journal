@@ -212,6 +212,7 @@ function BucketName({
   return (
     <Link
       href={href}
+      prefetch={false}
       aria-label={`${text}, open ${count} ${plural(count, 'trade')} in the trade log`}
       className="rounded-chip outline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center"
     >
@@ -307,7 +308,15 @@ export function BreakdownCards({
   /** A column between the name and Trades: the tag's category. */
   columnsBefore?: SummaryColumn<BreakdownRow>[];
 }): React.JSX.Element {
-  const { partition: p, ctx, basis, currency, filters } = data;
+  const { partition: p, ctx, basis, currency } = data;
+  // The log lists every currency, so with more than one the link names this one.
+  const filters = useMemo(
+    () =>
+      data.currencies.length > 1
+        ? { ...data.filters, currency: data.currency }
+        : data.filters,
+    [data.filters, data.currencies.length, data.currency],
+  );
   const params = useSearchParams();
   const display = useDisplay();
   const chartId = useId();
