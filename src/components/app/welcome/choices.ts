@@ -4,7 +4,7 @@ import { offsetLabel } from '@/lib/time-zone-label';
 
 /**
  * TradeZella's order for the top of the list [inv-1 014].
- * INFERRED from [inv-1 008]: the record shows the lists as selects but not the
+ * INFERRED from [inv-1 013-014]: the record shows the lists as selects but not the
  * tail's order, so the rest follow A to Z by code.
  */
 const CURRENCIES_FIRST = [
@@ -112,7 +112,7 @@ export function gmtLabel(zone: string, at: Date = new Date()): string {
 
 /**
  * Every zone the browser knows, west to east, each "GMT−5 US/Eastern".
- * INFERRED from [inv-1 008]: the record shows a select of zones with an offset
+ * INFERRED from [inv-1 013-014]: the record shows a select of zones with an offset
  * and a name, not their order or naming, so Keel orders them west to east (then
  * by name) and shows the US names TradeZella uses for the six US zones.
  */

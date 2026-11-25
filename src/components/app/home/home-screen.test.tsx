@@ -196,9 +196,9 @@ test('Home never shows the sample as 3 of 3 on the way from the dialog to My wor
   finish();
   expect(await screen.findByText('Profile saved')).toBeTruthy();
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  const card = await screen.findByRole('region', { name: 'Get started' });
+  await waitFor(() => expect(card.textContent).toContain('0 of 3 complete'));
   watch.disconnect();
-  const card = screen.getByRole('region', { name: 'Get started' });
-  expect(card.textContent).toContain('0 of 3 complete');
   expect(seen.some((t) => t.includes('3 of 3'))).toBe(false);
   expect(seen.some((t) => t.includes('1 of 3'))).toBe(false);
 });

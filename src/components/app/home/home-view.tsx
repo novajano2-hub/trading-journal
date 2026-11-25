@@ -16,9 +16,10 @@ import type { ReactNode } from 'react';
 import { CARD, CARD_PAD, CardHeader } from '@/components/app/dashboard/shared';
 import { StrategyError } from '@/components/app/strategies/strategy-states';
 import { Chip } from '@/components/ui/chip';
-import { gettingStarted } from '@/data/getting-started';
+import { gettingStarted, type GettingStarted } from '@/data/getting-started';
 import {
   useAccounts,
+  useActiveWorkspace,
   useChallenges,
   usePrefs,
   useTrades,
@@ -206,51 +207,25 @@ function CardsSkeleton(): React.JSX.Element {
   );
 }
 
-/**
- * Home: a greeting, then the Get started card with Explore, and Recommended
- * focus with Resources. `firstRun` is Home as an empty My workspace, held
- * while the required preferences dialog is open over it [inv-1 013]: the
- * greeting with no name, every step open (0 of 3), and nothing read from the
- * workspace that happens to be active (the sample), so none of its progress
- * shows through. Ordinary loading is the greeting over skeleton cards.
- */
-export function HomeView({
-  firstRun = false,
+type Prefs = NonNullable<ReturnType<typeof usePrefs>['data']>;
+
+/** The greeting and the cards; `progress` undefined is the cards' skeleton. */
+function HomeLayout({
+  prefs,
+  name,
+  progress,
 }: {
-  firstRun?: boolean;
+  prefs: Prefs | undefined;
+  name: string | undefined;
+  progress: GettingStarted | undefined;
 }): React.JSX.Element {
-  const queryClient = useQueryClient();
-  const prefs = usePrefs();
-  const accounts = useAccounts();
-  const challenges = useChallenges();
-  const trades = useTrades();
-  const error =
-    prefs.error ?? accounts.error ?? challenges.error ?? trades.error;
-  if (error && !firstRun)
-    return (
-      <StrategyError
-        title="Home couldn't load."
-        error={error}
-        onRetry={() => void queryClient.resetQueries({ queryKey: ['keel'] })}
-      />
-    );
-
-  const p = prefs.data;
-  const progress = firstRun
-    ? gettingStarted([], [], [])
-    : accounts.data && challenges.data && trades.data
-      ? gettingStarted(accounts.data, challenges.data, trades.data)
-      : undefined;
-  // An old display name reads as the first name until one is set.
-  const name = firstRun ? undefined : (p?.firstName ?? p?.displayName);
   const now = new Date();
-
   return (
     <div className="flex flex-col gap-4 px-5 pt-0.5 pb-7">
       <header className="pt-1.5 pb-0.5">
-        {p ? (
+        {prefs ? (
           <h2 className="text-2xl leading-[1.15] font-semibold tracking-[-0.03em] sm:text-[26px]">
-            {greeting(now, p.timeZone, name)}
+            {greeting(now, prefs.timeZone, name)}
           </h2>
         ) : (
           // Prefs are still being read: the greeting's place, held empty.
@@ -275,4 +250,71 @@ export function HomeView({
       )}
     </div>
   );
+}
+
+/** Home as an empty My workspace: it reads only the prefs (the zone), never the workspace's rows. */
+function FirstRunHome(): React.JSX.Element {
+  const prefs = usePrefs();
+  return (
+    <HomeLayout
+      prefs={prefs.data}
+      name={undefined}
+      progress={gettingStarted([], [], [])}
+    />
+  );
+}
+
+function LiveHome(): React.JSX.Element {
+  const queryClient = useQueryClient();
+  const prefs = usePrefs();
+  const workspace = useActiveWorkspace();
+  const accounts = useAccounts();
+  const challenges = useChallenges();
+  const trades = useTrades();
+  // The workspace read gates the three row reads: if it fails they stay
+  // disabled, so its error is part of the chain.
+  const error =
+    prefs.error ??
+    workspace.error ??
+    accounts.error ??
+    challenges.error ??
+    trades.error;
+  if (error)
+    return (
+      <StrategyError
+        title="Home couldn't load."
+        error={error}
+        onRetry={() => void queryClient.resetQueries({ queryKey: ['keel'] })}
+      />
+    );
+  const p = prefs.data;
+  return (
+    <HomeLayout
+      prefs={p}
+      // An old display name reads as the first name until one is set.
+      name={p?.firstName ?? p?.displayName}
+      progress={
+        accounts.data && challenges.data && trades.data
+          ? gettingStarted(accounts.data, challenges.data, trades.data)
+          : undefined
+      }
+    />
+  );
+}
+
+/**
+ * Home: a greeting, then the Get started card with Explore, and Recommended
+ * focus with Resources. `firstRun` is Home as an empty My workspace, held
+ * while the required preferences dialog is open over it [inv-1 013]: the
+ * greeting with no name and every step open (0 of 3). That mode calls no
+ * workspace-row hook (accounts, challenges, trades), so nothing is read from
+ * the workspace that happens to be active (the sample). Ordinary loading is
+ * the greeting over skeleton cards.
+ */
+export function HomeView({
+  firstRun = false,
+}: {
+  firstRun?: boolean;
+}): React.JSX.Element {
+  return firstRun ? <FirstRunHome /> : <LiveHome />;
 }

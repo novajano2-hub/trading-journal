@@ -193,12 +193,17 @@ test('an old display name reads as the first name', async () => {
   expect(await screen.findByText('Good evening, Alex')).toBeTruthy();
 });
 
-test('first-run mode is an empty My workspace: no name, 0 of 3, and nothing read from the active sample', async () => {
+test('first-run mode is an empty My workspace: no name, 0 of 3, and the workspace rows are never read', async () => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-11-25T09:00:00Z'));
   // The active (sample) workspace is 3 of 3 with a name saved.
   const r = repo({ prop: true });
   await r.prefs.update({ firstName: 'Sam', timeZone: 'UTC' });
+  const reads = [
+    vi.spyOn(r.accounts, 'list'),
+    vi.spyOn(r.challenges, 'list'),
+    vi.spyOn(r.trades, 'list'),
+  ];
   renderApp(<HomeView firstRun />, { repository: r, url: '/app/home' });
   expect(await screen.findByText('Good morning')).toBeTruthy();
   expect(screen.queryByText(/Sam/)).toBeNull();
@@ -212,13 +217,14 @@ test('first-run mode is an empty My workspace: no name, 0 of 3, and nothing read
   ).toBeTruthy();
   expect(screen.getByRole('region', { name: 'Resources' })).toBeTruthy();
   expect(screen.queryByRole('status', { name: 'Loading Home' })).toBeNull();
+  for (const read of reads) expect(read).not.toHaveBeenCalled();
 });
 
 test('the Get started card has a prop-oriented subline, and a done step is green with the word Done', async () => {
   renderApp(<HomeView />, { repository: repo(), url: '/app/home' });
   const card = await screen.findByRole('region', { name: 'Get started' });
   expect(card.textContent).toContain(
-    'Set up your prop account and challenge, and track each rule as you trade.',
+    'Follow your evaluation against its profit target and loss limits, from the first account to the last trade.',
   );
   const three = await step(3);
   expect(
@@ -227,6 +233,18 @@ test('the Get started card has a prop-oriented subline, and a done step is green
   const tick = three.querySelector('span.grid');
   expect(tick?.className).toContain('bg-gain-soft');
   expect(tick?.className).toContain('text-gain');
+});
+
+test("a failed workspace read shows Home's error with a retry, not a loading state", async () => {
+  const r = repo();
+  r.workspaces.getActive = async () => {
+    throw new Error('no workspace');
+  };
+  renderApp(<HomeView />, { repository: r, url: '/app/home' });
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toContain("Home couldn't load.");
+  expect(within(alert).getByRole('button', { name: 'Try again' })).toBeTruthy();
+  expect(screen.queryByRole('status', { name: 'Loading Home' })).toBeNull();
 });
 
 test("Home's own failure says Home couldn't load", async () => {
@@ -250,8 +268,9 @@ test('/app makes no move while a read is pending, then lands on Home, and on the
     await gate;
     return trades(...args);
   };
-  const first = renderApp(<AppLanding />, { repository: held, url: '/app' });
-  expect(first.container.textContent).toBe('');
+  const calls = vi.spyOn(held.trades, 'list');
+  renderApp(<AppLanding />, { repository: held, url: '/app' });
+  await waitFor(() => expect(calls).toHaveBeenCalled());
   await new Promise((r) => setTimeout(r, 50));
   expect(window.location.pathname).toBe('/app');
   release();

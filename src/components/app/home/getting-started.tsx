@@ -71,8 +71,8 @@ export function GettingStartedCard({
         }
       />
       <p className="mt-1.5 max-w-[62ch] text-[13px] leading-normal text-muted">
-        Set up your prop account and challenge, and track each rule as you
-        trade.
+        Follow your evaluation against its profit target and loss limits, from
+        the first account to the last trade.
       </p>
       <div
         role="progressbar"
