@@ -249,6 +249,7 @@ function NoteBody({
   readOnly,
   handleRef,
   stamp,
+  settleRef,
   onStatus,
 }: {
   label: string;
@@ -262,6 +263,8 @@ function NoteBody({
   handleRef?: { current: NoteEditorHandle | null };
   /** Fields the next save writes with the body (the template a body came from). */
   stamp?: { current: Partial<JournalEntry> | undefined };
+  /** Receives a function that writes what is waiting and resolves once every save has landed or failed (`onStatus` says which). */
+  settleRef?: { current: (() => Promise<void>) | null };
   onStatus(s: NoteStatus): void;
 }): React.JSX.Element {
   const save = useSaveJournalEntry();
@@ -281,6 +284,8 @@ function NoteBody({
   // is let go: the next change makes a new one rather than bring it back. (A
   // daily note in Trash is not let go: its date keeps it, read-only, E109.)
   const waiting = useRef(0);
+  // The last write failed: the text on screen is not the stored one.
+  const failed = useRef(false);
   useEffect(() => {
     if (waiting.current === 0)
       note.current = entry ? Promise.resolve(entry) : null;
@@ -313,8 +318,10 @@ function NoteBody({
           body,
         });
         note.current = Promise.resolve(saved);
+        failed.current = false;
         onStatus('saved');
       } catch {
+        failed.current = true;
         onStatus('failed');
       } finally {
         waiting.current -= 1;
@@ -324,6 +331,23 @@ function NoteBody({
   const flushRef = useRef(flush);
   useEffect(() => {
     flushRef.current = flush;
+  });
+
+  // Writes what is waiting now (or tries again after a failed write), then
+  // waits for everything already on its way.
+  const settle = async () => {
+    if (timer.current !== undefined || failed.current) {
+      if (timer.current !== undefined) clearTimeout(timer.current);
+      flush();
+    }
+    await queue.current;
+  };
+  useEffect(() => {
+    if (!settleRef) return;
+    settleRef.current = settle;
+    return () => {
+      settleRef.current = null;
+    };
   });
 
   // Leaving the trade (or the page) saves what is still waiting.
@@ -417,12 +441,15 @@ export function DayNoteBinding({
   readOnly,
   handleRef,
   stamp,
+  settleRef,
   onStatus,
 }: {
   date: string;
   readOnly: boolean;
   handleRef?: { current: NoteEditorHandle | null };
   stamp?: { current: Partial<JournalEntry> | undefined };
+  /** Receives a function that writes what is waiting and resolves once every save has landed or failed. */
+  settleRef?: { current: (() => Promise<void>) | null };
   onStatus(s: NoteStatus): void;
 }): React.JSX.Element {
   const journal = useJournal();
@@ -496,6 +523,7 @@ export function DayNoteBinding({
         readOnly={readOnly || trashed}
         handleRef={handleRef}
         stamp={stamp}
+        settleRef={settleRef}
         onStatus={onStatus}
       />
     </>

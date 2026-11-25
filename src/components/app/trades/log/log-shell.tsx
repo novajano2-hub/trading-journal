@@ -206,30 +206,62 @@ export function ShowMore({
 /**
  * The page around a log view: the Day / Week / All switch pinned at the top
  * bar with the columns menu and Add trade beside it, the phone action row
- * (the Calendar button goes first, in the slot Task 16 fills), and the aside
- * (the mini calendar) beside the list.
+ * (the Calendar button goes first), and the aside (the mini calendar) beside
+ * the list, pinned as the switch is. The record has the calendar in the right
+ * column only; Keel's call (TradeZella unknown): below `xl` the column would
+ * either sit under a list that pages on, out of reach, or squeeze the day
+ * cards' figures, so the calendar waits behind `calendarAction` (the Calendar
+ * button, in the phone row and, from `sm`, by the columns menu) and opens as
+ * a sheet.
  */
 export function LogShell({
   view,
   columnsMenu,
   aside,
+  calendarAction,
   children,
 }: {
   view: 'day' | 'week';
   columnsMenu: React.ReactNode;
   aside?: React.ReactNode;
+  calendarAction?: React.ReactNode;
   children: React.ReactNode;
 }): React.JSX.Element {
   const phone = usePhone();
+  const root = useRef<HTMLDivElement>(null);
+  const row = useRef<HTMLDivElement>(null);
+  // The switch row's height, for the aside to sit under it when both are pinned.
+  useEffect(() => {
+    const el = row.current;
+    const host = root.current;
+    if (!el || !host) return;
+    const publish = () =>
+      host.style.setProperty('--log-switch', `${el.offsetHeight}px`);
+    publish();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  const column = aside !== undefined && !phone;
   return (
-    <div className="flex min-w-0 flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0">
-      <div className="sticky top-[var(--top-bar,56px)] z-20 -mx-5 bg-bg px-5 py-2 sm:top-[var(--top-bar,68px)]">
+    <div
+      ref={root}
+      className="flex min-w-0 flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0"
+    >
+      <div
+        ref={row}
+        className="sticky top-[var(--top-bar,56px)] z-20 -mx-5 bg-bg px-5 py-2 sm:top-[var(--top-bar,68px)]"
+      >
         <div className="flex items-center gap-2.5">
           <div className="max-sm:flex-1">
             <TradesSwitch view={view} />
           </div>
           {phone ? null : (
             <div className="ml-auto flex items-center gap-2">
+              {calendarAction ? (
+                <div className="xl:hidden">{calendarAction}</div>
+              ) : null}
               {columnsMenu}
               <AddTradeLink />
             </div>
@@ -237,24 +269,33 @@ export function LogShell({
         </div>
       </div>
       {phone ? (
-        <div className="flex items-center gap-2">
-          {/* The Calendar button goes first (the mini calendar's sheet). */}
-          <div className="flex-1">
+        <div className="flex items-center gap-1.5">
+          {/* Sized by their labels, then sharing what is left; tighter padding so three fit 390px. */}
+          {calendarAction ? (
+            <div className="min-w-0 flex-auto [&>button]:w-full [&>button]:px-2!">
+              {calendarAction}
+            </div>
+          ) : null}
+          <div className="min-w-0 flex-auto [&_button]:px-2!">
             <PlanTheDay wide />
           </div>
-          <AddTradeLink className="flex-1" />
+          <AddTradeLink className="min-w-0 flex-auto px-2!" />
         </div>
       ) : null}
 
       <div
         className={
-          aside
-            ? 'grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_280px]'
+          column
+            ? 'grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_280px]'
             : ''
         }
       >
         <div className="flex min-w-0 flex-col gap-4">{children}</div>
-        {aside}
+        {column ? (
+          <div className="sticky top-[calc(var(--top-bar,68px)+var(--log-switch,52px))] hidden xl:block">
+            {aside}
+          </div>
+        ) : null}
       </div>
     </div>
   );

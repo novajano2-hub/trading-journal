@@ -68,13 +68,16 @@ export function tradeLevelFilterActive(f: GlobalFilters): boolean {
 /**
  * The trade log by day: cards newest first, each collapsed until opened.
  * Render inside `<Suspense>`: it reads the URL's filters. `aside` is where the
- * mini calendar goes, `noteAction` the card's Add note or View note.
+ * mini calendar goes (and `calendarAction` the Calendar button that opens it as
+ * a sheet where there is no column), `noteAction` the card's Add note or View note.
  */
 export function TradesDayView({
   aside,
+  calendarAction,
   noteAction,
 }: {
   aside?: React.ReactNode;
+  calendarAction?: React.ReactNode;
   noteAction?: (date: string) => React.ReactNode;
 }): React.JSX.Element {
   useRememberLogView('day');
@@ -191,6 +194,7 @@ export function TradesDayView({
         unitLeftOut={set.data.unitLeftOut}
         noTradesAtAll={allTrades.length === 0}
         aside={aside}
+        calendarAction={calendarAction}
         noteAction={noteAction}
         facts={{ accounts, strategies, tags, categories }}
         records={days}
@@ -206,6 +210,7 @@ function DayList({
   unitLeftOut,
   noTradesAtAll,
   aside,
+  calendarAction,
   noteAction,
   facts: lists,
   records,
@@ -216,6 +221,7 @@ function DayList({
   unitLeftOut: number;
   noTradesAtAll: boolean;
   aside?: React.ReactNode;
+  calendarAction?: React.ReactNode;
   noteAction?: (date: string) => React.ReactNode;
   facts: LogLists;
   records: readonly DayRecord[];
@@ -237,6 +243,10 @@ function DayList({
     () => new Map(records.map((r) => [r.id, r])),
     [records],
   );
+  const byGroupDate = useMemo(
+    () => new Map(groups.map((g) => [g.date, g])),
+    [groups],
+  );
 
   const visible = groups.slice(0, paged.shown);
   const toggle = (date: string) =>
@@ -247,10 +257,13 @@ function DayList({
     });
 
   return (
-    <LogEnvContext.Provider value={{ env, columns, records: byDate }}>
+    <LogEnvContext.Provider
+      value={{ env, columns, records: byDate, groups: byGroupDate }}
+    >
       <LogShell
         view="day"
         aside={aside}
+        calendarAction={calendarAction}
         columnsMenu={
           <ColumnsMenu
             choices={DAY_CHOICES}

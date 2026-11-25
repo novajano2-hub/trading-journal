@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext } from 'react';
+import type { DayGroup } from '@/data/day-log';
 import type { ColumnId } from '@/data/trade-columns';
 import type { DayRecord } from '@/domain/types';
 import type { CellEnv } from '../columns';
@@ -13,6 +14,8 @@ export interface LogEnv {
   dayColumns?: readonly ColumnId[];
   /** The day record by date (moods, finished days). */
   records: ReadonlyMap<string, DayRecord>;
+  /** The Day view's day groups by date, for the note dialog's summary and table. */
+  groups?: ReadonlyMap<string, DayGroup>;
 }
 
 export const LogEnvContext = createContext<LogEnv | null>(null);

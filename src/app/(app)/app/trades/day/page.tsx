@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { TradesDayView } from '@/components/app/trades/log/day-view';
+import { TradesDayPageView } from '@/components/app/trades/log/log-pages';
 
 export const metadata: Metadata = { title: 'Trades by day' };
 
@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: 'Trades by day' };
 export default function TradesDayPage() {
   return (
     <Suspense fallback={null}>
-      <TradesDayView />
+      <TradesDayPageView />
     </Suspense>
   );
 }

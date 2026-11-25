@@ -55,12 +55,16 @@ const NONE: ReadonlySet<string> = new Set();
 /**
  * The trade log by week: cards newest first (weeks with trades only), the
  * first open. Render inside `<Suspense>`: it reads the URL's filters. `aside`
- * is where the mini calendar goes.
+ * is where the mini calendar goes (and `calendarAction` the Calendar button
+ * that opens it as a sheet where there is no column). The Week view has no note
+ * action: the record puts it on day cards, and a tile's dialog shows the card's body.
  */
 export function TradesWeekView({
   aside,
+  calendarAction,
 }: {
   aside?: React.ReactNode;
+  calendarAction?: React.ReactNode;
 }): React.JSX.Element {
   useRememberLogView('week');
   const { filters, setFilters } = useGlobalFilters();
@@ -159,6 +163,7 @@ export function TradesWeekView({
         unitLeftOut={set.data.unitLeftOut}
         noTradesAtAll={allTrades.length === 0}
         aside={aside}
+        calendarAction={calendarAction}
         facts={{ accounts, strategies, tags, categories }}
       />
     </FigureSourceContext.Provider>
@@ -173,6 +178,7 @@ function WeekList({
   unitLeftOut,
   noTradesAtAll,
   aside,
+  calendarAction,
   facts: lists,
 }: {
   weeks: WeekGroup[];
@@ -182,6 +188,7 @@ function WeekList({
   unitLeftOut: number;
   noTradesAtAll: boolean;
   aside?: React.ReactNode;
+  calendarAction?: React.ReactNode;
   facts: LogLists;
 }): React.JSX.Element {
   const prefs = usePrefs().data!;
@@ -227,6 +234,7 @@ function WeekList({
       <LogShell
         view="week"
         aside={aside}
+        calendarAction={calendarAction}
         columnsMenu={
           <ColumnsMenu
             choices={WEEK_CHOICES}
