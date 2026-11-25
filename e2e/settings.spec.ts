@@ -52,6 +52,11 @@ test('add a withdrawal, archive an account, and read one of its trades read-only
 
   // Its trades open read-only: the review toggle is locked and a note says why.
   await page.getByRole('link', { name: 'Trades', exact: true }).first().click();
+  // Trades opens the Day view; the account filter is tested on the All view.
+  await page
+    .getByRole('navigation', { name: 'Trade views' })
+    .getByRole('link', { name: 'All' })
+    .click();
   await expect(page.getByRole('table', { name: 'Trades' })).toBeVisible();
   await page.getByRole('button', { name: /Sample workspace/ }).click();
   await page
@@ -64,7 +69,9 @@ test('add a withdrawal, archive an account, and read one of its trades read-only
     .locator('tbody tr')
     .first();
   await first.getByRole('link').first().click();
-  await expect(page).toHaveURL(/\/app\/trades\/(?!new)[^/?]+(\?.*)?$/);
+  await expect(page).toHaveURL(
+    /\/app\/trades\/(?!(?:new|day|week)(?:[/?]|$))[^/?]+(\?.*)?$/,
+  );
   await expect(
     page.getByText('This account is archived. Its trades are read-only.'),
   ).toBeVisible();

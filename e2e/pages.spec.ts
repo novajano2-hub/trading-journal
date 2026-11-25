@@ -239,6 +239,8 @@ test("today's pages claim no in-browser processing", async ({ page }) => {
 const APP_ROUTES = [
   '/app/dashboard',
   '/app/trades',
+  '/app/trades/day',
+  '/app/trades/week',
   '/app/trades/new',
   '/app/calendar',
   '/app/reports',
@@ -333,7 +335,7 @@ test('every app route renders without horizontal overflow at 390 and 1440', asyn
   }
 });
 
-test('Privacy hides every dollar figure on Trades, Calendar and Reports', async ({
+test('Privacy hides every dollar figure on Trades (All, Day and Week), Calendar and Reports', async ({
   page,
 }, info) => {
   test.skip(info.project.name !== 'desktop', 'one width is enough');
@@ -353,6 +355,10 @@ test('Privacy hides every dollar figure on Trades, Calendar and Reports', async 
   const ready = {
     '/app/trades': () =>
       expect(page.getByRole('table', { name: 'Trades' })).toBeVisible(),
+    '/app/trades/day': () =>
+      expect(page.getByRole('article').first()).toBeVisible(),
+    '/app/trades/week': () =>
+      expect(page.getByRole('article').first()).toBeVisible(),
     '/app/calendar': () =>
       expect(page.getByTestId('calendar-ready')).toBeVisible(),
     '/app/reports': () =>

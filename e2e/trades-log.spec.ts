@@ -42,3 +42,22 @@ test('the Day and Week filters round-trip in the URL', async ({ page }) => {
   await expect(page).toHaveURL(/to=2026-11-20/);
   await expect(page.getByRole('article').first()).toBeVisible();
 });
+
+test('a trade opened from the Day view backs out to the Day view, filters kept', async ({
+  page,
+}) => {
+  await page.goto('/app/trades/day?from=2026-11-09&to=2026-11-20');
+  const first = page.getByRole('article').first();
+  await expect(first).toBeVisible({ timeout: 30_000 });
+  await first.getByRole('button', { name: /^Expand / }).click();
+  await first.getByRole('table').getByRole('link').first().click();
+  await expect(page).toHaveURL(/\/app\/trades\/(?!day|week)[^/?]+\?/);
+  await page
+    .getByRole('heading', { level: 1 })
+    .getByRole('link', { name: 'Trades' })
+    .click();
+  await expect(page).toHaveURL(
+    /\/app\/trades\/day\?.*from=2026-11-09.*to=2026-11-20/,
+  );
+  await expect(page.getByRole('article').first()).toBeVisible();
+});
