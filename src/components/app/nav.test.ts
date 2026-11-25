@@ -16,6 +16,7 @@ import {
 
 test('order and groups', () => {
   expect(APP_NAV.map((i) => i.id)).toEqual([
+    'home',
     'dashboard',
     'trades',
     'calendar',
@@ -139,4 +140,17 @@ test('a day page sits under Trades, with no Display menu and no filters', () => 
   expect(dayPageDate('/app/day')).toBeUndefined();
   expect(dayPageDate('/app/trades')).toBeUndefined();
   expect(hidesDisplayMenu('/app/trades')).toBe(false);
+});
+
+test('Home is the first module, with the House glyph, and is not filter-scoped', () => {
+  const home = APP_NAV[0]!;
+  expect(home).toMatchObject({
+    id: 'home',
+    label: 'Home',
+    href: '/app/home',
+    group: 'modules',
+    filterScoped: false,
+  });
+  expect(pageTitle('/app/home')).toBe('Home');
+  expect(filtersApply('/app/home')).toBe(false);
 });

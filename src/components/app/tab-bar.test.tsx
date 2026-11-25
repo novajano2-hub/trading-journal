@@ -76,6 +76,7 @@ test('More opens a sheet with the switcher, the other modules, Settings, "Not li
       .getAllByRole('link')
       .map((a) => a.textContent),
   ).toEqual([
+    'Home',
     'Progress tracker',
     'Strategies',
     'Notebook',

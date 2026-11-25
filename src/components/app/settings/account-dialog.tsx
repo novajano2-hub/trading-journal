@@ -33,11 +33,14 @@ function amountText(cents: number): string {
 
 function AccountForm({
   account,
+  initialType,
   hasTrades,
   onClose,
 }: {
   /** Absent: a new account. */
   account?: Account;
+  /** A new account's type before the user picks one; Home's first step opens on a prop account. */
+  initialType?: AccountType;
   hasTrades: boolean;
   onClose(): void;
 }): React.JSX.Element {
@@ -47,7 +50,9 @@ function AccountForm({
   const ids = useId();
   const [name, setName] = useState(account?.name ?? '');
   const [broker, setBroker] = useState(account?.broker ?? '');
-  const [type, setType] = useState<AccountType>(account?.type ?? 'live');
+  const [type, setType] = useState<AccountType>(
+    account?.type ?? initialType ?? 'live',
+  );
   const [currency, setCurrency] = useState(
     account?.currency ?? prefs?.baseCurrency ?? 'USD',
   );
@@ -238,11 +243,13 @@ function AccountForm({
 export function AccountDialog({
   open,
   account,
+  initialType,
   hasTrades,
   onClose,
 }: {
   open: boolean;
   account?: Account;
+  initialType?: AccountType;
   hasTrades: boolean;
   onClose(): void;
 }): React.JSX.Element {
@@ -258,6 +265,7 @@ export function AccountDialog({
         <AccountForm
           key={account?.id ?? 'new'}
           account={account}
+          initialType={initialType}
           hasTrades={hasTrades}
           onClose={onClose}
         />

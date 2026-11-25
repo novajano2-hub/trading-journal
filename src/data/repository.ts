@@ -22,6 +22,7 @@ import type {
   RuleGroup,
   Side,
   Strategy,
+  SurveyAnswers,
   Tag,
   TagCategory,
   Tracker,
@@ -482,6 +483,22 @@ export interface DayShotsRepo {
   remove(ws: string, id: string): Promise<void>;
 }
 
+export interface FirstRunInput {
+  firstName: string;
+  lastName: string;
+  username: string;
+  baseCurrency: string;
+  timeZone: string;
+  survey?: SurveyAnswers;
+}
+export interface OnboardingRepo {
+  /**
+   * One transaction: prefs (names, currency, zone, the onboarding flag); "My account" in My workspace in that
+   * currency when it has none; My workspace active. RangeError for a bad username, zone or currency, with nothing written.
+   */
+  complete(input: FirstRunInput): Promise<void>;
+}
+
 export interface Repository {
   workspaces: WorkspacesRepo;
   prefs: PrefsRepo;
@@ -499,4 +516,5 @@ export interface Repository {
   days: DaysRepo;
   dayShots: DayShotsRepo;
   imports: ImportRepo;
+  onboarding: OnboardingRepo;
 }

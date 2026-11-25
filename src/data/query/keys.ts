@@ -40,6 +40,7 @@ export type WriteKind =
   | 'workspaces.resetSample'
   | 'workspaces.clearUser'
   | 'prefs.update'
+  | 'onboarding.complete'
   | 'trades.update'
   | 'trades.updateMany'
   | 'trades.createManual'
@@ -96,6 +97,9 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
       return [keys.workspace('mine')];
     case 'prefs.update':
       return [keys.prefs()];
+    // The first run: prefs and My workspace, which becomes the active one.
+    case 'onboarding.complete':
+      return [keys.prefs(), keys.activeWorkspace(), keys.workspace('mine')];
     // Writes that change an account, its open trades or their journaling also
     // make the import context stale (keys.imports covers it): the plan is remade.
     case 'trades.update':

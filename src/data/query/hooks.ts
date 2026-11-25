@@ -38,6 +38,7 @@ import type {
   NewCashFlow,
   NewChallenge,
   ChallengePatch,
+  FirstRunInput,
   NewStrategy,
   NewTag,
   Repository,
@@ -909,5 +910,16 @@ export function useRemoveDayShot(): UseMutationResult<
 > {
   return useWorkspaceWrite('dayShots.remove', (r, ws, v: { id: string }) =>
     r.dayShots.remove(ws, v.id),
+  );
+}
+
+/** The first run's one write (K47, K55): prefs, My account, and My workspace active. */
+export function useCompleteFirstRun(): UseMutationResult<
+  void,
+  Error,
+  FirstRunInput
+> {
+  return useFixedWrite('onboarding.complete', '', (r, input: FirstRunInput) =>
+    r.onboarding.complete(input),
   );
 }
