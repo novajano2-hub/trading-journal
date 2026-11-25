@@ -541,7 +541,7 @@ Every row below is Keel's call (TradeZella unknown).
 | Id | Question | Keel's call | Basis |
 | --- | --- | --- | --- |
 | C47 | Persistence | Remembered in prefs | INFERRED [inv-2] |
-| C48 | Settings groups | Profile; then Accounts, Trading, Tags, Logs (TZ's order, Keel's pages; 6B adds Rules and fees in its slot) | [inv-3 108] |
+| C48 | Settings groups | Profile; then Accounts, Trading, Tags, Logs (TZ's order, Keel's pages). 6B's Trade defaults and Notebook pages go after Trading, in TZ's Rules and fees and Notebook slots, whichever plan lands first | [inv-3 108]; 6B's coordination note |
 | C49 | Day pages | Keep the slim rail whatever the choice | 6A K33 |
 
 **Report PDF**
@@ -550,7 +550,7 @@ Every row below is Keel's call (TradeZella unknown).
 | --- | --- | --- | --- |
 | C50 | Which reports | Performance only | [rec S32, S48; zooms] |
 | C51 | Contents | What the tab shows: both chart slots as drawn and the summary table, with a header naming the filters, range, accounts, unit and basis, and the date printed | UNKNOWN [rec §7] |
-| C52 | File | The browser's print dialog; no library | §4.4 |
+| C52 | File | The browser's print dialog; no library. One print stylesheet, shared with 6B's note PDF export, built by whichever plan lands first | §4.4; 6B's coordination note |
 
 **Import worker**
 

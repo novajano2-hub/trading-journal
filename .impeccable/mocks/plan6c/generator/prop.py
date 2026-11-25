@@ -257,6 +257,59 @@ def build_07():
     page('07-prop-transactions.html', 'Prop firms, transactions', 'Prop firms', prop_top(), prop_ptop(), main, css, after=dialog,
          note='?state=payout opens Log a payout.')
 
+def build_13():
+    def steps(n):
+        dots = ''.join(f'<i class="{"on" if i < n else ""}"></i>' for i in range(4))
+        return f'<div class="fr-steps" aria-label="Step {n} of 4"><span>Step {n} of 4</span><span class="fr-bar" aria-hidden="true">{dots}</span></div>'
+    opts = [('Own capital', 'Your own trading accounts. They go in your journal as now.', False), ('Prop firms', 'Evaluation and funded accounts with a prop firm.', True), ('Both', 'Prop accounts here; your own accounts stay in your journal.', False)]
+    ol = ''.join(f'<label class="{"on" if on else ""}"><span class="rd"></span><span>{n}<small>{d}</small></span></label>' for n, d, on in opts)
+    s1 = f"""<section class="card frun fr-start" aria-labelledby="f1">{steps(1)}
+  <h2 id="f1">How do you trade?</h2><p class="hint">This only helps you set up; it changes nothing else.</p>
+  <div class="radio" role="radiogroup" style="margin-top:14px">{ol}</div>
+  <div class="fr-ft"><button class="btn ghost">Skip</button><button class="btn pri">Continue</button></div></section>"""
+    added = [('3 Nov', 'Sample firm A', 'Evaluation fee', -165.00), ('30 Sep', 'Sample firm A', 'Activation fee', -85.00), ('2 Nov', 'Sample firm A', 'Payout', 1800.00)]
+    al = ''.join(f'<li><span>{d}</span><span>{f}</span><span>{c}</span><b class="{tone(a)}">{money(a)}</b></li>' for d, f, c, a in added)
+    s2 = f"""<section class="card frun fr-txns" aria-labelledby="f2">{steps(2)}
+  <h2 id="f2">Add what you've paid and been paid</h2><p class="hint">Fees and resets as a negative amount, payouts as a positive one. You can add more later in Transactions.</p>
+  <div class="grid2" style="margin-top:14px">
+    <div class="fld"><label>Firm</label><span class="inp ph">Firm name</span></div><div class="fld"><label>Amount</label><span class="inp ph">−300 or 3000</span></div>
+    <div class="fld"><label>Date</label><span class="inp">{icon("CalendarBlank")}25 Nov 2026</span></div><div class="fld"><label>Category</label><span class="inp">Uncategorized{icon("CaretDown-bold","i sel")}</span></div>
+    <div class="fld"><label>Status</label><span class="inp">Not reviewed{icon("CaretDown-bold","i sel")}</span></div><div class="fld"><label>Description, optional</label><span class="inp ph">For example, a reset</span></div>
+  </div>
+  <div style="margin-top:12px"><button class="btn" aria-disabled="true">{icon("Plus-bold")}Add transaction</button></div>
+  <ul class="fr-list" aria-label="Added">{al}</ul>
+  <div class="fr-ft"><button class="btn ghost">Back</button><button class="btn pri">Continue</button></div></section>"""
+    s3 = f"""<section class="card frun fr-totals" aria-labelledby="f3">{steps(3)}
+  <h2 id="f3">Your prop-firm money so far</h2>
+  <div class="strip" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-top:16px">
+    <div>{lbl('Spent', 'Every cost you added.')}<span class="fig loss">−$250.00</span></div>
+    <div>{lbl('Earned', 'Every payout and other income you added.')}<span class="fig gain">+$1,800.00</span></div>
+    <div>{lbl('Net', 'Earned minus spent.')}<span class="fig gain">+$1,550.00</span></div></div>
+  <div class="fr-ft"><button class="btn ghost">Back</button><button class="btn pri">Continue</button></div></section>"""
+    s4 = f"""<section class="card frun fr-accts" aria-labelledby="f4">{steps(4)}
+  <h2 id="f4">Track your active accounts</h2><p class="hint">Add each evaluation or funded account as a challenge, with its rules, to follow its progress against them.</p>
+  <div class="fr-ft"><button class="btn">Go to the dashboard</button><button class="btn pri">{icon("Plus-bold")}Add active accounts</button></div></section>"""
+    main = f'<div class="fr-wrap">{s1}{s2}{s3}{s4}</div>'
+    css = PROP_CSS + """
+.fr-wrap { display: flex; justify-content: center; padding-top: 8px; }
+.frun { width: min(640px, 100%); padding: 22px 24px 18px; }
+.frun h2 { font-size: 19px; font-weight: 650; letter-spacing: -.02em; margin-top: 14px; }
+.frun .hint { margin-top: 4px; }
+.fr-steps { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; color: var(--faint); }
+.fr-bar { display: flex; gap: 4px; } .fr-bar i { width: 28px; height: 4px; border-radius: 2px; background: var(--line); } .fr-bar i.on { background: var(--accent); }
+.fr-ft { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); }
+.fr-ft .ghost { margin-right: auto; }
+.fr-list { list-style: none; margin-top: 14px; border-top: 1px solid var(--line); }
+.fr-list li { display: grid; grid-template-columns: 70px 1fr 1fr auto; gap: 10px; padding: 10px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); font-size: 13.5px; }
+.fr-list li span:first-child { color: var(--muted); }
+.fr-txns, .fr-totals, .fr-accts { display: none; }
+[data-state='txns'] .fr-start, [data-state='totals'] .fr-start, [data-state='accounts'] .fr-start { display: none; }
+[data-state='txns'] .fr-txns, [data-state='totals'] .fr-totals, [data-state='accounts'] .fr-accts { display: block; }
+@media (max-width: 639.98px) { .frun { padding: 18px 16px 14px; } .fr-list li { grid-template-columns: 56px 1fr auto; } .fr-list li span:nth-child(3) { display: none; } .strip { grid-template-columns: 1fr !important; gap: 10px; } .strip > div { padding-left: 0; border-left: 0 !important; } }
+"""
+    page('13-prop-first-run.html', 'Prop firms, first run', 'Prop firms', prop_top(), prop_ptop(), main, css,
+         note='?state=txns, ?state=totals and ?state=accounts show steps 2 to 4. Shown once per workspace with no challenge and no transaction (C71).')
+
 if __name__ == '__main__':
     import random
-    build_04(); build_05(); build_06(); build_07(); print('ok')
+    build_04(); build_05(); build_06(); build_07(); build_13(); print('ok')

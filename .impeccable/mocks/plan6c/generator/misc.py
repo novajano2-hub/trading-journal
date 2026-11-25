@@ -84,9 +84,9 @@ def build_08():
 
 def snapshot_svg():
     """The image the snapshot makes: the month as shown, Keel's wordmark at the foot."""
-    from dash import NOV
-    W, H = 560, 380
-    x0, y0, cw, chh = 16, 64, 62, 52
+    from dash import NOV, NOTES, WIN
+    W, H = 560, 420
+    x0, y0, cw, chh = 16, 64, 62, 60
     s = f'<svg viewBox="0 0 {W} {H}" role="img" aria-label="Preview of the November 2026 calendar image">'
     s += f'<rect width="{W}" height="{H}" rx="10" fill="var(--surface-1)"/>'
     s += '<text x="16" y="30" font-size="15" font-weight="600" fill="var(--text)">November 2026</text>'
@@ -109,12 +109,17 @@ def snapshot_svg():
                 col = 'var(--gain)' if v[0] > 0 else 'var(--loss)'
                 s += f'<text x="{x+5}" y="{y+29}" font-size="10.5" font-weight="600" fill="{col}">{compact(v[0])}</text>'
                 s += f'<text x="{x+5}" y="{y+42}" font-size="8.5" fill="var(--muted)">{v[1]} trades</text>'
+                s += f'<text x="{x+5}" y="{y+53}" font-size="8.5" fill="var(--muted)">{WIN[day]}% won</text>'
+            if day in NOTES:
+                s += f'<rect x="{x+cw-13}" y="{y+5}" width="8" height="9" rx="1.5" fill="none" stroke="var(--muted)" stroke-width="1"/><line x1="{x+cw-11}" x2="{x+cw-7}" y1="{y+8.5}" y2="{y+8.5}" stroke="var(--muted)" stroke-width=".8"/><line x1="{x+cw-11}" x2="{x+cw-7}" y1="{y+11}" y2="{y+11}" stroke="var(--muted)" stroke-width=".8"/>'
             day += 1
         wx = x0 + 7 * (cw + 4)
         wt = [4201.65, 1181.31, 129.16, 0, 0][w]
+        wd = [5, 5, 4, 0, 0][w]
         s += f'<rect x="{wx}" y="{y0+8+w*(chh+4)}" width="{W-wx-16}" height="{chh}" rx="6" fill="var(--sunken)"/>'
         s += f'<text x="{wx+6}" y="{y0+21+w*(chh+4)}" font-size="9" fill="var(--muted)">Week {w+1}</text>'
         s += f'<text x="{wx+6}" y="{y0+35+w*(chh+4)}" font-size="10" font-weight="600" fill="{"var(--gain)" if wt > 0 else "var(--text)"}">{compact(wt) if wt else "$0"}</text>'
+        s += f'<text x="{wx+6}" y="{y0+48+w*(chh+4)}" font-size="8.5" fill="var(--muted)">{wd} days</text>'
     s += f'<text x="{W-16}" y="{H-12}" font-size="11" font-weight="650" fill="var(--accent-ink)" text-anchor="end">Keel</text>'
     s += '</svg>'
     return s
@@ -177,7 +182,7 @@ def build_12():
     tabs = ''.join(f'<a href="#" class="{"on" if t == "Performance" else ""}">{t}</a>' for t in ['Overview', 'Performance', 'Reports', 'Compare', 'Calendar'])
     slot = lambda n, title, chart, legend: f'''<section class="card" aria-labelledby="c{n}">{hd(f'Chart {n}', f'c{n}', title, end='<button class="btn sm ghost">'+icon('ArrowsOut')+'Expand</button>')}
   <div class="plot">{chart}</div><div class="wfoot">{legend}</div></section>'''
-    weeks = [('16 Nov', 1181.31, 67, '52.2%'), ('9 Nov', 4201.65, 72, '55.6%'), ('2 Nov', 129.16, 37, '48.6%'), ('26 Oct', -842.10, 58, '44.8%'), ('19 Oct', 1622.40, 61, '54.1%')]
+    weeks = [('15 Nov', 129.16, 37, '48.6%'), ('8 Nov', 1181.31, 67, '52.2%'), ('1 Nov', 4201.65, 72, '55.6%'), ('25 Oct', -842.10, 58, '44.8%'), ('18 Oct', 1622.40, 61, '54.1%')]
     tr = ''.join(f'<tr><td>Week of {w}</td><td class="n f {tone(v)}">{money(v)}</td><td class="n">{n}</td><td class="n">{p}</td></tr>' for w, v, n, p in weeks)
     table = f'<table style="margin-top:8px"><thead><tr><th>Week</th><th class="n">Net P&amp;L</th><th class="n">Trades</th><th class="n">Win rate</th></tr></thead><tbody>{tr}</tbody></table>'
     c1 = slot(1, 'By week, all time', lines_chart([s1], 560, 210, MONTHS), '<span class="k"><i class="ln" style="background:var(--accent)"></i>Net P&amp;L, running</span>')
