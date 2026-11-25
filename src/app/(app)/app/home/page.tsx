@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
-import { HomeView } from '@/components/app/home/home-view';
+import { HomeScreen } from '@/components/app/home/home-screen';
 
 export const metadata: Metadata = { title: 'Home' };
 
 export default function HomePage() {
-  return <HomeView />;
+  return <HomeScreen />;
 }

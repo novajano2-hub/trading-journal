@@ -12,13 +12,23 @@ export default defineConfig({
     reuseExistingServer: false,
   },
   projects: [
+    // Runs the first run's shortcut once: a browser that has seen it, saved for the rest.
+    { name: 'setup', testMatch: /onboard\.setup\.ts/ },
     {
       name: 'desktop',
-      use: { viewport: { width: 1440, height: 900 } },
+      dependencies: ['setup'],
+      use: {
+        viewport: { width: 1440, height: 900 },
+        storageState: 'e2e/.state/onboarded.json',
+      },
     },
     {
       name: 'mobile',
-      use: { viewport: { width: 390, height: 844 } },
+      dependencies: ['setup'],
+      use: {
+        viewport: { width: 390, height: 844 },
+        storageState: 'e2e/.state/onboarded.json',
+      },
     },
   ],
 });
