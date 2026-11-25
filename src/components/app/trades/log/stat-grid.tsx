@@ -1,17 +1,23 @@
 'use client';
 
+import { useContext } from 'react';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { MetricId } from '@/content/metric-definitions';
 import type { DayStats } from '@/data/day-log';
+import { metricContextOf } from '@/data/metrics';
 import { usePrefs } from '@/data/query/hooks';
 import { isClosed } from '@/domain/trade-status';
 import type { Trade } from '@/domain/types';
-import { useDisplay } from '@/lib/display';
+import {
+  FigureSourceContext,
+  sumFigures,
+  tradeFigure,
+  useDisplay,
+} from '@/lib/display';
 import { signTone } from '../../dashboard/shared';
 
-/** Up to two decimals with trailing zeros dropped: 50%, 48.48%, 57.14% (the record's format). */
-const percent = (ratio: number): string =>
-  `${Number((ratio * 100).toFixed(2))}%`;
+/** One decimal, as comp 06 shows it: 57.1%, 66.7%, 25.0%. */
+const percent = (ratio: number): string => `${(ratio * 100).toFixed(1)}%`;
 
 const NONE = <span className="font-medium text-faint">None</span>;
 
@@ -24,8 +30,8 @@ const quantity = (n: number): string =>
  * then Win rate, Volume, Profit factor. `trades` are the base-currency trades
  * the stats were built from, so a unit other than dollars can read them.
  * Money goes through the display unit (Privacy included); an empty value reads
- * "None". Commissions read as the display's two decimals, where TradeZella
- * trims to one: Keel's call (the unit system formats every amount alike).
+ * "None". Number formats follow comp 06: commissions as two-decimal money
+ * ($28.50), win rate to one decimal (57.1%).
  */
 export function StatGrid({
   stats,
@@ -35,14 +41,28 @@ export function StatGrid({
   trades?: readonly Trade[];
 }): React.JSX.Element {
   const display = useDisplay();
-  const basis = usePrefs().data?.pnlBasis ?? 'net';
-  const closed = trades.filter(isClosed).map((t) => t.id);
-  const money = (cents: number | null, signed: boolean) =>
-    cents === null
+  const prefs = usePrefs().data;
+  const basis = prefs?.pnlBasis ?? 'net';
+  const source = useContext(FigureSourceContext);
+  const closedTrades = trades.filter(isClosed);
+  // Gross is read on the gross basis (R, ticks and the rest differ from net's), whatever basis the view's figures are forced to.
+  const ctx = source?.ctx ?? (prefs ? metricContextOf(prefs) : undefined);
+  const pctBase = source?.pctBase ?? null;
+  const gross =
+    stats.gross === null
       ? null
-      : display.figure(display.ofTrades(closed, cents), signed);
-
-  const gross = money(stats.gross, true);
+      : display.figure({
+          ...sumFigures(
+            ctx
+              ? closedTrades.map((t) =>
+                  tradeFigure(t, { ...ctx, pnlBasis: 'gross' }),
+                )
+              : [],
+            pctBase,
+          ),
+          money: stats.gross,
+          pct: pctBase ? stats.gross / pctBase : null,
+        });
   const commissions =
     stats.gross === null ? null : display.cash(stats.commissions, false);
   const ratio =

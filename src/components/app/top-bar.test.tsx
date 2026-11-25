@@ -264,3 +264,26 @@ test('Plan the day sits before Import on the Dashboard and Trades only', () => {
     cleanup();
   }
 });
+
+test('the bar publishes its measured height for what pins under it, and Plan the day shows on the day and week views', () => {
+  layOut({ titleWidth: 115, chipsWidth: 100 });
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+    function (this: HTMLElement) {
+      return {
+        left: 0,
+        width: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        height: this.tagName === 'HEADER' ? 104 : 0,
+      } as DOMRect;
+    },
+  );
+  renderBar('/app/trades/day');
+  expect(document.documentElement.style.getPropertyValue('--top-bar')).toBe(
+    '104px',
+  );
+  expect(screen.getByRole('button', { name: 'Plan the day' })).toBeTruthy();
+  cleanup();
+  expect(document.documentElement.style.getPropertyValue('--top-bar')).toBe('');
+});

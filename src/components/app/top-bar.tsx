@@ -91,6 +91,12 @@ function useChipsFit({
   useLayoutEffect(() => {
     const sm = matchMedia('(min-width: 640px)');
     const measure = () => {
+      // The bar's measured height, for what pins itself under it (the trade views' switch row).
+      if (bar.current)
+        document.documentElement.style.setProperty(
+          '--top-bar',
+          `${bar.current.getBoundingClientRect().height}px`,
+        );
       const t = title.current;
       const r = tail.current;
       const c = chips.current;
@@ -106,12 +112,17 @@ function useChipsFit({
       setFit((f) => (f === next ? f : next));
     };
     measure();
-    if (typeof ResizeObserver === 'undefined') return;
+    const unpublish = () =>
+      document.documentElement.style.removeProperty('--top-bar');
+    if (typeof ResizeObserver === 'undefined') return unpublish;
     // The bar resizes with the window; the rest with their words.
     const observer = new ResizeObserver(measure);
     for (const el of [bar, title, controls, chips])
       if (el.current) observer.observe(el.current);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      unpublish();
+    };
   }, [bar, title, tail, controls, chips]);
   return fit;
 }

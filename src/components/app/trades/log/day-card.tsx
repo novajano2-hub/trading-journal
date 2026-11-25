@@ -87,6 +87,8 @@ export function DayCard({
       : id;
   };
   const closed = group.trades.filter(isClosed);
+  // Keel's call (TradeZella unknown): the enlarged chart's start and end are the
+  // first open and the last close of the day's closed trades.
   const span =
     closed.length === 0
       ? undefined
@@ -115,6 +117,7 @@ export function DayCard({
   return (
     <article aria-labelledby={heading} className={`${CARD} ${CARD_PAD}`}>
       <header className="flex min-h-9 items-center gap-2.5">
+        {/* Keel's call (TradeZella unknown): a note-only card has nothing to expand, so it has no chevron. */}
         {noteOnly ? null : (
           <button
             type="button"
@@ -145,6 +148,7 @@ export function DayCard({
         </b>
         <div className="ml-auto flex items-center gap-0.5 max-sm:-mr-2.5">
           {mood}
+          {/* Keel's call (TradeZella unknown): a note-only card has no Review link; the comp shows none. */}
           {noteOnly ? null : (
             <Link
               href={`/app/day/${group.date}/review`}
@@ -178,6 +182,8 @@ export function DayCard({
               <StatGrid stats={group.stats} trades={group.trades} />
             </div>
           ) : (
+            // Keel's call (TradeZella unknown): a day with only other-currency trades
+            // has no chart or figures (they sum the base currency), only this line and the apart list.
             <p className="mt-2 text-[13px] text-muted">
               {group.otherCurrency.length}{' '}
               {plural(group.otherCurrency.length, 'trade')} in other currencies,

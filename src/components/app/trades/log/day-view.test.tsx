@@ -156,6 +156,10 @@ test('the card header shows net after costs whatever the P&L basis', async () =>
     prefs: { pnlBasis: 'gross' },
   });
   const first = (await cards())[0]!;
+  expect(
+    within(first).getByText('Gross P&L').closest('div')!.querySelector('dd')!
+      .textContent,
+  ).toBe('+$75.00');
   await waitFor(() => {
     // Net after costs: 100 - 40 = $60.00; gross would be $75.00 and sits in the grid.
     expect(
@@ -180,7 +184,7 @@ test('the stat grid matches day-log', async () => {
   expect(value('Gross P&L')).toBe('+$75.00');
   expect(value('Won / lost')).toBe('1 / 1');
   expect(value('Commissions')).toBe('$15.00');
-  expect(value('Win rate')).toBe('50%');
+  expect(value('Win rate')).toBe('50.0%');
   // Both sides: two closed trades of one contract (2 each) and one open (1).
   expect(value('Volume')).toBe('5');
   expect(value('Profit factor')).toBe('2.50');
@@ -535,4 +539,51 @@ test('below sm the quick actions are glyph buttons, Plan the day sits in the pag
   const list = await within(first).findByRole('list', { name: 'Trades' });
   expect(within(list).getAllByRole('listitem')).toHaveLength(3);
   match.mockRestore();
+});
+
+test('under the R unit the header is net R and Gross P&L is gross R', async () => {
+  const withRisk = trades()
+    .slice(0, 2)
+    .map((t) => ({ ...t, initialRisk: 10_000 }));
+  await renderApp(<TradesDayView />, {
+    sample: sample({ trades: withRisk, journal: [], days: [] }),
+    url: '/app/trades/day',
+    prefs: { displayUnit: 'r' },
+  });
+  const first = (await cards())[0]!;
+  // Net 100 - 40 = $60 over $100 risk; gross 110 - 35 = $75.
+  expect(
+    within(first).getByRole('heading').parentElement!.textContent,
+  ).toContain('+0.60R');
+  expect(
+    within(first).getByText('Gross P&L').closest('div')!.querySelector('dd')!
+      .textContent,
+  ).toBe('+0.75R');
+});
+
+test('a workspace with no trades shows the Import state whatever the filters', async () => {
+  await renderApp(<TradesDayView />, {
+    sample: sample({ trades: [], journal: [], days: [] }),
+    url: '/app/trades/day?range=last-week',
+  });
+  expect(await screen.findByText('No trades yet.')).toBeTruthy();
+  expect(screen.getByRole('link', { name: 'Import' })).toBeTruthy();
+  expect(screen.queryByText('No trades match these filters.')).toBeNull();
+});
+
+test('the tag panel is named for the trade and its day', async () => {
+  await renderApp(<TradesDayView />, {
+    sample: sample(),
+    url: '/app/trades/day',
+  });
+  const first = (await cards())[0]!;
+  fireEvent.click(
+    within(first).getByRole('button', { name: 'Expand Tue 24 Nov 2026' }),
+  );
+  const [add] = await screen.findAllByRole('button', { name: /Add tags/ });
+  fireEvent.click(add!);
+  const panel = await screen.findByRole('dialog', {
+    name: 'Tags for ES, Tue 24 Nov 2026',
+  });
+  expect(panel).toBeTruthy();
 });

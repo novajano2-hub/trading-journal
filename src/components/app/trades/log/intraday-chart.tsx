@@ -9,7 +9,12 @@ import { plural } from '@/lib/format';
 import { signTone } from '../../dashboard/shared';
 import { clockOf } from './day-label';
 
-/** The span of the day's trading the x axis covers: first open to last close of its closed trades. */
+/**
+ * The span of the day's trading the x axis covers: first open to last close of
+ * its closed trades. Keel's call (TradeZella unknown): the record says only
+ * "the start, the middle and the end of the day's trading", so these anchors
+ * are Keel's reading of it.
+ */
 export interface ChartSpan {
   from: string;
   to: string;

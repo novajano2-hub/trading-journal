@@ -2,6 +2,7 @@
 
 import { Plus } from '@phosphor-icons/react/dist/ssr';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useId } from 'react';
 import { Popover } from 'radix-ui';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { MetricId } from '@/content/metric-definitions';
@@ -53,6 +54,8 @@ function TagsWithPicker({
   env: CellEnv;
 }): React.JSX.Element {
   const update = useUpdateTrades();
+  const title = useId();
+  const date = dayLabel(dayOfTrade(trade, env.timeZone));
   return (
     <span className="flex min-w-0 items-center gap-1.5">
       <span className="min-w-0 flex-1">
@@ -70,11 +73,19 @@ function TagsWithPicker({
         </Popover.Trigger>
         <Popover.Portal>
           <Popover.Content
+            aria-labelledby={title}
             align="end"
             sideOffset={6}
             collisionPadding={12}
             className="z-[60] w-[280px] max-w-[calc(100vw-24px)] origin-(--radix-popover-content-transform-origin) rounded-[12px] border border-line bg-surface-1 p-3 text-text shadow-[var(--shadow)] outline-none motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in"
           >
+            {/* Names the trade, as the record's tag panel does; the wording is Keel's own. */}
+            <h3
+              id={title}
+              className="mb-2 text-[13.5px] font-semibold text-text"
+            >
+              Tags for {trade.instrument.root}, {date}
+            </h3>
             <TagPicker
               label={`Tags for ${trade.instrument.root}`}
               autoFocus

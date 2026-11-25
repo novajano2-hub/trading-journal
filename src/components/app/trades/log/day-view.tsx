@@ -343,7 +343,7 @@ function DayList({
   return (
     <LogEnvContext.Provider value={{ env, columns, records: byDate }}>
       <div className="flex min-w-0 flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0">
-        <div className="sticky top-14 z-20 -mx-5 bg-bg px-5 py-2 sm:top-[68px]">
+        <div className="sticky top-[var(--top-bar,56px)] z-20 -mx-5 bg-bg px-5 py-2 sm:top-[var(--top-bar,68px)]">
           <div className="flex items-center gap-2.5">
             <div className="max-sm:flex-1">
               <TradesSwitch view="day" />
@@ -382,7 +382,7 @@ function DayList({
         >
           <div className="flex min-w-0 flex-col gap-4">
             {groups.length === 0 ? (
-              noTradesAtAll && !filtered ? (
+              noTradesAtAll ? (
                 <StateBlock
                   icon={TableIcon}
                   title="No trades yet."
