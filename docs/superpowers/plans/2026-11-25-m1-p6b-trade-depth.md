@@ -424,7 +424,8 @@ Delivers B5 to B8, B55 and Review Focus 2.
   ```
   hooks `useMergeTrades()`, `useSplitTrade()`, `useMoveTrades()`, `useMoveAccountTrades()`; `WriteKind`s `'trades.merge' | 'trades.split' | 'trades.move'` invalidating trades, journal, imports, history, days and `keys.filesAll(ws)` (merge reassigns files with `FilesRepo.reassign`, which has no hook of its own).
 - Each runs in one `rwTx` over trades, journal, files, accounts, history; refuses archived accounts (source or destination) with `ArchivedAccountError`; writes history rows (merged, split, moved; source you; a move logs `field: 'accountId'`).
-- `imports.ts` `context`: `openTrades` excludes `grouping === 'manual'`. `undo`: refuses with `{ ok: false, reason: 'regrouped', tradeIds }` when any trade the import built was merged, split or moved since (history rows with those actions on its trade ids, or a missing id). Extend `UndoResult` with that reason.
+- `imports.ts` `context`: `openTrades` excludes `grouping === 'manual'`. `undo`: refuses with `{ ok: false, reason: 'regrouped', tradeIds }` when any trade the import built was merged, split or moved since: a trade with `grouping === 'manual'`, or a missing id. Don't rely on history rows for this, as they are purged after 30 days.
+- Also in this task (Module A review minors): add `keys.filesAll(ws)` to the invalidations of `trades.remove`, `strategies.remove`, `journal.remove`, `imports.undo` and `accounts.clearTrades`, pinned in `keys.test.ts`; make `files.test.ts` "a refused trade removal keeps the files" assert `ArchivedAccountError` instead of a bare `rejects.toThrow()`; when an import commit drops a replaced trade that no new trade continues, keep its files (an undo restores it) and delete them when the import can no longer be undone (a later import depends on it or its trades are regrouped). Extend `UndoResult` with that reason.
 
 - [ ] **Step 1: Write the failing tests:**
   - `'merge writes one trade, unlinks the other notes, moves their files, logs each trade'`;
@@ -778,6 +779,7 @@ Delivers B29 and spec §5.9's screen. Comp: `08-history.html`.
 
 **Interfaces:**
 - Consumes: `useHistory()` (Task 3).
+- Rows of one edit share one timestamp: order them by `field` when reading.
 - Columns in Keel's order: Time (profile zone, GMT offset); Record (type over identifier); Change (field, then from and to on one line, formatted with Display; Privacy masks money); Action; Source. Search over type, identifier and field; Filter by type, action and source; 50 rows a page. Phone: the time and the record, then the change, action and source.
 
 - [ ] **Step 1: Write the failing tests:** `'rows are newest first and page at 50'`; `'search and each filter narrow the rows'`; `'money values are masked under Privacy'`; `'the empty and no-match states'`.
