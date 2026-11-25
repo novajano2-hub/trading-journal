@@ -34,6 +34,10 @@ const CALENDAR_STATS: readonly CalendarStat[] = [
   'points',
 ];
 
+const NOTE_SIZES = ['h1', 'h2', 'h3', 'body'] as const;
+const NOTE_SIZE_MIN = 10;
+const NOTE_SIZE_MAX = 40;
+
 /** The prefs as stored, over the defaults. Works inside a transaction that includes `db.meta`. */
 export async function readPrefs(db: KeelDb): Promise<UserPrefs> {
   return withDefaults((await db.meta.get(META.prefs))?.value);
@@ -133,7 +137,12 @@ function validate(p: Partial<UserPrefs>): void {
     throw new RangeError(
       'Onboarding must be { status: "done", at: <ISO time> }',
     );
-  for (const key of ['dayColumns', 'weekColumns', 'seenTips'] as const) {
+  for (const key of [
+    'dayColumns',
+    'weekColumns',
+    'seenTips',
+    'tradeStats',
+  ] as const) {
     const list = p[key];
     if (
       list !== undefined &&
@@ -141,6 +150,26 @@ function validate(p: Partial<UserPrefs>): void {
     )
       throw new RangeError(`${key} must be a list of strings`);
   }
+  const nt = p.noteType;
+  if (
+    nt !== undefined &&
+    !(
+      typeof nt === 'object' &&
+      nt !== null &&
+      NOTE_SIZES.every(
+        (k) =>
+          Number.isInteger(nt[k]) &&
+          nt[k] >= NOTE_SIZE_MIN &&
+          nt[k] <= NOTE_SIZE_MAX,
+      ) &&
+      typeof nt.strikeChecked === 'boolean'
+    )
+  )
+    throw new RangeError(
+      `Note type sizes are whole numbers from ${NOTE_SIZE_MIN} to ${NOTE_SIZE_MAX}, and strikeChecked is true or false`,
+    );
+  if (p.strategyChooser !== undefined && typeof p.strategyChooser !== 'boolean')
+    throw new RangeError('strategyChooser must be true or false');
 }
 
 const asPartial = (value: unknown): Partial<UserPrefs> =>

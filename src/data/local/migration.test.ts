@@ -333,3 +333,72 @@ test('a v2 database with only the sample is not onboarded', async () => {
 test('a fresh database is not onboarded', async () => {
   expect(await onboardingOf(new IDBFactory())).toBeUndefined();
 });
+
+// ---- version 3 to 4 --------------------------------------------------------
+
+/** The stores as version 3 declared them: version 2's, plus the routine's. */
+const V3_STORES = {
+  ...V2_STORES,
+  trackers: '[workspaceId+id], workspaceId',
+  days: '[workspaceId+id], workspaceId',
+  dayShots: '[workspaceId+id], workspaceId, [workspaceId+date]',
+};
+
+/** A version 3 database holding `rows` (by table) and `meta` records. */
+async function openV3(
+  indexedDB: IDBFactory,
+  rows: V2Rows = {},
+  meta: { key: string; value: unknown }[] = [],
+): Promise<void> {
+  const v3 = new Dexie(DB_NAME, { indexedDB, IDBKeyRange });
+  v3.version(3).stores(V3_STORES);
+  for (const [table, list] of Object.entries(rows))
+    await v3.table(table).bulkPut(list ?? []);
+  await v3.table('meta').bulkPut(meta);
+  v3.close();
+}
+
+test('the 6B upgrade keeps every row and adds empty tables', async () => {
+  const indexedDB = new IDBFactory();
+  const trade = (ws: string) => ({
+    ...makeTrade({ id: `t-${ws}`, workspaceId: ws, net: 500 }),
+    plannedStop: 99,
+    initialRisk: 1_000,
+  });
+  const rows: V2Rows = {
+    trades: [trade(M), trade(S)],
+    accounts: [account(M), account(S)],
+    strategies: [M, S].map((ws) => ({
+      id: `s-${ws}`,
+      workspaceId: ws,
+      name: 'Breakout',
+    })),
+    journal: [v2Entry(M), v2Entry(S)],
+    days: [M, S].map((ws) => ({ id: '2026-11-20', workspaceId: ws })),
+    imports: [M, S].map((ws) => ({
+      id: `imp-${ws}`,
+      workspaceId: ws,
+      accountId: `a-${ws}`,
+      replacedTrades: [trade(ws)],
+    })),
+  };
+  await openV3(indexedDB, rows, [{ key: 'prefs', value: PREFS }]);
+  const db = new KeelDb({ indexedDB, IDBKeyRange });
+  await db.open();
+  for (const [table, list] of Object.entries(rows))
+    for (const row of list ?? []) {
+      const { workspaceId, id } = row as { workspaceId: string; id: string };
+      expect(await db.table(table).get([workspaceId, id])).toEqual(row);
+    }
+  expect((await db.meta.get('prefs'))?.value).toEqual(PREFS);
+  for (const table of [
+    'files',
+    'noteVersions',
+    'history',
+    'targetRules',
+    'feeRules',
+    'missedTrades',
+  ])
+    expect(await db.table(table).count()).toBe(0);
+  db.close();
+});
