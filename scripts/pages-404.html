@@ -1,0 +1,120 @@
+<!doctype html>
+<!--
+  The 404 page of the GitHub Pages copy (see build-pages.mjs). Pages serves it,
+  at the address asked for, whenever no file matches, so an address like
+  /app/trades/<id> lands here. It finds the prerendered placeholder page for
+  that address, puts the id from the address where the placeholder was, and
+  writes the result over this page: the app opens on that id.
+  The base path and the dynamic routes are filled in at build time.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Keel</title>
+  </head>
+  <body>
+    <noscript>Keel needs JavaScript.</noscript>
+    <p
+      id="status"
+      style="
+        font:
+          16px/1.5 system-ui,
+          sans-serif;
+        margin: 2rem;
+      "
+    ></p>
+    <script>
+      (function () {
+        var D = __KEEL_PAGES__;
+        var status = document.getElementById('status');
+
+        function notFound() {
+          status.innerHTML =
+            'There is nothing at this address. <a href="' +
+            D.base +
+            '/">Open Keel</a>';
+        }
+
+        // The page decodes a segment the way Next hands it over, percent-decoded.
+        function decoded(segment) {
+          try {
+            return decodeURIComponent(segment);
+          } catch (e) {
+            return segment;
+          }
+        }
+
+        // A value as it sits inside the page's data: a JSON string, inside a
+        // script's string, and never a way out of the script.
+        function inData(value) {
+          var json = JSON.stringify(value)
+            .slice(1, -1)
+            .replace(/</g, '\\u003c');
+          return JSON.stringify(json).slice(1, -1);
+        }
+
+        var path = location.pathname;
+        if (path.indexOf(D.base + '/') !== 0) return notFound();
+        var rest = path.slice(D.base.length);
+
+        // A trailing slash names a folder, which has no file: the page is the name without it.
+        if (rest.length > 1 && rest.charAt(rest.length - 1) === '/') {
+          location.replace(
+            D.base + rest.slice(0, -1) + location.search + location.hash,
+          );
+          return;
+        }
+
+        // Redirects from next.config.ts, which a static site cannot run.
+        for (var k = 0; k < D.redirects.length; k++) {
+          if (D.redirects[k].from === rest) {
+            location.replace(
+              D.base + D.redirects[k].to + location.search + location.hash,
+            );
+            return;
+          }
+        }
+
+        var segments = rest.split('/').slice(1);
+        var hit = null;
+        for (var i = 0; i < D.routes.length && !hit; i++) {
+          var route = D.routes[i];
+          if (route.pattern.length !== segments.length) continue;
+          var values = {};
+          var ok = true;
+          var n = 0;
+          for (var j = 0; j < segments.length && ok; j++) {
+            if (route.pattern[j] === null) {
+              ok = segments[j] !== '';
+              values[route.names[n++]] = decoded(segments[j]);
+            } else {
+              ok = route.pattern[j] === segments[j];
+            }
+          }
+          if (ok) hit = { route: route, values: values };
+        }
+        if (!hit) return notFound();
+
+        status.textContent = 'Opening…';
+        fetch(D.base + hit.route.file)
+          .then(function (res) {
+            if (!res.ok) throw new Error(String(res.status));
+            return res.text();
+          })
+          .then(function (html) {
+            for (var name in hit.values) {
+              html = html
+                .split('__keel_' + name + '__')
+                .join(inData(hit.values[name]));
+            }
+            document.open();
+            document.write(html);
+            document.close();
+          })
+          .catch(notFound);
+      })();
+    </script>
+  </body>
+</html>
