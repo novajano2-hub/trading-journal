@@ -454,6 +454,8 @@ test('every metric carries its definition', async () => {
     'rule-average',
     'tracker-follow-rate',
     'tracker-history',
+    // On the day page's review tiles (Plan 6A Task 13).
+    'session-length',
     // On a trade note's stats card (Task 21).
     'volume',
     // On a challenge's card (Task 19).

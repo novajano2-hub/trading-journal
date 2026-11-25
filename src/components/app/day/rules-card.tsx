@@ -18,9 +18,12 @@ import { DayRules } from '../progress/day-rules';
 export function RulesCard({
   date,
   today,
+  foot,
 }: {
   date: string;
   today: string;
+  /** What closes the card on a scored day: the review page's Close the day. */
+  foot?: React.ReactNode;
 }): React.JSX.Element | null {
   const scores = useDayScores().data;
   const days = useDays().data;
@@ -86,6 +89,7 @@ export function RulesCard({
           Couldn&apos;t save that tick. Try again.
         </p>
       ) : null}
+      {score.unscored === undefined ? foot : null}
     </section>
   );
 }

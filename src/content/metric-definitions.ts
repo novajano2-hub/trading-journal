@@ -2,6 +2,7 @@ import type { PnlBasis } from '@/domain/types';
 
 export const METRIC_IDS = [
   'rule-adherence',
+  'session-length',
   'broken-rules-cost',
   'rule-kept',
   'rule-cost-broken',
@@ -362,6 +363,11 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Volume',
     definition:
       'Contracts, lots or shares traded, each trade counted once by the quantity it opened, not by every fill. On a day, a trade counts what its exits closed that day, so a trade that exits over several days is shared among them by exited size. What an open trade still holds counts on the day it opened.',
+  },
+  'session-length': {
+    label: 'Session',
+    definition:
+      "How long the day's session ran, from Start session to End session. A session left running ends at midnight. None when the day's session was never started.",
   },
   'day-rating': {
     label: 'Day rating',
