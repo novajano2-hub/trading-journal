@@ -74,13 +74,13 @@ test('a name that is not a zone changes nothing', async () => {
   expect((await r.prefs.saved()).timeZone).toBeUndefined();
 });
 
-test('the name and the base currency save when you leave the field', async () => {
+test('the first name and the base currency save when you leave the field', async () => {
   const r = repo();
   renderApp(<ProfileSettings />, {
     repository: r,
     url: '/app/settings/profile',
   });
-  const name = await screen.findByLabelText('Name');
+  const name = await screen.findByLabelText('First name');
   fireEvent.change(name, { target: { value: 'Sam' } });
   fireEvent.blur(name);
   const currency = screen.getByLabelText('Base currency');
@@ -88,7 +88,7 @@ test('the name and the base currency save when you leave the field', async () =>
   fireEvent.blur(currency);
   await waitFor(async () =>
     expect(await r.prefs.get()).toMatchObject({
-      displayName: 'Sam',
+      firstName: 'Sam',
       baseCurrency: 'EUR',
     }),
   );
@@ -105,4 +105,57 @@ test('a bad base currency is announced as an alert the field points to', async (
   const alert = await screen.findByRole('alert');
   expect(alert.textContent).toBe('Use a three-letter currency code, like USD.');
   expect(currency.getAttribute('aria-describedby')).toBe(alert.id);
+});
+
+test('Profile edits the first name, last name and username', async () => {
+  const r = repo();
+  renderApp(<ProfileSettings />, {
+    repository: r,
+    url: '/app/settings/profile',
+  });
+  const last = await screen.findByLabelText('Last name');
+  fireEvent.change(last, { target: { value: 'Rivera' } });
+  fireEvent.blur(last);
+  const user = screen.getByLabelText('Username');
+  expect(
+    screen.getByText(
+      'Letters, digits, dots and underscores, 3 to 30 characters.',
+    ),
+  ).toBeTruthy();
+  fireEvent.change(user, { target: { value: 'sam.rivera_1' } });
+  fireEvent.blur(user);
+  await waitFor(async () =>
+    expect(await r.prefs.get()).toMatchObject({
+      lastName: 'Rivera',
+      username: 'sam.rivera_1',
+    }),
+  );
+});
+
+test('a bad username is announced and not saved', async () => {
+  const r = repo();
+  renderApp(<ProfileSettings />, {
+    repository: r,
+    url: '/app/settings/profile',
+  });
+  const user = await screen.findByLabelText('Username');
+  fireEvent.change(user, { target: { value: 'a b' } });
+  fireEvent.blur(user);
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toContain('3 to 30 characters');
+  expect(user.getAttribute('aria-describedby')).toBe(alert.id);
+  expect((await r.prefs.saved()).username).toBeUndefined();
+});
+
+test('an old display name reads as the first name, and is kept in storage', async () => {
+  const r = repo();
+  await r.prefs.update({ displayName: 'Alex' });
+  renderApp(<ProfileSettings />, {
+    repository: r,
+    url: '/app/settings/profile',
+  });
+  const name = (await screen.findByLabelText('First name')) as HTMLInputElement;
+  await waitFor(() => expect(name.value).toBe('Alex'));
+  expect((await r.prefs.saved()).displayName).toBe('Alex');
+  expect((await r.prefs.saved()).firstName).toBeUndefined();
 });

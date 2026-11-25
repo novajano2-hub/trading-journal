@@ -50,18 +50,82 @@ interface Draft {
   text: string;
 }
 
-/** Name, time zone, base currency and appearance. Each saves as you finish it. */
+// same rule as src/data/local/prefs.ts USERNAME
+const USERNAME = /^[A-Za-z0-9._]{3,30}$/;
+
+/**
+ * A text preference that saves when you leave the field. What is typed belongs
+ * to the saved value it was typed over: once that changes (a save lands, or
+ * another tab saves), the typing is stale. An empty field forgets the value.
+ */
+function TextPref({
+  label,
+  saved,
+  hint,
+  autoComplete,
+  invalid,
+  onSave,
+}: {
+  label: string;
+  saved: string;
+  hint: string;
+  autoComplete: string;
+  /** The message for a typed value that can't be saved, or none. */
+  invalid?(text: string): string | null;
+  /** `null`: the field was emptied. */
+  onSave(next: string | null): void;
+}): React.JSX.Element {
+  const id = useId();
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const typed = draft?.base === saved ? draft.text : null;
+  return (
+    <div>
+      <label htmlFor={id} className={LABEL}>
+        {label}
+      </label>
+      <input
+        id={id}
+        value={typed ?? saved}
+        autoComplete={autoComplete}
+        spellCheck={false}
+        aria-invalid={error !== null || undefined}
+        aria-describedby={`${id}-${error !== null ? 'err' : 'help'}`}
+        onChange={(e) => {
+          setDraft({ base: saved, text: e.target.value });
+          setError(null);
+        }}
+        onBlur={() => {
+          if (typed === null) return;
+          const next = typed.trim();
+          if (next === saved) return setDraft(null);
+          const message = next === '' ? null : (invalid?.(next) ?? null);
+          if (message !== null) return setError(message);
+          onSave(next === '' ? null : next);
+        }}
+        className={INPUT}
+      />
+      {error !== null ? (
+        <FieldError id={`${id}-err`}>{error}</FieldError>
+      ) : (
+        <p id={`${id}-help`} className={HELP}>
+          {hint}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** First name, last name, username, time zone, base currency and appearance. Each saves as you finish it. */
 export function ProfileSettings(): React.JSX.Element {
   const prefs = usePrefs().data;
   const saved = useSavedPrefs().data;
   const update = useUpdatePrefs();
   const unset = useUnsetPrefs();
-  const nameId = useId();
   const currencyId = useId();
 
   // What is typed belongs to the saved value it was typed over: once that
   // changes (a save lands, or another tab saves), the typing is stale.
-  const [nameDraft, setNameDraft] = useState<Draft | null>(null);
   const [currencyDraft, setCurrencyDraft] = useState<Draft | null>(null);
   const [currencyError, setCurrencyError] = useState(false);
 
@@ -75,11 +139,8 @@ export function ProfileSettings(): React.JSX.Element {
     );
 
   const zoneSaved = saved.timeZone !== undefined;
-  const savedName = prefs.displayName ?? '';
-  const name = nameDraft?.base === savedName ? nameDraft.text : null;
   const currency =
     currencyDraft?.base === prefs.baseCurrency ? currencyDraft.text : null;
-  const shownName = name ?? savedName;
   const shownCurrency = currency ?? prefs.baseCurrency;
   const busy = update.isPending || unset.isPending;
 
@@ -90,29 +151,49 @@ export function ProfileSettings(): React.JSX.Element {
     >
       <CardHeader headingId="profile-heading" title="Profile" />
       <div className="mt-5 grid max-w-[460px] gap-5">
-        <div>
-          <label htmlFor={nameId} className={LABEL}>
-            Name
-          </label>
-          <input
-            id={nameId}
-            value={shownName}
-            autoComplete="name"
-            onChange={(e) =>
-              setNameDraft({ base: savedName, text: e.target.value })
-            }
-            onBlur={() => {
-              if (name === null) return;
-              const next = name.trim();
-              if (next === savedName) return setNameDraft(null);
-              // An empty name is no name: the key is forgotten, not saved empty.
-              if (next === '') unset.mutate(['displayName']);
-              else update.mutate({ displayName: next });
-            }}
-            className={INPUT}
-          />
-          <p className={HELP}>Shown in your workspace. Optional.</p>
-        </div>
+        <TextPref
+          label="First name"
+          // An old display name reads as the first name until one is saved.
+          saved={prefs.firstName ?? prefs.displayName ?? ''}
+          hint="Shown in your workspace, in your greeting. Optional."
+          autoComplete="given-name"
+          onSave={(next) => {
+            if (next !== null) return update.mutate({ firstName: next });
+            // Emptied: the display name goes too, or it would read as the name again.
+            unset.mutate(
+              prefs.displayName === undefined
+                ? ['firstName']
+                : ['firstName', 'displayName'],
+            );
+          }}
+        />
+        <TextPref
+          label="Last name"
+          saved={prefs.lastName ?? ''}
+          hint="Optional."
+          autoComplete="family-name"
+          onSave={(next) =>
+            next === null
+              ? unset.mutate(['lastName'])
+              : update.mutate({ lastName: next })
+          }
+        />
+        <TextPref
+          label="Username"
+          saved={prefs.username ?? ''}
+          hint="Letters, digits, dots and underscores, 3 to 30 characters."
+          autoComplete="username"
+          invalid={(text) =>
+            USERNAME.test(text)
+              ? null
+              : 'Use letters, digits, dots and underscores, 3 to 30 characters.'
+          }
+          onSave={(next) =>
+            next === null
+              ? unset.mutate(['username'])
+              : update.mutate({ username: next })
+          }
+        />
 
         <div>
           <TimeZoneField

@@ -36,6 +36,7 @@ export const TAB_IDS: readonly AppModuleId[] = [
 
 /** What More holds, in order: the other modules, then Settings. */
 export const MORE_IDS: readonly AppModuleId[] = [
+  'home',
   'progress',
   'strategies',
   'notebook',
