@@ -65,7 +65,7 @@ Each of these exists in TZ and is visible in the user's account or in TZ's help.
   - two-line rows instead of tables below `sm`; dialogs become full-height sheets with a fixed footer;
   - a `MetricTip` on every new metric, its text in `src/content/metric-definitions.ts`;
   - Privacy hides every money figure, pattern sentences, rule amounts, swap and history values included.
-- **TZ parity.** Keel's calls only where TZ is unknown (§6.1).
+- **TZ parity is behaviour and features only, never its UI** (the owner, 2026-11-25). Layout, the arrangement of a screen, look, wording and icons are Keel's own (design G and the comps); copying a screen's arrangement from the recording counts as copying TZ's UI. Keel's calls only where TZ's behaviour is unknown (§6.1).
 - **Comps first.** Impeccable comps for each surface, light and dark, at 390 and 1440, before it is built (§8).
 - **Migration safety:** no existing row is rewritten by the upgrade; new tables start empty; new fields are optional; the sample reseeds by version; My workspace never does.
 - **After 6A.** The build starts once Plan 6A is merged. 6B takes the next Dexie version after 6A's v3 (expected v4; if 6C lands first, the next free one) and the next sample seed version.
@@ -89,7 +89,7 @@ Each of these exists in TZ and is visible in the user's account or in TZ's help.
 | A. Foundations | Types; the next Dexie version (files, noteVersions, history, targetRules, feeRules, missedTrades); the file store; the history write path; hooks; sample seed | Every module writes history; three modules store files |
 | B. Trade risk (#39, on a trade) | Levels and units in `src/domain`, test-first; one `tradeRisk` used by every R figure; the trade page's target and stop blocks; the tracker's stop rule reads levels | #39's rules (D) and patterns (E) read it |
 | C. Trade operations (#38) | Merge, split and move on the trade log's bulk bar; Move trades in Settings > Accounts | Needs the history path and the file store (attachments move) |
-| D. Trade defaults (#39 rules) | Settings page with two tabs; apply on import and to existing trades | Reads B's levels |
+| D. Trade defaults (#39 rules) | A settings page holding both kinds of rule; apply on import and to existing trades | Reads B's levels |
 | E. Swap (#55), stat choice (#56), attachments (#43 on trades) | The trade page's remaining depth | Small, on the same page |
 | F. Patterns (#40) | Domain, test-first; the log column, the trade page, filters, day cards and the day page (6A seam), the patterns report | Reads B (R for D5) and 6A's session (D11) |
 | G. Notes (#43) | Images, toolbar, slash items, version history, full screen, voice, export and import, note settings | Uses A's file store |
@@ -149,11 +149,11 @@ The next Dexie version adds six workspace tables. All join `DATA_TABLES`, so a w
 
 | Part | Reuses | New |
 | --- | --- | --- |
-| Bulk bar | `bulk-bar.tsx` and its menu style | Merge, Split and Move to account, in TZ's order among the existing actions |
+| Bulk bar | `bulk-bar.tsx` and its menu style | Merge, Split and Move to account among the existing actions, placed by Keel's own grouping (the comps) |
 | Dialogs | `MorphDialog` with a scroller and a fixed footer; the fills table of `trade-view.tsx` (`Executions`) | `MergeDialog`, `SplitDialog` (an execution list with ticks), `MoveDialog` (an account picker) |
 | Domain | `trade-builder.ts` | `buildGroupedTrade(executions)`: one trade from a given list, open if the position doesn't return to flat, never cut at a flat point |
 | Data | The trades repository | `merge`, `split`, `move` in one transaction each, with history rows |
-| Accounts | `accounts.tsx` row menu | Move trades, between Edit balance and Archive (TZ's place), and its dialog |
+| Accounts | `accounts.tsx` row menu | Move trades in the account's menu (its place is the comps'), and its dialog |
 
 **Behaviour in Keel**
 
@@ -215,7 +215,7 @@ The next Dexie version adds six workspace tables. All join `DATA_TABLES`, so a w
 
 | Part | Reuses | New |
 | --- | --- | --- |
-| Page | `settings-nav.tsx`, `settings-ui.tsx`, `Segmented` | `/app/settings/defaults` with two tabs, in the nav after Trading |
+| Page | `settings-nav.tsx`, `settings-ui.tsx`, `Segmented` | `/app/settings/defaults`, holding both kinds of rule in an arrangement of Keel's own (the comps), in the nav after Trading |
 | Rule dialogs | `MorphDialog`, the tag picker's chip input for symbols, `LevelsBlock`'s unit and level rows (with % in place of quantity) | `TargetRuleDialog`, `FeeRuleDialog` |
 | Engine | `src/domain/import/plan.ts` (where fills become trades) | `applyTargetRules(trade, rules)` and `applyFeeRules(fills, rules)`, pure; run in the import commit; "apply to existing" runs them over matching trades in one transaction |
 
@@ -388,7 +388,7 @@ Out of 6B: moved to the market-data plan with #14 (U1). The record (§7) ties TZ
 
 | Part | Reuses | New |
 | --- | --- | --- |
-| Page | `import-history.tsx` at `/app/settings/import-history` ("Logs") | A `Segmented` switch Imports and History; `HistoryTable` |
+| Page | `import-history.tsx` at `/app/settings/import-history` ("Logs") | History beside the import log on the same page, in an arrangement of Keel's own (the comps); `HistoryTable` |
 | Writes | Every repository write path | `history.log(...)` inside the same transaction as the change |
 
 **Behaviour in Keel** (B26 to B29)
@@ -419,7 +419,7 @@ Every row below is Keel's call (TradeZella unknown). "Basis" names the evidence 
 | B4 | Split | At least one execution moved and one left; each part rebuilt, open if unbalanced. The original keeps its id, serial, levels (an over-size side shows §5.2's error until fixed), rating, reviewed mark and rule checks; the new trade takes the next serial, is not reviewed, and copies tags and strategies only | "Pick which executions to separate" [help 7031683] |
 | B5 | Undo | None; the dialogs say what happens; history logs it; merge and split reverse each other | Nothing seen |
 | B6 | What a move carries | Everything attached to the trade; the source account, its cash flows and balance stay; active accounts only | "Transfer" [help 6706238]; archived accounts are read-only [help 8164981] |
-| B7 | The whole-account move's label and place | "Move trades" in the account menu, where TZ's Transfer data sits | [rec S58 21:01] |
+| B7 | The whole-account move's label and place | "Move trades" in the account's menu; its place in the menu is the comps' | The feature [rec S58 21:01; help 6706238] |
 | B8 | Imports after a manual grouping | A trade marked `grouping: 'manual'` is never handed to an import's open-trade rebuild (`plan.ts` `openTrades`), so new fills on its symbol start their own trade, and fingerprint dedupe drops fills it already holds. Undoing an import whose trades were merged, split or moved since is refused with the reason, as Keel already refuses an undo a later import depends on | Keel's import plan and undo (`imports.ts`) |
 
 **Targets and stops**
