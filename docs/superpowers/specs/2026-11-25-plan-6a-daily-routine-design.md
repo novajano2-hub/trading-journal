@@ -119,7 +119,7 @@ The user split Plan 6 into three sub-plans:
 | #40 | Insights on day cards |
 | #43 | Images in notes, which will reuse 6A's screenshot store |
 | #46 | The tracker card becomes a removable widget |
-| #50 | The slim rail on the day page |
+| #50 | The collapsible sidebar on other pages (the day page's slim rail is built in 6A, K33) |
 | #52 | The scale strip |
 
 ### 4.2 Order inside 6A
@@ -214,7 +214,7 @@ Dexie version 3 adds three workspace tables. All join `DATA_TABLES`, so a worksp
 - **No trades.** A trading day with no trades scores 0 on every rule, the daily cap included. A profitable day earns the cap's point.
 - **Values.**
   - A percent rule holds the share of the day's trades that meet it.
-  - The cap holds the day's net loss.
+  - The cap holds the day's loss, 0.0 on a profitable day, and the rule's average is the mean daily loss [connector day]. That the loss is the day's net loss is INFERRED (P6A-02).
 - **Per rule.**
   - Average performance is the mean daily score.
   - Follow rate is followed days over scored days.
@@ -261,7 +261,7 @@ Dexie version 3 adds three workspace tables. All join `DATA_TABLES`, so a worksp
 | Card | The dashboard card shell | `ProgressCard`, shown by default (K21) |
 | Start my day | None | `StartMyDay`, the date popover, shared with #36 and #37 |
 
-**Accounts.** The page, its scores and the dashboard card follow Keel's global account selection, as TZ's tracker has an account picker.
+**Accounts.** The page, its scores and the dashboard card follow Keel's global account selection, as TZ's tracker has an account picker. The exception is the daily cap, which counts every account whatever the selection [help 10371695] (P6A-01).
 
 The "Your plan" and Goals cards are Keel's own and stay unchanged and separate (K22).
 
@@ -361,7 +361,7 @@ The "Your plan" and Goals cards are Keel's own and stay unchanged and separate (
 | Routes | Next 16 `params` | `/app/day/[date]/plan` and `/review`. `/app/day/[date]` redirects by K26 |
 | Notebook New | The New menu | It no longer offers Pre-market plan; existing entries stay readable (U3) |
 
-**Accounts.** The review trades and the rules card follow the global account selection. The normal shell stays, and Import links to Keel's Import page (K33).
+**Accounts.** The review trades and the rules card follow the global account selection, except the daily cap (§5.1). Day pages use the slim rail, and Import opens the method picker (K33).
 
 **Data**
 
@@ -430,7 +430,7 @@ The "Your plan" and Goals cards are Keel's own and stay unchanged and separate (
 
 **Week view** [rec S24 9:34, 9:36; rec S30]
 
-- A card for each week that has trades, latest first: the span and the net.
+- A card for each week that has trades, latest first: the span and the net. (That weeks without trades are left out is INFERRED, except for the empty current week, which is confirmed [rec S24 9:34 zoom]; K41 holds the call.)
 - Seven weekday tiles. Each shows a trend mark, the weekday, the date, the net and the count, with a green or red tint. A day without trades is blank.
 - A daily P&L bar chart, then the stat grid.
 - The week's trade table, with a Day column. The column is there by default: it appeared on its own, without the column chooser [rec S24 9:34, 9:36 zoom].
@@ -486,7 +486,7 @@ The "Your plan" and Goals cards are Keel's own and stay unchanged and separate (
 
 **States**
 
-- **No trades or notes:** Keel's empty state, with Import and Add trade.
+- **No trades or notes:** Keel's empty state, with Import only [inv-2 051] (P6A-19).
 - **Filters match nothing:** "No trades match these filters." with Clear filters.
 - **A note but no trades:** a card with the date, a no-trades line and View note.
 - **Open trades only:** net None and no chart. The total counts the open trades.
@@ -610,13 +610,13 @@ Every row below is Keel's call (TradeZella unknown). Q numbers are the spec's 41
 | Id | Question | Keel's call | Basis |
 | --- | --- | --- | --- |
 | K1 | Period score (Q1) | The mean, over the range's scored days (clipped to the tracker's start and today), of points met over rules active, as a %. None with no scored day | INFERRED; today's score is met over active [connector] |
-| K2 | Current streak (Q2) | Consecutive perfect scored days (every active rule met). It ends today if today is perfect, else yesterday; today never breaks it early. Best streak is the longest run. The tile's second line gives the best streak and perfect days | The day streak read 0 on a day that earned a point [connector 2026-10-19] |
+| K2 | Current streak (Q2) | Consecutive perfect scored days (every active rule met). It ends today if today is perfect, else yesterday; today never breaks it early. The tile shows "N days" only, as TradeZella's page does [rec S08 3:31]; the best streak and perfect days are not shown (P6A-09) | The day streak read 0 on a day that earned a point [connector 2026-10-19] |
 | K3 | Unfinished days; the lock (Q2) | Unfinished days score live, with the version in effect that day. Finishing freezes each rule's inputs per account (counts, sums, largest loss) with the ticks, so any account selection rebuilds the frozen score | Points earned on an unfinished day [connector] |
-| K4 | Which trades a trade rule reads (Q3) | Trades opened on that date, in the profile zone, in the selected accounts | [help 10371695] |
+| K4 | Which trades a trade rule reads (Q3) | Trades opened on that date (TradeZella's, answered by the record: "every trade opened that day" [help 10371695]); the profile zone and the selected accounts are Keel's mapping | [help 10371695] (P6A-23) |
 | K5 | The per-trade pair (Q3) | x is trades within the loss limit (winners included); y is the trades opened that day. Met when x = y and y > 0. Shown "x of y" | Reads like the strategy and stop pairs (INFERRED) |
-| K6 | Per-trade average (Q4) | The day's largest single-trade loss (0 if none), averaged over scored days | The rule caps the largest loss |
+| K6 | Per-trade average (Q4) | The day's largest single-trade loss (0 if none), averaged over scored days, shown as a positive amount as TradeZella's values are | The rule caps the largest loss; TradeZella's averages are positive money [connector day] |
 | K7 | A loss at the limit (Q5) | Passes, for both loss rules | "More than the limit" [help 10371695]; Keel's goal agrees |
-| K8 | The daily cap's figure | The realized net booked that date (Plan 5's day rule), always net, in the selected accounts (every account when all are selected, as the help describes). It needs a trade opened or exited that day | [help 10371695]; the Plan 5 ruling |
+| K8 | The daily cap's figure | The realized net booked that date (Plan 5's day rule), always net, across every account in the workspace whatever the selection, as the help says. Its score is the day's loss, 0 on a green day. It needs a trade opened or exited that day | [help 10371695]; [connector day]; the Plan 5 ruling (P6A-01, P6A-02) |
 | K9 | What meets the time rule (Q6) | `noteStartedAt`: the first edit made on the note's own date, by the trader's clock, from any surface, at or before the limit. Planning ahead on an earlier date doesn't stamp it | Rule key `day_journaling_in_time` [connector]; [help 10371695] |
 | K10 | Trading hours (Q7) | A trade opened that day enters inside the window, and exits inside it if it exits that day. Score: the share of such trades | [help 10371695] |
 | K11 | Custom rules (Q8) | The same seven weekday toggles, Mo to Fr by default; a rule is active only on its days that are trading days. Ticked on the day page's rules card and the tracker's checklist rows until the day is finished. No cap | [help 10371695] |
@@ -625,7 +625,7 @@ Every row below is Keel's call (TradeZella unknown). Q numbers are the spec's 41
 | K14 | Date range (Q12, Q13) | The range drives the period score and the rules table. The streak, today's progress, the checklist and the grid ignore it | INFERRED |
 | K15 | The $ or % unit (Q14) | Stored on the rule. % is a share of the trade's account balance at the start of its day (`balanceAt`) | [inv-3 103] |
 | K16 | Edits and today | They apply today at once. A second save the same day replaces that day's version | [inv-3 102] |
-| K17 | Reset (Q15, Q17) | There are no achievements. Reset restores the defaults, deletes custom rules, ticks, locks and history, and restarts the tracker today. Notes, timers, moods, ratings, shots and trades stay. Per workspace, one confirmation prompt after the button, as TradeZella's | [help 12141413; inv-3 103] |
+| K17 | Reset (Q15, Q17) | There are no achievements. Reset restores the defaults, deletes custom rules, the ticks of unfinished days and the history, and restarts the tracker today. Finished days stay locked, since TradeZella shows no unlock (P6A-04). Notes, timers, moods, ratings, shots and trades stay. Per workspace, one confirmation prompt after the button, as TradeZella's | [help 12141413; inv-3 103] |
 | K18 | Destinations (Q16) | The card's checklist button opens today's day page in plan mode. The page's start-my-day opens the date popover | INFERRED |
 | K19 | Marks and the face (Q17, Q18) | Met: gain CheckCircle. Failed: loss XCircle. Pending: faint clock. A rule is decided once met, once it can't be met, or at day's end. No streak face (no emoji) | [rec S08]; DESIGN.md |
 | K20 | Unscored dates and finishing | Before the tracker's start, the rules card quietly says the day isn't tracked yet and gives the start date. A non-trading day says it isn't a trading day. A future date opens plan mode only, with no rules state. Only scored days, today or earlier, can be finished, after a confirmation, so locked days never stretch the grid before the start | None seen |
@@ -640,13 +640,13 @@ Every row below is Keel's call (TradeZella unknown). Q numbers are the spec's 41
 | --- | --- | --- | --- |
 | K25 | The review date control (Q19) | The start-my-day popover. Plan keeps a plain date | INFERRED |
 | K26 | Modes and future dates (Q20) | Any date opens. Today and future dates open plan; past dates open review | [rec S22] |
-| K27 | Screenshots after upload (Q21) | Thumbnails in upload order. A click opens a full-size viewer with previous, next and a confirmed delete. No caption, no cap. Type and size checked first. Plan mode only | [inv-2 061] |
+| K27 | Screenshots after upload (Q21) | Thumbnails in upload order. A click opens a full-size viewer with previous, next and a confirmed delete. No caption, no cap. Type and size checked first. Plan mode only (answered by the record: review has no screenshots card [rec S23 8:54]) | [inv-2 061] (P6A-23) |
 | K28 | Saving (Q22) | Autosave, as Keel's editors do. Version history waits for #43 | INFERRED [rec S23] |
 | K29 | A review row (Q23) | Opens the trade page, as trade-log rows do | Keel has no preview drawer |
 | K30 | The timer | Today only, by the date in plan mode. One start and stop a day; a running timer ends at finish or at local midnight. Session is its length, None if never started | [help 16934706] |
 | K31 | The day rating | 1 to 5 stars (Keel's trade-rating control), in review, today and past, with or without trades. The Calendar's Day rating keeps reading trade ratings until TZ is shown to differ | [help 16934706] |
 | K32 | Templates | The note's Templates control inserts a saved template at the cursor, as the day-view dialog does [help 5858190]. Change template replaces the body, after a confirmation when the body isn't empty, and records `templateId`. The list offers the user's daily templates plus three Keel-written ones that mirror TZ's three recommended (TZ's structure, Keel's content), then Manage templates and Edit default | [help 5858190; inv-2 056] |
-| K33 | Shell and import | The normal shell until #50. Import links to Keel's Import page | Keel's import is a page |
+| K33 | Shell and import | Not a Keel's call: the record answers it (P6A-13). On day pages the sidebar is the slim icon rail with an add-trade "+" [rec S23 8:46], and Import opens a method picker: upload a file (Keel's Import page), enter a trade by hand, or auto-sync, not live yet [inv-2 062-063] | [rec S23 8:46]; [inv-2 062-063] |
 | K34 | The day's trades | The Day view's grouping (K37) | One rule for every day surface |
 | K35 | The note's date zone | One zone everywhere: the trader's profile zone. It sets the day page, the note, the tracker, the day and week groups, and the trade page's Daily note (changed from the account's zone, §7), so a trade's note and its day card always match | One day must mean one date |
 
@@ -662,7 +662,7 @@ Every row below is Keel's call (TradeZella unknown). Q numbers are the spec's 41
 | K41 | Weeks (Q29) | Later week cards start collapsed, like day cards; only the first is seen expanded. Gap weeks between traded weeks are left out, as the empty current week is. An empty Week view uses the Day view's empty state | [rec S24 9:34; rec S26 9:46 zoom] |
 | K42 | Paging (Q30) | 20 day cards, more on scroll, and a Show more button for the keyboard. Weeks 8 at a time | The performance budget |
 | K43 | The note dialog (Q31) | Its menu holds Move to Trash. The summary expands to the trade table. Autosave; Save flushes and closes | Keel's editors autosave |
-| K44 | Mood | Five values as words with plain faces, no colour, an optional note. Shown where the date has a day record or a daily note | [help 5829446]; nothing is written on view |
+| K44 | Mood | Five values as words (the approved comps), no colour, an optional note. TradeZella's rule: it shows only on days logged through start my day [help 5829446]; in Keel, a date with a day record (P6A-12). Set on the Day view's cards only | [help 5829446]; nothing is written on view |
 | K45 | Units (Q32) | Every display unit, as the trade log | Keel's Display menu |
 | K46 | The week-tile dialog | The day card's body in a `MorphDialog` from the tile. A tile without trades is not a button | [help 17096845] |
 
@@ -671,14 +671,14 @@ Every row below is Keel's call (TradeZella unknown). Q numbers are the spec's 41
 | Id | Question | Keel's call | Basis |
 | --- | --- | --- | --- |
 | K47 | Broker list; not yet (Q35) | A Keel-written list (the brokers page's), plus Other and None yet. "Not yet" and the other two clear each other | [inv-1 004] |
-| K48 | Username rules; skipping (Q37) | The username takes letters, digits, dots and underscores, 3 to 30 characters; uniqueness waits for accounts (#2). The preferences step can't be skipped | [inv-1 013] |
+| K48 | Username rules; skipping (Q37) | The username takes letters, digits, dots and underscores, 3 to 30 characters; uniqueness waits for accounts (#2). The preferences dialog can't be skipped | [inv-1 013] |
 | K49 | Step links (Q38) | Step 1: a new prop account in Settings > Accounts. Step 2: a new challenge. Step 3: Add trade. Focus rows link to these and to Prop firms | INFERRED [spec 4.2] |
 | K50 | Step 1 and completion (Q40) | Step 1 reads as adding your prop firm, and says plainly that automatic sync isn't live yet; it completes when a prop-firm account or a challenge exists. Step 2: a challenge exists. Step 3: any trade exists. Computed for the active workspace | INFERRED [spec 4.4]; sync is #12 |
 | K51 | Steps 1 and 2 done; 3 of 3 (Q39) | Steps 1 and 2 take TZ's done look when done. At 3 of 3 the card stays, with no dismiss | The done look [rec S01 0:00; rec S63 22:18 zoom]; nothing else seen |
 | K52 | Variants (Q41) | One prop-led variant | [inv-1 016; rec S01] |
 | K53 | Explore, resources | Explore: Prop firms, the Dashboard, and Backtesting marked not live; agents is AI, left out. Resources: the changelog only (no academy #29 or community #20) | Never fake capability |
 | K54 | The onboarded signal | A user counts as onboarded when any of these exist: a prefs record, any My workspace rows (accounts, trades, notes), or an active-workspace meta row. The v3 upgrade sets the flag for them | TZ asks only at sign-up |
-| K55 | A reload mid-survey | Answers kept for the browser session; nothing saved before the preferences step | Keel's call |
+| K55 | A reload mid-survey | Answers kept for the browser session; nothing saved before the preferences dialog is submitted | Keel's call |
 | K56 | The gate and the landing | The gate covers every `/app/*` route, the sample workspace link included. After the first run, while the checklist is incomplete, `/app` lands on Home; once it is complete, on the Dashboard | Home seen as the landing [rec S01; rec S55] |
 
 ### 6.2 Answered by the spec
@@ -692,6 +692,7 @@ Every row below is Keel's call (TradeZella unknown). Q numbers are the spec's 41
 - **U3. The Notebook's Pre-market plan kind:** Notebook > New no longer offers it, and existing entries stay readable (option b).
 - **U4. Keel's Goals card** (weekly net goal, daily loss limit; Plan 5) has no TZ counterpart. It is removed, TZ's way: the progress tracker's rules (daily loss cap, per-trade cap and the rest) take its place on the dashboard, and the tracker card sits where Goals was. Existing goal settings are dropped, with no migration of values. Remove the Goals card, its editor, `goalDays` and the goal prefs, and their tests. This supersedes K22. E50 closes.
 - **Approved by the user, 2026-11-25.**
+- **Parity audit (2026-11-25).** An independent audit (`.superpowers/research/tradezella/plan6a-parity-audit.md`, P6A-01 to P6A-30) checked this doc, the plan and the comps against the record. Every finding was verified and corrected; the K rows above cite them.
 - **Checked against TradeZella's record after comp approval (2026-11-25).** The record wins over a comp on behaviour: the heat grid has seven rows, Sunday to Saturday, with weekends blank [rec S08 3:31]; reset asks once [inv-3 103]; the review trades table has exactly Symbol, Status, Entry, Exit, Net P&L, Net ROI [rec S23 8:46]; and mood is set on the Day view's cards only [help 5829446], not on the day page.
 - **The comps** (`.impeccable/mocks/plan6a/`) were approved by the user on 2026-11-25. Their labels are Keel's: "Plan the day", "Close the day", "Start session" and "End session"; the stages Plan, Trade, Import and Review; and the moods Rough, Low, Steady, Good and Great, as words.
 
@@ -772,7 +773,6 @@ Every row below is Keel's call (TradeZella unknown). Q numbers are the spec's 41
 - Close #35, #36, #37, #47 and E50.
 - Add rows for:
   - the streak email (with #26);
-  - the day page's slim rail (#50);
   - day-card insights (#40);
   - the week events list (#25);
   - the replay quick action (#15).

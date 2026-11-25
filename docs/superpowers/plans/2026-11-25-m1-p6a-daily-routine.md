@@ -32,16 +32,13 @@
 4. **`DESIGN.md`, `src/styles/theme.css` and `PRODUCT.md`.**
 5. **Plan 5,** `docs/superpowers/plans/2026-11-22-m1-p5-rest-of-the-app.md`, and its rulings file.
 
-**Where a comp differs from TradeZella's recorded behaviour, the record wins.** The comps set the look only. Four places were checked and corrected after the comps were approved:
+**TradeZella's record wins over every other source on behaviour.** That covers comps, the spec's wording and this plan. A parity audit of this plan, the spec and the comps against the record (`.superpowers/research/tradezella/plan6a-parity-audit.md`, findings P6A-01 to P6A-30) found 30 differences. Each was checked against the record and corrected in all three on 2026-11-25. The comps now show the corrected behaviour. Every module review re-checks parity against the record (see Execution).
 
-| Comp | TradeZella's record | The build |
-|---|---|---|
-| 01: the heat grid has five rows, Monday to Friday | Rows run Sunday to Saturday, and weekends are blank [rec S08 3:31] | Seven rows in week order. Non-trading days are blank, and cells after today aren't drawn (Task 7) |
-| 02: reset asks twice (spec K17) | One confirmation prompt after the button [inv-3 103; help 12141413] | One prompt (Task 9) |
-| 05: the review trades table adds a Time column; phone rows add side, R, strategy and tags | The columns are Symbol, Status, Entry, Exit, Net P&L, Net ROI [rec S23 8:46] | Exactly those columns, and phone rows carry only those fields (Task 13) |
-| 05: a mood control on the day page | The mood check-in is a day-card quick action in the Day view [help 5829446]. The day page's help lists only the day rating [help 16934706] | The day page has the day rating only. Mood is set on the Day view's cards, and the lock still freezes it (Tasks 13, 15) |
+**Execution:** one implementer at a time, never in parallel (the user's call), with a review after each module.
+- Each implementer brief says: the record wins over comps on behaviour, and every control, column, field, stat, step and state must trace to the record or to a marked Keel's call.
+- Each module review has two parts: the code review, and a parity check of that module's tasks against `plan6a-behaviour.md`, section by section. The parity check reports anything the module adds, omits or changes, against both the record and this plan.
 
-**Execution:** one implementer at a time, never in parallel (the user's call), with a review after each module:
+The modules:
 
 | Module | Tasks |
 |---|---|
@@ -49,7 +46,7 @@
 | B Progress tracker (#35) | 7-10 |
 | C Day page (#36) | 11-13 |
 | D Day and Week views (#37) | 14-17 |
-| E Getting started (#47) | 18-19 |
+| E Getting started (#47) | 18-19 (Home, then the first run) |
 | F Finish | 20 |
 
 ## Global Constraints
@@ -90,7 +87,9 @@
   - Never use TradeZella's wording, layout, icons or emoji.
   - No em or en dashes. Numeric ranges read "a to b". "None" marks an empty value. No eyebrows and no decorative dots.
   - Every metric label carries a `MetricTip`, whose text lives only in `src/content/metric-definitions.ts`.
-- **Numbers:** tabular figures throughout. Every money figure goes through `useDisplay()`, so the units and Privacy apply to tracker values, tiles, day cards, chart labels, hover readouts and `aria-label`s.
+- **Numbers:** tabular figures throughout.
+  - On the Trades Day and Week views, every money figure goes through `useDisplay()` (`display.figure`), so the units and Privacy apply to day cards, chart labels, hover readouts and `aria-label`s.
+  - On the tracker page and the day page, TradeZella has no unit menu and no Filters [rec S08 3:31; rec S23] (P6A-03). There, the Display menu is hidden, and money shows in its currency, always net, through `display.cash` (Privacy still masks it). The tracker's phone header shows only the date range.
 - **Charts:** hand-rolled SVG in the dashboard's style. Each has `role="img"` with a label carrying the range and key values, plus a hover and focus readout.
 - **Phone:**
   - New modules go in More. The tab bar stays Dashboard, Trades, Calendar, Reports, More.
@@ -106,7 +105,7 @@
   - Component tests start with `// @vitest-environment happy-dom` and `afterEach(cleanup)`.
   - Domain and data work is test-first.
   - `npm run e2e` builds first and serves on port 3100. Never run two `next build`s against the same `.next`.
-  - From Task 18, e2e specs start from an onboarded browser state (see Task 18).
+  - From Task 19, e2e specs start from an onboarded browser state (see Task 19).
 - **Verification:**
   - Before each commit: `npm test`, `npm run typecheck` and `npm run lint` pass.
   - Before the last commit of each module: `npm run build`, and that module's e2e spec, pass.
@@ -133,9 +132,9 @@
    Pinned in Tasks 4, 5, 13 and 16.
 4. **The first-run gate never traps a user who has data.** Expected:
    - every onboarded signal (K54) sets the flag on upgrade, and a sample-only v2 database does not;
-   - a failed first-run save leaves the user on the preferences step with their answers, and makes no second "My account" on retry.
+   - a failed first-run save leaves the user in the preferences dialog with their answers, and makes no second "My account" on retry.
 
-   Pinned in Tasks 1 and 18.
+   Pinned in Tasks 1 and 19.
 5. **Privacy hides money everywhere new.** Expected: no amount shows in:
    - tracker values and the rules table's averages;
    - review tiles, day cards, week tiles and bars;
@@ -158,7 +157,9 @@ These settle what the spec left to the builder (§8). Reviewers should not "fix"
 | First-run save | One transaction (`onboarding.complete`) writes: the names, currency, zone and flag; "My account" in My workspace, when it has no account; and My workspace as active (comp 14 shows My workspace after the first run) |
 | Day and week volume | Both sides: every fill's quantity [help 5829446]. Unlike the trade log's volume (Plan 5: each trade once), so don't unify them |
 | Mood | Five words, Rough to Great, as the approved comps show. K44's "plain faces" is dropped, because the icon set has no plain face for the top end |
-| Day and week columns | New column ids `assetClass` and `day`. Saved in their own prefs, `dayColumns` and `weekColumns`, apart from `tradeColumns` |
+| Day and week columns | New column ids `ticker` (the root symbol, TradeZella's Ticker pill) and `day`. The existing `instrument` column is the contract, TradeZella's Instrument ("ES Dec 26", the option contract, or the pair) [rec S26 9:50] (P6A-07). Saved in their own prefs, `dayColumns` and `weekColumns` ("the user's visible columns for each table" [help 5829446]) |
+| The week start | Follows the `weekStart` pref, Sunday by default, on the heat grid, the week tiles and the mini calendar. This is Plan 5 ruling 73, which the user accepted: TradeZella runs Sunday to Saturday, and Keel's setting lets a trader change it (P6A-22) |
+| Edit rules validation (TradeZella unknown) | Times are HH:mm, and from is before to. Amounts are positive cents. A percent is over 0 and at most 100%. A custom name is 1 to 80 characters. No rule on the number of trading days: zero is allowed, and every day then reads "not a trading day" (P6A-21) |
 | Old goal prefs (U4) | Ignored on read and left in storage, so no row is rewritten |
 | The sample's rule values | The seed may size its caps to the sample's trades so every state shows (a streak, a perfect, partial, broken and finished day). My workspace keeps TradeZella's $100 defaults |
 | Trading hours | Read in the profile zone (K35). The dialog labels the times with that zone's current GMT offset, as comp 02 does |
@@ -185,11 +186,11 @@ src/components/app/progress/      progress-view.tsx tiles.tsx heat-grid.tsx day-
 src/components/app/day/           day-view.tsx day-header.tsx stage-bar.tsx session-button.tsx bad-date.tsx
                                   plan-mode.tsx note-card.tsx template-menu.tsx first-visit-tip.tsx
                                   screenshots-card.tsx shot-viewer.tsx review-mode.tsx review-tiles.tsx
-                                  review-trades.tsx rating-card.tsx finish-day.tsx
+                                  review-trades.tsx rating-card.tsx finish-day.tsx import-picker.tsx
 src/components/app/trades/log/    trades-switch.tsx day-view.tsx day-card.tsx intraday-chart.tsx stat-grid.tsx
                                   log-table.tsx day-note-dialog.tsx mini-calendar.tsx
                                   week-view.tsx week-card.tsx week-tiles.tsx week-bars.tsx
-src/components/app/welcome/       welcome-view.tsx survey-step.tsx preferences-step.tsx survey-model.ts
+src/components/app/welcome/       welcome-view.tsx survey-step.tsx preferences-dialog.tsx survey-model.ts
 src/components/app/home/          home-view.tsx getting-started.tsx
 src/components/app/               first-run-gate.tsx
                                   (modified) nav.ts tab-bar.tsx app-shell.tsx top-bar.tsx filter-bar.tsx
@@ -325,16 +326,24 @@ Delivers the scoring rules of spec §5.1 and K2 to K11, K15, K19, K20 and K24.
   export type RuleValue =
     | { kind: 'time'; at?: string; limit: string }
     | { kind: 'share'; x: number; y: number }
-    | { kind: 'money'; cents: Cents | null; limit: Cents }
+    | { kind: 'money'; cents: Cents /* a loss, >= 0; 0 on a green day */; limit: Cents }
     | { kind: 'tick'; ticked: boolean };
   export interface RuleResult { key: RuleKey; stage: TrackerStage; status: RuleStatus; points: 0 | 1;
-    /** For averages: the share (0..1) for share, time and tick rules; −largestLoss for lossPerTrade; dayNet for lossPerDay. */
-    score: number; value: RuleValue }
+    /** For averages, as TradeZella's daily scores [connector day]:
+     *  share rules: the share (0..1); tick rules: 1 or 0;
+     *  startBy: minutes after midnight of the stamp, or null with none;
+     *  lossPerTrade: largestLoss (positive cents); lossPerDay: max(0, −dayNet), so 0 on a green day (P6A-02). */
+    score: number | null; value: RuleValue }
   export type Unscored = 'before-start' | 'not-trading-day' | 'future';
   export interface DayScore { date: string; unscored?: Unscored; rules: RuleResult[];
     met: number; active: number; perfect: boolean; finished: boolean }
   export interface ScoreArgs { date: string; today: string; nowTime: string /* HH:mm, profile zone */;
-    startedOn: string; version: TrackerVersion | undefined; inputs: AccountDayInputs;
+    startedOn: string; version: TrackerVersion | undefined;
+    /** Summed over the selected accounts: every rule but the daily cap reads these. */
+    inputs: AccountDayInputs;
+    /** Summed over every account in the workspace: the daily cap reads these, whatever the selection,
+     *  as it "caps the day's net loss across all accounts" [help 10371695] (P6A-01). */
+    allInputs: AccountDayInputs;
     ticks: Readonly<Record<string, boolean>>; noteStartedAt?: string /* HH:mm via stampTime */; finished: boolean }
   export function scoreDay(a: ScoreArgs): DayScore;
   ```
@@ -364,6 +373,8 @@ Delivers the scoring rules of spec §5.1 and K2 to K11, K15, K19, K20 and K24.
     - `'a loss at the limit passes both loss rules'` (K7):
       - net −10_000, and dayNet −10_000, are `'met'`;
       - −10_001 is `'failed'`.
+    - `'the daily cap scores the day's loss, 0 on a green day'` (P6A-02): dayNet +26_690 gives `value.cents 0`, `score 0`, and `'met'`. dayNet −40_710 gives `cents 40_710` and `score 40_710`.
+    - `'the daily cap counts every account whatever the selection'` (P6A-01): `inputs` for account A has dayNet +5_000, and `allInputs` has −20_000. The cap is `'failed'`, while the strategy rule reads A's counts only.
     - `'winners count toward the per-trade pair'` (K5): nets +5_000, −2_000 and −15_000 against a $100 cap give `{ x: 2, y: 3 }`, `'failed'`.
     - `'the time rule needs the first edit on its own date by the limit'` (K9):
       - `'09:30'` is met and `'09:31'` failed;
@@ -396,7 +407,12 @@ Delivers K1, K2, K6, K12 and K14's figures.
   export function periodScore(days: readonly DayScore[], from?: string, to?: string): number | null;
   /** K2: current is the run of perfect days ending today if today is perfect, else yesterday. */
   export function streaks(days: readonly DayScore[], today: string): { current: number; best: number; perfect: number; scored: number };
-  export interface RuleStat { key: RuleKey; stage: TrackerStage; streak: number; average: number | null;
+  export interface RuleStat { key: RuleKey; stage: TrackerStage;
+    /** Followed days running back from today: 0 when today has failed; from yesterday while today is pending [connector day] (P6A-05). */
+    streak: number;
+    /** The mean of the non-null daily scores; null with none. For startBy it is the mean start time in minutes,
+     *  shown as HH:mm; with no logged start it is null, shown "None", as TradeZella's "--" [connector day] (P6A-06). */
+    average: number | null;
     followRate: number | null; scoredDays: number }
   export function ruleStats(days: readonly DayScore[], today: string, from?: string, to?: string): RuleStat[];
   export type GridStep = 0 | 1 | 2 | 3 | 4;
@@ -411,9 +427,10 @@ Delivers K1, K2, K6, K12 and K14's figures.
   - `'a no-trade trading day breaks the streak'`.
   - `'best and perfect count over all scored days'`.
   - `'rule stats'`:
-    - the streak runs back from today, or from yesterday when today isn't met;
+    - the streak counts today when it's met, is 0 when today has failed, and runs from yesterday while today is pending (P6A-05);
     - the follow rate is met days over the scored days the rule was active;
-    - the average is the mean `score`, which gives −largestLoss cents for lossPerTrade (K6).
+    - the average is the mean of the non-null scores. That gives a positive amount for lossPerTrade (K6). For the daily cap it gives the mean daily loss, so scores of 0 and 40_710 give 20_355, as TradeZella's arithmetic does (P6A-02).
+  - `'the start rule's average is None with no logged start, else the mean start time'` (P6A-06).
   - `'grid steps'`: shares 0, 0.2, 0.5, 0.9 and 1 give steps 0, 1, 2, 3 and 4. Unscored gives null.
 - [ ] **Step 2:** Run. Expected: FAIL.
 - [ ] **Step 3:** Implement.
@@ -443,7 +460,8 @@ Delivers §4.3's storage rules, K9, K16, K17, K20's finishing rule, and E109.
     get(ws: string): Promise<Tracker>;
     /** K16: a version from today, replacing one already dated today. */
     save(ws: string, rules: Omit<TrackerVersion, 'from'>): Promise<Tracker>;
-    /** K17: defaultVersion(today), startedOn today, asOf kept; clears every day's ticks, finishedAt and locked. */
+    /** K17: defaultVersion(today), startedOn today, asOf kept; clears the ticks of unfinished days.
+     *  Finished days stay locked: TradeZella shows no unlock (P6A-04), and days before the new start are unscored anyway. */
     reset(ws: string): Promise<Tracker>;
   }
   export interface DaysRepo {
@@ -499,6 +517,7 @@ Delivers §4.3's storage rules, K9, K16, K17, K20's finishing rule, and E109.
   - `'two first reads make one tracker row'`: `Promise.all([get, get])` leaves one row, and both have the same `startedOn`.
   - `'a save today replaces today's version and keeps yesterday's'` (Review Focus 1): created on 11-18, then saved twice on 11-20, gives `versions.length === 2`. The second save's rules win, and `versionOn(t, '2026-11-19').from === '2026-11-18'`.
   - `'reset restores the defaults from today and keeps notes, sessions, moods, ratings and shots'`.
+  - `'after a reset a closed day still refuses writes'` (P6A-04).
   - `'a finished day refuses every write'` (Review Focus 3): after `finish('2026-11-19')`, each of these rejects with `LockedDayError`:
     - `setTick`, `setRating`, `setMood`, `startSession`;
     - `dayShots.add` and `remove`;
@@ -554,7 +573,7 @@ Delivers K3, K23, and the seed requirements of spec §8.
   export function writeRoutine(rng: Random, s: { trades: Trade[]; journal: JournalEntry[]; accounts: Account[];
     startedOn: string; endDate: string }): { tracker: Tracker; days: DayRecord[] };
   ```
-  - `scoreHistory` scores a finished day from `locked`, summed over the selected accounts, and a live day from `dayInputs`.
+  - `scoreHistory` scores a finished day from `locked`, and a live day from `dayInputs`. In both cases, `inputs` is summed over the selected accounts and `allInputs` over every account (P6A-01).
   - It groups the trades by date once.
 - Seed v5 (K23):
   - **Its stream:** a new stream, `createRandom(opts.seed + 106)`.
@@ -614,13 +633,15 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
   export function PlanTheDay(p: { label?: string /* default 'Plan the day' */ }): JSX.Element;
   ```
 - The `MonthPicker` grid:
+  - a month dropdown, a year dropdown, and previous and next arrows [rec S22 8:44] (P6A-18);
   - today is ringed, and future dates are enabled;
   - it is a keyboard grid: arrows move, Enter picks, and Escape closes the popover.
 - A pick routes to `dayHref`.
 
 - [ ] **Step 1: Write the failing tests.**
   - `dayHref`: past dates give `/review`; today and future dates give `/plan`.
-  - `'today is ringed and a future date can be picked'`.
+  - `'today is ringed and a future date can be picked'`;
+  - `'the month and year dropdowns and the arrows change the month'`.
   - `'arrow keys move and Enter picks'`.
   - In `trade-view.test.tsx`, `'the Daily note dates by the trader's zone, not the account's'` (K35): a trade closed at `2026-11-20T03:30:00Z`, with account zone `Asia/Tokyo` and profile zone `America/New_York`, has its note on `2026-11-19`.
 - [ ] **Step 2:** Run. Expected: FAIL.
@@ -644,7 +665,9 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
   ```ts
   export function HeatGrid(p: { days: readonly DayScore[]; today: string; tracker: Tracker; weekStart?: WeekStart;
     markToday: boolean; paging: boolean; label: string }): JSX.Element;
-  export function DayRules(p: { score: DayScore; version: TrackerVersion; readOnly: boolean;
+  /** detail 'values': the tracker page's checklist, with each value right-aligned [rec S08 3:31].
+   *  detail 'names': the day page's card, with the mark and the name only, plus the start rule's time [rec S23 9:04] (P6A-10). */
+  export function DayRules(p: { score: DayScore; version: TrackerVersion; readOnly: boolean; detail: 'values' | 'names';
     onTick(ruleId: string, ticked: boolean): void; currency: string }): JSX.Element;
   // rule-label.ts: Keel's wording, as in comps 01 and 02
   export function ruleName(key: RuleKey, version: TrackerVersion, fmt: FormatMoney): string;
@@ -652,7 +675,8 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
   ```
 - New metric ids, with Keel's wording:
   - `'tracker-streak'`, `'tracker-score'`, `'tracker-today'`;
-  - `'rule-streak'`, `'rule-average'`, `'rule-follow-rate'`.
+  - `'rule-streak'`, `'rule-average'`, `'rule-follow-rate'`;
+  - `'tracker-history'`, the grid card's info tip, and `'tracker-card'`, the dashboard card's info tip. The card's tip says it shows how consistently the trader follows their own rules [rec S07 3:17] (P6A-17).
 - The `HeatGrid`:
   - seven weekday rows in week order (Sunday first by default, as TradeZella's), with week columns and month labels [rec S08 3:31];
   - it starts at the tracker's first day, so the first column may be partial, and cells after today aren't drawn;
@@ -664,7 +688,8 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
   - groups the rules into Prepare, Trade and Reflect;
   - marks each rule per K19: met is a gain-coloured `CheckCircle`, failed a loss-coloured `XCircle`, and pending a faint `Clock`;
   - lets the user tick custom rules ("Tick it yourself"), unless `readOnly`;
-  - shows each value on the right, as comp 01 does.
+  - with `detail: 'values'`, shows each value on the right, as TradeZella's checklist does ("None / 09:30", "0 / 0", "$0 / $100") [rec S08 3:31]. The daily cap shows the day's loss against the limit, $0.00 on a green day (P6A-02);
+  - with `detail: 'names'`, shows no values and no "n of m met" count.
 
 - [ ] **Step 1: Write the failing tests.**
   - heat grid:
@@ -697,10 +722,10 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
 - Consumes: `useDayScores`, `useRoutineToday`, `useGlobalFilters` (range), `periodScore`, `streaks`, `ruleStats`, `HeatGrid`, `DayRules`, `PlanTheDay` and `useSetTick`
 - Produces: `ProgressView(): JSX.Element`.
 - The page, per spec §5.1 and comp 01:
-  - **Tiles:**
-    - the streak, with a second line for the best streak and the perfect days;
-    - the period score, as a half gauge, with "on N scored days";
-    - today's score, as met of active with a bar, and the failed and pending counts.
+  - **Tiles,** exactly TradeZella's three, with no extra lines [rec S08 3:31] (P6A-09):
+    - the current streak, "N days";
+    - the period score, as a half gauge with its %, or None with no data;
+    - today's progress, met over active rules with a bar.
   - **Today card:** `DayRules`, and `PlanTheDay`.
   - **History card:** `HeatGrid` with paging, the legend, and the blank-days caption.
   - **Rules table:**
@@ -715,7 +740,8 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
     - the rules table becomes two-line rows.
 
 - [ ] **Step 1: Write the failing tests:**
-  - `'tiles read the streak, the period score and today's progress'`;
+  - `'tiles read the streak, the period score and today's progress, with no other lines'`;
+  - `'the tracker has no Display menu, and its phone header shows only the date range'` (P6A-03);
   - `'the date range moves the score and the rules table, not the streak or the grid'` (K14);
   - `'a non-trading today shows the empty checklist, Edit rules and 0 of 0'`;
   - `'it follows the global account selection'`;
@@ -746,7 +772,8 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
       - on or off for strategy and stop;
       - for the per-trade cap, $ or % and a value;
       - for the daily cap, an amount;
-    - its custom rules (a name, weekdays defaulting to Mon to Fri, and a delete), and an add-rule row.
+    - its custom rules, each with a delete;
+    - an "Add rule" link, which inserts an inline row: a name, weekdays defaulting to Mon to Fri, an Add button, and a discard icon [inv-3 104-106] (P6A-14).
   - **Reset all progress:** one confirmation prompt after the button, as TradeZella's [inv-3 103; help 12141413].
   - **The footer:** Cancel, and Save changes, disabled until something changes.
   - **No streak-email control.** There is no email, and an inert control is an anti-goal.
@@ -828,11 +855,12 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
 **Files:**
 - Create:
   - the routes `src/app/(app)/app/day/[date]/page.tsx`, `plan/page.tsx` and `review/page.tsx`;
-  - `src/components/app/day/day-view.tsx`, `day-header.tsx`, `stage-bar.tsx`, `session-button.tsx`, `bad-date.tsx`;
+  - `src/components/app/day/day-view.tsx`, `day-header.tsx`, `stage-bar.tsx`, `session-button.tsx`, `bad-date.tsx`, `import-picker.tsx`;
   - tests.
 - Modify:
   - `nav.ts`: `activeItem` maps `/app/day/*` to `'trades'` (comps 04 and 05), and `pageTitle` covers it;
-  - `top-bar.tsx`: the session button on day pages (comp 04, `?state=trading`).
+  - `top-bar.tsx`: the session button on day pages (comp 04, `?state=trading`); no Display menu on day pages or `/app/progress`; Import opens `ImportPicker` on day pages;
+  - `sidebar.tsx` / `app-shell.tsx`: the slim icon rail with the add-trade "+" on day pages (comp 04).
 
 **Interfaces:**
 - Consumes: `useRoutineToday`, `useDays`, `useStartSession`, `useEndSession`, `sessionLength`, `dayHref`, `dayModeOf`, `MonthPicker` and `isRealDate`
@@ -846,7 +874,13 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
   - **A bad date** shows the plain-page state, with a link to today.
   - **The header** is pinned, and holds:
     - the date, as a plain label in plan, and as the `MonthPicker` popover in review (K25);
-    - the stage bar Plan, Trade, Import, Review. The stages are links, and a switch pushes a history entry and keeps the date. Import goes to `/app/import` (K33), and Trade follows "Calls this plan makes".
+    - the stage bar Plan, Trade, Import, Review. The stages are links, and a switch pushes a history entry and keeps the date. Trade follows "Calls this plan makes";
+    - no Display menu (P6A-03).
+  - **Import** (the Import stage, and the top bar's Import on day pages) opens `ImportPicker`, a dialog of methods, as TradeZella's import modal [inv-2 062-063] (P6A-13):
+    - "Upload a file" goes to `/app/import`;
+    - "Enter a trade by hand" goes to `/app/trades/new`;
+    - "Auto-sync" is marked "Not live yet" and disabled (#12).
+  - **The slim rail** (P6A-13): on day pages, the desktop sidebar shrinks to its icon rail, with an add-trade "+" on top that goes to `/app/trades/new` [rec S23 8:46]. The workspace switcher stays reachable as an icon. Phone layouts keep the tab bar.
   - **The session** (K30):
     - today only, once a day;
     - while it runs, Trade shows the elapsed time, and the top bar shows "End session" with a clock;
@@ -860,7 +894,10 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
   - `'stage links push history and keep the date'`;
   - `'Trade starts the session today and is disabled on other dates'`;
   - `'the session runs once and End session stops it'`;
-  - `'review's date control opens the month popover'`.
+  - `'review's date control opens the month popover'`;
+  - `'Import opens the method picker, and Auto-sync is not live'`;
+  - `'day pages show the slim rail with add trade'`;
+  - `'day pages have no Display menu'`.
 - [ ] **Step 2:** Run. Expected: FAIL.
 - [ ] **Step 3:** Implement against comps 04 and 05.
 - [ ] **Step 4:** `npm test && npm run typecheck && npm run lint`. Expected: PASS.
@@ -893,7 +930,7 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
     - it autosaves (the repo stamps `noteStartedAt`), and takes a `readOnly` prop.
   - **The tip:** on the first visit to plan mode, a one-time tip sits by the Templates control (`seenTips: 'day-plan-templates'`).
   - **Rules card:**
-    - `DayRules`, and a "Progress tracker" link;
+    - `DayRules` with `detail: 'names'` (P6A-10), and a "Progress tracker" link;
     - before the start: "Not tracked yet. The tracker started on {date}." On a non-trading day: "Not a trading day." A future date has no rules card (K20).
   - **Screenshots** (K27, plan mode only):
     - a drop zone, and Choose files, for PNG or JPEG up to 10 MB, checked before the write;
@@ -939,10 +976,10 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
   - `ReviewMode({ date })`;
   - `RatingRow`, unchanged.
 - Behaviour, per spec §5.2 Review mode and K29, K31, K34, comps 05 and 05-locked:
-  - **Tiles:**
-    - Net P&L, with an "after $x fees" line;
-    - Win rate, with "n won, m lost";
-    - Session, as its length and "09:28 to 15:40".
+  - **Tiles,** exactly TradeZella's three, each a value only, with no sub-lines [rec S23 8:46] (P6A-11):
+    - Net P&L;
+    - Win rate;
+    - Session, its length.
 
     Without trades: net $0.00, and win rate and session None.
   - **Trades card:**
@@ -950,13 +987,13 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
     - exactly TradeZella's columns: Symbol, Outcome (`StatusChip`), Entry, Exit, Net P&L, Net ROI [rec S23 8:46], with no Time column (comp 05 added one);
     - a fixed height that scrolls inside the card on desktop. On a phone: two-line rows carrying only those fields, five, then "Show all {n} trades", with no inner scroll;
     - a row opens the trade;
-    - an Import link, and an empty line with Import when there are no trades.
+    - with no trades, an empty line and an Import button that opens `ImportPicker`. There is no Import button while the day has trades [inv-2 054] (P6A-19).
   - **Day rating card** (K31):
     - the day rating, 1 to 5 stars, with Clear;
     - it works today and on past days, with or without trades;
     - no mood control: TradeZella's mood check-in lives on the Day view's cards (Task 15).
   - **Note card:** Task 12's `NoteCard`, under the trades card. Nothing sits below the note.
-  - **Rules card:** `DayRules`, with Close the day at its foot and the comp's caption.
+  - **Rules card:** `DayRules` with `detail: 'names'`, with Close the day at its foot and the comp's caption.
     - It is offered only on scored days, today or earlier (K20).
     - It asks first. On confirm, it writes `freezeDay(...)` through `useFinishDay`.
   - **Locked state** (comp 05-locked):
@@ -967,6 +1004,8 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
 - [ ] **Step 1: Write the failing tests:**
   - `'review tiles read net, win rate and session; None without trades'`;
   - `'the trades card lists every trade of the day and opens a trade'`;
+  - `'the trades card offers Import only when the day has no trades'`;
+  - `'review tiles show only their values'`;
   - `'the day rating writes the day record and Clear removes it'`;
   - `'the day page has no mood control'`;
   - `'Close the day asks first, then locks the rules, note, rating and shots'`;
@@ -1048,7 +1087,7 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
   - `src/components/app/trades/log/trades-switch.tsx`, `day-view.tsx`, `day-card.tsx`, `intraday-chart.tsx`, `stat-grid.tsx`, `log-table.tsx`;
   - tests.
 - Modify:
-  - `src/data/trade-columns.ts`: `ColumnId` adds `'assetClass'` and `'day'`, and the file exports `DAY_COLUMNS` and `WEEK_COLUMNS = ['day', ...DAY_COLUMNS]`;
+  - `src/data/trade-columns.ts`: `ColumnId` adds `'ticker'` (the root symbol) and `'day'`, and the file exports `DAY_COLUMNS` and `WEEK_COLUMNS = ['day', ...DAY_COLUMNS]`;
   - `columns.tsx` and `cells.tsx`: those two cells;
   - `trades-view.tsx`: the switch above All, and Add trade in the header;
   - `nav.ts`: Trades' `href` becomes `'/app/trades/day'` (K36), `activeItem` covers `/app/trades/*`, and `filtersApply` covers Day and Week;
@@ -1064,7 +1103,7 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
   - `IntradayChart({ series, label, large? })`;
   - `StatGrid({ stats })`;
   - `LogTable({ trades, columns, onColumns })`.
-- `DAY_COLUMNS`: `['open', 'instrument', 'side', 'assetClass', 'net', 'roi', 'realizedR', 'strategies', 'tags']`. The header labels follow comp 06.
+- `DAY_COLUMNS`: `['open', 'ticker', 'side', 'instrument', 'net', 'roi', 'realizedR', 'strategies', 'tags']`: Open time, Ticker, Side, Instrument (the contract), Net P&L, Net ROI, Realized R, Strategy, Tags, as TradeZella's [rec S26 9:50, 9:54] (P6A-07). There is no asset-class column.
 - Behaviour, per spec §5.3 and K38 to K45, comp 06:
   - **The switch:** Day, Week and All are links that keep every filter param.
   - **The toolbar:** the switch, the toolbar and the mini calendar's slot are pinned.
@@ -1072,13 +1111,13 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
     - a chevron;
     - the date;
     - the net, always after costs;
-    - Mood, a menu, shown when the date has a day record or a daily note (K44);
+    - Mood, a menu, shown only on days logged through Plan the day, TradeZella's rule [help 5829446] (P6A-12). In Keel this means the date has a day record: a note stamp, session, tick, rating or finish;
     - Review, which goes to the day page's review;
     - a slot for the note action (Task 16).
   - **The intraday chart:**
-    - a step line of the cumulative net, tinted green above zero and red below;
+    - a step line of the cumulative net, tinted green above zero and red below, with $ labels on the y axis and none on the x axis [rec S24 9:27] (P6A-26);
     - hover reads "{time}, {symbol} {net}, running net {cum}";
-    - a click enlarges it in a `MorphDialog`.
+    - a click enlarges it in a `MorphDialog`, whose chart has a $ y axis and three time labels: the start, middle and end of the day's trading [rec S26] (P6A-26).
   - **The stat grid:** Trades, Gross P&L, Won / lost, Commissions, Win rate, Volume, Profit factor, each with a `MetricTip` (add the ids). Day volume needs its own definition: "both sides".
   - **Expanded:** `LogTable`, with the `dayColumns` pref.
     - The tags cell's "+" opens `TagPicker`.
@@ -1086,9 +1125,9 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
     - A row opens the trade.
   - **Paging** (K42): 20 cards, more on scroll, plus a Show more button.
   - **States:**
-    - no trades or notes: the empty state, with Import and Add trade;
+    - no trades or notes: the empty state, with Import only [inv-2 051] (P6A-19);
     - filters match nothing: "No trades match these filters." with Clear filters;
-    - a note-only card;
+    - a note-only card shows Net P&L $0.00, View note, and a no-trades line [inv-2 052] (P6A-20);
     - open trades only;
     - a one-day filter shows one card;
     - a narrowing display unit behaves as in the trade log (`unitLeftOut` from `useTradeSet`);
@@ -1104,7 +1143,10 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
   - `'the stat grid matches day-log'`;
   - `'chart hover reads the trade and the running net'`;
   - `'Privacy hides money on cards, chart labels and readouts'` (Review Focus 5);
-  - `'mood shows only where the date has a day record or a daily note'`;
+  - `'mood shows only where the date has a day record'`;
+  - `'note-only cards read $0.00'`;
+  - `'the card chart has $ labels and no time labels; the enlarged chart has three times'`;
+  - `'columns are TradeZella's: Ticker and Instrument, with no asset class'`;
   - `'20 cards, then more'`;
   - `'dayColumns saves apart from the trade log's columns'`;
   - `'Trades in the sidebar opens Day, and /app/trades stays All'`.
@@ -1212,13 +1254,78 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
 
 ## Module E: Getting started (#47)
 
-### Task 18: The first run: gate, welcome, survey and preferences
+### Task 18: Home, and the landing
+
+Home comes first, because the first run's preferences dialog opens over it [inv-1 013-014].
+
+**Files:**
+- Create:
+  - `src/app/(app)/app/home/page.tsx` and `src/app/(app)/app/page.tsx` (the landing);
+  - `src/components/app/home/home-view.tsx`, `getting-started.tsx`;
+  - `src/data/getting-started.ts`, and tests.
+- Modify:
+  - `next.config.ts`: remove the `/app` redirect;
+  - `nav.ts`: a `'home'` module first, with the `House` icon;
+  - `tab-bar.tsx`: `MORE_IDS` gains `'home'`;
+  - `settings/profile.tsx`: first name, last name and username fields. An existing `displayName` reads as the first name when no first name is set.
+
+**Interfaces:**
+- Produces:
+  ```ts
+  export interface GettingStarted { steps: { id: 'prop' | 'challenge' | 'trade'; done: boolean }[]; done: number; total: 3 }
+  /** K50: prop = a prop-evaluation or prop-funded account, or any challenge; challenge = a challenge; trade = any trade. */
+  export function gettingStarted(accounts: readonly Account[], challenges: readonly Challenge[], trades: readonly Trade[]): GettingStarted;
+  export function HomeView(p: { skeleton?: boolean }): JSX.Element;   // skeleton: the first run's backdrop (Task 19)
+  ```
+- Home, per spec §5.4 Home and K49 to K53, comp 14:
+  - **The greeting:** "Good morning, {firstName}", by the time of day (morning, afternoon, evening), with the date line. Without a first name, no name.
+  - **The Get started card:** "n of 3 complete", with a bar.
+    - The next step's number is ringed.
+    - A done step shows a tick, a struck-through title and a Done chip, with no button.
+    - The step buttons (K49):
+      - step 1 opens Settings > Accounts with a new prop account;
+      - step 2 opens Prop firms with a new challenge;
+      - step 3 opens `/app/trades/new`.
+    - Step 1's text says that automatic sync isn't live yet.
+    - At 3 of 3 the card stays (K51).
+  - **Explore:** Prop firms, the Dashboard, and Backtesting with "Not live yet" (K53).
+  - **Recommended focus:** TradeZella's four rows, in Keel's words [rec S01 0:11] (P6A-08), static:
+    1. add your prop account, saying plainly that automatic sync isn't live yet. It goes to Settings > Accounts;
+    2. set up rule monitoring with a challenge that watches the daily and max drawdown limits. It goes to a new challenge;
+    3. add your first challenge trade. It goes to `/app/trades/new`;
+    4. review your challenge dashboard. It goes to Prop firms.
+  - **Resources:** the Changelog.
+  - **Loading:** the greeting over skeletons.
+  - **Phone:** the cards stack, and Home is in More.
+- The landing at `/app` (K56) is a client page:
+  - Home while the checklist is incomplete;
+  - the Dashboard once it is complete.
+
+- [ ] **Step 1: Write the failing tests:**
+  - `gettingStarted`:
+    - each step on its own;
+    - a challenge alone completes steps 1 and 2.
+  - `'the next step is ringed, and done steps show Done without a button'`;
+  - `'the sample shows 3 of 3 and the card stays'`;
+  - `'recommended focus lists the four rows and their links'`;
+  - `'/app lands on Home until the checklist is complete, then on the Dashboard'`;
+  - `'the greeting uses the first name and the time of day'`;
+  - `'Profile edits the first name, last name and username'`;
+  - e2e: `app-shell`'s `'/app goes to the Dashboard'` still passes on the sample.
+- [ ] **Step 2:** Run. Expected: FAIL.
+- [ ] **Step 3:** Implement against comp 14.
+- [ ] **Step 4:** `npm test && npm run typecheck && npm run lint`. Expected: PASS.
+- [ ] **Step 5:** Commit: `feat(app): Home with getting started, and the /app landing (#47)`.
+
+---
+
+### Task 19: The first run: gate, welcome, survey, the preferences dialog and the zone notice
 
 **Files:**
 - Create:
   - `src/app/(welcome)/layout.tsx`: `data-surface="app"`, `DataProvider`, and the centred look of `(auth)`;
   - `src/app/(welcome)/app/welcome/page.tsx` and `[step]/page.tsx`;
-  - `src/components/app/welcome/welcome-view.tsx`, `survey-step.tsx`, `preferences-step.tsx`, `survey-model.ts`;
+  - `src/components/app/welcome/welcome-view.tsx`, `survey-step.tsx`, `survey-model.ts`, `preferences-dialog.tsx`;
   - `src/content/onboarding.ts`: the steps, the options, and the broker list from the brokers page content (K47);
   - `src/components/app/first-run-gate.tsx`;
   - `src/data/onboarding.ts`, `src/data/local/onboarding.ts`;
@@ -1232,6 +1339,7 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
   - any e2e spec that needs a fresh database (`grep -ln "first visit\|seeds the sample" e2e`): `test.use({ storageState: { cookies: [], origins: [] } })`.
 
 **Interfaces:**
+- Consumes: `HomeView` (Task 18), and `TimeZoneField`
 - Produces:
   ```ts
   // src/data/onboarding.ts
@@ -1249,31 +1357,33 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
   // hooks.ts
   export function useCompleteFirstRun(): UseMutationResult<void, Error, FirstRunInput>;
   ```
-- Behaviour, per spec §5.4 and U1, U2, K47, K48, K55, K56, comps 10 to 13:
-  - **The gate:**
-    - it renders nothing until the prefs load, so nothing flashes;
-    - while `isOnboarded` is false, it does `router.replace('/app/welcome')`;
-    - it covers every `/app/*` route, the sample link included.
-  - **Welcome** (comp 10), then **survey steps 1 to 6:**
-    1. experience, one of four bands;
-    2. capital: personal, prop or not yet, several at once. Not yet clears the other two, and either of them clears not yet (K47);
-    3. broker: a type-ahead with Other and None yet;
-    4. markets: seven tiles, several at once;
-    5. goals: several at once;
-    6. how you heard: ten sources, with free text for Other.
-  - **Step 7, preferences** (comp 13):
-    - first name, last name, username (K48), currency (USD first), and time zone (`TimeZoneField`, opening on `America/New_York`, with the comp's line);
-    - it can't be skipped.
-  - **Survey chrome:**
-    - a progress bar and "Step n of 7";
-    - Back from step 2 on, and Continue, disabled until the step is answered;
-    - Continue pinned above the safe area on a phone.
-  - **Answers** live in `sessionStorage['keel:first-run']` until step 7 (K55). Nothing is written to the repo before then.
-  - **Save** runs `complete` (U2: the answers are stored only), then `router.replace('/app')`.
-  - **No log-out and no social-proof strip.**
+- TradeZella's first run, in Keel, per spec §5.4, U1, U2, K47, K48, K55 and K56, comps 10 to 13 [inv-1 001-016]:
+  1. **Welcome** (comp 10).
+  2. **The survey, six steps** (comps 11 and 12), with the progress bar over six [inv-1 002, 008] (P6A-16):
+     1. experience, one of four bands;
+     2. capital: personal, prop or not yet, several at once. Not yet clears the other two, and either of them clears not yet (K47);
+     3. broker: a type-ahead with Other and None yet;
+     4. markets: seven tiles, several at once;
+     5. goals: several at once;
+     6. how you heard: ten sources, with free text for Other.
+
+     The chrome is "Step n of 6" and the bar, Back from step 2 on, and Continue, disabled until the step is answered and pinned above the safe area on a phone. There is no log-out and no social-proof strip.
+  3. **Home, with a required preferences dialog** (comp 13) [inv-1 013-014] (P6A-16):
+     - Home renders behind it as `HomeView skeleton`, since nothing is saved yet;
+     - the fields are first name, last name and username (K48), the default account currency (a select with USD first, shown "USD (US dollar)"), and the time zone (a select showing the GMT offset and the zone name, opening on `America/New_York`);
+     - one submit button, and no close. It can't be skipped.
+  4. **After saving,** a toast in Keel's words says the time zone is being applied to the trades [inv-1 015] (P6A-15).
+- **The gate:**
+  - it renders nothing until the prefs load, so nothing flashes;
+  - while `isOnboarded` is false:
+    - with no finished survey this browser session, it does `router.replace('/app/welcome')`;
+    - with a finished survey, it sends every `/app/*` route to `/app/home`, which shows the preferences dialog;
+  - it covers every `/app/*` route, the sample link included (U1, K56).
+- **Answers** live in `sessionStorage['keel:first-run']` until the dialog is submitted (K55). Nothing is written to the repo before then.
+- **Save** runs `complete`, storing the survey answers only (U2). Then it closes the dialog, shows the toast, and Home renders for My workspace.
 - e2e setup, in `onboard.setup.ts`:
   1. Freeze the clock at `2026-11-20T15:00:00Z`, and go to `/app/welcome`.
-  2. Wait for the heading "Welcome to Keel", which means the DB is open and the sample is seeded.
+  2. Wait for the welcome heading, which means the DB is open and the sample is seeded.
   3. In `page.evaluate`, open `keel-data` and merge `{ onboarding: { status: 'done', at: '2026-11-20T15:00:00.000Z', existing: true } }` into `meta['prefs']`.
   4. Save `context.storageState({ path: 'e2e/.state/onboarded.json', indexedDB: true })`.
 
@@ -1283,78 +1393,20 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
     - `'no second account when My workspace has one'`;
     - `'a bad username writes nothing'`;
   - `'the gate sends a new browser to welcome from any app route, the sample link included'`;
+  - `'after the survey every app route shows Home with the preferences dialog, which has no close'`;
   - `'an onboarded user passes the gate'`;
-  - `'Continue stays disabled until the step is answered'`;
+  - `'the survey has six steps, and Continue stays disabled until the step is answered'`;
   - `'Back appears from step 2'`;
   - `'not yet and the other capital choices clear each other'`;
   - `'a reload mid-survey resumes the answers'`;
   - `'the zone opens on US/Eastern'`;
-  - `'a failed save keeps the answers on the preferences step'` (Review Focus 4).
-  - `e2e/onboarding.spec.ts`, from an empty state: the whole first run. Afterwards, the switcher shows My workspace and My account.
+  - `'saving shows the time-zone toast'`;
+  - `'a failed save keeps the answers in the dialog'` (Review Focus 4).
+  - `e2e/onboarding.spec.ts`, from an empty state: the whole first run, then the toast. Home shows 0 of 3, and the switcher shows My workspace and My account.
 - [ ] **Step 2:** Run. Expected: FAIL.
 - [ ] **Step 3:** Implement against comps 10 to 13.
-- [ ] **Step 4:** `npm test && npm run typecheck && npm run lint && npm run build && npm run e2e`. Expected: PASS, the whole suite, on the onboarded state.
-- [ ] **Step 5:** Commit: `feat(app): first run with welcome, survey and preferences (#47)`.
-
----
-
-### Task 19: Home, and the landing
-
-**Files:**
-- Create:
-  - `src/app/(app)/app/home/page.tsx` and `src/app/(app)/app/page.tsx` (the landing);
-  - `src/components/app/home/home-view.tsx`, `getting-started.tsx`;
-  - `src/data/getting-started.ts`, and tests.
-- Modify:
-  - `next.config.ts`: remove the `/app` redirect;
-  - `nav.ts`: a `'home'` module first, with the `House` icon;
-  - `tab-bar.tsx`: `MORE_IDS` gains `'home'`;
-  - `settings/profile.tsx`: first name, last name and username fields. An existing `displayName` reads as the first name when no first name is set;
-  - `e2e/onboarding.spec.ts`: it lands on Home.
-
-**Interfaces:**
-- Produces:
-  ```ts
-  export interface GettingStarted { steps: { id: 'prop' | 'challenge' | 'trade'; done: boolean }[]; done: number; total: 3 }
-  /** K50: prop = a prop-evaluation or prop-funded account, or any challenge; challenge = a challenge; trade = any trade. */
-  export function gettingStarted(accounts: readonly Account[], challenges: readonly Challenge[], trades: readonly Trade[]): GettingStarted;
-  ```
-- Home, per spec §5.4 Home and K49 to K53, comp 14:
-  - **The greeting:** "Good morning, {firstName}", by the time of day (morning, afternoon, evening), with the date line. Without a first name, no name.
-  - **The Get started card:** "n of 3 complete", with a bar.
-    - The next step's number is ringed.
-    - A done step shows a tick, a struck-through title and a Done chip, with no button.
-    - The step buttons (K49):
-      - step 1 opens Settings > Accounts with a new prop account;
-      - step 2 opens Prop firms with a new challenge;
-      - step 3 opens `/app/trades/new`.
-    - Step 1's text says that automatic sync isn't live yet.
-    - At 3 of 3 the card stays (K51).
-  - **Explore:** Prop firms, the Dashboard, and Backtesting with "Not live yet" (K53).
-  - **Recommended focus:** four static rows, linking per K49.
-  - **Resources:** the Changelog.
-  - **Loading:** the greeting over skeletons.
-  - **Phone:** the cards stack, and Home is in More.
-- The landing at `/app` (K56) is a client page:
-  - Home while the checklist is incomplete;
-  - the Dashboard once it is complete.
-
-- [ ] **Step 1: Write the failing tests:**
-  - `gettingStarted`:
-    - each step on its own;
-    - a challenge alone completes steps 1 and 2.
-  - `'the next step is ringed, and done steps show Done without a button'`;
-  - `'the sample shows 3 of 3 and the card stays'`;
-  - `'/app lands on Home until the checklist is complete, then on the Dashboard'`;
-  - `'the greeting uses the first name and the time of day'`;
-  - `'Profile edits the first name, last name and username'`;
-  - e2e:
-    - `app-shell`'s `'/app goes to the Dashboard'` still passes on the sample;
-    - `onboarding.spec.ts` lands on Home at 0 of 3.
-- [ ] **Step 2:** Run. Expected: FAIL.
-- [ ] **Step 3:** Implement against comp 14.
-- [ ] **Step 4:** `npm test && npm run typecheck && npm run lint && npm run build && npm run e2e`. Expected: PASS. This is the end of Module E.
-- [ ] **Step 5:** Commit: `feat(app): Home with getting started, and the /app landing (#47)`.
+- [ ] **Step 4:** `npm test && npm run typecheck && npm run lint && npm run build && npm run e2e`. Expected: PASS, the whole suite, on the onboarded state. This is the end of Module E.
+- [ ] **Step 5:** Commit: `feat(app): first run with welcome, survey and the preferences dialog (#47)`.
 
 ---
 
@@ -1375,7 +1427,7 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
 - [ ] **Step 2: Records,** in `docs/BACKLOG.md`.
   - Close #35, #36, #37, #47, E50 and E109, in the Done convention (`~~…~~. Done in Plan 6A Task N: …`).
   - Apply every correction in spec §7.
-  - Add rows for the streak email (with #26), the day page's slim rail (#50), day-card insights (#40), the week events list (#25) and the replay quick action (#15).
+  - Add rows for the streak email (with #26), day-card insights (#40), the week events list (#25) and the replay quick action (#15).
 - [ ] **Step 3: Performance.**
   - Do this in a scratch Playwright script at `scripts/.p6a-perf.tmp.mjs`, which is never committed.
   - On the sample, time a filter change on `/app/progress`, `/app/trades/day` and `/app/trades/week`, with `performance.mark`s around the recompute. Each must be under 50 ms.
