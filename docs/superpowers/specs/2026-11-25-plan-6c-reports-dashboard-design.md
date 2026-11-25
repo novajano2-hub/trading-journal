@@ -12,13 +12,15 @@
 3. `DESIGN.md` and `PRODUCT.md`.
 4. The Plan 5 rulings, and Plan 6A's spec (`2026-11-25-plan-6a-daily-routine-design.md`), whose Keel's calls K1 to K56 and decisions U1 to U4 stand.
 
-Where TZ is unknown this doc decides, as a **Keel's call (TradeZella unknown)** with an id (C1 to C66, all listed in §6.1). The owner's decisions are D1 to D3 (§6.2).
+Where TZ is unknown this doc decides, as a **Keel's call (TradeZella unknown)** with an id (C1 to C75, all listed in §6.1).
+
+**TradeZella's behaviour, never its UI** (the owner, 2026-11-25). Wherever this doc says "TZ's template", "TZ's default", "TZ's widgets" or "TZ's way", it means TZ's features and behaviour: which widgets exist, which are in the default set, and what each one does and computes. The layout, look, arrangement, wording and icons are Keel's own: design G and the comps. Nothing here asks for TZ's screen. The owner's decisions are D1 to D3 (§6.2).
 
 ## 1. Intent and why
 
 Plan 6C finishes Plan 6 with the parts of TZ that sit around the daily loop:
 
-- the dashboard as TZ builds it: saved templates of widgets, an upper strip and a lower section (#46), including TZ's composite score (#23) and 6A's progress tracker card as a removable widget;
+- TZ's dashboard features: saved templates of widgets, with an upper section of at most five figures and a lower section (#46), laid out in Keel's own design, including TZ's composite score (#23) and 6A's progress tracker card as a removable widget;
 - prop finances: what a prop trader spent, earned and netted, which challenges pass, and why they break (#45);
 - two account and calendar features: a cost method per account, and the calendar saved as an image (#49);
 - shell polish: the sidebar and the Settings menu collapse to icons (#50);
@@ -32,7 +34,7 @@ All of it runs on local data. Together with 6A and 6B it closes the Plan 6 rows 
 **Goals**
 
 - TZ parity for the seven rows, including the help-only behaviour: the twelve upper and seventeen lower widgets [help 7118437], the prop dashboard's figures, insights and filters [help 13463814], and the transactions with their review status [help 14588595, 14502964].
-- One composite score that reproduces TZ's 76.3 on the forex file's 2 Nov trades, and TZ's component readings at the other two recorded scopes (rec §2.4), shown in Keel's own look and words (D1).
+- One composite score with TZ's method, matching TZ's 76.3 on the forex file's 2 Nov trades within the readings' error (the inferred method gives 76.43), and TZ's component readings at the other two recorded scopes (rec §2.4), shown in Keel's own look and words (D1).
 - The prop module as TZ's: Dashboard, Accounts and Transactions (#45 with D3).
 - A safe upgrade for every existing Dexie database; a sample workspace that shows every new state.
 
@@ -107,12 +109,13 @@ Dexie version 4 adds one workspace table, which joins `DATA_TABLES` (a workspace
 
 | Table | Key | Holds |
 | --- | --- | --- |
-| `propTxns` | `[workspaceId+id]`, index `[workspaceId+date]` | `date`, `description?`, `firm`, `challengeId?`, `category`, `amount` (signed `Cents`), `currency`, `status` |
+| `propTxns` | `[workspaceId+id]`, index `[workspaceId+date]` | `date`, `description?`, `firm`, `challengeId?`, `category`, `amount` (signed `Cents`, in the base currency, C58), `status` |
 
 **New optional fields** (no migration):
 
 - `Account.costMethod?: 'fifo' | 'lifo' | 'average'`; unset reads FIFO.
-- `Challenge.steps` widens to `0 | 1 | 2`, 0 meaning straight to funded (C30).
+- `Trade.costMethod?`, the method the trade was built with, stamped by the builder so `realizations(trade)` reads it; unset reads FIFO.
+- No new value for `Challenge.steps` (1 or 2, as TZ's form): a challenge created in the funded phase reads as straight to funded (C30).
 - `Challenge.strategyIds?`, `Challenge.breachReason?` (C33), `Challenge.breachedOn?` (`YYYY-MM-DD`).
 - On `UserPrefs`: `dashboards?` (templates and the one in use, C1), `sidebar?: 'expanded' | 'collapsed'` (C47), `propLayout?: 'grid' | 'list'` (C63).
 
@@ -158,6 +161,7 @@ Dexie version 4 adds one workspace table, which joins `DATA_TABLES` (a workspace
 - Two sections: an upper strip of small figure widgets, at most five; a lower section of larger widgets [help 7118437, 9718410].
 - A template button beside start my day opens the template menu [rec S02; inv-1 049].
 - Every widget has an info tip, its own loading state and its own no-data state [rec S03, S04, S07, S21].
+- The last import's time stays under the title, as Keel shows it today [rec S02; gaps row 15]; only the resync is out.
 - Widgets follow the unit, the filters, the date range and the accounts. The calendars ignore the date range; the score ignores the unit [rec S04, S20, S22].
 
 **Template menu** [inv-1 049; help 9718410]
@@ -170,7 +174,7 @@ Dexie version 4 adds one workspace table, which joins `DATA_TABLES` (a workspace
 - Add, remove and rearrange.
 - Cancel, and save the template.
 
-**The default template** [rec S02; inv-1 035-037] (rec §1.1)
+**The default set of widgets** [rec S02; inv-1 035-037] (rec §1.1). The set and each widget's behaviour are TZ's; the order and arrangement below are Keel's (comp 01), which keeps TZ's order where it reads well.
 
 - Upper: Net P&L, Trade win %, Profit factor, Day win %, Avg win/loss trade.
 - Lower, in order: the score, the progress tracker, daily net cumulative P&L; net daily P&L, recent trades and open positions, account balance; the advanced calendar (two thirds wide), drawdown, trade time performance; trade duration performance.
@@ -183,9 +187,9 @@ Dexie version 4 adds one workspace table, which joins `DATA_TABLES` (a workspace
 | --- | --- | --- | --- |
 | Net P&L, with the trade count | Upper | The summary strip's P&L figure (`summary-strip.tsx`) with a count | [rec S02] |
 | Account balance and P&L | Upper | `balanceAt` at the range's end, and the closed net P&L in range (C17) | help only |
-| Trade win %, with the W, BE, L chips and a half gauge | Upper | `summarize` win rate; a new `HalfGauge` | [rec S02] |
-| Profit factor, with a ring | Upper | `profitFactorOf`; a new `RingGauge` | [rec S02] |
-| Day win %, with day chips and a half gauge | Upper | `daySummary` | [rec S02] |
+| Trade win %, with won, breakeven and lost | Upper | `summarize` win rate, with a split bar (C67) | [rec S02] |
+| Profit factor, gross profit against gross loss | Upper | `profitFactorOf`, with a split bar and no amounts (C67) | [rec S02] |
+| Day win %, with green, flat and red days | Upper | `daySummary`, with a split bar (C67) | [rec S02] |
 | Avg win/loss trade, with a split bar and both amounts | Upper | `RatioText` and a split bar | [rec S02] |
 | Trade expectancy | Upper | `expectancyOf` | help only |
 | Current day streak, current trade streak, current streak | Upper | `dayStreaks`, `tradeStreaks` (C16) | help only |
@@ -214,7 +218,7 @@ Dexie version 4 adds one workspace table, which joins `DATA_TABLES` (a workspace
 | Registry | The card shell, `states.tsx`, `MetricTip` | `src/components/app/dashboard/widgets/` (one file per widget body or group), `registry.ts` |
 | Templates | `usePrefs`, `useUpdatePrefs` | `src/domain/dashboard/templates.ts` (pure: validate, add, remove, move, default) |
 | Menu and edit mode | `Segmented`, `ConfirmDialog`, `MorphDialog` | `TemplateMenu`, `EditBar`, `WidgetPicker` |
-| Charts | `ReportChart`, `Sparkline` | `ScatterChart`, `HalfGauge`, `RingGauge` |
+| Charts | `ReportChart`, `Sparkline` | `ScatterChart`, `SplitBar`, `RadarChart` |
 | Series | `timeSeries`, `drawdownSeries`, `equityCurve`, `runningByExit` | `scatterPoints(trades, axis)` in `src/domain/metrics/` |
 
 **Keel's own cards.** "Your plan", "Mistakes" and "Performance" have no TZ widget, and leave the dashboard (D2).
@@ -232,7 +236,8 @@ Dexie version 4 adds one workspace table, which joins `DATA_TABLES` (a workspace
 - **No trades:** each widget its own empty state; the score says it needs a trade.
 - **A narrowing unit:** widgets recompute on eligible trades; the balance widgets show their unit empty state; the score stays.
 - **Edit mode:** a draft; leaving with unsaved changes asks first.
-- **Upper strip full:** the add slot is gone; the picker greys the upper widgets.
+- **Upper strip full:** the add slot is gone (C70).
+- **No starting balance:** both balance widgets ask for one and link to Settings > Accounts [inv-1 036].
 
 **Phone**
 
@@ -251,19 +256,19 @@ Dexie version 4 adds one workspace table, which joins `DATA_TABLES` (a workspace
 
 | Component | Weight | Raw value | Sub-score |
 | --- | --- | --- | --- |
-| Profit factor | 25% | Gross profit over gross loss | The higher of the help's band (20 under 1.8; 50 at 1.8 rising to 100 at 2.6, linear inside each band) and the ratio × 33.3 (INFERRED), capped at 100 (C21) |
+| Profit factor | 25% | Gross profit over gross loss | Under 1.8: the ratio × 33.3, never under 20 (INFERRED from TZ's readings, rec §2.4). From 1.8: the help's bands, 50 at 1.8 rising to 100 at 2.6, linear inside each band (C21). This keeps the help's step down at 1.8 |
 | Avg win/loss | 20% | Average win over average loss | As profit factor |
 | Max drawdown | 20% | Largest peak-to-trough drop over the highest cumulative P&L before it, % | 100 − that %, clamped to 0 to 100 |
 | Win % | 15% | Winners over trades | win % / 60 × 100, capped at 100 |
 | Recovery factor | 10% | Net P&L over the max drawdown | The help's bands (3.5 or more = 100; under 1.0 = 0; linear inside each band); 0 when there is no drawdown (INFERRED) |
-| Consistency | 10% | Standard deviation of the trades' net P&L over the total net P&L | 0 when the net is negative; else 100 − 100 × that ratio, clamped (INFERRED) |
+| Consistency | 10% | Standard deviation of profits over total net P&L. Per trade (INFERRED from the 2 Nov reading, which a daily basis can't give; the help's "daily" is counter-evidence, rec §2.3, §2.4); population deviation (C24) | 0 when the net is negative; else 100 − 100 × that ratio, clamped (INFERRED) |
 
 **Mapping onto Keel**
 
 | Part | Reuses | New |
 | --- | --- | --- |
 | Inputs | `summarize`, `profitFactorOf`, `maxDrawdown` (daily curve), the net basis (`pnlBasis`) | `src/domain/metrics/score.ts`: `scoreOf(trades, ctx)` returning six sub-scores, the raw values and the total; pure, test-first |
-| Fixtures | The 2 Nov 2026 trades of `keel-sample-forex-prop.csv` (in the main checkout's git-ignored research `import/` folder; copied into `src/domain/metrics/__fixtures__/` as a small CSV of those nine fills) | The whole score pinned at 76.3 ±0.05 on those four trades. Component tests at the other two scopes on the inputs the screen shows: win % 49.79 gives 82.98; profit factor 1.20 and avg win/loss 1.21 give 40 ±3; win % 42.47 gives 70.8 (C59) |
+| Fixtures | The 2 Nov 2026 trades of `keel-sample-forex-prop.csv` (in the main checkout's git-ignored research `import/` folder; copied into `src/domain/metrics/__fixtures__/` as a small CSV of those nine fills) | The whole score pinned at the method's own 76.43 ±0.01 on those four trades, and within ±0.2 of TZ's 76.3 (the documented gap). Component tests at the other two scopes on the inputs the screen shows: win % 49.79 gives 82.98; profit factor 1.20 and avg win/loss 1.21 give 40 ±3; win % 42.47 gives 70.8 (C59) |
 | Widget | The card shell | `RadarChart` (SVG, six axes, five rings, a text table alternative) and the score bar |
 
 **Look.** Keel's own name and copy (C20). The radar polygon uses the accent (adherence-like: a measure against a standard). The bar is a neutral track with the marker, labelled in words by band (C22), so no money hue carries a non-money figure.
@@ -271,7 +276,7 @@ Dexie version 4 adds one workspace table, which joins `DATA_TABLES` (a workspace
 **States**
 
 - **No trades:** the widget's empty state, "needs at least one closed trade".
-- **A component that can't be computed** (no losses for profit factor, no drawdown for recovery): it scores as the method says (100 for profit factor with no losses is C23; recovery 0), and its axis readout says why.
+- **A component that can't be computed** (no losses for profit factor, no drawdown for recovery): it scores as the method says (100 for profit factor with no losses is C23). With no drawdown, the radar draws recovery full while the total counts it 0, as TZ's 2 Nov figure shows (INFERRED, rec §2.4). The radar shows no axis values, as TZ's doesn't; the hover and focus readout and the hidden table carry them (Keel's accessibility rule).
 - **A narrowing unit:** unchanged; the score always reads money (TZ's behaviour).
 
 ### 5.3 Prop finances, pass rate and breach insights (#45)
@@ -297,15 +302,20 @@ Dexie version 4 adds one workspace table, which joins `DATA_TABLES` (a workspace
 - **Passing insights:** pass rate = passed over attempted; by firm, account type, account size, strategy.
 - **Breach insights:** reasons ranked with their share; average days and average P&L before a breach; the most common size and firm; a switch between evaluation and funded breaches.
 - **Filters:** firm, phase, status, account size, account type, strategy. A date range over everything.
+- **No unit or basis control** on the module [help 13463814]: prop figures are money, net, in the base currency, whatever Keel's display menu says, and the menu is hidden on prop pages (C72).
+
+**First run** [inv-1 018-029] (rec §3.1)
+
+- With no data, the module offers a first run instead of its dashboard: how the trader trades (own capital, prop firms, or both); then how to bring finances in (the bank link, out, or by hand); then a transaction form adding rows to a list (firm, signed amount, date, category, status, description); then three totals (invested, income, net); then an offer to add active accounts (to New challenge) or go to the dashboard.
 
 **Accounts** [help 14502950, 13463750, 13463732; inv-1 030-034] (folded in by D3)
 
-- Sub-tabs: evaluations, funded, breached; a list or grid switch.
+- Sub-tabs: evaluations, funded, breached; a list or grid switch. Each account shows its balance, start date and linked trading account [help 14499729].
 - A row menu: view details; move to funding; mark as breached; edit; delete (permanent).
 - **Mark as breached** asks for a reason from a fixed list (max drawdown broken; overtrading or forcing trades; time pressure; lack of risk management; other, with the trader's words). A breach is permanent: the challenge moves to the breached tab, stays in the history and the insights, and never returns.
-- **Move to funding** passes the evaluation; its results stay viewable.
+- **Move to funding** passes the evaluation; its results stay viewable. Both it and Mark as breached also sit on the details view's Funding tab [help 14502950].
 - **Details:** a tab per phase (step 1, step 2, funding); a balance chart by day, hour or trade; a path-to-funding panel (profit against target, days against the minimum, daily loss used, drawdown used, best-day consistency); stats (win rate, average win, average loss, best day, worst day); the phase's trades, with an upload; an attach-strategy link.
-- **Create** adds a broker and a quantity to the fields Keel's form has (strategies and straight to funded are above).
+- **Create** adds strategies, a broker and a quantity (several of the same challenge [help 13463750]) to the fields Keel's form has. Steps stay 1 or 2, and the phase evaluation or funded.
 
 **Mapping onto Keel**
 
@@ -316,22 +326,24 @@ Dexie version 4 adds one workspace table, which joins `DATA_TABLES` (a workspace
 | Log payout | `MorphDialog` | `LogPayoutDialog`: the funded challenge, amount, date |
 | Aggregates | `balanceAt`, `checkChallenge` | `src/domain/prop/finance.ts`: totals, ROI, ROI series, breakdowns, pass rates, breach facts; pure, test-first |
 | Dashboard | `ReportChart` (lines), the breakdown bar list look, `Segmented` | `PropDashboard`, its filter popover |
-| Breach | `ChallengeCard`'s breach suggestion, `challenge-form.tsx` | `MarkBreachedDialog` with the five reasons; the form stops offering a status change once breached |
-| Challenge form | `challenge-form.tsx` | Strategies (several), straight to funded as a third steps option, a broker, and a quantity (C64) |
+| Breach | `ChallengeCard`'s breach suggestion, `challenge-form.tsx` | `MarkBreachedDialog` with the five reasons and nothing chosen; the form stops offering a status change once breached |
+| Challenge form | `challenge-form.tsx` | Strategies (several), a broker, and a quantity (C64) |
+| First run | The challenge form, the transaction add row | `PropFirstRun`: the four steps (C71) |
 | Accounts tab | `PropView`'s card list (the grid), `Segmented`, `PhoneRows` | Sub-tabs Evaluations, Funded, Breached (C62); a List or Grid switch (C63); a row menu: View details, Move to funding (Plan 5's pass action, PF4), Mark as breached, Edit, Delete (confirmed) |
-| Details | `checkChallenge` (path to funding), `balanceAt`, `daySummary`, the trade log's rows, the Import page | `/app/prop-firms/accounts/[id]`: a tab per phase; a balance chart (Day, Hour, Trade, C65); the path-to-funding panel; five stats; the phase's trades with Import (the account chosen); strategies shown and attached (C66) |
+| Details | `checkChallenge` (path to funding), `balanceAt`, `daySummary`, the trade log's rows, the Import page | `/app/prop-firms/accounts/[id]`: a tab per phase; a balance chart (Day, Hour, Trade, C65); the path-to-funding panel; five stats; the phase's trades with Import (the account chosen); strategies shown and attached (C66); Move to funded and Mark as breached on the current phase |
 
 **Data**
 
-- `PropTxn`: `{ id, workspaceId, date, description?, firm, challengeId?, category, amount, currency, status }`; `category`: `payout | evaluation-fee | activation-fee | reset-fee | affiliate-income | uncategorized`; `status`: `not-reviewed | reviewed | ignored`.
-- `Challenge`: `strategyIds?`, `breachReason?` (`max-drawdown | overtrading | time-pressure | risk-management | other`), `breachedOn?`, and `steps: 0 | 1 | 2`.
+- `PropTxn`: `{ id, workspaceId, date, description?, firm, challengeId?, category, amount, status }`; `category`: `payout | evaluation-fee | activation-fee | reset-fee | affiliate-income | uncategorized`; `status`: `not-reviewed | reviewed | ignored`.
+- `Challenge`: `strategyIds?`, `breachReason?` (`max-drawdown | overtrading | time-pressure | risk-management | other`), `breachedOn?`.
+- `UserPrefs.propStart?`: the first run's answer (`'own' | 'prop' | 'both'`), stored only (C71).
 
 **States**
 
-- **No challenges and no transactions:** the dashboard's empty state, with Add transaction and New challenge (no bank link, C38).
-- **Transactions only:** the money cards, ROI and breakdowns fill; pass and breach insights say no challenge has an outcome yet.
-- **Challenges without fees or transactions:** spend reads $0.00 and ROI None.
-- **A filter that matches nothing:** "No challenges match these filters." with Clear.
+- **No challenges and no transactions:** the first run (C71); afterwards, the dashboard's empty state with Add transaction and New challenge (C69).
+- **Transactions only:** the money cards, ROI and breakdowns fill; pass and breach insights say no challenge has an outcome yet (C69).
+- **Challenges without fees or transactions:** spend reads $0.00 and ROI None (C69).
+- **A filter that matches nothing:** "No challenges match these filters." with Clear (C69).
 - **Other currencies:** money figures read the base currency only; others are left out and named (as 6A's K24).
 - **Privacy:** every amount masked, ROI and pass rates shown.
 
@@ -356,7 +368,7 @@ Dexie version 4 adds one workspace table, which joins `DATA_TABLES` (a workspace
 | --- | --- | --- |
 | Matching | `matchLots` (`trade-builder.ts`), `realizations` | A method argument: FIFO closes the oldest lot, LIFO the newest, average closes at the running average cost; test-first, with the help's 100 at $10 and 100 at $15 example |
 | Reading | `MetricContext` | The account's method passed to every `realizations` reader (days, balance, series, units, prop, dashboard, routine, tracker) |
-| Settings | `account-dialog.tsx`, the accounts table | A cost method select (FIFO first, the default), and a column |
+| Settings | `account-dialog.tsx`, the accounts table | A cost method select in the Edit dialog only (FIFO first, the default; C74), and a column |
 
 **Behaviour Keel decides** (C39 to C42): a change applies to the account's past and future trades at once, after a confirmation that says which figures move. Trade boundaries never move (a trade runs flat to flat under every method). What moves: the per-exit split (which day books what), an open trade's realized part, and, for a pair converted at each exit's own rate (USDJPY on a USD account), a closed trade's total.
 
@@ -398,7 +410,7 @@ Dexie version 4 adds one workspace table, which joins `DATA_TABLES` (a workspace
 | Part | Reuses | New |
 | --- | --- | --- |
 | Toggle | The sidebar's head (`sidebar.tsx`) | A collapse button; the state in `UserPrefs.sidebar` (C47) |
-| Rail | 6A's slim rail (K33): icons, the add-trade "+", group dividers | Used on every desktop page when collapsed; tooltips name each item; the "Not live yet" group keeps its mark |
+| Rail | 6A's slim rail (K33): icons, the add-trade "+", group dividers | Used on every desktop page when collapsed; tooltips name each item (INFERRED in TZ; kept by Keel's accessibility rule); the "Not live yet" group keeps its mark |
 | Settings | `settings/layout.tsx`, `SETTINGS_NAV` | Groups TZ's way, with Keel's pages only: Profile; then Accounts, Trading, Tags, Logs (C48). Collapses to an icon column with the sidebar |
 | E52 | The sticky top bar | `scroll-padding-top` so a focused control is never under the bar (WCAG 2.4.11) |
 | E55 | `top-bar.tsx` | The wrapped-chips row, the phone bar below 375px, the Tab walk e2e from 640 to 1023 |
@@ -454,8 +466,8 @@ Every row below is Keel's call (TradeZella unknown).
 | C1 | Where templates live | In prefs, one set per browser, shared by both workspaces, as the trade log's columns are | Keel is local-first; TZ is per account (INFERRED) |
 | C2 | Choosing, naming, renaming, deleting | The menu lists the templates with the one in use marked; picking one switches. New template asks for a name and starts as a copy of the template in use. Edit mode has the name field and Delete (confirmed); the last template can't be deleted. No limit on the number | TZ shows a list, edit pencils and create [inv-1 049]; no limit stated [help 9718410] |
 | C3 | Rearranging | Drag on a pointer; Move earlier and Move later buttons for the keyboard and on phones | "Rearrange" [help 9718410]; WCAG |
-| C4 | Sizes in the lower section | Each widget has a fixed width: the advanced calendar and the yearly calendar two thirds, the rest one third, at `xl`; halves at `md`; full width on a phone | TZ's default layout [rec S02] |
-| C5 | The default template | TZ's default list (§5.1), named "Main" in Keel's words; restored by "Reset to default" in edit mode | [rec S02; inv-1 035] |
+| C4 | Sizes in the lower section | Each widget has a fixed width: the advanced calendar and the yearly calendar two thirds, the rest one third, at `xl`; halves at `md`; full width on a phone | Keel's layout (comp 01); TZ's layout is not copied |
+| C5 | The default template | TZ's default set of widgets (§5.1), arranged as comp 01, named "Main" in Keel's words. No reset control: TZ shows none (P6C-19) | The set [rec S02; inv-1 035]; the arrangement is Keel's |
 | C6 | The add-widget picker | A list of the section's widgets not yet on the template, each with its info line; a widget appears once per template | INFERRED; duplicates would show the same figure twice |
 | C7 | Widget settings | Stored on the template's widget: the scatter's entry or exit time, the report's metrics, the challenge shown. The calendars' cell stats stay one pref, shared with `/app/calendar` | The calendar menu is already a pref (Plan 5) |
 | C8 | Leaving edit mode | Cancel drops the draft; navigating away with changes asks first | Keel's forms |
@@ -464,22 +476,22 @@ Every row below is Keel's call (TradeZella unknown).
 | C11 | The challenge widget | One challenge's compact card; its settings pick which; the default is the most urgent active challenge, as the prop page sorts | help only |
 | C12 | The plain and mini calendars | Calendar: the month with net only, tinted win, loss or breakeven, no stats menu or snapshot. Calendar mini: 6A's mini calendar; a day opens the Day view on that date | [help 7118437] |
 | C13 | The yearly calendar | Keel's year grid; a month opens `/app/calendar` on that month | Plan 5's year view |
-| C14 | Win %, avg win and avg loss | Three running series by day over the range, win % on the left axis and money on the right | "Their evolution" [help 7118437] |
+| C14 | Win %, avg win and avg loss | Following the help's "evolve throughout the day" [help 7118437]: x is the time of day; the range's closed trades in order of exit time of day, with the running win %, average win and average loss after each, win % on the left axis and money on the right | [help 7118437], read as time of day (rec §1.2) |
 | C15 | Daily and cumulative | Daily bars and the running line on one chart, two axes | [help 7118437] |
-| C16 | The streak widgets | Day: the run of winning or losing days ending on the range's last trading day, labelled win or loss; trade: the same for trades; current streak: both, side by side | "Consecutive winning days" [help 7118437] |
+| C16 | The streak widgets | Day: the number of winning days in a row ending on the range's last trading day, 0 when that day was not a win; trade: the same for trades; current streak: both, side by side. A breakeven day or trade ends a run (Keel's call; TZ unknown) | "Winning trading days in a row", "winning trades in a row" [help 7118437] |
 | C17 | Account balance and P&L | The selected accounts' balance at the range's end, with the closed net P&L in the range under it; base currency only | help only |
 | C18 | Average drawdown | The mean of the daily drawdown in the range; with no range set, today's drawdown from the all-time peak, as the help says | [help 7118437] |
-| C19 | Scatters | One dot per closed trade, net P&L on y with sign colour and shape (filled above zero, hollow below, for colour-blind traders); time of day in the profile zone; hold time on a log axis with TZ's tick ladder; a hover or focus readout names the trade and opens it on click | [rec S16, S21]; PRODUCT.md accessibility |
+| C19 | Scatters | One dot per closed trade, net P&L on y with sign colour and shape (filled above zero, hollow below, for colour-blind traders); time of day in the profile zone; hold time on a log axis; both axes rescale to the range's trades (TZ's behaviour); a hover or focus readout names the trade and opens it on click | [rec S16, S21]; PRODUCT.md accessibility |
 
 **Score**
 
 | Id | Question | Keel's call | Basis |
 | --- | --- | --- | --- |
-| C20 | Name and copy | Keel's own name and words, set in the comps; never TZ's name | Anti-goal |
-| C21 | The ratio curve (profit factor, avg win/loss, recovery) | Linear inside each of the help's bands. For profit factor and avg win/loss, the sub-score is the higher of the help's band and the ratio × 33.3, so it never falls as the ratio rises (the help's flat 20 under 1.8 and its 50 at 1.8 contradict TZ's own readings of about 40 at 1.20 and 48 at 1.45, rec §2.4). The help's floor of 20 holds under a ratio of 0.6 | [help 10305642]; rec §2.4 |
+| C20 | Name and copy | Keel's own name and words, set in the comps ("Edge score", bands Weak, Building, Strong); never TZ's name | Anti-goal |
+| C21 | The ratio curve (profit factor, avg win/loss, recovery) | Linear inside each of the help's bands. Profit factor and avg win/loss: under 1.8, the ratio × 33.3, never under 20 (TZ's readings contradict the help's flat 20 there, rec §2.4); from 1.8, the help's bands, keeping its step down at 1.8 (about 60 just under, 50 at 1.8), since no reading contradicts them | [help 10305642]; rec §2.4 |
 | C22 | The bar | A neutral 0 to 100 track with a marker and Keel's band words (for example 0 to 40, 40 to 70, 70 to 100), not a red-to-green gradient | DESIGN.md hue jobs; TZ's gradient is look, not behaviour |
 | C23 | Edge values | No losses: profit factor and avg win/loss score 100. No drawdown: max drawdown 100, recovery 0 (rec §2.4). Net loss: consistency 0 | rec §2.4 |
-| C24 | Bases | Net or gross by the trader's basis; drawdown on the daily P&L curve (E70); consistency on each closed trade's net | rec §2.4; Plan 5 |
+| C24 | Bases | Net or gross by the trader's basis; drawdown on the daily P&L curve (E70); consistency on each closed trade's net, with the population standard deviation (INFERRED; the help says "daily") | rec §2.3, §2.4; Plan 5 |
 | C25 | The threshold | Fixed at 60; not a setting | Nothing shows a setting |
 | C26 | Decimals | Up to two, trailing zeros dropped, as TZ | [rec S02, S06, S22] |
 
@@ -491,7 +503,7 @@ Every row below is Keel's call (TradeZella unknown).
 | C28 | Fees on the challenge | A challenge's evaluation and activation fees count as spend on its first start date, unless a transaction of that category is linked to it, which then replaces the field | TZ has both [inv-1 030; connector] |
 | C60 | What counts where | The sign decides, as TZ's help says: every negative amount not ignored is spent, every positive one is earned, whatever its category. So an uncategorized cost counts in spent, affiliate income in earned, and a positive amount on a fee category (a refund) in earned. "Expenses by fee type" groups the negative amounts by category, uncategorized included | [help 14588595, 13463814]; INFERRED |
 | C29 | Payouts and balances | Log payout writes a payout transaction linked to the funded challenge; it does not write a withdrawal. The card's "paid out" reads payout transactions, and falls back to the funded account's withdrawals for a challenge with none (Plan 5's reading) | UNKNOWN [rec §3.2]; no data loss |
-| C30 | Account type | 1-step, 2-step, straight to funded (`steps: 0`), a third option in the form | [connector; help 13463814] |
+| C30 | Account type | 1-step and 2-step from `steps`; straight to funded is a challenge created in the funded phase (its phases hold no evaluation step with an account or a start date). Derived, not stored; the form keeps TZ's steps (1 or 2) and phase toggle | The type [connector; help 13463814]; the derivation INFERRED |
 | C31 | Account size | The first phase account's starting balance; None when no account is linked | The rules' balance [inv-1 032] |
 | C32 | ROI and pass rate | ROI = net over spent, None with no spend. Pass rate = passed over (passed + breached) evaluations; active ones aren't counted; passed means passed or moved to funded | INFERRED [rec §3.3] |
 | C33 | Breach reasons | The five reasons, in Keel's words; "other" keeps the trader's text in `failureReason`. A challenge breached before 6C reads as other with its text | [help 14502950] |
@@ -499,10 +511,10 @@ Every row below is Keel's call (TradeZella unknown).
 | C35 | Routes | Three routes under `/app/prop-firms`; the sidebar entry opens the Dashboard | TZ's three tabs [help 14499729] |
 | C36 | The ROI chart's periods | 1W, 1M and 1Y set the window, ending at the range's end or today | [help 13463814] |
 | C37 | The date range | Keel's global date range chip: transactions by date, challenges by their first start date | INFERRED |
-| C38 | No bank link | Left out; the empty state offers Add transaction and New challenge only | PRODUCT.md "never fake capability" |
+| C38 | No bank link | Left out everywhere it appears: the first run's finance step and the dashboard | PRODUCT.md "never fake capability" |
 | C62 | The sub-tabs | Evaluations: active challenges in an evaluation phase. Funded: passed or funded, not breached (Keel's "passed" waits there until its funded account is linked, PF4). Breached: breached. Each with its count | [help 14502950]; Keel's statuses |
-| C63 | List or grid | Grid is today's cards; List is a table: name, firm, type, size, phase, status, balance, start. The choice is remembered in prefs (`propLayout`) | help only; columns UNKNOWN |
-| C64 | Broker and quantity | The broker fills the broker of each account the form creates. Quantity n (1 to 20) makes n challenges with the same rules and fees, named "name", "name 2" and so on, each with its own new accounts; quantity is only offered with new accounts, not when linking existing ones | [inv-1 031]; "number of identical accounts" (INFERRED) |
+| C63 | List or grid | Both show the balance, start date and linked trading account (TZ's). Grid is today's cards; List is a table: name, firm, linked account, type, size, phase, status, balance, start (the other columns Keel's). The choice is remembered in prefs (`propLayout`) | [help 14499729]; other columns UNKNOWN |
+| C64 | Broker and quantity | The broker fills the broker of each account the form creates. Quantity n (1 to 20) makes n challenges with the same rules and fees, named "name", "name 2" and so on, each with its own new accounts; quantity is only offered with new accounts, not when linking existing ones | [inv-1 031]; quantity's meaning [help 13463750]; the rest Keel's |
 | C65 | The balance chart | Day: the balance at each day's close; Hour: at each hour with an exit; Trade: after each trade. Over the shown phase's account, from its start | [help 14502950] |
 | C66 | Attach strategy | The details view lists the challenge's strategies with an Attach control (the same multi-select as the form); it feeds the dashboard's strategy filter and pass rate by strategy | [help 14502950] |
 
@@ -554,15 +566,26 @@ Every row below is Keel's call (TradeZella unknown).
 | Id | Question | Keel's call | Basis |
 | --- | --- | --- | --- |
 | C57 | Seed v6 | Prop transactions for the sample's challenges (fees, two resets, payouts on the funded challenge, one ignored row, one uncategorized cost), one breached challenge with a reason and date. No seeded template: templates are prefs, which a reseed never touches | The sample shows every state |
-| C58 | Currencies | The dashboard keeps Plan 5's currency switch (shown when more than one currency has closed trades); every money widget and the score read the currency it picks. Prop totals read the base currency; others are left out and named | Plan 5 (E49); 6A K24 |
-| C59 | The score's tests | The whole score is pinned only where TZ's trade set is rebuildable (2 Nov, rec §2.4); elsewhere each component's curve is pinned on the inputs the screen shows | rec §2.4 |
+| C58 | Currencies | The dashboard keeps Plan 5's currency switch (shown when more than one currency has closed trades); every money widget and the score read the currency it picks. Prop transactions are in the base currency (no currency field, as TZ's have none); balances of accounts in other currencies are left out and named | Plan 5 (E49); 6A K24 |
+| C59 | The score's tests | The whole score is pinned only where TZ's trade set is rebuildable (2 Nov): to the method's own 76.43, with its documented gap of 0.13 to TZ's 76.3; elsewhere each component's curve is pinned on the inputs the screen shows, within the readings' ±3 | rec §2.4 |
+| C68 | The transactions table | Columns: date, description, firm, challenge, category (with its edit control), amount, status, actions; newest first | Fields [help 14588595]; columns and order UNKNOWN (rec §3.2) |
+| C69 | Prop states TZ doesn't show | The empty, transactions-only, no-fee and no-match states as §5.3 States writes them | rec §3.5 UNKNOWN |
+| C70 | Dashboard states TZ doesn't show | A full upper section hides its add place; a template saved elsewhere replaces the one shown on refetch | UNKNOWN |
+| C71 | The prop first run | Shown on the first visit to the prop module while it has no challenge and no transaction, once per workspace, with a Skip. The bank-link choice is left out (C38), so the finance step goes straight to the transaction form. The "how do you trade" answer is stored only (`propStart`) and changes nothing, as 6A's survey (U2). The last step's Add active accounts opens New challenge | [inv-1 019-029]; storage UNKNOWN |
+| C72 | Prop figures and the display menu | Money, net, in the base currency; the display menu is hidden on prop pages, as on the tracker (6A) | [help 13463814]: no such control |
+| C73 | Counts on tabs and links | Only the accounts sub-tabs carry counts (C62); the module tabs, the transaction filter and the strategy rows don't | rec §3 shows none |
+| C74 | Cost method at creation | Offered only in the Edit dialog, the one path TZ's help describes; a new account starts FIFO | [help 6826141]; creation UNKNOWN |
+| C75 | The balance widget's second line | Deposits and withdrawals, net, as a second line in the same chart on its own right-hand scale (their size is far below the balance's) | [rec S02]; the scale is Keel's |
+| C67 | The figure widgets' marks | TZ's half gauges and ring are look; Keel shows the same split (won, breakeven, lost; green, flat, red days; gross profit against loss; average win against loss) as a thin split bar with the counts in words, as its summary strip does | DESIGN.md; comps 01 and 03 |
 | C61 | 6B's order | 6C plans against `main` after 6A. If 6B lands first, Task 1 takes the next Dexie version after 6B's, the migration test opens 6B's version, and the cost method joins 6B's builder changes | No 6B spec yet |
 
 ### 6.2 Decided by the owner (2026-11-25)
 
 - **D1. The score (#23): the same behaviour.** Keel's score has TZ's six components, weights and curves, as TZ's own figures show them (rec §2.4), and reproduces 76.3 on the 2 Nov forex trades. Its name, words and look are Keel's (C20, C22). Supersedes the backlog's "our own, not a copy" (§7).
-- **D2. Keel's own dashboard cards are retired,** as U4 retired Goals. "Your plan", "Mistakes" and "Performance" leave the dashboard, and the default dashboard is TZ's template. Rule adherence stays on the Progress tracker and Strategies pages, mistakes in Reports > Tags. DESIGN.md's "Plan vs actual" dashboard and PRODUCT.md's principle 3 are reworded to say so (§8, records). The cards' components are deleted with their tests, except what a widget or another page reuses.
+- **D2. Keel's own dashboard cards are retired,** as U4 retired Goals. "Your plan", "Mistakes" and "Performance" leave the dashboard, and the default dashboard holds TZ's default set of widgets, in Keel's layout and look. Rule adherence stays on the Progress tracker and Strategies pages, mistakes in Reports > Tags. DESIGN.md's "Plan vs actual" dashboard and PRODUCT.md's principle 3 are reworded to say so (§8, records). The cards' components are deleted with their tests, except what a widget or another page reuses.
 - **D3. TZ's prop accounts tab is folded into 6C** (§5.3 Accounts): the sub-tabs, the list or grid switch, move to funding, the details view, and the broker and quantity on a challenge.
+- **Parity audit (2026-11-25).** An independent audit (`.superpowers/research/tradezella/plan6c-parity-audit.md`, P6C-01 to P6C-26) checked this doc and the comps against the record, and the record against its sources. Every finding was verified and corrected in the record, this doc, the comps and the plan; the C rows above cite the results.
+- **The owner's standing rule (2026-11-25):** what TZ has, nothing more; less only where Keel has no plans (AI, mentors). TZ's behaviour and features, never its UI.
 - **Approval.** Asked to approve this doc, the owner delegated it ("if it needs to be approved do so", 2026-11-25). It is approved on that word, with D1 to D3 and the Keel's calls in §6.1 as written.
 
 ### 6.3 Answered by the record
@@ -575,7 +598,7 @@ Every row below is Keel's call (TradeZella unknown).
 
 | Record | Says | Should say |
 | --- | --- | --- |
-| BACKLOG #46 | Layouts with widgets; four charts | TZ's 12 upper and 17 lower widgets, at most 5 upper, several templates with an edit mode (§5.1) |
+| BACKLOG #46 | Layouts with widgets; four charts | TZ's 12 upper and 17 lower widgets and their behaviour, at most 5 upper, several templates with an edit mode (§5.1), in Keel's own layout and look |
 | BACKLOG #23 | Our own score, not a copy | TZ's score's behaviour (six components, weights, curves), in Keel's name and look (D1) |
 | BACKLOG #45 | Spend and payouts; pass rate per firm; breach reasons | Adds transactions with a review status, log payout, ROI and its chart, pass rate by type, size and strategy, breach facts, six filters; reasons from a fixed list; and TZ's accounts tab (D3, §5.3) |
 | BACKLOG #49 | LIFO and average later | FIFO, LIFO and weighted average per account, in the account dialog and the accounts table |
