@@ -67,7 +67,10 @@ test("the dashboard card's link opens the page on the same range", async ({
   await expect(card).toContainText(/\d+ of \d+ rules met/);
   await expect(
     card.getByRole('link', { name: "Today's checklist" }),
-  ).toHaveAttribute('href', /^\/app\/day\/\d{4}-\d{2}-\d{2}\/plan$/);
+  ).toHaveAttribute(
+    'href',
+    /^\/app\/day\/\d{4}-\d{2}-\d{2}\/plan\?from=2026-11-02&to=2026-11-20$/,
+  );
   await card.getByRole('link', { name: 'Open tracker' }).click();
   await expect(page).toHaveURL(
     /\/app\/progress\?from=2026-11-02&to=2026-11-20$/,
