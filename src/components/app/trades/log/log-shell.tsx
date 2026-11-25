@@ -304,6 +304,7 @@ export function LogEmpty({
         actions={hasActiveFilters(filters) ? clear : undefined}
       />
     );
+  // Keel's call (TradeZella unknown): the record is silent for Day and Week; matches Keel's All view.
   return (
     <StateBlock
       icon={FunnelSimple}

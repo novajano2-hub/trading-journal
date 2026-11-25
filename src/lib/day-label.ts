@@ -1,8 +1,11 @@
 import { onTradingDate, weekdayOf } from '@/lib/time-format';
 
-/** A trading date in full, "Tue 24 Nov 2026" (the record: weekday, month, day and year). */
-export function dayLabel(date: string): string {
-  return `${weekdayOf(date, 'short')} ${onTradingDate(date, { day: 'numeric', month: 'short', year: 'numeric' })}`;
+/**
+ * A trading date in full, "Tue 24 Nov 2026" (the record: weekday, month, day
+ * and year); without the year, "Tue 24 Nov" (the phone's header).
+ */
+export function dayLabel(date: string, year = true): string {
+  return `${weekdayOf(date, 'short')} ${onTradingDate(date, { day: 'numeric', month: 'short', ...(year ? { year: 'numeric' } : {}) })}`;
 }
 
 /** An instant as HH:MM, or HH:MM:SS with `seconds`, in the profile zone. */

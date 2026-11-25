@@ -18,6 +18,7 @@ import { SessionButton } from './day/session-button';
 import { isRealDate } from './notebook/notebook-model';
 import { PlanTheDay } from './routine/plan-the-day';
 import { useStrategy, useTrade } from '@/data/query/hooks';
+import { LOG_VIEW_HREF, useLastLogView } from '@/lib/log-view';
 import {
   dayPageDate,
   filtersApply,
@@ -127,12 +128,13 @@ function useChipsFit({
   return fit;
 }
 
-/** "Trades" as the way back to the log, with the filters it was left with. */
+/** "Trades" as the way back to the log view last used in this tab, with the filters it was left with. */
 function BackToTrades(): React.JSX.Element {
   const search = useSearchParams().toString();
+  const view = useLastLogView();
   return (
     <Link
-      href={`/app/trades${search ? `?${search}` : ''}`}
+      href={`${LOG_VIEW_HREF[view]}${search ? `?${search}` : ''}`}
       className="rounded-chip text-faint no-underline outline-offset-2 hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
     >
       Trades

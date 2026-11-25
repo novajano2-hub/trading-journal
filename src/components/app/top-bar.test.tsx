@@ -9,6 +9,7 @@ vi.mock('next/navigation', () => import('./__fixtures__/navigation'));
 
 afterEach(() => {
   cleanup();
+  window.sessionStorage.clear();
   vi.restoreAllMocks();
 });
 
@@ -193,6 +194,22 @@ test('a trade page titles the bar "Trades" then the trade number, and shows no f
   await waitFor(() => expect(title.textContent).toContain(String(id.serial)));
   expect(screen.queryByTestId('chips')).toBeNull();
   expect(screen.getByRole('banner').dataset.chips).toBeUndefined();
+});
+
+test('the Trades crumb returns to the log view last used in this tab', () => {
+  window.sessionStorage.setItem('keel.tradeLogView', 'day');
+  const id = fixtureSample().trades[0]!;
+  renderApp(
+    <TopBar
+      filters={<div data-testid="chips" />}
+      search={<button data-testid="search">Search</button>}
+    />,
+    { url: `/app/trades/${encodeURIComponent(id.id)}?symbol=ES` },
+  );
+  const title = screen.getByRole('heading', { level: 1 });
+  expect(
+    within(title).getByRole('link', { name: 'Trades' }).getAttribute('href'),
+  ).toBe('/app/trades/day?symbol=ES');
 });
 
 test('the trade log keeps its plain title and its chips', () => {

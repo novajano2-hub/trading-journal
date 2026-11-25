@@ -17,6 +17,7 @@ export const MOODS: readonly { value: Mood['value']; word: string }[] = [
   { value: 5, word: 'Great' },
 ];
 
+/** Keel's call (TradeZella unknown): the mood note's 280-character cap and its counter. */
 export const MOOD_NOTE_MAX = 280;
 
 export const moodWord = (value: Mood['value']): string =>

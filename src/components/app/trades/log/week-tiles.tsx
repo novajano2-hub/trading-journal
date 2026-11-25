@@ -8,7 +8,7 @@ import { useDisplay } from '@/lib/display';
 import { plural } from '@/lib/format';
 import { usePhone } from '@/lib/use-phone';
 import { onTradingDate, weekdayOf } from '@/lib/time-format';
-import { tileLabel, weekLabel } from './day-label';
+import { tileLabel, weekLabel } from '@/lib/day-label';
 
 export type Trend = 'up' | 'down' | 'flat' | 'open' | 'other';
 
@@ -61,7 +61,6 @@ export function useTileFigures() {
       count,
       full: figure ? display.figure(figure) : null,
       compact: figure ? display.figure(figure, true, undefined, true) : null,
-      cash: display.cash(0, false),
     };
   };
 }
@@ -95,6 +94,7 @@ export function WeekTiles({
       {week.days.map((day, i) => {
         const date = dates[i]!;
         const dayNumber = onTradingDate(date, { day: 'numeric' });
+        // K46, Keel's call (TradeZella unknown): a tile without trades is not a button.
         if (
           !day ||
           (day.trades.length === 0 && day.otherCurrency.length === 0)

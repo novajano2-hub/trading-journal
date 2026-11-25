@@ -547,6 +547,18 @@ test('recent trades opens on the closed trades, with an Open positions tab besid
   ).toEqual(['Closed', 'Open positions']);
 });
 
+test('All trades is a drill-down to the All view, keeping the filters', async () => {
+  await renderDashboard({
+    url: '/app/dashboard?from=2026-11-02&to=2026-11-19&account=acc-b',
+  });
+  const region = await screen.findByRole('region', { name: 'Recent trades' });
+  expect(
+    within(region)
+      .getByRole('link', { name: 'All trades' })
+      .getAttribute('href'),
+  ).toBe('/app/trades?from=2026-11-02&to=2026-11-19&account=acc-b');
+});
+
 test('open positions: each open trade with its quantity, entry and realized P&L from a partial exit', async () => {
   await renderDashboard({
     edit: (s) => {

@@ -7,7 +7,7 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { useId } from 'react';
-import type { DayGroup } from '@/data/day-log';
+import { daySpan, type DayGroup } from '@/data/day-log';
 import { useSetMood } from '@/data/query/hooks';
 import { isClosed } from '@/domain/trade-status';
 import type { ColumnId } from '@/data/trade-columns';
@@ -17,7 +17,7 @@ import { formatInstrument, plural } from '@/lib/format';
 import { CARD, CARD_PAD, signTone } from '../../dashboard/shared';
 import { MoodControl } from '../../routine/mood-control';
 import { usePhone } from '@/lib/use-phone';
-import { dayLabel } from './day-label';
+import { dayLabel } from '@/lib/day-label';
 import { IntradayChart } from './intraday-chart';
 import { useLogEnv } from './log-env';
 import { LogTable } from './log-table';
@@ -61,24 +61,13 @@ export function DayFigures({
       ? formatInstrument(t.instrument, t.openedAt, env.timeZone).name
       : id;
   };
-  const closed = group.trades.filter(isClosed);
-  // Keel's call (TradeZella unknown): the enlarged chart's start and end are the
-  // first open and the last close of the day's closed trades.
-  const span =
-    closed.length === 0
-      ? undefined
-      : {
-          from: new Date(
-            Math.min(...closed.map((t) => Date.parse(t.openedAt))),
-          ).toISOString(),
-          to: new Date(
-            Math.max(...closed.map((t) => Date.parse(t.closedAt))),
-          ).toISOString(),
-        };
+  // The enlarged chart's span is Keel's call (see `daySpan`).
+  const span = daySpan(group.trades, group.date, env.timeZone);
 
   const hasTrades = group.trades.length > 0;
   return (
     <>
+      {/* Keel's call (TradeZella unknown): a day whose trades are all open has no chart, as nothing has closed to plot. */}
       {hasTrades && group.series.length > 0 ? (
         <div className="my-3.5">
           <IntradayChart
@@ -165,13 +154,15 @@ export function DayCard({
   /** Where Add note or View note goes (the note dialog fills it). */
   noteAction?: React.ReactNode;
 }): React.JSX.Element {
-  const { columns, records } = useLogEnv();
+  const { env, columns, records } = useLogEnv();
   const display = useDisplay();
   const phone = usePhone();
   const setMood = useSetMood();
   const heading = useId();
   const panel = useId();
   const date = dayLabel(group.date);
+  // Below sm the header drops the year ("Tue 24 Nov", as comp 06 at 390 shows).
+  const headerDate = phone ? dayLabel(group.date, false) : date;
   const record = records.get(group.date);
 
   const noteOnly =
@@ -197,29 +188,29 @@ export function DayCard({
 
   return (
     <article aria-labelledby={heading} className={`${CARD} ${CARD_PAD}`}>
-      <header className="flex min-h-9 items-center gap-2.5">
-        {/* Keel's call (TradeZella unknown): a note-only card has nothing to expand, so it has no chevron. */}
-        {noteOnly ? null : (
-          <button
-            type="button"
-            aria-expanded={expanded}
-            aria-controls={panel}
-            aria-label={toggleName}
-            onClick={onToggle}
-            className="-ml-1.5 grid size-7 flex-none place-items-center rounded-chip text-muted outline-offset-0 hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:size-11"
-          >
-            {expanded ? (
-              <CaretDown size={14} weight="bold" aria-hidden="true" />
-            ) : (
-              <CaretRight size={14} weight="bold" aria-hidden="true" />
-            )}
-          </button>
-        )}
+      {/* The actions wrap onto their own line when a phone's header is too narrow
+          for them (Task 16 adds a 44px note glyph to the three here). */}
+      <header className="flex min-h-9 flex-wrap items-center gap-x-2.5 gap-y-1">
+        {/* The record's source (inv-2 052) shows the chevron on a note-only card too. */}
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-controls={panel}
+          aria-label={toggleName}
+          onClick={onToggle}
+          className="-ml-1.5 grid size-7 flex-none place-items-center rounded-chip text-muted outline-offset-0 hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:size-11"
+        >
+          {expanded ? (
+            <CaretDown size={14} weight="bold" aria-hidden="true" />
+          ) : (
+            <CaretRight size={14} weight="bold" aria-hidden="true" />
+          )}
+        </button>
         <h2
           id={heading}
           className="text-[15px] font-semibold tracking-[-0.015em] whitespace-nowrap text-text"
         >
-          {date}
+          {headerDate}
         </h2>
         <b
           className={`text-[15px] font-semibold whitespace-nowrap tabular-nums ${net === null ? 'text-faint' : signTone(group.stats.net!)}`}
@@ -229,7 +220,8 @@ export function DayCard({
         </b>
         <div className="ml-auto flex items-center gap-0.5 max-sm:-mr-2.5">
           {mood}
-          {/* Keel's call (TradeZella unknown): a note-only card has no Review link; the comp shows none. */}
+          {/* K40, Keel's call (TradeZella unknown): the quick actions are Mood, Review and the note action. */}
+          {/* The record's source (inv-2 052) shows no review icon on a note-only card. */}
           {noteOnly ? null : (
             <Link
               href={`/app/day/${group.date}/review`}
@@ -245,7 +237,22 @@ export function DayCard({
       </header>
 
       {noteOnly ? (
-        <p className="mt-1.5 text-[13.5px] text-muted">No trades this day.</p>
+        <>
+          <p className="mt-1.5 text-[13.5px] text-muted">No trades this day.</p>
+          <div id={panel} hidden={!expanded}>
+            {/* Keel's call (TradeZella unknown): what expanding a note-only card reveals. It is the trade table's area with no rows. */}
+            {expanded ? (
+              <div className="mt-3.5 border-t border-line">
+                <LogTable
+                  trades={[]}
+                  columns={columns}
+                  env={env}
+                  label={`Trades on ${date}`}
+                />
+              </div>
+            ) : null}
+          </div>
+        </>
       ) : (
         <>
           <DayFigures group={group} date={date} />

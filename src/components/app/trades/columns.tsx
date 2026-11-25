@@ -25,7 +25,7 @@ import { formatDuration, formatQty, price } from '@/lib/format';
 import { formatUnitValue, tradeFigure, type Display } from '@/lib/display';
 import { shortTime } from '@/lib/time-format';
 import { dayOfTrade } from '@/data/day-log';
-import { dayLabel } from './log/day-label';
+import { dayLabel } from '@/lib/day-label';
 import { InstrumentName, TradeTime, signTone } from '../dashboard/shared';
 import {
   MistakesCell,

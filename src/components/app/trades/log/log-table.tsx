@@ -2,8 +2,9 @@
 
 import { Plus } from '@phosphor-icons/react/dist/ssr';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { Popover } from 'radix-ui';
+import { Button } from '@/components/ui/button';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { MetricId } from '@/content/metric-definitions';
 import { dayOfTrade } from '@/data/day-log';
@@ -23,7 +24,7 @@ import {
 } from '../columns';
 import { TagsCell } from '../cells';
 import { PhoneRows } from '../phone-rows';
-import { clockOf, dayLabel } from './day-label';
+import { clockOf, dayLabel } from '@/lib/day-label';
 
 /** The widths the day table wants over the trade log's: HH:MM:SS, a ticker pill, a contract with its expiry. */
 const WIDTHS: Record<ColumnId, number> = {
@@ -139,11 +140,16 @@ function Cell({
   }
 }
 
+/** Rows a table shows before its Show more (the spec: tables page at 50 rows). */
+const PAGE = 50;
+
 /**
  * A day's (or week's) trades as a table: the given columns, rows in the order
- * given (newest open time first), no sorting and no selection. A row opens
- * its trade, carrying the page's filters; the instrument is its link. Below
- * `sm` it becomes the trade log's two-line rows.
+ * given (newest open time first), no sorting and no selection. The first 50
+ * rows, then a Show more for the next 50 (Keel's call, TradeZella unknown: the
+ * record is silent on paging). A row opens its trade, carrying the page's
+ * filters; the instrument is its link. Below `sm` it becomes the trade log's
+ * two-line rows.
  */
 export function LogTable({
   trades,
@@ -160,83 +166,106 @@ export function LogTable({
   const phone = usePhone();
   const router = useRouter();
   const search = useSearchParams().toString();
+  const [shown, setShown] = useState(PAGE);
+  const rows = trades.slice(0, shown);
+  const more =
+    trades.length > shown ? (
+      <div className="flex justify-center py-2">
+        <Button
+          variant="secondary"
+          aria-label={`Show more, ${label}`}
+          onClick={() => setShown((n) => n + PAGE)}
+        >
+          Show more
+        </Button>
+      </div>
+    ) : null;
 
-  if (phone) return <PhoneRows trades={trades} env={env} marksOpen />;
+  if (phone)
+    return (
+      <>
+        <PhoneRows trades={rows} env={env} marksOpen />
+        {more}
+      </>
+    );
 
   return (
-    <div className="relative overflow-x-auto">
-      <table
-        aria-label={label}
-        style={{
-          minWidth: `${columns.reduce((n, id) => n + WIDTHS[id], 0)}px`,
-        }}
-        className="w-full table-fixed border-collapse text-[13px] whitespace-nowrap [font-stretch:90%]"
-      >
-        <colgroup>
-          {columns.map((id) => (
-            <col key={id} style={{ width: WIDTHS[id] }} />
-          ))}
-        </colgroup>
-        <thead>
-          <tr>
-            {columns.map((id) => {
-              const align = ALIGN[id];
-              const tip = HEADER_TIPS[id];
-              return (
-                <th
-                  key={id}
-                  scope="col"
-                  className={`h-10 border-b border-line pr-1.5 align-middle text-xs font-medium text-faint last:pr-0 ${PAD_LEFT.has(id) ? 'pl-4' : ''} ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'}`}
-                >
-                  {tip ? (
-                    <MetricTip
-                      id={tip}
-                      basis={env.ctx.pnlBasis}
-                      className="text-xs font-medium"
-                    >
-                      {HEADER_LABEL[id] ?? COLUMN_LABELS[id].label}
-                    </MetricTip>
-                  ) : (
-                    COLUMN_LABELS[id].label
-                  )}
-                </th>
-              );
-            })}
-          </tr>
-        </thead>
-        <tbody>
-          {trades.map((t) => (
-            <tr
-              key={t.id}
-              onClick={(e) => {
-                // The row opens the trade; its own links and buttons keep their jobs.
-                if (
-                  (e.target as HTMLElement).closest(
-                    'a,button,input,[role=dialog]',
-                  )
-                )
-                  return;
-                router.push(
-                  `/app/trades/${encodeURIComponent(t.id)}${search ? `?${search}` : ''}`,
-                );
-              }}
-              className="h-10 cursor-pointer border-t border-line/70 text-text transition-colors duration-200 ease-(--ease-glide) first:border-t-0 hover:bg-sunken/60"
-            >
+    <>
+      <div className="relative overflow-x-auto">
+        <table
+          aria-label={label}
+          style={{
+            minWidth: `${columns.reduce((n, id) => n + WIDTHS[id], 0)}px`,
+          }}
+          className="w-full table-fixed border-collapse text-[13px] whitespace-nowrap [font-stretch:90%]"
+        >
+          <colgroup>
+            {columns.map((id) => (
+              <col key={id} style={{ width: WIDTHS[id] }} />
+            ))}
+          </colgroup>
+          <thead>
+            <tr>
               {columns.map((id) => {
                 const align = ALIGN[id];
+                const tip = HEADER_TIPS[id];
                 return (
-                  <td
+                  <th
                     key={id}
-                    className={`overflow-hidden py-1 pr-1.5 last:pr-0 ${PAD_LEFT.has(id) ? 'pl-4' : ''} ${align === 'right' ? 'text-right tabular-nums' : align === 'center' ? 'text-center' : 'text-left'}`}
+                    scope="col"
+                    className={`h-10 border-b border-line pr-1.5 align-middle text-xs font-medium text-faint last:pr-0 ${PAD_LEFT.has(id) ? 'pl-4' : ''} ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'}`}
                   >
-                    <Cell id={id} t={t} env={env} />
-                  </td>
+                    {tip ? (
+                      <MetricTip
+                        id={tip}
+                        basis={env.ctx.pnlBasis}
+                        className="text-xs font-medium"
+                      >
+                        {HEADER_LABEL[id] ?? COLUMN_LABELS[id].label}
+                      </MetricTip>
+                    ) : (
+                      COLUMN_LABELS[id].label
+                    )}
+                  </th>
                 );
               })}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {rows.map((t) => (
+              <tr
+                key={t.id}
+                onClick={(e) => {
+                  // The row opens the trade; its own links and buttons keep their jobs.
+                  if (
+                    (e.target as HTMLElement).closest(
+                      'a,button,input,[role=dialog]',
+                    )
+                  )
+                    return;
+                  router.push(
+                    `/app/trades/${encodeURIComponent(t.id)}${search ? `?${search}` : ''}`,
+                  );
+                }}
+                className="h-10 cursor-pointer border-t border-line/70 text-text transition-colors duration-200 ease-(--ease-glide) first:border-t-0 hover:bg-sunken/60"
+              >
+                {columns.map((id) => {
+                  const align = ALIGN[id];
+                  return (
+                    <td
+                      key={id}
+                      className={`overflow-hidden py-1 pr-1.5 last:pr-0 ${PAD_LEFT.has(id) ? 'pl-4' : ''} ${align === 'right' ? 'text-right tabular-nums' : align === 'center' ? 'text-center' : 'text-left'}`}
+                    >
+                      <Cell id={id} t={t} env={env} />
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {more}
+    </>
   );
 }

@@ -14,7 +14,11 @@ import { WEEK_COLUMNS } from '@/data/trade-columns';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import type { Trade, UserPrefs } from '@/domain/types';
 import { createLocalRepository } from '@/data/local/local-repository';
+import type { Repository } from '@/data/repository';
+import { resolveInstrument } from '@/domain/instruments';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
+import { act } from '@testing-library/react';
+import { commitNavigation } from '../../__fixtures__/navigation';
 import { renderApp as render } from '../../__fixtures__/render-app';
 import { TradesWeekView } from './week-view';
 
@@ -89,14 +93,17 @@ async function renderApp(
     sample?: () => Promise<SampleWorkspace>;
     url?: string;
     prefs?: Partial<UserPrefs>;
+    /** Replaces parts of the repository, to make a query fail. */
+    patch?: (repo: Repository) => Partial<Repository>;
   } = {},
 ) {
-  const repository = createLocalRepository({
+  const base = createLocalRepository({
     indexedDB: new IDBFactory(),
     IDBKeyRange,
     sample: opts.sample ?? sample(),
   });
-  await repository.prefs.update({ timeZone: 'UTC', ...opts.prefs });
+  await base.prefs.update({ timeZone: 'UTC', ...opts.prefs });
+  const repository = { ...base, ...opts.patch?.(base) };
   const out = render(ui, {
     repository,
     url: opts.url ?? '/app/trades/week',
@@ -246,7 +253,7 @@ test("a one-day filter fills one tile while the table keeps the week's other day
 
 test('weekColumns has Day by default and is saved apart from the Day view', async () => {
   expect(WEEK_COLUMNS[0]).toBe('day');
-  const { repo } = await renderApp(<TradesWeekView />);
+  await renderApp(<TradesWeekView />);
   const first = (await cards())[0]!;
   const table = within(first).getByRole('table', {
     name: 'Trades in 22 to 28 Nov 2026',
@@ -258,7 +265,6 @@ test('weekColumns has Day by default and is saved apart from the Day view', asyn
       .slice(0, 3),
   ).toEqual(['Day', 'Open', 'Ticker']);
   cleanup();
-  void repo;
   await renderApp(<TradesWeekView />, {
     prefs: { weekColumns: ['net', 'day'], dayColumns: ['open'] },
   });
@@ -330,7 +336,9 @@ test('the bars are one image labelled with every day, and a focus reads one', as
 });
 
 test('Privacy hides every amount, in names and labels too', async () => {
-  await renderApp(<TradesWeekView />, { prefs: { displayUnit: 'privacy' } });
+  const { container } = await renderApp(<TradesWeekView />, {
+    prefs: { displayUnit: 'privacy' },
+  });
   const first = (await cards())[0]!;
   const tiles = within(first).getByRole('list', { name: /^Days of/ });
   const names = within(tiles)
@@ -338,11 +346,21 @@ test('Privacy hides every amount, in names and labels too', async () => {
     .map((b) => b.getAttribute('aria-label')!);
   expect(names.length).toBe(2);
   for (const n of names) expect(n).not.toMatch(/\d{2}\.\d{2}|\$\d/);
-  const bars = within(first).getByRole('img', { name: /Net P&L by day/ });
-  expect(bars.getAttribute('aria-label')).not.toMatch(/\d{2}\.\d{2}|\$\d/);
   expect(
     within(first).getByRole('heading').parentElement!.textContent,
   ).not.toMatch(/\d{2}\.\d{2}/);
+  // The bars' label, a focus readout and the tile dialog.
+  const bars = within(first).getByRole('img', { name: /Net P&L by day/ });
+  fireEvent.focus(bars);
+  expect(await within(first).findByRole('status')).toBeTruthy();
+  fireEvent.click(within(tiles).getAllByRole('button')[1]!);
+  const dialog = await screen.findByRole('dialog');
+  expect(dialog.textContent).not.toMatch(/\$\d/);
+  // Nothing anywhere in the page, text or attribute: a dollar sign is never followed by a digit.
+  expect(container.ownerDocument.body.innerHTML).not.toMatch(/\$\d/);
+  expect(container.ownerDocument.body.innerHTML).not.toMatch(
+    /aria-label="[^"]*\d{2}\.\d{2}/,
+  );
 });
 
 test('a day with only other-currency trades keeps the Day view call and lists them apart', async () => {
@@ -443,4 +461,150 @@ test('below sm: seven narrow tiles with a compact net, the count in the label', 
   ).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Columns' })).toBeNull();
   match.mockRestore();
+});
+
+const nq = () => resolveInstrument('NQZ5')!;
+
+test('a symbol plus one day still honours the symbol in the week table', async () => {
+  const list = [
+    ...trades(),
+    trade({
+      id: 'n1',
+      serial: 6,
+      net: 700,
+      instrument: nq(),
+      openedAt: '2026-11-24T17:00:00Z',
+      closedAt: '2026-11-24T17:10:00Z',
+    }),
+  ];
+  await renderApp(<TradesWeekView />, {
+    sample: sample(list),
+    url: '/app/trades/week?from=2026-11-23&to=2026-11-23&symbol=ES',
+  });
+  const card = (await cards())[0]!;
+  const table = within(card).getByRole('table', {
+    name: 'Trades in 22 to 28 Nov 2026',
+  });
+  // The week's other ES days are listed (Tuesday's three), but not the NQ trade.
+  expect(within(table).getAllByRole('row')).toHaveLength(5);
+  expect(table.textContent).toContain('ES');
+  expect(table.textContent).not.toContain('NQ');
+});
+
+test('the week table pages at 50 rows', async () => {
+  const many = Array.from({ length: 60 }, (_, i) =>
+    trade({
+      id: `r${i}`,
+      serial: 100 + i,
+      net: 100,
+      openedAt: new Date(Date.UTC(2026, 10, 24, 12, i)).toISOString(),
+      closedAt: new Date(Date.UTC(2026, 10, 24, 12, i, 30)).toISOString(),
+    }),
+  );
+  await renderApp(<TradesWeekView />, { sample: sample(many) });
+  const first = (await cards())[0]!;
+  const table = within(first).getByRole('table', {
+    name: 'Trades in 22 to 28 Nov 2026',
+  });
+  expect(within(table).getAllByRole('row')).toHaveLength(51);
+  fireEvent.click(
+    within(first).getByRole('button', {
+      name: 'Show more, Trades in 22 to 28 Nov 2026',
+    }),
+  );
+  await waitFor(() =>
+    expect(within(table).getAllByRole('row')).toHaveLength(61),
+  );
+});
+
+test('a failed load shows the error, not the skeleton for ever', async () => {
+  await renderApp(<TradesWeekView />, {
+    patch: (r) => ({
+      tagCategories: {
+        ...r.tagCategories,
+        list: () => Promise.reject(new Error('boom')),
+      },
+    }),
+  });
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toContain("Your trades couldn't load.");
+});
+
+test('a trade lands on its local week in the profile zone (New York, a close after 00:00 UTC)', async () => {
+  // 02:00 UTC on Sun 22 Nov is 21:00 on Sat 21 Nov in New York: the week before.
+  await renderApp(<TradesWeekView />, {
+    sample: sample([
+      trade({
+        id: 'sat',
+        serial: 1,
+        net: 5000,
+        openedAt: '2026-11-22T01:30:00Z',
+        closedAt: '2026-11-22T02:00:00Z',
+      }),
+    ]),
+    prefs: { timeZone: 'America/New_York' },
+  });
+  expect((await cards()).map(heading)).toEqual(['15 to 21 Nov 2026']);
+  const tiles = within((await cards())[0]!).getByRole('list', {
+    name: /^Days of/,
+  });
+  expect(
+    within(tiles).getByRole('button', { name: /^Sat 21 Nov/ }),
+  ).toBeTruthy();
+});
+
+test('the tile and its dialog count the same trades, other currencies apart', async () => {
+  await renderApp(<TradesWeekView />, {
+    sample: sample([
+      ...trades(),
+      trade({
+        id: 'e2',
+        serial: 10,
+        net: 5000,
+        pnlCurrency: 'EUR',
+        openedAt: '2026-11-24T13:00:00Z',
+        closedAt: '2026-11-24T13:10:00Z',
+      }),
+    ]),
+  });
+  const first = (await cards())[0]!;
+  const tue = within(first).getByRole('button', { name: /^Tue 24 Nov/ });
+  expect(tue.getAttribute('aria-label')).toBe('Tue 24 Nov, +$60.00, 3 trades');
+  fireEvent.click(tue);
+  const dialog = await screen.findByRole('dialog', { name: /Tue 24 Nov 2026/ });
+  expect(dialog.textContent).toContain(
+    '3 trades, 1 in other currencies, listed apart',
+  );
+});
+
+test('the expanded weeks start again when the filters change', async () => {
+  await renderApp(<TradesWeekView />);
+  const list = await cards();
+  fireEvent.click(
+    within(list[1]!).getByRole('button', { name: 'Expand 8 to 14 Nov 2026' }),
+  );
+  await within(list[1]!).findByRole('table');
+  act(() => {
+    window.history.replaceState(null, '', '/app/trades/week?symbol=ES');
+    commitNavigation();
+  });
+  await waitFor(() =>
+    expect(
+      within(screen.getAllByRole('article')[1]!).queryByRole('table'),
+    ).toBeNull(),
+  );
+  expect(
+    within(screen.getAllByRole('article')[1]!)
+      .getByRole('button', { name: /8 to 14 Nov 2026/ })
+      .getAttribute('aria-expanded'),
+  ).toBe('false');
+});
+
+test('the bars readout is announced beside the image, not inside it', async () => {
+  await renderApp(<TradesWeekView />);
+  const first = (await cards())[0]!;
+  const bars = within(first).getByRole('img', { name: /Net P&L by day/ });
+  fireEvent.focus(bars);
+  const status = await within(first).findByRole('status');
+  expect(bars.contains(status)).toBe(false);
 });

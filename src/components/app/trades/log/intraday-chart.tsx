@@ -7,13 +7,11 @@ import { usePrefs } from '@/data/query/hooks';
 import { useDisplay } from '@/lib/display';
 import { plural } from '@/lib/format';
 import { signTone } from '../../dashboard/shared';
-import { clockOf } from './day-label';
+import { clockOf } from '@/lib/day-label';
 
 /**
- * The span of the day's trading the x axis covers: first open to last close of
- * its closed trades. Keel's call (TradeZella unknown): the record says only
- * "the start, the middle and the end of the day's trading", so these anchors
- * are Keel's reading of it.
+ * The span of the day's trading the x axis covers (see `daySpan`, Keel's call:
+ * the record says only "the start, the middle and the end of the day's trading").
  */
 export interface ChartSpan {
   from: string;
@@ -234,17 +232,25 @@ export function IntradayChart({
           className="pointer-events-none absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-text bg-surface-1"
         />
       ) : null}
-      {readout}
     </div>
   );
 
   const gutter = large ? 'pl-[76px]' : 'pl-[64px]';
+  // The readout is a sibling of the plot (not inside the card chart's button), so it is announced.
+  const overlay = (
+    <div className={`pointer-events-none absolute inset-x-0 top-0 ${gutter}`}>
+      <div className="relative" style={{ height: H }}>
+        {readout}
+      </div>
+    </div>
+  );
 
   if (large)
     return (
-      <div className={gutter}>
+      <div className={`relative ${gutter}`}>
         {/* A focus stop, so the arrow keys read the points in the enlarged chart too. */}
         <div
+          role="group"
           tabIndex={0}
           aria-label={`Points of the running net on ${label}`}
           className="rounded-chip outline-offset-4 focus-visible:outline-2 focus-visible:outline-accent"
@@ -252,6 +258,7 @@ export function IntradayChart({
         >
           {body}
         </div>
+        {overlay}
         <ul
           aria-label="Times"
           className="mt-2 flex list-none justify-between p-0 text-[11px] text-faint tabular-nums"
@@ -267,17 +274,20 @@ export function IntradayChart({
 
   return (
     <>
-      <button
-        ref={trigger}
-        type="button"
-        aria-haspopup="dialog"
-        aria-label={`Enlarge the chart. ${aria}`}
-        onClick={() => setOpen(true)}
-        className={`block w-full cursor-zoom-in rounded-control text-left outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent ${gutter}`}
-        {...shared}
-      >
-        {body}
-      </button>
+      <div className="relative">
+        <button
+          ref={trigger}
+          type="button"
+          aria-haspopup="dialog"
+          aria-label={`Enlarge the chart. ${aria}`}
+          onClick={() => setOpen(true)}
+          className={`block w-full cursor-zoom-in rounded-control text-left outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent ${gutter}`}
+          {...shared}
+        >
+          {body}
+        </button>
+        {overlay}
+      </div>
       <MorphDialog
         open={open}
         onOpenChange={setOpen}

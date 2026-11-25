@@ -10,7 +10,7 @@ import { useDisplay } from '@/lib/display';
 import { plural } from '@/lib/format';
 import { CARD, CARD_PAD, signTone } from '../../dashboard/shared';
 import { DayFigures, DayTables } from './day-card';
-import { dayLabel, weekLabel } from './day-label';
+import { dayLabel, weekLabel } from '@/lib/day-label';
 import { useLogEnv } from './log-env';
 import { LogTable } from './log-table';
 import { StatGrid } from './stat-grid';
@@ -32,7 +32,10 @@ function DayDialog({
   const { columns, dayColumns } = useLogEnv();
   const display = useDisplay();
   const label = date ? dayLabel(date) : '';
-  const total = day ? day.trades.length + day.otherCurrency.length : 0;
+  // The tile's count: base-currency trades, with other currencies listed apart.
+  const total = day ? day.trades.length : 0;
+  const other = day ? day.otherCurrency.length : 0;
+  const count = `${total} ${plural(total, 'trade')}${other > 0 ? `, ${other} in other currencies, listed apart` : ''}`;
   const net =
     day && day.stats.net !== null
       ? display.figure(
@@ -56,10 +59,10 @@ function DayDialog({
         net ? (
           <>
             <span className={signTone(day!.stats.net!)}>{net.text}</span> net,{' '}
-            {total} {plural(total, 'trade')}
+            {count}
           </>
         ) : (
-          `${total} ${plural(total, 'trade')}`
+          count
         )
       }
     >
@@ -118,7 +121,7 @@ export function WeekCard({
 
   return (
     <article aria-labelledby={heading} className={`${CARD} ${CARD_PAD}`}>
-      <header className="flex min-h-9 items-center gap-2.5">
+      <header className="flex min-h-9 flex-wrap items-center gap-x-2.5 gap-y-0.5">
         <button
           type="button"
           aria-expanded={expanded}

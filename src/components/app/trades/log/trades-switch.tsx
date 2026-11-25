@@ -25,7 +25,7 @@ export function TradesSwitch({
   return (
     <nav
       aria-label="Trade views"
-      className="inline-flex rounded-[11px] bg-track p-[3px] shadow-[inset_0_1px_2px_rgb(18_22_51/0.07)] max-sm:flex [[data-theme=dark]_&]:shadow-[inset_0_1px_2px_rgb(0_0_0/0.35)]"
+      className="inline-flex rounded-[11px] bg-track p-[3px] shadow-[inset_0_1px_2px_rgb(18_22_51/0.07)] max-sm:flex max-sm:w-full [[data-theme=dark]_&]:shadow-[inset_0_1px_2px_rgb(0_0_0/0.35)]"
     >
       {VIEWS.map((v) => {
         const current = v.view === view;

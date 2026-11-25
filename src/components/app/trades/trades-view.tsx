@@ -66,6 +66,7 @@ import {
   useDisplay,
 } from '@/lib/display';
 import { formatCount, plural } from '@/lib/format';
+import { useRememberLogView } from '@/lib/log-view';
 import { docText } from '@/lib/note-text';
 import { rangeCaption } from '@/lib/range-label';
 import { usePhone } from '@/lib/use-phone';
@@ -322,6 +323,7 @@ const download = (csv: string, day: string): void =>
  * table, which sorts by any column and pages at 50.
  */
 export function TradesView(): React.JSX.Element {
+  useRememberLogView('all');
   const { filters, setFilters } = useGlobalFilters();
   // Every status and review state: the switches' counts need both sides of each.
   const set = useTradeSet({
@@ -837,10 +839,8 @@ export function TradesView(): React.JSX.Element {
             {phone ? null : (
               <ColumnsMenu
                 columns={columnIds}
-                onChange={(next) => savePrefs({ tradeColumns: next })}
-                onReset={() =>
-                  savePrefs({ tradeColumns: [...DEFAULT_COLUMNS] })
-                }
+                defaults={DEFAULT_COLUMNS}
+                onSave={(next) => savePrefs({ tradeColumns: next })}
               />
             )}
             <button

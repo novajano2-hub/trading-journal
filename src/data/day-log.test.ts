@@ -2,7 +2,15 @@ import { beforeAll, describe, expect, test } from 'vitest';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import { defaultMetricContext } from '@/domain/metrics/context';
 import type { Execution, Trade } from '@/domain/types';
-import { dayOfTrade, groupDays, groupWeeks, type DayLogEnv } from './day-log';
+import {
+  dayOfTrade,
+  daySpan,
+  groupDays,
+  groupWeeks,
+  startOfLocalDay,
+  weekRows,
+  type DayLogEnv,
+} from './day-log';
 import {
   generateSampleWorkspace,
   SAMPLE_SEED,
@@ -310,6 +318,108 @@ describe('week grouping, other currencies and closed trades', () => {
     expect(d!.date).toBe('2026-03-02');
     expect(d!.stats.net).toBeNull();
     expect(d!.series).toEqual([]);
+  });
+});
+
+describe('the chart span (R19)', () => {
+  test('startOfLocalDay is 00:00 of the date in the zone', () => {
+    expect(startOfLocalDay('2026-03-02', NY)).toBe('2026-03-02T05:00:00.000Z');
+    // Summer: UTC-4.
+    expect(startOfLocalDay('2026-07-02', NY)).toBe('2026-07-02T04:00:00.000Z');
+    expect(startOfLocalDay('2026-03-02', 'UTC')).toBe(
+      '2026-03-02T00:00:00.000Z',
+    );
+  });
+
+  test('the span runs from the first open of the day to the last close', () => {
+    const a = makeTrade({
+      net: 1,
+      openedAt: at('2026-03-02', '14:00'),
+      closedAt: at('2026-03-02', '15:00'),
+    });
+    const b = makeTrade({
+      net: 1,
+      openedAt: at('2026-03-02', '16:00'),
+      closedAt: at('2026-03-02', '18:30'),
+    });
+    expect(daySpan([a, b], '2026-03-02', NY)).toEqual({
+      from: at('2026-03-02', '14:00').replace(':00Z', ':00.000Z'),
+      to: at('2026-03-02', '18:30').replace(':00Z', ':00.000Z'),
+    });
+  });
+
+  test('a trade opened two days before it closes starts the span at 00:00 of the day', () => {
+    const swing = makeTrade({
+      net: 1,
+      openedAt: at('2026-02-28', '15:00'),
+      closedAt: at('2026-03-02', '15:00'),
+    });
+    expect(daySpan([swing], '2026-03-02', NY)).toEqual({
+      from: '2026-03-02T05:00:00.000Z',
+      to: '2026-03-02T15:00:00.000Z',
+    });
+  });
+
+  test('a day with no closed trade has no span', () => {
+    const open = makeTrade({
+      net: 0,
+      status: 'open',
+      openedAt: at('2026-03-02', '15:00'),
+    });
+    expect(daySpan([open], '2026-03-02', NY)).toBeUndefined();
+  });
+});
+
+describe('week rows (R5)', () => {
+  // 2026-03-01 is a Sunday.
+  const week = [
+    makeTrade({
+      id: 'x1',
+      serial: 1,
+      net: 1,
+      openedAt: at('2026-03-02', '14:00'),
+      closedAt: at('2026-03-02', '15:00'),
+    }),
+    makeTrade({
+      id: 'x2',
+      serial: 2,
+      net: 1,
+      openedAt: at('2026-03-03', '14:00'),
+      closedAt: at('2026-03-03', '15:00'),
+    }),
+    makeTrade({
+      id: 'x3',
+      serial: 3,
+      net: 1,
+      pnlCurrency: 'GBP',
+      openedAt: at('2026-03-04', '14:00'),
+      closedAt: at('2026-03-04', '15:00'),
+    }),
+    makeTrade({
+      id: 'x4',
+      serial: 4,
+      net: 1,
+      openedAt: at('2026-03-10', '14:00'),
+      closedAt: at('2026-03-10', '15:00'),
+    }),
+  ];
+
+  test('buckets by week start, base currency apart from the rest, newest open first', () => {
+    const rows = weekRows(week, env());
+    expect([...rows.keys()].sort()).toEqual(['2026-03-01', '2026-03-08']);
+    const first = rows.get('2026-03-01')!;
+    expect(first.trades.map((t) => t.id)).toEqual(['x2', 'x1']);
+    expect(first.otherCurrency.map((t) => t.id)).toEqual(['x3']);
+    expect(rows.get('2026-03-08')!.trades.map((t) => t.id)).toEqual(['x4']);
+  });
+
+  test('follows the week start preference', () => {
+    const rows = weekRows(week, env({ weekStart: 'monday' }));
+    expect([...rows.keys()].sort()).toEqual(['2026-03-02', '2026-03-09']);
+  });
+
+  test('is empty with no trades', () => {
+    expect(weekRows([], env()).size).toBe(0);
   });
 });
 

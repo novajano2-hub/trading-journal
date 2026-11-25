@@ -30,6 +30,7 @@ import {
 import { localDate } from '@/domain/time';
 import type { DayRecord } from '@/domain/types';
 import { FigureSourceContext } from '@/lib/display';
+import { useRememberLogView } from '@/lib/log-view';
 import { ColumnsMenu } from '../columns-menu';
 import { DayCard } from './day-card';
 import { LogEnvContext } from './log-env';
@@ -45,7 +46,7 @@ import {
   type LogLists,
 } from './log-shell';
 
-/** TradeZella shows no paging; Keel loads 20 cards and more on scroll (Keel's call, the record is silent). */
+/** Paging is TradeZella unknown (K42): Keel's call, 20 cards then more on scroll or from Show more. */
 const FIRST = 20;
 const MORE = 20;
 
@@ -76,17 +77,24 @@ export function TradesDayView({
   aside?: React.ReactNode;
   noteAction?: (date: string) => React.ReactNode;
 }): React.JSX.Element {
+  useRememberLogView('day');
   const { filters, setFilters } = useGlobalFilters();
   const set = useTradeSet(filters);
   const tradesQuery = useTrades();
   const flowsQuery = useCashFlows();
   const prefs = usePrefs().data;
-  const accounts = useAccounts().data;
-  const strategies = useStrategies().data;
-  const tags = useTags().data;
-  const categories = useTagCategories().data;
-  const journal = useJournal().data;
-  const days = useDays().data;
+  const accountsQuery = useAccounts();
+  const strategiesQuery = useStrategies();
+  const tagsQuery = useTags();
+  const categoriesQuery = useTagCategories();
+  const journalQuery = useJournal();
+  const daysQuery = useDays();
+  const accounts = accountsQuery.data;
+  const strategies = strategiesQuery.data;
+  const tags = tagsQuery.data;
+  const categories = categoriesQuery.data;
+  const journal = journalQuery.data;
+  const days = daysQuery.data;
 
   const timeZone = prefs?.timeZone;
   const ctx = useMemo(
@@ -99,7 +107,10 @@ export function TradesDayView({
     timeZone === undefined
       ? undefined
       : localDate(new Date().toISOString(), timeZone);
-  const levelFilter = tradeLevelFilterActive(filters);
+  // The cleaned filters: a strategy or tag id that no longer exists is dropped.
+  const levelFilter = set.data
+    ? tradeLevelFilterActive(set.data.filters)
+    : false;
 
   // The dates of daily notes (not in Trash), inside the date range; none while a trade-level filter is on.
   const noteDates = useMemo(() => {
@@ -130,7 +141,17 @@ export function TradesDayView({
     [set.data, prefs, ctx, noteDates],
   );
 
-  const error = set.error ?? tradesQuery.error ?? flowsQuery.error;
+  // Any failed query ends the skeleton: none of them is optional here.
+  const error =
+    set.error ??
+    tradesQuery.error ??
+    flowsQuery.error ??
+    accountsQuery.error ??
+    strategiesQuery.error ??
+    tagsQuery.error ??
+    categoriesQuery.error ??
+    journalQuery.error ??
+    daysQuery.error;
   if (error) return <LogLoadError error={error} />;
   const allTrades = tradesQuery.data;
   const flows = flowsQuery.data;
@@ -146,6 +167,7 @@ export function TradesDayView({
     !tags ||
     !categories ||
     !days ||
+    !journal ||
     today === undefined
   )
     return <LogSkeleton />;
@@ -233,8 +255,8 @@ function DayList({
           <ColumnsMenu
             choices={DAY_CHOICES}
             columns={columns}
-            onChange={(next) => updatePrefs.mutate({ dayColumns: next })}
-            onReset={() => updatePrefs.mutate({ dayColumns: [...DAY_COLUMNS] })}
+            defaults={DAY_COLUMNS}
+            onSave={(next) => updatePrefs.mutate({ dayColumns: next })}
           />
         }
       >

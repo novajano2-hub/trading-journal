@@ -13,6 +13,7 @@ import type { SampleWorkspace } from '@/data/seed/generate';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import type { DayRecord, JournalEntry, Trade } from '@/domain/types';
 import { createLocalRepository } from '@/data/local/local-repository';
+import type { Repository } from '@/data/repository';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { renderApp as render } from '../../__fixtures__/render-app';
 import type { UserPrefs } from '@/domain/types';
@@ -102,14 +103,17 @@ async function renderApp(
     sample: () => Promise<SampleWorkspace>;
     url: string;
     prefs?: Partial<UserPrefs>;
+    /** Replaces parts of the repository, to make a query fail. */
+    patch?: (repo: Repository) => Partial<Repository>;
   },
 ) {
-  const repository = createLocalRepository({
+  const base = createLocalRepository({
     indexedDB: new IDBFactory(),
     IDBKeyRange,
     sample: opts.sample,
   });
-  await repository.prefs.update({ timeZone: 'UTC', ...opts.prefs });
+  await base.prefs.update({ timeZone: 'UTC', ...opts.prefs });
+  const repository = { ...base, ...opts.patch?.(base) };
   const out = render(ui, { repository, url: opts.url });
   return { ...out, repo: repository };
 }
@@ -426,6 +430,7 @@ test("dayColumns saves apart from the trade log's columns", async () => {
   await cards();
   fireEvent.click(screen.getByRole('button', { name: 'Columns' }));
   fireEvent.click(await screen.findByRole('checkbox', { name: 'Tags' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Update' }));
   await waitFor(async () => {
     const prefs = await repo.prefs.get();
     expect(prefs.dayColumns).toEqual([
@@ -586,4 +591,242 @@ test('the tag panel is named for the trade and its day', async () => {
     name: 'Tags for ES, Tue 24 Nov 2026',
   });
   expect(panel).toBeTruthy();
+});
+
+/** A phone: `matchMedia` says every query is false, so `usePhone` is true. */
+function phoneMedia() {
+  return vi.spyOn(window, 'matchMedia').mockImplementation(
+    (query: string) =>
+      ({
+        matches: false,
+        media: query,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }) as unknown as MediaQueryList,
+  );
+}
+
+test('a trade opened days before it closes does not stretch the chart: the span starts at 00:00 of the day', async () => {
+  await renderApp(<TradesDayView />, {
+    sample: sample({
+      trades: [
+        trade({
+          id: 'swing',
+          serial: 1,
+          net: 5000,
+          openedAt: '2026-11-22T15:00:00Z',
+          closedAt: '2026-11-24T14:50:00Z',
+        }),
+      ],
+      journal: [],
+      days: [],
+    }),
+    url: '/app/trades/day',
+  });
+  const first = (await cards())[0]!;
+  const chart = within(first).getByRole('button', {
+    name: /Enlarge the chart/,
+  });
+  // The card's own label reads from 00:00, not from two days earlier.
+  expect(chart.getAttribute('aria-label')).toContain('from 00:00 to 14:50');
+  fireEvent.click(chart);
+  const dialog = await screen.findByRole('dialog');
+  const times = within(within(dialog).getByRole('list', { name: 'Times' }))
+    .getAllByRole('listitem')
+    .map((li) => li.textContent);
+  expect(times).toEqual(['00:00:00', '07:25:00', '14:50:00']);
+});
+
+test('a trade lands on its local date in the profile zone (New York, a close after 00:00 UTC)', async () => {
+  await renderApp(<TradesDayView />, {
+    sample: sample({
+      trades: [
+        trade({
+          id: 'late',
+          serial: 1,
+          net: 5000,
+          openedAt: '2026-11-25T01:30:00Z',
+          closedAt: '2026-11-25T02:00:00Z',
+        }),
+      ],
+      journal: [],
+      days: [],
+    }),
+    url: '/app/trades/day',
+    prefs: { timeZone: 'America/New_York' },
+  });
+  const list = await cards();
+  // 21:00 on Tue 24 Nov in New York, though it is 25 Nov in UTC.
+  expect(list.map(heading)).toEqual(['Tue 24 Nov 2026']);
+  fireEvent.click(
+    within(list[0]!).getByRole('button', { name: 'Expand Tue 24 Nov 2026' }),
+  );
+  const table = await screen.findByRole('table', {
+    name: 'Trades on Tue 24 Nov 2026',
+  });
+  expect(table.textContent).toContain('20:30:00');
+});
+
+const sixty = () =>
+  Array.from({ length: 60 }, (_, i) =>
+    trade({
+      id: `r${i}`,
+      serial: i + 1,
+      net: 100,
+      openedAt: new Date(Date.UTC(2026, 10, 24, 12, i)).toISOString(),
+      closedAt: new Date(Date.UTC(2026, 10, 24, 12, i, 30)).toISOString(),
+    }),
+  );
+
+test('a day table pages at 50 rows with a Show more', async () => {
+  await renderApp(<TradesDayView />, {
+    sample: sample({ trades: sixty(), journal: [], days: [] }),
+    url: '/app/trades/day',
+  });
+  const first = (await cards())[0]!;
+  fireEvent.click(
+    within(first).getByRole('button', { name: 'Expand Tue 24 Nov 2026' }),
+  );
+  const table = await within(first).findByRole('table', {
+    name: 'Trades on Tue 24 Nov 2026',
+  });
+  expect(within(table).getAllByRole('row')).toHaveLength(51);
+  fireEvent.click(
+    within(first).getByRole('button', {
+      name: 'Show more, Trades on Tue 24 Nov 2026',
+    }),
+  );
+  await waitFor(() =>
+    expect(within(table).getAllByRole('row')).toHaveLength(61),
+  );
+  expect(
+    within(first).queryByRole('button', { name: /^Show more/ }),
+  ).toBeNull();
+});
+
+test('the phone rows page at 50 too', async () => {
+  const match = phoneMedia();
+  await renderApp(<TradesDayView />, {
+    sample: sample({ trades: sixty(), journal: [], days: [] }),
+    url: '/app/trades/day',
+  });
+  const first = (await cards())[0]!;
+  fireEvent.click(
+    within(first).getByRole('button', { name: 'Expand Tue 24 Nov 2026' }),
+  );
+  const list = await within(first).findByRole('list', { name: 'Trades' });
+  expect(within(list).getAllByRole('listitem')).toHaveLength(50);
+  fireEvent.click(
+    within(first).getByRole('button', {
+      name: 'Show more, Trades on Tue 24 Nov 2026',
+    }),
+  );
+  await waitFor(() =>
+    expect(within(list).getAllByRole('listitem')).toHaveLength(60),
+  );
+  match.mockRestore();
+});
+
+test.each([
+  [
+    'the tag categories',
+    (r: Repository) => ({
+      tagCategories: {
+        ...r.tagCategories,
+        list: () => Promise.reject(new Error('boom')),
+      },
+    }),
+  ],
+  [
+    'the day records',
+    (r: Repository) => ({
+      days: { ...r.days, list: () => Promise.reject(new Error('boom')) },
+    }),
+  ],
+  [
+    'the journal',
+    (r: Repository) => ({
+      journal: { ...r.journal, list: () => Promise.reject(new Error('boom')) },
+    }),
+  ],
+])(
+  'a failed load of %s shows the error, not the skeleton for ever',
+  async (_name, patch) => {
+    await renderApp(<TradesDayView />, {
+      sample: sample(),
+      url: '/app/trades/day',
+      patch: patch as (r: Repository) => Partial<Repository>,
+    });
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain("Your trades couldn't load.");
+    expect(
+      screen.queryByRole('status', { name: 'Loading your trades' }),
+    ).toBeNull();
+  },
+);
+
+test('a note-only card has a chevron that reveals the empty table area', async () => {
+  await renderApp(<TradesDayView />, {
+    sample: sample(),
+    url: '/app/trades/day',
+  });
+  const note = (await cards())[2]!;
+  const toggle = within(note).getByRole('button', {
+    name: 'Expand Sun 22 Nov 2026',
+  });
+  expect(toggle.getAttribute('aria-expanded')).toBe('false');
+  // No review link on a note-only card.
+  expect(within(note).queryByRole('link', { name: /Review/ })).toBeNull();
+  fireEvent.click(toggle);
+  const table = await within(note).findByRole('table', {
+    name: 'Trades on Sun 22 Nov 2026',
+  });
+  expect(within(table).getAllByRole('row')).toHaveLength(1);
+  expect(toggle.getAttribute('aria-expanded')).toBe('true');
+});
+
+test('a stale strategy in the address does not hide note-only days', async () => {
+  await renderApp(<TradesDayView />, {
+    sample: sample(),
+    url: '/app/trades/day?strategy=gone',
+  });
+  expect((await cards()).map(heading)).toContain('Sun 22 Nov 2026');
+});
+
+test('below sm the header reads the date without the year, and the actions may wrap', async () => {
+  const match = phoneMedia();
+  await renderApp(<TradesDayView />, {
+    sample: sample(),
+    url: '/app/trades/day',
+  });
+  const first = (await cards())[0]!;
+  expect(heading(first)).toBe('Tue 24 Nov');
+  const header = within(first).getByRole('heading').parentElement!;
+  expect(header.className).toContain('flex-wrap');
+  // The toggle still names the full date.
+  expect(
+    within(first).getByRole('button', { name: 'Expand Tue 24 Nov 2026' }),
+  ).toBeTruthy();
+  match.mockRestore();
+});
+
+test('the enlarged chart has a group focus stop, and the card chart readout sits beside its button', async () => {
+  await renderApp(<TradesDayView />, {
+    sample: sample(),
+    url: '/app/trades/day',
+  });
+  const first = (await cards())[0]!;
+  const chart = within(first).getByRole('button', {
+    name: /Enlarge the chart/,
+  });
+  fireEvent.focus(chart);
+  const status = within(first).getByRole('status');
+  expect(chart.contains(status)).toBe(false);
+  fireEvent.click(chart);
+  const dialog = await screen.findByRole('dialog');
+  expect(
+    within(dialog).getByRole('group', {
+      name: 'Points of the running net on Tue 24 Nov 2026',
+    }),
+  ).toBeTruthy();
 });

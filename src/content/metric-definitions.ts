@@ -657,7 +657,7 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'day-trades': {
     label: 'Trades',
     definition:
-      "Every trade on the day, open ones included. Open trades are counted here but aren't in the figures beside it.",
+      "Every trade in the day or week, open ones included. Open trades are counted here but aren't in the figures beside it.",
   },
   'day-gross': {
     label: 'Gross P&L',
@@ -682,7 +682,7 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'day-volume': {
     label: 'Volume',
     definition:
-      'The quantity traded on the day, both sides: the buys and the sells are both counted, so a trade that opens and closes ten contracts adds twenty.',
+      'The quantity traded in the day or week, both sides: the buys and the sells are both counted, so a trade that opens and closes ten contracts adds twenty.',
   },
   'day-profit-factor': {
     label: 'Profit factor',

@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from 'react';
 import {
-  dayOfTrade,
   groupDays,
   groupWeeks,
+  weekRows,
   type WeekGroup,
+  type WeekRows,
 } from '@/data/day-log';
 import {
   sanitizeColumns,
@@ -14,13 +15,12 @@ import {
   WEEK_COLUMNS,
   type ColumnId,
 } from '@/data/trade-columns';
-import type { GlobalFilters } from '@/data/filters';
+import { serializeFilters, type GlobalFilters } from '@/data/filters';
 import { metricContextOf } from '@/data/metrics';
 import { useGlobalFilters, useTradeSet } from '@/data/query/derived';
 import {
   useAccounts,
   useCashFlows,
-  useDays,
   usePrefs,
   useStrategies,
   useTagCategories,
@@ -28,10 +28,10 @@ import {
   useTrades,
   useUpdatePrefs,
 } from '@/data/query/hooks';
-import type { DayRecord, Trade } from '@/domain/types';
-import { weekFirstDay } from '@/domain/week';
+import type { DayRecord } from '@/domain/types';
 import { localDate } from '@/domain/time';
 import { FigureSourceContext } from '@/lib/display';
+import { useRememberLogView } from '@/lib/log-view';
 import { ColumnsMenu } from '../columns-menu';
 import { LogEnvContext } from './log-env';
 import {
@@ -50,9 +50,7 @@ import { WeekCard } from './week-card';
 /** Keel's call (TradeZella unknown): 8 weeks, then 8 more on scroll or from Show more; the record is silent on paging. */
 const FIRST = 8;
 const MORE = 8;
-
-const newestOpenFirst = (a: Trade, b: Trade) =>
-  Date.parse(b.openedAt) - Date.parse(a.openedAt) || b.serial - a.serial;
+const NONE: ReadonlySet<string> = new Set();
 
 /**
  * The trade log by week: cards newest first (weeks with trades only), the
@@ -64,16 +62,20 @@ export function TradesWeekView({
 }: {
   aside?: React.ReactNode;
 }): React.JSX.Element {
+  useRememberLogView('week');
   const { filters, setFilters } = useGlobalFilters();
   const set = useTradeSet(filters);
   const tradesQuery = useTrades();
   const flowsQuery = useCashFlows();
   const prefs = usePrefs().data;
-  const accounts = useAccounts().data;
-  const strategies = useStrategies().data;
-  const tags = useTags().data;
-  const categories = useTagCategories().data;
-  const days = useDays().data;
+  const accountsQuery = useAccounts();
+  const strategiesQuery = useStrategies();
+  const tagsQuery = useTags();
+  const categoriesQuery = useTagCategories();
+  const accounts = accountsQuery.data;
+  const strategies = strategiesQuery.data;
+  const tags = tagsQuery.data;
+  const categories = categoriesQuery.data;
 
   const ctx = useMemo(
     () => (prefs ? metricContextOf(prefs) : undefined),
@@ -99,29 +101,27 @@ export function TradesWeekView({
   }, [set.data, prefs, ctx]);
 
   // R5: the table lists the week's trades under every filter but the date range.
-  const rows = useMemo(() => {
-    const out = new Map<string, { trades: Trade[]; otherCurrency: Trade[] }>();
-    if (!set.data || !prefs) return out;
-    for (const t of set.data.dayTrades) {
-      const start = weekFirstDay(
-        dayOfTrade(t, prefs.timeZone),
-        prefs.weekStart ?? 'sunday',
-      );
-      let bucket = out.get(start);
-      if (!bucket) out.set(start, (bucket = { trades: [], otherCurrency: [] }));
-      (t.pnlCurrency === prefs.baseCurrency
-        ? bucket.trades
-        : bucket.otherCurrency
-      ).push(t);
-    }
-    for (const b of out.values()) {
-      b.trades.sort(newestOpenFirst);
-      b.otherCurrency.sort(newestOpenFirst);
-    }
-    return out;
-  }, [set.data, prefs]);
+  const rows = useMemo(
+    () =>
+      set.data && prefs
+        ? weekRows(set.data.dayTrades, {
+            timeZone: prefs.timeZone,
+            baseCurrency: prefs.baseCurrency,
+            weekStart: prefs.weekStart ?? 'sunday',
+          })
+        : new Map<string, WeekRows>(),
+    [set.data, prefs],
+  );
 
-  const error = set.error ?? tradesQuery.error ?? flowsQuery.error;
+  // Any failed query ends the skeleton: none of them is optional here.
+  const error =
+    set.error ??
+    tradesQuery.error ??
+    flowsQuery.error ??
+    accountsQuery.error ??
+    strategiesQuery.error ??
+    tagsQuery.error ??
+    categoriesQuery.error;
   if (error) return <LogLoadError error={error} />;
   const allTrades = tradesQuery.data;
   const flows = flowsQuery.data;
@@ -135,7 +135,6 @@ export function TradesWeekView({
     !strategies ||
     !tags ||
     !categories ||
-    !days ||
     today === undefined
   )
     return <LogSkeleton />;
@@ -177,7 +176,7 @@ function WeekList({
   facts: lists,
 }: {
   weeks: WeekGroup[];
-  rows: ReadonlyMap<string, { trades: Trade[]; otherCurrency: Trade[] }>;
+  rows: ReadonlyMap<string, WeekRows>;
   filters: GlobalFilters;
   onFilters(next: GlobalFilters): void;
   unitLeftOut: number;
@@ -189,7 +188,13 @@ function WeekList({
   const updatePrefs = useUpdatePrefs();
   // The first card starts open and the rest closed (the record, K41); a week
   // here is one the reader has flipped from that.
-  const [flipped, setFlipped] = useState<ReadonlySet<string>>(new Set());
+  // It starts again when the filters change, as the paging does.
+  const filterKey = serializeFilters(filters).toString();
+  const [flips, setFlips] = useState<{
+    key: string;
+    weeks: ReadonlySet<string>;
+  }>({ key: filterKey, weeks: new Set() });
+  const flipped = flips.key === filterKey ? flips.weeks : NONE;
   const paged = usePaged(weeks.length, filters, FIRST, MORE);
 
   const pending = updatePrefs.isPending
@@ -211,12 +216,11 @@ function WeekList({
   const env = useCellEnv(lists);
   const records = useMemo(() => new Map<string, DayRecord>(), []);
 
-  const toggle = (start: string) =>
-    setFlipped((s) => {
-      const next = new Set(s);
-      if (!next.delete(start)) next.add(start);
-      return next;
-    });
+  const toggle = (start: string) => {
+    const next = new Set(flipped);
+    if (!next.delete(start)) next.add(start);
+    setFlips({ key: filterKey, weeks: next });
+  };
 
   return (
     <LogEnvContext.Provider value={{ env, columns, dayColumns, records }}>
@@ -227,13 +231,12 @@ function WeekList({
           <ColumnsMenu
             choices={WEEK_CHOICES}
             columns={columns}
-            onChange={(next) => updatePrefs.mutate({ weekColumns: next })}
-            onReset={() =>
-              updatePrefs.mutate({ weekColumns: [...WEEK_COLUMNS] })
-            }
+            defaults={WEEK_COLUMNS}
+            onSave={(next) => updatePrefs.mutate({ weekColumns: next })}
           />
         }
       >
+        {/* K41, Keel's call (TradeZella unknown): an empty Week view reuses the Day view's empty state. */}
         {weeks.length === 0 ? (
           <LogEmpty
             noun="weeks"

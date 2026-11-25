@@ -8,7 +8,7 @@ import { plural } from '@/lib/format';
 import { usePhone } from '@/lib/use-phone';
 import { onTradingDate, weekdayOf } from '@/lib/time-format';
 import { signTone } from '../../dashboard/shared';
-import { tileLabel, weekLabel } from './day-label';
+import { tileLabel, weekLabel } from '@/lib/day-label';
 
 /** The plot's height in px, and the room a value label takes above or below a bar. */
 const PLOT = 132;
@@ -100,69 +100,72 @@ export function WeekBars({ week }: { week: WeekGroup }): React.JSX.Element {
 
   return (
     <div className="my-4">
-      <div
-        role="img"
-        tabIndex={0}
-        aria-label={aria}
-        onFocus={() =>
-          setAt(
-            (a) =>
-              a ??
-              (withTrades.length ? { i: withTrades[0]!, by: 'focus' } : null),
-          )
-        }
-        onBlur={() => setAt(null)}
-        onKeyDown={keys}
-        onPointerLeave={() => setAt((a) => (a?.by === 'pointer' ? null : a))}
-        style={{ height }}
-        className="relative rounded-control outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent"
-      >
-        <span
-          aria-hidden="true"
-          style={{ top: base }}
-          className="absolute inset-x-0 h-px bg-line-2"
-        />
-        {week.days.map((_, i) => {
-          const n = nets[i];
-          const f = figure(i);
-          if (n === null || n === undefined || !f) return null;
-          const h = n === 0 ? 0 : Math.max(2, Math.abs(n) * unit);
-          const label = display.figure(f, true, undefined, phone).text;
-          return (
-            <span key={`${uid}${i}`} aria-hidden="true">
-              {n === 0 ? null : (
+      {/* The readout is the plot's sibling, not inside the image, so it is announced. */}
+      <div className="relative">
+        <div
+          role="img"
+          tabIndex={0}
+          aria-label={aria}
+          onFocus={() =>
+            setAt(
+              (a) =>
+                a ??
+                (withTrades.length ? { i: withTrades[0]!, by: 'focus' } : null),
+            )
+          }
+          onBlur={() => setAt(null)}
+          onKeyDown={keys}
+          onPointerLeave={() => setAt((a) => (a?.by === 'pointer' ? null : a))}
+          style={{ height }}
+          className="relative rounded-control outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent"
+        >
+          <span
+            aria-hidden="true"
+            style={{ top: base }}
+            className="absolute inset-x-0 h-px bg-line-2"
+          />
+          {week.days.map((_, i) => {
+            const n = nets[i];
+            const f = figure(i);
+            if (n === null || n === undefined || !f) return null;
+            const h = n === 0 ? 0 : Math.max(2, Math.abs(n) * unit);
+            const label = display.figure(f, true, undefined, phone).text;
+            return (
+              <span key={`${uid}${i}`} aria-hidden="true">
+                {n === 0 ? null : (
+                  <span
+                    style={{
+                      left: `${xOf(i)}%`,
+                      top: n > 0 ? base - h : base,
+                      height: h,
+                    }}
+                    className={`absolute w-[min(44px,9%)] -translate-x-1/2 ${n > 0 ? 'rounded-t-[6px] bg-gain-fill' : 'rounded-b-[6px] bg-loss-fill'}`}
+                  />
+                )}
                 <span
                   style={{
                     left: `${xOf(i)}%`,
-                    top: n > 0 ? base - h : base,
-                    height: h,
+                    top: n >= 0 ? base - h - 18 : base + h + 2,
                   }}
-                  className={`absolute w-[min(44px,9%)] -translate-x-1/2 ${n > 0 ? 'rounded-t-[6px] bg-gain-fill' : 'rounded-b-[6px] bg-loss-fill'}`}
-                />
-              )}
-              <span
-                style={{
-                  left: `${xOf(i)}%`,
-                  top: n >= 0 ? base - h - 18 : base + h + 2,
-                }}
-                className={`absolute -translate-x-1/2 text-[10.5px] font-medium whitespace-nowrap tabular-nums sm:text-xs ${signTone(n)}`}
-              >
-                {label}
+                  className={`absolute -translate-x-1/2 text-[10.5px] font-medium whitespace-nowrap tabular-nums sm:text-xs ${signTone(n)}`}
+                >
+                  {label}
+                </span>
               </span>
-            </span>
-          );
-        })}
-        {week.days.map((d, i) =>
-          d && d.trades.length > 0 ? (
-            <span
-              key={`${uid}hit${i}`}
-              aria-hidden="true"
-              onPointerEnter={() => setAt({ i, by: 'pointer' })}
-              style={{ left: `${(i / 7) * 100}%`, width: `${100 / 7}%` }}
-              className="absolute inset-y-0"
-            />
-          ) : null,
-        )}
+            );
+          })}
+          {week.days.map((d, i) =>
+            d && d.trades.length > 0 ? (
+              <span
+                key={`${uid}hit${i}`}
+                aria-hidden="true"
+                onPointerEnter={() => setAt({ i, by: 'pointer' })}
+                style={{ left: `${(i / 7) * 100}%`, width: `${100 / 7}%` }}
+                className="absolute inset-y-0"
+              />
+            ) : null,
+          )}
+        </div>
         {readout}
       </div>
       <div
