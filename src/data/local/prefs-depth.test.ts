@@ -12,7 +12,7 @@ const open = () =>
 
 const NOTE = { h1: 28, h2: 22, h3: 18, body: 14, strikeChecked: true };
 
-test.each([['fees', 7], 'fees'])(
+test.each([[['fees', 7]], ['fees']])(
   'tradeStats %j that is not a list of strings is refused',
   async (tradeStats) => {
     await expect(
