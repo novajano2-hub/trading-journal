@@ -1,3 +1,4 @@
+import { USERNAME } from '../onboarding';
 import { isValidTimeZone } from '@/domain/time';
 import type {
   Appearance,
@@ -19,8 +20,6 @@ const DISPLAY_UNITS: readonly DisplayUnit[] = [
   'pips',
   'points',
 ];
-/** K48. */
-const USERNAME = /^[A-Za-z0-9._]{3,30}$/;
 const APPEARANCES: readonly Appearance[] = ['system', 'light', 'dark'];
 const CALENDAR_STATS: readonly CalendarStat[] = [
   'net',
@@ -77,7 +76,7 @@ export function localPrefs(ctx: LocalContext): PrefsRepo {
   };
 }
 
-function validate(p: Partial<UserPrefs>): void {
+export function validate(p: Partial<UserPrefs>): void {
   if (p.timeZone !== undefined && !isValidTimeZone(p.timeZone))
     throw new RangeError(`Unknown time zone "${p.timeZone}"`);
   const range = p.breakevenRange;
@@ -204,7 +203,7 @@ function validatePropStart(v: UserPrefs['propStart']): void {
     );
 }
 
-const asPartial = (value: unknown): Partial<UserPrefs> =>
+export const asPartial = (value: unknown): Partial<UserPrefs> =>
   typeof value === 'object' && value !== null
     ? (value as Partial<UserPrefs>)
     : {};

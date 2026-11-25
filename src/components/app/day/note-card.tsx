@@ -10,9 +10,11 @@ import { buttonClasses } from '@/components/ui/button-styles';
 import { Chip } from '@/components/ui/chip';
 import { useJournal, usePrefs, useTemplates } from '@/data/query/hooks';
 import type { JournalEntry, NoteTemplate } from '@/domain/types';
+import type { DayMode } from '@/lib/day-routes';
 import { CARD, CARD_PAD, Caption, CardHeader } from '../dashboard/shared';
 import { ConfirmDialog } from '../confirm-dialog';
 import { findDailyEntry } from '../notebook/notebook-model';
+import { clock } from '../trades/trade-time';
 import { TemplatesDialog } from '../notebook/templates-dialog';
 import type { NoteEditorHandle } from '../notes/note-editor';
 import { DayNoteBinding, type NoteStatus } from '../trades/trade-journal';
@@ -30,28 +32,23 @@ function textOf(node: unknown): string {
 }
 
 const LINK =
-  'rounded-chip font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent';
-
-function clock(iso: string, timeZone: string | undefined): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone,
-  }).format(new Date(iso));
-}
+  'inline-flex items-center rounded-chip font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11';
 
 /**
  * The day's note: Templates inserts at the cursor, Change template replaces
  * the body (after asking, when you have written in it) and records the
  * template. It saves as you type, and is read-only for a finished day. The
- * plan and the review pages both show it.
+ * plan and the review pages both show it; the template line, Change template
+ * and the one-time tip belong to plan mode (TradeZella's review note has
+ * none), and Templates stays in both.
  */
 export function NoteCard({
   date,
+  mode,
   readOnly,
 }: {
   date: string;
+  mode: DayMode;
   readOnly: boolean;
 }): React.JSX.Element {
   const handle = useRef<NoteEditorHandle | null>(null);
@@ -67,9 +64,18 @@ export function NoteCard({
   const entry = findDailyEntry(journal.data, date);
   const locked = readOnly || entry?.deletedAt !== undefined;
   const daily = (templates ?? []).filter((t) => t.kind === 'daily-review');
-  const source =
-    daily.find((t) => t.id === (chosen ?? entry?.templateId)) ??
-    daily.find((t) => t.isDefault);
+  // The template the note started from. A date with no note yet shows the
+  // default it will start from. A stored note with no `templateId` (made
+  // before it was recorded; Keel's call, the origin is unknown) or whose
+  // template is gone names none.
+  const source = daily.find(
+    (t) =>
+      t.id ===
+      (chosen ??
+        entry?.templateId ??
+        (entry ? undefined : daily.find((d) => d.isDefault)?.id)),
+  );
+  const plan = mode === 'plan';
 
   const apply = (t: NoteTemplate) => {
     stamp.current = { templateId: t.id };
@@ -89,7 +95,9 @@ export function NoteCard({
       : status === 'failed'
         ? null
         : entry
-          ? `Saved ${clock(entry.updatedAt, timeZone)}`
+          ? timeZone === undefined
+            ? null
+            : `Saved ${clock(entry.updatedAt, timeZone, false)}`
           : null;
 
   const templatesButton = (
@@ -108,7 +116,7 @@ export function NoteCard({
   return (
     <section
       aria-labelledby="day-note-title"
-      className={`${CARD} ${CARD_PAD} min-w-0 sm:self-stretch`}
+      className={`${CARD} ${CARD_PAD} min-w-0 lg:self-stretch`}
     >
       <CardHeader
         headingId="day-note-title"
@@ -129,41 +137,40 @@ export function NoteCard({
         }
         end={
           locked ? undefined : (
-            <span className="relative">
-              <TemplateMenu
-                trigger={templatesButton}
-                onPick={(t) =>
-                  handle.current?.insertContent(structuredClone(t.body))
-                }
-                manage={{
-                  onManage: () => setManage('all'),
-                  onEditDefault: () => setManage('default'),
-                }}
-              />
-              <FirstVisitTip />
-            </span>
+            <TemplateMenu
+              trigger={templatesButton}
+              onPick={(t) =>
+                handle.current?.insertContent(structuredClone(t.body))
+              }
+              manage={{
+                onManage: () => setManage('all'),
+                onEditDefault: () => setManage('default'),
+              }}
+            />
           )
         }
       />
-      {source ? (
+      {plan && (source || !locked) ? (
         <p className="mt-0.5 text-[12.5px] text-faint">
-          From the <b className="font-semibold text-muted">{source.name}</b>{' '}
-          template.
-          {locked ? null : (
+          {source ? (
             <>
-              {' '}
-              <TemplateMenu
-                trigger={
-                  <button type="button" className={LINK}>
-                    Change template
-                  </button>
-                }
-                onPick={change}
-              />
+              From the <b className="font-semibold text-muted">{source.name}</b>{' '}
+              template.{' '}
             </>
+          ) : null}
+          {locked ? null : (
+            <TemplateMenu
+              trigger={
+                <button type="button" className={LINK}>
+                  Change template
+                </button>
+              }
+              onPick={change}
+            />
           )}
         </p>
       ) : null}
+      {plan && !locked ? <FirstVisitTip /> : null}
       <div className="mt-3 max-w-[72ch] min-w-0">
         <DayNoteBinding
           date={date}

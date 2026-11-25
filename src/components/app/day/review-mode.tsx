@@ -2,9 +2,9 @@
 
 import { Suspense, useMemo } from 'react';
 import { groupDays, dayOfTrade } from '@/data/day-log';
+import type { MetricContext } from '@/domain/metrics/context';
 import { selectedAccounts } from '@/data/filters';
-import { metricContextOf } from '@/data/metrics';
-import { useGlobalFilters } from '@/data/query/derived';
+import { useGlobalFilters, useRoutineToday } from '@/data/query/derived';
 import { useAccounts, usePrefs, useTrades } from '@/data/query/hooks';
 import { NoteCard } from './note-card';
 import { RatingCard } from './rating-card';
@@ -13,7 +13,6 @@ import { ReviewTrades } from './review-trades';
 import { RulesCard } from './rules-card';
 import { FinishDay } from './finish-day';
 import { useDayFinished } from './day-lock';
-import { useDaySession, useElapsed } from './session-button';
 
 /** "all accounts", or the one chosen, or how many. */
 function scopeOf(
@@ -30,8 +29,7 @@ function Cards({ date }: { date: string }): React.JSX.Element | null {
   const trades = useTrades().data;
   const accounts = useAccounts().data;
   const prefs = usePrefs().data;
-  const { today, session } = useDaySession(date);
-  const elapsed = useElapsed(date, today, session);
+  const today = useRoutineToday();
   const { finished } = useDayFinished(date);
 
   const day = useMemo(() => {
@@ -40,7 +38,15 @@ function Cards({ date }: { date: string }): React.JSX.Element | null {
     const own = trades.filter(
       (t) => ids.has(t.accountId) && dayOfTrade(t, prefs.timeZone) === date,
     );
-    const ctx = metricContextOf(prefs);
+    // The page has no Display menu and every money figure is net, so the
+    // outcomes and the win rate classify on net whatever the hidden basis, and
+    // no unit narrows the day.
+    const ctx: MetricContext = {
+      timeZone: prefs.timeZone,
+      breakevenRange: prefs.breakevenRange,
+      pnlBasis: 'net',
+      weekStart: prefs.weekStart ?? 'sunday',
+    };
     const group = groupDays(own, {
       timeZone: prefs.timeZone,
       baseCurrency: prefs.baseCurrency,
@@ -59,16 +65,15 @@ function Cards({ date }: { date: string }): React.JSX.Element | null {
   const names = new Map(accounts.map((a) => [a.id, a.name]));
   return (
     <>
-      <div className="flex min-w-0 flex-col gap-4 max-sm:contents">
-        <div className="max-sm:order-1">
+      <div className="flex min-w-0 flex-col gap-4 max-lg:contents">
+        <div className="max-lg:order-1">
           <ReviewTiles
+            date={date}
             stats={day.stats}
-            sessionMs={elapsed}
             currency={prefs.baseCurrency}
-            basis={prefs.pnlBasis}
           />
         </div>
-        <div className="max-sm:order-2">
+        <div className="max-lg:order-2">
           <ReviewTrades
             trades={day.trades}
             ctx={day.ctx}
@@ -76,15 +81,15 @@ function Cards({ date }: { date: string }): React.JSX.Element | null {
             scope={scopeOf(filters.accountIds, names)}
           />
         </div>
-        <div className="max-sm:order-5">
-          <NoteCard key={date} date={date} readOnly={finished} />
+        <div className="max-lg:order-5">
+          <NoteCard key={date} date={date} mode="review" readOnly={finished} />
         </div>
       </div>
-      <div className="flex min-w-0 flex-col gap-4 max-sm:contents">
-        <div className="max-sm:order-3">
+      <div className="flex min-w-0 flex-col gap-4 max-lg:contents">
+        <div className="max-lg:order-3">
           <RatingCard date={date} readOnly={finished} />
         </div>
-        <div className="max-sm:order-4">
+        <div className="max-lg:order-4">
           <RulesCard
             date={date}
             today={today}
@@ -103,7 +108,7 @@ function Cards({ date }: { date: string }): React.JSX.Element | null {
  */
 export function ReviewMode({ date }: { date: string }): React.JSX.Element {
   return (
-    <div className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,1fr)_400px] sm:items-start">
+    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start">
       <Suspense fallback={null}>
         <Cards date={date} />
       </Suspense>

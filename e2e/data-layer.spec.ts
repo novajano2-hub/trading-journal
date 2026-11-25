@@ -22,6 +22,9 @@ async function countTrades(): Promise<number> {
   });
 }
 
+// A fresh database: the first visit lands on the welcome, which seeds too.
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test('the sample workspace seeds on the first app visit, once', async ({
   page,
 }) => {

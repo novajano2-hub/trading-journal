@@ -8,6 +8,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     testTimeout: 30000,
+    setupFiles: ['./vitest.setup.ts'],
     ...(perf ? {} : { testNamePattern: /^(?!.*(budget|under 50 ms)).*$/ }),
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
   },

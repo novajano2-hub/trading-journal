@@ -238,19 +238,24 @@ export function EntryPane({
               ? "This day's note is in Trash."
               : 'This note is in Trash. It is deleted for good after 30 days.'}
           </span>
-          <button type="button" onClick={onRestore} className={BAR_BUTTON}>
-            <ArrowCounterClockwise size={15} aria-hidden="true" />
-            Restore
-          </button>
-          <button
-            type="button"
-            onClick={onDeleteForever}
-            className={`${BAR_BUTTON} hover:text-loss`}
-          >
-            Delete forever
-          </button>
+          {closed ? null : (
+            <>
+              <button type="button" onClick={onRestore} className={BAR_BUTTON}>
+                <ArrowCounterClockwise size={15} aria-hidden="true" />
+                Restore
+              </button>
+              <button
+                type="button"
+                onClick={onDeleteForever}
+                className={`${BAR_BUTTON} hover:text-loss`}
+              >
+                Delete forever
+              </button>
+            </>
+          )}
         </div>
       ) : null}
+      {closed && trashed ? <LockLine className="mt-3" /> : null}
 
       <input
         aria-label="Note title"

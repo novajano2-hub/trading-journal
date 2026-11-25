@@ -76,37 +76,134 @@ async function pick(trigger: string, item: string) {
   fireEvent.click(await screen.findByRole('menuitem', { name: item }));
 }
 
-test('Templates inserts at the cursor and keeps the rest', async () => {
-  const repo = await open(TODAY, { note: 'Keep this line' });
+test('Templates inserts at the cursor, mid-document, and keeps the rest', async () => {
+  const repo = await open(TODAY, {
+    note: 'Keep this line',
+  });
   const box = await editor();
   await within(box).findByText('Keep this line');
+  // Two paragraphs, the cursor at the end of the first.
+  const tiptap = (
+    box as unknown as {
+      editor: {
+        commands: {
+          setContent(doc: unknown): void;
+          setTextSelection(pos: number): void;
+        };
+      };
+    }
+  ).editor;
+  tiptap.commands.setContent({
+    type: 'doc',
+    content: [
+      { type: 'paragraph', content: [{ type: 'text', text: 'First line' }] },
+      { type: 'paragraph', content: [{ type: 'text', text: 'Last line' }] },
+    ],
+  });
+  tiptap.commands.setTextSelection(1 + 'First line'.length);
   await pick('Templates', 'Daily game plan');
   await within(box).findByText('What I will trade');
-  expect(within(box).getByText('Keep this line')).toBeTruthy();
+  const text = box.textContent ?? '';
+  // Not appended: the template sits between the two lines.
+  expect(text.indexOf('First line')).toBeLessThan(
+    text.indexOf('What I will trade'),
+  );
+  expect(text.indexOf('What I will trade')).toBeLessThan(
+    text.indexOf('Last line'),
+  );
   await waitFor(
     async () => {
       const body = JSON.stringify((await dailyEntry(repo))?.body);
-      expect(body).toContain('Keep this line');
+      expect(body).toContain('First line');
+      expect(body).toContain('Last line');
       expect(body).toContain('What I will trade');
     },
     { timeout: 3000 },
   );
 });
 
-test('the Templates menu lists your daily templates, the three Keel ones, then Manage and Edit default', async () => {
-  await open();
+test('the Templates menu lists yours, then the built-in templates, then See more, Manage and Edit default', async () => {
+  const repo = repository();
+  await repo.templates.save(WS, {
+    name: 'My day',
+    kind: 'daily-review',
+    body: para('Mine'),
+    isDefault: false,
+  });
+  await open(TODAY, { repo });
   fireEvent.keyDown(await screen.findByRole('button', { name: 'Templates' }), {
     key: 'Enter',
   });
   await screen.findByRole('menuitem', { name: 'Daily game plan' });
-  expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual([
+  // Built-in templates sit with Keel's three, not under "Your templates".
+  const menu = screen.getByRole('menu');
+  expect(
+    [...menu.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent),
+  ).toEqual([
+    'My day',
     'Daily review',
     'Daily game plan',
     'All-in-one day',
     'Intraday check-in',
+    'See more templates',
     'Manage templates',
     'Edit default',
   ]);
+  const text = menu.textContent ?? '';
+  expect(text.indexOf('Your templates')).toBeLessThan(text.indexOf('My day'));
+  expect(text.indexOf('My day')).toBeLessThan(text.indexOf('Recommended'));
+  expect(text.indexOf('Recommended')).toBeLessThan(
+    text.indexOf('Daily review'),
+  );
+});
+
+test('See more templates opens Manage templates', async () => {
+  await open();
+  fireEvent.keyDown(await screen.findByRole('button', { name: 'Templates' }), {
+    key: 'Enter',
+  });
+  fireEvent.click(
+    await screen.findByRole('menuitem', { name: 'See more templates' }),
+  );
+  expect(await screen.findByRole('dialog', { name: 'Templates' })).toBeTruthy();
+});
+
+test('the template line names the template the note started from, even after the default changes', async () => {
+  const repo = repository();
+  await repo.journal.dailyNote(WS, TODAY);
+  await repo.templates.setDefault(WS, 'template-daily-plan');
+  await open(TODAY, { repo });
+  const line = await screen.findByText(/^From the/);
+  expect(line.textContent).toContain('Daily review');
+  expect(line.textContent).not.toContain('Daily game plan');
+});
+
+test('a day with no note yet names the default it will start from', async () => {
+  const repo = repository();
+  await repo.templates.setDefault(WS, 'template-daily-plan');
+  await open(TODAY, { repo });
+  expect((await screen.findByText(/^From the/)).textContent).toContain(
+    'Daily game plan',
+  );
+});
+
+test('a note made before templates were recorded names none, and a kind with no default starts empty', async () => {
+  // `open` saves the note straight to the journal, so it has no templateId.
+  await open(TODAY, { note: 'Older note' });
+  await within(await editor()).findByText('Older note');
+  expect(screen.queryByText(/^From the/)).toBeNull();
+  expect(screen.getByRole('button', { name: 'Change template' })).toBeTruthy();
+  cleanup();
+
+  const repo = repository();
+  const review = (await repo.templates.list(WS)).find(
+    (t) => t.id === 'template-daily-review',
+  )!;
+  await repo.templates.save(WS, { ...review, isDefault: false });
+  await open(TODAY, { repo });
+  await editor();
+  expect(screen.queryByText(/^From the/)).toBeNull();
+  expect((await editor()).textContent).toBe('');
 });
 
 test('Change template asks first when the note has text, then replaces it and records the template', async () => {
@@ -143,10 +240,20 @@ test('Change template replaces a note you have not written in without asking', a
   expect(screen.queryByRole('dialog', { name: /Replace the note/ })).toBeNull();
 });
 
-test('the tip shows once', async () => {
+test('the tip shows once, in the flow above the note, and Got it closes it', async () => {
   const repo = await open(TODAY, { seen: false });
   const tip = await screen.findByRole('note', { name: 'Tip' });
   expect(tip.textContent).toMatch(/default daily template/);
+  // Beside the control or below it, never over it: in the flow, before the editor.
+  expect(tip.className).not.toMatch(/absolute|fixed/);
+  const change = screen.getByRole('button', { name: 'Change template' });
+  const box = await editor();
+  expect(
+    change.compareDocumentPosition(tip) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(
+    tip.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
   fireEvent.click(within(tip).getByRole('button', { name: 'Got it' }));
   await waitFor(() =>
     expect(screen.queryByRole('note', { name: 'Tip' })).toBeNull(),
@@ -158,6 +265,18 @@ test('the tip shows once', async () => {
   await open(TODAY, { repo });
   await screen.findByRole('button', { name: 'Templates' });
   expect(screen.queryByRole('note', { name: 'Tip' })).toBeNull();
+});
+
+test('Escape closes the tip for good', async () => {
+  const repo = await open(TODAY, { seen: false });
+  await screen.findByRole('note', { name: 'Tip' });
+  fireEvent.keyDown(document.body, { key: 'Escape' });
+  await waitFor(() =>
+    expect(screen.queryByRole('note', { name: 'Tip' })).toBeNull(),
+  );
+  await waitFor(async () =>
+    expect((await repo.prefs.get()).seenTips).toContain('day-plan-templates'),
+  );
 });
 
 test('the rules card shows the rule names and a Progress tracker link', async () => {

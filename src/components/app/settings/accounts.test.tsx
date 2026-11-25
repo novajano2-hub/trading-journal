@@ -970,3 +970,25 @@ test('after a partial failure the selection is what was selected minus what was 
     .map((c) => c.getAttribute('aria-label'));
   expect(ticked.sort()).toEqual(['Select Empty one', 'Select Futures main']);
 });
+
+test('?new=prop opens the new-account dialog on a prop account once, and leaves the address clean', async () => {
+  renderApp(<AccountsSettings />, {
+    repository: repo(),
+    url: `${URL}?new=prop&q=main`,
+  });
+  const dialog = await screen.findByRole('dialog', { name: 'New account' });
+  const type = within(dialog).getByLabelText(
+    'Account type',
+  ) as HTMLSelectElement;
+  expect(type.value).toBe('prop-evaluation');
+  expect(window.location.search).toBe('?q=main');
+});
+
+test('without ?new the new-account dialog still opens on a live account', async () => {
+  renderApp(<AccountsSettings />, { repository: repo(), url: URL });
+  fireEvent.click(await screen.findByRole('button', { name: 'New account' }));
+  const dialog = await screen.findByRole('dialog', { name: 'New account' });
+  expect(
+    (within(dialog).getByLabelText('Account type') as HTMLSelectElement).value,
+  ).toBe('live');
+});

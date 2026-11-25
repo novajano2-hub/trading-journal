@@ -10,8 +10,8 @@ import {
 } from '@/data/query/hooks';
 import { SHOT_MAX_BYTES, ShotRejected } from '@/data/repository';
 import type { DayShot } from '@/domain/types';
-import { CARD, CARD_PAD, Caption, CardHeader } from '../dashboard/shared';
-import { ConfirmDialog } from '../confirm-dialog';
+import { CARD, CARD_PAD, CardHeader } from '../dashboard/shared';
+import { ConfirmDialog, ConfirmFailure } from '../confirm-dialog';
 import { ShotViewer, useShotUrl } from './shot-viewer';
 
 const TYPES = ['image/png', 'image/jpeg'];
@@ -66,21 +66,27 @@ export function ScreenshotsCard({
   const remove = useRemoveDayShot();
   const picker = useRef<HTMLInputElement>(null);
   const origin = useRef<HTMLElement | null>(null);
-  const [problems, setProblems] = useState<string[]>([]);
+  const zone = useRef<HTMLDivElement>(null);
+  // Enters minus leaves: a pointer crossing into a child leaves the zone and enters again.
+  const depth = useRef(0);
+  const nextProblem = useRef(0);
+  const [problems, setProblems] = useState<{ id: number; text: string }[]>([]);
   const [over, setOver] = useState(false);
   const [viewing, setViewing] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<DayShot | null>(null);
 
   const take = async (files: File[]) => {
-    const out: string[] = [];
+    const out: { id: number; text: string }[] = [];
+    const problem = (text: string) =>
+      out.push({ id: nextProblem.current++, text });
     setProblems([]);
     for (const file of files) {
       if (!TYPES.includes(file.type)) {
-        out.push(`${file.name} isn't a PNG or JPEG.`);
+        problem(`${file.name} isn't a PNG or JPEG.`);
         continue;
       }
       if (file.size > SHOT_MAX_BYTES) {
-        out.push(`${file.name} is over 10 MB.`);
+        problem(`${file.name} is over 10 MB.`);
         continue;
       }
       try {
@@ -93,7 +99,7 @@ export function ScreenshotsCard({
           },
         });
       } catch (e) {
-        out.push(
+        problem(
           e instanceof ShotRejected && e.reason === 'type'
             ? `${file.name} isn't a PNG or JPEG.`
             : e instanceof ShotRejected && e.reason === 'size'
@@ -107,17 +113,7 @@ export function ScreenshotsCard({
 
   return (
     <section aria-labelledby="shots-title" className={`${CARD} ${CARD_PAD}`}>
-      <CardHeader
-        headingId="shots-title"
-        title="Screenshots"
-        after={
-          shots.length > 0 ? (
-            <Caption>
-              {shots.length} {shots.length === 1 ? 'image' : 'images'}
-            </Caption>
-          ) : undefined
-        }
-      />
+      <CardHeader headingId="shots-title" title="Screenshots" />
       {shots.length > 0 ? (
         <div className="mt-3 grid grid-cols-2 gap-2.5">
           {shots.map((shot, i) => (
@@ -138,17 +134,26 @@ export function ScreenshotsCard({
       ) : null}
       {readOnly ? null : (
         <div
-          onDragOver={(e) => {
-            e.preventDefault();
+          ref={zone}
+          tabIndex={-1}
+          onDragEnter={() => {
+            depth.current += 1;
             setOver(true);
           }}
-          onDragLeave={() => setOver(false)}
+          onDragOver={(e) => {
+            e.preventDefault();
+          }}
+          onDragLeave={() => {
+            depth.current = Math.max(0, depth.current - 1);
+            if (depth.current === 0) setOver(false);
+          }}
           onDrop={(e) => {
             e.preventDefault();
+            depth.current = 0;
             setOver(false);
             void take([...e.dataTransfer.files]);
           }}
-          className={`mt-3 flex flex-col items-center gap-1 rounded-[10px] border-[1.5px] border-dashed px-4 py-[18px] text-center ${over ? 'border-accent bg-accent-soft' : 'border-line-2'}`}
+          className={`mt-3 flex flex-col items-center gap-1 rounded-[10px] border-[1.5px] border-dashed outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent px-4 py-[18px] text-center ${over ? 'border-accent bg-accent-soft' : 'border-line-2'}`}
         >
           <ImageSquare
             size={28}
@@ -186,7 +191,7 @@ export function ScreenshotsCard({
       {problems.length > 0 ? (
         <ul role="alert" className="mt-2 text-[13px] text-loss">
           {problems.map((p) => (
-            <li key={p}>{p}</li>
+            <li key={p.id}>{p.text}</li>
           ))}
         </ul>
       ) : null}
@@ -207,8 +212,16 @@ export function ScreenshotsCard({
         danger
         onConfirm={async () => {
           if (!deleting) return;
-          await remove.mutateAsync({ id: deleting.id });
-          if (shots.length <= 1) setViewing(null);
+          try {
+            await remove.mutateAsync({ id: deleting.id });
+          } catch {
+            throw new ConfirmFailure("Couldn't save. Try again.");
+          }
+          if (shots.length <= 1) {
+            // The thumbnail the viewer would return to is gone: the drop zone takes the focus.
+            origin.current = zone.current;
+            setViewing(null);
+          }
         }}
         onClose={() => setDeleting(null)}
       />
