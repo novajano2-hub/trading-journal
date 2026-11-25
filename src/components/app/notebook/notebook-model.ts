@@ -169,3 +169,14 @@ export function isRealDate(date: string): boolean {
     at.getUTCDate() === d
   );
 }
+
+/** The date's daily note: one out of Trash, else the trashed one, which is still the date's note (E109). */
+export function findDailyEntry(
+  entries: readonly JournalEntry[] | undefined,
+  date: string,
+): JournalEntry | undefined {
+  const onDate = entries?.filter(
+    (e) => e.kind === 'daily-review' && e.date === date,
+  );
+  return onDate?.find((e) => e.deletedAt === undefined) ?? onDate?.[0];
+}

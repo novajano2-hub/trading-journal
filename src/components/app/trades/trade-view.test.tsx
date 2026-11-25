@@ -744,6 +744,28 @@ test('a trashed day note shows read-only with Restore', async () => {
   expect(days[0]!.deletedAt).toBeUndefined();
 });
 
+test('a refused Restore on the trade page says so and leaves the note in Trash', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: sample(),
+  });
+  const note = await repository.journal.dailyNote(WS, '2026-11-09');
+  await repository.journal.trash(WS, note.id);
+  vi.spyOn(repository.journal, 'restore').mockRejectedValue(
+    new Error('The day is finished'),
+  );
+  renderApp(<TradeView id="t-c" />, { repository, url: URL_C });
+  await screen.findByRole('textbox', { name: 'Trade note' });
+  fireEvent.click(screen.getByRole('radio', { name: 'Daily note' }));
+  await screen.findByText("This day's note is in Trash.");
+  fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
+  expect((await screen.findByRole('alert')).textContent).toBe(
+    "Couldn't restore that note. Try again.",
+  );
+  expect(screen.getByText("This day's note is in Trash.")).toBeTruthy();
+});
+
 test('editing the day note creates the daily entry for the exit date once, and the link then opens it', async () => {
   const handle: { current: NoteEditorHandle | null } = { current: null };
   const { repo } = renderApp(<TradeView id="t-c" noteHandleRef={handle} />, {

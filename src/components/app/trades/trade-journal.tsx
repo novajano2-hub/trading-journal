@@ -24,6 +24,7 @@ import { localDate } from '@/domain/time';
 import { dayLabel } from './trade-time';
 import { NoteEditor, type NoteEditorHandle } from '../notes/note-editor';
 import { TagPicker } from '../tag-picker';
+import { findDailyEntry } from '../notebook/notebook-model';
 
 /** How long typing rests before the note is saved. */
 export const NOTE_SAVE_DELAY_MS = 600;
@@ -462,17 +463,6 @@ export function dayNoteDate(trade: Trade, timeZone: string): string {
   return localDate(trade.closedAt ?? trade.openedAt, timeZone);
 }
 
-/** The daily entry for a date: one out of Trash, else the trashed one, which is still the date's note (E109). */
-export function findDailyEntry(
-  entries: readonly JournalEntry[] | undefined,
-  date: string,
-): JournalEntry | undefined {
-  const onDate = entries?.filter(
-    (e) => e.kind === 'daily-review' && e.date === date,
-  );
-  return onDate?.find((e) => e.deletedAt === undefined) ?? onDate?.[0];
-}
-
 /**
  * The day note: the same editor and autosave, bound to the daily entry of the
  * trade's day. The entry is made on the first change (as the Notebook makes
@@ -493,6 +483,7 @@ export function DayNote({
   const templates = useTemplates();
   const daily = useDailyNote();
   const restore = useRestoreJournalEntry();
+  const [problem, setProblem] = useState<string | null>(null);
   const entry = findDailyEntry(journal.data, date);
   const trashed = entry?.deletedAt !== undefined;
   // As in TradeNote: once mounted for this date the editor stays, even though
@@ -535,9 +526,21 @@ export function DayNote({
           className="mt-3 flex flex-wrap items-center gap-2 rounded-control bg-warn-soft px-3 py-2 text-[13.5px] text-text"
         >
           <span className="mr-auto">This day&apos;s note is in Trash.</span>
+          {problem ? (
+            <span role="alert" className="text-loss">
+              {problem}
+            </span>
+          ) : null}
           <button
             type="button"
-            onClick={() => restore.mutate(entry.id)}
+            onClick={async () => {
+              setProblem(null);
+              try {
+                await restore.mutateAsync(entry.id);
+              } catch {
+                setProblem("Couldn't restore that note. Try again.");
+              }
+            }}
             disabled={restore.isPending}
             className="inline-flex h-8 items-center rounded-control border border-line bg-surface-1 px-3 text-[13px] font-semibold text-text outline-offset-2 hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11"
           >

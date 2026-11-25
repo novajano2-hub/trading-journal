@@ -206,7 +206,7 @@ export function MonthPicker({
                       tabIndex={date === stop ? 0 : -1}
                       onClick={() => onPick(date)}
                       onKeyDown={(e) => onKey(e, date)}
-                      className={`relative mx-auto inline-flex size-9 items-center justify-center rounded-full text-[13px] tabular-nums outline-none transition-colors duration-200 hover:bg-sunken focus-visible:ring-2 focus-visible:ring-accent pointer-coarse:size-11 ${
+                      className={`relative mx-auto inline-flex size-9 items-center justify-center rounded-full text-[13px] tabular-nums outline-offset-2 transition-colors duration-200 hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:size-11 ${
                         isSelected
                           ? 'bg-accent font-semibold text-accent-fg hover:bg-accent'
                           : 'text-text'

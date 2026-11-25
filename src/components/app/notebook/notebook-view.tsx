@@ -42,6 +42,7 @@ import { DRAFT_ID, EntryPane } from './entry-pane';
 import { FolderRail } from './folder-rail';
 import {
   BUILT_IN_FOLDERS,
+  findDailyEntry,
   folderOfKind,
   inFolder,
   isRealDate,
@@ -105,17 +106,6 @@ function Skeleton(): React.JSX.Element {
   );
 }
 
-/** The date's daily note: one out of Trash, else the trashed one, which is still the date's note (E109). */
-function dailyOn(
-  entries: readonly JournalEntry[] | undefined,
-  date: string,
-): JournalEntry | undefined {
-  const onDate = entries?.filter(
-    (e) => e.kind === 'daily-review' && e.date === date,
-  );
-  return onDate?.find((e) => e.deletedAt === undefined) ?? onDate?.[0];
-}
-
 /**
  * A day's note. A day with a note opens it; a day without one opens a draft
  * from the default daily template, which writes nothing. Its first change
@@ -133,7 +123,7 @@ function DailyPane({
   props: Omit<React.ComponentProps<typeof EntryPane>, 'entry' | 'ensure'>;
 }): React.JSX.Element {
   const { mutateAsync } = useDailyNote();
-  const existing = dailyOn(entries, date);
+  const existing = findDailyEntry(entries, date);
   const draft = useMemo(
     (): JournalEntry => ({
       id: DRAFT_ID,
@@ -213,21 +203,15 @@ export function NotebookView(): React.JSX.Element {
     if (noticeId !== undefined) undoButton.current?.focus();
   }, [noticeId]);
 
-  const open: JournalEntry | undefined =
-    selection.type === 'entry'
-      ? entries?.find((e) => e.id === selection.id)
-      : selection.type === 'daily'
-        ? (entries?.find(
-            (e) =>
-              e.kind === 'daily-review' &&
-              e.date === selection.date &&
-              e.deletedAt === undefined,
-          ) ??
-          // A trashed note is still the date's note (E109).
-          entries?.find(
-            (e) => e.kind === 'daily-review' && e.date === selection.date,
-          ))
-        : undefined;
+  const open: JournalEntry | undefined = useMemo(
+    () =>
+      selection.type === 'entry'
+        ? entries?.find((e) => e.id === selection.id)
+        : selection.type === 'daily'
+          ? findDailyEntry(entries, selection.date)
+          : undefined,
+    [entries, selection],
+  );
 
   // A folder you picked wins; before that, the one the open note belongs to.
   const known = (key: FolderKey) =>

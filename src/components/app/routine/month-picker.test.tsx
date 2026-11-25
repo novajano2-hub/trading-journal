@@ -34,6 +34,22 @@ test('today is ringed and a future date can be picked', () => {
   expect(onPick).toHaveBeenCalledWith('2026-11-28');
 });
 
+test("today's ring is not the focus ring, so focus shows on today (WCAG 2.4.7)", () => {
+  render(<Harness onPick={() => {}} />);
+  const today = screen.getByRole('gridcell', { name: /^19 November 2026$/ });
+  const other = screen.getByRole('gridcell', { name: /^20 November 2026$/ });
+  const classes = (el: HTMLElement) => el.className.split(/\s+/);
+  expect(classes(today)).toContain('ring-2');
+  expect(classes(other)).not.toContain('ring-2');
+  // Focus is an outline, a different paint from today's box-shadow ring.
+  for (const el of [today, other]) {
+    expect(classes(el)).toContain('focus-visible:outline-2');
+    expect(classes(el)).toContain('focus-visible:outline-accent');
+    expect(classes(el)).not.toContain('focus-visible:ring-2');
+    expect(classes(el)).not.toContain('outline-none');
+  }
+});
+
 test('the week starts on the chosen day', () => {
   render(<Harness onPick={() => {}} />);
   const heads = screen.getAllByRole('columnheader').map((h) => h.textContent);
