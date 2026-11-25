@@ -1,4 +1,4 @@
-import type { Cents, TrackerVersion } from '@/domain/types';
+import type { Cents, TrackerStage, TrackerVersion } from '@/domain/types';
 import type { RuleKey } from '@/domain/tracker/score';
 
 /** An amount as text; the page builds it from `useDisplay().cash`, so Privacy masks it. */
@@ -66,3 +66,10 @@ export function ruleCondition(
       return 'Ticked by hand';
   }
 }
+
+/** The stage as the rules table names it. */
+export const STAGE_NAME: Record<TrackerStage, string> = {
+  prepare: 'Prepare',
+  trade: 'Trade',
+  reflect: 'Reflect',
+};

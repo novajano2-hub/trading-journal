@@ -21,7 +21,7 @@ const STATUS_WORD: Record<RuleStatus, string> = {
 };
 
 /** K19: met is a gain-coloured check, failed a loss-coloured cross, pending a faint clock. */
-function Mark({ status }: { status: RuleStatus }): React.JSX.Element {
+export function Mark({ status }: { status: RuleStatus }): React.JSX.Element {
   const Icon =
     status === 'met' ? CheckCircle : status === 'failed' ? XCircle : Clock;
   const tone =

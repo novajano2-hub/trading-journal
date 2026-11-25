@@ -3,6 +3,7 @@ import {
   CalendarBlank,
   ChartBar,
   ClockCounterClockwise,
+  Gauge,
   GearSix,
   ListBullets,
   Notebook,
@@ -22,6 +23,7 @@ export type AppModuleId =
   | 'trades'
   | 'calendar'
   | 'reports'
+  | 'progress'
   | 'strategies'
   | 'notebook'
   | 'import'
@@ -99,6 +101,17 @@ export const APP_NAV: readonly NavItem[] = [
     built: false,
     summary:
       'Your results by time of day, weekday, symbol, strategy, tag, side, duration and R.',
+  },
+  {
+    id: 'progress',
+    label: 'Progress tracker',
+    href: '/app/progress',
+    icon: Gauge,
+    group: 'modules',
+    filterScoped: true,
+    built: true,
+    summary:
+      'How consistently you follow your own rules: your streak, your score and every rule.',
   },
   {
     id: 'strategies',
@@ -268,7 +281,7 @@ export function strategyEditId(pathname: string): string | undefined {
 
 /**
  * Whether the global filters drive this page: Dashboard, the trade log, Calendar,
- * Strategies (the list and one strategy) and Reports, except Compare, whose two groups each own their filters.
+ * Strategies (the list and one strategy), the progress tracker (its date range only) and Reports, except Compare, whose two groups each own their filters.
  * Elsewhere the bar shows no chips.
  */
 export function filtersApply(pathname: string): boolean {
@@ -277,9 +290,21 @@ export function filtersApply(pathname: string): boolean {
     (/^\/app\/strategies\/[^/]+$/.test(pathname) &&
       pathname !== '/app/strategies/new') ||
     (/^\/app\/reports(\/|$)/.test(pathname) &&
-      !/^\/app\/reports\/compare\/?$/.test(pathname))
+      !/^\/app\/reports\/compare\/?$/.test(pathname)) ||
+    pathname === '/app/progress'
   );
 }
+
+/**
+ * Pages where the bar shows the date range alone: the progress tracker, which
+ * has no Filters and takes its accounts from the switcher (K14).
+ */
+export const datesOnly = (pathname: string): boolean =>
+  pathname === '/app/progress';
+
+/** Pages with no Display menu: money there is always net, in its own currency (P6A-03). */
+export const hidesDisplayMenu = (pathname: string): boolean =>
+  pathname === '/app/progress';
 
 /** The page where each group of trades has its own filters rather than the global ones. */
 export const isComparePage = (pathname: string): boolean =>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { CaretLeft, CaretRight } from '@phosphor-icons/react/dist/ssr';
 import { buttonClasses } from '@/components/ui/button-styles';
 import type { DayScore } from '@/domain/tracker/score';
@@ -57,6 +58,7 @@ export function HeatGrid({
   markToday,
   paging,
   label,
+  controlsHost,
 }: {
   days: readonly DayScore[];
   today: string;
@@ -65,6 +67,12 @@ export function HeatGrid({
   markToday: boolean;
   paging: boolean;
   label: string;
+  /**
+   * Where the paging controls go. Omitted: above the grid. An element: portalled
+   * into it, so a card can put them in its header. `null`: that element isn't
+   * mounted yet, so they wait.
+   */
+  controlsHost?: HTMLElement | null;
 }): React.JSX.Element {
   const textId = useId();
   const host = useRef<HTMLDivElement>(null);
@@ -199,38 +207,48 @@ export function HeatGrid({
   const shown = hover ?? focused;
   const rowOffset = weekStartsOn(weekStart);
 
+  const controls = (
+    <>
+      <button
+        type="button"
+        aria-label="Earlier weeks"
+        aria-disabled={back >= maxOffset ? 'true' : undefined}
+        onClick={() =>
+          setOffset(Math.min(maxOffset, back + Math.max(1, fit - 1)))
+        }
+        className={ICON_BUTTON}
+      >
+        <CaretLeft size={15} weight="bold" aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        aria-label="Later weeks"
+        aria-disabled={back === 0 ? 'true' : undefined}
+        onClick={() => setOffset(Math.max(0, back - Math.max(1, fit - 1)))}
+        className={ICON_BUTTON}
+      >
+        <CaretRight size={15} weight="bold" aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        onClick={() => setOffset(0)}
+        className={buttonClasses('secondary', 'sm')}
+      >
+        Today
+      </button>
+    </>
+  );
+
   return (
     <div ref={host}>
       {paging ? (
-        <div className="mb-1 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            aria-label="Earlier weeks"
-            aria-disabled={back >= maxOffset ? 'true' : undefined}
-            onClick={() =>
-              setOffset(Math.min(maxOffset, back + Math.max(1, fit - 1)))
-            }
-            className={ICON_BUTTON}
-          >
-            <CaretLeft size={15} weight="bold" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            aria-label="Later weeks"
-            aria-disabled={back === 0 ? 'true' : undefined}
-            onClick={() => setOffset(Math.max(0, back - Math.max(1, fit - 1)))}
-            className={ICON_BUTTON}
-          >
-            <CaretRight size={15} weight="bold" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setOffset(0)}
-            className={buttonClasses('secondary', 'sm')}
-          >
-            Today
-          </button>
-        </div>
+        controlsHost === undefined ? (
+          <div className="mb-1 flex items-center justify-end gap-2">
+            {controls}
+          </div>
+        ) : controlsHost ? (
+          createPortal(controls, controlsHost)
+        ) : null
       ) : null}
       <div
         className="mt-3 inline-flex flex-col gap-1.5"
@@ -249,7 +267,7 @@ export function HeatGrid({
             <span
               key={j}
               className="whitespace-nowrap"
-              style={{ gridColumn: j + 1 }}
+              style={{ gridColumn: j + 1, gridRow: 1 }}
             >
               {name}
             </span>

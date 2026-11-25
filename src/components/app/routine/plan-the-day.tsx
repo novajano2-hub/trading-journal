@@ -16,8 +16,11 @@ const PANEL =
 /** The shared start-my-day popover: pick a date, and land on its day page (today and later plan, earlier review). */
 export function PlanTheDay({
   label = 'Plan the day',
+  wide = false,
 }: {
   label?: string;
+  /** Full width, as in a card's footer. */
+  wide?: boolean;
 }): React.JSX.Element {
   const today = useRoutineToday();
   const weekStart = usePrefs().data?.weekStart;
@@ -25,7 +28,7 @@ export function PlanTheDay({
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState<string | undefined>(undefined);
 
-  const look = `${buttonClasses('secondary')} gap-[7px] pr-[15px] pl-3`;
+  const look = `${buttonClasses('secondary')} gap-[7px] pr-[15px] pl-3${wide ? ' w-full' : ''}`;
   if (today === undefined) {
     return (
       <button type="button" disabled aria-haspopup="dialog" className={look}>

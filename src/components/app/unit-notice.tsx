@@ -6,7 +6,7 @@ import { usePrefs, useUpdatePrefs } from '@/data/query/hooks';
 import { UNIT_SCOPE } from '@/content/display-units';
 import { isTradeUnit } from '@/domain/metrics/units';
 import { plural } from '@/lib/format';
-import { filtersApply } from './nav';
+import { filtersApply, hidesDisplayMenu } from './nav';
 
 /**
  * The words for a page whose trades the display unit narrowed: "Ticks counts
@@ -60,7 +60,10 @@ export function UnitLeftOut({
  * it reads the search params.
  */
 export function UnitNotice(): React.JSX.Element | null {
-  return filtersApply(usePathname()) ? <FilteredNotice /> : null;
+  const pathname = usePathname();
+  return filtersApply(pathname) && !hidesDisplayMenu(pathname) ? (
+    <FilteredNotice />
+  ) : null;
 }
 
 function FilteredNotice(): React.JSX.Element | null {

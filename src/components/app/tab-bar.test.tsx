@@ -75,7 +75,14 @@ test('More opens a sheet with the switcher, the other modules, Settings, "Not li
     within(modules!)
       .getAllByRole('link')
       .map((a) => a.textContent),
-  ).toEqual(['Strategies', 'Notebook', 'Import', 'Prop firms', 'Settings']);
+  ).toEqual([
+    'Progress tracker',
+    'Strategies',
+    'Notebook',
+    'Import',
+    'Prop firms',
+    'Settings',
+  ]);
   expect(within(sheet).getByRole('list', { name: 'Not live yet' })).toBe(
     notLive,
   );

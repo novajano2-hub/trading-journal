@@ -8,6 +8,8 @@ import {
   strategyPageId,
   tradePageId,
   filtersApply,
+  datesOnly,
+  hidesDisplayMenu,
   type AppModuleId,
 } from './nav';
 
@@ -17,6 +19,7 @@ test('order and groups', () => {
     'trades',
     'calendar',
     'reports',
+    'progress',
     'strategies',
     'notebook',
     'import',
@@ -84,6 +87,7 @@ test('filtersApply is true only on the routes the global filters drive', () => {
     '/app/reports/time',
     '/app/strategies',
     '/app/strategies/str-1',
+    '/app/progress',
   ])
     expect(filtersApply(p), p).toBe(true);
   for (const p of [
@@ -99,4 +103,22 @@ test('filtersApply is true only on the routes the global filters drive', () => {
     '/app/settings',
   ])
     expect(filtersApply(p), p).toBe(false);
+});
+
+test('Progress tracker sits after Reports, with the Gauge glyph', () => {
+  const ids = APP_NAV.map((i) => i.id);
+  expect(ids.indexOf('progress')).toBe(ids.indexOf('reports') + 1);
+  const progress = APP_NAV.find((i) => i.id === 'progress')!;
+  expect(progress.label).toBe('Progress tracker');
+  expect(progress.href).toBe('/app/progress');
+  expect(pageTitle('/app/progress')).toBe('Progress tracker');
+});
+
+test('the tracker shows the date range alone and no Display menu', () => {
+  expect(datesOnly('/app/progress')).toBe(true);
+  expect(hidesDisplayMenu('/app/progress')).toBe(true);
+  for (const p of ['/app/dashboard', '/app/trades', '/app/reports']) {
+    expect(datesOnly(p), p).toBe(false);
+    expect(hidesDisplayMenu(p), p).toBe(false);
+  }
 });

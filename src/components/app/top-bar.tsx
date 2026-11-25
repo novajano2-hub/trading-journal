@@ -16,6 +16,7 @@ import { PlanTheDay } from './routine/plan-the-day';
 import { useStrategy, useTrade } from '@/data/query/hooks';
 import {
   filtersApply,
+  hidesDisplayMenu,
   isComparePage,
   pageTitle,
   strategyEditId,
@@ -319,7 +320,10 @@ export function TopBar({
           {label || basis ? (
             <div ref={controls} className="flex flex-none items-center gap-2">
               {label}
-              <div className="flex">{basis}</div>
+              {/* The tracker has no unit menu: money there is net, in its currency. */}
+              {hidesDisplayMenu(pathname) ? null : (
+                <div className="flex">{basis}</div>
+              )}
             </div>
           ) : null}
           {/* The start-my-day popover, before Import, on the Dashboard and Trades only. */}

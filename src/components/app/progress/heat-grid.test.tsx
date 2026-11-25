@@ -178,3 +178,20 @@ test('without paging there are no controls', () => {
   grid();
   expect(screen.queryByRole('button', { name: 'Today' })).toBeNull();
 });
+
+test('with a controls host, the paging controls render in it, not above the grid', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const { container } = grid({ paging: true, controlsHost: host });
+  expect(host.querySelector('button[aria-label="Earlier weeks"]')).toBeTruthy();
+  expect(host.textContent).toContain('Today');
+  expect(container.querySelector('button[aria-label="Earlier weeks"]')).toBe(
+    null,
+  );
+  host.remove();
+});
+
+test('a host that is not mounted yet shows no controls', () => {
+  grid({ paging: true, controlsHost: null });
+  expect(screen.queryByRole('button', { name: 'Earlier weeks' })).toBeNull();
+});
