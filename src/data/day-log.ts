@@ -1,4 +1,5 @@
 import { classify, type MetricContext } from '@/domain/metrics/context';
+import { closedInOrder, isClosed } from '@/domain/trade-status';
 import { localDate } from '@/domain/time';
 import type { Cents, Trade, WeekStart } from '@/domain/types';
 import { weekFirstDay } from '@/domain/week';
@@ -39,6 +40,8 @@ export interface WeekGroup {
   days: (DayGroup | null)[] /* seven, week order */;
   stats: DayStats;
   trades: Trade[];
+  /** The week's other-currency trades, listed apart (K24). */
+  otherCurrency: Trade[];
   dailyNet: (Cents | null)[];
 }
 export interface DayLogEnv {
@@ -54,16 +57,16 @@ const DAY_MS = 86_400_000;
 
 /** K37: the close date if closed, else the open date, in the profile zone. */
 export function dayOfTrade(t: Trade, timeZone: string): string {
-  return localDate(t.closedAt ?? t.openedAt, timeZone);
+  return localDate(isClosed(t) ? t.closedAt : t.openedAt, timeZone);
 }
 
 const newestOpenFirst = (a: Trade, b: Trade) =>
-  a.openedAt < b.openedAt ? 1 : a.openedAt > b.openedAt ? -1 : 0;
+  Date.parse(b.openedAt) - Date.parse(a.openedAt) || b.serial - a.serial;
 
 /** Every fill on both sides; without fills, Keel's call (TradeZella unknown): maxPosition once if open, twice if closed. */
 function volumeOf(t: Trade): number {
   if (t.executions.length === 0) {
-    return t.maxPosition * (t.status === 'closed' ? 2 : 1);
+    return t.maxPosition * (isClosed(t) ? 2 : 1);
   }
   return t.executions.reduce((n, e) => n + e.qty, 0);
 }
@@ -79,7 +82,7 @@ function statsOf(trades: readonly Trade[], ctx: MetricContext): DayStats {
   let volume = 0;
   for (const t of trades) {
     volume += volumeOf(t);
-    if (t.status !== 'closed') continue;
+    if (!isClosed(t)) continue;
     closed += 1;
     net += t.net;
     gross += t.gross;
@@ -103,15 +106,11 @@ function statsOf(trades: readonly Trade[], ctx: MetricContext): DayStats {
 }
 
 function seriesOf(trades: readonly Trade[]): IntradayPoint[] {
-  const closed = trades
-    .filter((t) => t.status === 'closed' && t.closedAt !== undefined)
-    .sort((a, b) =>
-      a.closedAt! < b.closedAt! ? -1 : a.closedAt! > b.closedAt! ? 1 : 0,
-    );
+  const closed = closedInOrder(trades);
   let cumulative = 0;
   return closed.map((t) => {
     cumulative += t.net;
-    return { tradeId: t.id, time: t.closedAt!, net: t.net, cumulative };
+    return { tradeId: t.id, time: t.closedAt, net: t.net, cumulative };
   });
 }
 
@@ -167,7 +166,10 @@ export function groupWeeks(
   const weeks: WeekGroup[] = [];
   for (const [start, group] of byStart) {
     const trades = group.flatMap((d) => d.trades).sort(newestOpenFirst);
-    if (trades.length === 0) continue;
+    const otherCurrency = group
+      .flatMap((d) => d.otherCurrency)
+      .sort(newestOpenFirst);
+    if (trades.length === 0 && otherCurrency.length === 0) continue;
     const slots = Array.from({ length: 7 }, (_, i): DayGroup | null => {
       const date = addDays(start, i);
       return group.find((d) => d.date === date) ?? null;
@@ -178,6 +180,7 @@ export function groupWeeks(
       days: slots,
       stats: statsOf(trades, env.ctx),
       trades,
+      otherCurrency,
       dailyNet: slots.map((d) => d?.stats.net ?? null),
     });
   }

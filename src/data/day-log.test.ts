@@ -268,6 +268,51 @@ describe('week grouping', () => {
   });
 });
 
+describe('week grouping, other currencies and closed trades', () => {
+  test('a GBP-only week stays, with its trades apart', () => {
+    const gbp = makeTrade({
+      net: 5,
+      pnlCurrency: 'GBP',
+      openedAt: at('2026-03-10'),
+      closedAt: at('2026-03-10'),
+    });
+    const [w] = groupWeeks(groupDays([gbp], env()), env());
+    expect(w!.start).toBe('2026-03-08');
+    expect(w!.trades).toEqual([]);
+    expect(w!.otherCurrency).toEqual([gbp]);
+    expect(w!.stats.net).toBeNull();
+  });
+
+  test('a mixed week keeps a GBP-only tile apart from the sums', () => {
+    const usd = makeTrade({
+      net: 10,
+      openedAt: at('2026-03-09'),
+      closedAt: at('2026-03-09'),
+    });
+    const gbp = makeTrade({
+      net: 7,
+      pnlCurrency: 'GBP',
+      openedAt: at('2026-03-10'),
+      closedAt: at('2026-03-10'),
+    });
+    const [w] = groupWeeks(groupDays([usd, gbp], env()), env());
+    expect(w!.trades).toEqual([usd]);
+    expect(w!.otherCurrency).toEqual([gbp]);
+    expect(w!.stats.net).toBe(10);
+    expect(w!.days[2]!.trades).toEqual([]);
+    expect(w!.days[2]!.otherCurrency).toEqual([gbp]);
+  });
+
+  test('closed status without a close time counts as open everywhere', () => {
+    const t = makeTrade({ net: 9, openedAt: at('2026-03-02') });
+    delete t.closedAt;
+    const [d] = groupDays([t], env());
+    expect(d!.date).toBe('2026-03-02');
+    expect(d!.stats.net).toBeNull();
+    expect(d!.series).toEqual([]);
+  });
+});
+
 describe('performance', () => {
   let s: SampleWorkspace;
   beforeAll(() => {
