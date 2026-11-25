@@ -1145,7 +1145,7 @@ function TradePage({
 
           <NoteCard
             trade={trade}
-            timeZone={timeZone}
+            timeZone={prefs.timeZone}
             readOnly={readOnly}
             handleRef={noteHandleRef}
           />

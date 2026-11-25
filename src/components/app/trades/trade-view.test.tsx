@@ -996,3 +996,35 @@ test('the trade note tab does not read the journal', async () => {
   await screen.findByRole('textbox', { name: 'Trade note' });
   expect(list).not.toHaveBeenCalled();
 });
+
+test("the Daily note dates by the trader's zone, not the account's (K35)", async () => {
+  const base = sample(
+    {
+      openedAt: '2026-11-20T03:00:00Z',
+      closedAt: '2026-11-20T03:30:00Z',
+      executions: [],
+    },
+    'acc-a',
+  );
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => {
+      const w = await base();
+      return {
+        ...w,
+        accounts: w.accounts.map((a) =>
+          a.id === 'acc-a' ? { ...a, timeZone: 'Asia/Tokyo' } : a,
+        ),
+      };
+    },
+  });
+  await repository.prefs.update({ timeZone: 'America/New_York' });
+  renderApp(<TradeView id="t-c" />, { repository, url: URL_C });
+  await screen.findByRole('textbox', { name: 'Trade note' });
+  fireEvent.click(screen.getByRole('radio', { name: 'Daily note' }));
+  const link = await screen.findByRole('link', {
+    name: 'Open in the Notebook',
+  });
+  expect(link.getAttribute('href')).toBe('/app/notebook/daily/2026-11-19');
+});

@@ -457,7 +457,7 @@ export function TradeNote({
   );
 }
 
-/** The day note's date: the trade's last exit (its open date while it is open), on the account's clock. */
+/** The day note's date: the trade's last exit (its open date while it is open), on the trader's clock. */
 export function dayNoteDate(trade: Trade, timeZone: string): string {
   return localDate(trade.closedAt ?? trade.openedAt, timeZone);
 }

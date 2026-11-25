@@ -12,6 +12,7 @@ import {
   type RefObject,
 } from 'react';
 import { RAISED } from '@/components/ui/button-styles';
+import { PlanTheDay } from './routine/plan-the-day';
 import { useStrategy, useTrade } from '@/data/query/hooks';
 import {
   filtersApply,
@@ -319,6 +320,12 @@ export function TopBar({
             <div ref={controls} className="flex flex-none items-center gap-2">
               {label}
               <div className="flex">{basis}</div>
+            </div>
+          ) : null}
+          {/* The start-my-day popover, before Import, on the Dashboard and Trades only. */}
+          {pathname === '/app/dashboard' || pathname === '/app/trades' ? (
+            <div className="flex flex-none max-sm:hidden">
+              <PlanTheDay />
             </div>
           ) : null}
           {/* Import's own page needs no link to itself. The bar's last control: Keel has no signed-in person, so no avatar. */}
