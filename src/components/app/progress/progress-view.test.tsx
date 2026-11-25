@@ -376,3 +376,43 @@ test('the tracker has no Display menu, and its phone header shows only the date 
     window.innerWidth = 1024;
   }
 });
+
+test('a custom rule added today has a row before any day is scored with it, with zeros', async () => {
+  show('/app/progress', () => {
+    const s = fixtureSample();
+    return {
+      ...s,
+      tracker: {
+        ...s.tracker,
+        startedOn: '2026-11-19',
+        versions: [
+          HAND_RULES('2026-11-19', [
+            {
+              ...c1,
+              id: 'c-new',
+              name: 'Walk before the open',
+              // Sundays only, so no day has been scored with it.
+              days: [true, false, false, false, false, false, false],
+            },
+          ]),
+        ],
+      },
+    };
+  });
+  await ready();
+  const text = row('Walk before the open').textContent!;
+  expect(text).toContain('0 days');
+  expect(text).toContain('None');
+  expect(text).toContain('0%');
+});
+
+test('Edit rules opens the dialog from the rules card', async () => {
+  show();
+  await ready();
+  fireEvent.click(
+    within(rulesCard()).getByRole('button', { name: 'Edit rules' }),
+  );
+  expect(
+    await screen.findByRole('dialog', { name: 'Edit rules' }),
+  ).toBeTruthy();
+});

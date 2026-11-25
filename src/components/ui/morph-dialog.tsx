@@ -53,8 +53,8 @@ export function MorphDialog({
   description?: ReactNode;
   /** A decorative tile beside the title, as the card it grew from has. */
   icon?: ReactNode;
-  /** `full` fills the screen inside a small gutter, for a chart or a table that wants the room. */
-  size?: 'default' | 'full';
+  /** `full` fills the screen inside a small gutter, for a chart or a table that wants the room. `sheet` is the default size on a wide screen and a full-height sheet on a phone. */
+  size?: 'default' | 'full' | 'sheet';
   /** Pinned under the scrolling body, never inside it. */
   footer?: ReactNode;
   children: ReactNode;
@@ -178,12 +178,14 @@ export function MorphDialog({
           className={`fixed z-50 flex flex-col overflow-hidden rounded-card border border-line bg-surface-1 shadow-[var(--shadow)] outline-none ${
             size === 'full'
               ? 'inset-3 sm:inset-6'
-              : 'inset-0 m-auto h-fit max-h-[80dvh] w-[calc(100%-32px)] max-w-[760px]'
+              : size === 'sheet'
+                ? 'inset-x-0 top-3 bottom-0 max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 sm:inset-0 sm:m-auto sm:h-fit sm:max-h-[80dvh] sm:w-[calc(100%-32px)] sm:max-w-[760px]'
+                : 'inset-0 m-auto h-fit max-h-[80dvh] w-[calc(100%-32px)] max-w-[760px]'
           }`}
         >
           <div
             ref={body}
-            className={`flex min-h-0 flex-col ${size === 'full' ? 'h-full' : 'max-h-[80dvh]'}`}
+            className={`flex min-h-0 flex-col ${size === 'full' ? 'h-full' : size === 'sheet' ? 'h-full sm:h-auto sm:max-h-[80dvh]' : 'max-h-[80dvh]'}`}
           >
             <div className="flex items-start gap-3 border-b border-line px-5 pt-[18px] pb-4">
               {icon ? <div className="flex-none pt-px">{icon}</div> : null}

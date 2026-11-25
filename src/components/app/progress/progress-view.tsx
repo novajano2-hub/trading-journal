@@ -2,7 +2,7 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { Info, Warning } from '@phosphor-icons/react/dist/ssr';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { MetricTip } from '@/components/ui/metric-tip';
 import { StateGlyph } from '@/components/ui/state-glyph';
@@ -18,6 +18,7 @@ import { plural } from '@/lib/format';
 import { CARD, CARD_PAD, Caption, CardHeader } from '../dashboard/shared';
 import { PlanTheDay } from '../routine/plan-the-day';
 import { DayRules } from './day-rules';
+import { EditRules } from './edit-rules';
 import { HeatGrid } from './heat-grid';
 import { RulesTable } from './rules-table';
 import { ProgressTiles } from './tiles';
@@ -43,6 +44,9 @@ export function ProgressView(): React.JSX.Element {
   const queryClient = useQueryClient();
   // The grid's paging controls live in the History card's header.
   const [controlsHost, setControlsHost] = useState<HTMLElement | null>(null);
+  // The Edit rules dialog grows from, and returns to, whichever button opened it.
+  const [editing, setEditing] = useState(false);
+  const editOrigin = useRef<HTMLElement | null>(null);
 
   if (scores.status === 'error') {
     const storage = scores.error instanceof StorageUnavailableError;
@@ -75,8 +79,10 @@ export function ProgressView(): React.JSX.Element {
   if (!history || !prefs) return <ProgressSkeleton />;
 
   const { tracker, today, days } = history;
-  // Task 9 mounts the Edit rules dialog here.
-  const editRules = () => undefined;
+  const editRules = (opener: HTMLElement) => {
+    editOrigin.current = opener;
+    setEditing(true);
+  };
   const todayScore = history.scoreOn(today);
   const version =
     versionOn(tracker, today) ?? tracker.versions[tracker.versions.length - 1]!;
@@ -119,7 +125,7 @@ export function ProgressView(): React.JSX.Element {
               <button
                 type="button"
                 aria-haspopup="dialog"
-                onClick={editRules}
+                onClick={(e) => editRules(e.currentTarget)}
                 className="rounded-chip font-semibold text-accent-ink underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-accent"
               >
                 Edit rules
@@ -190,6 +196,7 @@ export function ProgressView(): React.JSX.Element {
           />
         </div>
       </div>
+      <EditRules open={editing} onOpenChange={setEditing} origin={editOrigin} />
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { buttonClasses } from '@/components/ui/button-styles';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { DayScore, RuleKey, RuleStatus } from '@/domain/tracker/score';
 import type { RuleStat } from '@/domain/tracker/summary';
-import type { TrackerVersion } from '@/domain/types';
+import type { TrackerStage, TrackerVersion } from '@/domain/types';
 import { useDisplay } from '@/lib/display';
 import { plural } from '@/lib/format';
 import { CARD, CARD_PAD, Caption, CardHeader } from '../dashboard/shared';
@@ -18,38 +18,28 @@ import {
   type FormatMoney,
 } from './rule-label';
 
-/** The built-in rules in the order the scorer lists them within a stage. */
-const BUILT_IN_ORDER: readonly RuleKey[] = [
-  'startBy',
-  'hours',
-  'strategy',
-  'stop',
-  'lossPerTrade',
-  'lossPerDay',
-];
 const STAGE_ORDER = { prepare: 0, trade: 1, reflect: 2 } as const;
 
-/** A rule is current when the version in effect today has it on. */
-function isCurrent(key: RuleKey, version: TrackerVersion): boolean {
-  if (key.startsWith('custom:'))
-    return version.custom.some((c) => c.id === key.slice('custom:'.length));
+/** The rules the version in effect today has on, with their stage. */
+function currentRules(
+  version: TrackerVersion,
+): { key: RuleKey; stage: TrackerStage }[] {
   const b = version.builtIn;
-  switch (key) {
-    case 'startBy':
-      return b.startBy.on;
-    case 'hours':
-      return b.hours.on;
-    case 'strategy':
-      return b.strategy.on;
-    case 'stop':
-      return b.stop.on;
-    case 'lossPerTrade':
-      return b.lossPerTrade.on;
-    case 'lossPerDay':
-      return b.lossPerDay.on;
-    default:
-      return false;
-  }
+  const built: { key: RuleKey; stage: TrackerStage; on: boolean }[] = [
+    { key: 'startBy', stage: 'prepare', on: b.startBy.on },
+    { key: 'hours', stage: 'trade', on: b.hours.on },
+    { key: 'strategy', stage: 'reflect', on: b.strategy.on },
+    { key: 'stop', stage: 'reflect', on: b.stop.on },
+    { key: 'lossPerTrade', stage: 'reflect', on: b.lossPerTrade.on },
+    { key: 'lossPerDay', stage: 'reflect', on: b.lossPerDay.on },
+  ];
+  return [
+    ...built.filter((r) => r.on),
+    ...version.custom.map((c) => ({
+      key: `custom:${c.id}` as RuleKey,
+      stage: c.stage,
+    })),
+  ];
 }
 
 const hhmm = (minutes: number): string => {
@@ -73,9 +63,10 @@ interface Row {
 }
 
 /**
- * The tracker's current rules, one row each, in stage order. `stats` holds
- * every rule that ever scored; the table lists only those the version in
- * effect today has on, and a rule that does not apply today has no mark.
+ * The tracker's current rules, one row each, in stage order (the sort is
+ * stable, so a stage keeps the built-ins first, then the custom rules in
+ * their order). `stats` holds every rule that ever scored; a rule that does
+ * not apply today has no mark.
  */
 function useRows(
   stats: readonly RuleStat[],
@@ -86,18 +77,22 @@ function useRows(
   const display = useDisplay();
   // The tracker is always net, in the rule's own currency.
   const fmt: FormatMoney = (cents) => display.cash(cents, false, currency);
-  const order = (key: RuleKey): number =>
-    key.startsWith('custom:')
-      ? BUILT_IN_ORDER.length +
-        version.custom.findIndex((c) => `custom:${c.id}` === key)
-      : BUILT_IN_ORDER.indexOf(key);
-  return stats
-    .filter((s) => isCurrent(s.key, version))
-    .sort(
-      (a, b) =>
-        STAGE_ORDER[a.stage] - STAGE_ORDER[b.stage] ||
-        order(a.key) - order(b.key),
+  // Every current rule has a row; one with no scored day reads zeros, as
+  // TradeZella's nothing-done state does.
+  const seen = new Map(stats.map((s) => [s.key, s]));
+  return currentRules(version)
+    .map(
+      ({ key, stage }): RuleStat =>
+        seen.get(key) ?? {
+          key,
+          stage,
+          streak: 0,
+          average: null,
+          followRate: 0,
+          scoredDays: 0,
+        },
     )
+    .sort((a, b) => STAGE_ORDER[a.stage] - STAGE_ORDER[b.stage])
     .map((s) => {
       const custom = s.key.startsWith('custom:');
       const avg = s.average;
@@ -121,7 +116,7 @@ function useRows(
         none: avg === null,
         follow: s.followRate === null ? null : Math.round(s.followRate * 100),
         title:
-          s.followRate === null
+          s.followRate === null || s.scoredDays === 0
             ? 'No scored days yet'
             : `${met} of ${s.scoredDays} scored ${plural(s.scoredDays, 'day')}`,
         status: today.rules.find((r) => r.key === s.key)?.status,
@@ -172,7 +167,8 @@ export function RulesTable({
   currency: string;
   /** The range and the scored days in it, "1-24 Nov, 17 scored days". */
   caption: string;
-  onEdit(): void;
+  /** Gets the button that was pressed, for the dialog to grow from. */
+  onEdit(opener: HTMLElement): void;
 }): React.JSX.Element {
   const rows = useRows(stats, version, today, currency);
   return (
@@ -188,7 +184,7 @@ export function RulesTable({
           <button
             type="button"
             aria-haspopup="dialog"
-            onClick={onEdit}
+            onClick={(e) => onEdit(e.currentTarget)}
             className={`${buttonClasses('secondary', 'sm')} gap-2`}
           >
             <PencilSimple size={15} aria-hidden="true" className="flex-none" />
