@@ -49,6 +49,13 @@ export function builtInCategories(ws: string): TagCategory[] {
   ];
 }
 
+/** The ids of Keel's three extra daily templates (K32), the "recommended" group. */
+export const KEEL_DAILY_IDS = [
+  'template-daily-plan',
+  'template-daily-full',
+  'template-daily-checkin',
+] as const;
+
 /** "Daily review", "Pre-market plan" and "Weekly recap", each the default for its kind, and Keel's three other daily templates (K32), which are not defaults. */
 export function builtInTemplates(ws: string): NoteTemplate[] {
   const template = (
@@ -86,21 +93,21 @@ export function builtInTemplates(ws: string): NoteTemplate[] {
       WEEKLY_RECAP_BODY,
     ),
     template(
-      'template-daily-plan',
+      KEEL_DAILY_IDS[0],
       'Daily game plan',
       'daily-review',
       DAILY_PLAN_BODY,
       false,
     ),
     template(
-      'template-daily-full',
+      KEEL_DAILY_IDS[1],
       'All-in-one day',
       'daily-review',
       DAILY_FULL_BODY,
       false,
     ),
     template(
-      'template-daily-checkin',
+      KEEL_DAILY_IDS[2],
       'Intraday check-in',
       'daily-review',
       DAILY_CHECKIN_BODY,

@@ -274,11 +274,12 @@ export interface TemplatesRepo {
   list(ws: string): Promise<NoteTemplate[]>;
   /**
    * Creates when `id` is absent, otherwise replaces (a built-in keeps its
-   * kind). The kind keeps one default: saving a default clears the others,
-   * and a kind left without one falls back to its built-in template.
+   * kind). The kind keeps at most one default: saving a default clears the
+   * others, and saving the default without `isDefault` leaves the kind with
+   * none (a new note of that kind then starts empty).
    */
   save(ws: string, t: TemplateDraft): Promise<NoteTemplate>;
-  /** Refuses a built-in template (`Error('built-in template')`). Removing the default makes the kind's built-in template the default. */
+  /** Refuses a built-in template (`Error('built-in template')`). Removing the default leaves the kind without one. */
   remove(ws: string, id: string): Promise<void>;
   /** Clears `isDefault` on the kind's other templates. */
   setDefault(ws: string, id: string): Promise<void>;
