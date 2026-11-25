@@ -174,3 +174,26 @@ describe('realizations of a trade in another quote currency (E71)', () => {
     expect(t.net).toBe(-40993);
   });
 });
+
+describe('realizations by cost method (#49)', () => {
+  test('each method books its own cost per exit and the exits add up to the trade', () => {
+    const execs = [
+      fill('f1', 'buy', 1, 100, '2026-03-02T15:00:00Z', 100),
+      fill('f2', 'buy', 1, 110, '2026-03-02T15:01:00Z', 100),
+      fill('f3', 'sell', 1, 120, '2026-03-02T15:02:00Z', 0),
+      fill('f4', 'sell', 1, 120, '2026-03-02T15:03:00Z', 0),
+    ];
+    const t = built(execs);
+    const per = (m?: 'lifo' | 'average') =>
+      realizations(m ? { ...t, costMethod: m } : t).map((r) => r.gross);
+    const pv = es.pointValue * 100;
+    expect(per()).toEqual([20 * pv, 10 * pv]);
+    expect(per('lifo')).toEqual([10 * pv, 20 * pv]);
+    expect(per('average')).toEqual([15 * pv, 15 * pv]);
+    for (const m of ['lifo', 'average'] as const) {
+      const r = realizations({ ...t, costMethod: m });
+      expect(r.reduce((n, x) => n + x.gross, 0)).toBe(t.gross);
+      expect(r.reduce((n, x) => n + x.fees, 0)).toBe(t.fees);
+    }
+  });
+});
