@@ -29,6 +29,9 @@ export function ProgressCard(): React.JSX.Element {
   const score = history?.scoreOn(history.today);
   // The page opens on the same account selection and range.
   const trackerHref = navHref(PROGRESS, useSearchParams());
+  const query = trackerHref.includes('?')
+    ? trackerHref.slice(trackerHref.indexOf('?'))
+    : '';
 
   return (
     <section
@@ -82,7 +85,7 @@ export function ProgressCard(): React.JSX.Element {
               </p>
             </div>
             <Link
-              href={dayHref(today, today)}
+              href={`${dayHref(today, today)}${query}`}
               className={`${buttonClasses('secondary', 'sm')} flex-none gap-1.5`}
             >
               <ListChecks size={16} aria-hidden="true" />

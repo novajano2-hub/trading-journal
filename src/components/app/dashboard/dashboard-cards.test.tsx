@@ -119,6 +119,20 @@ test('Open tracker keeps the date range and the account selection', async () => 
   ).toBe('/app/progress?from=2026-11-02&to=2026-11-19&account=acc-b');
 });
 
+test('the checklist link keeps the date range and the account selection', async () => {
+  await renderDashboard({
+    url: '/app/dashboard?from=2026-11-02&to=2026-11-19&account=acc-b',
+  });
+  const card = await trackerCard();
+  expect(
+    (
+      await within(card).findByRole('link', { name: "Today's checklist" })
+    ).getAttribute('href'),
+  ).toBe(
+    '/app/day/2026-11-19/plan?from=2026-11-02&to=2026-11-19&account=acc-b',
+  );
+});
+
 test('a non-trading today reads 0 of 0 rules met, with the grid and no caption line', async () => {
   await renderDashboard({
     edit: (s) => {

@@ -89,7 +89,8 @@ export function ruleStats(
     const inPeriod = results(ranged);
     const decided = inPeriod.filter((x) => x.r.status !== 'pending');
     const met = decided.filter((x) => x.r.status === 'met').length;
-    const scores = inPeriod.flatMap((x) =>
+    // A rule with no decided day has no average (R12), whatever a pending day holds.
+    const scores = decided.flatMap((x) =>
       x.r.score === null ? [] : [x.r.score],
     );
 

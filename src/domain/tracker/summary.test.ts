@@ -119,6 +119,15 @@ describe('streaks', () => {
 });
 
 describe('ruleStats', () => {
+  test('a rule with no decided day has no average, whatever a pending day holds', () => {
+    const only = [withRules('2026-11-19', [res('lossPerTrade', 'pending', 0)])];
+    const s = ruleStats(only, '2026-11-19').find(
+      (r) => r.key === 'lossPerTrade',
+    )!;
+    expect(s.average).toBeNull();
+    expect(s.followRate).toBeNull();
+  });
+
   test('rule stats', () => {
     const mk = (d: string, st: RuleResult['status'], sc: number | null) =>
       withRules(d, [res('lossPerTrade', st, sc), res('lossPerDay', 'met', 0)]);

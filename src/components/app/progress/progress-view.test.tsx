@@ -158,6 +158,8 @@ test('a new tracker with nothing done yet reads 0 days, a score of None and foll
   const pending = row('Mark key levels before the open');
   expect(pending.textContent).toContain('0 days');
   expect(within(pending).getAllByRole('cell').at(-1)!.textContent).toBe('0%');
+  // No decided day: the average is None too (R12), not 0%.
+  expect(within(pending).getAllByRole('cell').at(-2)!.textContent).toBe('None');
   expect(pending.textContent).not.toContain('Prepare');
 });
 
