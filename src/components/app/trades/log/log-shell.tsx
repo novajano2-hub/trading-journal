@@ -32,6 +32,7 @@ import type {
 } from '@/domain/types';
 import { pctBaseOf, useDisplay, type FigureSource } from '@/lib/display';
 import { usePhone } from '@/lib/use-phone';
+import { useWide } from '@/lib/use-wide';
 import { PlanTheDay } from '../../routine/plan-the-day';
 import { hasActiveFilters } from '../../filter-model';
 import { CARD } from '../../dashboard/shared';
@@ -228,6 +229,7 @@ export function LogShell({
   children: React.ReactNode;
 }): React.JSX.Element {
   const phone = usePhone();
+  const wide = useWide();
   const root = useRef<HTMLDivElement>(null);
   const row = useRef<HTMLDivElement>(null);
   // The switch row's height, for the aside to sit under it when both are pinned.
@@ -243,7 +245,9 @@ export function LogShell({
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-  const column = aside !== undefined && !phone;
+  // The column is built only where it shows (from xl): a hidden one would still
+  // group every trade again at each filter change.
+  const column = aside !== undefined && !phone && wide;
   return (
     <div
       ref={root}
@@ -259,9 +263,7 @@ export function LogShell({
           </div>
           {phone ? null : (
             <div className="ml-auto flex items-center gap-2">
-              {calendarAction ? (
-                <div className="xl:hidden">{calendarAction}</div>
-              ) : null}
+              {wide ? null : calendarAction}
               {columnsMenu}
               <AddTradeLink />
             </div>
@@ -292,7 +294,7 @@ export function LogShell({
       >
         <div className="flex min-w-0 flex-col gap-4">{children}</div>
         {column ? (
-          <div className="sticky top-[calc(var(--top-bar,68px)+var(--log-switch,52px))] hidden xl:block">
+          <div className="sticky top-[calc(var(--top-bar,68px)+var(--log-switch,52px))]">
             {aside}
           </div>
         ) : null}

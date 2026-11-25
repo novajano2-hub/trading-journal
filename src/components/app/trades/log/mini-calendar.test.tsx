@@ -8,13 +8,14 @@ import {
 } from '@testing-library/react';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { groupDays } from '@/data/day-log';
 import { createLocalRepository } from '@/data/local/local-repository';
 import type { SampleWorkspace } from '@/data/seed/generate';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import type { MetricContext } from '@/domain/metrics/context';
+import type { Repository } from '@/data/repository';
 import type { Trade, UserPrefs, WeekStart } from '@/domain/types';
 import { FilterBar } from '../../filter-bar';
 import { renderApp as render } from '../../__fixtures__/render-app';
@@ -30,6 +31,10 @@ vi.mock('next/navigation', () => import('../../__fixtures__/navigation'));
 MotionGlobalConfig.skipAnimations = true;
 
 afterEach(cleanup);
+// The calendar column is there from xl (1280px): these tests run at 1440 unless one says otherwise.
+beforeEach(() => {
+  window.innerWidth = 1440;
+});
 
 const WS = fixtureSample().trades[0]!.workspaceId;
 
@@ -131,14 +136,21 @@ function sample(list: Trade[] = trades()) {
 /** Renders over a repository whose prefs are set first (UTC, so a day reads as written). */
 async function renderApp(
   ui: React.ReactElement,
-  opts: { url?: string; prefs?: Partial<UserPrefs>; list?: Trade[] } = {},
+  opts: {
+    url?: string;
+    prefs?: Partial<UserPrefs>;
+    list?: Trade[];
+    /** Replaces parts of the repository, to make a query fail. */
+    patch?: (repo: Repository) => Partial<Repository>;
+  } = {},
 ) {
-  const repository = createLocalRepository({
+  const base = createLocalRepository({
     indexedDB: new IDBFactory(),
     IDBKeyRange,
     sample: sample(opts.list),
   });
-  await repository.prefs.update({ timeZone: 'UTC', ...opts.prefs });
+  await base.prefs.update({ timeZone: 'UTC', ...opts.prefs });
+  const repository = { ...base, ...opts.patch?.(base) };
   return render(ui, { repository, url: opts.url ?? '/app/trades/day' });
 }
 
@@ -487,4 +499,55 @@ test('the Week view carries the calendar too, and a pick filters its weeks to th
       .getByRole('button', { name: /^Tue 24 Nov/ })
       .getAttribute('data-tone'),
   ).toBe('gain');
+});
+
+test('the column is built only from xl; below it nothing hidden is computed and the Calendar button stands in', async () => {
+  window.innerWidth = 1024;
+  await renderApp(
+    <TradesDayView
+      aside={<TradesMiniCalendar />}
+      calendarAction={<CalendarSheetButton />}
+    />,
+  );
+  await screen.findAllByRole('article');
+  // Not in the page at all (not merely hidden): no day buttons, no landmark.
+  expect(screen.queryByRole('complementary')).toBeNull();
+  expect(screen.queryByRole('button', { name: /^Mon 23 Nov/ })).toBeNull();
+  // The button sits by the columns menu, not in a phone row.
+  expect(screen.getByRole('button', { name: 'Calendar' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Columns' })).toBeTruthy();
+  cleanup();
+  window.innerWidth = 1440;
+  await renderApp(
+    <TradesDayView
+      aside={<TradesMiniCalendar />}
+      calendarAction={<CalendarSheetButton />}
+    />,
+  );
+  await screen.findAllByRole('article');
+  expect(
+    await screen.findByRole('complementary', { name: 'November 2026' }),
+  ).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Calendar' })).toBeNull();
+});
+
+test('a failed load leaves a short line, not a placeholder that never ends', async () => {
+  await renderApp(<TradesMiniCalendar />, {
+    patch: (r) => ({
+      trades: { ...r.trades, list: () => Promise.reject(new Error('boom')) },
+    }),
+  });
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toBe("The calendar couldn't load.");
+  expect(screen.queryByRole('complementary')).toBeNull();
+});
+
+test('a tracker that fails to load falls back to the local date; the calendar still shows', async () => {
+  await renderApp(<TradesMiniCalendar />, {
+    patch: (r) => ({
+      tracker: { ...r.tracker, get: () => Promise.reject(new Error('boom')) },
+    }),
+  });
+  expect(await screen.findByRole('complementary')).toBeTruthy();
+  expect(screen.queryByRole('alert')).toBeNull();
 });

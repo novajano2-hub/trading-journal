@@ -398,6 +398,19 @@ export function TradesMiniCalendar({
   const allTrades = tradesQuery.data;
   const accounts = accountsQuery.data;
   const flows = flowsQuery.data;
+  // A failed query ends the placeholder: a short line says so. (The tracker is
+  // not one of them: without it "today" is the local date.)
+  const error =
+    set.error ?? tradesQuery.error ?? accountsQuery.error ?? flowsQuery.error;
+  if (error)
+    return (
+      <p
+        role="alert"
+        className={`text-[13px] text-muted ${bare ? '' : `${CARD} px-4 py-3.5`}`}
+      >
+        The calendar couldn&apos;t load.
+      </p>
+    );
   if (
     !set.data ||
     !groups ||

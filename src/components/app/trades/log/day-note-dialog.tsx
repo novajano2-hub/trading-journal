@@ -17,7 +17,6 @@ import { MorphDialog } from '@/components/ui/morph-dialog';
 import {
   useJournal,
   usePrefs,
-  useSaveJournalEntry,
   useTemplates,
   useTrashJournalEntry,
 } from '@/data/query/hooks';
@@ -31,7 +30,11 @@ import { LockLine, useDayFinished } from '../../day/day-lock';
 import { TemplateMenu } from '../../day/template-menu';
 import { findDailyEntry } from '../../notebook/notebook-model';
 import type { NoteEditorHandle } from '../../notes/note-editor';
-import { DayNoteBinding, type NoteStatus } from '../trade-journal';
+import {
+  DayNoteBinding,
+  type NoteControl,
+  type NoteStatus,
+} from '../trade-journal';
 import { clock } from '../trade-time';
 import { DayTables, QUICK } from './day-card';
 import { useLogEnv } from './log-env';
@@ -64,6 +67,9 @@ const percent = (ratio: number): string => `${(ratio * 100).toFixed(1)}%`;
  * inside the Day view (it reads the view's day groups and columns). A note
  * is made on the first change, never by looking; autosave writes it as you
  * type; Save writes what is waiting and closes.
+ *
+ * Keel's call (TradeZella unknown): the record says Save stores the note and is
+ * silent on unsaved edits (K43, spec 5.3); Keel's editors autosave.
  */
 export function DayNoteDialog({
   date,
@@ -81,12 +87,11 @@ export function DayNoteDialog({
   const journal = useJournal();
   const templates = useTemplates().data;
   const timeZone = usePrefs().data?.timeZone;
-  const save = useSaveJournalEntry();
   const trash = useTrashJournalEntry();
   const { finished } = useDayFinished(date);
   const panel = useId();
   const handle = useRef<NoteEditorHandle | null>(null);
-  const settle = useRef<(() => Promise<void>) | null>(null);
+  const control = useRef<NoteControl | null>(null);
   const lastStatus = useRef<NoteStatus>('idle');
   const [status, setStatus] = useState<NoteStatus>('idle');
   const [expanded, setExpanded] = useState(false);
@@ -104,32 +109,31 @@ export function DayNoteDialog({
     if (s === 'saved') setProblem(null);
   };
 
-  // Keel's call (TradeZella unknown, record line 706): closing with unsaved edits
-  // neither warns nor discards. Autosave leaves nothing to discard, so closing
-  // any way writes what is waiting, as Save does.
-  const close = (next: boolean) => {
-    if (!next) void settle.current?.();
-    onOpenChange(next);
-  };
-
-  const onSave = async () => {
-    await settle.current?.();
-    // A failed write keeps the dialog open, with the alert beside Save.
+  // Keel's call (TradeZella unknown): the record says Save stores the note and is
+  // silent on unsaved edits (K43, spec 5.3); Keel's editors autosave. So closing
+  // with unsaved edits (record line 706) neither warns nor discards: closing any
+  // way, Save, the X or Escape, writes what is waiting first, and a write that
+  // still fails keeps the dialog open with the alert, so no text is lost.
+  const close = async (next: boolean) => {
+    if (next) {
+      onOpenChange(true);
+      return;
+    }
+    await control.current?.settle();
     if (lastStatus.current === 'failed') return;
     onOpenChange(false);
   };
 
-  // Keel's call (TradeZella unknown): the star and Move to Trash write the note
-  // the editor has been saving, so what is waiting lands first; the star builds
-  // on the stored note, never on the copy this dialog opened with.
+  // Keel's call (TradeZella unknown): the star is written in the editor's own
+  // queue, behind what is waiting, so an autosave right after builds on the
+  // starred note and neither the star nor the text is lost.
   const toggleStar = async () => {
-    if (!entry) return;
+    if (!entry || !control.current) return;
     setProblem(null);
     try {
-      await settle.current?.();
-      const fresh = findDailyEntry((await journal.refetch()).data, date);
-      if (!fresh || fresh.deletedAt !== undefined) return;
-      await save.mutateAsync({ ...fresh, favorite: fresh.favorite !== true });
+      await control.current.patch((current) => ({
+        favorite: current.favorite !== true,
+      }));
     } catch {
       setProblem("Couldn't favourite the note. Try again.");
     }
@@ -140,7 +144,7 @@ export function DayNoteDialog({
     if (!entry) return;
     setProblem(null);
     try {
-      await settle.current?.();
+      await control.current?.settle();
       await trash.mutateAsync(entry.id);
     } catch {
       setProblem("Couldn't move the note to Trash. Try again.");
@@ -167,14 +171,21 @@ export function DayNoteDialog({
           ),
         )
       : null;
+  const rate = group?.stats.winRate;
+  const apart =
+    other > 0 ? `${other} in other currencies, listed apart` : undefined;
   const count =
     trades === 0 && other > 0
       ? `${other} ${plural(other, 'trade')} in other currencies, listed apart`
-      : `${trades} ${plural(trades, 'trade')}, ${
-          group?.stats.winRate === null || group === undefined
-            ? 'None'
-            : percent(group.stats.winRate)
-        } win rate`;
+      : [
+          `${trades} ${plural(trades, 'trade')}`,
+          rate === null || rate === undefined
+            ? 'win rate None'
+            : `${percent(rate)} win rate`,
+          apart,
+        ]
+          .filter((part) => part !== undefined)
+          .join(', ');
 
   const caption =
     status === 'saving'
@@ -269,7 +280,7 @@ export function DayNoteDialog({
   return (
     <MorphDialog
       open={open}
-      onOpenChange={close}
+      onOpenChange={(next) => void close(next)}
       origin={origin}
       returnFocus={origin}
       title="Day note"
@@ -291,7 +302,7 @@ export function DayNoteDialog({
           ) : null}
           <div className="ml-auto">
             {/* Keel's call (TradeZella unknown): with nothing to save (a finished day, a note in Trash) the button reads Done and only closes. */}
-            <Button onClick={() => void onSave()}>
+            <Button onClick={() => void close(false)}>
               {readOnly ? 'Done' : 'Save'}
             </Button>
           </div>
@@ -336,7 +347,7 @@ export function DayNoteDialog({
           date={date}
           readOnly={finished}
           handleRef={handle}
-          settleRef={settle}
+          controlRef={control}
           onStatus={onStatus}
         />
       </div>

@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import {
+  act,
   cleanup,
   fireEvent,
   screen,
@@ -91,19 +92,24 @@ async function renderApp(
     days?: DayRecord[];
     prefs?: Partial<UserPrefs>;
     url?: string;
+    /** More trades on top of the day's own. */
+    extra?: Trade[];
+    patch?: (repo: Repository) => Partial<Repository>;
   } = {},
 ): Promise<{ repo: Repository }> {
-  const repository = createLocalRepository({
+  const base = createLocalRepository({
     indexedDB: new IDBFactory(),
     IDBKeyRange,
     sample: async (): Promise<SampleWorkspace> => ({
       ...fixtureSample(),
-      trades: trades(),
+      trades: [...trades(), ...(opts.extra ?? [])],
       journal: opts.journal ?? [dailyNote('2026-11-22')],
       days: opts.days ?? [],
     }),
   });
-  await repository.prefs.update({ timeZone: 'UTC', ...opts.prefs });
+  await base.prefs.update({ timeZone: 'UTC', ...opts.prefs });
+  // `patch` replaces parts of the repository, to hold or fail a write.
+  const repository = { ...base, ...opts.patch?.(base) };
   const { repo } = render(
     <TradesDayView noteAction={(date) => <DayNoteAction date={date} />} />,
     { repository, url: opts.url ?? '/app/trades/day' },
@@ -213,13 +219,33 @@ test('reopening shows the saved text, and the card now offers View note', async 
   ).findByText(/Kept for later/);
 });
 
-test('it is read-only with the lock line on a finished day (no Templates, star or menu)', async () => {
-  await renderApp({
+const FINISHED_MON: DayRecord = {
+  id: '2026-11-23',
+  workspaceId: WS,
+  finishedAt: '2026-11-23T22:00:00Z',
+};
+const FINISHED_TUE: DayRecord = {
+  id: '2026-11-24',
+  workspaceId: WS,
+  finishedAt: '2026-11-24T22:00:00Z',
+};
+
+/** Done, then Escape: each closes the dialog. */
+async function closeBothWays(heading: string, name: 'Add note' | 'View note') {
+  const first = await open(heading, name);
+  fireEvent.click(within(first).getByRole('button', { name: 'Done' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  const second = await open(heading, name);
+  fireEvent.keyDown(second, { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+}
+
+test('it is read-only with the lock line on a finished day (no Templates, star or menu), and refuses every write', async () => {
+  const { repo } = await renderApp({
     journal: [dailyNote('2026-11-23')],
-    days: [
-      { id: '2026-11-23', workspaceId: WS, finishedAt: '2026-11-23T22:00:00Z' },
-    ],
+    days: [FINISHED_MON],
   });
+  const before = await repo.journal.list(WS);
   const dialog = await open(MON, 'View note');
   const box = await within(dialog).findByRole('textbox', {
     name: 'Daily note',
@@ -239,6 +265,53 @@ test('it is read-only with the lock line on a finished day (no Templates, star o
   expect(within(dialog).queryByRole('button', { name: 'Save' })).toBeNull();
   fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  await closeBothWays(MON, 'View note');
+  // Opening and closing, Done or Escape, wrote nothing.
+  expect(await repo.journal.list(WS)).toEqual(before);
+});
+
+test('a finished day with no note stays without one: nothing is created by opening or closing', async () => {
+  const { repo } = await renderApp({ days: [FINISHED_TUE] });
+  const before = await repo.journal.list(WS);
+  expect(await dailyOn(repo, '2026-11-24')).toBeUndefined();
+  const dialog = await open(TUE, 'Add note');
+  const box = await within(dialog).findByRole('textbox', {
+    name: 'Daily note',
+  });
+  expect(box.getAttribute('contenteditable')).toBe('false');
+  expect(within(dialog).getAllByText(/This day is closed/)).toHaveLength(1);
+  // The star and the notebook link have no note to act on.
+  expect(
+    within(dialog).queryByRole('link', { name: 'Open in Notebook' }),
+  ).toBeNull();
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  await closeBothWays(TUE, 'Add note');
+  expect(await repo.journal.list(WS)).toEqual(before);
+  expect(await dailyOn(repo, '2026-11-24')).toBeUndefined();
+});
+
+test('a finished day with a note in Trash has no Restore and exactly one lock line, and writes nothing', async () => {
+  const { repo } = await renderApp({
+    journal: [dailyNote('2026-11-23', { deletedAt: '2026-11-25T01:00:00Z' })],
+    days: [FINISHED_MON],
+  });
+  const before = await repo.journal.list(WS);
+  const dialog = await open(MON, 'View note');
+  expect(
+    await within(dialog).findByText("This day's note is in Trash."),
+  ).toBeTruthy();
+  expect(within(dialog).queryByRole('button', { name: 'Restore' })).toBeNull();
+  expect(within(dialog).getAllByText(/This day is closed/)).toHaveLength(1);
+  expect(
+    (
+      await within(dialog).findByRole('textbox', { name: 'Daily note' })
+    ).getAttribute('contenteditable'),
+  ).toBe('false');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  await closeBothWays(MON, 'View note');
+  expect(await repo.journal.list(WS)).toEqual(before);
 });
 
 test('Move to Trash sits in its menu, and the dialog then shows the trashed note with Restore (R26)', async () => {
@@ -426,4 +499,153 @@ test('the note action on a phone is a glyph that names the day', async () => {
   });
   expect(button.textContent).toBe('');
   match.mockRestore();
+});
+
+test('a day with trades and none closed reads "win rate None", not "None win rate"', async () => {
+  await renderApp({
+    extra: [
+      trade({
+        id: 'o1',
+        serial: 9,
+        status: 'open',
+        net: 0,
+        openedAt: '2026-11-21T15:00:00Z',
+      }),
+    ],
+  });
+  const dialog = await open('Sat 21 Nov 2026', 'Add note');
+  const summary = within(dialog).getByRole('button', { name: /Show trades/ });
+  expect(summary.textContent).toContain('1 trade, win rate None');
+  expect(summary.textContent).not.toContain('None win rate');
+});
+
+test('a day with base and other-currency trades names the other ones, as the week tile does', async () => {
+  await renderApp({
+    extra: [
+      trade({
+        id: 'e1',
+        serial: 9,
+        net: 5000,
+        pnlCurrency: 'EUR',
+        openedAt: '2026-11-23T13:00:00Z',
+        closedAt: '2026-11-23T13:10:00Z',
+      }),
+    ],
+  });
+  const dialog = await open(MON, 'Add note');
+  const summary = within(dialog).getByRole('button', { name: /Show trades/ });
+  expect(summary.textContent).toContain(
+    '1 trade, 100.0% win rate, 1 in other currencies, listed apart',
+  );
+  cleanup();
+  // A day of other currencies only keeps its own line.
+  await renderApp({
+    extra: [
+      trade({
+        id: 'e2',
+        serial: 9,
+        net: 5000,
+        pnlCurrency: 'EUR',
+        openedAt: '2026-11-21T13:00:00Z',
+        closedAt: '2026-11-21T13:10:00Z',
+      }),
+    ],
+  });
+  const only = await open('Sat 21 Nov 2026', 'Add note');
+  expect(
+    within(only).getByRole('button', { name: /Show trades/ }).textContent,
+  ).toContain('1 trade in other currencies, listed apart');
+});
+
+/** A failing write: on while `failing.on`, then the real one. */
+function failingSaves(failing: { on: boolean }) {
+  return (r: Repository): Partial<Repository> => ({
+    journal: {
+      ...r.journal,
+      save: (ws, draft) =>
+        failing.on
+          ? Promise.reject(new Error('boom'))
+          : r.journal.save(ws, draft),
+    },
+  });
+}
+
+test('after a failed write the X and Escape keep the dialog open with the alert, and close once the retry lands', async () => {
+  const failing = { on: true };
+  const { repo } = await renderApp({ patch: failingSaves(failing) });
+  const dialog = await open(TUE, 'Add note');
+  const box = await within(dialog).findByRole('textbox', {
+    name: 'Daily note',
+  });
+  tiptapOf(box).commands.insertContent('Text the store refused');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+  expect(await within(dialog).findByRole('alert')).toBeTruthy();
+  // Save stays open; so do the X and Escape, which used to lose the text.
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 80));
+  });
+  expect(screen.queryByRole('dialog', { name: 'Day note' })).not.toBeNull();
+  fireEvent.keyDown(dialog, { key: 'Escape' });
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 80));
+  });
+  expect(screen.queryByRole('dialog', { name: 'Day note' })).not.toBeNull();
+  expect(within(dialog).getByRole('alert')).toBeTruthy();
+  // The store works again: closing retries, and the text is kept.
+  failing.on = false;
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(JSON.stringify((await dailyOn(repo, '2026-11-24'))?.body)).toContain(
+    'Text the store refused',
+  );
+});
+
+test("the star writes in the editor's queue: star, then type, then Save keeps both", async () => {
+  // The star's write is held; the text typed after it must not land first and be written over, or the star lost.
+  let release: () => void = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const { repo } = await renderApp({
+    journal: [dailyNote('2026-11-23')],
+    patch: (r) => ({
+      journal: {
+        ...r.journal,
+        save: async (ws, draft) => {
+          if (draft.favorite === true) await held;
+          return r.journal.save(ws, draft);
+        },
+      },
+    }),
+  });
+  const dialog = await open(MON, 'View note');
+  const box = await within(dialog).findByRole('textbox', {
+    name: 'Daily note',
+  });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Favourite' }));
+  tiptapOf(box).commands.insertContent(' Added after the star.');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+  setTimeout(release, 120);
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull(), {
+    timeout: 3000,
+  });
+  const stored = (await dailyOn(repo, '2026-11-23'))!;
+  expect(stored.favorite).toBe(true);
+  expect(JSON.stringify(stored.body)).toContain('Added after the star.');
+});
+
+test('a failed star says so and leaves the note as it was', async () => {
+  const failing = { on: true };
+  const { repo } = await renderApp({
+    journal: [dailyNote('2026-11-23')],
+    patch: failingSaves(failing),
+  });
+  const dialog = await open(MON, 'View note');
+  await within(dialog).findByRole('textbox', { name: 'Daily note' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Favourite' }));
+  expect((await within(dialog).findByRole('alert')).textContent).toContain(
+    "Couldn't favourite the note",
+  );
+  expect((await dailyOn(repo, '2026-11-23'))?.favorite).toBeUndefined();
 });
