@@ -12,7 +12,7 @@
 3. `DESIGN.md` and `PRODUCT.md`.
 4. The Plan 5 rulings, and Plan 6A's spec (`2026-11-25-plan-6a-daily-routine-design.md`), whose Keel's calls K1 to K56 and decisions U1 to U4 stand.
 
-Where TZ is unknown this doc decides, as a **Keel's call (TradeZella unknown)** with an id (C1 to C75, all listed in §6.1).
+Where TZ is unknown this doc decides, as a **Keel's call (TradeZella unknown)** with an id (C1 to C76, all listed in §6.1).
 
 **TradeZella's behaviour, never its UI** (the owner, 2026-11-25). Wherever this doc says "TZ's template", "TZ's default", "TZ's widgets" or "TZ's way", it means TZ's features and behaviour: which widgets exist, which are in the default set, and what each one does and computes. The layout, look, arrangement, wording and icons are Keel's own: design G and the comps. Nothing here asks for TZ's screen. The owner's decisions are D1 to D3 (§6.2).
 
@@ -437,7 +437,15 @@ Dexie version 4 adds one workspace table, which joins `DATA_TABLES` (a workspace
 
 **Phone**: the button opens the same print dialog; the layout is A4 or Letter whatever the screen.
 
-### 5.8 Import parsing in a worker (#48)
+### 5.8 Reports: the month's statistics and Total swap (found by 6B's audit)
+
+**TZ's behaviour:** Reports > Calendar shows, for the month picked in its year grid, the month grid, its running P&L, a win and loss split, and a statistics card with the Overview's full stat set, Total commissions, Total fees and Total swap among them [rec S50; help 7189346].
+
+**Keel already has it, laid out its own way:** Plan 5 kept the month view on `/app/calendar` (the user's choice, 2026-11-24, gaps row 109) and gave its month panel the winners and losers, the trade win rate and a link to Reports > Overview set to that month, where the running P&L and every stat live (C3). The owner's rule (TZ's behaviour, never its UI) leaves that layout as it is.
+
+**What is missing:** Total swap. Keel stores no swap until 6B adds a per-trade `swap`. 6C adds a "Swap" figure to the Overview's costs group, beside commissions and fees, summing that field, and to the Choose figures list (C76).
+
+### 5.9 Import parsing in a worker (#48)
 
 **TZ's behaviour**: none applies; TZ parses on its server (rec §8).
 
@@ -541,7 +549,7 @@ Every row below is Keel's call (TradeZella unknown).
 | Id | Question | Keel's call | Basis |
 | --- | --- | --- | --- |
 | C47 | Persistence | Remembered in prefs | INFERRED [inv-2] |
-| C48 | Settings groups | Profile; then Accounts, Trading, Tags, Logs (TZ's order, Keel's pages). 6B's Trade defaults and Notebook pages go after Trading, in TZ's Rules and fees and Notebook slots, whichever plan lands first | [inv-3 108]; 6B's coordination note |
+| C48 | Settings groups | Profile; then Accounts, Trading, Tags, Logs (TZ's order, Keel's pages). With 6B: Profile; Accounts, Trading (with 6B's two rule cards), Tags, Notebook, Logs, as 6B's coordination note sets it, whichever plan lands first | [inv-3 108]; 6B's coordination note |
 | C49 | Day pages | Keep the slim rail whatever the choice | 6A K33 |
 
 **Report PDF**
@@ -577,6 +585,7 @@ Every row below is Keel's call (TradeZella unknown).
 | C74 | Cost method at creation | Offered only in the Edit dialog, the one path TZ's help describes; a new account starts FIFO | [help 6826141]; creation UNKNOWN |
 | C75 | The balance widget's second line | Deposits and withdrawals, net, as a second line in the same chart on its own right-hand scale (their size is far below the balance's) | [rec S02]; the scale is Keel's |
 | C67 | The figure widgets' marks | TZ's half gauges and ring are look; Keel shows the same split (won, breakeven, lost; green, flat, red days; gross profit against loss; average win against loss) as a thin split bar with the counts in words, as its summary strip does | DESIGN.md; comps 01 and 03 |
+| C76 | Total swap | The Overview's costs group gains "Swap", the sum of 6B's per-trade `swap` over the trades in the filters, signed as stored; "None" when no trade carries one. Built only once 6B's field has landed; until then the row waits in the backlog with #55 | [rec S50; help 7189346]; 6B's P6B-10 |
 | C61 | 6B's order | 6C plans against `main` after 6A. If 6B lands first, Task 1 takes the next Dexie version after 6B's, the migration test opens 6B's version, and the cost method joins 6B's builder changes | No 6B spec yet |
 
 ### 6.2 Decided by the owner (2026-11-25)

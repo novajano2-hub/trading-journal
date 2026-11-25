@@ -19,7 +19,7 @@
 - Vitest 5 with happy-dom and fake-indexeddb;
 - Playwright on system Chrome.
 
-**Spec:** `docs/superpowers/specs/2026-11-25-plan-6c-reports-dashboard-design.md`. It is approved; C1 to C75 and D1 to D3 are its ids. The authorities, in order:
+**Spec:** `docs/superpowers/specs/2026-11-25-plan-6c-reports-dashboard-design.md`. It is approved; C1 to C76 and D1 to D3 are its ids. The authorities, in order:
 1. **The spec,** including its corrections (§7) and its Keel's calls (§6.1).
 2. **The comps,** the binding look: `.impeccable/mocks/plan6c/01-dashboard.html` to `13-prop-first-run.html` with `shell.css`, their captures in `.impeccable/mocks/plan6c/captures/`, the `?state=` variants listed in `index.html`, and `?theme=dark` on any comp.
 3. **The behaviour record and the parity audit,** for behaviour only: `.superpowers/research/tradezella/plan6c-behaviour.md` and `plan6c-parity-audit.md` (git-ignored, in this worktree). The audit's 26 findings (P6C-01 to P6C-26) are fixed in the spec, the comps and this plan; module reviews check against both.
@@ -549,7 +549,7 @@ Delivers spec §5.6, C47 to C49, E52, E55 (comps 10, 11).
 - Modify: `src/components/app/{sidebar.tsx,app-shell.tsx,top-bar.tsx}`, `src/components/app/settings/settings-nav.tsx`, `src/app/(app)/app/settings/layout.tsx`, `src/app/globals.css`
 - Test: `sidebar.test.tsx`, `top-bar.test.tsx`, `e2e/shell.spec.ts`
 
-**Interfaces:** a collapse button in the sidebar's head (Collapse the sidebar, Expand the sidebar, `aria-expanded`); collapsed, every desktop page shows 6A's rail (add trade "+", icons, group divider, "Not live yet" faint) with a tooltip naming each item; the state in `UserPrefs.sidebar`; day pages keep the rail. Settings menu groups: Profile; Accounts, Trading, Tags, Logs, with 6B's Trade defaults and Notebook after Trading if 6B has landed (C48); collapsed with the sidebar to an icon column from `lg`; below `lg` the labelled pill row stays. E52: `scroll-padding-top` equal to the sticky bar's height; E55: the wrapped-chips row, the phone bar below 375px, the Tab-walk e2e from 640 to 1023.
+**Interfaces:** a collapse button in the sidebar's head (Collapse the sidebar, Expand the sidebar, `aria-expanded`); collapsed, every desktop page shows 6A's rail (add trade "+", icons, group divider, "Not live yet" faint) with a tooltip naming each item; the state in `UserPrefs.sidebar`; day pages keep the rail. Settings menu groups: Profile; Accounts, Trading, Tags, Logs, or with 6B landed Profile; Accounts, Trading, Tags, Notebook, Logs (C48); collapsed with the sidebar to an icon column from `lg`; below `lg` the labelled pill row stays. E52: `scroll-padding-top` equal to the sticky bar's height; E55: the wrapped-chips row, the phone bar below 375px, the Tab-walk e2e from 640 to 1023.
 
 - [ ] **Step 1: Write the failing tests:** toggling writes the pref and the rail renders with names in tooltips and accessible names; Settings' groups and divider; collapsed Settings shows icons with names; the e2e spec collapses, reloads and finds it collapsed, and tabs backwards without a focused control under the bar.
 - [ ] **Step 2:** `npm test -- sidebar settings-nav`. Expected: FAIL.
@@ -580,7 +580,9 @@ Delivers spec §5.7, C50 to C52 (comp 12, `?state=print`).
 - [ ] **Step 4:** `npm test && npm run typecheck && npm run lint`. Expected: PASS.
 - [ ] **Step 5:** Commit: `feat(app): export Performance as a PDF through a print layout (#51)`.
 
-**Parity check, Module F** (record §7): Performance only; nothing claimed about TZ's file contents.
+- [ ] **Step 6 (only if 6B's per-trade `swap` has landed): Total swap (spec §5.8, C76).** In `src/components/app/reports/overview-costs.tsx`, add a "Swap" figure beside commissions and fees, summing `trade.swap` over the filtered trades (signed as stored; "None" when no trade carries one), with its MetricTip in `metric-definitions.ts` and its key in the Choose figures list (`overview-choice.tsx`, whose test holds the list to the page). Test first: `'the Overview sums swap'` and `'no swap reads None'`. Commit: `feat(app): Total swap on the Overview (P6B-10, #55)`. If 6B hasn't landed, leave a backlog line on #55 instead.
+
+**Parity check, Module F** (record §7; spec §5.8): Performance only; nothing claimed about TZ's file contents; the Overview's Swap figure if built.
 
 ---
 
@@ -588,7 +590,7 @@ Delivers spec §5.7, C50 to C52 (comp 12, `?state=print`).
 
 ### Task 19: Planning in a worker, and the live size limit
 
-Delivers spec §5.8, C53 to C56, E44, E45, E95.
+Delivers spec §5.9, C53 to C56, E44, E45, E95.
 
 **Files:**
 - Create: `src/lib/import/plan.worker.ts`, `src/lib/import/plan-client.ts`
