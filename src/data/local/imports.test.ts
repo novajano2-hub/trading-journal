@@ -728,6 +728,34 @@ describe('imports.undo', () => {
     expect(await repo.trades.list(M)).toEqual(before);
   });
 
+  test('undo removes the files of the trades it deletes and keeps those of a trade it restores', async () => {
+    const { repo, db, commit } = await setup();
+    const file = {
+      bytes: new ArrayBuffer(4),
+      type: 'application/pdf',
+      name: 'plan.pdf',
+    };
+    const a = await commit(OPEN_ES, 'impA');
+    const [opened] = await repo.trades.list(M);
+    await repo.files.add(M, `trade:${opened!.id}`, file, { images: false });
+    const b = await commit(CLOSE_ES, 'impB');
+    const c = await commit(CORN, 'impC', { mapping: { overrides: { ZC } } });
+    const corn = (await repo.trades.list(M)).find((t) => t.importId === c.id)!;
+    await repo.files.add(M, `trade:${corn.id}`, file, { images: false });
+    const owners = async () =>
+      (await db.files.toArray()).map((f) => f.owner).sort();
+    expect(await owners()).toEqual(
+      [`trade:${opened!.id}`, `trade:${corn.id}`].sort(),
+    );
+
+    // The closed trade goes with its job; the open one it replaced comes back with its file.
+    expect(await repo.imports.undo(M, c.id)).toEqual({ ok: true });
+    expect(await repo.imports.undo(M, b.id)).toEqual({ ok: true });
+    expect(await owners()).toEqual([`trade:${opened!.id}`]);
+    expect(await repo.imports.undo(M, a.id)).toEqual({ ok: true });
+    expect(await owners()).toEqual([]);
+  });
+
   test('undo twice is idempotent, and the undone rows stop counting as imported', async () => {
     const { repo, acc, plan, commit } = await setup();
     const a = await commit(sampleFillsCsv(), 'impA');

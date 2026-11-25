@@ -14,6 +14,7 @@ import { USER_WORKSPACE } from '../workspaces';
 import type { LocalContext } from './context';
 import type { KeelDb } from './db';
 import { assertEditable } from './editable';
+import { deleteOwnerFiles } from './files';
 import { META, type ImportJobRecord } from './schema';
 import { pruneJournalLinks } from './journal';
 import { rwTx } from './tx';
@@ -261,6 +262,7 @@ export function localImports(ctx: LocalContext): ImportRepo {
           );
           // A replaced trade that no written trade continues under its id is gone.
           const written = new Set(tradeIds);
+          // Its files stay, so undoing this import brings the trade back with them.
           await pruneJournalLinks(
             db,
             ws,
@@ -303,6 +305,7 @@ export function localImports(ctx: LocalContext): ImportRepo {
           db.strategies,
           db.meta,
           db.accounts,
+          db.files,
         ],
         async (): Promise<UndoResult> => {
           const job = await db.imports.get([ws, jobId]);
@@ -337,10 +340,12 @@ export function localImports(ctx: LocalContext): ImportRepo {
           await db.trades.bulkDelete(built.map((t) => [ws, t.id]));
           // A restored trade keeps its id, so its journal links stay.
           const restoredIds = new Set(restored.map((t) => t.id));
-          await pruneJournalLinks(
+          const gone = [...remaining].filter((id) => !restoredIds.has(id));
+          await pruneJournalLinks(db, ws, gone);
+          await deleteOwnerFiles(
             db,
             ws,
-            [...remaining].filter((id) => !restoredIds.has(id)),
+            gone.map((id) => `trade:${id}`),
           );
           await db.trades.bulkPut(await withLiveReferences(db, ws, restored));
           await db.imports.put({

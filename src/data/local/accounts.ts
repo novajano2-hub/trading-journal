@@ -1,5 +1,6 @@
 import { NotFoundError, type AccountsRepo } from '../repository';
 import type { LocalContext } from './context';
+import { deleteOwnerFiles } from './files';
 import { bumpImportRevision } from './imports';
 import { rwTx } from './tx';
 import { pruneJournalLinks } from './journal';
@@ -84,7 +85,7 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
       const db = await ctx.db();
       return rwTx(
         db,
-        [db.accounts, db.trades, db.journal, db.imports, db.meta],
+        [db.accounts, db.trades, db.journal, db.imports, db.meta, db.files],
         async () => {
           if (!(await db.accounts.get([ws, id])))
             throw new NotFoundError('account', id);
@@ -93,10 +94,12 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
             .equals([ws, id])
             .primaryKeys();
           await db.trades.bulkDelete(tradeKeys);
-          await pruneJournalLinks(
+          const tradeIds = tradeKeys.map(([, tradeId]) => tradeId);
+          await pruneJournalLinks(db, ws, tradeIds);
+          await deleteOwnerFiles(
             db,
             ws,
-            tradeKeys.map(([, tradeId]) => tradeId),
+            tradeIds.map((tradeId) => `trade:${tradeId}`),
           );
           await db.imports
             .where('[workspaceId+accountId]')

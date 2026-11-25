@@ -6,6 +6,7 @@ import {
 } from '../repository';
 import type { LocalContext } from './context';
 import type { KeelDb } from './db';
+import { deleteOwnerFiles } from './files';
 import { rwTx } from './tx';
 import { mergePatch } from '../merge';
 
@@ -93,11 +94,12 @@ export function localStrategies(ctx: LocalContext): StrategiesRepo {
 
     async remove(ws, id) {
       const db = await ctx.db();
-      await rwTx(db, [db.strategies, db.trades], async () => {
+      await rwTx(db, [db.strategies, db.trades, db.files], async () => {
         const strategy = await db.strategies.get([ws, id]);
         if (!strategy) throw new NotFoundError('strategy', id);
         await onItsTrades(db, ws, id, ruleIdsOf(strategy), true);
         await db.strategies.delete([ws, id]);
+        await deleteOwnerFiles(db, ws, `strategy:${id}`);
       });
     },
   };

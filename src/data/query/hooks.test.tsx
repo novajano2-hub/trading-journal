@@ -2,7 +2,7 @@
 import { QueryClient } from '@tanstack/react-query';
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { afterEach, expect, test, vi } from 'vitest';
 import type { ImportJob } from '@/domain/types';
 import type { ImportPlan } from '@/domain/import/plan';
@@ -12,12 +12,16 @@ import { createLocalRepository } from '../local/local-repository';
 import { USER_WORKSPACE } from '../workspaces';
 import {
   useActiveWorkspace,
+  useAddFile,
   useCommitImport,
   useCreateTagCategory,
   useDailyNote,
   useEnsureTradeNote,
+  useFile,
+  useFiles,
   useJournal,
   useRemoveAccount,
+  useRemoveFile,
   useRemoveTagCategory,
   useSetActiveWorkspace,
   useTagCategories,
@@ -135,6 +139,62 @@ test('a bulk update, a trade note and a daily note refresh what they change', as
   expect(result.current.trades.data?.find((t) => t.id === 'f-2')?.noteId).toBe(
     noteId,
   );
+});
+
+test('file hooks list an owner’s files; adding and removing refresh them', async () => {
+  const { result } = renderHook(
+    () => {
+      const [id, setId] = useState<string | undefined>(undefined);
+      return {
+        setId,
+        files: useFiles('trade:f-1'),
+        elsewhere: useFiles('trade:f-2'),
+        one: useFile(id),
+        add: useAddFile(),
+        remove: useRemoveFile(),
+      };
+    },
+    { wrapper: wrapper() },
+  );
+  await waitFor(() => expect(result.current.files.data).toEqual([]));
+  // A file read waits while it has no id.
+  expect(result.current.one.data).toBeUndefined();
+  let added = '';
+  await act(async () => {
+    const stored = await result.current.add.mutateAsync({
+      owner: 'trade:f-1',
+      file: {
+        bytes: new ArrayBuffer(4),
+        type: 'application/pdf',
+        name: 'plan.pdf',
+      },
+      images: false,
+    });
+    added = stored.id;
+  });
+  await waitFor(() =>
+    expect(result.current.files.data?.map((f) => f.id)).toEqual([added]),
+  );
+  expect(result.current.elsewhere.data).toEqual([]);
+  // A refused file is an error from the write, and the list stays as it was.
+  await act(async () => {
+    await expect(
+      result.current.add.mutateAsync({
+        owner: 'trade:f-1',
+        file: { bytes: new ArrayBuffer(4), type: 'application/pdf', name: 'x' },
+        images: true,
+      }),
+    ).rejects.toMatchObject({ name: 'FileRejected', reason: 'type' });
+  });
+  expect(result.current.files.data).toHaveLength(1);
+
+  act(() => result.current.setId(added));
+  await waitFor(() => expect(result.current.one.data?.name).toBe('plan.pdf'));
+  await act(async () => {
+    await result.current.remove.mutateAsync({ id: added });
+  });
+  await waitFor(() => expect(result.current.files.data).toEqual([]));
+  await waitFor(() => expect(result.current.one.data).toBeNull());
 });
 
 test('an update shows up in the list', async () => {

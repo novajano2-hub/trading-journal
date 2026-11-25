@@ -21,6 +21,7 @@ import type {
   Rule,
   RuleGroup,
   Side,
+  StoredFile,
   Strategy,
   Tag,
   TagCategory,
@@ -481,6 +482,54 @@ export interface DayShotsRepo {
   remove(ws: string, id: string): Promise<void>;
 }
 
+export const IMAGE_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+] as const;
+
+/** A file Keel won't keep: not an image where one is required, over 10 MB, or no room left in the browser's storage. */
+export class FileRejected extends Error {
+  override name = 'FileRejected';
+  constructor(readonly reason: 'type' | 'size' | 'quota') {
+    super(`The file was refused: ${reason}`);
+  }
+}
+
+export interface NewFile {
+  bytes: ArrayBuffer;
+  type: string;
+  name: string;
+}
+
+/**
+ * The one local file store: trade attachments (`trade:<id>`), note images
+ * (`note:<id>`) and strategy photos (`strategy:<id>`). 6A's `dayShots` stays
+ * its own store.
+ */
+export interface FilesRepo {
+  /** The owner's files in upload order. */
+  list(ws: string, owner: string): Promise<StoredFile[]>;
+  get(ws: string, id: string): Promise<StoredFile | undefined>;
+  /**
+   * With `images`, the type must be one of IMAGE_TYPES (FileRejected 'type'); any
+   * file over SHOT_MAX_BYTES is FileRejected 'size', and a full store FileRejected
+   * 'quota'. Throws LockedDayError for the owner `note:<id>` of a daily note on a
+   * finished date.
+   */
+  add(
+    ws: string,
+    owner: string,
+    file: NewFile,
+    opts: { images: boolean },
+  ): Promise<StoredFile>;
+  /** Throws NotFoundError for a missing file, LockedDayError as `add` does. */
+  remove(ws: string, id: string): Promise<void>;
+  /** Moves every file of owner `from` to owner `to`, keeping ids and upload times (a merge moves its sources' files). */
+  reassign(ws: string, from: string, to: string): Promise<void>;
+}
+
 export interface Repository {
   workspaces: WorkspacesRepo;
   prefs: PrefsRepo;
@@ -497,5 +546,6 @@ export interface Repository {
   tracker: TrackerRepo;
   days: DaysRepo;
   dayShots: DayShotsRepo;
+  files: FilesRepo;
   imports: ImportRepo;
 }

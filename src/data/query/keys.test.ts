@@ -66,6 +66,8 @@ test('Plan 5 writes invalidate what they change', () => {
     ['days.finish', k('days')],
     ['dayShots.add', k('dayShotsAll')],
     ['dayShots.remove', k('dayShotsAll')],
+    ['files.add', k('filesAll')],
+    ['files.remove', k('filesAll')],
   ];
   for (const [write, expected] of table)
     expect(invalidationsFor(write, ws), write).toEqual(expected);
@@ -75,6 +77,17 @@ test('a day key covers a date, and the shots of one date sit under all shots', (
   expect(keys.dayShots('mine', '2026-11-19').slice(0, 4)).toEqual(
     keys.dayShotsAll('mine'),
   );
+});
+
+test('the files of one owner and one file sit under all files', () => {
+  expect(keys.files('mine', 'trade:t-1').slice(0, 4)).toEqual(
+    keys.filesAll('mine'),
+  );
+  expect(keys.file('mine', 'f-1').slice(0, 4)).toEqual(keys.filesAll('mine'));
+  expect(keys.files('mine', 'trade:t-1')).not.toEqual(
+    keys.files('mine', 'trade:t-2'),
+  );
+  expect(keys.file('mine', 'f-1')).not.toEqual(keys.file('sample', 'f-1'));
 });
 
 test('every write that changes what an import context holds makes it stale', () => {

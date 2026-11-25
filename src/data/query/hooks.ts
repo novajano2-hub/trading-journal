@@ -20,6 +20,7 @@ import type {
   JournalEntry,
   NoteFolder,
   NoteTemplate,
+  StoredFile,
   Strategy,
   Tag,
   TagCategory,
@@ -37,6 +38,7 @@ import type {
   NewAccount,
   NewCashFlow,
   NewChallenge,
+  NewFile,
   ChallengePatch,
   NewStrategy,
   NewTag,
@@ -178,6 +180,25 @@ export function useDayShots(date: string): UseQueryResult<DayShot[]> {
   return useWorkspaceQuery(
     (ws) => keys.dayShots(ws, date),
     (r, ws) => r.dayShots.list(ws, date),
+  );
+}
+
+/** The owner's files (`trade:<id>`, `note:<id>` or `strategy:<id>`), in upload order. */
+export function useFiles(owner: string): UseQueryResult<StoredFile[]> {
+  return useWorkspaceQuery(
+    (ws) => keys.files(ws, owner),
+    (r, ws) => r.files.list(ws, owner),
+  );
+}
+
+/** One stored file, `null` once it is gone; waits while `id` is undefined. */
+export function useFile(
+  id: string | undefined,
+): UseQueryResult<StoredFile | null> {
+  return useWorkspaceQuery(
+    (ws) => keys.file(ws, id ?? ''),
+    async (r, ws) => (await r.files.get(ws, id!)) ?? null,
+    id !== undefined,
   );
 }
 
@@ -909,5 +930,27 @@ export function useRemoveDayShot(): UseMutationResult<
 > {
   return useWorkspaceWrite('dayShots.remove', (r, ws, v: { id: string }) =>
     r.dayShots.remove(ws, v.id),
+  );
+}
+
+export function useAddFile(): UseMutationResult<
+  StoredFile,
+  Error,
+  { owner: string; file: NewFile; images: boolean }
+> {
+  return useWorkspaceWrite(
+    'files.add',
+    (r, ws, v: { owner: string; file: NewFile; images: boolean }) =>
+      r.files.add(ws, v.owner, v.file, { images: v.images }),
+  );
+}
+
+export function useRemoveFile(): UseMutationResult<
+  void,
+  Error,
+  { id: string }
+> {
+  return useWorkspaceWrite('files.remove', (r, ws, v: { id: string }) =>
+    r.files.remove(ws, v.id),
   );
 }

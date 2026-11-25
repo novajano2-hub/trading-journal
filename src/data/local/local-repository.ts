@@ -6,6 +6,7 @@ import { localCashFlows } from './cashflows';
 import { localChallenges } from './challenges';
 import { localDays } from './days';
 import { localDayShots } from './day-shots';
+import { localFiles } from './files';
 import { localFolders } from './folders';
 import { localImports } from './imports';
 import { localJournal } from './journal';
@@ -52,5 +53,6 @@ export function createLocalRepository(
     tracker: localTracker(ctx),
     days: localDays(ctx),
     dayShots: localDayShots(ctx),
+    files: localFiles(ctx),
   };
 }

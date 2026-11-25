@@ -10,7 +10,8 @@ import {
 import { dayLabel, parseYmd, ymd } from '../seed/calendar';
 import type { LocalContext } from './context';
 import { readPrefs } from './prefs';
-import { isLocked, todayIn } from './routine-today';
+import { isLocked, refuseLockedNote, todayIn } from './routine-today';
+import { deleteOwnerFiles } from './files';
 import { rwTx } from './tx';
 import type { KeelDb } from './db';
 
@@ -89,7 +90,7 @@ function byRecency(a: JournalEntry, b: JournalEntry): number {
   return a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0;
 }
 
-/** Deletes the entries and clears `noteId` on trades pointing at them. Call inside an rw transaction over `db.journal` and `db.trades`. */
+/** Deletes the entries and their image files (B56) and clears `noteId` on trades pointing at them. Call inside an rw transaction over `db.journal`, `db.trades` and `db.files`. */
 async function deleteEntries(
   db: KeelDb,
   ws: string,
@@ -97,6 +98,11 @@ async function deleteEntries(
 ): Promise<void> {
   const gone = new Set(ids);
   await db.journal.bulkDelete(ids.map((id): [string, string] => [ws, id]));
+  await deleteOwnerFiles(
+    db,
+    ws,
+    ids.map((id) => `note:${id}`),
+  );
   await db.trades
     .where('workspaceId')
     .equals(ws)
@@ -104,20 +110,6 @@ async function deleteEntries(
     .modify((t) => {
       delete t.noteId;
     });
-}
-
-/** Throws LockedDayError for a daily note on a finished date. Call inside a transaction that includes `db.days`. */
-async function refuseLockedNote(
-  db: KeelDb,
-  ws: string,
-  entry: Pick<JournalEntry, 'kind' | 'date'> | undefined,
-): Promise<void> {
-  if (
-    entry?.kind === 'daily-review' &&
-    entry.date !== undefined &&
-    (await isLocked(db, ws, entry.date))
-  )
-    throw new LockedDayError();
 }
 
 export function localJournal(ctx: LocalContext): JournalRepo {
@@ -143,7 +135,7 @@ export function localJournal(ctx: LocalContext): JournalRepo {
         e.deletedAt !== undefined && Date.parse(e.deletedAt) < cutoff;
       let rows = await db.journal.where('workspaceId').equals(ws).toArray();
       if (rows.some(expired)) {
-        await rwTx(db, [db.journal, db.trades], () =>
+        await rwTx(db, [db.journal, db.trades, db.files], () =>
           deleteEntries(
             db,
             ws,
@@ -210,7 +202,7 @@ export function localJournal(ctx: LocalContext): JournalRepo {
 
     async remove(ws, id) {
       const db = await ctx.db();
-      await rwTx(db, [db.journal, db.trades, db.days], async () => {
+      await rwTx(db, [db.journal, db.trades, db.days, db.files], async () => {
         const entry = await db.journal.get([ws, id]);
         if (!entry) throw new NotFoundError('journal entry', id);
         await refuseLockedNote(db, ws, entry);

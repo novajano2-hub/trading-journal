@@ -30,6 +30,10 @@ export const keys = {
   dayShotsAll: (ws: string) => [...W(ws), 'day-shots'] as const,
   dayShots: (ws: string, date: string) =>
     [...W(ws), 'day-shots', date] as const,
+  filesAll: (ws: string) => [...W(ws), 'files'] as const,
+  files: (ws: string, owner: string) =>
+    [...W(ws), 'files', 'owner', owner] as const,
+  file: (ws: string, id: string) => [...W(ws), 'files', 'id', id] as const,
   imports: (ws: string) => [...W(ws), 'imports'] as const,
   importContext: (ws: string, accountId: string) =>
     [...W(ws), 'imports', 'context', accountId] as const,
@@ -82,6 +86,8 @@ export type WriteKind =
   | 'days.finish'
   | 'dayShots.add'
   | 'dayShots.remove'
+  | 'files.add'
+  | 'files.remove'
   | 'imports.commit'
   | 'imports.undo';
 
@@ -189,6 +195,9 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
     case 'dayShots.add':
     case 'dayShots.remove':
       return [keys.dayShotsAll(ws)];
+    case 'files.add':
+    case 'files.remove':
+      return [keys.filesAll(ws)];
     case 'imports.commit':
       return [keys.imports(ws), keys.trades(ws)];
   }

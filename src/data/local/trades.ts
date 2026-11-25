@@ -12,6 +12,7 @@ import type { LocalContext } from './context';
 import type { KeelDb } from './db';
 import { rwTx } from './tx';
 import { assertEditable } from './editable';
+import { deleteOwnerFiles } from './files';
 import { pruneJournalLinks } from './journal';
 import { bumpImportRevision } from './imports';
 
@@ -159,15 +160,24 @@ export function localTrades(ctx: LocalContext): TradesRepo {
     async remove(ws, ids) {
       const db = await ctx.db();
       const keys = ids.map((id): [string, string] => [ws, id]);
-      await rwTx(db, [db.trades, db.journal, db.accounts], async () => {
-        await assertEditable(db, ws, await db.trades.bulkGet(keys));
-        // Later imports' fills would have nothing to close (Plan 5 adds a tombstone flow).
-        for (const t of await db.trades.bulkGet(keys))
-          if (t?.status === 'open' && t.importId !== undefined)
-            throw new OpenImportedTradeError(t.id, t.importId);
-        await db.trades.bulkDelete(keys);
-        await pruneJournalLinks(db, ws, ids);
-      });
+      await rwTx(
+        db,
+        [db.trades, db.journal, db.accounts, db.files],
+        async () => {
+          await assertEditable(db, ws, await db.trades.bulkGet(keys));
+          // Later imports' fills would have nothing to close (Plan 5 adds a tombstone flow).
+          for (const t of await db.trades.bulkGet(keys))
+            if (t?.status === 'open' && t.importId !== undefined)
+              throw new OpenImportedTradeError(t.id, t.importId);
+          await db.trades.bulkDelete(keys);
+          await pruneJournalLinks(db, ws, ids);
+          await deleteOwnerFiles(
+            db,
+            ws,
+            ids.map((id) => `trade:${id}`),
+          );
+        },
+      );
     },
   };
 }
