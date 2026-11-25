@@ -1,11 +1,14 @@
 import { describe, expect, test } from 'vitest';
 import type { ManualTradeInput } from '@/data/repository';
 import { resolveInstrument } from './instruments';
-import type { Instrument } from './types';
+import { plannedR } from './metrics/summary';
+import type { Instrument, LevelSide } from './types';
 import {
   ASSET_TYPES,
   buildManualTrade,
   assetTypeOf,
+  formPriceOf,
+  keepHiddenSides,
   manualInstrument,
   type InstrumentSpec,
 } from './manual-trade';
@@ -138,14 +141,61 @@ describe('buildManualTrade', () => {
     expect(r.trade.gross).toBe(2 * 10 * 1000 * 100);
   });
 
-  test('the planned stop sets the initial risk; an explicit id is kept', () => {
+  test('the planned stop is one Price level and sets the initial risk; an explicit id is kept', () => {
     const r = buildManualTrade(input({ plannedStop: 4990 }), {
       ...ctx,
       id: 'keep-me',
     });
     expect(r.ok && r.trade.id).toBe('keep-me');
-    expect(r.ok && r.trade.plannedStop).toBe(4990);
+    // Saved in levels at the full size: the legacy fields are not written.
+    expect(r.ok && r.trade.stops).toEqual({
+      unit: 'price',
+      levels: [{ value: 4990, qty: 2 }],
+    });
+    expect(r.ok && r.trade).not.toHaveProperty('plannedStop');
+    expect(r.ok && r.trade).not.toHaveProperty('targets');
     expect(r.ok && r.trade.initialRisk).toBe(2 * 10 * 50 * 100);
+  });
+
+  test('the planned target is one Price level; with a stop it gives Planned R, alone it gives no risk', () => {
+    const both = buildManualTrade(
+      input({ plannedStop: 4990, plannedTarget: 5030 }),
+      ctx,
+    );
+    expect(both.ok && both.trade.targets).toEqual({
+      unit: 'price',
+      levels: [{ value: 5030, qty: 2 }],
+    });
+    expect(both.ok && both.trade).not.toHaveProperty('plannedTarget');
+    expect(both.ok && plannedR(both.trade)).toBe(3);
+    const alone = buildManualTrade(input({ plannedTarget: 5030 }), ctx);
+    expect(alone.ok && alone.trade.targets).toBeDefined();
+    expect(alone.ok && alone.trade).not.toHaveProperty('stops');
+    expect(alone.ok && alone.trade).not.toHaveProperty('initialRisk');
+    expect(alone.ok && plannedR(alone.trade)).toBeUndefined();
+  });
+
+  test('a trade with no plan has no levels and no risk', () => {
+    const r = buildManualTrade(input(), ctx);
+    expect(r.ok && r.trade).not.toHaveProperty('stops');
+    expect(r.ok && r.trade).not.toHaveProperty('targets');
+    expect(r.ok && r.trade).not.toHaveProperty('initialRisk');
+  });
+
+  test('a stop on a trade the fills grew is one level of the whole position', () => {
+    const r = buildManualTrade(
+      input({
+        plannedStop: 4990,
+        fills: [
+          fillOf('buy', 1, 5000, 0),
+          fillOf('buy', 2, 5000, 1),
+          fillOf('sell', 3, 5010, 5),
+        ],
+      }),
+      ctx,
+    );
+    expect(r.ok && r.trade.stops?.levels).toEqual([{ value: 4990, qty: 3 }]);
+    expect(r.ok && r.trade.initialRisk).toBe(3 * 10 * 50 * 100);
   });
 
   test('forex settles in the pair rules: lots, 100000, JPY quote', () => {
@@ -161,6 +211,84 @@ describe('buildManualTrade', () => {
     // 1 yen * 100000 = 100000 JPY, converted at 151 into USD
     expect(r.ok && r.trade.pnlCurrency).toBe('USD');
     expect(r.ok && r.trade.gross).toBe(Math.round((100000 / 151) * 100));
+  });
+});
+
+describe('the form and levels saved elsewhere', () => {
+  const side = (
+    unit: LevelSide['unit'],
+    ...levels: [number, number][]
+  ): LevelSide => ({
+    unit,
+    levels: levels.map(([value, qty]) => ({ value, qty })),
+  });
+
+  test('the form shows a side that is one Price level, and no other', () => {
+    expect(formPriceOf(side('price', [4990, 2]))).toBe(4990);
+    expect(formPriceOf(side('price', [4990, 1], [4980, 1]))).toBeUndefined();
+    expect(formPriceOf(side('ticks', [12, 2]))).toBeUndefined();
+    expect(formPriceOf(side('price'))).toBeUndefined();
+    expect(formPriceOf(undefined)).toBeUndefined();
+  });
+
+  const made = (p: Partial<ManualTradeInput> = {}) => {
+    const r = buildManualTrade(input(p), ctx);
+    if (!r.ok) throw new Error(r.error);
+    return r.trade;
+  };
+  /** A manual trade whose stops were later saved as two levels on the trade page. */
+  const split = () => ({
+    ...made({ plannedStop: 4990 }),
+    stops: side('price', [4990, 1], [4980, 1]),
+    initialRisk: 150000,
+  });
+
+  test('a rebuilt trade keeps the sides the form could not show, and its risk follows them', () => {
+    const old = split();
+    // The form showed an empty stop box, so it sent no stop.
+    const next = keepHiddenSides(made(), old, input());
+    expect(next.stops).toEqual(old.stops);
+    expect(next.stops).not.toBe(old.stops);
+    expect(next.initialRisk).toBe(150000);
+  });
+
+  test('a stop typed into the form replaces the hidden side', () => {
+    const next = keepHiddenSides(
+      made({ plannedStop: 4995 }),
+      split(),
+      input({ plannedStop: 4995 }),
+    );
+    expect(next.stops).toEqual(side('price', [4995, 2]));
+    expect(next.initialRisk).toBe(2 * 5 * 50 * 100);
+  });
+
+  test('a side the form showed follows the form, even when cleared', () => {
+    const old = made({ plannedStop: 4990, plannedTarget: 5030 });
+    // The stop box was emptied; the target box kept.
+    const next = keepHiddenSides(
+      made({ plannedTarget: 5030 }),
+      old,
+      input({ plannedTarget: 5030 }),
+    );
+    expect(next).not.toHaveProperty('stops');
+    expect(next).not.toHaveProperty('initialRisk');
+    expect(next.targets).toEqual(side('price', [5030, 2]));
+  });
+
+  test('a trade saved before levels is a side the form shows', () => {
+    const old = {
+      ...made(),
+      plannedStop: 4990,
+      plannedTarget: 5030,
+      initialRisk: 100000,
+    };
+    const next = keepHiddenSides(
+      made({ plannedStop: 4990 }),
+      old,
+      input({ plannedStop: 4990 }),
+    );
+    expect(next.stops).toEqual(side('price', [4990, 2]));
+    expect(next).not.toHaveProperty('targets');
   });
 });
 

@@ -1,4 +1,5 @@
 import { realizations } from '../metrics/realized';
+import { hasStop } from '../risk';
 import { localDate, localParts } from '../time';
 import type { AccountDayInputs, Cents, Trade, TrackerVersion } from '../types';
 
@@ -70,7 +71,7 @@ export function dayInputs(
 
     i.opened += 1;
     if (t.strategyIds.length > 0) i.withStrategy += 1;
-    if (t.plannedStop !== undefined) i.withStop += 1;
+    if (hasStop(t)) i.withStop += 1;
     // The hours count is read only by a version with the rule on.
     if (hours.on) {
       const entry = minuteOf(t.openedAt, timeZone);

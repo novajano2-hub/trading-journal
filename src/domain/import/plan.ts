@@ -1,5 +1,5 @@
 import { instrumentKey, resolveInstrument } from '../instruments';
-import { riskFromStop } from '../metrics/summary';
+import { copySide, riskFromStop, tradeRisk } from '../risk';
 import {
   buildTrades,
   canonicalSymbol,
@@ -256,7 +256,10 @@ function mergedRisk(built: Trade, stored: Trade): Cents | undefined {
 /**
  * The rebuilt trade keeps the stored trade's identity and the user's journaling.
  * The planned stop, target and risk were set for the stored direction, so a
- * rebuild that flips it drops them.
+ * rebuild that flips it drops them. Levels keep their own quantities and
+ * units; the risk is the stop side's loss on the rebuilt trade (B14). A trade
+ * saved before levels keeps its single stop and target, and its derived risk
+ * follows the position as before.
  */
 function inherit(built: Trade, stored: Trade): Trade {
   const t: Trade = {
@@ -274,7 +277,10 @@ function inherit(built: Trade, stored: Trade): Trade {
   if (stored.plannedStop !== undefined) t.plannedStop = stored.plannedStop;
   if (stored.plannedTarget !== undefined)
     t.plannedTarget = stored.plannedTarget;
-  const risk = mergedRisk(built, stored);
+  if (stored.targets) t.targets = copySide(stored.targets);
+  if (stored.stops) t.stops = copySide(stored.stops);
+  const risk =
+    stored.targets || stored.stops ? tradeRisk(t) : mergedRisk(built, stored);
   if (risk !== undefined) t.initialRisk = risk;
   return t;
 }

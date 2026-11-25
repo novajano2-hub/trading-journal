@@ -82,6 +82,32 @@ describe('tradesCsv', () => {
     );
   });
 
+  test('the R columns read the one risk model: a legacy trade as it was, a level trade by its levels', () => {
+    // Saved before levels: a 5 point stop and a 10 point target.
+    const old = makeTrade({
+      net: 22_500,
+      avgEntry: 4500,
+      plannedStop: 4495,
+      plannedTarget: 4510,
+      initialRisk: 25_000,
+    });
+    // Saved in levels: a 5 point stop and a 15 point target, one contract each.
+    const levels = makeTrade({
+      net: 22_500,
+      avgEntry: 4500,
+      maxPosition: 1,
+      stops: { unit: 'price', levels: [{ value: 4495, qty: 1 }] },
+      targets: { unit: 'price', levels: [{ value: 4515, qty: 1 }] },
+      initialRisk: 25_000,
+    });
+    const csv = tradesCsv([old, levels], ['realizedR', 'plannedR'], env);
+    expect(csv.split('\r\n')).toEqual([
+      'Realized R,Planned R',
+      '0.90,2.00',
+      '0.90,3.00',
+    ]);
+  });
+
   test('a field with a comma, quote or line break is quoted', () => {
     const t = makeTrade({ net: 0, strategyIds: ['s'] });
     const csv = tradesCsv([t], ['strategies'], {

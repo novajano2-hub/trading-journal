@@ -1,5 +1,5 @@
-import { quoteToPnl } from '../currency';
-import { roundHalfEven, toCents } from '../money';
+import { roundHalfEven } from '../money';
+import { plannedRMultiple } from '../risk';
 import { isClosed } from '../trade-status';
 import type { Cents, Trade } from '../types';
 import {
@@ -46,27 +46,16 @@ export interface Summary {
   currencies: string[];
 }
 
-/** Planned R: |target - entry| / |entry - stop|; needs both a target and a stop distinct from the entry. */
+/**
+ * Planned R: planned reward over planned risk, from `domain/risk`. A trade
+ * saved before levels reads as it always did, |target - entry| / |entry - stop|,
+ * and needs a target and a stop distinct from the entry.
+ */
 export function plannedR(trade: Trade): number | undefined {
-  const { plannedStop: stop, plannedTarget: target, avgEntry } = trade;
-  if (stop === undefined || target === undefined) return undefined;
-  const risk = Math.abs(avgEntry - stop);
-  return risk === 0 ? undefined : Math.abs(target - avgEntry) / risk;
+  return plannedRMultiple(trade);
 }
 
-/**
- * Risk in cents implied by a stop price: |avgEntry - stop| x maxPosition x pointValue,
- * converted to the trade's P&L currency at the entry price.
- */
-export function riskFromStop(trade: Trade, stop: number): Cents {
-  const quote =
-    Math.abs(trade.avgEntry - stop) *
-    trade.maxPosition *
-    trade.instrument.pointValue;
-  return toCents(
-    quoteToPnl(quote, trade.instrument, trade.pnlCurrency, trade.avgEntry),
-  );
-}
+export { riskFromStop } from '../risk';
 
 const sum = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0);
 const ratio = (n: number, d: number): number | null => (d === 0 ? null : n / d);

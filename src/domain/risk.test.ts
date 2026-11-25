@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest';
+import { LEGACY_TRADES } from './__fixtures__/legacy-trades';
 import { makeTrade } from './__fixtures__/trades';
 import { resolveInstrument } from './instruments';
-import { plannedR, riskFromStop } from './metrics/summary';
+import { riskFromStop } from './metrics/summary';
 import {
   hasStop,
   levelMoney,
@@ -341,8 +342,29 @@ describe('a trade without levels (B14)', () => {
     expect(tradeRisk(t)).toBe(riskFromStop(t, 4508.5));
     expect(tradeRisk(t)).toBe(20000);
     expect(plannedReward(t)).toBe(60000);
-    expect(plannedRMultiple(t)).toBeCloseTo(plannedR(t)!, 10);
+    expect(plannedRMultiple(t)).toBe(3); // 6 over 2, as the old price ratio
     expect(hasStop(t)).toBe(true);
+  });
+
+  test.each(LEGACY_TRADES)(
+    'Planned R of a legacy trade is the old price ratio, to the last digit: $name',
+    ({ trade, plannedR }) => {
+      // Reward over risk in whole cents would differ in the fourth decimal.
+      expect(plannedRMultiple(trade)).toBe(plannedR);
+    },
+  );
+
+  test('a trade with stored levels takes its Planned R from the money, not the prices', () => {
+    const t = makeTrade({
+      net: 0,
+      instrument: inst('AAPL'),
+      avgEntry: 100,
+      maxPosition: 10,
+      targets: side('price', [110, 5], [120, 5]),
+      stops: side('price', [95, 10]),
+    });
+    // 5 x 10 + 5 x 20 = 150 over 10 x 5 = 50.
+    expect(plannedRMultiple(t)).toBe(3);
   });
 
   test('a legacy stop in another currency reads the same as riskFromStop', () => {

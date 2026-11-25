@@ -12,6 +12,7 @@ import { fixtureSample } from '@/data/__fixtures__/sample';
 import type { SampleWorkspace } from '@/data/seed/generate';
 import { resolveInstrument } from '@/domain/instruments';
 import { buildManualTrade } from '@/domain/manual-trade';
+import type { Trade } from '@/domain/types';
 import { renderApp } from '../__fixtures__/render-app';
 import { ManualTradeForm } from './manual-trade-form';
 
@@ -22,8 +23,12 @@ afterEach(cleanup);
 
 const WS = fixtureSample().trades[0]!.workspaceId;
 
-/** The sample, with acc-a read in New York time, and optionally a manual ES trade tagged `tag-setup`. */
-function sample(withManual = false) {
+/** The sample, with acc-a read in New York time, and optionally a manual ES trade tagged `tag-setup`, with `plan` as its stop, target or levels. */
+function sample(
+  withManual = false,
+  plan: { plannedStop?: number; plannedTarget?: number } = {},
+  levels: Partial<Trade> = {},
+) {
   return async (): Promise<SampleWorkspace> => {
     const fx = fixtureSample();
     fx.accounts = fx.accounts.map((a) =>
@@ -52,13 +57,14 @@ function sample(withManual = false) {
               fees: 0,
             },
           ],
+          ...plan,
         },
         { workspaceId: WS, serial: 900, accountCurrency: 'USD', id: 'man-1' },
       );
       if (!built.ok) throw new Error('fixture');
       fx.trades = [
         ...fx.trades,
-        { ...built.trade, tagIds: ['tag-setup'], rating: 3 },
+        { ...built.trade, tagIds: ['tag-setup'], rating: 3, ...levels },
       ];
     }
     return fx;
@@ -220,6 +226,69 @@ test('editing a manual trade keeps its tags and rating, and rebuilds the fills',
     serial: 900,
     source: 'manual',
   });
+});
+
+test('editing a trade saved in levels shows its one stop and target, and saves them again', async () => {
+  const { repo } = renderApp(<ManualTradeForm tradeId="man-1" />, {
+    sample: sample(true, { plannedStop: 4990, plannedTarget: 5030 }),
+    url: '/app/trades/man-1/edit',
+  });
+  await screen.findByText(/^Times in New York, UTC-0[45]:00$/);
+  expect(
+    (screen.getByLabelText('Planned stop') as HTMLInputElement).value,
+  ).toBe('4990');
+  expect(
+    (screen.getByLabelText('Planned target') as HTMLInputElement).value,
+  ).toBe('5030');
+  // Two contracts are held until the second fill goes: the levels follow the size.
+  set('Planned stop', '4980');
+  fireEvent.click(screen.getByRole('button', { name: 'Save trade' }));
+  await waitFor(() =>
+    expect(window.location.pathname).toBe('/app/trades/man-1'),
+  );
+  const t = (await repo.trades.get(WS, 'man-1'))!;
+  expect(t.stops).toEqual({ unit: 'price', levels: [{ value: 4980, qty: 2 }] });
+  expect(t.targets).toEqual({
+    unit: 'price',
+    levels: [{ value: 5030, qty: 2 }],
+  });
+  expect(t.initialRisk).toBe(20 * 2 * 50 * 100);
+  expect(t).not.toHaveProperty('plannedStop');
+});
+
+test('editing the fills of a trade whose stops are several levels keeps them', async () => {
+  const stops = {
+    unit: 'price' as const,
+    levels: [
+      { value: 4990, qty: 1 },
+      { value: 4980, qty: 1 },
+    ],
+  };
+  const { repo } = renderApp(<ManualTradeForm tradeId="man-1" />, {
+    sample: sample(
+      true,
+      { plannedTarget: 5030 },
+      { stops, initialRisk: 150000 },
+    ),
+    url: '/app/trades/man-1/edit',
+  });
+  await screen.findByText(/^Times in New York, UTC-0[45]:00$/);
+  // The form has one box for a stop; several levels are the trade page's.
+  expect(
+    (screen.getByLabelText('Planned stop') as HTMLInputElement).value,
+  ).toBe('');
+  expect(
+    (screen.getByLabelText('Planned target') as HTMLInputElement).value,
+  ).toBe('5030');
+  set('Fill 2 price', '5020');
+  fireEvent.click(screen.getByRole('button', { name: 'Save trade' }));
+  await waitFor(() =>
+    expect(window.location.pathname).toBe('/app/trades/man-1'),
+  );
+  const t = (await repo.trades.get(WS, 'man-1'))!;
+  expect(t.stops).toEqual(stops);
+  expect(t.initialRisk).toBe(150000);
+  expect(t.executions[1]!.price).toBe(5020);
 });
 
 test('an imported trade cannot be edited here', async () => {

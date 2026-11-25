@@ -321,6 +321,78 @@ describe('planImport', () => {
     expect(noRisk).not.toHaveProperty('initialRisk');
   });
 
+  describe('levels on a stored open trade (B14)', () => {
+    const stored = plan(H + '2026-11-16 09:41:00,ESZ5,Buy,2,6010\n').trades[0]!;
+    const stops = { unit: 'price' as const, levels: [{ value: 6000, qty: 2 }] };
+    const targets = {
+      unit: 'price' as const,
+      levels: [{ value: 6030, qty: 2 }],
+    };
+    // 10 points on 2 contracts at $50 a point.
+    const withLevels: Trade = {
+      ...stored,
+      stops,
+      targets,
+      initialRisk: 100000,
+    };
+    const merge = (open: Trade, rows: string) =>
+      plan(H + rows, ctx({ openTrades: [open] }), {}, 'imp2').trades[0]!;
+    // Another contract at 6013 makes the average 6011, 11 points from the stop.
+    const scaled =
+      '2026-11-16 09:50:00,ESZ5,Buy,1,6013\n2026-11-16 10:00:00,ESZ5,Sell,3,6020\n';
+
+    test('a rebuilt open trade keeps its levels and recomputes its risk', () => {
+      const t = merge(withLevels, scaled);
+      expect(t.avgEntry).toBe(6011);
+      expect(t.stops).toEqual(stops);
+      expect(t.targets).toEqual(targets);
+      // Copies, not references shared with the stored trade.
+      expect(t.stops).not.toBe(stops);
+      expect(t.stops!.levels[0]).not.toBe(stops.levels[0]);
+      // The levels keep their own quantities; only the entry moved: 11 x 2 x 50.
+      expect(t.initialRisk).toBe(110000);
+      expect(t).not.toHaveProperty('plannedStop');
+      expect(t).not.toHaveProperty('plannedTarget');
+    });
+
+    test('a rebuilt trade with targets and no stop has no risk', () => {
+      const targetsOnly: Trade = { ...stored, targets };
+      const t = merge(targetsOnly, scaled);
+      expect(t.targets).toEqual(targets);
+      expect(t).not.toHaveProperty('stops');
+      expect(t).not.toHaveProperty('initialRisk');
+    });
+
+    test('a merge that flips the direction drops the levels and their risk', () => {
+      const t = merge(
+        withLevels,
+        '2026-11-16 09:30:00,ESZ5,Sell,2,6020\n2026-11-16 09:41:00,ESZ5,Buy,2,6010\n',
+      );
+      expect(t.direction).toBe('short');
+      expect(t).not.toHaveProperty('stops');
+      expect(t).not.toHaveProperty('targets');
+      expect(t).not.toHaveProperty('initialRisk');
+    });
+
+    test('a trade saved before levels keeps its single stop, and its risk follows the position', () => {
+      const old: Trade = {
+        ...stored,
+        plannedStop: 6000,
+        plannedTarget: 6030,
+        initialRisk: 100000,
+      };
+      const t = merge(old, scaled);
+      expect(t).toMatchObject({
+        plannedStop: 6000,
+        plannedTarget: 6030,
+        // 11 points on the merged 3 contracts, as before levels.
+        initialRisk: 165000,
+      });
+      expect(t).not.toHaveProperty('stops');
+      expect(t).not.toHaveProperty('targets');
+    });
+  });
+
   test('slash, case and space variants of one symbol are one position (E6)', () => {
     const p = plan(
       H +

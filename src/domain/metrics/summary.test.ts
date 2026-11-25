@@ -1,7 +1,12 @@
 import { describe, expect, test } from 'vitest';
+import {
+  LEGACY_AVG_PLANNED_R,
+  LEGACY_TRADES,
+} from '../__fixtures__/legacy-trades';
 import { makeTrade } from '../__fixtures__/trades';
 import { resolveInstrument } from '../instruments';
 import { costBasis, defaultMetricContext, pnlOf } from './context';
+import { rOf } from './units';
 import {
   costsOf,
   expectancyIn,
@@ -244,6 +249,60 @@ describe('summarize', () => {
       avgPlannedR: null,
       plannedRTradeCount: 0,
     });
+  });
+});
+
+describe('Planned R reads the one risk model (Plan 6B, B14)', () => {
+  test.each(LEGACY_TRADES)(
+    'plannedR of a legacy trade is unchanged: $name',
+    ({ trade, plannedR: before, realizedR }) => {
+      // The figures the code gave before levels existed, to the last digit.
+      expect(plannedR(trade)).toBe(before);
+      expect(rOf(trade, 'net')).toBe(realizedR);
+    },
+  );
+
+  test('plannedR of a legacy trade is unchanged in a summary', () => {
+    const s = summarize(
+      LEGACY_TRADES.map((l) => l.trade),
+      ctx,
+    );
+    expect(s.avgPlannedR).toBe(LEGACY_AVG_PLANNED_R);
+    expect(s.plannedRTradeCount).toBe(LEGACY_TRADES.length);
+  });
+
+  test('plannedR of a level trade is its reward over its risk', () => {
+    const t = makeTrade({
+      net: 0,
+      instrument: resolveInstrument('AAPL')!,
+      avgEntry: 100,
+      maxPosition: 20,
+      targets: {
+        unit: 'price',
+        levels: [
+          { value: 107.5, qty: 10 },
+          { value: 117.5, qty: 10 },
+        ],
+      },
+      stops: { unit: 'price', levels: [{ value: 95, qty: 20 }] },
+    });
+    // 10 x 7.5 + 10 x 17.5 = 250 over 20 x 5 = 100.
+    expect(plannedR(t)).toBe(2.5);
+    const s = summarize([t], ctx);
+    expect(s).toMatchObject({ avgPlannedR: 2.5, plannedRTradeCount: 1 });
+  });
+
+  test('a level trade with only stops has no Planned R, and a figure for Realized R', () => {
+    const t = makeTrade({
+      net: -5000,
+      instrument: resolveInstrument('AAPL')!,
+      avgEntry: 100,
+      maxPosition: 20,
+      stops: { unit: 'price', levels: [{ value: 95, qty: 20 }] },
+      initialRisk: 10000,
+    });
+    expect(plannedR(t)).toBeUndefined();
+    expect(rOf(t, 'net')).toBe(-0.5);
   });
 });
 

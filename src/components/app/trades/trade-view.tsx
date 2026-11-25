@@ -42,6 +42,7 @@ import {
 } from '@/data/trade-patch';
 import { closedQty, moneyPerPip } from '@/domain/metrics/units';
 import { costBasis, type MetricContext } from '@/domain/metrics/context';
+import { sidesOf } from '@/domain/risk';
 import {
   plannedR,
   riskFromStop,
@@ -1173,6 +1174,8 @@ function pnlTone(cents: number): string {
 }
 
 function Legend({ trade }: { trade: Trade }): React.JSX.Element {
+  // The chart's zones: one for each side the trade has, saved either way.
+  const sides = sidesOf(trade);
   return (
     <span className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
       <span className="inline-flex items-center gap-1.5">
@@ -1196,7 +1199,7 @@ function Legend({ trade }: { trade: Trade }): React.JSX.Element {
         </svg>
         Sell
       </span>
-      {trade.plannedTarget === undefined ? null : (
+      {sides.targets === undefined ? null : (
         <span className="inline-flex items-center gap-1.5">
           <i
             aria-hidden="true"
@@ -1205,7 +1208,7 @@ function Legend({ trade }: { trade: Trade }): React.JSX.Element {
           Target zone
         </span>
       )}
-      {trade.plannedStop === undefined ? null : (
+      {sides.stops === undefined ? null : (
         <span className="inline-flex items-center gap-1.5">
           <i
             aria-hidden="true"

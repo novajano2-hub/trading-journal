@@ -1,5 +1,4 @@
 import { quoteToPnl } from './currency';
-import { riskFromStop } from './metrics/summary';
 import { toCents } from './money';
 import type {
   Cents,
@@ -39,6 +38,21 @@ export interface LevelProblem {
    * past the trade's size, flagged once at the level that crosses it (B11).
    */
   kind: 'wrong-side' | 'over-size';
+}
+
+/**
+ * Risk in cents implied by a stop price: |avgEntry - stop| x maxPosition x pointValue,
+ * converted to the trade's P&L currency at the entry price. It lives here, with
+ * the rest of the risk model, and `metrics/summary` re-exports it.
+ */
+export function riskFromStop(trade: Trade, stop: number): Cents {
+  const quote =
+    Math.abs(trade.avgEntry - stop) *
+    trade.maxPosition *
+    trade.instrument.pointValue;
+  return toCents(
+    quoteToPnl(quote, trade.instrument, trade.pnlCurrency, trade.avgEntry),
+  );
 }
 
 /** Price noise from float arithmetic: 1.075 + 20 x 0.0001 is 1.0770000000000002. */
@@ -159,6 +173,14 @@ export function sidesOf(t: Trade): LevelSides {
   return sides;
 }
 
+/** A copy of a side that shares no level object with the original. */
+export function copySide(side: LevelSide): LevelSide {
+  return {
+    unit: side.unit,
+    levels: side.levels.map((level) => ({ ...level })),
+  };
+}
+
 function sideMoney(t: Trade, role: LevelRole, side: LevelSide): Cents {
   return side.levels.reduce(
     (sum, level) => sum + levelMoney(t, role, side.unit, level),
@@ -194,8 +216,27 @@ export function plannedRisk(t: Trade): Cents | undefined {
   return targets && stops ? sideMoney(t, 'stop', stops) : undefined;
 }
 
-/** Planned reward over planned risk; none without both sides, or when the risk is nothing. */
+/**
+ * Planned R of a trade saved before levels: the distance to its target over the
+ * distance to its stop, in price. It is the figure that trade has always shown,
+ * and the money ratio below would not give it back to the digit (reward and
+ * risk are whole cents, so the ratio of the two moves in the fourth decimal).
+ */
+function legacyPlannedR(t: Trade): number | undefined {
+  const { plannedStop: stop, plannedTarget: target, avgEntry } = t;
+  if (stop === undefined || target === undefined) return undefined;
+  const risk = Math.abs(avgEntry - stop);
+  return risk === 0 ? undefined : Math.abs(target - avgEntry) / risk;
+}
+
+/**
+ * Planned reward over planned risk; none without both sides, or when the risk
+ * is nothing. A trade with no stored levels keeps its old figure (B14); one
+ * with levels reads the money of the levels.
+ */
 export function plannedRMultiple(t: Trade): number | undefined {
+  if (t.targets === undefined && t.stops === undefined)
+    return legacyPlannedR(t);
   const reward = plannedReward(t);
   const risk = plannedRisk(t);
   if (reward === undefined || risk === undefined || !(risk > 0))

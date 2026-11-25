@@ -1,4 +1,4 @@
-import { buildManualTrade } from '@/domain/manual-trade';
+import { buildManualTrade, keepHiddenSides } from '@/domain/manual-trade';
 import { strategyRules, type HistoryRow, type Trade } from '@/domain/types';
 import {
   ArchivedAccountError,
@@ -205,13 +205,19 @@ export function localTrades(ctx: LocalContext): TradesRepo {
           });
           if (!built.ok)
             throw new ManualTradeRejected(built.error, built.fillIndex);
-          // The journal stays; the figures and fills are rebuilt.
-          const next: Trade = {
-            ...built.trade,
-            strategyIds: old.strategyIds,
-            tagIds: old.tagIds,
-            ruleChecks: old.ruleChecks,
-          };
+          // The journal stays; the figures and fills are rebuilt. The form
+          // edits one stop and one target; levels saved on the trade page
+          // that it cannot show stay as they were.
+          const next: Trade = keepHiddenSides(
+            {
+              ...built.trade,
+              strategyIds: old.strategyIds,
+              tagIds: old.tagIds,
+              ruleChecks: old.ruleChecks,
+            },
+            old,
+            input,
+          );
           for (const k of ['rating', 'noteId', 'reviewed'] as const)
             if (old[k] !== undefined) Object.assign(next, { [k]: old[k] });
           await db.trades.put(next);

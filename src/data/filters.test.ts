@@ -3,10 +3,12 @@ import { makeTrade } from '../domain/__fixtures__/trades';
 import { resolveInstrument } from '../domain/instruments';
 import { summarize } from '../domain/metrics/summary';
 import type { Account, Trade } from '../domain/types';
+import { applyTradePatch } from './trade-patch';
 import {
   applyFilters,
   EMPTY_FILTERS,
   mergeFilterParams,
+  narrowToUnit,
   parseFilters,
   previousRange,
   queryString,
@@ -684,6 +686,31 @@ describe('the full filter set', () => {
     expect(
       run([stop, free, zero], { noInitialRisk: true, r: { min: -9 } }),
     ).toEqual([]);
+  });
+
+  test('the R filter keeps a level trade by its stop side', () => {
+    const levels = (unit: 'price', ...vs: number[]) => ({
+      unit,
+      levels: vs.map((value) => ({ value, qty: 1 })),
+    });
+    // One ES contract, $50 a point: a stop 10 points away risks $500.
+    const stopped = applyTradePatch(trade({ net: 100000 }), {
+      stops: levels('price', 4490),
+    });
+    // A target alone has no stop side, so no risk and no R.
+    const targeted = applyTradePatch(trade({ net: 100000 }), {
+      targets: levels('price', 4530),
+    });
+    // Both sides: the stop side alone is the risk.
+    const both = applyTradePatch(trade({ net: 100000 }), {
+      stops: levels('price', 4490),
+      targets: levels('price', 4530),
+    });
+    const old = trade({ net: 100000, plannedStop: 4490, initialRisk: 50000 });
+    const ts = [stopped, targeted, both, old];
+    expect(run(ts, { r: { min: 2, max: 2 } })).toEqual([stopped, both, old]);
+    expect(run(ts, { noInitialRisk: true })).toEqual([targeted]);
+    expect(narrowToUnit(ts, 'r')).toEqual([stopped, both, old]);
   });
 
   test('sessions are cut in New York time, from the entry or the exit', () => {

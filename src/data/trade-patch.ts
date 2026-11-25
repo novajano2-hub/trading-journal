@@ -1,4 +1,4 @@
-import { riskFromStop } from '@/domain/metrics/summary';
+import { sidesOf, tradeRisk } from '@/domain/risk';
 import type { Trade } from '@/domain/types';
 import { mergePatch } from './merge';
 
@@ -11,6 +11,8 @@ export type TradePatch = Partial<
     | 'ruleChecks'
     | 'plannedStop'
     | 'plannedTarget'
+    | 'targets'
+    | 'stops'
     | 'initialRisk'
     | 'noteId'
     | 'reviewed'
@@ -22,6 +24,8 @@ const CLEARABLE = [
   'rating',
   'plannedStop',
   'plannedTarget',
+  'targets',
+  'stops',
   'initialRisk',
   'noteId',
   'reviewed',
@@ -40,9 +44,27 @@ export function applyTradePatch(
 ): Trade {
   const result = mergePatch(trade, patch, CLEARABLE);
 
-  if ('plannedStop' in patch && !('initialRisk' in patch)) {
-    if (patch.plannedStop === undefined) delete result.initialRisk;
-    else result.initialRisk = riskFromStop(result, patch.plannedStop);
+  // B14: a trade with a side saved in levels leaves the single-level fields.
+  // The side the patch does not name moves into levels with them, so it is
+  // not lost with the fields it was read from.
+  if ('targets' in patch || 'stops' in patch) {
+    const before = sidesOf(trade);
+    if (!('targets' in patch) && !result.targets && before.targets)
+      result.targets = before.targets;
+    if (!('stops' in patch) && !result.stops && before.stops)
+      result.stops = before.stops;
+    delete result.plannedStop;
+    delete result.plannedTarget;
+  }
+  // The stored risk is the stop side's loss, one figure for every R reader.
+  // It follows the stop whichever shape it is saved in; an explicit one wins.
+  if (
+    ('stops' in patch || 'plannedStop' in patch) &&
+    !('initialRisk' in patch)
+  ) {
+    const risk = tradeRisk(result);
+    if (risk === undefined) delete result.initialRisk;
+    else result.initialRisk = risk;
   }
   // These are required on Trade: clearing them means empty.
   if ('strategyIds' in patch && patch.strategyIds === undefined)
