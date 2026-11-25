@@ -364,6 +364,7 @@ Delivers spec §5.2's screen. Comp: `01-trade-page.html`, `?state=over`, `?state
 - Consumes: `unitsFor`, `levelProblems`, `plannedReward`, `plannedRisk`, `plannedRMultiple`, `tradeRisk` (Task 5); `save` in `TradePage`.
 - Produces: `LevelsBlock({ trade, side: 'target' | 'stop', value?: LevelSide, readOnly, onCommit(next: LevelSide | undefined): void })` and `SizeHelper({ position: number; onPick(qty: number): void })` (a share of the position, B12).
 - Derived figures in the comp's order: Planned R, Realized R, Planned reward, Planned risk.
+- The editor refuses a zero quantity on a level (an amount level with quantity 0 has no price and the domain never flags it).
 
 - [ ] **Step 1: Write the failing tests:** `'adding a level starts with what is left'` (B11); `'a wrong-side level shows its error and does not save'` (B13); `'over-size shows its error'`; `'stops only: Planned R, reward and risk read None, Realized R a figure'`; `'Privacy masks reward, risk and amount levels'`.
 - [ ] **Step 2:** FAIL. **Step 3:** Implement to the comp, light and dark, 390 and 1440. **Step 4:** PASS.
