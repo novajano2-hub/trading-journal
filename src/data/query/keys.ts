@@ -83,7 +83,8 @@ export type WriteKind =
   | 'dayShots.add'
   | 'dayShots.remove'
   | 'imports.commit'
-  | 'imports.undo';
+  | 'imports.undo'
+  | 'onboarding.complete';
 
 /** The query keys a successful write makes stale, in workspace `ws`. */
 export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
@@ -191,5 +192,8 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
       return [keys.dayShotsAll(ws)];
     case 'imports.commit':
       return [keys.imports(ws), keys.trades(ws)];
+    // The first run: prefs and My workspace, which becomes the active one.
+    case 'onboarding.complete':
+      return [keys.prefs(), keys.activeWorkspace(), keys.workspace('mine')];
   }
 }

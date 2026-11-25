@@ -9,6 +9,7 @@ import { localDayShots } from './day-shots';
 import { localFolders } from './folders';
 import { localImports } from './imports';
 import { localJournal } from './journal';
+import { localOnboarding } from './onboarding';
 import { localPrefs } from './prefs';
 import { localStrategies } from './strategies';
 import { localTagCategories } from './tag-categories';
@@ -52,5 +53,6 @@ export function createLocalRepository(
     tracker: localTracker(ctx),
     days: localDays(ctx),
     dayShots: localDayShots(ctx),
+    onboarding: localOnboarding(ctx),
   };
 }
