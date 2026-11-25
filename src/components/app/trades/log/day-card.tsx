@@ -10,6 +10,7 @@ import { useId } from 'react';
 import type { DayGroup } from '@/data/day-log';
 import { useSetMood } from '@/data/query/hooks';
 import { isClosed } from '@/domain/trade-status';
+import type { ColumnId } from '@/data/trade-columns';
 import type { DayRecord } from '@/domain/types';
 import { useDisplay } from '@/lib/display';
 import { formatInstrument, plural } from '@/lib/format';
@@ -42,43 +43,17 @@ const QUICK =
   'inline-flex h-8 items-center gap-1.5 rounded-control px-2.5 text-[13px] font-medium text-muted no-underline outline-offset-0 hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11';
 
 /**
- * One day of the trade log: a header (chevron, date, the net after costs,
- * Mood, Review and a slot for the note action), the running-net chart and the
- * seven figures, and, expanded, the day's trades as a table. Every card starts
- * collapsed (the record's rule). A day with a note and no trades reads $0.00
- * with a no-trades line; one with trades none of which closed reads None and
- * has no chart.
+ * A day's running-net chart and its seven figures (the card's body above the
+ * table). A day with only other-currency trades has no chart or figures.
  */
-export function DayCard({
+export function DayFigures({
   group,
-  expanded,
-  onToggle,
-  noteAction,
+  date,
 }: {
   group: DayGroup;
-  expanded: boolean;
-  onToggle(): void;
-  /** Where Add note or View note goes (the note dialog fills it). */
-  noteAction?: React.ReactNode;
+  date: string;
 }): React.JSX.Element {
-  const { env, columns, records } = useLogEnv();
-  const display = useDisplay();
-  const phone = usePhone();
-  const setMood = useSetMood();
-  const heading = useId();
-  const panel = useId();
-  const date = dayLabel(group.date);
-  const record = records.get(group.date);
-
-  const noteOnly =
-    group.trades.length === 0 && group.otherCurrency.length === 0;
-  const closedIds = group.trades.filter(isClosed).map((t) => t.id);
-  const net =
-    group.stats.net === null
-      ? null
-      : display.figure(display.ofTrades(closedIds, group.stats.net));
-  const zero = display.cash(0, false);
-
+  const { env } = useLogEnv();
   const byId = new Map(group.trades.map((t) => [t.id, t]));
   const nameOf = (id: string) => {
     const t = byId.get(id);
@@ -101,6 +76,113 @@ export function DayCard({
           ).toISOString(),
         };
 
+  const hasTrades = group.trades.length > 0;
+  return (
+    <>
+      {hasTrades && group.series.length > 0 ? (
+        <div className="my-3.5">
+          <IntradayChart
+            series={group.series}
+            label={date}
+            span={span}
+            nameOf={nameOf}
+          />
+        </div>
+      ) : null}
+      {hasTrades ? (
+        <div className={group.series.length > 0 ? '' : 'mt-3.5'}>
+          <StatGrid stats={group.stats} trades={group.trades} />
+        </div>
+      ) : (
+        // Keel's call (TradeZella unknown): a day with only other-currency trades
+        // has no chart or figures (they sum the base currency), only this line and the apart list.
+        <p className="mt-2 text-[13px] text-muted">
+          {group.otherCurrency.length}{' '}
+          {plural(group.otherCurrency.length, 'trade')} in other currencies,
+          listed apart and left out of the figures.
+        </p>
+      )}
+    </>
+  );
+}
+
+/** A day's trades as a table, then its other-currency trades apart. */
+export function DayTables({
+  group,
+  date,
+  columns,
+}: {
+  group: DayGroup;
+  date: string;
+  columns: readonly ColumnId[];
+}): React.JSX.Element {
+  const { env } = useLogEnv();
+  const hasTrades = group.trades.length > 0;
+  return (
+    <div className="mt-3.5 border-t border-line">
+      {hasTrades ? (
+        <LogTable
+          trades={group.trades}
+          columns={columns}
+          env={env}
+          label={`Trades on ${date}`}
+        />
+      ) : null}
+      {group.otherCurrency.length > 0 ? (
+        <div className={hasTrades ? 'mt-4' : ''}>
+          <p className="py-2 text-[12.5px] text-faint">
+            In other currencies, listed apart and left out of the figures above.
+          </p>
+          <LogTable
+            trades={group.otherCurrency}
+            columns={columns}
+            env={env}
+            label={`Trades in other currencies on ${date}`}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * One day of the trade log: a header (chevron, date, the net after costs,
+ * Mood, Review and a slot for the note action), the running-net chart and the
+ * seven figures, and, expanded, the day's trades as a table. Every card starts
+ * collapsed (the record's rule). A day with a note and no trades reads $0.00
+ * with a no-trades line; one with trades none of which closed reads None and
+ * has no chart.
+ */
+export function DayCard({
+  group,
+  expanded,
+  onToggle,
+  noteAction,
+}: {
+  group: DayGroup;
+  expanded: boolean;
+  onToggle(): void;
+  /** Where Add note or View note goes (the note dialog fills it). */
+  noteAction?: React.ReactNode;
+}): React.JSX.Element {
+  const { columns, records } = useLogEnv();
+  const display = useDisplay();
+  const phone = usePhone();
+  const setMood = useSetMood();
+  const heading = useId();
+  const panel = useId();
+  const date = dayLabel(group.date);
+  const record = records.get(group.date);
+
+  const noteOnly =
+    group.trades.length === 0 && group.otherCurrency.length === 0;
+  const closedIds = group.trades.filter(isClosed).map((t) => t.id);
+  const net =
+    group.stats.net === null
+      ? null
+      : display.figure(display.ofTrades(closedIds, group.stats.net));
+  const zero = display.cash(0, false);
+
   const mood = isLoggedDay(record) ? (
     <MoodControl
       compact={phone}
@@ -111,7 +193,6 @@ export function DayCard({
     />
   ) : null;
 
-  const hasTrades = group.trades.length > 0;
   const toggleName = `${expanded ? 'Collapse' : 'Expand'} ${date}`;
 
   return (
@@ -167,55 +248,10 @@ export function DayCard({
         <p className="mt-1.5 text-[13.5px] text-muted">No trades this day.</p>
       ) : (
         <>
-          {hasTrades && group.series.length > 0 ? (
-            <div className="my-3.5">
-              <IntradayChart
-                series={group.series}
-                label={date}
-                span={span}
-                nameOf={nameOf}
-              />
-            </div>
-          ) : null}
-          {hasTrades ? (
-            <div className={group.series.length > 0 ? '' : 'mt-3.5'}>
-              <StatGrid stats={group.stats} trades={group.trades} />
-            </div>
-          ) : (
-            // Keel's call (TradeZella unknown): a day with only other-currency trades
-            // has no chart or figures (they sum the base currency), only this line and the apart list.
-            <p className="mt-2 text-[13px] text-muted">
-              {group.otherCurrency.length}{' '}
-              {plural(group.otherCurrency.length, 'trade')} in other currencies,
-              listed apart and left out of the figures.
-            </p>
-          )}
+          <DayFigures group={group} date={date} />
           <div id={panel} hidden={!expanded}>
             {expanded ? (
-              <div className="mt-3.5 border-t border-line">
-                {hasTrades ? (
-                  <LogTable
-                    trades={group.trades}
-                    columns={columns}
-                    env={env}
-                    label={`Trades on ${date}`}
-                  />
-                ) : null}
-                {group.otherCurrency.length > 0 ? (
-                  <div className={hasTrades ? 'mt-4' : ''}>
-                    <p className="py-2 text-[12.5px] text-faint">
-                      In other currencies, listed apart and left out of the
-                      figures above.
-                    </p>
-                    <LogTable
-                      trades={group.otherCurrency}
-                      columns={columns}
-                      env={env}
-                      label={`Trades in other currencies on ${date}`}
-                    />
-                  </div>
-                ) : null}
-              </div>
+              <DayTables group={group} date={date} columns={columns} />
             ) : null}
           </div>
         </>

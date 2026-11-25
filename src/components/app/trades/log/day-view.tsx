@@ -1,22 +1,10 @@
 'use client';
 
-import { useQueryClient } from '@tanstack/react-query';
-import {
-  FunnelSimple,
-  Table as TableIcon,
-  Warning,
-} from '@phosphor-icons/react/dist/ssr';
-import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { buttonClasses } from '@/components/ui/button-styles';
-import { unitEmptyCopy } from '@/content/display-units';
+import { useMemo, useState } from 'react';
 import { groupDays, type DayGroup } from '@/data/day-log';
 import {
   advancedFilterCount,
-  EMPTY_FILTERS,
   resolveRange,
-  serializeFilters,
   type GlobalFilters,
 } from '@/data/filters';
 import { metricContextOf } from '@/data/metrics';
@@ -33,40 +21,29 @@ import {
   useTrades,
   useUpdatePrefs,
 } from '@/data/query/hooks';
-import { StorageUnavailableError } from '@/data/repository';
 import {
   DAY_CHOICES,
   DAY_COLUMNS,
   sanitizeDayColumns,
   type ColumnId,
 } from '@/data/trade-columns';
-import { rowFacts } from '@/data/trade-rows';
-import { isTradeUnit } from '@/domain/metrics/units';
 import { localDate } from '@/domain/time';
-import type {
-  Account,
-  DayRecord,
-  Strategy,
-  Tag,
-  TagCategory,
-} from '@/domain/types';
-import {
-  FigureSourceContext,
-  pctBaseOf,
-  useDisplay,
-  type FigureSource,
-} from '@/lib/display';
-import { usePhone } from '@/lib/use-phone';
-import { PlanTheDay } from '../../routine/plan-the-day';
-import { hasActiveFilters } from '../../filter-model';
-import { CARD } from '../../dashboard/shared';
+import type { DayRecord } from '@/domain/types';
+import { FigureSourceContext } from '@/lib/display';
 import { ColumnsMenu } from '../columns-menu';
-import type { CellEnv } from '../columns';
-import { StateBlock } from '../trades-view';
-import { AddTradeLink } from './add-trade-link';
 import { DayCard } from './day-card';
 import { LogEnvContext } from './log-env';
-import { TradesSwitch } from './trades-switch';
+import {
+  figureSourceOf,
+  LogEmpty,
+  LogLoadError,
+  LogShell,
+  LogSkeleton,
+  ShowMore,
+  useCellEnv,
+  usePaged,
+  type LogLists,
+} from './log-shell';
 
 /** TradeZella shows no paging; Keel loads 20 cards and more on scroll (Keel's call, the record is silent). */
 const FIRST = 20;
@@ -84,19 +61,6 @@ export function tradeLevelFilterActive(f: GlobalFilters): boolean {
     f.strategyIds.length > 0 ||
     f.tagIds.length > 0 ||
     advancedFilterCount(f) > 0
-  );
-}
-
-function Skeleton(): React.JSX.Element {
-  return (
-    <div
-      role="status"
-      aria-label="Loading your trades"
-      className="flex flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0"
-    >
-      <div className={`${CARD} h-[104px]`} aria-hidden="true" />
-      <div className={`${CARD} h-[240px]`} aria-hidden="true" />
-    </div>
   );
 }
 
@@ -123,7 +87,6 @@ export function TradesDayView({
   const categories = useTagCategories().data;
   const journal = useJournal().data;
   const days = useDays().data;
-  const queryClient = useQueryClient();
 
   const timeZone = prefs?.timeZone;
   const ctx = useMemo(
@@ -168,30 +131,7 @@ export function TradesDayView({
   );
 
   const error = set.error ?? tradesQuery.error ?? flowsQuery.error;
-  if (error)
-    return (
-      <StateBlock
-        role="alert"
-        icon={Warning}
-        title={
-          error instanceof StorageUnavailableError
-            ? "Keel can't open storage in this browser, so your workspace can't load."
-            : "Your trades couldn't load."
-        }
-        actions={
-          <Button
-            variant="secondary"
-            onClick={() => {
-              if (error instanceof StorageUnavailableError)
-                window.location.reload();
-              else void queryClient.resetQueries({ queryKey: ['keel'] });
-            }}
-          >
-            Try again
-          </Button>
-        }
-      />
-    );
+  if (error) return <LogLoadError error={error} />;
   const allTrades = tradesQuery.data;
   const flows = flowsQuery.data;
   if (
@@ -208,23 +148,17 @@ export function TradesDayView({
     !days ||
     today === undefined
   )
-    return <Skeleton />;
+    return <LogSkeleton />;
 
-  // The header net is always after costs, whatever the P&L basis: figures read the net-basis context.
-  const source: FigureSource = {
-    tradesById: new Map(set.data.trades.map((t) => [t.id, t])),
-    ctx: { ...ctx, pnlBasis: 'net' },
-    pctBase: pctBaseOf({
-      accounts,
-      flows,
-      trades: allTrades,
-      accountIds: set.data.filters.accountIds,
-      currency: prefs.baseCurrency,
-      from: resolveRange(set.data.filters.range, today, weekStart ?? 'sunday')
-        .from,
-      timeZone: prefs.timeZone,
-    }),
-  };
+  const source = figureSourceOf({
+    trades: set.data.trades,
+    prefs,
+    accounts,
+    flows,
+    allTrades,
+    filters: set.data.filters,
+    today,
+  });
 
   return (
     <FigureSourceContext.Provider value={source}>
@@ -261,43 +195,14 @@ function DayList({
   noTradesAtAll: boolean;
   aside?: React.ReactNode;
   noteAction?: (date: string) => React.ReactNode;
-  facts: {
-    accounts: Account[];
-    strategies: Strategy[];
-    tags: Tag[];
-    categories: TagCategory[];
-  };
+  facts: LogLists;
   records: readonly DayRecord[];
 }): React.JSX.Element {
   const prefs = usePrefs().data!;
-  const display = useDisplay();
-  const phone = usePhone();
   const updatePrefs = useUpdatePrefs();
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
-  const [shown, setShown] = useState(FIRST);
-  const sentinel = useRef<HTMLDivElement>(null);
+  const paged = usePaged(groups.length, filters, FIRST, MORE);
 
-  // A changed filter starts the list again at its first 20.
-  const filterKey = serializeFilters(filters).toString();
-  const lastKey = useRef(filterKey);
-  useEffect(() => {
-    if (lastKey.current === filterKey) return;
-    lastKey.current = filterKey;
-    setShown(FIRST);
-  }, [filterKey]);
-
-  useEffect(() => {
-    const el = sentinel.current;
-    if (!el || typeof IntersectionObserver === 'undefined') return;
-    const io = new IntersectionObserver((entries) => {
-      if (entries.some((e) => e.isIntersecting)) setShown((n) => n + MORE);
-    });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [shown, groups.length]);
-
-  const ctx = metricContextOf(prefs);
-  const timeZone = prefs.timeZone;
   const pending = updatePrefs.isPending
     ? updatePrefs.variables?.dayColumns
     : undefined;
@@ -305,34 +210,13 @@ function DayList({
     () => sanitizeDayColumns(pending ?? prefs.dayColumns),
     [pending, prefs.dayColumns],
   );
-  const factsFor = useMemo(
-    () => rowFacts({ timeZone, ctx: metricContextOf(prefs), ...lists }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      timeZone,
-      prefs,
-      lists.accounts,
-      lists.strategies,
-      lists.tags,
-      lists.categories,
-    ],
-  );
-  const env: CellEnv = { timeZone, ctx, display, facts: factsFor };
+  const env = useCellEnv(lists);
   const byDate = useMemo(
     () => new Map(records.map((r) => [r.id, r])),
     [records],
   );
 
-  const narrowed =
-    unitLeftOut > 0 && isTradeUnit(prefs.displayUnit)
-      ? prefs.displayUnit
-      : undefined;
-  const filtered = hasActiveFilters(filters);
-  const clear = (
-    <Button onClick={() => onFilters(EMPTY_FILTERS)}>Clear filters</Button>
-  );
-
-  const visible = groups.slice(0, shown);
+  const visible = groups.slice(0, paged.shown);
   const toggle = (date: string) =>
     setOpen((s) => {
       const next = new Set(s);
@@ -342,100 +226,43 @@ function DayList({
 
   return (
     <LogEnvContext.Provider value={{ env, columns, records: byDate }}>
-      <div className="flex min-w-0 flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0">
-        <div className="sticky top-[var(--top-bar,56px)] z-20 -mx-5 bg-bg px-5 py-2 sm:top-[var(--top-bar,68px)]">
-          <div className="flex items-center gap-2.5">
-            <div className="max-sm:flex-1">
-              <TradesSwitch view="day" />
-            </div>
-            {phone ? null : (
-              <div className="ml-auto flex items-center gap-2">
-                <ColumnsMenu
-                  choices={DAY_CHOICES}
-                  columns={columns}
-                  onChange={(next) => updatePrefs.mutate({ dayColumns: next })}
-                  onReset={() =>
-                    updatePrefs.mutate({ dayColumns: [...DAY_COLUMNS] })
-                  }
-                />
-                <AddTradeLink />
-              </div>
-            )}
-          </div>
-        </div>
-        {phone ? (
-          <div className="flex items-center gap-2">
-            {/* The Calendar button goes first (the mini calendar's sheet). */}
-            <div className="flex-1">
-              <PlanTheDay wide />
-            </div>
-            <AddTradeLink className="flex-1" />
-          </div>
-        ) : null}
-
-        <div
-          className={
-            aside
-              ? 'grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_280px]'
-              : ''
-          }
-        >
-          <div className="flex min-w-0 flex-col gap-4">
-            {groups.length === 0 ? (
-              noTradesAtAll ? (
-                <StateBlock
-                  icon={TableIcon}
-                  title="No trades yet."
-                  body="Import a CSV from your broker to see your days here."
-                  actions={
-                    <Link
-                      href="/app/import"
-                      className={buttonClasses('primary')}
-                    >
-                      Import
-                    </Link>
-                  }
-                />
-              ) : narrowed ? (
-                <StateBlock
-                  icon={FunnelSimple}
-                  {...unitEmptyCopy(narrowed, 'closed')}
-                  actions={filtered ? clear : undefined}
-                />
-              ) : (
-                <StateBlock
-                  icon={FunnelSimple}
-                  title="No trades match these filters."
-                  actions={clear}
-                />
-              )
-            ) : (
-              <>
-                {visible.map((g) => (
-                  <DayCard
-                    key={g.date}
-                    group={g}
-                    expanded={open.has(g.date)}
-                    onToggle={() => toggle(g.date)}
-                    noteAction={noteAction?.(g.date)}
-                  />
-                ))}
-                {groups.length > shown ? (
-                  <div ref={sentinel} className="flex justify-center py-2">
-                    <Button
-                      variant="secondary"
-                      onClick={() => setShown((n) => n + MORE)}
-                    >
-                      Show more
-                    </Button>
-                  </div>
-                ) : null}
-              </>
-            )}
-          </div>
-          {aside}
-        </div>
-      </div>
+      <LogShell
+        view="day"
+        aside={aside}
+        columnsMenu={
+          <ColumnsMenu
+            choices={DAY_CHOICES}
+            columns={columns}
+            onChange={(next) => updatePrefs.mutate({ dayColumns: next })}
+            onReset={() => updatePrefs.mutate({ dayColumns: [...DAY_COLUMNS] })}
+          />
+        }
+      >
+        {groups.length === 0 ? (
+          <LogEmpty
+            noun="days"
+            noTradesAtAll={noTradesAtAll}
+            unitLeftOut={unitLeftOut}
+            filters={filters}
+            onFilters={onFilters}
+          />
+        ) : (
+          <>
+            {visible.map((g) => (
+              <DayCard
+                key={g.date}
+                group={g}
+                expanded={open.has(g.date)}
+                onToggle={() => toggle(g.date)}
+                noteAction={noteAction?.(g.date)}
+              />
+            ))}
+            {paged.hasMore ? (
+              <ShowMore sentinel={paged.sentinel} onClick={paged.showMore} />
+            ) : null}
+          </>
+        )}
+      </LogShell>
     </LogEnvContext.Provider>
   );
 }
