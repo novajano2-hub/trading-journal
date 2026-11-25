@@ -43,6 +43,10 @@ export function onTradingDate(
 export const weekdayOf = (date: string, style: 'short' | 'long' = 'long') =>
   onTradingDate(date, { weekday: style }, 'en-US');
 
+/** "Thu 19 Nov". */
+export const dayLabel = (date: string): string =>
+  `${weekdayOf(date, 'short')} ${onTradingDate(date, { day: 'numeric', month: 'short' })}`;
+
 /** The compact row clock, '20 Nov 10:15', in the given timezone. */
 export function shortTime(iso: string, timeZone = 'America/New_York'): string {
   const parts = Object.fromEntries(

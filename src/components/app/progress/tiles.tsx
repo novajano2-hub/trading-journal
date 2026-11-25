@@ -1,5 +1,6 @@
 import { MetricTip } from '@/components/ui/metric-tip';
 import { plural } from '@/lib/format';
+import { ProgressBar } from './progress-bar';
 
 /** On a phone the three tiles are one card of three columns; from sm each is its own card. */
 const TILE =
@@ -56,7 +57,7 @@ function Gauge({ share }: { share: number | null }): React.JSX.Element {
 /**
  * TradeZella's three tiles and nothing more: the current streak, the period's
  * score as a half gauge, and today's rules met over those that apply, with a
- * bar. `score` is null with no scored day in the range, and reads None.
+ * bar. `score` is null while no rule has been met in the range, and reads None.
  */
 export function ProgressTiles({
   streak,
@@ -112,15 +113,11 @@ export function ProgressTiles({
             <span className="max-sm:hidden"> rules met</span>
           </small>
         </span>
-        <div
+        <ProgressBar
+          percent={Math.round(share * 100)}
           aria-hidden="true"
-          className="mt-2.5 h-1.5 overflow-hidden rounded-[3px] bg-accent-soft max-sm:hidden"
-        >
-          <i
-            className="block h-full rounded-[3px] bg-[linear-gradient(90deg,color-mix(in_srgb,var(--accent)_78%,#fff),var(--accent))]"
-            style={{ width: `${Math.round(share * 100)}%` }}
-          />
-        </div>
+          className="mt-2.5 max-sm:hidden"
+        />
       </div>
     </section>
   );

@@ -112,6 +112,7 @@ export const METRIC_IDS = [
   'rule-average',
   'tracker-history',
   'tracker-card',
+  'tracker-follow-rate',
 ] as const;
 
 export type MetricId = (typeof METRIC_IDS)[number];
@@ -141,7 +142,7 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'rule-follow-rate': {
     label: 'Follow rate',
     definition:
-      "Closed trades that kept this rule, divided by those that kept or broke it. Only trades the rule applies to count, and unanswered checks don't. On the progress tracker it is the days that kept the rule, divided by the days it was decided; a day still pending doesn't count.",
+      "Closed trades that kept this rule, divided by those that kept or broke it. Only trades the rule applies to count, and unanswered checks don't.",
   },
   'rule-followed-pnl': {
     label: 'P&L when followed',
@@ -633,7 +634,7 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'tracker-score': {
     label: 'Score',
     definition:
-      "The average share of rules met across the scored days in the range. Each day counts the same, however many rules applied that day. Days that aren't scored are left out.",
+      "The average share of rules met across the scored days in the range. Each day counts the same, however many rules applied that day. Days that aren't scored are left out. It reads None until you have met a rule in the range.",
   },
   'tracker-today': {
     label: 'Today',
@@ -658,7 +659,12 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'tracker-card': {
     label: 'Progress tracker',
     definition:
-      'How consistently you follow your own rules. Each square is a trading day, shaded by the share of rules you met, with your current streak beside it.',
+      'How consistently you follow your own rules. Each square is a trading day, shaded by the share of rules you met.',
+  },
+  'tracker-follow-rate': {
+    label: 'Follow rate',
+    definition:
+      "The days that kept this rule, divided by the days it was decided, in the date range. A day still pending doesn't count, and a rule with no decided day reads 0%.",
   },
 };
 

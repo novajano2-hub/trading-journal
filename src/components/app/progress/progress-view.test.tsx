@@ -100,6 +100,8 @@ function show(
   });
   return renderApp(<ProgressView />, { url, repository });
 }
+const spyCalls = (repo: { days: { setTick: unknown } }) =>
+  (repo.days.setTick as { mock: { calls: unknown[] } }).mock.calls.length;
 const ready = () => screen.findByRole('heading', { name: 'Rules' });
 const tiles = () => screen.getByRole('region', { name: 'Summary' });
 const rulesCard = () =>
@@ -133,7 +135,7 @@ test("tiles read the streak, the period score and today's progress, with no othe
   expect(labels).toEqual(['tracker-streak', 'tracker-score', 'tracker-today']);
 });
 
-test('a new tracker with nothing done yet reads 0 days and None, with its one scored day pending', async () => {
+test('a new tracker with nothing done yet reads 0 days, a score of None and follow rate 0%, with its one scored day pending', async () => {
   show('/app/progress', () => {
     const s = fixtureSample();
     return {
@@ -149,9 +151,14 @@ test('a new tracker with nothing done yet reads 0 days and None, with its one sc
   const t = tiles().textContent!;
   expect(t).toContain('0 days');
   expect(t).toContain('0 of 1 rules met');
-  // One scored day, today, and it is pending: no rule has been decided.
-  expect(within(rulesCard()).getByText(/1 scored day$/)).toBeTruthy();
-  expect(row('Mark key levels before the open').textContent).toContain('None');
+  // No rule has been met, so the score is None (TradeZella's "--"), not 0%.
+  expect(t).toContain('Score, all timeNone');
+  expect(t).not.toContain('0%');
+  // Today is pending: no rule is decided, and R12 reads that as 0%.
+  const pending = row('Mark key levels before the open');
+  expect(pending.textContent).toContain('0 days');
+  expect(within(pending).getAllByRole('cell').at(-1)!.textContent).toBe('0%');
+  expect(pending.textContent).not.toContain('Prepare');
 });
 
 test('the date range moves the score and the rules table, not the streak or the grid', async () => {
@@ -160,9 +167,7 @@ test('the date range moves the score and the rules table, not the streak or the 
   const gridBefore = screen
     .getAllByRole('gridcell')
     .map((c) => `${c.getAttribute('aria-label')}|${c.dataset.step}`);
-  expect(
-    within(rulesCard()).getByText(/all time, 14 scored days/),
-  ).toBeTruthy();
+  expect(within(rulesCard()).queryByText(/scored days?$/)).toBeNull();
   expect(row('Mark key levels before the open').textContent).toContain('23%');
   all.unmount();
   cleanup();
@@ -174,9 +179,6 @@ test('the date range moves the score and the rules table, not the streak or the 
   expect(t).toContain('75%');
   // The streak is still 3.
   expect(t).toContain('3 days');
-  expect(
-    within(rulesCard()).getByText(/16-19 Nov, 4 scored days/),
-  ).toBeTruthy();
   const mark = row('Mark key levels before the open');
   expect(mark.textContent).toContain('100%');
   // Its streak is the same too.
@@ -187,7 +189,7 @@ test('the date range moves the score and the rules table, not the streak or the 
   expect(gridAfter).toEqual(gridBefore);
 });
 
-test('the rules table lists the current rules only, in stage order, with their stage line', async () => {
+test('the rules table lists the current rules only, in stage order, with no stage line', async () => {
   show();
   await ready();
   const names = [...rulesCard().querySelectorAll('tbody tr')].map(
@@ -196,8 +198,8 @@ test('the rules table lists the current rules only, in stage order, with their s
   // "Old habit" is a rule of the past, and the built-ins are off.
   expect(names).toEqual(['Mark key levels before the open']);
   expect(within(rulesCard()).queryByText('Old habit')).toBeNull();
-  expect(row('Mark key levels before the open').textContent).toContain(
-    'Prepare, ticked by hand',
+  expect(row('Mark key levels before the open').textContent).not.toMatch(
+    /Prepare/,
   );
   expect(row('Mark key levels before the open').textContent).toContain(
     'Ticked by hand',
@@ -269,14 +271,61 @@ test('it follows the global account selection', async () => {
   await ready();
   const all = tiles().textContent;
   const strategyAll = row('Every trade has a strategy').textContent;
+  // All accounts: a score of 7%, and the strategy rule's average and follow rate at 8%.
+  expect(all).toBe(
+    'Current streak0 daysScore, all time7%Today0 of 5 rules met',
+  );
+  expect(strategyAll).toContain('8%8%');
   everything.unmount();
   cleanup();
 
   show('/app/progress?account=acc-b', fixtureSample);
   await ready();
+  expect(tiles().textContent).toBe(
+    'Current streak0 daysScore, all time4%Today0 of 5 rules met',
+  );
+  expect(row('Every trade has a strategy').textContent).toContain('0%0%');
   // acc-b is one account: its own trades score, so its figures differ.
   expect(tiles().textContent).not.toBe(all);
   expect(row('Every trade has a strategy').textContent).not.toBe(strategyAll);
+});
+
+test('a refused tick shows a neutral note beside the checklist and leaves the box unticked', async () => {
+  const { repo } = show();
+  await ready();
+  vi.spyOn(repo.days, 'setTick').mockRejectedValue(new Error('day is closed'));
+  const today = screen
+    .getByRole('heading', { name: 'Today' })
+    .closest('section')!;
+  const box = within(today).getByRole('checkbox', {
+    name: 'Mark key levels before the open',
+  }) as HTMLInputElement;
+  expect(within(today).queryByRole('alert')).toBeNull();
+  fireEvent.click(box);
+  const note = await within(today).findByRole('alert');
+  expect(note.textContent).toBe("Couldn't save. Try again.");
+  expect(box.checked).toBe(false);
+  // The next tick clears it while the write is tried again.
+  fireEvent.click(box);
+  await waitFor(() => expect(spyCalls(repo)).toBe(2));
+});
+
+test('Privacy masks the rules table averages', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<ProgressView />, { url: '/app/progress', repository });
+  await ready();
+  const cap = row("Keep the day's loss to $••• or less");
+  // The average of a money rule is an amount: masked, with its words.
+  expect(cap.textContent).toContain('$•••');
+  expect(within(cap).getAllByText('hidden amount').length).toBeGreaterThan(0);
+  expect(rulesCard().textContent).not.toMatch(/[$€£]\s?\d/);
+  // Counts and percents stay.
+  expect(row('Every trade has a strategy').textContent).toMatch(/\d+%/);
 });
 
 test('ticking a custom rule writes the tick', async () => {
@@ -317,7 +366,7 @@ test("History carries the grid's paging controls in its header, and the legend a
   expect(
     within(header).getByRole('button', { name: /About History/ }),
   ).toBeTruthy();
-  expect(header.textContent).toContain('Since Mon 2 Nov');
+  expect(history.textContent).not.toContain('Since');
   expect(history.textContent).toContain(
     "Blank days aren't scored: weekends and other non-trading days.",
   );

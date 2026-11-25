@@ -5,8 +5,7 @@ import { FigureText } from '@/components/product/figure-text';
 import { TaskCheckbox } from '@/components/ui/task-checkbox';
 import type { DayScore, RuleResult, RuleStatus } from '@/domain/tracker/score';
 import type { TrackerStage, TrackerVersion } from '@/domain/types';
-import { useDisplay } from '@/lib/display';
-import { ruleName, tradeCap, type FormatMoney } from './rule-label';
+import { ruleName, tradeCap, useNetCash } from './rule-label';
 
 const STAGES: readonly { stage: TrackerStage; title: string }[] = [
   { stage: 'prepare', title: 'Prepare' },
@@ -89,9 +88,7 @@ export function DayRules({
   onTick(ruleId: string, ticked: boolean): void;
   currency: string;
 }): React.JSX.Element {
-  const display = useDisplay();
-  // The tracker page is always net, in the rule's own currency.
-  const fmt: FormatMoney = (cents) => display.cash(cents, false, currency);
+  const fmt = useNetCash(currency);
   const values = detail === 'values';
 
   const valueOf = (r: RuleResult): React.ReactNode => {

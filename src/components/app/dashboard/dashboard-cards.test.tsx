@@ -22,6 +22,7 @@ import { keepHyphens } from '@/lib/format';
 import { dashboardFixture } from '../__fixtures__/dashboard-sample';
 import { renderApp } from '../__fixtures__/render-app';
 import { DashboardView } from './dashboard-view';
+import { ProgressCard } from './progress-card';
 
 vi.mock('next/navigation', () => import('../__fixtures__/navigation'));
 
@@ -104,6 +105,45 @@ test("the card shows today's score and links to the tracker", async () => {
   expect(
     within(card).queryByRole('button', { name: 'Earlier weeks' }),
   ).toBeNull();
+});
+
+test('Open tracker keeps the date range and the account selection', async () => {
+  await renderDashboard({
+    url: '/app/dashboard?from=2026-11-02&to=2026-11-19&account=acc-b',
+  });
+  const card = await trackerCard();
+  expect(
+    within(card)
+      .getByRole('link', { name: 'Open tracker' })
+      .getAttribute('href'),
+  ).toBe('/app/progress?from=2026-11-02&to=2026-11-19&account=acc-b');
+});
+
+test('a non-trading today reads 0 of 0 rules met, with the grid and no caption line', async () => {
+  await renderDashboard({
+    edit: (s) => {
+      // Saturday 21 Nov.
+      s.tracker = { ...s.tracker, asOf: '2026-11-21' };
+    },
+  });
+  const card = await trackerCard();
+  await waitFor(() => expect(card.textContent).toContain('0 of 0 rules met'));
+  expect(card.textContent).not.toContain('No rules apply');
+  expect(within(card).getByRole('grid')).toBeTruthy();
+  expect(card.textContent).not.toContain("Blank days aren't scored");
+});
+
+test('while it loads the card shows a skeleton and no figures', () => {
+  renderApp(<ProgressCard />, {
+    repository: createLocalRepository({
+      indexedDB: new IDBFactory(),
+      IDBKeyRange,
+      sample: async () => fixtureSample(),
+    }),
+  });
+  const card = screen.getByRole('region', { name: 'Progress tracker' });
+  expect(card.textContent).not.toMatch(/\d|None|rules met/);
+  expect(within(card).queryByRole('grid')).toBeNull();
 });
 
 test("its checklist button opens today's day page in plan mode", async () => {
@@ -398,6 +438,7 @@ test('every metric carries its definition', async () => {
     'tracker-today',
     'rule-streak',
     'rule-average',
+    'tracker-follow-rate',
     'tracker-history',
     // On a trade note's stats card (Task 21).
     'volume',
