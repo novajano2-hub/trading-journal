@@ -182,7 +182,8 @@ export function writeRoutine(
       ticks: Object.fromEntries(
         CUSTOM.map((c, i) => [c.id, keep.has(date) || tickDraws[i]!]),
       ),
-      ...(times.length > 0
+      // The routine's today has no session yet, so the Trade stage can start one.
+      ...(times.length > 0 && date !== endDate
         ? {
             session: {
               start: new Date(Math.min(...times) - 10 * MINUTE).toISOString(),

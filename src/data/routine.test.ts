@@ -72,6 +72,11 @@ describe('scoreHistory', () => {
     const liveB = live(['B']);
     const liveAll = live();
     expect(liveA.rules).not.toEqual(liveB.rules);
+    // The daily cap reads every account, whatever the selection: A's 5,000 plus B's 3,000.
+    for (const d of [liveA, liveB, liveAll]) {
+      const cap = d.rules.find((r) => r.key === 'lossPerDay')!;
+      expect(cap.value).toMatchObject({ kind: 'money', cents: 8_000 });
+    }
 
     const locked = freezeDay(
       '2026-11-18',
@@ -113,6 +118,62 @@ describe('scoreHistory', () => {
       expect(d.active).toBe(before.active);
       expect(d.finished).toBe(true);
     }
+  });
+
+  test('a day finished today keeps its locked version after a save replaces the version', () => {
+    const accounts = [acct('A')];
+    const trades = [
+      makeTrade({
+        accountId: 'A',
+        net: -20_000,
+        openedAt: '2026-11-19T15:00:00Z',
+        closedAt: '2026-11-19T15:10:00Z',
+        strategyIds: ['s'],
+        plannedStop: 10,
+      }),
+    ];
+    const before = tracker();
+    const record: DayRecord = {
+      id: '2026-11-19',
+      workspaceId: 'w',
+      noteStartedAt: '2026-11-19T13:00:00Z',
+      ticks: {},
+    };
+    const locked = freezeDay(
+      '2026-11-19',
+      before,
+      record,
+      trades,
+      accounts,
+      [],
+      env(),
+    );
+    const finished: DayRecord = {
+      ...record,
+      finishedAt: '2026-11-19T21:00:00Z',
+      locked,
+    };
+    const cap = (t: Tracker) =>
+      scoreHistory(t, [finished], trades, accounts, [], env())
+        .scoreOn('2026-11-19')
+        .rules.find((r) => r.key === 'lossPerDay')!;
+    const was = cap(before);
+    expect(was.value).toMatchObject({ kind: 'money', limit: 10_000 });
+    // A save today replaces today's version with a far looser cap.
+    const today = {
+      ...defaultVersion('2026-11-19'),
+      builtIn: {
+        ...defaultVersion('2026-11-19').builtIn,
+        lossPerDay: { on: true, amount: 9_000_000 },
+      },
+    };
+    const after = tracker({ versions: [before.versions[0]!, today] });
+    expect(cap(after)).toEqual(was);
+    // The same edit on an unfinished day changes the verdict.
+    const open = scoreHistory(after, [record], trades, accounts, [], env())
+      .scoreOn('2026-11-19')
+      .rules.find((r) => r.key === 'lossPerDay')!;
+    expect(open.value).toMatchObject({ limit: 9_000_000 });
   });
 
   test('unfinished past days score live with the version in effect that day', () => {
@@ -202,6 +263,7 @@ describe('sessionLength', () => {
       sessionLength(
         { start, end: '2026-11-18T16:30:00Z' },
         '2026-11-18',
+        '2026-11-18',
         '2026-11-18T20:00:00Z',
         NY,
       ),
@@ -209,18 +271,57 @@ describe('sessionLength', () => {
   });
   test('a running session today runs to now', () => {
     expect(
-      sessionLength({ start }, '2026-11-18', '2026-11-18T15:00:00Z', NY),
+      sessionLength(
+        { start },
+        '2026-11-18',
+        '2026-11-18',
+        '2026-11-18T15:00:00Z',
+        NY,
+      ),
     ).toBe(3_600_000);
   });
   test('a running session on a past date is capped at local midnight (K30)', () => {
     // 2026-11-19 00:00 in New York is 05:00Z.
     expect(
-      sessionLength({ start }, '2026-11-18', '2026-11-20T15:00:00Z', NY),
+      sessionLength(
+        { start },
+        '2026-11-18',
+        '2026-11-20',
+        '2026-11-20T15:00:00Z',
+        NY,
+      ),
     ).toBe(15 * 3_600_000);
+  });
+  test("a session on the routine's today runs to now, even when the real clock is days later (the sample)", () => {
+    expect(
+      sessionLength(
+        { start },
+        '2026-11-18',
+        '2026-11-18',
+        '2026-11-18T15:00:00Z',
+        NY,
+      ),
+    ).toBe(3_600_000);
+    // The real date is later than the routine's today: still today's date, so no midnight cap.
+    expect(
+      sessionLength(
+        { start },
+        '2026-11-18',
+        '2026-11-18',
+        '2026-11-25T15:00:00Z',
+        NY,
+      ),
+    ).toBe(Date.parse('2026-11-25T15:00:00Z') - Date.parse(start));
   });
   test('null when never started', () => {
     expect(
-      sessionLength(undefined, '2026-11-18', '2026-11-18T15:00:00Z', NY),
+      sessionLength(
+        undefined,
+        '2026-11-18',
+        '2026-11-18',
+        '2026-11-18T15:00:00Z',
+        NY,
+      ),
     ).toBeNull();
   });
 });

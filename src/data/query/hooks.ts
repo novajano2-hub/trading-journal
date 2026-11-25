@@ -803,11 +803,12 @@ type Rating = 1 | 2 | 3 | 4 | 5 | undefined;
 export function useSaveTracker(): UseMutationResult<
   Tracker,
   Error,
-  Omit<TrackerVersion, 'from'>
+  { rules: Omit<TrackerVersion, 'from'> }
 > {
   return useWorkspaceWrite(
     'tracker.save',
-    (r, ws, v: Omit<TrackerVersion, 'from'>) => r.tracker.save(ws, v),
+    (r, ws, v: { rules: Omit<TrackerVersion, 'from'> }) =>
+      r.tracker.save(ws, v.rules),
   );
 }
 

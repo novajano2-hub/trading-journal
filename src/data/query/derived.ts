@@ -25,7 +25,7 @@ import {
   type CurrencyMetrics,
 } from '../metrics';
 import { routineToday } from '@/domain/tracker/defaults';
-import { scoreHistory, type ScoreHistory } from '../routine';
+import { msToLocalMidnight, scoreHistory, type ScoreHistory } from '../routine';
 import {
   useAccounts,
   useCashFlows,
@@ -370,16 +370,32 @@ export function useImportPlan(input: ImportInput | null): Derived<ImportPlan> {
   };
 }
 
+/**
+ * The clock for the routine's today. A one-shot timer re-reads it at the next
+ * local midnight, so the date rolls over while the page is open.
+ */
+function useRoutineClock(timeZone: string | undefined): [string, () => void] {
+  const [now, setNow] = useState(() => new Date().toISOString());
+  const refresh = useCallback(() => setNow(new Date().toISOString()), []);
+  useEffect(() => {
+    if (timeZone === undefined) return;
+    const id = setTimeout(refresh, msToLocalMidnight(now, timeZone) + 100);
+    return () => clearTimeout(id);
+  }, [now, timeZone, refresh]);
+  return [now, refresh];
+}
+
 /** The routine's today (K23): the sample's fixed date, else the local date in the profile zone. */
 export function useRoutineToday(): string | undefined {
   const tracker = useTracker().data;
   const timeZone = usePrefs().data?.timeZone;
+  const [now] = useRoutineClock(timeZone);
   return useMemo(
     () =>
       tracker && timeZone !== undefined
-        ? routineToday(tracker, new Date().toISOString(), timeZone)
+        ? routineToday(tracker, now, timeZone)
         : undefined,
-    [tracker, timeZone],
+    [tracker, timeZone, now],
   );
 }
 
@@ -401,18 +417,7 @@ export function useDayScores(): Derived<ScoreHistory> {
   const timeZone = prefs.data?.timeZone;
   const baseCurrency = prefs.data?.baseCurrency;
 
-  // R8: while today is in the scored range, re-read the clock each minute, so
-  // a missed start time turns failed while the page is open.
-  const [now, setNow] = useState(() => new Date().toISOString());
-  const active =
-    tracker.data !== undefined &&
-    timeZone !== undefined &&
-    routineToday(tracker.data, now, timeZone) >= tracker.data.startedOn;
-  useEffect(() => {
-    if (!active) return;
-    const id = setInterval(() => setNow(new Date().toISOString()), 60_000);
-    return () => clearInterval(id);
-  }, [active]);
+  const [now, refresh] = useRoutineClock(timeZone);
 
   const data = useMemo(() => {
     if (
@@ -450,6 +455,19 @@ export function useDayScores(): Derived<ScoreHistory> {
     selection,
     now,
   ]);
+
+  // R8: only while today's score is live (scored, not finished), re-read the
+  // clock each minute, so a missed start time turns failed while the page is open.
+  const todayScore = data?.scoreOn(data.today);
+  const live =
+    todayScore !== undefined &&
+    todayScore.unscored === undefined &&
+    !todayScore.finished;
+  useEffect(() => {
+    if (!live) return;
+    const id = setInterval(refresh, 60_000);
+    return () => clearInterval(id);
+  }, [live, refresh]);
 
   return { ...state, data: state.status === 'success' ? data : undefined };
 }

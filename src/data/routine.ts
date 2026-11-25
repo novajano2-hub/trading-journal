@@ -187,13 +187,32 @@ export function freezeDay(
   };
 }
 
+/** The instant (ms) the local date ends, in the zone. */
+const midnightAfter = (date: string, timeZone: string): number => {
+  const [y, m, d] = dayAfter(date).split('-').map(Number) as [
+    number,
+    number,
+    number,
+  ];
+  return new TZDate(y, m - 1, d, 0, 0, 0, timeZone).getTime();
+};
+
+/** Milliseconds from `now` to the next local midnight in the zone. */
+export function msToLocalMidnight(now: string, timeZone: string): number {
+  return Math.max(
+    0,
+    midnightAfter(localDate(now, timeZone), timeZone) - Date.parse(now),
+  );
+}
+
 /**
- * Session length in ms: end minus start. A running session on a past date ends
+ * Session length in ms: end minus start. A running session on a date before the routine's `today` ends
  * at that date's local midnight (K30); one on today runs to `now`. Null if never started.
  */
 export function sessionLength(
   s: DayRecord['session'],
   date: string,
+  today: string,
   now: string,
   timeZone: string,
 ): number | null {
@@ -201,13 +220,8 @@ export function sessionLength(
   const start = Date.parse(s.start);
   let end: number;
   if (s.end !== undefined) end = Date.parse(s.end);
-  else if (date < localDate(now, timeZone)) {
-    const [y, m, d] = dayAfter(date).split('-').map(Number) as [
-      number,
-      number,
-      number,
-    ];
-    end = new TZDate(y, m - 1, d, 0, 0, 0, timeZone).getTime();
+  else if (date < today) {
+    end = midnightAfter(date, timeZone);
   } else end = Date.parse(now);
   return Math.max(0, end - start);
 }

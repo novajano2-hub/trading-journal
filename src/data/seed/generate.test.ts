@@ -45,6 +45,16 @@ describe('sample workspace generator', () => {
     expect(h.scoreOn(s.endDate).finished).toBe(false);
   });
 
+  test("the sample's today is live and has no session, so the Trade stage can start one", () => {
+    const today = s.days.find((d) => d.id === s.endDate);
+    expect(today).toBeDefined();
+    expect(today!.session).toBeUndefined();
+    expect(today!.finishedAt).toBeUndefined();
+    expect(today!.locked).toBeUndefined();
+    expect(today!.noteStartedAt).toBeDefined();
+    expect(today!.ticks).toBeDefined();
+  });
+
   test('every day record with a start stamp has a daily note on its date', () => {
     const stamped = s.days.filter((d) => d.noteStartedAt !== undefined);
     expect(stamped.length).toBeGreaterThan(0);
