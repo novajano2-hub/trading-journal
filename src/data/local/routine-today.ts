@@ -1,4 +1,5 @@
 import { routineToday } from '@/domain/tracker/defaults';
+import type { DayRecord } from '@/domain/types';
 import type { KeelDb } from './db';
 import { readPrefs } from './prefs';
 
@@ -23,6 +24,10 @@ export async function isLocked(
   ws: string,
   date: string,
 ): Promise<boolean> {
-  const day = await db.days.get([ws, date]);
+  return isLockedDay(await db.days.get([ws, date]));
+}
+
+/** The one lock rule: a day record that is locked or finished. */
+export function isLockedDay(day: DayRecord | undefined): boolean {
   return day?.locked !== undefined || day?.finishedAt !== undefined;
 }

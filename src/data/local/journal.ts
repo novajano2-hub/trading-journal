@@ -180,8 +180,17 @@ export function localJournal(ctx: LocalContext): JournalRepo {
       };
       return rwTx(db, [db.journal, db.days, db.meta, db.trackers], async () => {
         await refuseLockedNote(db, ws, entry);
-        if (draft.id !== undefined)
-          await refuseLockedNote(db, ws, await db.journal.get([ws, draft.id]));
+        const stored =
+          draft.id !== undefined
+            ? await db.journal.get([ws, draft.id])
+            : undefined;
+        await refuseLockedNote(db, ws, stored);
+        // Only trash and restore move a note in or out of Trash: a save keeps what is stored.
+        if (stored !== undefined) {
+          if (stored.deletedAt !== undefined)
+            entry.deletedAt = stored.deletedAt;
+          else delete entry.deletedAt;
+        }
         await db.journal.put(entry);
         // K9: the first edit on the note's own date starts its clock.
         if (entry.kind === 'daily-review' && entry.date !== undefined) {

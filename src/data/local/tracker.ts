@@ -3,7 +3,7 @@ import type { Tracker } from '@/domain/types';
 import type { TrackerRepo } from '../repository';
 import type { LocalContext } from './context';
 import type { KeelDb } from './db';
-import { todayIn } from './routine-today';
+import { isLockedDay, todayIn } from './routine-today';
 import { rwTx } from './tx';
 
 /** The workspace's tracker, made on first read. Call inside an rw transaction over `trackers` and `meta`. */
@@ -66,7 +66,7 @@ export function localTracker(ctx: LocalContext): TrackerRepo {
         const open = await db.days
           .where('workspaceId')
           .equals(ws)
-          .filter((d) => d.locked === undefined && d.ticks !== undefined)
+          .filter((d) => !isLockedDay(d) && d.ticks !== undefined)
           .toArray();
         for (const day of open) {
           const next = { ...day };

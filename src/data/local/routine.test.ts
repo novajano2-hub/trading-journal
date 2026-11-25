@@ -12,7 +12,12 @@ const M = 'mine';
 /** New York is UTC-5 in November, so 08:47 there is 13:47Z. */
 const at = (day: string, hhmm = '08:47') => new Date(`${day}T${hhmm}:00-05:00`);
 
-async function setup(start = '2026-11-18') {
+const ids = (list: string[]) => {
+  let i = 0;
+  return () => list[i++] ?? `id-${i}`;
+};
+
+async function setup(start = '2026-11-18', newId?: () => string) {
   const indexedDB = new IDBFactory();
   let clock = at(start);
   let n = 0;
@@ -20,7 +25,7 @@ async function setup(start = '2026-11-18') {
     indexedDB,
     IDBKeyRange,
     now: () => clock,
-    newId: () => `id-${++n}`,
+    newId: newId ?? (() => `id-${++n}`),
     sample: async () => fixtureSample(),
   });
   await repo.prefs.update({ timeZone: 'America/New_York' });
@@ -54,13 +59,22 @@ const png = (bytes = 4) => ({
   name: 'a.png',
 });
 
-test('two first reads make one tracker row', async () => {
+test('a first read racing a save keeps the saved version and one tracker row', async () => {
   const { repo, db } = await setup();
-  const [a, b] = await Promise.all([repo.tracker.get(M), repo.tracker.get(M)]);
+  const rules = rulesOf(defaultVersion('2026-11-18'));
+  const saved = {
+    ...rules,
+    builtIn: { ...rules.builtIn, stop: { on: false } },
+  };
+  const [read] = await Promise.all([
+    repo.tracker.get(M),
+    repo.tracker.save(M, saved),
+  ]);
   expect(await db.trackers.where('workspaceId').equals(M).count()).toBe(1);
-  expect(a.startedOn).toBe('2026-11-18');
-  expect(b.startedOn).toBe(a.startedOn);
-  expect(a.versions).toEqual([defaultVersion('2026-11-18')]);
+  expect(read.startedOn).toBe('2026-11-18');
+  const after = await repo.tracker.get(M);
+  expect(after.versions).toHaveLength(1);
+  expect(after.versions[0]!.builtIn.stop.on).toBe(false);
 });
 
 test("a save today replaces today's version and keeps yesterday's", async () => {
@@ -107,6 +121,26 @@ test('reset restores the defaults from today and keeps notes, sessions, moods, r
   expect(day.rating).toBe(3);
   expect(await repo.dayShots.list(M, '2026-11-18')).toHaveLength(1);
   expect((await repo.journal.get(M, note.id))?.id).toBe(note.id);
+});
+
+test('reset leaves a day with finishedAt, and a locked day, untouched', async () => {
+  const { repo, db, setNow } = await setup('2026-11-18');
+  await repo.tracker.get(M);
+  const finishedOnly = {
+    id: '2026-11-17',
+    workspaceId: M,
+    ticks: { r: true },
+    finishedAt: '2026-11-17T20:00:00.000Z',
+  };
+  await db.days.put(finishedOnly);
+  await repo.days.setTick(M, '2026-11-19', 'r', true);
+  await repo.days.finish(M, '2026-11-18', await frozen(repo));
+  const lockedBefore = (await db.days.get([M, '2026-11-18']))!;
+  setNow(at('2026-11-20'));
+  await repo.tracker.reset(M);
+  expect(await db.days.get([M, '2026-11-17'])).toEqual(finishedOnly);
+  expect(await db.days.get([M, '2026-11-18'])).toEqual(lockedBefore);
+  expect((await db.days.get([M, '2026-11-19']))!.ticks).toBeUndefined();
 });
 
 test('after a reset a closed day still refuses writes', async () => {
@@ -169,7 +203,6 @@ test('finish refuses a future date, a date before the start and a non-trading da
   await expect(repo.days.finish(M, '2026-11-21', f)).rejects.toBeInstanceOf(
     RangeError,
   );
-  await repo.days.startSession(M, '2026-11-22').catch(() => undefined);
   const done = await repo.days.finish(M, '2026-11-20', f);
   expect(done.finishedAt).toBeDefined();
 });
@@ -201,6 +234,17 @@ test("the first edit on the note's own date stamps noteStartedAt", async () => {
   ).toBe(stamp);
 });
 
+test('a save built from a pre-trash copy leaves the note in Trash; only restore un-trashes', async () => {
+  const { repo } = await setup();
+  const note = await repo.journal.dailyNote(M, '2026-11-19');
+  await repo.journal.trash(M, note.id);
+  const saved = await repo.journal.save(M, { ...note, favorite: true });
+  expect(saved.deletedAt).toBeDefined();
+  expect((await repo.journal.get(M, note.id))?.deletedAt).toBeDefined();
+  await repo.journal.restore(M, note.id);
+  expect((await repo.journal.get(M, note.id))?.deletedAt).toBeUndefined();
+});
+
 test("a trashed daily note stays the date's note", async () => {
   const { repo, db } = await setup();
   const note = await repo.journal.dailyNote(M, '2026-11-19');
@@ -217,7 +261,9 @@ test("a trashed daily note stays the date's note", async () => {
 });
 
 test('shots: wrong type and over 10 MB are refused; list keeps upload order', async () => {
-  const { repo } = await setup();
+  // Ids that sort against upload order, and one clock tick for every upload:
+  // only the createdAt tie-break can keep upload order.
+  const { repo } = await setup('2026-11-18', ids(['z', 'y', 'x', 'w']));
   await expect(
     repo.dayShots.add(M, '2026-11-18', { ...png(), type: 'image/gif' }),
   ).rejects.toMatchObject({ reason: 'type' });
