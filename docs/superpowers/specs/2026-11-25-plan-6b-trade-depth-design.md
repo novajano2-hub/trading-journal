@@ -256,7 +256,7 @@ The next Dexie version adds six workspace tables. All join `DATA_TABLES`, so a w
 
 **Behaviour in Keel**
 
-- **Swap** (B49, B50): one signed amount per trade, negative a cost. Net = gross − fees + swap; gross unchanged; existing trades carry none, so no figure moves. Shown as "Swap" after Fees on the trade page, and as "Swap" in the Overview's costs group (hideable like the rest). TZ also lists it on Reports > Calendar's statistics card, which Keel's Calendar report doesn't have yet: that card is a reports gap, raised with 6C and the backlog, and swap joins it when it is built. Manual trades have no swap field: as in TZ, swap by hand goes in a fill's fees. "Financing" is this same figure.
+- **Swap** (B49, B50): one signed amount per trade, negative a cost. Net = gross − fees + swap; gross unchanged; existing trades carry none, so no figure moves. Shown as "Swap" after Fees on the trade page, and as "Swap" in the Overview's costs group (hideable like the rest). TZ also lists it among Reports > Calendar's month statistics; in Keel the month view's panel opens the Overview set to that month (Plan 5 C3, gaps row 109), so the Overview's Swap figure covers it (agreed with 6C, 2026-11-25). Manual trades have no swap field: as in TZ, swap by hand goes in a fill's fees. "Financing" is this same figure.
 - **Stat choice** (B51): a control on the trade page's stats card opens a dialog: search, every stat row with a box and its current value, Cancel, Reset to default, Save. Default: every row on (Keel shows all today). Saved per user. Order stays fixed. The header figures (Net P&L, Net ROI, Realized R) are not in the list: they are always shown.
 - **Costs by hand** (B58): each execution row's commission and fee are editable on the trade page and saved when the row is confirmed; the trade's fees and net are recomputed and the change is logged. Allowed on a finished day (B55).
 - **Attachments** (B30): images (PNG, JPEG, GIF, WebP) as thumbnails, other files as named rows with their size and an open action; 10 MB each; no count cap; upload order; the viewer steps through images, with a confirmed delete; no captions.
@@ -507,7 +507,7 @@ Every row below is Keel's call (TradeZella unknown). "Basis" names the evidence 
 | Id | Question | Keel's call | Basis |
 | --- | --- | --- | --- |
 | B49 | Swap in net | Net = gross − fees + swap; signed, negative a cost | It's a cost (INFERRED) [help 5829394] |
-| B50 | Where swap shows | Trade page and Overview, labelled "Swap"; Reports > Calendar once its statistics card exists (a reports gap, with 6C) | [rec S13; help 5829394; help 7189346] |
+| B50 | Where swap shows | Trade page and Overview, labelled "Swap"; a calendar month reaches it through the month panel's link to the Overview (Plan 5 C3). 6B builds the Overview figure; 6C checks it | [rec S13; help 5829394; help 7189346] |
 | B51 | The stat choice | Every stat-card row switchable; the header figures fixed; all on by default; per user; fixed order | [help 5860216] |
 
 **Storage**

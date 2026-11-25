@@ -71,7 +71,7 @@
 - **Performance,** on the sample (~1,230 trades): every pattern for the whole workspace under 50 ms; filtering plus patterns under 50 ms; the history table pages at 50 rows; thumbnails load lazily and revoke their object URLs on unmount.
 - **Tests:** component tests start with `// @vitest-environment happy-dom` and `afterEach(cleanup)`. Domain and data work is test-first. `npm run e2e` builds first; use the 3130 config.
 - **Verification:** before each commit, `npm test`, `npm run typecheck` and `npm run lint` pass; before each module's last commit, `npm run build` and that module's e2e spec pass.
-- **Out of scope:** AI (#22); the trade scale (#52, U1); price-path patterns T1, T2, T4, T5, T6, T9, T10, T11, T12, T13, D2, D6, D8, D12 (#14); shared strategies (#19); backtesting (#16); the strategy cap and paywall; a strategy colour (Plan 5 ruling 41); the Calendar report's statistics card (a reports gap with 6C).
+- **Out of scope:** AI (#22); the trade scale (#52, U1); price-path patterns T1, T2, T4, T5, T6, T9, T10, T11, T12, T13, D2, D6, D8, D12 (#14); shared strategies (#19); backtesting (#16); the strategy cap and paywall; a strategy colour (Plan 5 ruling 41).
 
 ## Review Focus
 
@@ -512,7 +512,7 @@ Comps: `04-trade-defaults.html` (default, `?state=target-rule`, `?state=fees`, `
 
 ### Task 13: Swap
 
-Delivers B49, B50, and E27's swap part.
+Delivers B49, B50, and E27's swap part. 6B owns the Overview's Swap figure; 6C's plan only checks it (agreed 2026-11-25).
 
 **Files:**
 - Modify: `src/domain/import/mapping.ts` (`TradeRowField` `'swap'`, synonyms swap, swaps, rollover, financing), `src/domain/import/rows.ts` (`ImportedTrip.swap?`), `src/domain/import/plan.ts` (`buildTrips`), `src/domain/metrics/summary.ts` (`costsOf` gains `swap`), `src/components/app/reports/{overview-costs,overview-choice}.tsx` (`costs:swap`), `src/components/app/trades/trade-view.tsx` (the Swap row after Fees; the hero's sub-line adds swap), `src/content/metric-definitions.ts` (`swap`)
@@ -803,6 +803,6 @@ Delivers B53.
 ### Task 27: Audit, records and final checks
 
 - [ ] **Step 1: Parity audit.** A fresh reviewer, who has not seen the build reviews, checks the whole branch against `plan6b-behaviour.md` row by row and against the spec's B and U calls: every control, column, field, stat, step and state. Fix every verified finding.
-- [ ] **Step 2: Records.** In `docs/BACKLOG.md`: close #38, #39, #40 (fills-only), #42, #43, #44, #53, #55, #56, E10 and E27's swap part; add rows for the price-path patterns and D8 (with #14), for the Calendar report's statistics card (reports, with 6C), and move #52 to the market-data plan (U1). In `docs/research/tradezella-feature-map.md`, mark the rows done and correct TR10 (spec §7). Record new components in `DESIGN.md`.
+- [ ] **Step 2: Records.** In `docs/BACKLOG.md`: close #38, #39, #40 (fills-only), #42, #43, #44, #53, #55, #56, E10 and E27's swap part; add rows for the price-path patterns and D8 (with #14), and move #52 to the market-data plan (U1). In `docs/research/tradezella-feature-map.md`, mark the rows done and correct TR10 (spec §7). Record new components in `DESIGN.md`.
 - [ ] **Step 3: Final checks.** `npm test && npm run typecheck && npm run lint && npm run build`, then every e2e spec on port 3130. Check 390, 768, 1440 and 1680 in light and dark for each new surface.
 - [ ] **Step 4:** Commit: `docs: Plan 6B records and parity audit`.
