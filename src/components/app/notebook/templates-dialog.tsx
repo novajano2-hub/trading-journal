@@ -120,9 +120,12 @@ function TemplateForm({
 export function TemplatesDialog({
   open,
   onOpenChange,
+  editDefault = false,
 }: {
   open: boolean;
   onOpenChange(open: boolean): void;
+  /** Opens straight on the default daily template, to edit it. */
+  editDefault?: boolean;
 }): React.JSX.Element {
   const templates = useTemplates().data;
   const setDefault = useSetDefaultTemplate();
@@ -130,6 +133,22 @@ export function TemplatesDialog({
   const [editing, setEditing] = useState<Editing | null>(null);
   const [deleting, setDeleting] = useState<NoteTemplate | null>(null);
   const [failed, setFailed] = useState(false);
+
+  const [wasOpen, setWasOpen] = useState(false);
+  if (open !== wasOpen && (!open || templates !== undefined)) {
+    setWasOpen(open);
+    const first = editDefault
+      ? templates?.find((t) => t.kind === 'daily-review' && t.isDefault)
+      : undefined;
+    if (open && first)
+      setEditing({
+        id: first.id,
+        kind: first.kind,
+        name: first.name,
+        body: structuredClone(first.body),
+        isDefault: first.isDefault,
+      });
+  }
 
   const close = (next: boolean) => {
     if (!next) setEditing(null);

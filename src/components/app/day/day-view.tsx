@@ -9,6 +9,8 @@ import { usePhone } from '@/lib/use-phone';
 import { BadDate } from './bad-date';
 import { useImportPicker } from './import-picker';
 import { useDaySession } from './session-button';
+import { PlanMode } from './plan-mode';
+import { ReviewMode } from './review-mode';
 import { StageBar } from './stage-bar';
 
 /**
@@ -72,6 +74,7 @@ export function DayView({
           {imports.picker}
         </>
       ) : null}
+      {mode === 'plan' ? <PlanMode date={date} /> : <ReviewMode date={date} />}
     </div>
   );
 }

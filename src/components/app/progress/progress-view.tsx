@@ -13,8 +13,7 @@ import { StorageUnavailableError } from '@/data/repository';
 import { versionOn } from '@/domain/tracker/defaults';
 import { periodScore, ruleStats, streaks } from '@/domain/tracker/summary';
 import { rangeCaption } from '@/lib/range-label';
-import { onTradingDate, weekdayOf } from '@/lib/time-format';
-import { plural } from '@/lib/format';
+import { dayLabel } from '@/lib/time-format';
 import { CARD, CARD_PAD, Caption, CardHeader } from '../dashboard/shared';
 import { PlanTheDay } from '../routine/plan-the-day';
 import { DayRules } from './day-rules';
@@ -23,10 +22,6 @@ import { HeatGrid } from './heat-grid';
 import { RulesTable } from './rules-table';
 import { ProgressTiles } from './tiles';
 import { ProgressSkeleton } from './states';
-
-/** "Tue 24 Nov". */
-const dayLabel = (date: string): string =>
-  `${weekdayOf(date, 'short')} ${onTradingDate(date, { day: 'numeric', month: 'short' })}`;
 
 /**
  * The progress tracker page: three tiles, today's checklist, the history grid
@@ -46,6 +41,8 @@ export function ProgressView(): React.JSX.Element {
   const [controlsHost, setControlsHost] = useState<HTMLElement | null>(null);
   // The Edit rules dialog grows from, and returns to, whichever button opened it.
   const [editing, setEditing] = useState(false);
+  // A tick the write refused (a day closed in another tab, storage failing).
+  const [tickFailed, setTickFailed] = useState(false);
   const editOrigin = useRef<HTMLElement | null>(null);
 
   if (scores.status === 'error') {
@@ -87,13 +84,6 @@ export function ProgressView(): React.JSX.Element {
   const version =
     versionOn(tracker, today) ?? tracker.versions[tracker.versions.length - 1]!;
   const range = resolveRange(filters.range, today, prefs.weekStart);
-  const scoredInRange = days.filter(
-    (d) =>
-      !d.unscored &&
-      d.active > 0 &&
-      (range.from === undefined || d.date >= range.from) &&
-      (range.to === undefined || d.date <= range.to),
-  ).length;
   const rangeText = rangeCaption(range, today);
   const empty = todayScore.active === 0;
   const readOnly = todayScore.finished;
@@ -139,11 +129,20 @@ export function ProgressView(): React.JSX.Element {
               readOnly={readOnly}
               detail="values"
               currency={prefs.baseCurrency}
-              onTick={(ruleId, ticked) =>
-                setTick.mutate({ date: today, ruleId, ticked })
-              }
+              onTick={(ruleId, ticked) => {
+                setTickFailed(false);
+                setTick.mutate(
+                  { date: today, ruleId, ticked },
+                  { onError: () => setTickFailed(true) },
+                );
+              }}
             />
           )}
+          {tickFailed ? (
+            <p role="alert" className="mt-2 text-[13px] text-muted">
+              Couldn&apos;t save. Try again.
+            </p>
+          ) : null}
           <div className="mt-3 border-t border-line pt-3.5">
             <PlanTheDay wide />
           </div>
@@ -156,19 +155,14 @@ export function ProgressView(): React.JSX.Element {
             headingId="history-title"
             title="History"
             after={
-              <>
-                <MetricTip
-                  id="tracker-history"
-                  basis="net"
-                  className="-ml-1.5 size-[22px] justify-center text-faint hover:text-muted"
-                >
-                  <Info size={15} aria-hidden="true" />
-                  <span className="sr-only">About History</span>
-                </MetricTip>
-                <span className="text-[12.5px] whitespace-nowrap text-faint max-sm:order-3 max-sm:basis-full">
-                  Since {dayLabel(tracker.startedOn)}
-                </span>
-              </>
+              <MetricTip
+                id="tracker-history"
+                basis="net"
+                className="-ml-1.5 size-[22px] justify-center text-faint hover:text-muted"
+              >
+                <Info size={15} aria-hidden="true" />
+                <span className="sr-only">About History</span>
+              </MetricTip>
             }
             end={
               <span ref={setControlsHost} className="flex items-center gap-2" />
@@ -191,7 +185,6 @@ export function ProgressView(): React.JSX.Element {
             version={version}
             today={todayScore}
             currency={prefs.baseCurrency}
-            caption={`${rangeText}, ${scoredInRange} scored ${plural(scoredInRange, 'day')}`}
             onEdit={editRules}
           />
         </div>

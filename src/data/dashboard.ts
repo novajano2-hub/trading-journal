@@ -129,11 +129,7 @@ export interface DashboardEnv {
   strategies: readonly Strategy[];
   tags: readonly Tag[];
   tagCategories: readonly TagCategory[];
-  baseCurrency: string;
   ctx: MetricContext;
-  /** The resolved date range. */
-  range: { from?: string; to?: string };
-  today: string;
 }
 
 export interface DashboardModel {

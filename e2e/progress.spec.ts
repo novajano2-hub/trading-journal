@@ -28,9 +28,7 @@ test('a grid hover reads rules met', async ({ page }) => {
   await ready(page);
   const history = page.getByRole('region', { name: 'History' });
   await history.locator('[role="gridcell"][data-step]').last().hover();
-  await expect(history.getByRole('status')).toContainText(
-    /\d+ of \d+ rules met/,
-  );
+  await expect(history.getByText(/\d+ of \d+ rules met/)).toBeVisible();
 });
 
 test('Edit rules: a trading day switched off shows in today, once saved', async ({
@@ -58,8 +56,10 @@ test('Edit rules: a trading day switched off shows in today, once saved', async 
   await expect(today).toContainText("isn't a trading day");
 });
 
-test("the dashboard card's link opens the page", async ({ page }) => {
-  await page.goto('/app/dashboard');
+test("the dashboard card's link opens the page on the same range", async ({
+  page,
+}) => {
+  await page.goto('/app/dashboard?from=2026-11-02&to=2026-11-20');
   await expect(page.getByTestId('dashboard-ready')).toBeVisible({
     timeout: 20_000,
   });
@@ -67,8 +67,13 @@ test("the dashboard card's link opens the page", async ({ page }) => {
   await expect(card).toContainText(/\d+ of \d+ rules met/);
   await expect(
     card.getByRole('link', { name: "Today's checklist" }),
-  ).toHaveAttribute('href', /^\/app\/day\/\d{4}-\d{2}-\d{2}\/plan$/);
+  ).toHaveAttribute(
+    'href',
+    /^\/app\/day\/\d{4}-\d{2}-\d{2}\/plan\?from=2026-11-02&to=2026-11-20$/,
+  );
   await card.getByRole('link', { name: 'Open tracker' }).click();
-  await expect(page).toHaveURL(/\/app\/progress$/);
+  await expect(page).toHaveURL(
+    /\/app\/progress\?from=2026-11-02&to=2026-11-20$/,
+  );
   await ready(page);
 });

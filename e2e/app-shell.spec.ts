@@ -63,11 +63,11 @@ test('every app route renders its title without overflow; placeholders state it 
       await expect(
         page.getByRole('link', { name: 'Opening range breakout' }),
       ).toBeVisible();
-    // Daily journal: the seed's 20 daily reviews and its 95 pre-market plans.
+    // Daily journal: the seed's 20 daily reviews, its 95 pre-market plans and the 3 routine-note- daily notes the routine stamps (sample v5).
     if (path === '/app/notebook')
       await expect(
         page.getByRole('list', { name: 'Notes' }).getByRole('listitem'),
-      ).toHaveCount(115, { timeout: 20_000 });
+      ).toHaveCount(20 + 95 + 3, { timeout: 20_000 });
     // Settings opens on Profile, with its five sections.
     if (path === '/app/settings') {
       await expect(page).toHaveURL(/\/app\/settings\/profile$/);
@@ -377,7 +377,12 @@ test('Tab walks the top bar in the order it reads: title, chips, search, Display
   const tail = [
     bar.getByRole('combobox', { name: 'Search' }),
     bar.getByRole('button', { name: /show as / }),
-    ...(mobile ? [] : [bar.getByRole('link', { name: 'Import' })]),
+    ...(mobile
+      ? []
+      : [
+          bar.getByRole('button', { name: 'Plan the day' }),
+          bar.getByRole('link', { name: 'Import' }),
+        ]),
   ];
   // What comes before the bar: the skip link on phones, the sidebar's last link on desktop.
   const before = mobile

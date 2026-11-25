@@ -1,6 +1,6 @@
 'use client';
 
-import { CaretDown } from '@phosphor-icons/react/dist/ssr';
+import { CaretDown, LockSimple } from '@phosphor-icons/react/dist/ssr';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Popover } from 'radix-ui';
@@ -9,7 +9,9 @@ import type { DayMode } from '@/lib/day-routes';
 import { dayHref } from '@/lib/day-routes';
 import { onTradingDate, weekdayOf } from '@/lib/time-format';
 import { usePhone } from '@/lib/use-phone';
+import { Chip } from '@/components/ui/chip';
 import { MonthPicker } from '../routine/month-picker';
+import { useDayFinished } from './day-lock';
 import { useDaySession } from './session-button';
 import { StageBar } from './stage-bar';
 
@@ -48,6 +50,7 @@ export function DayHeader({
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(date.slice(0, 7));
   const label = dayLabel(date, today);
+  const closed = useDayFinished(date);
 
   return (
     <>
@@ -100,6 +103,15 @@ export function DayHeader({
       ) : (
         <h1 className={`${TITLE} flex-none sm:mr-1`}>{label}</h1>
       )}
+      {closed.finished ? (
+        <Chip className="mr-2 flex-none">
+          <LockSimple size={13} aria-hidden="true" />
+          Closed
+          {closed.time === undefined ? null : (
+            <span className="max-sm:sr-only">{closed.time}</span>
+          )}
+        </Chip>
+      ) : null}
       {phone ? null : (
         <StageBar
           date={date}

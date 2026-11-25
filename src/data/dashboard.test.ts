@@ -39,10 +39,7 @@ const env = (ctx: MetricContext): DashboardEnv => ({
   strategies: s.strategies,
   tags: s.tags,
   tagCategories: s.tagCategories,
-  baseCurrency: 'USD',
   ctx,
-  range: {},
-  today: '2026-11-20',
 });
 
 test('the dashboard is the engine, sorted by cost', () => {

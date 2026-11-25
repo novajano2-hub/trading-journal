@@ -12,6 +12,7 @@ import { MenuSelect } from '@/components/ui/menu-select';
 import { useSaveJournalEntry } from '@/data/query/hooks';
 import type { JournalEntry, NoteFolder } from '@/domain/types';
 import { dayLabel } from '@/data/seed/calendar';
+import { LockLine, useDayFinished } from '../day/day-lock';
 import { NOTE_SAVE_DELAY_MS } from '../trades/trade-journal';
 import { NoteEditor } from '../notes/note-editor';
 import { DayCard, TradeStatsCard } from './day-card';
@@ -61,6 +62,11 @@ export function EntryPane({
 }): React.JSX.Element {
   const save = useSaveJournalEntry();
   const trashed = entry.deletedAt !== undefined;
+  // A daily note of a finished date is frozen with the day (K3).
+  const closed = useDayFinished(
+    entry.kind === 'daily-review' ? entry.date : undefined,
+  ).finished;
+  const frozen = trashed || closed;
   const isDraft = entry.id === DRAFT_ID;
   const [seed] = useState(entry.body);
   const [title, setTitle] = useState(entry.title);
@@ -162,7 +168,7 @@ export function EntryPane({
         <MenuSelect
           label="Move to folder"
           value={shown.folderId ?? ''}
-          disabled={trashed}
+          disabled={frozen}
           onChange={(id) => commit({ folderId: id === '' ? undefined : id })}
           options={[
             { value: '', label: 'No folder' },
@@ -192,7 +198,7 @@ export function EntryPane({
             </span>
           ) : null}
         </span>
-        {trashed ? null : (
+        {frozen ? null : (
           <>
             <button
               type="button"
@@ -221,6 +227,7 @@ export function EntryPane({
         )}
       </div>
 
+      {closed && !trashed ? <LockLine className="mt-3" /> : null}
       {trashed ? (
         <div
           role="note"
@@ -248,7 +255,7 @@ export function EntryPane({
       <input
         aria-label="Note title"
         value={title}
-        readOnly={trashed}
+        readOnly={frozen}
         placeholder="Untitled note"
         onChange={(e) => {
           setTitle(e.target.value);
@@ -262,7 +269,7 @@ export function EntryPane({
         <DayCard
           date={day}
           linkedTradeIds={shown.linkedTradeIds}
-          readOnly={trashed}
+          readOnly={frozen}
           onLinkedChange={(ids) => commit({ linkedTradeIds: ids })}
         />
       ) : entry.kind === 'trade-note' ? (
@@ -273,7 +280,7 @@ export function EntryPane({
         <LinkedTrades
           linkedIds={shown.linkedTradeIds}
           date={day}
-          readOnly={trashed}
+          readOnly={frozen}
           onChange={(ids) => commit({ linkedTradeIds: ids })}
         />
       )}
@@ -286,10 +293,10 @@ export function EntryPane({
         {shown.tags.map((t) => (
           <span
             key={t}
-            className={`inline-flex h-[26px] items-center rounded-full bg-sunken pl-2.5 text-[12.5px] font-[550] text-text ${trashed ? 'pr-2.5' : 'pr-1'}`}
+            className={`inline-flex h-[26px] items-center rounded-full bg-sunken pl-2.5 text-[12.5px] font-[550] text-text ${frozen ? 'pr-2.5' : 'pr-1'}`}
           >
             {t}
-            {trashed ? null : (
+            {frozen ? null : (
               <button
                 type="button"
                 aria-label={`Remove tag ${t}`}
@@ -303,7 +310,7 @@ export function EntryPane({
             )}
           </span>
         ))}
-        {trashed ? null : (
+        {frozen ? null : (
           <input
             aria-label="Add a tag"
             placeholder={shown.tags.length === 0 ? 'Add a tag' : 'Add another'}
@@ -334,7 +341,7 @@ export function EntryPane({
         <NoteEditor
           label="Note"
           value={seed}
-          readOnly={trashed}
+          readOnly={frozen}
           placeholder="Write here, or type / for blocks"
           onChange={(doc) => {
             draft.current.body = doc;

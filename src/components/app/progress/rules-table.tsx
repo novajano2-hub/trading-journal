@@ -7,16 +7,11 @@ import { MetricTip } from '@/components/ui/metric-tip';
 import type { DayScore, RuleKey, RuleStatus } from '@/domain/tracker/score';
 import type { RuleStat } from '@/domain/tracker/summary';
 import type { TrackerStage, TrackerVersion } from '@/domain/types';
-import { useDisplay } from '@/lib/display';
 import { plural } from '@/lib/format';
-import { CARD, CARD_PAD, Caption, CardHeader } from '../dashboard/shared';
+import { CARD, CARD_PAD, CardHeader } from '../dashboard/shared';
 import { Mark } from './day-rules';
-import {
-  ruleCondition,
-  ruleName,
-  STAGE_NAME,
-  type FormatMoney,
-} from './rule-label';
+import { ProgressBar } from './progress-bar';
+import { ruleCondition, ruleName, useNetCash } from './rule-label';
 
 const STAGE_ORDER = { prepare: 0, trade: 1, reflect: 2 } as const;
 
@@ -50,15 +45,13 @@ const hhmm = (minutes: number): string => {
 interface Row {
   key: RuleKey;
   name: string;
-  stage: string;
   condition: string;
   streak: string;
   average: React.ReactNode;
   /** The average is empty. */
   none: boolean;
-  /** Whole percent, or null with no decided day. */
-  follow: number | null;
-  title: string;
+  /** Whole percent; 0 with no decided day (R12). */
+  follow: number;
   status: RuleStatus | undefined;
 }
 
@@ -74,11 +67,10 @@ function useRows(
   today: DayScore,
   currency: string,
 ): Row[] {
-  const display = useDisplay();
-  // The tracker is always net, in the rule's own currency.
-  const fmt: FormatMoney = (cents) => display.cash(cents, false, currency);
-  // Every current rule has a row; one with no scored day reads zeros, as
-  // TradeZella's nothing-done state does.
+  const fmt = useNetCash(currency);
+  // Every current rule has a row. One with no decided day reads streak 0,
+  // average None and follow rate 0%: these zeros are Keel's R12, not
+  // TradeZella's state (its zeros come from scored, failed days).
   const seen = new Map(stats.map((s) => [s.key, s]));
   return currentRules(version)
     .map(
@@ -94,7 +86,6 @@ function useRows(
     )
     .sort((a, b) => STAGE_ORDER[a.stage] - STAGE_ORDER[b.stage])
     .map((s) => {
-      const custom = s.key.startsWith('custom:');
       const avg = s.average;
       let average: React.ReactNode;
       if (avg === null) average = 'None';
@@ -102,23 +93,14 @@ function useRows(
       else if (s.key === 'lossPerTrade' || s.key === 'lossPerDay')
         average = <FigureText f={fmt(Math.round(avg))} />;
       else average = `${Math.round(avg * 100)}%`;
-      const met =
-        s.followRate === null ? 0 : Math.round(s.followRate * s.scoredDays);
       return {
         key: s.key,
         name: ruleName(s.key, version, fmt),
-        stage: custom
-          ? `${STAGE_NAME[s.stage]}, ticked by hand`
-          : STAGE_NAME[s.stage],
         condition: ruleCondition(s.key, version, fmt),
         streak: `${s.streak} ${plural(s.streak, 'day')}`,
         average,
         none: avg === null,
-        follow: s.followRate === null ? null : Math.round(s.followRate * 100),
-        title:
-          s.followRate === null || s.scoredDays === 0
-            ? 'No scored days yet'
-            : `${met} of ${s.scoredDays} scored ${plural(s.scoredDays, 'day')}`,
+        follow: s.followRate === null ? 0 : Math.round(s.followRate * 100),
         status: today.rules.find((r) => r.key === s.key)?.status,
       };
     });
@@ -126,18 +108,10 @@ function useRows(
 
 function FollowBar({ row }: { row: Row }): React.JSX.Element {
   return (
-    <span className="flex items-center gap-2.5" title={row.title}>
-      <span
-        aria-hidden="true"
-        className="relative h-1.5 flex-1 overflow-hidden rounded-[3px] bg-accent-soft"
-      >
-        <i
-          className="absolute inset-y-0 left-0 rounded-[3px] bg-[linear-gradient(90deg,color-mix(in_srgb,var(--accent)_78%,#fff),var(--accent))]"
-          style={{ width: `${row.follow ?? 0}%` }}
-        />
-      </span>
+    <span className="flex items-center gap-2.5">
+      <ProgressBar percent={row.follow} aria-hidden="true" className="flex-1" />
       <b className="w-[38px] text-right text-[13px] font-[550] tabular-nums">
-        {row.follow === null ? 'None' : `${row.follow}%`}
+        {row.follow}%
       </b>
     </span>
   );
@@ -158,15 +132,12 @@ export function RulesTable({
   version,
   today,
   currency,
-  caption,
   onEdit,
 }: {
   stats: readonly RuleStat[];
   version: TrackerVersion;
   today: DayScore;
   currency: string;
-  /** The range and the scored days in it, "1-24 Nov, 17 scored days". */
-  caption: string;
   /** Gets the button that was pressed, for the dialog to grow from. */
   onEdit(opener: HTMLElement): void;
 }): React.JSX.Element {
@@ -179,7 +150,6 @@ export function RulesTable({
       <CardHeader
         headingId="rules-title"
         title="Rules"
-        after={<Caption>{caption}</Caption>}
         end={
           <button
             type="button"
@@ -219,7 +189,7 @@ export function RulesTable({
               <MetricTip id="rule-average" basis="net" />
             </th>
             <th scope="col" className={TH}>
-              <MetricTip id="rule-follow-rate" basis="net" />
+              <MetricTip id="tracker-follow-rate" basis="net" />
             </th>
           </tr>
         </thead>
@@ -237,9 +207,6 @@ export function RulesTable({
                 <span className="block leading-[1.35] font-medium">
                   {r.name}
                 </span>
-                <small className="mt-px block text-xs text-faint">
-                  {r.stage}
-                </small>
               </td>
               <td className={`${TD} whitespace-normal text-muted`}>
                 {r.condition}
@@ -275,7 +242,7 @@ export function RulesTable({
               <span className="flex items-baseline gap-2.5">
                 <b className="text-sm leading-[1.35] font-medium">{r.name}</b>
                 <b className="ml-auto text-[13px] font-semibold tabular-nums">
-                  {r.follow === null ? 'None' : `${r.follow}%`}
+                  {r.follow}%
                 </b>
               </span>
               <span className="mt-[3px] flex flex-wrap gap-x-3 gap-y-0.5 text-[12.5px] text-muted">

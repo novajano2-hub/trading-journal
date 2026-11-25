@@ -221,10 +221,7 @@ export function DashboardView(): React.JSX.Element {
       strategies,
       tags,
       tagCategories: categories,
-      baseCurrency: prefs.baseCurrency,
       ctx,
-      range,
-      today,
     });
     // What the display units divide by, and the trades behind each figure.
     const pctBase = pctBaseOf({

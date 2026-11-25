@@ -158,12 +158,12 @@ test('reset restores the seed; clear empties only My workspace', async () => {
     seededAt: '2026-11-23T15:00:00.000Z',
     version: SAMPLE_SEED_VERSION,
   });
-  // My workspace keeps its built-ins (2 categories, 3 templates) and its own rows.
-  expect(await mineCounts(db)).toEqual([1, 1, 1, 1, 1, 1, 3, 4, 1, 1, 1]);
+  // My workspace keeps its built-ins (2 categories, 6 templates) and its own rows.
+  expect(await mineCounts(db)).toEqual([1, 1, 1, 1, 1, 1, 3, 7, 1, 1, 1]);
   expect(await db.trades.get(['mine', mine.trade.id])).toEqual(mine.trade);
 
   await repo.workspaces.clearUser();
-  expect(await mineCounts(db)).toEqual([0, 0, 0, 0, 0, 0, 2, 3, 0, 0, 0]);
+  expect(await mineCounts(db)).toEqual([0, 0, 0, 0, 0, 0, 2, 6, 0, 0, 0]);
   const builtIns = await mineRowsOf(db, ['tagCategories', 'templates']);
   expect(builtIns).toEqual([
     [...builtInCategories(USER_WORKSPACE.id)].sort(byId),
