@@ -34,6 +34,7 @@ export const keys = {
   files: (ws: string, owner: string) =>
     [...W(ws), 'files', 'owner', owner] as const,
   file: (ws: string, id: string) => [...W(ws), 'files', 'id', id] as const,
+  history: (ws: string) => [...W(ws), 'history'] as const,
   imports: (ws: string) => [...W(ws), 'imports'] as const,
   importContext: (ws: string, accountId: string) =>
     [...W(ws), 'imports', 'context', accountId] as const,
@@ -108,9 +109,14 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
     case 'trades.updateMany':
     case 'trades.createManual':
     case 'trades.replaceManual':
-      return [keys.trades(ws), keys.imports(ws)];
+      return [keys.trades(ws), keys.imports(ws), keys.history(ws)];
     case 'trades.remove':
-      return [keys.trades(ws), keys.journal(ws), keys.imports(ws)];
+      return [
+        keys.trades(ws),
+        keys.journal(ws),
+        keys.imports(ws),
+        keys.history(ws),
+      ];
     case 'journal.remove':
       return [
         keys.trades(ws),

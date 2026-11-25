@@ -13,6 +13,7 @@ import type {
   DayRecord,
   DayShot,
   FrozenDay,
+  HistoryRow,
   ImportJob,
   Instrument,
   JournalEntry,
@@ -530,6 +531,15 @@ export interface FilesRepo {
   reassign(ws: string, from: string, to: string): Promise<void>;
 }
 
+/**
+ * The edit history (B26 to B28): one row per changed field, written by each
+ * repository write in the transaction that makes the change.
+ */
+export interface HistoryRepo {
+  /** Newest first. Removes the workspace's rows older than 30 days first (B28). */
+  list(ws: string): Promise<HistoryRow[]>;
+}
+
 export interface Repository {
   workspaces: WorkspacesRepo;
   prefs: PrefsRepo;
@@ -547,5 +557,6 @@ export interface Repository {
   days: DaysRepo;
   dayShots: DayShotsRepo;
   files: FilesRepo;
+  history: HistoryRepo;
   imports: ImportRepo;
 }

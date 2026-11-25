@@ -6,6 +6,7 @@ test('the invalidation table', () => {
   expect(invalidationsFor('trades.update', 'sample')).toEqual([
     keys.trades('sample'),
     keys.imports('sample'),
+    keys.history('sample'),
   ]);
   expect(invalidationsFor('tags.remove', 'mine')).toEqual([
     keys.tags('mine'),
@@ -40,9 +41,9 @@ test('Plan 5 writes invalidate what they change', () => {
     ['templates.save', k('templates')],
     ['templates.remove', k('templates')],
     ['templates.setDefault', k('templates')],
-    ['trades.createManual', k('trades', 'imports')],
-    ['trades.replaceManual', k('trades', 'imports')],
-    ['trades.updateMany', k('trades', 'imports')],
+    ['trades.createManual', k('trades', 'imports', 'history')],
+    ['trades.replaceManual', k('trades', 'imports', 'history')],
+    ['trades.updateMany', k('trades', 'imports', 'history')],
     ['accounts.clearTrades', k('trades', 'journal', 'imports')],
     [
       'accounts.remove',
@@ -71,6 +72,20 @@ test('Plan 5 writes invalidate what they change', () => {
   ];
   for (const [write, expected] of table)
     expect(invalidationsFor(write, ws), write).toEqual(expected);
+});
+
+test('every trade write makes the edit history stale', () => {
+  for (const write of [
+    'trades.update',
+    'trades.updateMany',
+    'trades.createManual',
+    'trades.replaceManual',
+    'trades.remove',
+  ] as const)
+    expect(invalidationsFor(write, 'mine'), write).toContainEqual(
+      keys.history('mine'),
+    );
+  expect(keys.history('mine')).not.toEqual(keys.history('sample'));
 });
 
 test('a day key covers a date, and the shots of one date sit under all shots', () => {

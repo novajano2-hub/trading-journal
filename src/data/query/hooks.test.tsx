@@ -19,6 +19,7 @@ import {
   useEnsureTradeNote,
   useFile,
   useFiles,
+  useHistory,
   useJournal,
   useRemoveAccount,
   useRemoveFile,
@@ -214,6 +215,40 @@ test('an update shows up in the list', async () => {
       result.current.trades.data!.find((t) => t.id === 'f-1')!.tagIds,
     ).toEqual(['tag-setup']),
   );
+});
+
+test('a trade write shows up in the edit history', async () => {
+  const { result } = renderHook(
+    () => ({
+      history: useHistory(),
+      update: useUpdateTrade(),
+      updateMany: useUpdateTrades(),
+    }),
+    { wrapper: wrapper() },
+  );
+  await waitFor(() => expect(result.current.history.data).toEqual([]));
+  await act(async () => {
+    await result.current.update.mutateAsync({
+      id: 'f-2',
+      patch: { rating: 4 },
+    });
+  });
+  await waitFor(() =>
+    expect(
+      result.current.history.data?.map((r) => [
+        r.entityId,
+        r.field,
+        r.newValue,
+      ]),
+    ).toEqual([['f-2', 'rating', 4]]),
+  );
+  await act(async () => {
+    await result.current.updateMany.mutateAsync({
+      ids: ['f-1', 'f-2'],
+      patch: { reviewed: true },
+    });
+  });
+  await waitFor(() => expect(result.current.history.data).toHaveLength(3));
 });
 
 test('switching to My workspace swaps the data', async () => {

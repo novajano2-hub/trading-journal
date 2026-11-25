@@ -8,6 +8,7 @@ import { localDays } from './days';
 import { localDayShots } from './day-shots';
 import { localFiles } from './files';
 import { localFolders } from './folders';
+import { localHistory } from './history';
 import { localImports } from './imports';
 import { localJournal } from './journal';
 import { localPrefs } from './prefs';
@@ -54,5 +55,6 @@ export function createLocalRepository(
     days: localDays(ctx),
     dayShots: localDayShots(ctx),
     files: localFiles(ctx),
+    history: localHistory(ctx),
   };
 }

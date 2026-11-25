@@ -16,6 +16,7 @@ import type {
   DayRecord,
   DayShot,
   FrozenDay,
+  HistoryRow,
   ImportJob,
   JournalEntry,
   NoteFolder,
@@ -200,6 +201,11 @@ export function useFile(
     async (r, ws) => (await r.files.get(ws, id!)) ?? null,
     id !== undefined,
   );
+}
+
+/** The last 30 days of edits in the active workspace, newest first. */
+export function useHistory(): UseQueryResult<HistoryRow[]> {
+  return useWorkspaceQuery(keys.history, (r, ws) => r.history.list(ws));
 }
 
 export function useTrades(): UseQueryResult<Trade[]> {
