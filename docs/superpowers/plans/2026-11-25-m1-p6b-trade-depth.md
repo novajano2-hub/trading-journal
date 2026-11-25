@@ -274,6 +274,7 @@ Delivers B26 and B27.
 - Logged: accounts (`name`, `broker`, `type`, `currency`, `startingBalance`, `status`); cash flows (`amount`, `kind`, `at`, `note`); strategies (`name`, `description`, `status`, `icon`, `photoId`; groups as "rules", value the rule count); tags and categories (`name`, `color`, `categoryId`, `description`). Target and fee rules log in Task 11.
 - An import commit logs one row: type `import`, action `created`, source `import`, label the file name, `field: 'trades'`, `newValue` the trade count (B27). An undo logs action `undone`.
 - Settling expired options (Plan 5) logs its trade edits with source `system`.
+- `accounts.clearTrades` logs one account row (field `trades`, old value the count, new value 0, source you). Deleting a strategy, tag or category logs one row on that entity, not one per trade it was removed from; `journal.ensureTradeNote` (the system linking a note) logs nothing (ledger ruling).
 
 - [ ] **Step 1: Write the failing tests,** one per repository: `'<entity> create, edit and delete each log'`; `'an import logs one row, not one per trade'`; `'an undo logs one row'`; `'settled options log as system'`.
 - [ ] **Step 2:** FAIL. **Step 3:** Implement. **Step 4:** PASS (test, typecheck, lint).
