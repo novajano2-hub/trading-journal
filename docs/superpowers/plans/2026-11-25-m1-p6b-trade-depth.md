@@ -752,7 +752,7 @@ Delivers B43, B48. Comps: `07-strategies.html` (`?state=strategy`, `?state=misse
 
 **Files:**
 - Create: `src/data/local/missed-trades.ts` and a test; `src/components/app/strategies/{missed-trades,photo-field}.tsx`, and tests
-- Modify: `src/data/repository.ts`, `src/data/query/{keys,hooks}.ts`, `strategy-view.tsx` (the missed-trades card; the photo band), `strategies-view.tsx` (the band on cards; "n missed" beside the trade count), `strategy-form.tsx` (the Photo field), `src/data/local/strategies.ts` (`remove` deletes its missed trades)
+- Modify: `src/data/repository.ts`, `src/data/query/{keys,hooks}.ts`, `strategy-view.tsx` (the missed-trades card; the photo band), `strategies-view.tsx` (the band on cards; "n missed" beside the trade count), `strategy-form.tsx` (the Photo field), `src/data/local/strategies.ts` (`remove` deletes its missed trades; `update` can clear `photoId`: add it to the clearable keys)
 
 **Interfaces:**
 - Produces: `MissedTradesRepo { list(ws, strategyId); create(ws, input: Omit<MissedTrade, 'id' | 'workspaceId'>); update(ws, id, patch); remove(ws, id) }`; hooks `useMissedTrades(strategyId)`, `useSaveMissedTrade()`, `useRemoveMissedTrade()`.
