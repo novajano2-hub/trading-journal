@@ -357,9 +357,10 @@ export function generateSampleWorkspace(opts: {
     tagCategories,
     tags,
     trades: allTrades,
-    journal,
+    journal: [...journal, ...routine.notes],
     challenges: prop.challenges,
-    ...routine,
+    tracker: routine.tracker,
+    days: routine.days,
   };
 }
 

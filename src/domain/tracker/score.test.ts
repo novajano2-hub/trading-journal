@@ -20,13 +20,22 @@ const inp = (o: Partial<AccountDayInputs>): AccountDayInputs => ({
   ...o,
 });
 
+/** Hours are off by default; most of these tests want every built-in rule. */
+const allRules = (from: string) => {
+  const v = defaultVersion(from);
+  return {
+    ...v,
+    builtIn: { ...v.builtIn, hours: { ...v.builtIn.hours, on: true } },
+  };
+};
+
 // 2026-11-19 is a Thursday.
 const args = (o: Partial<ScoreArgs> = {}): ScoreArgs => ({
   date: '2026-11-19',
   today: '2026-11-20',
   nowTime: '10:00',
   startedOn: '2026-11-02',
-  version: defaultVersion('2026-11-02'),
+  version: allRules('2026-11-02'),
   inputs: none,
   allInputs: none,
   ticks: {},
@@ -201,7 +210,7 @@ describe('scoreDay', () => {
   });
 
   test('a custom rule on a non-trading weekday is never active (K11)', () => {
-    const version = defaultVersion('2026-11-02');
+    const version = allRules('2026-11-02');
     version.custom = [
       {
         id: 'c1',
@@ -219,7 +228,7 @@ describe('scoreDay', () => {
   });
 
   test('custom rules are met by a tick, only on their days, ordered by stage', () => {
-    const version = defaultVersion('2026-11-02');
+    const version = allRules('2026-11-02');
     const days = (on: number[]) =>
       [0, 1, 2, 3, 4, 5, 6].map((d) => on.includes(d)) as [
         boolean,
@@ -261,7 +270,7 @@ describe('scoreDay', () => {
   });
 
   test('switched-off built-ins are not active', () => {
-    const version = defaultVersion('2026-11-02');
+    const version = allRules('2026-11-02');
     version.builtIn.startBy.on = false;
     version.builtIn.lossPerDay.on = false;
     const s = scoreDay(args({ version }));

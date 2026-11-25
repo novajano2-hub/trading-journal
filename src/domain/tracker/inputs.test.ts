@@ -1,15 +1,19 @@
 import { describe, expect, test } from 'vitest';
 import { makeTrade } from '../__fixtures__/trades';
 import { realizations } from '../metrics/realized';
-import type { Execution } from '../types';
+import type { Execution, TrackerVersion } from '../types';
 import { defaultVersion } from './defaults';
 import { dayInputs, stampTime, sumInputs, type InputsEnv } from './inputs';
 
 const NY = 'America/New_York';
+const withHours = (v: TrackerVersion): TrackerVersion => ({
+  ...v,
+  builtIn: { ...v.builtIn, hours: { ...v.builtIn.hours, on: true } },
+});
 const env = (over: Partial<InputsEnv> = {}): InputsEnv => ({
   timeZone: NY,
   baseCurrency: 'USD',
-  version: defaultVersion('2026-11-02'),
+  version: withHours(defaultVersion('2026-11-02')),
   balanceAtDayStart: () => 50_000_00,
   ...over,
 });

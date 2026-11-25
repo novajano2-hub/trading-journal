@@ -20,7 +20,7 @@ export function defaultVersion(from: string): TrackerVersion {
     tradingDays: [...MON_TO_FRI] as Weekdays,
     builtIn: {
       startBy: { on: true, time: '09:30' },
-      hours: { on: true, from: '09:00', to: '12:00' },
+      hours: { on: false, from: '09:00', to: '12:00' },
       strategy: { on: true },
       stop: { on: true },
       lossPerTrade: { on: true, unit: 'amount', value: 10_000 },

@@ -26,7 +26,7 @@ describe('tracker defaults', () => {
       tradingDays: [false, true, true, true, true, true, false],
       builtIn: {
         startBy: { on: true, time: '09:30' },
-        hours: { on: true, from: '09:00', to: '12:00' },
+        hours: { on: false, from: '09:00', to: '12:00' },
         strategy: { on: true },
         stop: { on: true },
         lossPerTrade: { on: true, unit: 'amount', value: 10_000 },

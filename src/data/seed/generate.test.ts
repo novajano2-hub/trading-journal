@@ -45,16 +45,24 @@ describe('sample workspace generator', () => {
     expect(h.scoreOn(s.endDate).finished).toBe(false);
   });
 
+  test('every day record with a start stamp has a daily note on its date', () => {
+    const stamped = s.days.filter((d) => d.noteStartedAt !== undefined);
+    expect(stamped.length).toBeGreaterThan(0);
+    for (const d of stamped)
+      expect(
+        s.journal.some(
+          (j) =>
+            j.kind === 'daily-review' &&
+            j.date === d.id &&
+            j.deletedAt === undefined,
+        ),
+      ).toBe(true);
+  });
+
   test('v5 leaves every existing sample value unchanged', () => {
-    const {
-      accounts,
-      strategies,
-      tagCategories,
-      tags,
-      trades,
-      journal,
-      challenges,
-    } = s;
+    const { accounts, strategies, tagCategories, tags, trades, challenges } = s;
+    // Only the routine's own notes are new; every other entry is hashed whole.
+    const journal = s.journal.filter((j) => !j.id.startsWith('routine-note-'));
     const hash = createHash('sha256')
       .update(
         JSON.stringify({
@@ -154,7 +162,9 @@ describe('sample workspace generator', () => {
   });
 
   test('daily notes for the last 20 trading days, from the daily template', () => {
-    const daily = s.journal.filter((j) => j.kind === 'daily-review');
+    const daily = s.journal.filter(
+      (j) => j.kind === 'daily-review' && !j.id.startsWith('routine-note-'),
+    );
     expect(daily).toHaveLength(20);
     const dates = daily.map((j) => j.date!);
     expect(new Set(dates).size).toBe(20);

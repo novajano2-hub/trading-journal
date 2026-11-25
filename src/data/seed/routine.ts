@@ -12,6 +12,7 @@ import type {
 } from '@/domain/types';
 import { freezeDay } from '../routine';
 import { NY, nyIso, nyMs } from './calendar';
+import { writeRoutineNotes } from './journal';
 import type { Random } from './random';
 import { SAMPLE_WORKSPACE } from '../workspaces';
 
@@ -69,7 +70,7 @@ export function writeRoutine(
     startedOn: string;
     endDate: string;
   },
-): { tracker: Tracker; days: DayRecord[] } {
+): { tracker: Tracker; days: DayRecord[]; notes: JournalEntry[] } {
   const { trades, startedOn, endDate } = s;
   const noteDays = s.journal
     .filter((e) => e.kind === 'daily-review' && e.date !== undefined)
@@ -87,6 +88,13 @@ export function writeRoutine(
   );
   // Noted days get a record, and so do the keep days: with the sample's trades
   // left as they are, those are the only days that can be perfect.
+  // A stamp needs a note on its date, so the keep days that have none get one.
+  const noted = new Set(noteDays);
+  const notes = writeRoutineNotes(
+    rng,
+    trades,
+    [...keep].filter((d) => !noted.has(d)).sort(),
+  );
   const recordDays = [...new Set([...noteDays, ...keep])].sort();
 
   // What the sample loses, per trade and per day, and what the keep days need.
@@ -204,5 +212,5 @@ export function writeRoutine(
     );
     return finished;
   });
-  return { tracker, days };
+  return { tracker, days, notes };
 }

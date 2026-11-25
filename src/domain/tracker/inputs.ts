@@ -71,17 +71,20 @@ export function dayInputs(
     i.opened += 1;
     if (t.strategyIds.length > 0) i.withStrategy += 1;
     if (t.plannedStop !== undefined) i.withStop += 1;
-    const entry = minuteOf(t.openedAt, timeZone);
-    let inside = entry >= from && entry <= to;
-    if (
-      inside &&
-      t.closedAt !== undefined &&
-      localDate(t.closedAt, timeZone) === date
-    ) {
-      const exit = minuteOf(t.closedAt, timeZone);
-      inside = exit >= from && exit <= to;
+    // The hours count is read only by a version with the rule on.
+    if (hours.on) {
+      const entry = minuteOf(t.openedAt, timeZone);
+      let inside = entry >= from && entry <= to;
+      if (
+        inside &&
+        t.closedAt !== undefined &&
+        localDate(t.closedAt, timeZone) === date
+      ) {
+        const exit = minuteOf(t.closedAt, timeZone);
+        inside = exit >= from && exit <= to;
+      }
+      if (inside) i.inHours += 1;
     }
-    if (inside) i.inHours += 1;
 
     if (!base) {
       i.otherCurrency += 1;
