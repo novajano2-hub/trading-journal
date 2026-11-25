@@ -692,7 +692,8 @@ describe('sample workspace generator', () => {
         by((t) => t.category === 'uncategorized' && t.amount < 0),
       ).toHaveLength(1);
       expect(by((t) => t.category === 'reset-fee')).toHaveLength(2);
-      expect(by((t) => t.category === 'evaluation-fee')).toHaveLength(3);
+      expect(by((t) => t.category === 'evaluation-fee')).toHaveLength(2);
+      expect(by((t) => t.category === 'activation-fee')).toHaveLength(1);
       const payouts = by((t) => t.category === 'payout');
       expect(payouts).toHaveLength(2);
       for (const p of payouts) {
@@ -730,19 +731,21 @@ describe('sample workspace generator', () => {
       });
     });
 
-    test("the fees match the challenges' fee fields, which the rows then replace (C28)", () => {
-      const fee = (challenge: string) =>
+    test("the fee rows match the challenges' fee fields, which they replace (C28)", () => {
+      const fee = (challenge: string, category: string) =>
         s.propTxns.find(
-          (t) => t.challengeId === challenge && t.category === 'evaluation-fee',
+          (t) => t.challengeId === challenge && t.category === category,
         )!.amount;
-      for (const id of [forex, f50, f100])
-        expect(-fee(id)).toBe(
-          s.challenges.find((c) => c.id === id)!.evaluationFee,
-        );
-      // The activation fees stay fields: no row of that category.
-      expect(s.propTxns.some((t) => t.category === 'activation-fee')).toBe(
-        false,
-      );
+      const field = (id: string) => s.challenges.find((c) => c.id === id)!;
+      expect(-fee(forex, 'evaluation-fee')).toBe(field(forex).evaluationFee);
+      expect(-fee(forex, 'activation-fee')).toBe(field(forex).activationFee);
+      expect(-fee(f100, 'evaluation-fee')).toBe(field(f100).evaluationFee);
+      // The funded challenge's fees stay fields: no row of a fee category.
+      expect(
+        s.propTxns.filter(
+          (t) => t.challengeId === f50 && t.category.endsWith('-fee'),
+        ),
+      ).toEqual([]);
     });
 
     test("the resets fall inside the breached challenge's life, and the refund after it", () => {
@@ -807,8 +810,10 @@ describe('sample workspace generator', () => {
         net: 298_100,
         payouts: 2,
       });
-      // The fee fields no row holds still count: both activation fees.
-      expect(items.filter((i) => i.id.startsWith('fee-'))).toHaveLength(2);
+      // The fee fields no row holds still count: the funded challenge's two.
+      expect(
+        items.filter((i) => i.id.startsWith('fee-')).map((i) => i.challengeId),
+      ).toEqual([f50, f50]);
     });
 
     test('the same seed and end give the same rows, and a later end shifts them with the days', () => {

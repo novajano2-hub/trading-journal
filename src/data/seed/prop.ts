@@ -386,12 +386,12 @@ function strategiesOf(
 /**
  * The money a sample trader moved through its prop firms, and what a
  * challenge records beyond v6 (C57). Both draw from streams of their own, so
- * nothing the generator wrote before moves. The shapes follow the comps: a
- * fee for each challenge (the Futures 50K evaluation fee, the Forex 100K one
- * and the breached challenge's, all matching their fee fields, which a linked
- * cost then replaces: C28), two resets on the breached challenge, two payouts
- * on the funded one, one ignored refund, and one uncategorized cost no
- * challenge owns. The activation fees stay fields, so both readings show.
+ * nothing the generator wrote before moves. The shapes follow the comps: the
+ * evaluation fee of the breached challenge and the Forex 100K evaluation and
+ * activation fees (each matching its fee field, which a linked cost then
+ * replaces: C28), two resets on the breached challenge, two payouts on the
+ * funded one, one ignored refund, and one uncategorized cost no challenge
+ * owns. The Futures 50K fees stay fields, so both readings show.
  */
 export function addPropFinances(args: {
   endDate: string;
@@ -477,12 +477,13 @@ export function addPropFinances(args: {
     -forex.evaluationFee!,
     'reviewed',
   );
+  // Its activation fee is a row too, so the Forex 100K fees are all dated rows.
   add(
-    feeDate(funded),
-    `Evaluation, ${funded.name}`,
-    funded,
-    'evaluation-fee',
-    -funded.evaluationFee!,
+    feeDate(forex),
+    `Activation, ${forex.name}`,
+    forex,
+    'activation-fee',
+    -forex.activationFee!,
     'reviewed',
   );
   // Payouts on the funded phase: the first a few weeks in, the second after it.
