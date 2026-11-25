@@ -183,3 +183,26 @@ test('clearing My workspace clears its rows; the sample keeps its own', async ()
   expect(await repo.propTxns.list(M)).toEqual([]);
   expect(await repo.propTxns.list(S)).toHaveLength(1);
 });
+
+test("the sample opens with its own rows, and a reset brings them back without touching My workspace's", async () => {
+  const row = {
+    id: 'sample-prop-txn-1',
+    workspaceId: S,
+    ...fee,
+    description: 'Evaluation, Forex 100K',
+    firm: 'Sample firm',
+  };
+  const repo = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => ({ ...fixtureSample(), propTxns: [row] }),
+    newId: () => 'extra',
+  });
+  expect(await repo.propTxns.list(S)).toEqual([row]);
+  await repo.propTxns.add(S, { ...fee, date: '2026-11-10' });
+  const mine = await repo.propTxns.add(M, fee);
+  expect(await repo.propTxns.list(S)).toHaveLength(2);
+  await repo.workspaces.resetSample();
+  expect(await repo.propTxns.list(S)).toEqual([row]);
+  expect(await repo.propTxns.list(M)).toEqual([mine]);
+});

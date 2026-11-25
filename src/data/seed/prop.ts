@@ -1,10 +1,22 @@
 import { defaultMetricContext } from '@/domain/metrics/context';
-import { checkChallenge, findingText } from '@/domain/prop/challenge';
+import {
+  checkChallenge,
+  findingText,
+  type BreachFinding,
+} from '@/domain/prop/challenge';
 import { evaluateProp } from '@/domain/prop/evaluate';
 import { localDate } from '@/domain/time';
-import type { Account, Challenge, PropRuleSet, Trade } from '@/domain/types';
+import type {
+  Account,
+  BreachReason,
+  Cents,
+  Challenge,
+  PropRuleSet,
+  PropTxn,
+  Trade,
+} from '@/domain/types';
 import { SAMPLE_WORKSPACE } from '../workspaces';
-import { NY, nyMs } from './calendar';
+import { DAY_MS, NY, nyMs, parseYmd, ymd } from './calendar';
 import { FUTURES_SPECS, type AccountSpec } from './instruments';
 import { createRandom, type Random } from './random';
 import type { BuildPlanTrades, Plan, PlanTrade } from './generate';
@@ -225,6 +237,14 @@ const usd = (cents: number): string =>
     currency: 'USD',
   }).format(cents / 100);
 
+/** The reason a rule check's finding gives the trader's list (C33). */
+const REASON_OF: Record<BreachFinding['rule'], BreachReason> = {
+  'max-drawdown': 'max-drawdown',
+  'daily-loss': 'risk-management',
+  'period-ended': 'time-pressure',
+  consistency: 'other',
+};
+
 /** The accounts, their trades and the three challenges of the sample's Prop firms page. */
 export function addPropFirms(
   args: {
@@ -320,5 +340,199 @@ export function addPropFirms(
   if (!finding)
     throw new Error("the sample's breached challenge has no breach");
   breached.failureReason = findingText(finding, usd);
+  // v7: the reason and the day, as the rule check found them (C33, C34).
+  breached.breachReason = REASON_OF[finding.rule];
+  breached.breachedOn = finding.date;
   return { accounts, trades, challenges };
+}
+
+const addDays = (date: string, n: number): string =>
+  ymd(parseYmd(date) + n * DAY_MS);
+
+/** The day a challenge starts: its earliest start date, else its first phase account's first trade. */
+function startOf(c: Challenge, trades: readonly Trade[]): string {
+  const dated = c.phases.flatMap((p) =>
+    p.startDate === undefined ? [] : [p.startDate],
+  );
+  if (dated.length > 0) return dated.sort()[0]!;
+  const account = c.phases.find((p) => p.accountId !== undefined)?.accountId;
+  const days = trades
+    .filter((t) => t.accountId === account)
+    .map((t) => localDate(t.openedAt, NY))
+    .sort();
+  if (days[0] === undefined)
+    throw new Error(`the sample's challenge "${c.name}" has no start`);
+  return days[0];
+}
+
+/**
+ * The strategies a challenge was traded with, most used first: the ones its
+ * accounts' trades carry, one or two of them.
+ */
+function strategiesOf(
+  c: Challenge,
+  trades: readonly Trade[],
+  rng: Random,
+): string[] {
+  const accounts = new Set(c.phases.flatMap((p) => p.accountId ?? []));
+  const used = new Map<string, number>();
+  for (const t of trades)
+    if (accounts.has(t.accountId))
+      for (const id of t.strategyIds) used.set(id, (used.get(id) ?? 0) + 1);
+  const ranked = [...used].sort((a, b) => b[1] - a[1]);
+  return ranked.slice(0, rng.int(1, 2)).map(([id]) => id);
+}
+
+/**
+ * The money a sample trader moved through its prop firms, and what a
+ * challenge records beyond v6 (C57). Both draw from streams of their own, so
+ * nothing the generator wrote before moves. The shapes follow the comps: a
+ * fee for each challenge (the Futures 50K evaluation fee, the Forex 100K one
+ * and the breached challenge's, all matching their fee fields, which a linked
+ * cost then replaces: C28), two resets on the breached challenge, two payouts
+ * on the funded one, one ignored refund, and one uncategorized cost no
+ * challenge owns. The activation fees stay fields, so both readings show.
+ */
+export function addPropFinances(args: {
+  endDate: string;
+  challenges: readonly Challenge[];
+  /** The prop accounts' trades. */
+  trades: readonly Trade[];
+  strategyRng: Random;
+  txnRng: Random;
+}): { challenges: Challenge[]; propTxns: PropTxn[] } {
+  const { endDate, trades, strategyRng: sr, txnRng: rng } = args;
+  const challenges = args.challenges.map((c) => ({
+    ...c,
+    strategyIds: strategiesOf(c, trades, sr),
+  }));
+  const named = (name: string): Challenge => {
+    const c = challenges.find((x) => x.name === name);
+    if (!c) throw new Error(`the sample has no challenge "${name}"`);
+    return c;
+  };
+  const forex = named('Forex 100K');
+  const funded = named('Futures 50K');
+  const broken = named('Futures 100K');
+  const notAfterEnd = (date: string): string =>
+    date > endDate ? endDate : date;
+
+  const rows: Omit<PropTxn, 'id' | 'workspaceId'>[] = [];
+  const add = (
+    date: string,
+    description: string,
+    c: Challenge | undefined,
+    category: PropTxn['category'],
+    amount: Cents,
+    status: PropTxn['status'],
+    firm = FIRM,
+  ): void => {
+    rows.push({
+      date,
+      description,
+      firm: c?.firm ?? firm,
+      ...(c && { challengeId: c.id }),
+      category,
+      amount,
+      status,
+    });
+  };
+  /** A fee is paid up to three days before the challenge's first day. */
+  const feeDate = (c: Challenge): string =>
+    addDays(startOf(c, trades), -rng.int(0, 3));
+
+  add(
+    feeDate(broken),
+    `Evaluation, ${broken.name}`,
+    broken,
+    'evaluation-fee',
+    -broken.evaluationFee!,
+    'reviewed',
+  );
+  // Two resets inside the breached challenge's life, a week apart at least.
+  const born = startOf(broken, trades);
+  const resetOne = rng.int(6, 12);
+  const resetTwo = resetOne + rng.int(7, 14);
+  add(
+    addDays(born, resetOne),
+    'Reset',
+    broken,
+    'reset-fee',
+    -9_900,
+    'reviewed',
+  );
+  add(
+    notAfterEnd(addDays(born, resetTwo)),
+    'Reset',
+    broken,
+    'reset-fee',
+    -9_900,
+    'not-reviewed',
+  );
+  add(
+    feeDate(forex),
+    `Evaluation, ${forex.name}`,
+    forex,
+    'evaluation-fee',
+    -forex.evaluationFee!,
+    'reviewed',
+  );
+  add(
+    feeDate(funded),
+    `Evaluation, ${funded.name}`,
+    funded,
+    'evaluation-fee',
+    -funded.evaluationFee!,
+    'reviewed',
+  );
+  // Payouts on the funded phase: the first a few weeks in, the second after it.
+  const fundedFrom =
+    funded.phases.find((p) => p.step === 'funded')?.startDate ??
+    startOf(funded, trades);
+  const firstPayout = addDays(fundedFrom, rng.int(14, 21));
+  const secondPayout = addDays(firstPayout, rng.int(10, 16));
+  add(
+    notAfterEnd(firstPayout),
+    'Payout',
+    funded,
+    'payout',
+    180_000,
+    'reviewed',
+  );
+  add(
+    notAfterEnd(secondPayout),
+    'Payout',
+    funded,
+    'payout',
+    270_000,
+    'not-reviewed',
+  );
+  // A refund the trader marked ignored, after the breach.
+  add(
+    notAfterEnd(addDays(broken.breachedOn ?? born, rng.int(3, 10))),
+    'Card refund, duplicate charge',
+    broken,
+    'uncategorized',
+    16_500,
+    'ignored',
+  );
+  // A cost no challenge owns, from another payee.
+  add(
+    addDays(endDate, -rng.int(5, 20)),
+    'Market data fee',
+    undefined,
+    'uncategorized',
+    -2_900,
+    'not-reviewed',
+    'Sample data feed',
+  );
+
+  return {
+    challenges,
+    propTxns: rows.map((r, i) => ({
+      ...r,
+      id: `sample-prop-txn-${i + 1}`,
+      workspaceId: WS,
+    })),
+  };
 }

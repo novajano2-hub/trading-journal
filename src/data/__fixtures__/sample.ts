@@ -167,6 +167,7 @@ export function fixtureSample(): SampleWorkspace {
       }),
     ],
     challenges: [],
+    propTxns: [],
     journal: [
       {
         id: 'j-1',

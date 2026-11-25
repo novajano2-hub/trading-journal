@@ -5,6 +5,7 @@ import { defaultMetricContext } from '@/domain/metrics/context';
 import { dailyPnl } from '@/domain/metrics/days';
 import { summarize } from '@/domain/metrics/summary';
 import { evaluateProp } from '@/domain/prop/evaluate';
+import { spendItems, totals } from '@/domain/prop/finance';
 import { closedInOrder } from '@/domain/trade-status';
 import { toCents } from '@/domain/money';
 import { localDate, localParts } from '@/domain/time';
@@ -75,13 +76,20 @@ describe('sample workspace generator', () => {
     for (const j of daily) expect(j.templateId).toBe('template-daily-review');
   });
 
-  test('v6 leaves every existing sample value unchanged', () => {
-    const { accounts, strategies, tagCategories, tags, trades, challenges } = s;
+  test('v7 leaves every existing sample value unchanged', () => {
+    const { accounts, strategies, tagCategories, tags, trades } = s;
     // Only the routine's own notes are new; every other entry is hashed whole.
-    // v6 adds templateId to the daily notes; strip it so nothing else moved.
+    // v6 adds templateId to the daily notes, v7 the strategies, the breach reason
+    // and the breach date to the challenges; strip them so nothing else moved.
     const journal = s.journal
       .filter((j) => !j.id.startsWith('routine-note-'))
       .map((j) => ({ ...j, templateId: undefined }));
+    const challenges = s.challenges.map(
+      ({ strategyIds, breachReason, breachedOn, ...kept }) => {
+        void [strategyIds, breachReason, breachedOn];
+        return kept;
+      },
+    );
     const hash = createHash('sha256')
       .update(
         JSON.stringify({
@@ -663,6 +671,158 @@ describe('sample workspace generator', () => {
           true,
         );
       }
+    });
+  });
+
+  describe('prop finances (C57)', () => {
+    const ENDS = '2026-11-19';
+    const firmOf = (id: string) => s.challenges.find((c) => c.id === id)!.firm;
+    const [forex, f50, f100] = [
+      'sample-challenge-forex-100k',
+      'sample-challenge-futures-50k',
+      'sample-challenge-futures-100k',
+    ];
+
+    test("nine transactions with the comps' shape", () => {
+      expect(s.propTxns).toHaveLength(9);
+      const by = (f: (t: (typeof s.propTxns)[number]) => boolean) =>
+        s.propTxns.filter(f);
+      expect(by((t) => t.status === 'ignored')).toHaveLength(1);
+      expect(
+        by((t) => t.category === 'uncategorized' && t.amount < 0),
+      ).toHaveLength(1);
+      expect(by((t) => t.category === 'reset-fee')).toHaveLength(2);
+      expect(by((t) => t.category === 'evaluation-fee')).toHaveLength(3);
+      const payouts = by((t) => t.category === 'payout');
+      expect(payouts).toHaveLength(2);
+      for (const p of payouts) {
+        expect(p.amount).toBeGreaterThan(0);
+        expect(p.challengeId).toBe(f50);
+      }
+      // Every status shows; costs are negative and income positive.
+      expect(new Set(s.propTxns.map((t) => t.status))).toEqual(
+        new Set(['reviewed', 'not-reviewed', 'ignored']),
+      );
+      for (const t of by((t) => t.category.endsWith('-fee')))
+        expect(t.amount).toBeLessThan(0);
+      expect(s.propTxns.every((t) => t.workspaceId === 'sample')).toBe(true);
+      expect(new Set(s.propTxns.map((t) => t.id)).size).toBe(9);
+    });
+
+    test("each row is a real date up to the sample's end, and links a challenge of the sample", () => {
+      const ids = new Set(s.challenges.map((c) => c.id));
+      for (const t of s.propTxns) {
+        expect(t.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        expect(t.date <= ENDS, `${t.id} ${t.date}`).toBe(true);
+        if (t.challengeId) {
+          expect(ids.has(t.challengeId)).toBe(true);
+          expect(t.firm).toBe(firmOf(t.challengeId));
+        }
+      }
+      // The one cost no challenge owns is another payee's.
+      const loose = s.propTxns.filter((t) => t.challengeId === undefined);
+      expect(loose).toHaveLength(1);
+      expect(loose[0]).toMatchObject({
+        description: 'Market data fee',
+        category: 'uncategorized',
+        amount: -2_900,
+        status: 'not-reviewed',
+      });
+    });
+
+    test("the fees match the challenges' fee fields, which the rows then replace (C28)", () => {
+      const fee = (challenge: string) =>
+        s.propTxns.find(
+          (t) => t.challengeId === challenge && t.category === 'evaluation-fee',
+        )!.amount;
+      for (const id of [forex, f50, f100])
+        expect(-fee(id)).toBe(
+          s.challenges.find((c) => c.id === id)!.evaluationFee,
+        );
+      // The activation fees stay fields: no row of that category.
+      expect(s.propTxns.some((t) => t.category === 'activation-fee')).toBe(
+        false,
+      );
+    });
+
+    test("the resets fall inside the breached challenge's life, and the refund after it", () => {
+      const broken = s.challenges.find((c) => c.id === f100)!;
+      const start = broken.phases[0]!.startDate!;
+      const resets = s.propTxns.filter((t) => t.category === 'reset-fee');
+      for (const r of resets) {
+        expect(r.challengeId).toBe(f100);
+        expect(r.date > start).toBe(true);
+        expect(r.date <= broken.breachedOn!).toBe(true);
+      }
+      expect(resets[0]!.date).not.toBe(resets[1]!.date);
+      const refund = s.propTxns.find((t) => t.status === 'ignored')!;
+      expect(refund).toMatchObject({
+        challengeId: f100,
+        category: 'uncategorized',
+        amount: 16_500,
+      });
+      expect(refund.date >= broken.breachedOn!).toBe(true);
+    });
+
+    test('the payouts come after the funded phase starts', () => {
+      const funded = s.challenges.find((c) => c.id === f50)!;
+      const from = funded.phases.find((p) => p.step === 'funded')!.startDate!;
+      for (const t of s.propTxns.filter((t) => t.category === 'payout'))
+        expect(t.date > from).toBe(true);
+    });
+
+    test('one breached challenge carries a reason and the day its own check found', () => {
+      const broken = s.challenges.find((c) => c.id === f100)!;
+      expect(broken).toMatchObject({
+        status: 'breached',
+        breachReason: 'max-drawdown',
+      });
+      // "Max drawdown limit broken on 27 Oct": the text and the date agree.
+      const day = Number(/ on (\d+) /.exec(broken.failureReason!)![1]);
+      expect(Number(broken.breachedOn!.slice(8))).toBe(day);
+      expect(broken.breachedOn! <= ENDS).toBe(true);
+      expect(
+        s.challenges.filter((c) => c.breachReason !== undefined),
+      ).toHaveLength(1);
+      expect(
+        s.challenges.filter((c) => c.breachedOn !== undefined),
+      ).toHaveLength(1);
+    });
+
+    test("every challenge is traded with one or two of the sample's strategies, most used first", () => {
+      const known = new Set(s.strategies.map((x) => x.id));
+      for (const c of s.challenges) {
+        expect(c.strategyIds!.length).toBeGreaterThanOrEqual(1);
+        expect(c.strategyIds!.length).toBeLessThanOrEqual(2);
+        for (const id of c.strategyIds!) expect(known.has(id)).toBe(true);
+        expect(new Set(c.strategyIds).size).toBe(c.strategyIds!.length);
+      }
+    });
+
+    test('the totals the prop dashboard reads', () => {
+      const items = spendItems(s.challenges, s.propTxns);
+      expect(totals(items)).toMatchObject({
+        spent: 151_900,
+        earned: 450_000,
+        net: 298_100,
+        payouts: 2,
+      });
+      // The fee fields no row holds still count: both activation fees.
+      expect(items.filter((i) => i.id.startsWith('fee-'))).toHaveLength(2);
+    });
+
+    test('the same seed and end give the same rows, and a later end shifts them with the days', () => {
+      const again = generateSampleWorkspace({
+        seed: SAMPLE_SEED,
+        endDate: ENDS,
+      });
+      expect(again.propTxns).toEqual(s.propTxns);
+      const later = generateSampleWorkspace({
+        seed: SAMPLE_SEED,
+        endDate: '2026-11-20',
+      });
+      expect(later.propTxns).toHaveLength(9);
+      for (const t of later.propTxns) expect(t.date <= '2026-11-20').toBe(true);
     });
   });
 });
