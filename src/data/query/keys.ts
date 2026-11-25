@@ -126,7 +126,12 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
       ];
     case 'imports.undo':
     case 'accounts.clearTrades':
-      return [keys.trades(ws), keys.journal(ws), keys.imports(ws)];
+      return [
+        keys.trades(ws),
+        keys.journal(ws),
+        keys.imports(ws),
+        keys.history(ws),
+      ];
     case 'journal.ensureTradeNote':
       return [
         keys.journal(ws),
@@ -135,9 +140,9 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
         keys.days(ws),
       ];
     case 'accounts.create':
-      return [keys.accounts(ws)];
+      return [keys.accounts(ws), keys.history(ws)];
     case 'accounts.update':
-      return [keys.accounts(ws), keys.imports(ws)];
+      return [keys.accounts(ws), keys.imports(ws), keys.history(ws)];
     case 'accounts.remove':
       return [
         keys.accounts(ws),
@@ -146,6 +151,7 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
         keys.imports(ws),
         keys.cashFlows(ws),
         keys.challenges(ws),
+        keys.history(ws),
       ];
     case 'challenges.create':
     case 'challenges.update':
@@ -154,28 +160,39 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
     case 'cashFlows.create':
     case 'cashFlows.update':
     case 'cashFlows.remove':
-      return [keys.cashFlows(ws)];
+      return [keys.cashFlows(ws), keys.history(ws)];
     case 'strategies.create':
-      return [keys.strategies(ws)];
+      return [keys.strategies(ws), keys.history(ws)];
     case 'strategies.update':
     case 'strategies.remove':
-      return [keys.strategies(ws), keys.trades(ws), keys.imports(ws)];
+      return [
+        keys.strategies(ws),
+        keys.trades(ws),
+        keys.imports(ws),
+        keys.history(ws),
+      ];
     case 'tags.create':
     case 'tags.update':
-      return [keys.tags(ws)];
+      return [keys.tags(ws), keys.history(ws)];
     case 'tags.remove':
-      return [keys.tags(ws), keys.trades(ws), keys.imports(ws)];
+      return [
+        keys.tags(ws),
+        keys.trades(ws),
+        keys.imports(ws),
+        keys.history(ws),
+      ];
     case 'tagCategories.create':
-      return [keys.tagCategories(ws)];
+      return [keys.tagCategories(ws), keys.history(ws)];
     // Tags sort by their category's name.
     case 'tagCategories.update':
-      return [keys.tagCategories(ws), keys.tags(ws)];
+      return [keys.tagCategories(ws), keys.tags(ws), keys.history(ws)];
     case 'tagCategories.remove':
       return [
         keys.tagCategories(ws),
         keys.tags(ws),
         keys.trades(ws),
         keys.imports(ws),
+        keys.history(ws),
       ];
     case 'templates.save':
     case 'templates.remove':
@@ -205,6 +222,6 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
     case 'files.remove':
       return [keys.filesAll(ws)];
     case 'imports.commit':
-      return [keys.imports(ws), keys.trades(ws)];
+      return [keys.imports(ws), keys.trades(ws), keys.history(ws)];
   }
 }

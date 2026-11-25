@@ -1,5 +1,5 @@
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { sampleFillsCsv } from '@/content/landing-sample-csv';
 import { parseCsv } from '@/domain/import/csv';
 import { guessMapping, type MappingOptions } from '@/domain/import/mapping';
@@ -57,6 +57,8 @@ async function setup() {
       mapping?: Partial<MappingOptions>;
       /** Plans from an altered context, to reach a state the repository no longer builds. */
       alter?: (c: ImportContext) => ImportContext;
+      /** When the plan is made, as an ISO time; default: a minute after the last. */
+      now?: string;
     } = {},
   ) => {
     const read = await repo.imports.context(M, o.accountId ?? acc.id);
@@ -72,7 +74,8 @@ async function setup() {
       {
         importId,
         fileName: `${importId}.csv`,
-        now: new Date(Date.UTC(2026, 10, 21, 0, planned++)).toISOString(),
+        now:
+          o.now ?? new Date(Date.UTC(2026, 10, 21, 0, planned++)).toISOString(),
       },
     );
   };
@@ -877,5 +880,184 @@ describe('imports.undo on an archived account (M6)', () => {
     expect(
       (await repo.imports.list(M)).find((j) => j.id === job.id)?.status,
     ).toBe('active');
+  });
+});
+
+describe('import history', () => {
+  /**
+   * The rows of My workspace without their volatile ids, oldest first (rows
+   * of one write share a time: the import's own comes first). The accounts
+   * `setup` makes have rows of their own, left out here.
+   */
+  const written = async (repo: Awaited<ReturnType<typeof setup>>['repo']) =>
+    (await repo.history.list(M))
+      .filter((r) => r.type !== 'account')
+      .sort((a, b) => a.at.localeCompare(b.at) || a.type.localeCompare(b.type))
+      .map((r) => {
+        const { id, workspaceId, ...rest } = r;
+        void id;
+        void workspaceId;
+        return rest;
+      });
+
+  test('an import logs one row, not one per trade', async () => {
+    const { repo, commit } = await setup();
+    const job = await commit(sampleFillsCsv(), 'impA');
+    expect(job.tradeCount).toBe(8);
+    expect(await repo.trades.list(M)).toHaveLength(8);
+    expect(await written(repo)).toEqual([
+      {
+        at: expect.any(String),
+        type: 'import',
+        action: 'created',
+        source: 'import',
+        entityId: 'impA',
+        label: 'impA.csv',
+        field: 'trades',
+        newValue: 8,
+      },
+    ]);
+  });
+
+  test('an import that is refused or fails writes no row', async () => {
+    const { repo, plan, commit } = await setup();
+    await commit(OPEN_ES, 'impA');
+    const p = await plan(CLOSE_ES, 'impB');
+    // A value IndexedDB cannot store makes the job write throw after the trade writes.
+    const broken = {
+      ...p,
+      fingerprints: [...p.fingerprints, (() => 0) as unknown as string],
+    };
+    await expect(repo.imports.commit(M, broken)).rejects.toThrow();
+    // A stale plan: another import landed since it was made.
+    const stale = await plan(CORN, 'impC', { mapping: { overrides: { ZC } } });
+    await commit(CLOSE_ES, 'impB');
+    await expect(repo.imports.commit(M, stale)).rejects.toBeInstanceOf(
+      StalePlanError,
+    );
+    expect((await written(repo)).map((r) => r.entityId)).toEqual([
+      'impA',
+      'impB',
+    ]);
+  });
+
+  test('a row that cannot be written takes the commit and the undo back with it', async () => {
+    const { repo, plan, commit } = await setup();
+    const first = await plan(OPEN_ES, 'impA');
+    const ids = vi.spyOn(crypto, 'randomUUID').mockImplementation(() => {
+      throw new Error('no row id');
+    });
+    try {
+      await expect(repo.imports.commit(M, first)).rejects.toThrow('no row id');
+    } finally {
+      ids.mockRestore();
+    }
+    expect(await repo.trades.list(M)).toEqual([]);
+    expect(await repo.imports.list(M)).toEqual([]);
+
+    await commit(OPEN_ES, 'impA');
+    const open = await repo.trades.list(M);
+    const failing = vi.spyOn(crypto, 'randomUUID').mockImplementation(() => {
+      throw new Error('no row id');
+    });
+    try {
+      await expect(repo.imports.undo(M, 'impA')).rejects.toThrow('no row id');
+    } finally {
+      failing.mockRestore();
+    }
+    expect(await repo.trades.list(M)).toEqual(open);
+    expect((await repo.imports.list(M))[0]!.status).toBe('active');
+    expect(await written(repo)).toHaveLength(1);
+  });
+
+  test('an undo logs one row', async () => {
+    const { repo, commit } = await setup();
+    await commit(sampleFillsCsv(), 'impA');
+    expect(await repo.imports.undo(M, 'impA')).toEqual({ ok: true });
+    expect(await repo.trades.list(M)).toEqual([]);
+    expect(await written(repo)).toEqual([
+      expect.objectContaining({ action: 'created', entityId: 'impA' }),
+      {
+        at: expect.any(String),
+        type: 'import',
+        action: 'undone',
+        source: 'import',
+        entityId: 'impA',
+        label: 'impA.csv',
+        field: 'trades',
+        oldValue: 8,
+        newValue: 0,
+      },
+    ]);
+    // Undoing it again changes nothing, so it logs nothing.
+    expect(await repo.imports.undo(M, 'impA')).toEqual({ ok: true });
+    expect(await written(repo)).toHaveLength(2);
+  });
+
+  test('an undo that is refused logs nothing', async () => {
+    const { repo, commit } = await setup();
+    await commit(OPEN_ES, 'impA');
+    await commit(CLOSE_ES, 'impB');
+    // B closed A's position: undoing A first is refused.
+    expect(await repo.imports.undo(M, 'impA')).toMatchObject({ ok: false });
+    await expect(repo.imports.undo(M, 'nope')).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+    expect(await written(repo)).toHaveLength(2);
+  });
+
+  test('an undo that fails part way logs nothing', async () => {
+    const { repo, db, commit } = await setup();
+    await commit(OPEN_ES, 'impA');
+    const [trade] = await repo.trades.list(M);
+    // A corrupt row (links not an array) makes the unlink step throw after the trade delete.
+    await db.journal.put({
+      id: 'corrupt',
+      workspaceId: M,
+      kind: 'note',
+      title: '',
+      body: null,
+      linkedTradeIds: trade!.id as unknown as string[],
+      tags: [],
+      updatedAt: '2026-11-20T00:00:00.000Z',
+    });
+    await expect(repo.imports.undo(M, 'impA')).rejects.toThrow();
+    expect(await written(repo)).toHaveLength(1);
+  });
+
+  test('settled options log as system', async () => {
+    const { repo, commit } = await setup();
+    // Open before it expires (2026-11-20, 16:00 in New York), planned a day before.
+    const option = H + '2026-11-18 10:00:00,AAPL  261120C00150000,Buy,1,1.50\n';
+    await commit(option, 'impA', { now: '2026-11-19T00:00:00.000Z' });
+    const [opened] = await repo.trades.list(M);
+    expect(opened).toMatchObject({ status: 'open' });
+    // A position another import leaves open is not settled, and logs nothing of its own.
+    await commit(OPEN_ES, 'impB', { now: '2026-11-19T01:00:00.000Z' });
+
+    // The next file comes after the expiry: the option closes at 0.
+    const job = await commit(CLOSE_ES, 'impC');
+    expect(await repo.trades.get(M, opened!.id)).toMatchObject({
+      status: 'closed',
+      avgExit: 0,
+    });
+    const rows = await written(repo);
+    expect(rows.map((r) => [r.type, r.action, r.source, r.entityId])).toEqual([
+      ['import', 'created', 'import', 'impA'],
+      ['import', 'created', 'import', 'impB'],
+      ['import', 'created', 'import', 'impC'],
+      ['trade', 'edited', 'system', opened!.id],
+    ]);
+    expect(rows[3]).toMatchObject({
+      label: expect.stringContaining('AAPL'),
+      field: 'fills',
+      oldValue: 1,
+      newValue: 2,
+    });
+    // The import itself is still one row, with the trades it wrote.
+    expect(rows[2]).toMatchObject({
+      field: 'trades',
+      newValue: job.tradeCount,
+    });
   });
 });

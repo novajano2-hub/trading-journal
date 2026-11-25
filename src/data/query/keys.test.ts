@@ -12,14 +12,20 @@ test('the invalidation table', () => {
     keys.tags('mine'),
     keys.trades('mine'),
     keys.imports('mine'),
+    keys.history('mine'),
   ]);
-  expect(invalidationsFor('tags.update', 'mine')).toEqual([keys.tags('mine')]);
+  expect(invalidationsFor('tags.update', 'mine')).toEqual([
+    keys.tags('mine'),
+    keys.history('mine'),
+  ]);
   expect(invalidationsFor('accounts.create', 'mine')).toEqual([
     keys.accounts('mine'),
+    keys.history('mine'),
   ]);
   expect(invalidationsFor('imports.commit', 'mine')).toEqual([
     keys.imports('mine'),
     keys.trades('mine'),
+    keys.history('mine'),
   ]);
   expect(invalidationsFor('workspaces.resetSample', 'sample')).toEqual([
     keys.workspace('sample'),
@@ -31,10 +37,13 @@ test('Plan 5 writes invalidate what they change', () => {
   const k = (...names: (keyof typeof keys)[]) =>
     names.map((n) => (keys[n] as (w: string) => readonly unknown[])(ws));
   const table: [Parameters<typeof invalidationsFor>[0], unknown[]][] = [
-    ['tagCategories.create', k('tagCategories')],
+    ['tagCategories.create', k('tagCategories', 'history')],
     // Tags sort by their category's name.
-    ['tagCategories.update', k('tagCategories', 'tags')],
-    ['tagCategories.remove', k('tagCategories', 'tags', 'trades', 'imports')],
+    ['tagCategories.update', k('tagCategories', 'tags', 'history')],
+    [
+      'tagCategories.remove',
+      k('tagCategories', 'tags', 'trades', 'imports', 'history'),
+    ],
     ['folders.create', k('folders')],
     ['folders.rename', k('folders')],
     ['folders.remove', k('folders', 'journal')],
@@ -44,14 +53,22 @@ test('Plan 5 writes invalidate what they change', () => {
     ['trades.createManual', k('trades', 'imports', 'history')],
     ['trades.replaceManual', k('trades', 'imports', 'history')],
     ['trades.updateMany', k('trades', 'imports', 'history')],
-    ['accounts.clearTrades', k('trades', 'journal', 'imports')],
+    ['accounts.clearTrades', k('trades', 'journal', 'imports', 'history')],
     [
       'accounts.remove',
-      k('accounts', 'trades', 'journal', 'imports', 'cashFlows', 'challenges'),
+      k(
+        'accounts',
+        'trades',
+        'journal',
+        'imports',
+        'cashFlows',
+        'challenges',
+        'history',
+      ),
     ],
-    ['cashFlows.create', k('cashFlows')],
-    ['cashFlows.update', k('cashFlows')],
-    ['cashFlows.remove', k('cashFlows')],
+    ['cashFlows.create', k('cashFlows', 'history')],
+    ['cashFlows.update', k('cashFlows', 'history')],
+    ['cashFlows.remove', k('cashFlows', 'history')],
     ['challenges.create', k('challenges')],
     ['challenges.update', k('challenges')],
     ['challenges.remove', k('challenges')],
@@ -86,6 +103,42 @@ test('every trade write makes the edit history stale', () => {
       keys.history('mine'),
     );
   expect(keys.history('mine')).not.toEqual(keys.history('sample'));
+});
+
+test('every write of a logged record makes the edit history stale', () => {
+  for (const write of [
+    'accounts.create',
+    'accounts.update',
+    'accounts.remove',
+    'accounts.clearTrades',
+    'cashFlows.create',
+    'cashFlows.update',
+    'cashFlows.remove',
+    'strategies.create',
+    'strategies.update',
+    'strategies.remove',
+    'tags.create',
+    'tags.update',
+    'tags.remove',
+    'tagCategories.create',
+    'tagCategories.update',
+    'tagCategories.remove',
+    'imports.commit',
+    'imports.undo',
+  ] as const)
+    expect(invalidationsFor(write, 'mine'), write).toContainEqual(
+      keys.history('mine'),
+    );
+  // What history does not log leaves it alone: notes, preferences, the tracker (B26).
+  for (const write of [
+    'prefs.update',
+    'journal.save',
+    'journal.ensureTradeNote',
+    'tracker.save',
+  ] as const)
+    expect(invalidationsFor(write, 'mine'), write).not.toContainEqual(
+      keys.history('mine'),
+    );
 });
 
 test('a day key covers a date, and the shots of one date sit under all shots', () => {

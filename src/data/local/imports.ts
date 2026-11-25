@@ -15,8 +15,17 @@ import type { LocalContext } from './context';
 import type { KeelDb } from './db';
 import { assertEditable } from './editable';
 import { deleteOwnerFiles } from './files';
+import {
+  changeRows,
+  lifecycleRow,
+  logHistory,
+  tradeChanges,
+  tradeLabel,
+  type NewHistoryRow,
+} from './history';
 import { META, type ImportJobRecord } from './schema';
 import { pruneJournalLinks } from './journal';
+import { readPrefs } from './prefs';
 import { rwTx } from './tx';
 
 /** The job as the history shows it, without what dedupe and undo work from. */
@@ -162,6 +171,43 @@ async function withLiveReferences(
 
 const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
+/**
+ * The import's one history row (B27), then the system's edits: a stored open
+ * option the plan settled at expiry gains its closing fill, and that edit is
+ * the system's, not the import's (B26). A trade the file itself opens and
+ * settles is not an edit: it is one of the import's trades.
+ */
+function commitRows(
+  job: ImportJob,
+  plan: ImportPlan,
+  timeZone: string,
+): NewHistoryRow[] {
+  const settled = new Set(
+    plan.flags
+      .filter((f) => f.code === 'expired-worthless')
+      .map((f) => f.tradeId),
+  );
+  const stored = new Map(plan.replacedTrades.map((t) => [t.id, t]));
+  return [
+    {
+      ...lifecycleRow('import', 'created', job.id, job.fileName, 'import'),
+      field: 'trades',
+      newValue: job.tradeCount,
+    },
+    ...plan.trades.flatMap((t) => {
+      const before = stored.get(t.id);
+      if (!before || !settled.has(t.id)) return [];
+      return changeRows(
+        'trade',
+        t.id,
+        tradeLabel(t, timeZone),
+        tradeChanges(before, t).filter((c) => c.field === 'fills'),
+        'system',
+      );
+    }),
+  ];
+}
+
 export function localImports(ctx: LocalContext): ImportRepo {
   return {
     async list(ws) {
@@ -244,6 +290,7 @@ export function localImports(ctx: LocalContext): ImportRepo {
           db.tags,
           db.strategies,
           db.meta,
+          db.history,
         ],
         async () => {
           if (!(await db.accounts.get([ws, plan.accountId])))
@@ -288,6 +335,8 @@ export function localImports(ctx: LocalContext): ImportRepo {
               ...plan.mapping.overrides,
             },
           });
+          const { timeZone } = await readPrefs(db);
+          await logHistory(db, ws, commitRows(job, plan, timeZone), ctx);
         },
       );
       return job;
@@ -306,6 +355,7 @@ export function localImports(ctx: LocalContext): ImportRepo {
           db.meta,
           db.accounts,
           db.files,
+          db.history,
         ],
         async (): Promise<UndoResult> => {
           const job = await db.imports.get([ws, jobId]);
@@ -354,6 +404,25 @@ export function localImports(ctx: LocalContext): ImportRepo {
             undoneAt: ctx.now().toISOString(),
           });
           await bumpImportRevision(db, ws);
+          await logHistory(
+            db,
+            ws,
+            [
+              {
+                ...lifecycleRow(
+                  'import',
+                  'undone',
+                  jobId,
+                  job.fileName,
+                  'import',
+                ),
+                field: 'trades',
+                oldValue: job.tradeCount,
+                newValue: 0,
+              },
+            ],
+            ctx,
+          );
           return { ok: true };
         },
       );

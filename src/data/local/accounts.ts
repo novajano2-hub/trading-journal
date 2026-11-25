@@ -1,10 +1,21 @@
 import { NotFoundError, type AccountsRepo } from '../repository';
 import type { LocalContext } from './context';
 import { deleteOwnerFiles } from './files';
+import { changeRows, fieldChanges, lifecycleRow, logHistory } from './history';
 import { bumpImportRevision } from './imports';
 import { rwTx } from './tx';
 import { pruneJournalLinks } from './journal';
 import { mergePatch } from '../merge';
+
+/** The account fields history keeps (B26). */
+const LOGGED_FIELDS = [
+  'name',
+  'broker',
+  'type',
+  'currency',
+  'startingBalance',
+  'status',
+] as const;
 
 export function localAccounts(ctx: LocalContext): AccountsRepo {
   return {
@@ -17,13 +28,21 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
     async create(ws, input) {
       const db = await ctx.db();
       const account = { ...input, id: ctx.newId(), workspaceId: ws };
-      await db.accounts.put(account);
-      return account;
+      return rwTx(db, [db.accounts, db.history], async () => {
+        await db.accounts.put(account);
+        await logHistory(
+          db,
+          ws,
+          [lifecycleRow('account', 'created', account.id, account.name)],
+          ctx,
+        );
+        return account;
+      });
     },
 
     async update(ws, id, patch) {
       const db = await ctx.db();
-      return rwTx(db, [db.accounts], async () => {
+      return rwTx(db, [db.accounts, db.history], async () => {
         const account = await db.accounts.get([ws, id]);
         if (!account) throw new NotFoundError('account', id);
         const next = {
@@ -36,6 +55,17 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
           workspaceId: ws,
         };
         await db.accounts.put(next);
+        await logHistory(
+          db,
+          ws,
+          changeRows(
+            'account',
+            id,
+            next.name,
+            fieldChanges(account, next, LOGGED_FIELDS),
+          ),
+          ctx,
+        );
         return next;
       });
     },
@@ -44,10 +74,17 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
       const db = await ctx.db();
       await rwTx(
         db,
-        [db.accounts, db.trades, db.imports, db.cashflows, db.challenges],
+        [
+          db.accounts,
+          db.trades,
+          db.imports,
+          db.cashflows,
+          db.challenges,
+          db.history,
+        ],
         async () => {
-          if (!(await db.accounts.get([ws, id])))
-            throw new NotFoundError('account', id);
+          const account = await db.accounts.get([ws, id]);
+          if (!account) throw new NotFoundError('account', id);
           const trades = await db.trades
             .where('[workspaceId+accountId]')
             .equals([ws, id])
@@ -77,6 +114,13 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
             })),
           );
           await db.accounts.delete([ws, id]);
+          // Its cash flows and import jobs go with it, under this one row.
+          await logHistory(
+            db,
+            ws,
+            [lifecycleRow('account', 'deleted', id, account.name)],
+            ctx,
+          );
         },
       );
     },
@@ -85,10 +129,18 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
       const db = await ctx.db();
       return rwTx(
         db,
-        [db.accounts, db.trades, db.journal, db.imports, db.meta, db.files],
+        [
+          db.accounts,
+          db.trades,
+          db.journal,
+          db.imports,
+          db.meta,
+          db.files,
+          db.history,
+        ],
         async () => {
-          if (!(await db.accounts.get([ws, id])))
-            throw new NotFoundError('account', id);
+          const account = await db.accounts.get([ws, id]);
+          if (!account) throw new NotFoundError('account', id);
           const tradeKeys = await db.trades
             .where('[workspaceId+accountId]')
             .equals([ws, id])
@@ -107,6 +159,16 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
             .delete();
           // A plan made before this would write onto trades that are gone.
           await bumpImportRevision(db, ws);
+          // One row for the account, not one per trade it loses.
+          if (tradeKeys.length > 0)
+            await logHistory(
+              db,
+              ws,
+              changeRows('account', id, account.name, [
+                { field: 'trades', oldValue: tradeKeys.length, newValue: 0 },
+              ]),
+              ctx,
+            );
           return tradeKeys.length;
         },
       );

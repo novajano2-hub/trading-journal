@@ -7,6 +7,13 @@ import {
 import type { LocalContext } from './context';
 import type { KeelDb } from './db';
 import { deleteOwnerFiles } from './files';
+import {
+  changeRows,
+  fieldChanges,
+  lifecycleRow,
+  logHistory,
+  type FieldChange,
+} from './history';
 import { rwTx } from './tx';
 import { mergePatch } from '../merge';
 
@@ -31,6 +38,53 @@ async function onItsTrades(
       if (leave) t.strategyIds = t.strategyIds.filter((s) => s !== id);
       t.ruleChecks = t.ruleChecks.filter((c) => !ruleIds.has(c.ruleId));
     });
+}
+
+/** The strategy fields history keeps (B26); the groups read as `rules`, their count. */
+const LOGGED_FIELDS = [
+  'name',
+  'description',
+  'status',
+  'icon',
+  'photoId',
+  'rules',
+] as const;
+
+function loggedView(s: Strategy) {
+  return {
+    name: s.name,
+    description: s.description,
+    status: s.status,
+    icon: s.icon,
+    photoId: s.photoId,
+    rules: strategyRules(s).length,
+  };
+}
+
+/** The groups and rules as the trader reads them: titles, texts and when each is graded, without ids. */
+function rulesOf(s: Strategy): string {
+  return JSON.stringify(
+    s.groups.map((g) => [g.title, g.rules.map((r) => [r.text, r.showWhen])]),
+  );
+}
+
+/**
+ * The logged fields that differ between two versions of a strategy. Rules
+ * reworded, regrouped or reordered to the same count still show, as the same
+ * number on both sides, so the edit is not lost.
+ */
+function strategyChanges(before: Strategy, after: Strategy): FieldChange[] {
+  const changes = fieldChanges(loggedView(before), loggedView(after), [
+    ...LOGGED_FIELDS,
+  ]);
+  if (
+    !changes.some((c) => c.field === 'rules') &&
+    rulesOf(before) !== rulesOf(after)
+  ) {
+    const count = strategyRules(after).length;
+    changes.push({ field: 'rules', oldValue: count, newValue: count });
+  }
+  return changes;
 }
 
 export function localStrategies(ctx: LocalContext): StrategiesRepo {
@@ -64,13 +118,21 @@ export function localStrategies(ctx: LocalContext): StrategiesRepo {
         id: ctx.newId(),
         workspaceId: ws,
       };
-      await db.strategies.put(strategy);
-      return strategy;
+      return rwTx(db, [db.strategies, db.history], async () => {
+        await db.strategies.put(strategy);
+        await logHistory(
+          db,
+          ws,
+          [lifecycleRow('strategy', 'created', strategy.id, strategy.name)],
+          ctx,
+        );
+        return strategy;
+      });
     },
 
     async update(ws, id, patch) {
       const db = await ctx.db();
-      return rwTx(db, [db.strategies, db.trades], async () => {
+      return rwTx(db, [db.strategies, db.trades, db.history], async () => {
         const strategy = await db.strategies.get([ws, id]);
         if (!strategy) throw new NotFoundError('strategy', id);
         const { groups, ...rest } = patch;
@@ -88,19 +150,41 @@ export function localStrategies(ctx: LocalContext): StrategiesRepo {
           if (gone.size > 0) await onItsTrades(db, ws, id, gone, false);
         }
         await db.strategies.put(next);
+        await logHistory(
+          db,
+          ws,
+          changeRows(
+            'strategy',
+            id,
+            next.name,
+            strategyChanges(strategy, next),
+          ),
+          ctx,
+        );
         return next;
       });
     },
 
     async remove(ws, id) {
       const db = await ctx.db();
-      await rwTx(db, [db.strategies, db.trades, db.files], async () => {
-        const strategy = await db.strategies.get([ws, id]);
-        if (!strategy) throw new NotFoundError('strategy', id);
-        await onItsTrades(db, ws, id, ruleIdsOf(strategy), true);
-        await db.strategies.delete([ws, id]);
-        await deleteOwnerFiles(db, ws, `strategy:${id}`);
-      });
+      await rwTx(
+        db,
+        [db.strategies, db.trades, db.files, db.history],
+        async () => {
+          const strategy = await db.strategies.get([ws, id]);
+          if (!strategy) throw new NotFoundError('strategy', id);
+          await onItsTrades(db, ws, id, ruleIdsOf(strategy), true);
+          await db.strategies.delete([ws, id]);
+          await deleteOwnerFiles(db, ws, `strategy:${id}`);
+          // One row for the strategy, not one per trade it leaves.
+          await logHistory(
+            db,
+            ws,
+            [lifecycleRow('strategy', 'deleted', id, strategy.name)],
+            ctx,
+          );
+        },
+      );
     },
   };
 }

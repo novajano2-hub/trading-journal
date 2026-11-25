@@ -44,6 +44,38 @@ export function fieldChanges<T extends object>(
   });
 }
 
+/** A row as the caller gives it: `logHistory` adds the id, the workspace and the time. */
+export type NewHistoryRow = Omit<HistoryRow, 'id' | 'workspaceId' | 'at'>;
+
+/** One row for a record that came, went or was undone, with no field. */
+export function lifecycleRow(
+  type: HistoryRow['type'],
+  action: 'created' | 'deleted' | 'undone',
+  entityId: string,
+  label: string,
+  source: HistoryRow['source'] = 'you',
+): NewHistoryRow {
+  return { type, action, source, entityId, label };
+}
+
+/** One edited row per change; none for a write that changed nothing logged. */
+export function changeRows(
+  type: HistoryRow['type'],
+  entityId: string,
+  label: string,
+  changes: readonly FieldChange[],
+  source: HistoryRow['source'] = 'you',
+): NewHistoryRow[] {
+  return changes.map((change) => ({
+    type,
+    action: 'edited',
+    source,
+    entityId,
+    label,
+    ...change,
+  }));
+}
+
 /**
  * Writes one history row per entry, stamped with the clock. Call inside the
  * transaction that makes the change, with `db.history` in its table list: the
@@ -54,7 +86,7 @@ export function fieldChanges<T extends object>(
 export async function logHistory(
   db: KeelDb,
   ws: string,
-  rows: Omit<HistoryRow, 'id' | 'workspaceId' | 'at'>[],
+  rows: readonly NewHistoryRow[],
   ctx: LocalContext,
 ): Promise<void> {
   if (rows.length === 0) return;

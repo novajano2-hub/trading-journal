@@ -5,6 +5,7 @@ import {
   type TagsRepo,
 } from '../repository';
 import type { LocalContext } from './context';
+import { changeRows, fieldChanges, lifecycleRow, logHistory } from './history';
 import { rwTx } from './tx';
 import type { KeelDb } from './db';
 import { mergePatch } from '../merge';
@@ -36,6 +37,9 @@ async function assertCategory(
     throw new NotFoundError('tag category', id);
 }
 
+/** The tag fields history keeps (B26). */
+const LOGGED_FIELDS = ['name', 'categoryId', 'description'] as const;
+
 export function localTags(ctx: LocalContext): TagsRepo {
   return {
     async list(ws) {
@@ -60,18 +64,24 @@ export function localTags(ctx: LocalContext): TagsRepo {
         id: ctx.newId(),
         workspaceId: ws,
       };
-      return rwTx(db, [db.tags, db.tagCategories], async () => {
+      return rwTx(db, [db.tags, db.tagCategories, db.history], async () => {
         await assertCategory(db, ws, tag.categoryId);
         const existing = await sameName(db, tag);
         if (existing) return existing;
         await db.tags.put(tag);
+        await logHistory(
+          db,
+          ws,
+          [lifecycleRow('tag', 'created', tag.id, tag.name)],
+          ctx,
+        );
         return tag;
       });
     },
 
     async update(ws, id, patch) {
       const db = await ctx.db();
-      return rwTx(db, [db.tags, db.tagCategories], async () => {
+      return rwTx(db, [db.tags, db.tagCategories, db.history], async () => {
         const tag = await db.tags.get([ws, id]);
         if (!tag) throw new NotFoundError('tag', id);
         const next: Tag = {
@@ -85,16 +95,35 @@ export function localTags(ctx: LocalContext): TagsRepo {
         const clash = await sameName(db, next);
         if (clash) throw new DuplicateNameError(clash.name);
         await db.tags.put(next);
+        await logHistory(
+          db,
+          ws,
+          changeRows(
+            'tag',
+            id,
+            next.name,
+            fieldChanges(tag, next, LOGGED_FIELDS),
+          ),
+          ctx,
+        );
         return next;
       });
     },
 
     async remove(ws, id) {
       const db = await ctx.db();
-      await rwTx(db, [db.tags, db.trades], async () => {
-        if (!(await db.tags.get([ws, id]))) throw new NotFoundError('tag', id);
+      await rwTx(db, [db.tags, db.trades, db.history], async () => {
+        const tag = await db.tags.get([ws, id]);
+        if (!tag) throw new NotFoundError('tag', id);
         await dropTagsFromTrades(db, ws, [id]);
         await db.tags.delete([ws, id]);
+        // One row for the tag, not one per trade it leaves.
+        await logHistory(
+          db,
+          ws,
+          [lifecycleRow('tag', 'deleted', id, tag.name)],
+          ctx,
+        );
       });
     },
   };
