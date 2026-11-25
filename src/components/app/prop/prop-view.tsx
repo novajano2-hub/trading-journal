@@ -3,7 +3,8 @@
 import { Bank, Plus, ShieldCheck } from '@phosphor-icons/react/dist/ssr';
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { writeParam } from '@/components/app/reports/use-report-data';
 import { Button } from '@/components/ui/button';
 import { StateGlyph } from '@/components/ui/state-glyph';
 import { Segmented } from '@/components/ui/segmented';
@@ -60,7 +61,18 @@ export function PropView(): React.JSX.Element {
   const prefs = usePrefs();
   const update = useUpdateChallenge();
   const [filter, setFilter] = useState<Filter>('all');
-  const [editing, setEditing] = useState<Challenge | 'new' | null>(null);
+  // Home's second step links here with ?new=challenge: the form opens, and the
+  // param leaves the address (below) so a reload or Back doesn't reopen it.
+  const [editing, setEditing] = useState<Challenge | 'new' | null>(() =>
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('new') === 'challenge'
+      ? 'new'
+      : null,
+  );
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('new') === 'challenge')
+      writeParam('new', null);
+  }, []);
   const error =
     challenges.error ??
     accounts.error ??
