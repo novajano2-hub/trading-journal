@@ -335,13 +335,16 @@ const FEE_ORDER: { category: PropTxnCategory; label: string }[] = [
  * challenge (or no size) reads None. By fee it groups the negative amounts by
  * category, uncategorized included, in the category order (C60): all of a fee
  * row is spent, and its count is its transactions. Elsewhere a row's count is
- * the challenges of its group in `challenges`.
+ * the challenges of its group in `inView` (all of `challenges` by default):
+ * `challenges` is what groups the rows, so a row linked to a challenge a
+ * filter leaves out of view still counts in its own group.
  */
 export function breakdown(
   items: readonly PropTxn[],
   challenges: readonly Challenge[],
   accounts: readonly Account[],
   by: 'firm' | 'type' | 'size' | 'fee',
+  inView: readonly Challenge[] = challenges,
 ): BreakdownRow[] {
   if (by === 'fee') {
     const rows = new Map<PropTxnCategory, BreakdownRow>();
@@ -396,8 +399,9 @@ export function breakdown(
     else row.earned += i.amount;
     row.net += i.amount;
   }
-  for (const g of groupOfChallenge.values()) {
-    const row = rows.get(g.key);
+  const viewed = new Set(inView.map((c) => c.id));
+  for (const [id, g] of groupOfChallenge) {
+    const row = viewed.has(id) ? rows.get(g.key) : undefined;
     if (row) row.count++;
   }
   return sortGroups([...rows.values()], by, (r) => [r.spent + r.earned]);

@@ -11,8 +11,11 @@ import type { ImportContext, ImportPlan } from '@/domain/import/plan';
 import { useHydrated } from '@/lib/use-hydrated';
 import type {
   Account,
+  BreachReason,
   CashFlow,
+  Cents,
   Challenge,
+  CostMethod,
   DayRecord,
   DayShot,
   FrozenDay,
@@ -20,6 +23,7 @@ import type {
   JournalEntry,
   NoteFolder,
   NoteTemplate,
+  PropTxn,
   Strategy,
   Tag,
   TagCategory,
@@ -37,7 +41,9 @@ import type {
   NewAccount,
   NewCashFlow,
   NewChallenge,
+  NewPropTxn,
   ChallengePatch,
+  PropTxnPatch,
   FirstRunInput,
   NewStrategy,
   NewTag,
@@ -47,6 +53,7 @@ import type {
   TemplateDraft,
   UndoResult,
 } from '../repository';
+import { NotFoundError } from '../repository';
 import type { TradePatch } from '../trade-patch';
 import { USER_WORKSPACE } from '../workspaces';
 import { keys, type WriteKind } from './keys';
@@ -921,5 +928,112 @@ export function useCompleteFirstRun(): UseMutationResult<
 > {
   return useFixedWrite('onboarding.complete', '', (r, input: FirstRunInput) =>
     r.onboarding.complete(input),
+  );
+}
+
+// Plan 6C: the prop money ledger, breaches and the cost method.
+
+export function usePropTxns(): UseQueryResult<PropTxn[]> {
+  return useWorkspaceQuery(keys.propTxns, (r, ws) => r.propTxns.list(ws));
+}
+
+export function useAddPropTxn(): UseMutationResult<PropTxn, Error, NewPropTxn> {
+  return useWorkspaceWrite('propTxns.add', (r, ws, v: NewPropTxn) =>
+    r.propTxns.add(ws, v),
+  );
+}
+
+export function useUpdatePropTxn(): UseMutationResult<
+  PropTxn,
+  Error,
+  { id: string; patch: PropTxnPatch }
+> {
+  return useWorkspaceWrite(
+    'propTxns.update',
+    (r, ws, v: { id: string; patch: PropTxnPatch }) =>
+      r.propTxns.update(ws, v.id, v.patch),
+  );
+}
+
+/** For good; the row cannot be undone. */
+export function useRemovePropTxn(): UseMutationResult<void, Error, string> {
+  return useWorkspaceWrite('propTxns.remove', (r, ws, id: string) =>
+    r.propTxns.remove(ws, id),
+  );
+}
+
+/**
+ * Log a payout (C29): a payout row linked to the funded challenge, in its
+ * firm, for a positive amount, not yet reviewed. It counts in total earned at
+ * once. It writes no withdrawal. Rejects with RangeError for an amount that is
+ * not income, NotFoundError for a challenge that is not there.
+ */
+export function useLogPayout(): UseMutationResult<
+  PropTxn,
+  Error,
+  { challengeId: string; amount: Cents; date: string; description?: string }
+> {
+  return useWorkspaceWrite(
+    'propTxns.add',
+    async (
+      r,
+      ws,
+      v: {
+        challengeId: string;
+        amount: Cents;
+        date: string;
+        description?: string;
+      },
+    ) => {
+      if (!Number.isInteger(v.amount) || v.amount <= 0)
+        throw new RangeError('A payout is a positive whole number of cents');
+      const challenge = (await r.challenges.list(ws)).find(
+        (c) => c.id === v.challengeId,
+      );
+      if (!challenge) throw new NotFoundError('challenge', v.challengeId);
+      return r.propTxns.add(ws, {
+        date: v.date,
+        ...(v.description !== undefined && { description: v.description }),
+        firm: challenge.firm,
+        challengeId: challenge.id,
+        category: 'payout',
+        amount: v.amount,
+        status: 'not-reviewed',
+      });
+    },
+  );
+}
+
+/** A breach is permanent. Rejects with ChallengeBreachedError for a challenge already breached. */
+export function useMarkBreached(): UseMutationResult<
+  Challenge,
+  Error,
+  { id: string; reason: BreachReason; note?: string; on: string }
+> {
+  return useWorkspaceWrite(
+    'challenges.markBreached',
+    (
+      r,
+      ws,
+      v: { id: string; reason: BreachReason; note?: string; on: string },
+    ) =>
+      r.challenges.markBreached(ws, v.id, {
+        reason: v.reason,
+        ...(v.note !== undefined && { note: v.note }),
+        on: v.on,
+      }),
+  );
+}
+
+/** Rebuilds the account's trades under the method, in one transaction (C40). */
+export function useSetCostMethod(): UseMutationResult<
+  Account,
+  Error,
+  { id: string; method: CostMethod }
+> {
+  return useWorkspaceWrite(
+    'accounts.setCostMethod',
+    (r, ws, v: { id: string; method: CostMethod }) =>
+      r.accounts.setCostMethod(ws, v.id, v.method),
   );
 }

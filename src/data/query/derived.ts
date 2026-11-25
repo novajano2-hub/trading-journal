@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ImportMapping } from '@/domain/import/mapping';
 import type { ParsedCsv } from '@/domain/import/csv';
 import { planImport, type ImportPlan } from '@/domain/import/plan';
-import type { Account, Trade } from '@/domain/types';
+import type { Account, Trade, WidgetKey } from '@/domain/types';
+import type { PropFilters } from '@/domain/prop/finance';
 import { localDate } from '@/domain/time';
 import {
   applyFilters,
@@ -24,14 +25,23 @@ import {
   metricsByCurrency,
   type CurrencyMetrics,
 } from '../metrics';
+import {
+  DEFAULT_PROP_VIEW,
+  propFinance,
+  type PropFinance,
+  type PropFinanceView,
+} from '../prop-finance';
+import { widgetData, type WidgetData } from '../widget-data';
 import { routineToday } from '@/domain/tracker/defaults';
 import { msToLocalMidnight, scoreHistory, type ScoreHistory } from '../routine';
 import {
   useAccounts,
   useCashFlows,
+  useChallenges,
   useDays,
   useImportContext,
   usePrefs,
+  usePropTxns,
   useStrategies,
   useTags,
   useTracker,
@@ -144,6 +154,8 @@ export interface TradeSet {
   filters: GlobalFilters;
   /** The trades the filters match that the display unit reads. */
   trades: Trade[];
+  /** The trades the filters match, whatever the display unit: what the score reads (it reads money). */
+  matched: Trade[];
   /** The same filters except the date, narrowed the same way: what the day figures are built from. */
   dayTrades: Trade[];
   /** The selected accounts: the active ones when no account is filtered. */
@@ -220,6 +232,7 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
     return {
       filters: clean,
       trades: kept,
+      matched,
       dayTrades: narrowToUnit(dayMatched, unit),
       accounts: selectedAccounts(accounts.data, clean),
       unitLeftOut: matched.length - kept.length,
@@ -463,5 +476,142 @@ export function useDayScores(): Derived<ScoreHistory> {
     return () => clearInterval(id);
   }, [live, refresh]);
 
+  return { ...state, data: state.status === 'success' ? data : undefined };
+}
+
+// Plan 6C: the dashboard's widgets and the prop dashboard.
+
+export interface WidgetDataResult {
+  /** The series of the widgets asked for, as far as they are built. */
+  values: WidgetData;
+  /** The P&L currency read: the one asked for when the filtered trades have it, else the base. */
+  currency: string;
+  /** The base currency first, then the others the trades are in. More than one shows the currency switch. */
+  currencies: string[];
+  /** The trades the filters matched that the display unit leaves out; 0 otherwise. */
+  unitLeftOut: number;
+}
+
+/**
+ * What the listed widgets read (#46), from the URL's filters, the date range
+ * and the display unit: only the series those widgets need, in one P&L
+ * currency (`opts.currency`, else the base). The score reads every trade the
+ * filters match, the other widgets the ones the unit keeps. Call it under a
+ * `<Suspense>` boundary, as `useGlobalFilters` needs.
+ */
+export function useWidgetData(
+  keys: readonly WidgetKey[],
+  opts: { currency?: string } = {},
+): Derived<WidgetDataResult> {
+  const { filters } = useGlobalFilters();
+  const set = useTradeSet(filters);
+  const flows = useCashFlows();
+  const everyTrade = useTrades();
+  const prefs = usePrefs();
+  const state = combine([set, flows]);
+  // The keys may arrive as a fresh array every render.
+  const keyList = keys.join(',');
+  const currency = opts.currency;
+  const data = useMemo(() => {
+    if (!set.data || !prefs.data || !flows.data || !everyTrade.data)
+      return undefined;
+    const today = localDate(new Date().toISOString(), prefs.data.timeZone);
+    const read = widgetData(
+      keyList === '' ? [] : (keyList.split(',') as WidgetKey[]),
+      {
+        matched: set.data.matched,
+        trades: set.data.trades,
+        dayTrades: set.data.dayTrades,
+        accounts: set.data.accounts,
+        flows: flows.data,
+        balanceTrades: everyTrade.data,
+        // Day figures count only the exits dated inside the date range.
+        ctx: {
+          ...metricContextOf(prefs.data),
+          range: resolveRange(
+            set.data.filters.range,
+            today,
+            prefs.data.weekStart,
+          ),
+        },
+        baseCurrency: prefs.data.baseCurrency,
+        ...(currency !== undefined && { currency }),
+        today,
+      },
+    );
+    return { ...read, unitLeftOut: set.data.unitLeftOut };
+  }, [set.data, prefs.data, flows.data, everyTrade.data, keyList, currency]);
+  return { ...state, data: state.status === 'success' ? data : undefined };
+}
+
+/**
+ * The prop dashboard's figures (#45) for the page's filters and switches, in
+ * the workspace's base currency (C58). The filters may be an inline object:
+ * what they hold is what counts.
+ */
+export function usePropFinance(
+  filters: PropFilters,
+  view: PropFinanceView = DEFAULT_PROP_VIEW,
+): Derived<PropFinance> {
+  const challenges = useChallenges();
+  const accounts = useAccounts();
+  const trades = useTrades();
+  const flows = useCashFlows();
+  const txns = usePropTxns();
+  const strategies = useStrategies();
+  const prefs = usePrefs();
+  const state = combine([
+    challenges,
+    accounts,
+    trades,
+    flows,
+    txns,
+    strategies,
+    prefs,
+  ]);
+  const filterKey = JSON.stringify(filters);
+  const viewKey = JSON.stringify(view);
+  const timeZone = prefs.data?.timeZone;
+  const today =
+    timeZone === undefined
+      ? undefined
+      : localDate(new Date().toISOString(), timeZone);
+  const data = useMemo(() => {
+    if (
+      !challenges.data ||
+      !accounts.data ||
+      !trades.data ||
+      !flows.data ||
+      !txns.data ||
+      !strategies.data ||
+      !prefs.data ||
+      today === undefined
+    )
+      return undefined;
+    return propFinance({
+      challenges: challenges.data,
+      accounts: accounts.data,
+      trades: trades.data,
+      flows: flows.data,
+      txns: txns.data,
+      strategies: strategies.data,
+      filters: JSON.parse(filterKey) as PropFilters,
+      view: JSON.parse(viewKey) as PropFinanceView,
+      baseCurrency: prefs.data.baseCurrency,
+      ctx: metricContextOf(prefs.data),
+      today,
+    });
+  }, [
+    challenges.data,
+    accounts.data,
+    trades.data,
+    flows.data,
+    txns.data,
+    strategies.data,
+    prefs.data,
+    today,
+    filterKey,
+    viewKey,
+  ]);
   return { ...state, data: state.status === 'success' ? data : undefined };
 }

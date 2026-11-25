@@ -1,4 +1,4 @@
-import { localParts } from '../time';
+import { TZDate } from '@date-fns/tz';
 import { closedInOrder } from '../trade-status';
 import type { Cents, Trade } from '../types';
 import { pnlOf, type MetricContext } from './context';
@@ -28,9 +28,10 @@ export const DURATION_TICKS = [
 
 const MINUTE = 60_000;
 
+// The hour and minute only: `localParts` also formats the date, three times the work over a few thousand trades.
 const minuteOfDay = (iso: string, timeZone: string) => {
-  const p = localParts(iso, timeZone);
-  return p.hour * 60 + p.minute;
+  const d = new TZDate(Date.parse(iso), timeZone);
+  return d.getHours() * 60 + d.getMinutes();
 };
 
 /**

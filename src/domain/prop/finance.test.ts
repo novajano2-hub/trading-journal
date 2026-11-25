@@ -811,6 +811,24 @@ describe('breakdown', () => {
     });
   });
 
+  test('the challenges in view count; every challenge still groups its rows', () => {
+    const inView = CHALLENGES.filter((c) => c.status === 'breached');
+    const all = breakdown(ITEMS, CHALLENGES, ACCOUNTS, 'type');
+    const some = breakdown(ITEMS, CHALLENGES, ACCOUNTS, 'type', inView);
+    // The money is the same: a row linked to a challenge outside the view is still its group's.
+    expect(some.map((r) => [r.key, r.spent, r.earned])).toEqual(
+      all.map((r) => [r.key, r.spent, r.earned]),
+    );
+    expect(
+      some.map((r) => [r.key, r.count]),
+      'counts',
+    ).toEqual([
+      ['1-step', inView.filter((c) => c.steps === 1).length],
+      ['2-step', inView.filter((c) => c.steps === 2).length],
+      ['none', 0],
+    ]);
+  });
+
   test('a straight to funded row is labelled in words', () => {
     const s2f = challenge('s2f', {
       phase: 'funded',
