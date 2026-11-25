@@ -169,8 +169,8 @@ export function ProfileSettings(): React.JSX.Element {
             </FieldError>
           ) : (
             <p id={`${currencyId}-help`} className={HELP}>
-              The currency your totals and goals are in. Trades in another
-              currency are shown on their own.
+              The currency your totals are in. Trades in another currency are
+              shown on their own.
             </p>
           )}
         </div>

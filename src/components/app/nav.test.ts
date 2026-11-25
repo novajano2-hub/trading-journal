@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 import {
   APP_NAV,
   activeItem,
+  dayPageDate,
   navHref,
   pageTitle,
   strategyEditId,
@@ -121,4 +122,21 @@ test('the tracker shows the date range alone and no Display menu', () => {
     expect(datesOnly(p), p).toBe(false);
     expect(hidesDisplayMenu(p), p).toBe(false);
   }
+});
+
+test('a day page sits under Trades, with no Display menu and no filters', () => {
+  for (const path of [
+    '/app/day/2026-11-24',
+    '/app/day/2026-11-24/plan',
+    '/app/day/2026-11-24/review',
+  ]) {
+    expect(activeItem(path)?.id, path).toBe('trades');
+    expect(pageTitle(path), path).toBe('Trades');
+    expect(dayPageDate(path), path).toBe('2026-11-24');
+    expect(hidesDisplayMenu(path), path).toBe(true);
+    expect(filtersApply(path), path).toBe(false);
+  }
+  expect(dayPageDate('/app/day')).toBeUndefined();
+  expect(dayPageDate('/app/trades')).toBeUndefined();
+  expect(hidesDisplayMenu('/app/trades')).toBe(false);
 });

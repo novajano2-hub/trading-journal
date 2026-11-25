@@ -2,6 +2,7 @@ import type { JournalKind, NoteTemplate } from '@/domain/types';
 import { NotFoundError, type TemplatesRepo } from '../repository';
 import type { LocalContext } from './context';
 import type { KeelDb } from './db';
+import { builtInTemplates } from '../seed/templates';
 import { rwTx } from './tx';
 
 /** The kind's templates. Call inside a transaction that includes `db.templates`. */
@@ -17,6 +18,13 @@ async function ofKind(
     .toArray();
 }
 
+/** The ids of the built-ins that are their kind's default. */
+const builtInDefaultIds = new Set(
+  builtInTemplates('')
+    .filter((t) => t.isDefault)
+    .map((t) => t.id),
+);
+
 /**
  * Makes `id` the kind's only default, or, with no id, gives a kind left
  * without a default its built-in template. Call inside an rw transaction
@@ -31,7 +39,13 @@ async function settleDefault(
   const all = await ofKind(db, ws, kind);
   const chosen =
     id ??
-    (all.some((t) => t.isDefault) ? undefined : all.find((t) => t.builtIn)?.id);
+    (all.some((t) => t.isDefault)
+      ? undefined
+      : // The built-in that is the kind's own default (not one of Keel's extra daily templates).
+        (
+          all.find((t) => t.builtIn && builtInDefaultIds.has(t.id)) ??
+          all.find((t) => t.builtIn)
+        )?.id);
   if (chosen === undefined) return;
   for (const t of all) {
     const isDefault = t.id === chosen;

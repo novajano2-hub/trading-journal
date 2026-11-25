@@ -265,18 +265,11 @@ export type CalendarStat =
   | 'ticks'
   | 'pips'
   | 'points';
-/** One workspace's goals, in its base currency. A missing field means that goal isn't set. */
-export interface Goals {
-  weeklyNet?: Cents;
-  dailyLossLimit?: Cents;
-}
 export interface UserPrefs {
   timeZone: string;
   baseCurrency: string;
   breakevenRange: BreakevenRange;
   pnlBasis: PnlBasis;
-  /** Goals per workspace id; a workspace with no entry has none set (the sample workspace falls back to its defaults). */
-  goals?: Record<string, Goals>;
   displayName?: string;
   /** How every money figure shows. */
   displayUnit: DisplayUnit;

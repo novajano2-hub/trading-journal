@@ -69,12 +69,12 @@ import { price } from '@/lib/format';
 import { StatusChip } from './cells';
 import { qty } from './columns';
 import { FillsTimeline, positions, sortedFills } from './fills-timeline';
+import { RatingRow } from '../routine/rating-row';
 import { RuleChecklist } from './rule-checklist';
 import { clock, clockOnDay, dayLabel } from './trade-time';
 import {
   DayNote,
   dayNoteDate,
-  RatingRow,
   StrategyPicker,
   TagRows,
   TradeNote,

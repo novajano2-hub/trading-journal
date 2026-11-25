@@ -28,12 +28,26 @@ export function PlanTheDay({
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState<string | undefined>(undefined);
 
-  const look = `${buttonClasses('secondary')} gap-[7px] pr-[15px] pl-3${wide ? ' w-full' : ''}`;
+  // In the top bar it is icon-only below 1800, where the bar is tight: the
+  // label stays for screen readers, and a tooltip names it.
+  const look = wide
+    ? `${buttonClasses('secondary')} w-full gap-[7px] pr-[15px] pl-3`
+    : `${buttonClasses('secondary')} gap-[7px] pr-[15px] pl-3 max-[1799px]:w-[34px] max-[1799px]:px-0 max-[1799px]:pointer-coarse:w-11`;
+  const text = (
+    <span className={wide ? undefined : 'max-[1799px]:sr-only'}>{label}</span>
+  );
+  const tip = wide ? undefined : label;
   if (today === undefined) {
     return (
-      <button type="button" disabled aria-haspopup="dialog" className={look}>
+      <button
+        type="button"
+        disabled
+        aria-haspopup="dialog"
+        title={tip}
+        className={look}
+      >
         <CalendarCheck size={16} aria-hidden="true" className="flex-none" />
-        {label}
+        {text}
       </button>
     );
   }
@@ -47,9 +61,9 @@ export function PlanTheDay({
         setOpen(next);
       }}
     >
-      <Popover.Trigger className={look}>
+      <Popover.Trigger title={tip} className={look}>
         <CalendarCheck size={16} aria-hidden="true" className="flex-none" />
-        {label}
+        {text}
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content

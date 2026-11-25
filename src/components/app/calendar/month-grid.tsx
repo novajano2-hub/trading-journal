@@ -14,7 +14,7 @@ import type { CalendarStat, Cents, WeekStart } from '@/domain/types';
 import { rotateFromWeekStart } from '@/domain/week';
 import { formatUnitValue } from '@/lib/display';
 import { formatPct, plural } from '@/lib/format';
-import { onTradingDate, weekdayOf } from '@/lib/time-format';
+import { dayLabel } from '@/lib/time-format';
 
 /** A figure as text and label; the view builds it from the display unit. */
 export type FormatMoney = (
@@ -26,9 +26,7 @@ export type FormatMoney = (
   units?: UnitSums,
 ) => { text: string; label: string };
 
-/** "Thu 19 Nov". */
-export const dayLabel = (date: string): string =>
-  `${weekdayOf(date, 'short')} ${onTradingDate(date, { day: 'numeric', month: 'short' })}`;
+export { dayLabel };
 
 /** A day's fill and hairline by tone; the bar under its figures. */
 export const TONE_BOX: Record<CalendarDay['tone'], string> = {

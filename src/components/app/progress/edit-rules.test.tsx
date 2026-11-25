@@ -170,6 +170,92 @@ test('a custom rule can be deleted and a new one discarded', async () => {
   });
 });
 
+test("after Add, discard or Delete, focus moves to that stage's Add rule link", async () => {
+  show(() => {
+    const s = fixtureSample();
+    const v = defaultVersion('2026-11-02');
+    v.custom = [
+      { id: 'c1', name: 'Walk first', stage: 'prepare', days: v.tradingDays },
+    ];
+    return { ...s, tracker: { ...s.tracker, versions: [v] } };
+  });
+  await ready();
+  const addLink = (stage: string) =>
+    within(section(stage)).getByRole('button', { name: 'Add rule' });
+
+  // Add.
+  fireEvent.click(addLink('Trade'));
+  fireEvent.change(screen.getByRole('textbox', { name: 'New rule name' }), {
+    target: { value: 'No chasing' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+  expect(document.activeElement).toBe(addLink('Trade'));
+
+  // Discard.
+  fireEvent.click(addLink('Reflect'));
+  fireEvent.click(screen.getByRole('button', { name: 'Discard the new rule' }));
+  expect(document.activeElement).toBe(addLink('Reflect'));
+
+  // Delete.
+  fireEvent.click(screen.getByRole('button', { name: 'Delete Walk first' }));
+  expect(document.activeElement).toBe(addLink('Prepare'));
+});
+
+test('a typed but un-Added rule counts as a change, and Save includes it', async () => {
+  const { repo } = show();
+  await ready();
+  expect((save() as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(
+    within(section('Prepare')).getByRole('button', { name: 'Add rule' }),
+  );
+  // An empty name is not a change.
+  expect((save() as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.change(screen.getByRole('textbox', { name: 'New rule name' }), {
+    target: { value: '  Read the calendar ' },
+  });
+  expect((save() as HTMLButtonElement).disabled).toBe(false);
+  fireEvent.click(save());
+  await waitFor(async () => {
+    const t = await tracker(repo);
+    expect(t.versions[t.versions.length - 1]!.custom).toHaveLength(1);
+  });
+  const t = await tracker(repo);
+  expect(t.versions[t.versions.length - 1]!.custom[0]).toMatchObject({
+    name: 'Read the calendar',
+    stage: 'prepare',
+    days: [false, true, true, true, true, true, false],
+  });
+});
+
+test('a typed rule that is too long keeps Save off', async () => {
+  show();
+  await ready();
+  fireEvent.click(
+    within(section('Prepare')).getByRole('button', { name: 'Add rule' }),
+  );
+  fireEvent.change(screen.getByRole('textbox', { name: 'New rule name' }), {
+    target: { value: 'x'.repeat(81) },
+  });
+  expect((save() as HTMLButtonElement).disabled).toBe(true);
+});
+
+test('the compact weekday pills are 44px targets on a coarse pointer', async () => {
+  show();
+  await ready();
+  fireEvent.click(
+    within(section('Trade')).getByRole('button', { name: 'Add rule' }),
+  );
+  const pills = within(
+    screen.getByRole('group', { name: 'Days for the new rule' }),
+  ).getAllByRole('button');
+  expect(pills).toHaveLength(7);
+  // The button is the target; the 24px chip sits inside it.
+  for (const pill of pills) {
+    expect(pill.className).toContain('pointer-coarse:h-11');
+    expect(pill.className).toContain('pointer-coarse:min-w-11');
+  }
+});
+
 test('reset asks once, then restarts the tracker today', async () => {
   const closed = vi.fn();
   const { repo } = show(() => {
