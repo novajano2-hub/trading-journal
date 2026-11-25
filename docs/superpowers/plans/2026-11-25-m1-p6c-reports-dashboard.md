@@ -82,7 +82,7 @@ These settle what the spec left to the builder (§8). Reviewers should not "fix"
 |---|---|
 | Where the cost method reaches `realizations` | `Trade.costMethod?: CostMethod`, stamped by the builder from the account (unset reads FIFO). `realizations(trade)` and `sizedRealizations(trade)` read it, so their signatures don't change |
 | The rebuild | `accounts.setCostMethod(ws, accountId, method)`: one Dexie transaction that writes the account, then re-finalizes each of its trades from its stored executions with the new method, keeping every other field. Imports and manual trades read the account's method at build time; an undo restores the stored rows, then re-finalizes them the same way |
-| The score's fixture | `src/domain/metrics/__fixtures__/forex-2026-11-02.csv`: the nine 2 Nov fills of the forex sample file, read in America/New_York with the execution mapping. Pinned to the method's own 76.43 ±0.01 and within ±0.2 of TZ's 76.3 (C59). If it misses, stop and report the parts; don't tune a curve to fit |
+| The score's fixture | `src/domain/metrics/__fixtures__/forex-2026-11-02.csv`: the nine 2 Nov fills of the forex sample file, read in America/New_York with the execution mapping. Pinned to the method's own 76.44 ±0.01 and within ±0.2 of TZ's 76.3 (C59). If it misses, stop and report the parts; don't tune a curve to fit |
 | Standard deviation in consistency | Population (divide by n): it reproduces the 2 Nov reading of 67 (sample deviation gives 62) |
 | The lower grid | CSS grid, 3 columns from `xl` (2 from `md`, 1 below), `grid-auto-flow: dense`; a `wide` widget (the advanced and yearly calendars) spans 2 columns and 2 rows, so the next two widgets stack beside it, as comp 01 shows |
 | Widget data | One hook, `useWidgetData(keys)`, computes only the series the template's widgets need from one filtered trade set, so a template without scatters never builds them |
@@ -228,7 +228,7 @@ Delivers spec §5.2, C21 to C26 and C59.
   - `ratioScore`: 1.20 → 40; 1.21 → 40.33 (±0.01); 1.45 → 48.33; 0.5 → 20; 1.79 → 59.67; 1.8 → 50 (the help's step, kept); 1.85 → 55; 2.3 → 85; 2.6 → 100; 4.36 → 100.
   - `winRateScore`: 25 → 41.67; 49.79 → 82.98; 42.47 → 70.78; 75 → 100.
   - `recoveryScore`: null → 0; 0.9 → 0; 1.0 → 1; 3.49 → 89 (±0.1); 3.5 → 100; 4.04 → 100.
-  - `'the 2 Nov forex trades score 76.43, within 0.2 of TradeZella's 76.3'`: build the fixture (import it with the generic execution mapping, zone America/New_York); total 76.43 ±0.01 and |total − 76.3| ≤ 0.2; parts: winRate 100, profitFactor 100, winLoss 48.48 (±0.05), drawdown 100, recovery score 0 with `why: 'no-drawdown'` and `plotted` 100, consistency 67.48 (±0.05).
+  - `'the 2 Nov forex trades score 76.44, within 0.2 of TradeZella's 76.3'`: build the fixture (import it with the generic execution mapping, zone America/New_York); total 76.44 ±0.01 and |total − 76.3| ≤ 0.2; parts: winRate 100, profitFactor 100, winLoss 48.48 (±0.05), drawdown 100, recovery score 0 with `why: 'no-drawdown'` and `plotted` 100, consistency 67.48 (±0.05).
   - `'a net loss scores consistency 0'`; `'no losses: profit factor 100, why no-losses'`; `'the unit does not change the score'` (same result with `unit: 'pips'`); `'no closed trade: null'`; `'every total is within 0 to 100'` over random trade sets.
   - `'the sample scores in under 20 ms'` (1,230 trades, after one warm-up run).
 - [ ] **Step 2:** `npm test -- score`. Expected: FAIL.

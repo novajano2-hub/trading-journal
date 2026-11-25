@@ -12,7 +12,7 @@
 3. `DESIGN.md` and `PRODUCT.md`.
 4. The Plan 5 rulings, and Plan 6A's spec (`2026-11-25-plan-6a-daily-routine-design.md`), whose Keel's calls K1 to K56 and decisions U1 to U4 stand.
 
-Where TZ is unknown this doc decides, as a **Keel's call (TradeZella unknown)** with an id (C1 to C76, all listed in §6.1).
+Where TZ is unknown this doc decides, as a **Keel's call (TradeZella unknown)** with an id (C1 to C77, all listed in §6.1).
 
 **TradeZella's behaviour, never its UI** (the owner, 2026-11-25). Wherever this doc says "TZ's template", "TZ's default", "TZ's widgets" or "TZ's way", it means TZ's features and behaviour: which widgets exist, which are in the default set, and what each one does and computes. The layout, look, arrangement, wording and icons are Keel's own: design G and the comps. Nothing here asks for TZ's screen. The owner's decisions are D1 to D3 (§6.2).
 
@@ -34,7 +34,7 @@ All of it runs on local data. Together with 6A and 6B it closes the Plan 6 rows 
 **Goals**
 
 - TZ parity for the seven rows, including the help-only behaviour: the twelve upper and seventeen lower widgets [help 7118437], the prop dashboard's figures, insights and filters [help 13463814], and the transactions with their review status [help 14588595, 14502964].
-- One composite score with TZ's method, matching TZ's 76.3 on the forex file's 2 Nov trades within the readings' error (the inferred method gives 76.43), and TZ's component readings at the other two recorded scopes (rec §2.4), shown in Keel's own look and words (D1).
+- One composite score with TZ's method, matching TZ's 76.3 on the forex file's 2 Nov trades within the readings' error (the inferred method gives 76.44), and TZ's component readings at the other two recorded scopes (rec §2.4), shown in Keel's own look and words (D1).
 - The prop module as TZ's: Dashboard, Accounts and Transactions (#45 with D3).
 - A safe upgrade for every existing Dexie database; a sample workspace that shows every new state.
 
@@ -268,7 +268,7 @@ Dexie version 4 adds one workspace table, which joins `DATA_TABLES` (a workspace
 | Part | Reuses | New |
 | --- | --- | --- |
 | Inputs | `summarize`, `profitFactorOf`, `maxDrawdown` (daily curve), the net basis (`pnlBasis`) | `src/domain/metrics/score.ts`: `scoreOf(trades, ctx)` returning six sub-scores, the raw values and the total; pure, test-first |
-| Fixtures | The 2 Nov 2026 trades of `keel-sample-forex-prop.csv` (in the main checkout's git-ignored research `import/` folder; copied into `src/domain/metrics/__fixtures__/` as a small CSV of those nine fills) | The whole score pinned at the method's own 76.43 ±0.01 on those four trades, and within ±0.2 of TZ's 76.3 (the documented gap). Component tests at the other two scopes on the inputs the screen shows: win % 49.79 gives 82.98; profit factor 1.20 and avg win/loss 1.21 give 40 ±3; win % 42.47 gives 70.8 (C59) |
+| Fixtures | The 2 Nov 2026 trades of `keel-sample-forex-prop.csv` (in the main checkout's git-ignored research `import/` folder; copied into `src/domain/metrics/__fixtures__/` as a small CSV of those nine fills) | The whole score pinned at the method's own 76.44 ±0.01 on those four trades, and within ±0.2 of TZ's 76.3 (the documented gap). Component tests at the other two scopes on the inputs the screen shows: win % 49.79 gives 82.98; profit factor 1.20 and avg win/loss 1.21 give 40 ±3; win % 42.47 gives 70.8 (C59) |
 | Widget | The card shell | `RadarChart` (SVG, six axes, five rings, a text table alternative) and the score bar |
 
 **Look.** Keel's own name and copy (C20). The radar polygon uses the accent (adherence-like: a measure against a standard). The bar is a neutral track with the marker, labelled in words by band (C22), so no money hue carries a non-money figure.
@@ -575,7 +575,7 @@ Every row below is Keel's call (TradeZella unknown).
 | --- | --- | --- | --- |
 | C57 | Seed v6 | Prop transactions for the sample's challenges (fees, two resets, payouts on the funded challenge, one ignored row, one uncategorized cost), one breached challenge with a reason and date. No seeded template: templates are prefs, which a reseed never touches | The sample shows every state |
 | C58 | Currencies | The dashboard keeps Plan 5's currency switch (shown when more than one currency has closed trades); every money widget and the score read the currency it picks. Prop transactions are in the base currency (no currency field, as TZ's have none); balances of accounts in other currencies are left out and named | Plan 5 (E49); 6A K24 |
-| C59 | The score's tests | The whole score is pinned only where TZ's trade set is rebuildable (2 Nov): to the method's own 76.43, with its documented gap of 0.13 to TZ's 76.3; elsewhere each component's curve is pinned on the inputs the screen shows, within the readings' ±3 | rec §2.4 |
+| C59 | The score's tests | The whole score is pinned only where TZ's trade set is rebuildable (2 Nov): to the method's own 76.44, with its documented gap of 0.14 to TZ's 76.3; elsewhere each component's curve is pinned on the inputs the screen shows, within the readings' ±3 | rec §2.4 |
 | C68 | The transactions table | Columns: date, description, firm, challenge, category (with its edit control), amount, status, actions; newest first | Fields [help 14588595]; columns and order UNKNOWN (rec §3.2) |
 | C69 | Prop states TZ doesn't show | The empty, transactions-only, no-fee and no-match states as §5.3 States writes them | rec §3.5 UNKNOWN |
 | C70 | Dashboard states TZ doesn't show | A full upper section hides its add place; a template saved elsewhere replaces the one shown on refetch | UNKNOWN |
@@ -586,6 +586,7 @@ Every row below is Keel's call (TradeZella unknown).
 | C75 | The balance widget's second line | Deposits and withdrawals, net, as a second line in the same chart on its own right-hand scale (their size is far below the balance's) | [rec S02]; the scale is Keel's |
 | C67 | The figure widgets' marks | TZ's half gauges and ring are look; Keel shows the same split (won, breakeven, lost; green, flat, red days; gross profit against loss; average win against loss) as a thin split bar with the counts in words, as its summary strip does | DESIGN.md; comps 01 and 03 |
 | C76 | Total swap | The Overview's costs group gains "Swap", the sum of 6B's per-trade `swap` over the trades in the filters, signed as stored; "None" when no trade carries one. Built only once 6B's field has landed; until then the row waits in the backlog with #55 | [rec S50; help 7189346]; 6B's P6B-10 |
+| C77 | A set with no winning trade | Profit factor and average win to loss score 0 (nothing won, so no edge is shown), `why: 'no-profit'`; "no losses scores 100" (C23) applies only when there is a profit. An all-breakeven range scores low, not 65 | TZ unknown (rec §2.3 UNKNOWN: zero denominators) |
 | C61 | 6B's order | 6C plans against `main` after 6A. If 6B lands first, Task 1 takes the next Dexie version after 6B's, the migration test opens 6B's version, and the cost method joins 6B's builder changes | No 6B spec yet |
 
 ### 6.2 Decided by the owner (2026-11-25)
