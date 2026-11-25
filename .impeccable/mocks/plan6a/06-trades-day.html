@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Keel, Trades, by day</title>
-<!-- Plan 6A comp. Open with ?theme=dark for graphite. -->
+<!-- Plan 6A comp. Open with ?theme=dark for graphite. Variants: expanded -->
 <script>(function(){var q=new URLSearchParams(location.search),t=q.get('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'),d=document.documentElement;d.dataset.theme=t;var s=q.get('state');if(s)d.dataset.state=s;})();</script>
 <link rel="stylesheet" href="shell.css">
 <style>
@@ -62,6 +62,12 @@
   .dc-trades { margin-top: 12px; }
 }
 
+/* Day cards start collapsed; ?state=expanded opens the first one with its trades. */
+html:not([data-state='expanded']) .v-exp { display: none !important; }
+[data-state='expanded'] .v-col { display: none !important; }
+/* Day-card chart: running net with $ labels on the y axis (no time labels). */
+.ia { padding-left: 46px; }
+.ia-y { position: absolute; right: calc(100% + 8px); transform: translateY(-50%); font-size: 11px; line-height: 1; color: var(--faint); white-space: nowrap; }
 </style>
 </head>
 <body class="">
@@ -103,7 +109,7 @@
   <div class="tl-list">
     <article class="card dc open" aria-labelledby="d-2026-11-24">
   <header class="dc-hd">
-    <button class="dc-tog" aria-expanded="true" aria-label="Collapse Tue 24 Nov"><svg class="i" aria-hidden="true"><use href="#i-CaretDown-bold"/></svg></button>
+    <button class="dc-tog v-col" aria-expanded="false" aria-label="Expand Tue 24 Nov"><svg class="i" aria-hidden="true"><use href="#i-CaretRight-bold"/></svg></button><button class="dc-tog v-exp" aria-expanded="true" aria-label="Collapse Tue 24 Nov"><svg class="i" aria-hidden="true"><use href="#i-CaretDown-bold"/></svg></button>
     <h2 id="d-2026-11-24">Tue 24 Nov</h2><b class="dc-net gain">+$421.00</b>
     <div class="qa only-desk">
     <button class="btn sm ghost" aria-haspopup="menu">Mood <b class="mw">Good</b><svg class="i cd" aria-hidden="true"><use href="#i-CaretDown-bold"/></svg></button>
@@ -115,17 +121,18 @@
     <button class="pbtn" aria-label="View note"><svg class="i" aria-hidden="true"><use href="#i-NotePencil-regular"/></svg></button>
   </div>
   </header>
-  <div class="dc-chart"><div class="ia" style="height:112px"><div class="ia-plot" style="height:94px"><svg class="intra" viewBox="0 0 600 94" preserveAspectRatio="none" role="img" aria-label="Running net through the day, ending +$421.00">
+  <div class="dc-chart"><div class="ia"><div class="ia-plot" style="height:94px"><div aria-hidden="true"><span class="ia-y" style="top:81.9px">$0</span><span class="ia-y" style="top:49.7px">+$200</span><span class="ia-y" style="top:17.5px">+$400</span></div><svg class="intra" viewBox="0 0 600 94" preserveAspectRatio="none" role="img" aria-label="Running net through the day, ending +$421.00">
   <defs>
     <clipPath id="c2026-11-24-up"><rect x="0" y="-10" width="600" height="91.9"/></clipPath>
     <clipPath id="c2026-11-24-dn"><rect x="0" y="81.9" width="600" height="94"/></clipPath>
   </defs>
+  <line class="gl" x1="0" x2="600" y1="49.7" y2="49.7" vector-effect="non-scaling-stroke"/><line class="gl" x1="0" x2="600" y1="17.5" y2="17.5" vector-effect="non-scaling-stroke"/>
   <line class="zero" x1="0" x2="600" y1="81.9" y2="81.9" vector-effect="non-scaling-stroke"/>
   <path d="M55.3 81.9 V30.3 H66.8 V34.8 H119.8 V15.5 H214.0 V38.9 H481.9 V17.9 H500.1 V29.2 H596.0 V14.1 V81.9 Z" fill="var(--gain-fill)" opacity=".14" clip-path="url(#c2026-11-24-up)"/>
   <path d="M55.3 81.9 V30.3 H66.8 V34.8 H119.8 V15.5 H214.0 V38.9 H481.9 V17.9 H500.1 V29.2 H596.0 V14.1 V81.9 Z" fill="var(--loss-fill)" opacity=".14" clip-path="url(#c2026-11-24-dn)"/>
   <path d="M55.3 81.9 V30.3 H66.8 V34.8 H119.8 V15.5 H214.0 V38.9 H481.9 V17.9 H500.1 V29.2 H596.0 V14.1" fill="none" stroke="var(--gain-fill)" stroke-width="1.75" stroke-linejoin="round" vector-effect="non-scaling-stroke" clip-path="url(#c2026-11-24-up)"/>
   <path d="M55.3 81.9 V30.3 H66.8 V34.8 H119.8 V15.5 H214.0 V38.9 H481.9 V17.9 H500.1 V29.2 H596.0 V14.1" fill="none" stroke="var(--loss-fill)" stroke-width="1.75" stroke-linejoin="round" vector-effect="non-scaling-stroke" clip-path="url(#c2026-11-24-dn)"/>
-</svg><i class="ia-pt up" style="left:35.67%;top:41.41%"></i></div><div class="ia-ax"><span style="left:0.67%" class="s">09:41</span><span style="left:50.00%" class="">12:40</span><span style="left:99.33%" class="e">15:39</span></div></div><div class="tt only-desk" style="left:35.7%;top:24px;transform:translate(-50%,-100%)"><b>11:48, TSLA 385 Call</b><span class="loss">−$145.30</span>, running net +$266.90</div></div>
+</svg><i class="ia-pt up" style="left:35.67%;top:41.41%"></i><div class="tt only-desk" style="left:35.7%;top:24px;transform:translate(-50%,-100%)"><b>11:48, TSLA 385 Call</b><span class="loss">−$145.30</span>, running net +$266.90</div></div></div></div>
   <div class="dstats">
   <div><span class="lbl">Trades</span><b class="">7</b></div>
   <div><span class="lbl">Gross P&amp;L</span><b class="gain">+$449.50</b></div>
@@ -135,16 +142,16 @@
   <div><span class="lbl">Volume</span><b class="">145</b></div>
   <div><span class="lbl">Profit factor</span><b class="">2.73</b></div>
 </div>
-  <div class="dc-trades"><table class="dtab only-desk">
-  <colgroup><col style="width:62px"><col><col style="width:66px"><col style="width:76px"><col style="width:92px"><col style="width:78px"><col style="width:84px"><col style="width:164px"><col style="width:84px"></colgroup>
-  <thead><tr><th>Open</th><th>Symbol</th><th>Side</th><th>Instrument</th><th class="n">Net P&amp;L</th><th class="n">Net ROI</th><th class="n">Realized R</th><th>Strategy</th><th>Tags</th></tr></thead>
-  <tbody><tr><td class="tm"><b>15:21</b></td><td><span class="sym"><b>MNQ</b> <span>Dec 26</span></span></td><td><span class="sd">Long</span></td><td class="muted">Futures</td>
-<td class="n f gain">+$93.60</td><td class="n gain">+0.06%</td><td class="n gain">+0.98R</td><td>Session momentum</td><td><span class="tagc"><span class="chip">1 tag</span><button class="chip add" aria-label="Add tags"><svg class="i" aria-hidden="true"><use href="#i-Plus-bold"/></svg></button></span></td></tr><tr><td class="tm"><b>14:12</b></td><td><span class="sym"><b>GBPUSD</b></span></td><td><span class="sd">Short</span></td><td class="muted">Forex</td>
-<td class="n f loss">−$70.00</td><td class="n loss">−0.05%</td><td class="n loss">−0.33R</td><td>Level reversal</td><td><span class="tagc"><span class="chip wa">2 tags</span><button class="chip add" aria-label="Add tags"><svg class="i" aria-hidden="true"><use href="#i-Plus-bold"/></svg></button></span></td></tr><tr><td class="tm"><b>13:36</b></td><td><span class="sym"><b>EURUSD</b></span></td><td><span class="sd">Long</span></td><td class="muted">Forex</td>
-<td class="n f gain">+$130.50</td><td class="n gain">+0.08%</td><td class="n gain">+0.61R</td><td>Session momentum</td><td><span class="tagc"><span class="chip">1 tag</span><button class="chip add" aria-label="Add tags"><svg class="i" aria-hidden="true"><use href="#i-Plus-bold"/></svg></button></span></td></tr><tr><td class="tm"><b>11:14</b></td><td><span class="sym"><b>TSLA</b> <span>385 Call</span></span></td><td><span class="sd">Long</span></td><td class="muted">Option</td>
-<td class="n f loss">−$145.30</td><td class="n loss">−17.72%</td><td class="n loss">−1.45R</td><td>Trend pullback</td><td><span class="tagc"><span class="chip wa">2 tags</span><button class="chip add" aria-label="Add tags"><svg class="i" aria-hidden="true"><use href="#i-Plus-bold"/></svg></button></span></td></tr><tr><td class="tm"><b>10:22</b></td><td><span class="sym"><b>MES</b> <span>Dec 26</span></span></td><td><span class="sd">Short</span></td><td class="muted">Futures</td>
-<td class="n f gain">+$119.80</td><td class="n gain">+0.09%</td><td class="n gain">+1.04R</td><td>Level reversal</td><td><span class="tagc"><span class="chip">1 tag</span><button class="chip add" aria-label="Add tags"><svg class="i" aria-hidden="true"><use href="#i-Plus-bold"/></svg></button></span></td></tr><tr><td class="tm"><b>10:05</b></td><td><span class="sym"><b>NVDA</b></span></td><td><span class="sd">Long</span></td><td class="muted">Stock</td>
-<td class="n f loss">−$28.30</td><td class="n loss">−0.26%</td><td class="n loss">−0.31R</td><td>Trend pullback</td><td><span class="tagc"><span class="chip">1 tag</span><button class="chip add" aria-label="Add tags"><svg class="i" aria-hidden="true"><use href="#i-Plus-bold"/></svg></button></span></td></tr><tr><td class="tm"><b>09:41</b></td><td><span class="sym"><b>ES</b> <span>Dec 26</span></span></td><td><span class="sd">Long</span></td><td class="muted">Futures</td>
+  <div class="dc-trades v-exp"><table class="dtab only-desk">
+  <colgroup><col style="width:58px"><col style="width:70px"><col style="width:62px"><col><col style="width:92px"><col style="width:78px"><col style="width:84px"><col style="width:164px"><col style="width:84px"></colgroup>
+  <thead><tr><th>Open</th><th>Ticker</th><th>Side</th><th>Instrument</th><th class="n">Net P&amp;L</th><th class="n">Net ROI</th><th class="n">Realized R</th><th>Strategy</th><th>Tags</th></tr></thead>
+  <tbody><tr><td class="tm"><b>15:21</b></td><td><span class="sym"><b>MNQ</b></span></td><td><span class="sd">Long</span></td><td class="muted">MNQ Dec 26</td>
+<td class="n f gain">+$93.60</td><td class="n gain">+0.06%</td><td class="n gain">+0.98R</td><td>Session momentum</td><td><span class="tagc"><span class="chip">1 tag</span><button class="chip add" aria-label="Add tags"><svg class="i" aria-hidden="true"><use href="#i-Plus-bold"/></svg></button></span></td></tr><tr><td class="tm"><b>14:12</b></td><td><span class="sym"><b>GBPUSD</b></span></td><td><span class="sd">Short</span></td><td class="muted">GBPUSD</td>
+<td class="n f loss">−$70.00</td><td class="n loss">−0.05%</td><td class="n loss">−0.33R</td><td>Level reversal</td><td><span class="tagc"><span class="chip wa">2 tags</span><button class="chip add" aria-label="Add tags"><svg class="i" aria-hidden="true"><use href="#i-Plus-bold"/></svg></button></span></td></tr><tr><td class="tm"><b>13:36</b></td><td><span class="sym"><b>EURUSD</b></span></td><td><span class="sd">Long</span></td><td class="muted">EURUSD</td>
+<td class="n f gain">+$130.50</td><td class="n gain">+0.08%</td><td class="n gain">+0.61R</td><td>Session momentum</td><td><span class="tagc"><span class="chip">1 tag</span><button class="chip add" aria-label="Add tags"><svg class="i" aria-hidden="true"><use href="#i-Plus-bold"/></svg></button></span></td></tr><tr><td class="tm"><b>11:14</b></td><td><span class="sym"><b>TSLA</b></span></td><td><span class="sd">Long</span></td><td class="muted">TSLA 385 Call 27 Nov</td>
+<td class="n f loss">−$145.30</td><td class="n loss">−17.72%</td><td class="n loss">−1.45R</td><td>Trend pullback</td><td><span class="tagc"><span class="chip wa">2 tags</span><button class="chip add" aria-label="Add tags"><svg class="i" aria-hidden="true"><use href="#i-Plus-bold"/></svg></button></span></td></tr><tr><td class="tm"><b>10:22</b></td><td><span class="sym"><b>MES</b></span></td><td><span class="sd">Short</span></td><td class="muted">MES Dec 26</td>
+<td class="n f gain">+$119.80</td><td class="n gain">+0.09%</td><td class="n gain">+1.04R</td><td>Level reversal</td><td><span class="tagc"><span class="chip">1 tag</span><button class="chip add" aria-label="Add tags"><svg class="i" aria-hidden="true"><use href="#i-Plus-bold"/></svg></button></span></td></tr><tr><td class="tm"><b>10:05</b></td><td><span class="sym"><b>NVDA</b></span></td><td><span class="sd">Long</span></td><td class="muted">NVDA</td>
+<td class="n f loss">−$28.30</td><td class="n loss">−0.26%</td><td class="n loss">−0.31R</td><td>Trend pullback</td><td><span class="tagc"><span class="chip">1 tag</span><button class="chip add" aria-label="Add tags"><svg class="i" aria-hidden="true"><use href="#i-Plus-bold"/></svg></button></span></td></tr><tr><td class="tm"><b>09:41</b></td><td><span class="sym"><b>ES</b></span></td><td><span class="sd">Long</span></td><td class="muted">ES Dec 26</td>
 <td class="n f gain">+$320.70</td><td class="n gain">+0.10%</td><td class="n gain">+2.79R</td><td>Opening range breakout</td><td><span class="tagc"><span class="chip">2 tags</span><button class="chip add" aria-label="Add tags"><svg class="i" aria-hidden="true"><use href="#i-Plus-bold"/></svg></button></span></td></tr></tbody>
 </table><div class="only-phone"><ul class="prows"><li><a href="#">
   <span class="l1"><span class="sym"><b>MNQ</b> <span>Dec 26</span></span><span class="tm">15:21</span><b class="gain">+$93.60</b></span>
@@ -183,17 +190,18 @@
     <button class="pbtn" aria-label="View note"><svg class="i" aria-hidden="true"><use href="#i-NotePencil-regular"/></svg></button>
   </div>
   </header>
-  <div class="dc-chart"><div class="ia" style="height:112px"><div class="ia-plot" style="height:94px"><svg class="intra" viewBox="0 0 600 94" preserveAspectRatio="none" role="img" aria-label="Running net through the day, ending +$526.25">
+  <div class="dc-chart"><div class="ia"><div class="ia-plot" style="height:94px"><div aria-hidden="true"><span class="ia-y" style="top:81.9px">$0</span><span class="ia-y" style="top:55.2px">+$250</span><span class="ia-y" style="top:28.4px">+$500</span></div><svg class="intra" viewBox="0 0 600 94" preserveAspectRatio="none" role="img" aria-label="Running net through the day, ending +$526.25">
   <defs>
     <clipPath id="c2026-11-23-up"><rect x="0" y="-10" width="600" height="91.9"/></clipPath>
     <clipPath id="c2026-11-23-dn"><rect x="0" y="81.9" width="600" height="94"/></clipPath>
   </defs>
+  <line class="gl" x1="0" x2="600" y1="55.2" y2="55.2" vector-effect="non-scaling-stroke"/><line class="gl" x1="0" x2="600" y1="28.4" y2="28.4" vector-effect="non-scaling-stroke"/>
   <line class="zero" x1="0" x2="600" y1="81.9" y2="81.9" vector-effect="non-scaling-stroke"/>
   <path d="M46.1 81.9 V67.2 H334.8 V31.6 H364.0 V14.1 H379.5 V23.8 H434.5 V18.7 H596.0 V25.6 V81.9 Z" fill="var(--gain-fill)" opacity=".14" clip-path="url(#c2026-11-23-up)"/>
   <path d="M46.1 81.9 V67.2 H334.8 V31.6 H364.0 V14.1 H379.5 V23.8 H434.5 V18.7 H596.0 V25.6 V81.9 Z" fill="var(--loss-fill)" opacity=".14" clip-path="url(#c2026-11-23-dn)"/>
   <path d="M46.1 81.9 V67.2 H334.8 V31.6 H364.0 V14.1 H379.5 V23.8 H434.5 V18.7 H596.0 V25.6" fill="none" stroke="var(--gain-fill)" stroke-width="1.75" stroke-linejoin="round" vector-effect="non-scaling-stroke" clip-path="url(#c2026-11-23-up)"/>
   <path d="M46.1 81.9 V67.2 H334.8 V31.6 H364.0 V14.1 H379.5 V23.8 H434.5 V18.7 H596.0 V25.6" fill="none" stroke="var(--loss-fill)" stroke-width="1.75" stroke-linejoin="round" vector-effect="non-scaling-stroke" clip-path="url(#c2026-11-23-dn)"/>
-</svg></div><div class="ia-ax"><span style="left:0.67%" class="s">03:41</span><span style="left:50.07%" class="">09:26</span><span style="left:99.33%" class="e">15:10</span></div></div></div>
+</svg></div></div></div>
   <div class="dstats">
   <div><span class="lbl">Trades</span><b class="">6</b></div>
   <div><span class="lbl">Gross P&amp;L</span><b class="gain">+$549.70</b></div>
@@ -206,7 +214,7 @@
   
 </article>
     <article class="card dc dc-empty" aria-labelledby="d-22">
-      <header class="dc-hd"><button class="dc-tog" aria-label="No trades to show" disabled style="opacity:.4"><svg class="i" aria-hidden="true"><use href="#i-CaretRight-bold"/></svg></button><h2 id="d-22">Sun 22 Nov</h2><span class="dc-cap">Note only</span><div class="qa only-desk">
+      <header class="dc-hd"><button class="dc-tog" aria-label="No trades to show" disabled style="opacity:.4"><svg class="i" aria-hidden="true"><use href="#i-CaretRight-bold"/></svg></button><h2 id="d-22">Sun 22 Nov</h2><b class="dc-net">$0.00</b><span class="dc-cap">Note only</span><div class="qa only-desk">
     <button class="btn sm ghost" aria-haspopup="menu">Add mood<svg class="i cd" aria-hidden="true"><use href="#i-CaretDown-bold"/></svg></button>
     
     <button class="btn sm ghost"><svg class="i" aria-hidden="true"><use href="#i-NotePencil-regular"/></svg>View note</button>
@@ -231,17 +239,18 @@
     <button class="pbtn" aria-label="View note"><svg class="i" aria-hidden="true"><use href="#i-NotePencil-regular"/></svg></button>
   </div>
   </header>
-  <div class="dc-chart"><div class="ia" style="height:112px"><div class="ia-plot" style="height:94px"><svg class="intra" viewBox="0 0 600 94" preserveAspectRatio="none" role="img" aria-label="Running net through the day, ending +$512.30">
+  <div class="dc-chart"><div class="ia"><div class="ia-plot" style="height:94px"><div aria-hidden="true"><span class="ia-y" style="top:67.3px">$0</span><span class="ia-y" style="top:41.3px">+$250</span><span class="ia-y" style="top:15.4px">+$500</span></div><svg class="intra" viewBox="0 0 600 94" preserveAspectRatio="none" role="img" aria-label="Running net through the day, ending +$512.30">
   <defs>
     <clipPath id="c2026-11-20-up"><rect x="0" y="-10" width="600" height="77.3"/></clipPath>
     <clipPath id="c2026-11-20-dn"><rect x="0" y="67.3" width="600" height="94"/></clipPath>
   </defs>
+  <line class="gl" x1="0" x2="600" y1="41.3" y2="41.3" vector-effect="non-scaling-stroke"/><line class="gl" x1="0" x2="600" y1="15.4" y2="15.4" vector-effect="non-scaling-stroke"/>
   <line class="zero" x1="0" x2="600" y1="67.3" y2="67.3" vector-effect="non-scaling-stroke"/>
   <path d="M46.7 67.3 V81.9 H99.6 V72.7 H174.9 V45.5 H266.4 V68.6 H439.4 V37.3 H596.0 V14.1 V67.3 Z" fill="var(--gain-fill)" opacity=".14" clip-path="url(#c2026-11-20-up)"/>
   <path d="M46.7 67.3 V81.9 H99.6 V72.7 H174.9 V45.5 H266.4 V68.6 H439.4 V37.3 H596.0 V14.1 V67.3 Z" fill="var(--loss-fill)" opacity=".14" clip-path="url(#c2026-11-20-dn)"/>
   <path d="M46.7 67.3 V81.9 H99.6 V72.7 H174.9 V45.5 H266.4 V68.6 H439.4 V37.3 H596.0 V14.1" fill="none" stroke="var(--gain-fill)" stroke-width="1.75" stroke-linejoin="round" vector-effect="non-scaling-stroke" clip-path="url(#c2026-11-20-up)"/>
   <path d="M46.7 67.3 V81.9 H99.6 V72.7 H174.9 V45.5 H266.4 V68.6 H439.4 V37.3 H596.0 V14.1" fill="none" stroke="var(--loss-fill)" stroke-width="1.75" stroke-linejoin="round" vector-effect="non-scaling-stroke" clip-path="url(#c2026-11-20-dn)"/>
-</svg></div><div class="ia-ax"><span style="left:0.67%" class="s">09:31</span><span style="left:50.17%" class="">11:57</span><span style="left:99.33%" class="e">14:22</span></div></div></div>
+</svg></div></div></div>
   <div class="dstats">
   <div><span class="lbl">Trades</span><b class="">6</b></div>
   <div><span class="lbl">Gross P&amp;L</span><b class="gain">+$560.10</b></div>
@@ -267,17 +276,18 @@
     <button class="pbtn" aria-label="View note"><svg class="i" aria-hidden="true"><use href="#i-NotePencil-regular"/></svg></button>
   </div>
   </header>
-  <div class="dc-chart"><div class="ia" style="height:112px"><div class="ia-plot" style="height:94px"><svg class="intra" viewBox="0 0 600 94" preserveAspectRatio="none" role="img" aria-label="Running net through the day, ending −$81.50">
+  <div class="dc-chart"><div class="ia"><div class="ia-plot" style="height:94px"><div aria-hidden="true"><span class="ia-y" style="top:65.4px">−$50</span><span class="ia-y" style="top:39.3px">$0</span></div><svg class="intra" viewBox="0 0 600 94" preserveAspectRatio="none" role="img" aria-label="Running net through the day, ending −$81.50">
   <defs>
     <clipPath id="c2026-11-19-up"><rect x="0" y="-10" width="600" height="49.3"/></clipPath>
     <clipPath id="c2026-11-19-dn"><rect x="0" y="39.3" width="600" height="94"/></clipPath>
   </defs>
+  <line class="gl" x1="0" x2="600" y1="65.4" y2="65.4" vector-effect="non-scaling-stroke"/>
   <line class="zero" x1="0" x2="600" y1="39.3" y2="39.3" vector-effect="non-scaling-stroke"/>
   <path d="M64.3 39.3 V77.0 H190.4 V14.1 H316.4 V44.6 H596.0 V81.9 V39.3 Z" fill="var(--gain-fill)" opacity=".14" clip-path="url(#c2026-11-19-up)"/>
   <path d="M64.3 39.3 V77.0 H190.4 V14.1 H316.4 V44.6 H596.0 V81.9 V39.3 Z" fill="var(--loss-fill)" opacity=".14" clip-path="url(#c2026-11-19-dn)"/>
   <path d="M64.3 39.3 V77.0 H190.4 V14.1 H316.4 V44.6 H596.0 V81.9" fill="none" stroke="var(--gain-fill)" stroke-width="1.75" stroke-linejoin="round" vector-effect="non-scaling-stroke" clip-path="url(#c2026-11-19-up)"/>
   <path d="M64.3 39.3 V77.0 H190.4 V14.1 H316.4 V44.6 H596.0 V81.9" fill="none" stroke="var(--loss-fill)" stroke-width="1.75" stroke-linejoin="round" vector-effect="non-scaling-stroke" clip-path="url(#c2026-11-19-dn)"/>
-</svg></div><div class="ia-ax"><span style="left:0.67%" class="s">09:36</span><span style="left:50.00%" class="">11:24</span><span style="left:99.33%" class="e">13:12</span></div></div></div>
+</svg></div></div></div>
   <div class="dstats">
   <div><span class="lbl">Trades</span><b class="">4</b></div>
   <div><span class="lbl">Gross P&amp;L</span><b class="loss">−$61.00</b></div>
