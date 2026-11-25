@@ -12,9 +12,14 @@ import {
   type RefObject,
 } from 'react';
 import { RAISED } from '@/components/ui/button-styles';
+import { DayHeader } from './day/day-header';
+import { useImportPicker } from './day/import-picker';
+import { SessionButton } from './day/session-button';
+import { isRealDate } from './notebook/notebook-model';
 import { PlanTheDay } from './routine/plan-the-day';
 import { useStrategy, useTrade } from '@/data/query/hooks';
 import {
+  dayPageDate,
   filtersApply,
   hidesDisplayMenu,
   isComparePage,
@@ -243,6 +248,11 @@ export function TopBar({
     tradeId !== undefined ||
     strategyId !== undefined ||
     editingId !== undefined;
+  const rawDate = dayPageDate(pathname);
+  // A day page with a bad date keeps the plain bar; its page says why.
+  const dayDate =
+    rawDate !== undefined && isRealDate(rawDate) ? rawDate : undefined;
+  const imports = useImportPicker();
   const measured = useChipsFit({ bar, title, tail, controls, chips });
   // The chips show only where the filters drive the page. A trade page's bar
   // carries none (its Previous and Next keep the URL's), nor does Import; those
@@ -260,34 +270,42 @@ export function TopBar({
         {/* Below sm the title and its badge take the room the icons leave; from sm its items join the bar's. */}
         <div className="flex min-w-0 flex-1 items-center gap-2 sm:contents">
           {menu}
-          <h1
-            className={`flex h-[68px] min-w-0 flex-1 items-center text-[24px] leading-[1.2] font-[650] tracking-[-0.035em] max-sm:h-auto max-sm:flex-initial max-sm:text-[20px] ${FIT.title[fit]}`}
-          >
-            <span
-              ref={title}
-              className={
-                crumbed
-                  ? 'flex min-w-0 items-center whitespace-nowrap'
-                  : 'truncate'
-              }
+          {dayDate !== undefined ? (
+            <DayHeader
+              date={dayDate}
+              mode={pathname.endsWith('/review') ? 'review' : 'plan'}
+              onImport={imports.open}
+            />
+          ) : (
+            <h1
+              className={`flex h-[68px] min-w-0 flex-1 items-center text-[24px] leading-[1.2] font-[650] tracking-[-0.035em] max-sm:h-auto max-sm:flex-initial max-sm:text-[20px] ${FIT.title[fit]}`}
             >
-              {tradeId !== undefined ? (
-                <>
-                  <Suspense fallback={<span>Trades</span>}>
-                    <BackToTrades />
-                  </Suspense>
-                  <TradeNumber id={tradeId} />
-                </>
-              ) : strategyId !== undefined || editingId !== undefined ? (
-                <StrategyCrumb
-                  id={(strategyId ?? editingId)!}
-                  edit={editingId !== undefined}
-                />
-              ) : (
-                pageTitle(pathname)
-              )}
-            </span>
-          </h1>
+              <span
+                ref={title}
+                className={
+                  crumbed
+                    ? 'flex min-w-0 items-center whitespace-nowrap'
+                    : 'truncate'
+                }
+              >
+                {tradeId !== undefined ? (
+                  <>
+                    <Suspense fallback={<span>Trades</span>}>
+                      <BackToTrades />
+                    </Suspense>
+                    <TradeNumber id={tradeId} />
+                  </>
+                ) : strategyId !== undefined || editingId !== undefined ? (
+                  <StrategyCrumb
+                    id={(strategyId ?? editingId)!}
+                    edit={editingId !== undefined}
+                  />
+                ) : (
+                  pageTitle(pathname)
+                )}
+              </span>
+            </h1>
+          )}
           {badge}
         </div>
         {showFilters ? (
@@ -332,8 +350,28 @@ export function TopBar({
               <PlanTheDay />
             </div>
           ) : null}
-          {/* Import's own page needs no link to itself. The bar's last control: Keel has no signed-in person, so no avatar. */}
-          {pathname === '/app/import' ? null : (
+          {/* The day's one session, on today's page. */}
+          {dayDate !== undefined ? (
+            <div className="flex flex-none max-sm:ml-1">
+              <SessionButton date={dayDate} />
+            </div>
+          ) : null}
+          {/* Import's own page needs no link to itself; a day page opens the method picker instead. The bar's last control: Keel has no signed-in person, so no avatar. */}
+          {dayDate !== undefined ? (
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              onClick={(e) => imports.open(e.currentTarget)}
+              className={IMPORT}
+            >
+              <UploadSimple
+                size={16}
+                aria-hidden="true"
+                className="flex-none"
+              />
+              Import
+            </button>
+          ) : pathname === '/app/import' ? null : (
             <Link href="/app/import" className={IMPORT}>
               <UploadSimple
                 size={16}
@@ -345,6 +383,7 @@ export function TopBar({
           )}
         </div>
       </header>
+      {imports.picker}
       {/* On a phone the note sits under the bar. */}
       {isComparePage(pathname) ? (
         <p className="px-5 pt-3 text-[13px] text-faint sm:hidden">
