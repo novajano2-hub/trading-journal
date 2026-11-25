@@ -25,6 +25,11 @@ export const keys = {
     [...W(ws), 'journal', 'entry', id] as const,
   journalForTrade: (ws: string, tradeId: string) =>
     [...W(ws), 'journal', 'trade', tradeId] as const,
+  tracker: (ws: string) => [...W(ws), 'tracker'] as const,
+  days: (ws: string) => [...W(ws), 'days'] as const,
+  dayShotsAll: (ws: string) => [...W(ws), 'day-shots'] as const,
+  dayShots: (ws: string, date: string) =>
+    [...W(ws), 'day-shots', date] as const,
   imports: (ws: string) => [...W(ws), 'imports'] as const,
   importContext: (ws: string, accountId: string) =>
     [...W(ws), 'imports', 'context', accountId] as const,
@@ -71,6 +76,12 @@ export type WriteKind =
   | 'journal.restore'
   | 'journal.ensureTradeNote'
   | 'journal.dailyNote'
+  | 'tracker.save'
+  | 'tracker.reset'
+  | 'days.write'
+  | 'days.finish'
+  | 'dayShots.add'
+  | 'dayShots.remove'
   | 'imports.commit'
   | 'imports.undo';
 
@@ -93,13 +104,24 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
     case 'trades.replaceManual':
       return [keys.trades(ws), keys.imports(ws)];
     case 'trades.remove':
-    case 'journal.remove':
       return [keys.trades(ws), keys.journal(ws), keys.imports(ws)];
+    case 'journal.remove':
+      return [
+        keys.trades(ws),
+        keys.journal(ws),
+        keys.imports(ws),
+        keys.days(ws),
+      ];
     case 'imports.undo':
     case 'accounts.clearTrades':
       return [keys.trades(ws), keys.journal(ws), keys.imports(ws)];
     case 'journal.ensureTradeNote':
-      return [keys.journal(ws), keys.trades(ws), keys.imports(ws)];
+      return [
+        keys.journal(ws),
+        keys.trades(ws),
+        keys.imports(ws),
+        keys.days(ws),
+      ];
     case 'accounts.create':
       return [keys.accounts(ws)];
     case 'accounts.update':
@@ -157,7 +179,16 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
     case 'journal.trash':
     case 'journal.restore':
     case 'journal.dailyNote':
-      return [keys.journal(ws)];
+      return [keys.journal(ws), keys.days(ws)];
+    case 'tracker.save':
+    case 'tracker.reset':
+      return [keys.tracker(ws), keys.days(ws)];
+    case 'days.write':
+    case 'days.finish':
+      return [keys.days(ws)];
+    case 'dayShots.add':
+    case 'dayShots.remove':
+      return [keys.dayShotsAll(ws)];
     case 'imports.commit':
       return [keys.imports(ws), keys.trades(ws)];
   }

@@ -2,6 +2,7 @@ import { format, parse } from 'date-fns';
 import { localDate } from '@/domain/time';
 import type { JournalEntry } from '@/domain/types';
 import {
+  LockedDayError,
   NotFoundError,
   type JournalDraft,
   type JournalRepo,
@@ -9,6 +10,7 @@ import {
 import { dayLabel, parseYmd, ymd } from '../seed/calendar';
 import type { LocalContext } from './context';
 import { readPrefs } from './prefs';
+import { isLocked, todayIn } from './routine-today';
 import { rwTx } from './tx';
 import type { KeelDb } from './db';
 
@@ -104,13 +106,28 @@ async function deleteEntries(
     });
 }
 
+/** Throws LockedDayError for a daily note on a finished date. Call inside a transaction that includes `db.days`. */
+async function refuseLockedNote(
+  db: KeelDb,
+  ws: string,
+  entry: Pick<JournalEntry, 'kind' | 'date'> | undefined,
+): Promise<void> {
+  if (
+    entry?.kind === 'daily-review' &&
+    entry.date !== undefined &&
+    (await isLocked(db, ws, entry.date))
+  )
+    throw new LockedDayError();
+}
+
 export function localJournal(ctx: LocalContext): JournalRepo {
   /** Sets or clears `deletedAt`. */
   async function setTrashed(ws: string, id: string, trashed: boolean) {
     const db = await ctx.db();
-    await rwTx(db, [db.journal], async () => {
+    await rwTx(db, [db.journal, db.days], async () => {
       const entry = await db.journal.get([ws, id]);
       if (!entry) throw new NotFoundError('journal entry', id);
+      await refuseLockedNote(db, ws, entry);
       const next = { ...entry };
       if (trashed) next.deletedAt = ctx.now().toISOString();
       else delete next.deletedAt;
@@ -161,15 +178,33 @@ export function localJournal(ctx: LocalContext): JournalRepo {
         workspaceId: ws,
         updatedAt: ctx.now().toISOString(),
       };
-      await db.journal.put(entry);
-      return entry;
+      return rwTx(db, [db.journal, db.days, db.meta, db.trackers], async () => {
+        await refuseLockedNote(db, ws, entry);
+        if (draft.id !== undefined)
+          await refuseLockedNote(db, ws, await db.journal.get([ws, draft.id]));
+        await db.journal.put(entry);
+        // K9: the first edit on the note's own date starts its clock.
+        if (entry.kind === 'daily-review' && entry.date !== undefined) {
+          const day = (await db.days.get([ws, entry.date])) ?? {
+            id: entry.date,
+            workspaceId: ws,
+          };
+          if (
+            day.noteStartedAt === undefined &&
+            entry.date === (await todayIn(db, ws, ctx.now()))
+          )
+            await db.days.put({ ...day, noteStartedAt: entry.updatedAt });
+        }
+        return entry;
+      });
     },
 
     async remove(ws, id) {
       const db = await ctx.db();
-      await rwTx(db, [db.journal, db.trades], async () => {
-        if (!(await db.journal.get([ws, id])))
-          throw new NotFoundError('journal entry', id);
+      await rwTx(db, [db.journal, db.trades, db.days], async () => {
+        const entry = await db.journal.get([ws, id]);
+        if (!entry) throw new NotFoundError('journal entry', id);
+        await refuseLockedNote(db, ws, entry);
         await deleteEntries(db, ws, [id]);
       });
     },
@@ -211,18 +246,17 @@ export function localJournal(ctx: LocalContext): JournalRepo {
           `A daily note needs a YYYY-MM-DD date, got "${date}"`,
         );
       const db = await ctx.db();
-      return rwTx(db, [db.journal, db.templates], async () => {
-        const existing = await db.journal
+      return rwTx(db, [db.journal, db.templates, db.days], async () => {
+        // A trashed note is still the date's note (E109); one out of Trash wins.
+        const onDate = await db.journal
           .where('workspaceId')
           .equals(ws)
-          .filter(
-            (e) =>
-              e.kind === 'daily-review' &&
-              e.date === date &&
-              e.deletedAt === undefined,
-          )
-          .first();
+          .filter((e) => e.kind === 'daily-review' && e.date === date)
+          .toArray();
+        const existing =
+          onDate.find((e) => e.deletedAt === undefined) ?? onDate[0];
         if (existing) return existing;
+        if (await isLocked(db, ws, date)) throw new LockedDayError();
         const template = await db.templates
           .where('workspaceId')
           .equals(ws)

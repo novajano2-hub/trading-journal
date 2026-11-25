@@ -227,7 +227,9 @@ export function EntryPane({
           className="mt-3 flex flex-wrap items-center gap-2 rounded-control bg-warn-soft px-3 py-2 text-[13.5px] text-text"
         >
           <span className="mr-auto">
-            This note is in Trash. It is deleted for good after 30 days.
+            {entry.kind === 'daily-review' && entry.date !== undefined
+              ? "This day's note is in Trash."
+              : 'This note is in Trash. It is deleted for good after 30 days.'}
           </span>
           <button type="button" onClick={onRestore} className={BAR_BUTTON}>
             <ArrowCounterClockwise size={15} aria-hidden="true" />

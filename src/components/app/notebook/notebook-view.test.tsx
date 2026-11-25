@@ -361,6 +361,33 @@ test("the daily note route shows the day card with that day's net and trades", a
   ).toBeTruthy();
 });
 
+test('a trashed day note shows read-only with Restore', async () => {
+  const { repo } = await openWith('/app/notebook/daily/2026-11-19', {
+    prepare: (r) => r.journal.trash(WS, 'daily-2026-11-19'),
+  });
+  await screen.findByText("This day's note is in Trash.");
+  expect(
+    (
+      (await screen.findByRole('textbox', {
+        name: 'Note title',
+      })) as HTMLInputElement
+    ).readOnly,
+  ).toBe(true);
+  // It is still the date's note: no second one was made.
+  expect(
+    (await repo.journal.list(WS)).filter(
+      (e) => e.date === '2026-11-19' && e.kind === 'daily-review',
+    ),
+  ).toHaveLength(1);
+  fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
+  await waitFor(() =>
+    expect(screen.queryByText("This day's note is in Trash.")).toBeNull(),
+  );
+  expect(
+    (await repo.journal.get(WS, 'daily-2026-11-19'))!.deletedAt,
+  ).toBeUndefined();
+});
+
 const dailyNotes = async (repo: Repository, date: string) =>
   (await repo.journal.list(WS)).filter(
     (e) => e.kind === 'daily-review' && e.date === date,

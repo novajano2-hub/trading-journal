@@ -10,6 +10,7 @@ import {
   useJournal,
   useTemplates,
   useJournalEntry,
+  useRestoreJournalEntry,
   useSaveJournalEntry,
 } from '@/data/query/hooks';
 import type {
@@ -338,7 +339,8 @@ function NoteBody({
   // stored one (another tab may have renamed, moved or trashed it), so a save
   // builds on what is stored, never on the copy this editor opened with, as
   // the Notebook's pane does. A note gone from the store (trashed or deleted)
-  // is let go: the next change makes a new one rather than bring it back.
+  // is let go: the next change makes a new one rather than bring it back. (A
+  // daily note in Trash is not let go: its date keeps it, read-only, E109.)
   const waiting = useRef(0);
   useEffect(() => {
     if (waiting.current === 0)
@@ -460,15 +462,15 @@ export function dayNoteDate(trade: Trade, timeZone: string): string {
   return localDate(trade.closedAt ?? trade.openedAt, timeZone);
 }
 
-/** The daily entry for a date, if the day has one that is not in Trash. */
+/** The daily entry for a date: one out of Trash, else the trashed one, which is still the date's note (E109). */
 export function findDailyEntry(
   entries: readonly JournalEntry[] | undefined,
   date: string,
 ): JournalEntry | undefined {
-  return entries?.find(
-    (e) =>
-      e.kind === 'daily-review' && e.date === date && e.deletedAt === undefined,
+  const onDate = entries?.filter(
+    (e) => e.kind === 'daily-review' && e.date === date,
   );
+  return onDate?.find((e) => e.deletedAt === undefined) ?? onDate?.[0];
 }
 
 /**
@@ -490,7 +492,9 @@ export function DayNote({
   const journal = useJournal();
   const templates = useTemplates();
   const daily = useDailyNote();
+  const restore = useRestoreJournalEntry();
   const entry = findDailyEntry(journal.data, date);
+  const trashed = entry?.deletedAt !== undefined;
   // As in TradeNote: once mounted for this date the editor stays, even though
   // the first change adds the entry to the journal.
   const [mountedFor, setMountedFor] = useState<string | null>(null);
@@ -525,6 +529,22 @@ export function DayNote({
           Open in the Notebook
         </Link>
       </div>
+      {entry && trashed ? (
+        <div
+          role="note"
+          className="mt-3 flex flex-wrap items-center gap-2 rounded-control bg-warn-soft px-3 py-2 text-[13.5px] text-text"
+        >
+          <span className="mr-auto">This day&apos;s note is in Trash.</span>
+          <button
+            type="button"
+            onClick={() => restore.mutate(entry.id)}
+            disabled={restore.isPending}
+            className="inline-flex h-8 items-center rounded-control border border-line bg-surface-1 px-3 text-[13px] font-semibold text-text outline-offset-2 hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11"
+          >
+            Restore
+          </button>
+        </div>
+      ) : null}
       <NoteBody
         key={date}
         label="Daily note"
@@ -532,7 +552,7 @@ export function DayNote({
         ensure={() => daily.mutateAsync(date)}
         entry={entry ?? null}
         fallback={template}
-        readOnly={readOnly}
+        readOnly={readOnly || trashed}
         handleRef={handleRef}
         onStatus={onStatus}
       />
