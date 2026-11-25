@@ -3,6 +3,7 @@
 import { Bank, Plus, ShieldCheck } from '@phosphor-icons/react/dist/ssr';
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { writeParam } from '@/components/app/reports/use-report-data';
 import { Button } from '@/components/ui/button';
@@ -63,16 +64,15 @@ export function PropView(): React.JSX.Element {
   const [filter, setFilter] = useState<Filter>('all');
   // Home's second step links here with ?new=challenge: the form opens, and the
   // param leaves the address (below) so a reload or Back doesn't reopen it.
+  // Read from the router's params, not window.location: on a client navigation
+  // the address is written after this page renders.
+  const params = useSearchParams();
   const [editing, setEditing] = useState<Challenge | 'new' | null>(() =>
-    typeof window !== 'undefined' &&
-    new URLSearchParams(window.location.search).get('new') === 'challenge'
-      ? 'new'
-      : null,
+    params.get('new') === 'challenge' ? 'new' : null,
   );
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('new') === 'challenge')
-      writeParam('new', null);
-  }, []);
+    if (params.get('new') === 'challenge') writeParam('new', null);
+  }, [params]);
   const error =
     challenges.error ??
     accounts.error ??

@@ -7,6 +7,8 @@ import type { GettingStarted } from '@/data/getting-started';
 
 type StepId = GettingStarted['steps'][number]['id'];
 
+// Keel's call (TradeZella unknown): a done step 1 or 2 keeps its open line;
+// the record shows only a done step 3's line changing.
 /** Each step's words and where its button goes (K49). The labels are Keel's own. */
 const COPY: Record<
   StepId,

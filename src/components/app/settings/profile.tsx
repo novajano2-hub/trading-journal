@@ -10,6 +10,7 @@ import {
   useUnsetPrefs,
   useUpdatePrefs,
 } from '@/data/query/hooks';
+import { USERNAME } from '@/data/onboarding';
 import { zoneLabel } from '@/lib/time-zone-label';
 import { AppearanceControl } from '../appearance';
 import { FieldError } from './settings-ui';
@@ -49,9 +50,6 @@ interface Draft {
   base: string;
   text: string;
 }
-
-// same rule as src/data/local/prefs.ts USERNAME
-const USERNAME = /^[A-Za-z0-9._]{3,30}$/;
 
 /**
  * A text preference that saves when you leave the field. What is typed belongs

@@ -3,7 +3,12 @@
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { gettingStarted } from '@/data/getting-started';
-import { useAccounts, useChallenges, useTrades } from '@/data/query/hooks';
+import {
+  useAccounts,
+  useActiveWorkspace,
+  useChallenges,
+  useTrades,
+} from '@/data/query/hooks';
 
 /**
  * `/app` (K56): Home while the checklist is incomplete, the Dashboard once it
@@ -12,10 +17,16 @@ import { useAccounts, useChallenges, useTrades } from '@/data/query/hooks';
  */
 export function AppLanding(): null {
   const router = useRouter();
+  const workspace = useActiveWorkspace();
   const accounts = useAccounts();
   const challenges = useChallenges();
   const trades = useTrades();
-  const failed = accounts.isError || challenges.isError || trades.isError;
+  // The workspace read gates the other three: if it fails they never run.
+  const failed =
+    workspace.isError ||
+    accounts.isError ||
+    challenges.isError ||
+    trades.isError;
   const target =
     accounts.data && challenges.data && trades.data
       ? gettingStarted(accounts.data, challenges.data, trades.data).done === 3

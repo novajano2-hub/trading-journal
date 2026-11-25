@@ -6,6 +6,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import { SAMPLE_WORKSPACE } from '@/data/workspaces';
+import { StorageUnavailableError } from '@/data/repository';
 import type { Account, Challenge } from '@/domain/types';
 import { renderApp } from '../__fixtures__/render-app';
 import { AppLanding } from './landing';
@@ -222,5 +223,14 @@ test('/app lands on Home until the checklist is complete, then on the Dashboard'
 
 test('/app stays on Home for a partly done checklist', async () => {
   renderApp(<AppLanding />, { repository: repo(), url: '/app' });
+  await waitFor(() => expect(window.location.pathname).toBe('/app/home'));
+});
+
+test('/app goes to Home when the workspace read fails, instead of staying blank', async () => {
+  const r = repo();
+  r.workspaces.getActive = async () => {
+    throw new StorageUnavailableError('no storage');
+  };
+  renderApp(<AppLanding />, { repository: r, url: '/app' });
   await waitFor(() => expect(window.location.pathname).toBe('/app/home'));
 });

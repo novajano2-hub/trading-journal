@@ -1,3 +1,4 @@
+import { USERNAME } from '../onboarding';
 import { isValidTimeZone } from '@/domain/time';
 import type {
   Appearance,
@@ -19,8 +20,6 @@ const DISPLAY_UNITS: readonly DisplayUnit[] = [
   'pips',
   'points',
 ];
-/** K48. */
-const USERNAME = /^[A-Za-z0-9._]{3,30}$/;
 const APPEARANCES: readonly Appearance[] = ['system', 'light', 'dark'];
 const CALENDAR_STATS: readonly CalendarStat[] = [
   'net',
