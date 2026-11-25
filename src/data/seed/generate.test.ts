@@ -69,10 +69,19 @@ describe('sample workspace generator', () => {
       ).toBe(true);
   });
 
-  test('v5 leaves every existing sample value unchanged', () => {
+  test('every seeded daily-review entry records the daily review template', () => {
+    const daily = s.journal.filter((j) => j.kind === 'daily-review');
+    expect(daily.length).toBeGreaterThan(0);
+    for (const j of daily) expect(j.templateId).toBe('template-daily-review');
+  });
+
+  test('v6 leaves every existing sample value unchanged', () => {
     const { accounts, strategies, tagCategories, tags, trades, challenges } = s;
     // Only the routine's own notes are new; every other entry is hashed whole.
-    const journal = s.journal.filter((j) => !j.id.startsWith('routine-note-'));
+    // v6 adds templateId to the daily notes; strip it so nothing else moved.
+    const journal = s.journal
+      .filter((j) => !j.id.startsWith('routine-note-'))
+      .map((j) => ({ ...j, templateId: undefined }));
     const hash = createHash('sha256')
       .update(
         JSON.stringify({
