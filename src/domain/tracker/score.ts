@@ -29,10 +29,11 @@ export interface RuleResult {
   stage: TrackerStage;
   status: RuleStatus;
   points: 0 | 1;
-  /** For averages, as TradeZella's daily scores [connector day]:
-   *  share rules: the share (0..1); tick rules: 1 or 0;
-   *  startBy: minutes after midnight of the stamp, or null with none;
-   *  lossPerTrade: largestLoss (positive cents); lossPerDay: max(0, -dayNet), so 0 on a green day (P6A-02). */
+  /** For averages. TradeZella's: the share rules' x of y (strategy, stop), and the daily cap's
+   *  loss, 0 on a green day [connector day] (P6A-02). Keel's: hours as a share (TradeZella's pair is
+   *  INFERRED, K10); tick rules as 1 or 0 (TradeZella's custom-rule data is UNKNOWN); startBy as minutes
+   *  after midnight, or null with none (empty with none [connector day]; the logged value is INFERRED);
+   *  lossPerTrade as the largest loss in positive cents (K6; TradeZella's score is an [x, y] pair). */
   score: number | null;
   value: RuleValue;
 }
@@ -93,6 +94,9 @@ export function scoreDay(a: ScoreArgs): DayScore {
     return unscoredDay(date, a.finished, 'not-trading-day');
   }
 
+  // A trading day with no trades: the start rule and custom ticks can still be met while the trade
+  // rules score 0, so the day is never perfect and breaks the streak. This is Keel's call
+  // (TradeZella's evidence is confounded: no start was logged and no custom rules existed).
   const ended = date < a.today || a.finished;
   const i = a.inputs;
   const b = version.builtIn;
@@ -113,6 +117,7 @@ export function scoreDay(a: ScoreArgs): DayScore {
   /** Share rules: met when every trade counts, failed once one can't, else pending until the day ends. */
   const share = (
     key: RuleKey,
+    stage: TrackerStage,
     x: number,
     y: number,
     failsAtOnce: boolean,
@@ -122,7 +127,7 @@ export function scoreDay(a: ScoreArgs): DayScore {
     else if (ended || (failsAtOnce && x < y)) status = 'failed';
     else status = 'pending';
     const score = y > 0 ? x / y : ended ? 0 : null;
-    return make(key, 'trade', status, score, { kind: 'share', x, y });
+    return make(key, stage, status, score, { kind: 'share', x, y });
   };
 
   const byStage: Record<TrackerStage, RuleResult[]> = {
@@ -151,18 +156,26 @@ export function scoreDay(a: ScoreArgs): DayScore {
   }
 
   if (b.hours.on) {
-    byStage.trade.push(share('hours', i.inHours, i.opened, true));
+    byStage.trade.push(share('hours', 'trade', i.inHours, i.opened, true));
   }
   if (b.strategy.on) {
-    byStage.trade.push(share('strategy', i.withStrategy, i.opened, false));
+    byStage.reflect.push(
+      share('strategy', 'reflect', i.withStrategy, i.opened, false),
+    );
   }
   if (b.stop.on) {
-    byStage.trade.push(share('stop', i.withStop, i.opened, false));
+    byStage.reflect.push(share('stop', 'reflect', i.withStop, i.opened, false));
   }
   if (b.lossPerTrade.on) {
-    const r = share('lossPerTrade', i.withinTradeLoss, i.moneyOpened, true);
+    const r = share(
+      'lossPerTrade',
+      'reflect',
+      i.withinTradeLoss,
+      i.moneyOpened,
+      true,
+    );
     r.score = i.moneyOpened > 0 || ended ? i.largestLoss : null;
-    byStage.trade.push(r);
+    byStage.reflect.push(r);
   }
   if (b.lossPerDay.on) {
     const c = a.allInputs;
@@ -172,8 +185,8 @@ export function scoreDay(a: ScoreArgs): DayScore {
     if (loss > limit) status = 'failed';
     else if (c.booked) status = 'met';
     else status = ended ? 'failed' : 'pending';
-    byStage.trade.push(
-      make('lossPerDay', 'trade', status, c.booked || ended ? loss : null, {
+    byStage.reflect.push(
+      make('lossPerDay', 'reflect', status, c.booked || ended ? loss : null, {
         kind: 'money',
         cents: loss,
         limit,

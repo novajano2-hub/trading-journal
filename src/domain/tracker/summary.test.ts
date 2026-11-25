@@ -25,7 +25,7 @@ const res = (
   score: number | null,
 ): RuleResult => ({
   key,
-  stage: 'trade',
+  stage: 'reflect',
   status,
   points: status === 'met' ? 1 : 0,
   score,
@@ -134,7 +134,7 @@ describe('ruleStats', () => {
     expect(all.scoredDays).toBe(4);
     // K6: a positive mean of the non-null scores
     expect(all.average).toBeCloseTo((10_000 + 5_000 + 3_000) / 3);
-    expect(all.stage).toBe('trade');
+    expect(all.stage).toBe('reflect');
   });
 
   test('the daily cap averages the mean daily loss', () => {

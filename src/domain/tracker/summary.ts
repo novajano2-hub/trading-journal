@@ -54,10 +54,11 @@ export function streaks(
 export interface RuleStat {
   key: RuleKey;
   stage: TrackerStage;
-  /** Followed days running back from today: 0 when today has failed; from yesterday while today is pending [connector day] (P6A-05). */
+  /** Followed days running back from today: 0 when today has failed [connector day]; counted from yesterday while today is pending (Keel's call, P6A-05). */
   streak: number;
   /** The mean of the non-null daily scores; null with none. For startBy it is the mean start time in minutes,
-   *  shown as HH:mm; with no logged start it is null, shown "None", as TradeZella's "--" [connector day] (P6A-06). */
+   *  shown as HH:mm (Keel's call, TradeZella's average with logged starts is UNKNOWN, P6A-06); with no logged
+   *  start it is null, shown "None", as TradeZella's "--" [connector day]. */
   average: number | null;
   followRate: number | null;
   scoredDays: number;

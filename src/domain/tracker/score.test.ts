@@ -49,6 +49,71 @@ const rule = (a: ScoreArgs, key: RuleKey) => {
 };
 
 describe('scoreDay', () => {
+  test("built-ins sit in TradeZella's stages [connector settings.rules]", () => {
+    const stages = Object.fromEntries(
+      scoreDay(args()).rules.map((r) => [r.key, r.stage]),
+    );
+    expect(stages).toEqual({
+      startBy: 'prepare',
+      hours: 'trade',
+      strategy: 'reflect',
+      stop: 'reflect',
+      lossPerTrade: 'reflect',
+      lossPerDay: 'reflect',
+    });
+  });
+
+  test('a trade-stage custom rule sits after hours, ahead of the reflect built-ins', () => {
+    const version = allRules('2026-11-02');
+    version.custom = [
+      {
+        id: 't',
+        name: 'Trade',
+        stage: 'trade',
+        days: [true, true, true, true, true, true, true],
+      },
+      {
+        id: 'r',
+        name: 'Reflect',
+        stage: 'reflect',
+        days: [true, true, true, true, true, true, true],
+      },
+    ];
+    expect(scoreDay(args({ version })).rules.map((r) => r.key)).toEqual([
+      'startBy',
+      'hours',
+      'custom:t',
+      'strategy',
+      'stop',
+      'lossPerTrade',
+      'lossPerDay',
+      'custom:r',
+    ]);
+  });
+
+  test("a past trading day with no trades: start and custom can be met, the trade rules fail, never perfect (Keel's call)", () => {
+    const version = allRules('2026-11-02');
+    version.custom = [
+      {
+        id: 'c',
+        name: 'Custom',
+        stage: 'prepare',
+        days: [true, true, true, true, true, true, true],
+      },
+    ];
+    const s = scoreDay(
+      args({ version, noteStartedAt: '09:00', ticks: { c: true } }),
+    );
+    const status = (k: RuleKey) => s.rules.find((r) => r.key === k)!.status;
+    expect(status('startBy')).toBe('met');
+    expect(status('custom:c')).toBe('met');
+    for (const k of ['hours', 'strategy', 'stop', 'lossPerTrade'] as const) {
+      expect(status(k)).toBe('failed');
+    }
+    expect(status('lossPerDay')).toBe('failed');
+    expect(s.perfect).toBe(false);
+  });
+
   test('a trading day with no trades fails every trade rule once ended (spec 6.2)', () => {
     const s = scoreDay(args());
     for (const k of [
