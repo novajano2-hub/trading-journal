@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { differenceInCalendarDays, format, parse, parseISO } from 'date-fns';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { defaultMetricContext } from '@/domain/metrics/context';
@@ -9,6 +10,9 @@ import { toCents } from '@/domain/money';
 import { localDate, localParts } from '@/domain/time';
 import { mistakeTags } from '@/domain/metrics/mistakes';
 import { strategyRules, type Trade } from '@/domain/types';
+import { gridStep, streaks } from '@/domain/tracker/summary';
+import { scoreHistory } from '../routine';
+import { nyMs } from './calendar';
 import {
   generateSampleWorkspace,
   SAMPLE_SEED,
@@ -22,6 +26,50 @@ describe('sample workspace generator', () => {
   let s: SampleWorkspace;
   beforeAll(() => {
     s = generateSampleWorkspace({ seed: SAMPLE_SEED, endDate: '2026-11-19' });
+  });
+
+  test('the sample tracker shows every state', () => {
+    const h = scoreHistory(s.tracker, s.days, s.trades, s.accounts, [], {
+      timeZone: NY,
+      baseCurrency: 'USD',
+      now: new Date(nyMs(s.endDate, 20, 0)).toISOString(),
+      today: s.endDate,
+    });
+    expect(streaks(h.days, h.today).current).toBeGreaterThanOrEqual(2);
+    const steps = h.days.map((d) => gridStep(d));
+    expect(steps).toContain(4);
+    expect(steps.some((x) => x === 2 || x === 3)).toBe(true);
+    expect(steps.some((x) => x === 0 || x === 1)).toBe(true);
+    expect(h.days.some((d) => d.finished)).toBe(true);
+    expect(h.scoreOn(s.endDate).finished).toBe(false);
+  });
+
+  test('v5 leaves every existing sample value unchanged', () => {
+    const {
+      accounts,
+      strategies,
+      tagCategories,
+      tags,
+      trades,
+      journal,
+      challenges,
+    } = s;
+    const hash = createHash('sha256')
+      .update(
+        JSON.stringify({
+          accounts,
+          strategies,
+          tagCategories,
+          tags,
+          trades,
+          journal,
+          challenges,
+        }),
+      )
+      .digest('hex');
+    expect(hash).toBe(
+      '08613e3b01d577685a0bf14a5686ffef7a84c944e8b31208864afdde8a67fbdd',
+    );
   });
 
   test("the first three accounts' trades and their totals are as Plan 4 pinned them", () => {

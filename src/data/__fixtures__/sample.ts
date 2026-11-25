@@ -1,5 +1,6 @@
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import { resolveInstrument } from '@/domain/instruments';
+import { defaultVersion } from '@/domain/tracker/defaults';
 import type { SampleWorkspace } from '../seed/generate';
 import { SAMPLE_WORKSPACE } from '../workspaces';
 
@@ -14,6 +15,14 @@ export function fixtureSample(): SampleWorkspace {
   return {
     seed: 1,
     endDate: '2026-11-19',
+    tracker: {
+      id: 'tracker',
+      workspaceId: WS,
+      startedOn: '2026-11-02',
+      versions: [defaultVersion('2026-11-02')],
+      asOf: '2026-11-19',
+    },
+    days: [],
     accounts: [
       {
         id: 'acc-a',

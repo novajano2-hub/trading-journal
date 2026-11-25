@@ -24,13 +24,17 @@ import {
   metricsByCurrency,
   type CurrencyMetrics,
 } from '../metrics';
+import { routineToday } from '@/domain/tracker/defaults';
+import { scoreHistory, type ScoreHistory } from '../routine';
 import {
   useAccounts,
   useCashFlows,
+  useDays,
   useImportContext,
   usePrefs,
   useStrategies,
   useTags,
+  useTracker,
   useTrades,
 } from './hooks';
 
@@ -364,4 +368,75 @@ export function useImportPlan(input: ImportInput | null): Derived<ImportPlan> {
     error: state.error,
     data,
   };
+}
+
+/** The routine's today (K23): the sample's fixed date, else the local date in the profile zone. */
+export function useRoutineToday(): string | undefined {
+  const tracker = useTracker().data;
+  const timeZone = usePrefs().data?.timeZone;
+  return useMemo(
+    () =>
+      tracker && timeZone !== undefined
+        ? routineToday(tracker, new Date().toISOString(), timeZone)
+        : undefined,
+    [tracker, timeZone],
+  );
+}
+
+/**
+ * Every day's score from the tracker's start to the routine's today. It
+ * follows only the global account selection (K14): no other filter applies.
+ * Call it under a `<Suspense>` boundary, as `useGlobalFilters` needs.
+ */
+export function useDayScores(): Derived<ScoreHistory> {
+  const { filters } = useGlobalFilters();
+  const tracker = useTracker();
+  const days = useDays();
+  const trades = useTrades();
+  const accounts = useAccounts();
+  const flows = useCashFlows();
+  const prefs = usePrefs();
+  const state = combine([tracker, days, trades, accounts, flows, prefs]);
+  const selection = filters.accountIds.join(',');
+  const timeZone = prefs.data?.timeZone;
+  const baseCurrency = prefs.data?.baseCurrency;
+
+  const data = useMemo(() => {
+    if (
+      !tracker.data ||
+      !days.data ||
+      !trades.data ||
+      !accounts.data ||
+      !flows.data ||
+      timeZone === undefined ||
+      baseCurrency === undefined
+    )
+      return undefined;
+    const now = new Date().toISOString();
+    return scoreHistory(
+      tracker.data,
+      days.data,
+      trades.data,
+      accounts.data,
+      flows.data,
+      {
+        timeZone,
+        baseCurrency,
+        now,
+        today: routineToday(tracker.data, now, timeZone),
+        ...(selection ? { accountIds: selection.split(',') } : {}),
+      },
+    );
+  }, [
+    tracker.data,
+    days.data,
+    trades.data,
+    accounts.data,
+    flows.data,
+    timeZone,
+    baseCurrency,
+    selection,
+  ]);
+
+  return { ...state, data: state.status === 'success' ? data : undefined };
 }
