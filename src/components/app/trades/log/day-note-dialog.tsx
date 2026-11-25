@@ -145,6 +145,9 @@ export function DayNoteDialog({
     setProblem(null);
     try {
       await control.current?.settle();
+      // The editor holds text the store refused: stop, with the alert showing,
+      // as closing does, rather than trash a note that is not what is on screen.
+      if (lastStatus.current === 'failed') return;
       await trash.mutateAsync(entry.id);
     } catch {
       setProblem("Couldn't move the note to Trash. Try again.");

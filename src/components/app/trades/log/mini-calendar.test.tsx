@@ -1,23 +1,28 @@
 // @vitest-environment happy-dom
 import {
+  act,
   cleanup,
   fireEvent,
+  render as rtlRender,
   screen,
   waitFor,
   within,
 } from '@testing-library/react';
+import { QueryClient } from '@tanstack/react-query';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { groupDays } from '@/data/day-log';
 import { createLocalRepository } from '@/data/local/local-repository';
+import { DataProvider } from '@/data/query/provider';
 import type { SampleWorkspace } from '@/data/seed/generate';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import type { MetricContext } from '@/domain/metrics/context';
 import type { Repository } from '@/data/repository';
 import type { Trade, UserPrefs, WeekStart } from '@/domain/types';
 import { FilterBar } from '../../filter-bar';
+import { commitNavigation } from '../../__fixtures__/navigation';
 import { renderApp as render } from '../../__fixtures__/render-app';
 import {
   CalendarSheetButton,
@@ -550,4 +555,47 @@ test('a tracker that fails to load falls back to the local date; the calendar st
   });
   expect(await screen.findByRole('complementary')).toBeTruthy();
   expect(screen.queryByRole('alert')).toBeNull();
+});
+
+test('a refetch that fails while the data is there keeps the working calendar', async () => {
+  const base = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: sample(),
+  });
+  await base.prefs.update({ timeZone: 'UTC' });
+  // The trades load once, then the next read fails.
+  let reads = 0;
+  const repository: Repository = {
+    ...base,
+    trades: {
+      ...base.trades,
+      list: (ws) =>
+        ++reads === 1
+          ? base.trades.list(ws)
+          : Promise.reject(new Error('boom')),
+    },
+  };
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+  });
+  window.history.replaceState(null, '', '/app/trades/day');
+  commitNavigation();
+  rtlRender(
+    <DataProvider repository={repository} queryClient={queryClient}>
+      <TradesMiniCalendar />
+    </DataProvider>,
+  );
+  const aside = await screen.findByRole('complementary', {
+    name: 'November 2026',
+  });
+  await act(async () => {
+    await queryClient.refetchQueries({ queryKey: ['keel'] });
+  });
+  await waitFor(() => expect(reads).toBeGreaterThan(1));
+  // The error does not replace the calendar that is already showing.
+  expect(screen.queryByRole('alert')).toBeNull();
+  expect(
+    within(aside).getByRole('button', { name: /^Tue 24 Nov/ }),
+  ).toBeTruthy();
 });

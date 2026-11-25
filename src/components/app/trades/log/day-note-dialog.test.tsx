@@ -64,6 +64,12 @@ function trades(): Trade[] {
   ];
 }
 
+/**
+ * A trashed note's `deletedAt`: an hour before now, as the clock really runs
+ * (Trash purges a note after 30 days, so a fixed date would one day be purged).
+ */
+const anHourAgo = () => new Date(Date.now() - 3_600_000).toISOString();
+
 const dailyNote = (date: string, extra: Partial<JournalEntry> = {}) =>
   ({
     id: `note-${date}`,
@@ -148,7 +154,7 @@ const dailyOn = async (repo: Repository, date: string) =>
 
 test('the note action reads Add note, or View note once the date has a note, a trashed one too', async () => {
   const trashed = dailyNote('2026-11-23', {
-    deletedAt: '2026-11-25T01:00:00Z',
+    deletedAt: anHourAgo(),
   });
   await renderApp({ journal: [dailyNote('2026-11-22'), trashed] });
   expect(
@@ -293,7 +299,7 @@ test('a finished day with no note stays without one: nothing is created by openi
 
 test('a finished day with a note in Trash has no Restore and exactly one lock line, and writes nothing', async () => {
   const { repo } = await renderApp({
-    journal: [dailyNote('2026-11-23', { deletedAt: '2026-11-25T01:00:00Z' })],
+    journal: [dailyNote('2026-11-23', { deletedAt: anHourAgo() })],
     days: [FINISHED_MON],
   });
   const before = await repo.journal.list(WS);
@@ -356,7 +362,7 @@ test('Move to Trash sits in its menu, and the dialog then shows the trashed note
 
 test('a note in Trash opens with Restore, read-only', async () => {
   await renderApp({
-    journal: [dailyNote('2026-11-23', { deletedAt: '2026-11-25T01:00:00Z' })],
+    journal: [dailyNote('2026-11-23', { deletedAt: anHourAgo() })],
   });
   const dialog = await open(MON, 'View note');
   expect(
@@ -648,4 +654,43 @@ test('a failed star says so and leaves the note as it was', async () => {
     "Couldn't favourite the note",
   );
   expect((await dailyOn(repo, '2026-11-23'))?.favorite).toBeUndefined();
+});
+
+test('Move to Trash stops while the editor holds text the store refused, and trashes once it is stored', async () => {
+  const failing = { on: true };
+  const { repo } = await renderApp({ patch: failingSaves(failing) });
+  const dialog = await open(TUE, 'Add note');
+  const box = await within(dialog).findByRole('textbox', {
+    name: 'Daily note',
+  });
+  tiptapOf(box).commands.insertContent('Not stored yet');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+  expect(await within(dialog).findByRole('alert')).toBeTruthy();
+  const trashViaMenu = async () => {
+    fireEvent.keyDown(within(dialog).getByRole('button', { name: 'More' }), {
+      key: 'Enter',
+    });
+    const item = await screen.findByRole('menuitem', {
+      name: 'Move to Trash',
+    });
+    await waitFor(() => expect(item.getAttribute('data-disabled')).toBeNull());
+    fireEvent.click(item);
+  };
+  await trashViaMenu();
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 80));
+  });
+  // Nothing was trashed: the text on screen was never stored.
+  expect((await dailyOn(repo, '2026-11-24'))?.deletedAt).toBeUndefined();
+  expect(within(dialog).getByRole('alert')).toBeTruthy();
+  expect(screen.queryByRole('dialog', { name: 'Day note' })).not.toBeNull();
+  // The store works again: the retry lands the text, then the note is trashed.
+  failing.on = false;
+  await trashViaMenu();
+  await waitFor(async () =>
+    expect((await dailyOn(repo, '2026-11-24'))?.deletedAt).toBeDefined(),
+  );
+  expect(JSON.stringify((await dailyOn(repo, '2026-11-24'))?.body)).toContain(
+    'Not stored yet',
+  );
 });

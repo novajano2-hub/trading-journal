@@ -328,7 +328,12 @@ test('a day with open trades only reads None and has no chart', async () => {
 test('daily notes in Trash, or any trade-level filter, leave their days out', async () => {
   await renderApp(<TradesDayView />, {
     sample: sample({
-      journal: [dailyNote('2026-11-22', { deletedAt: '2026-11-25T00:00:00Z' })],
+      // An hour before now: Trash purges a note after 30 days, so a fixed date would one day be purged.
+      journal: [
+        dailyNote('2026-11-22', {
+          deletedAt: new Date(Date.now() - 3_600_000).toISOString(),
+        }),
+      ],
     }),
     url: '/app/trades/day',
   });

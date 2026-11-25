@@ -15,6 +15,7 @@ import {
   useGlobalFilters,
   useRoutineToday,
   useTradeSet,
+  type TradeSet,
 } from '@/data/query/derived';
 import {
   useAccounts,
@@ -370,6 +371,11 @@ export function TradesMiniCalendar({
 }): React.JSX.Element {
   const { filters, setFilters } = useGlobalFilters();
   const set = useTradeSet(filters);
+  // The trade set goes undefined while any query is failing, even for a refetch
+  // that fails with the data in hand; the calendar keeps the last one it had.
+  const [kept, setKept] = useState<TradeSet>();
+  if (set.data !== undefined && set.data !== kept) setKept(set.data);
+  const tradeSet = set.data ?? kept;
   const prefs = usePrefs().data;
   const tracker = useTracker();
   const routineToday = useRoutineToday();
@@ -383,8 +389,8 @@ export function TradesMiniCalendar({
   );
   const groups = useMemo(
     () =>
-      set.data && prefs && ctx
-        ? groupDays(set.data.dayTrades, {
+      tradeSet && prefs && ctx
+        ? groupDays(tradeSet.dayTrades, {
             timeZone: prefs.timeZone,
             baseCurrency: prefs.baseCurrency,
             ctx,
@@ -392,40 +398,43 @@ export function TradesMiniCalendar({
             noteDates: new Set<string>(),
           })
         : undefined,
-    [set.data, prefs, ctx],
+    [tradeSet, prefs, ctx],
   );
 
   const allTrades = tradesQuery.data;
   const accounts = accountsQuery.data;
   const flows = flowsQuery.data;
-  // A failed query ends the placeholder: a short line says so. (The tracker is
-  // not one of them: without it "today" is the local date.)
-  const error =
-    set.error ?? tradesQuery.error ?? accountsQuery.error ?? flowsQuery.error;
-  if (error)
-    return (
-      <p
-        role="alert"
-        className={`text-[13px] text-muted ${bare ? '' : `${CARD} px-4 py-3.5`}`}
-      >
-        The calendar couldn&apos;t load.
-      </p>
-    );
   if (
-    !set.data ||
+    !tradeSet ||
     !groups ||
     !prefs ||
     !allTrades ||
     !accounts ||
     !flows ||
     tracker.isPending
-  )
+  ) {
+    // A failed query with nothing to show ends the placeholder: a short line
+    // says so. A refetch that fails while the data is there does not (the
+    // calendar stays, from the trade set it last had), and the tracker is not
+    // one of them: without it "today" is the local date.
+    const error =
+      set.error ?? tradesQuery.error ?? accountsQuery.error ?? flowsQuery.error;
+    if (error)
+      return (
+        <p
+          role="alert"
+          className={`text-[13px] text-muted ${bare ? '' : `${CARD} px-4 py-3.5`}`}
+        >
+          The calendar couldn&apos;t load.
+        </p>
+      );
     return (
       <div
         aria-hidden="true"
         className={bare ? 'h-[360px]' : `${CARD} h-[392px]`}
       />
     );
+  }
 
   const localToday = localDate(new Date().toISOString(), prefs.timeZone);
   const today = routineToday ?? localToday;
@@ -433,19 +442,19 @@ export function TradesMiniCalendar({
   // Keel's call (TradeZella unknown): any one-day range in force (a picked day,
   // or the Today preset) is the selected day, outlined.
   const { from, to } = resolveRange(
-    set.data.filters.range,
+    tradeSet.filters.range,
     localToday,
     weekStart,
   );
   const selected = from !== undefined && from === to ? from : undefined;
   // The days' figures read the trades they are built from, not the date range's.
   const source = figureSourceOf({
-    trades: set.data.dayTrades,
+    trades: tradeSet.dayTrades,
     prefs,
     accounts,
     flows,
     allTrades,
-    filters: set.data.filters,
+    filters: tradeSet.filters,
     today: localToday,
   });
 
