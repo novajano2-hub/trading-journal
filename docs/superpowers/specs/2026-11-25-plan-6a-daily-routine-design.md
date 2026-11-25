@@ -630,7 +630,7 @@ Every row below is Keel's call (TradeZella unknown). Q numbers are the spec's 41
 | K19 | Marks and the face (Q17, Q18) | Met: gain CheckCircle. Failed: loss XCircle. Pending: faint clock. A rule is decided once met, once it can't be met, or at day's end. No streak face (no emoji) | [rec S08]; DESIGN.md |
 | K20 | Unscored dates and finishing | Before the tracker's start, the rules card quietly says the day isn't tracked yet and gives the start date. A non-trading day says it isn't a trading day. A future date opens plan mode only, with no rules state. Only scored days, today or earlier, can be finished, after a confirmation, so locked days never stretch the grid before the start | None seen |
 | K21 | The dashboard card | Shown by default; it becomes removable with #46 | Keel has no widget editor yet |
-| K22 | Goals and the tracker | Separate: the Goals card's loss limit is Keel's own, and the tracker keeps TZ's $100 default | Goals are not TZ's |
+| K22 | Goals and the tracker | Superseded by U4: the Goals card is removed and the tracker keeps TZ's $100 default | The user, 2026-11-25 |
 | K23 | The sample's tracker | Its "today" is `sampleEndDate`. The seed writes tracker history, so the sample shows a streak, partial days, a perfect day, a finished day and a broken day | The sample shows every state |
 | K24 | Currencies | Money rules (the loss caps) and day and week sums use the base currency only. Trades in other currencies are left out of them and shown apart, as the dashboard goals do | The Plan 5 ruling on goals |
 
@@ -690,6 +690,8 @@ Every row below is Keel's call (TradeZella unknown). Q numbers are the spec's 41
 - **U1. When the first run shows:** on the first app open in a browser, before any workspace (option a). The gate covers the sample workspace link too (K56).
 - **U2. The survey answers:** stored only; they change no default and hide nothing (option a).
 - **U3. The Notebook's Pre-market plan kind:** Notebook > New no longer offers it, and existing entries stay readable (option b).
+- **U4. Keel's Goals card** (weekly net goal, daily loss limit; Plan 5) has no TZ counterpart. It is removed, TZ's way: the progress tracker's rules (daily loss cap, per-trade cap and the rest) take its place on the dashboard, and the tracker card sits where Goals was. Existing goal settings are dropped, with no migration of values. Remove the Goals card, its editor, `goalDays` and the goal prefs, and their tests. This supersedes K22. E50 closes.
+- **Approved by the user, 2026-11-25.**
 
 ## 7. Corrections to existing records
 
@@ -702,7 +704,7 @@ Every row below is Keel's call (TradeZella unknown). Q numbers are the spec's 41
 | BACKLOG #47; ON1 to ON3 | The survey tailors defaults and hides prop pages; the checklist is account, import, strategy; next steps follow setup | No source shows the survey changing anything, and the user decided it stores answers only (U2). The checklist seen is prop-led: sync, challenge, trade [rec S01]. The focus list is static [rec S01 0:11] |
 | Feature map DV1 | Review shows the session length | The timer's length, as #36 |
 | Plan 5: the trade page's Daily note | Dates the day note by the account's clock (`dayNoteDate` with the account's zone) | Dates it by the trader's profile zone, as every 6A surface does, so a trade's note and its day card always match (K35) |
-| E50 | Monthly and trade-count goals; routine rules | The routine rules close with #35. Monthly and trade-count goals have no TZ counterpart: close them as not TZ, unless the user wants them |
+| E50 | Monthly and trade-count goals; routine rules | Closed: the routine rules come with #35, and the Goals card itself is removed (U4) |
 
 ## 8. Left to the builder
 
