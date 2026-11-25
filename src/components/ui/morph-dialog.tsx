@@ -53,8 +53,8 @@ export function MorphDialog({
   description?: ReactNode;
   /** A decorative tile beside the title, as the card it grew from has. */
   icon?: ReactNode;
-  /** `full` fills the screen inside a small gutter, for a chart or a table that wants the room. `sheet` is the default size on a wide screen and a full-height sheet on a phone. */
-  size?: 'default' | 'full' | 'sheet';
+  /** `full` fills the screen inside a small gutter, for a chart or a table that wants the room. `sheet` is the default size on a wide screen and a full-height sheet on a phone. `compact` is a narrow choice list (480px) that stays a small dialog on a phone. */
+  size?: 'default' | 'full' | 'sheet' | 'compact';
   /** Pinned under the scrolling body, never inside it. */
   footer?: ReactNode;
   children: ReactNode;
@@ -182,7 +182,9 @@ export function MorphDialog({
               ? 'inset-3 sm:inset-6'
               : size === 'sheet'
                 ? 'inset-x-0 top-3 bottom-0 max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 sm:inset-0 sm:m-auto sm:h-fit sm:max-h-[80dvh] sm:w-[calc(100%-32px)] sm:max-w-[760px]'
-                : 'inset-0 m-auto h-fit max-h-[80dvh] w-[calc(100%-32px)] max-w-[760px]'
+                : size === 'compact'
+                  ? 'inset-0 m-auto h-fit max-h-[80dvh] w-[calc(100%-32px)] max-w-[480px]'
+                  : 'inset-0 m-auto h-fit max-h-[80dvh] w-[calc(100%-32px)] max-w-[760px]'
           }`}
         >
           <div

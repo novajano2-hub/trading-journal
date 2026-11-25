@@ -104,9 +104,25 @@ test('today carries a mark only when asked', () => {
   expect(cell(/^Tue 24 Nov/).hasAttribute('data-today')).toBe(false);
 });
 
+test('the compact card shows no caption line, only the legend', () => {
+  grid({ compact: true });
+  expect(screen.queryByText(/Blank days aren't scored/)).toBeNull();
+  const full = grid();
+  expect(full.container.textContent).toContain("Blank days aren't scored");
+});
+
+test('compact squares are 11px apart by 3', () => {
+  grid({ compact: true });
+  const sized = screen.getByRole('grid').closest<HTMLElement>('[style*="--c"]');
+  expect(sized!.style.getPropertyValue('--c')).toBe('11px');
+  expect(sized!.style.getPropertyValue('--g')).toBe('3px');
+});
+
 test('hover and focus read the date and p of n rules met', () => {
-  grid();
-  const readout = screen.getByRole('status');
+  const { container } = grid();
+  // Not a live region: a focused square is read by its own label.
+  expect(screen.queryByRole('status')).toBeNull();
+  const readout = container.querySelector<HTMLElement>('span.tabular-nums')!;
   expect(readout.textContent).not.toContain('rules met');
   fireEvent.mouseEnter(cell(/^Mon 2 Nov/));
   expect(readout.textContent).toContain('Mon 2 Nov, 8 of 8 rules met');
@@ -129,6 +145,32 @@ test('arrow keys move through the grid on one tab stop', () => {
   expect(document.activeElement).toBe(cell(/^Tue 17 Nov/));
   fireEvent.keyDown(document.activeElement!, { key: 'ArrowUp' });
   expect(document.activeElement).toBe(cell(/^Mon 16 Nov/));
+});
+
+test('arrow keys at the window edge page the grid and keep focus', () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+    width: 160,
+    height: 100,
+    x: 0,
+    y: 0,
+    top: 0,
+    left: 0,
+    right: 160,
+    bottom: 100,
+    toJSON: () => ({}),
+  });
+  grid({ paging: true });
+  expect(screen.queryByRole('gridcell', { name: /^Mon 5 Oct/ })).toBeNull();
+  let at = cell(/^Tue 24 Nov/);
+  at.focus();
+  // Walk left a week at a time until the window has to move.
+  for (let i = 0; i < 8; i++) {
+    fireEvent.keyDown(at, { key: 'ArrowLeft' });
+    at = document.activeElement as HTMLElement;
+  }
+  expect(at.getAttribute('aria-label')).toMatch(/^Tue 29 Sep/);
+  expect(screen.queryByRole('gridcell', { name: /^Tue 24 Nov/ })).toBeNull();
+  expect(at.getAttribute('tabindex')).toBe('0');
 });
 
 test('the text alternative names the range and the perfect days', () => {

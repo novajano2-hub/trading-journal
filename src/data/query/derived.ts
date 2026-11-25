@@ -146,11 +146,6 @@ export interface TradeSet {
   trades: Trade[];
   /** The same filters except the date, narrowed the same way: what the day figures are built from. */
   dayTrades: Trade[];
-  /**
-   * `dayTrades` before the display unit narrows them. Money targets (the
-   * Dashboard's goals) read these under every unit, as Prop firms do.
-   */
-  moneyDayTrades: Trade[];
   /** The selected accounts: the active ones when no account is filtered. */
   accounts: Account[];
   /** The trades the filters matched that the display unit leaves out (R, ticks, pips, points); 0 otherwise. */
@@ -170,7 +165,7 @@ export interface TradeSet {
  * - A date range matches a trade's day: the local date of `closedAt`, or of
  *   `openedAt` while it is open, in the prefs timezone (`today` too). That
  *   picks the trades for the log, win rate and profit factor. Day figures
- *   (calendar, daily bars, day stats, goals) take instead the exits dated
+ *   (calendar, daily bars, day stats) take instead the exits dated
  *   inside the range (`MetricContext.range`), so a trade held over several
  *   days books each exit on its own day and only those in the range. They
  *   are built from `dayTrades` (every filter but the date), so an exit in the
@@ -226,7 +221,6 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
       filters: clean,
       trades: kept,
       dayTrades: narrowToUnit(dayMatched, unit),
-      moneyDayTrades: dayMatched,
       accounts: selectedAccounts(accounts.data, clean),
       unitLeftOut: matched.length - kept.length,
     };

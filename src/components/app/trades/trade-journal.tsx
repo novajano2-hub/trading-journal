@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { Popover } from 'radix-ui';
-import { Plus, Star, X } from '@phosphor-icons/react/dist/ssr';
+import { Plus, X } from '@phosphor-icons/react/dist/ssr';
 import {
   useDailyNote,
   useEnsureTradeNote,
@@ -25,6 +25,7 @@ import { dayLabel } from './trade-time';
 import { NoteEditor, type NoteEditorHandle } from '../notes/note-editor';
 import { TagPicker } from '../tag-picker';
 import { findDailyEntry } from '../notebook/notebook-model';
+import { LockLine, useDayFinished } from '../day/day-lock';
 
 /** How long typing rests before the note is saved. */
 export const NOTE_SAVE_DELAY_MS = 600;
@@ -236,73 +237,7 @@ export function TagRows({
   );
 }
 
-/** Five stars as a radio group: "Rating: 4 of 5". Choosing a star saves it; Clear takes it back. */
-export function RatingRow({
-  rating,
-  disabled,
-  onChange,
-}: {
-  rating: number | undefined;
-  disabled: boolean;
-  onChange(next: 1 | 2 | 3 | 4 | 5 | undefined): void;
-}): React.JSX.Element {
-  return (
-    <div className="mt-1.5 flex items-center gap-3 border-t border-line pt-3">
-      <span className="w-[84px] flex-none text-[12.5px] text-faint max-sm:w-[72px]">
-        Rating
-      </span>
-      <div
-        role="radiogroup"
-        aria-label={`Rating: ${rating === undefined ? 'none' : `${rating} of 5`}`}
-        className="flex gap-0.5"
-      >
-        {([1, 2, 3, 4, 5] as const).map((n) => (
-          <label
-            key={n}
-            className={`group relative grid size-7 place-items-center rounded-[8px] pointer-coarse:size-11 ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-          >
-            <input
-              type="radio"
-              name="trade-rating"
-              aria-label={`${n} ${n === 1 ? 'star' : 'stars'}`}
-              checked={rating === n}
-              disabled={disabled}
-              onChange={() => onChange(n)}
-              className="peer sr-only"
-            />
-            <Star
-              size={20}
-              weight={rating !== undefined && n <= rating ? 'fill' : 'regular'}
-              aria-hidden="true"
-              className={`${rating !== undefined && n <= rating ? 'text-accent' : 'text-line-2'} ${disabled ? '' : 'group-hover:text-accent/70'}`}
-            />
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 rounded-[8px] peer-focus-visible:outline-2 peer-focus-visible:outline-accent"
-            />
-          </label>
-        ))}
-      </div>
-      <span
-        aria-hidden="true"
-        className="text-[12.5px] whitespace-nowrap text-muted"
-      >
-        {rating === undefined ? 'Not rated' : `${rating} of 5`}
-      </span>
-      {rating !== undefined && !disabled ? (
-        <button
-          type="button"
-          onClick={() => onChange(undefined)}
-          className="ml-auto rounded-chip px-1.5 text-[12.5px] font-medium text-faint outline-offset-2 hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
-        >
-          Clear
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
-type NoteStatus = 'idle' | 'saving' | 'saved' | 'failed';
+export type NoteStatus = 'idle' | 'saving' | 'saved' | 'failed';
 
 /** The editor and its autosave; mounts once the trade's note (if it has one) has loaded. */
 function NoteBody({
@@ -313,6 +248,7 @@ function NoteBody({
   ensure,
   readOnly,
   handleRef,
+  stamp,
   onStatus,
 }: {
   label: string;
@@ -324,6 +260,8 @@ function NoteBody({
   ensure(): Promise<JournalEntry>;
   readOnly: boolean;
   handleRef?: { current: NoteEditorHandle | null };
+  /** Fields the next save writes with the body (the template a body came from). */
+  stamp?: { current: Partial<JournalEntry> | undefined };
   onStatus(s: NoteStatus): void;
 }): React.JSX.Element {
   const save = useSaveJournalEntry();
@@ -369,7 +307,11 @@ function NoteBody({
           if (note.current === pending) note.current = null;
           throw e;
         }
-        const saved = await save.mutateAsync({ ...current, body });
+        const saved = await save.mutateAsync({
+          ...current,
+          ...stamp?.current,
+          body,
+        });
         note.current = Promise.resolve(saved);
         onStatus('saved');
       } catch {
@@ -464,19 +406,23 @@ export function dayNoteDate(trade: Trade, timeZone: string): string {
 }
 
 /**
- * The day note: the same editor and autosave, bound to the daily entry of the
- * trade's day. The entry is made on the first change (as the Notebook makes
- * it), never by looking. One editor per date.
+ * The day note's editor and autosave, bound to the daily entry of a date: no
+ * header, so a page can lay out its own. The entry is made on the first
+ * change (as the Notebook makes it), never by looking. A note in Trash shows
+ * read-only with Restore (E109). One editor per date. `stamp` is written with
+ * the next save, to record the template a replaced body came from.
  */
-export function DayNote({
+export function DayNoteBinding({
   date,
   readOnly,
   handleRef,
+  stamp,
   onStatus,
 }: {
   date: string;
   readOnly: boolean;
   handleRef?: { current: NoteEditorHandle | null };
+  stamp?: { current: Partial<JournalEntry> | undefined };
   onStatus(s: NoteStatus): void;
 }): React.JSX.Element {
   const journal = useJournal();
@@ -505,21 +451,6 @@ export function DayNote({
       ?.body ?? EMPTY_DOC;
   return (
     <>
-      <div className="mt-3 flex items-center justify-between gap-3 text-[12.5px] text-faint">
-        <span className="tabular-nums">
-          {dayLabel(`${date}T12:00:00Z`, 'UTC')}
-        </span>
-        <Link
-          href={
-            entry
-              ? `/app/notebook/${encodeURIComponent(entry.id)}`
-              : `/app/notebook/daily/${date}`
-          }
-          className="rounded-chip text-[13px] font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:py-3"
-        >
-          Open in the Notebook
-        </Link>
-      </div>
       {entry && trashed ? (
         <div
           role="note"
@@ -556,6 +487,54 @@ export function DayNote({
         entry={entry ?? null}
         fallback={template}
         readOnly={readOnly || trashed}
+        handleRef={handleRef}
+        stamp={stamp}
+        onStatus={onStatus}
+      />
+    </>
+  );
+}
+
+/**
+ * The day note on the trade page: a date row with a link to the Notebook,
+ * then the day note's editor.
+ */
+export function DayNote({
+  date,
+  readOnly,
+  handleRef,
+  onStatus,
+}: {
+  date: string;
+  readOnly: boolean;
+  handleRef?: { current: NoteEditorHandle | null };
+  onStatus(s: NoteStatus): void;
+}): React.JSX.Element {
+  const journal = useJournal();
+  const entry = findDailyEntry(journal.data, date);
+  // A finished date's note is frozen with the day (K3).
+  const closed = useDayFinished(date).finished;
+  return (
+    <>
+      <div className="mt-3 flex items-center justify-between gap-3 text-[12.5px] text-faint">
+        <span className="tabular-nums">
+          {dayLabel(`${date}T12:00:00Z`, 'UTC')}
+        </span>
+        <Link
+          href={
+            entry
+              ? `/app/notebook/${encodeURIComponent(entry.id)}`
+              : `/app/notebook/daily/${date}`
+          }
+          className="rounded-chip text-[13px] font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:py-3"
+        >
+          Open in the Notebook
+        </Link>
+      </div>
+      {closed ? <LockLine className="mt-3" /> : null}
+      <DayNoteBinding
+        date={date}
+        readOnly={readOnly || closed}
         handleRef={handleRef}
         onStatus={onStatus}
       />

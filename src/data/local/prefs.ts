@@ -54,10 +54,6 @@ export function localPrefs(ctx: LocalContext): PrefsRepo {
       await db.transaction('rw', db.meta, async () => {
         const current = asPartial((await db.meta.get(META.prefs))?.value);
         stored = { ...current, ...changes };
-        // Goals merge per workspace, so a stale caller can't clobber other workspaces' goals.
-        if (changes.goals)
-          stored.goals = { ...current.goals, ...changes.goals };
-        validate({ goals: stored.goals });
         await db.meta.put({ key: META.prefs, value: stored });
       });
       return withDefaults(stored);
@@ -145,15 +141,6 @@ function validate(p: Partial<UserPrefs>): void {
     )
       throw new RangeError(`${key} must be a list of strings`);
   }
-  for (const [id, g] of Object.entries(p.goals ?? {})) {
-    if (typeof g !== 'object' || g === null)
-      throw new RangeError(`Goals for workspace "${id}" must be an object`);
-    for (const [field, cents] of Object.entries(g))
-      if (cents !== undefined && !(Number.isSafeInteger(cents) && cents > 0))
-        throw new RangeError(
-          `Goal ${field} for workspace "${id}" must be a positive whole number of cents, got ${cents}`,
-        );
-  }
 }
 
 const asPartial = (value: unknown): Partial<UserPrefs> =>
@@ -161,10 +148,14 @@ const asPartial = (value: unknown): Partial<UserPrefs> =>
     ? (value as Partial<UserPrefs>)
     : {};
 
-const withDefaults = (stored: unknown): UserPrefs => ({
-  ...defaultPrefs(),
-  ...asPartial(stored),
-});
+/** A `goals` key left by an older version is ignored on read, and stays in storage. */
+const withDefaults = (stored: unknown): UserPrefs => {
+  const kept: Partial<UserPrefs> & { goals?: unknown } = {
+    ...asPartial(stored),
+  };
+  delete kept.goals;
+  return { ...defaultPrefs(), ...kept };
+};
 
 /** A key set to undefined means "unchanged", not "erase". */
 function definedOnly(patch: Partial<UserPrefs>): Partial<UserPrefs> {

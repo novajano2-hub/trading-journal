@@ -9,7 +9,7 @@ import { gridStep, type GridStep } from '@/domain/tracker/summary';
 import type { Tracker, WeekStart } from '@/domain/types';
 import { weekFirstDay, weekStartsOn } from '@/domain/week';
 import { plural } from '@/lib/format';
-import { onTradingDate, weekdayOf } from '@/lib/time-format';
+import { dayLabel, onTradingDate } from '@/lib/time-format';
 
 const DAY_MS = 86_400_000;
 const addDays = (date: string, n: number): string =>
@@ -17,9 +17,6 @@ const addDays = (date: string, n: number): string =>
     .toISOString()
     .slice(0, 10);
 
-/** "Tue 24 Nov". */
-const dayLabel = (date: string): string =>
-  `${weekdayOf(date, 'short')} ${onTradingDate(date, { day: 'numeric', month: 'short' })}`;
 const monthName = (date: string): string =>
   onTradingDate(date, { month: 'short' });
 
@@ -35,9 +32,13 @@ const STEP_BG: Record<GridStep, string> = {
 /** The weekday column's width and gap, in px. */
 const AXIS = 30;
 const AXIS_GAP = 8;
-/** Cell and gap sizes: the comp's 22 and 5 on a wide card, 14 and 4 on a narrow one. */
-const sizeFor = (width: number) =>
-  width > 0 && width < 520 ? { c: 14, g: 4 } : { c: 22, g: 5 };
+/** Cell and gap sizes: the comp's 22 and 5 on a wide card, 14 and 4 on a narrow one, 11 and 3 when compact. */
+const sizeFor = (width: number, compact: boolean) =>
+  compact
+    ? { c: 11, g: 3 }
+    : width > 0 && width < 520
+      ? { c: 14, g: 4 }
+      : { c: 22, g: 5 };
 
 const ICON_BUTTON =
   'grid size-[30px] place-items-center rounded-control border border-line bg-surface-1 text-muted transition-colors hover:border-accent/35 hover:text-text focus-visible:outline-2 focus-visible:outline-accent aria-disabled:opacity-55 aria-disabled:hover:border-line aria-disabled:hover:text-muted pointer-coarse:size-11';
@@ -59,6 +60,7 @@ export function HeatGrid({
   paging,
   label,
   controlsHost,
+  compact = false,
 }: {
   days: readonly DayScore[];
   today: string;
@@ -73,6 +75,8 @@ export function HeatGrid({
    * mounted yet, so they wait.
    */
   controlsHost?: HTMLElement | null;
+  /** The dashboard card's small squares (11px, 3px apart), so more weeks fit. */
+  compact?: boolean;
 }): React.JSX.Element {
   const textId = useId();
   const host = useRef<HTMLDivElement>(null);
@@ -109,7 +113,7 @@ export function HeatGrid({
         (7 * DAY_MS),
     ) + 1;
 
-  const { c, g } = sizeFor(width);
+  const { c, g } = sizeFor(width, compact);
   const fit =
     width > 0
       ? Math.max(
@@ -128,7 +132,6 @@ export function HeatGrid({
   );
   const drawn = (date: string) => date >= first && date <= lastDay;
   const firstShown = weeks
-    .map((w) => addDays(w, 0))
     .flatMap((w) => Array.from({ length: 7 }, (_, r) => addDays(w, r)))
     .find(drawn);
   const lastShown = [...weeks]
@@ -182,6 +185,18 @@ export function HeatGrid({
         }.`
       : '';
 
+  const pendingFocus = useRef<string | null>(null);
+  const focusPending = () => {
+    const date = pendingFocus.current;
+    if (!date) return;
+    const el = gridRef.current?.querySelector<HTMLElement>(
+      `[data-date="${date}"]`,
+    );
+    if (!el) return;
+    pendingFocus.current = null;
+    el.focus();
+  };
+
   const move = (date: string, key: string) => {
     const step: Record<string, number> = {
       ArrowLeft: -7,
@@ -196,13 +211,25 @@ export function HeatGrid({
     const sameWeek =
       Math.abs(by) === 7 ||
       weekFirstDay(target, weekStart) === weekFirstDay(date, weekStart);
-    if (!sameWeek || !drawn(target) || !visible(target)) return true;
+    if (!sameWeek || !drawn(target)) return true;
+    if (!visible(target)) {
+      // Past the window's edge: page just far enough to bring the week in.
+      const index = Math.round(
+        (Date.parse(`${weekFirstDay(target, weekStart)}T00:00:00Z`) -
+          Date.parse(`${firstWeek}T00:00:00Z`)) /
+          (7 * DAY_MS),
+      );
+      const start = index < startIndex ? index : index - fit + 1;
+      setOffset(totalWeeks - fit - start);
+    }
     setFocusDate(target);
-    gridRef.current
-      ?.querySelector<HTMLElement>(`[data-date="${target}"]`)
-      ?.focus();
+    pendingFocus.current = target;
+    focusPending();
     return true;
   };
+
+  // A square that paging has only just drawn takes focus after the render.
+  useLayoutEffect(focusPending);
 
   const shown = hover ?? focused;
   const rowOffset = weekStartsOn(weekStart);
@@ -363,12 +390,13 @@ export function HeatGrid({
         {alternative}
       </p>
       <div className="mt-3.5 flex flex-col items-start justify-between gap-2.5 text-[12.5px] text-faint sm:flex-row sm:items-center sm:gap-4">
-        <span role="status" className="tabular-nums">
-          {shown ? textOf(shown) : NOTE}
+        {/* Not a live region: a focused square is already read by its label. */}
+        <span className="tabular-nums">
+          {shown ? textOf(shown) : compact ? null : NOTE}
         </span>
         <span
           aria-hidden="true"
-          className="inline-flex flex-none items-center gap-1 text-[12px]"
+          className="ml-auto inline-flex flex-none items-center gap-1 text-[12px]"
         >
           Less
           {([0, 1, 2, 3, 4] as const).map((s) => (

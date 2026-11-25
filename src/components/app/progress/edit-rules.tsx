@@ -1,7 +1,14 @@
 'use client';
 
 import { Clock, Info, Plus, Trash } from '@phosphor-icons/react/dist/ssr';
-import { useId, useMemo, useState, type RefObject } from 'react';
+import {
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
 import { Button } from '@/components/ui/button';
 import { MorphDialog } from '@/components/ui/morph-dialog';
 import { Segmented } from '@/components/ui/segmented';
@@ -265,32 +272,54 @@ function DayPills({
     <span
       role="group"
       aria-label={label}
-      className={`flex ${compact ? 'gap-[3px]' : 'mb-3 flex-wrap gap-1.5'} ${className}`}
+      className={`flex ${compact ? 'gap-[3px] pointer-coarse:col-span-2' : 'mb-3 flex-wrap gap-1.5'} ${className}`}
     >
-      {DAY_ORDER.map((i) => (
-        <button
-          key={i}
-          type="button"
-          aria-pressed={days[i]}
-          aria-label={DAY_SHORT[i]}
-          onClick={() => {
-            const next = [...days] as Weekdays;
-            next[i] = !next[i];
-            onChange(next);
-          }}
-          className={`${
-            compact
-              ? 'size-6 rounded-[6px] text-[11.5px] font-semibold pointer-coarse:size-9'
-              : 'h-9 min-w-14 rounded-full px-3.5 text-[13.5px] font-medium pointer-coarse:h-11'
-          } focus-visible:outline-2 focus-visible:outline-accent ${
-            days[i]
-              ? `bg-accent-soft text-accent-ink ${compact ? '' : 'font-semibold'}`
-              : `border border-line-2 text-muted ${compact ? 'text-faint' : ''}`
-          }`}
-        >
-          {compact ? DAY_SHORT[i]![0] : DAY_SHORT[i]}
-        </button>
-      ))}
+      {DAY_ORDER.map((i) => {
+        const toggle = () => {
+          const next = [...days] as Weekdays;
+          next[i] = !next[i];
+          onChange(next);
+        };
+        if (!compact)
+          return (
+            <button
+              key={i}
+              type="button"
+              aria-pressed={days[i]}
+              aria-label={DAY_SHORT[i]}
+              onClick={toggle}
+              className={`h-9 min-w-14 rounded-full px-3.5 text-[13.5px] font-medium pointer-coarse:h-11 focus-visible:outline-2 focus-visible:outline-accent ${
+                days[i]
+                  ? 'bg-accent-soft font-semibold text-accent-ink'
+                  : 'border border-line-2 text-muted'
+              }`}
+            >
+              {DAY_SHORT[i]}
+            </button>
+          );
+        // Compact: a 24px chip. On a coarse pointer the button is the 44px
+        // target (the row's full width shared by seven) and the chip sits in it.
+        return (
+          <button
+            key={i}
+            type="button"
+            aria-pressed={days[i]}
+            aria-label={DAY_SHORT[i]}
+            onClick={toggle}
+            className="group grid size-6 place-items-center focus-visible:outline-none pointer-coarse:h-11 pointer-coarse:min-w-11 pointer-coarse:flex-1 sm:pointer-coarse:w-11 sm:pointer-coarse:flex-none"
+          >
+            <span
+              className={`grid size-6 place-items-center rounded-[6px] text-[11.5px] font-semibold group-focus-visible:outline-2 group-focus-visible:outline-accent ${
+                days[i]
+                  ? 'bg-accent-soft text-accent-ink'
+                  : 'border border-line-2 text-faint'
+              }`}
+            >
+              {DAY_SHORT[i]![0]}
+            </span>
+          </button>
+        );
+      })}
     </span>
   );
 }
@@ -305,6 +334,41 @@ const ERROR = 'basis-full text-xs text-loss sm:pl-[50px]';
 /** On a phone the controls drop under the name, in line with it. */
 const CONTROLS =
   'contents max-sm:flex max-sm:basis-full max-sm:flex-wrap max-sm:items-center max-sm:gap-2.5 max-sm:pl-[50px]';
+
+/**
+ * One built-in rule: its switch, its name, and (when it has them) controls
+ * and a field error. The switch's label is the rule's name.
+ */
+function BuiltInRow({
+  on,
+  label,
+  onChange,
+  controls,
+  error,
+}: {
+  on: boolean;
+  label: string;
+  onChange(on: boolean): void;
+  controls?: React.ReactNode;
+  error?: { id: string; text: string | undefined };
+}): React.JSX.Element {
+  return (
+    <div className={ROW}>
+      <Switch on={on} label={label} onChange={onChange} />
+      <span
+        className={`${NAME} ${controls ? 'max-sm:basis-[calc(100%-50px)]' : ''} ${on ? '' : 'text-muted'}`}
+      >
+        {label}
+      </span>
+      {controls ? <div className={CONTROLS}>{controls}</div> : null}
+      {error?.text ? (
+        <p id={error.id} className={ERROR}>
+          {error.text}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 function DeleteButton({
   label,
@@ -346,19 +410,32 @@ function SectionHead({
   );
 }
 
+/** The unsaved custom rule being typed in a stage. */
+interface Pending {
+  stage: TrackerStage;
+  name: string;
+  days: Weekdays;
+}
+
+const ruleNameOk = (name: string): boolean => {
+  const n = name.trim().length;
+  return n >= 1 && n <= 80;
+};
+
 function NewRule({
+  pending,
+  onChange,
   onAdd,
   onDiscard,
 }: {
-  onAdd(name: string, days: Weekdays): void;
+  pending: Pending;
+  onChange(next: Pending): void;
+  onAdd(): void;
   onDiscard(): void;
 }): React.JSX.Element {
-  const [name, setName] = useState('');
-  const [days, setDays] = useState<Weekdays>([...MON_TO_FRI] as Weekdays);
   const errorId = useId();
-  const trimmed = name.trim();
-  const tooLong = trimmed.length > 80;
-  const ok = trimmed.length >= 1 && !tooLong;
+  const tooLong = pending.name.trim().length > 80;
+  const ok = ruleNameOk(pending.name);
   return (
     <div className={CUSTOM_ROW}>
       <span aria-hidden="true" className="hidden w-10 flex-none sm:block" />
@@ -370,20 +447,20 @@ function NewRule({
         placeholder="Name the rule"
         aria-invalid={tooLong ? true : undefined}
         aria-describedby={tooLong ? errorId : undefined}
-        value={name}
-        onChange={(e) => setName(e.target.value)}
+        value={pending.name}
+        onChange={(e) => onChange({ ...pending, name: e.target.value })}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && ok) {
             e.preventDefault();
-            onAdd(trimmed, days);
+            onAdd();
           }
         }}
         className={`${FIELD} col-start-1 row-start-1 min-w-0 sm:flex-1`}
       />
       <DayPills
         label="Days for the new rule"
-        days={days}
-        onChange={setDays}
+        days={pending.days}
+        onChange={(days) => onChange({ ...pending, days })}
         compact
         className="col-start-1 row-start-2"
       />
@@ -391,8 +468,8 @@ function NewRule({
         size="sm"
         variant="secondary"
         disabled={!ok}
-        onClick={() => onAdd(trimmed, days)}
-        className="col-start-2 row-start-2"
+        onClick={onAdd}
+        className="col-start-2 row-start-2 pointer-coarse:row-start-3"
       >
         Add
       </Button>
@@ -464,12 +541,25 @@ function Dialogs({
     versionOn(tracker, today) ?? tracker.versions[tracker.versions.length - 1]!;
   const base = useMemo(() => toDraft(current), [current]);
   const [draft, setDraft] = useState<Draft>(base);
-  const [adding, setAdding] = useState<TrackerStage | null>(null);
+  const [adding, setAdding] = useState<Pending | null>(null);
   const [asking, setAsking] = useState(false);
   const [failed, setFailed] = useState(false);
   const save = useSaveTracker();
   const reset = useResetTracker();
   const ids = useId();
+  // Where focus goes once the control it was on has left: a stage's Add rule.
+  const addButtons = useRef<Partial<Record<TrackerStage, HTMLButtonElement>>>(
+    {},
+  );
+  const focusAfter = useRef<TrackerStage | null>(null);
+  useLayoutEffect(() => {
+    const stage = focusAfter.current;
+    if (!stage) return;
+    const button = addButtons.current[stage];
+    if (!button) return;
+    focusAfter.current = null;
+    button.focus();
+  });
 
   // Each opening starts from the rules in effect today.
   const [wasOpen, setWasOpen] = useState(open);
@@ -483,8 +573,12 @@ function Dialogs({
   }
 
   const errors = validate(draft);
-  const valid = Object.keys(errors).length === 0;
-  const changed = JSON.stringify(draft) !== JSON.stringify(base);
+  // A rule typed but not yet Added counts as a change, and Save includes it
+  // when its name is valid (Keel's call).
+  const typed = adding !== null && adding.name.trim().length > 0;
+  const typedOk = adding !== null && ruleNameOk(adding.name);
+  const valid = Object.keys(errors).length === 0 && (!typed || typedOk);
+  const changed = typed || JSON.stringify(draft) !== JSON.stringify(base);
   const symbol = currencySymbol(currency);
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
   const errId = (k: string) => `${ids}-${k}`;
@@ -492,7 +586,22 @@ function Dialogs({
   const onSave = async () => {
     setFailed(false);
     try {
-      await save.mutateAsync({ rules: toRules(draft, current) });
+      const withTyped: Draft =
+        adding && typedOk
+          ? {
+              ...draft,
+              custom: [
+                ...draft.custom,
+                {
+                  id: crypto.randomUUID(),
+                  name: adding.name.trim(),
+                  stage: adding.stage,
+                  days: adding.days,
+                },
+              ],
+            }
+          : draft;
+      await save.mutateAsync({ rules: toRules(withTyped, current) });
       onOpenChange(false);
     } catch {
       setFailed(true);
@@ -501,8 +610,10 @@ function Dialogs({
 
   const customOf = (stage: TrackerStage) =>
     draft.custom.filter((c) => c.stage === stage);
-  const dropCustom = (id: string) =>
+  const dropCustom = (id: string, stage: TrackerStage) => {
+    focusAfter.current = stage;
     set({ custom: draft.custom.filter((c) => c.id !== id) });
+  };
 
   const footer = (
     <div className="flex items-center justify-end gap-2">
@@ -550,21 +661,32 @@ function Dialogs({
         />
         <DeleteButton
           label={`Delete ${c.name}`}
-          onClick={() => dropCustom(c.id)}
+          onClick={() => dropCustom(c.id, c.stage)}
           className="col-start-2 row-start-1"
         />
       </div>
     ));
 
   const addRule = (stage: TrackerStage) =>
-    adding === stage ? (
+    adding?.stage === stage ? (
       <NewRule
-        onDiscard={() => setAdding(null)}
-        onAdd={(name, days) => {
+        pending={adding}
+        onChange={setAdding}
+        onDiscard={() => {
+          focusAfter.current = stage;
+          setAdding(null);
+        }}
+        onAdd={() => {
+          focusAfter.current = stage;
           set({
             custom: [
               ...draft.custom,
-              { id: crypto.randomUUID(), name, stage, days },
+              {
+                id: crypto.randomUUID(),
+                name: adding.name.trim(),
+                stage,
+                days: adding.days,
+              },
             ],
           });
           setAdding(null);
@@ -574,7 +696,13 @@ function Dialogs({
       <div className="border-t border-line/70 pt-2 pb-3 sm:pl-[50px]">
         <button
           type="button"
-          onClick={() => setAdding(stage)}
+          ref={(el) => {
+            if (el) addButtons.current[stage] = el;
+            else delete addButtons.current[stage];
+          }}
+          onClick={() =>
+            setAdding({ stage, name: '', days: [...MON_TO_FRI] as Weekdays })
+          }
           className="inline-flex h-[30px] items-center gap-[5px] rounded-chip text-[13px] font-semibold whitespace-nowrap text-accent-ink hover:underline focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11"
         >
           <Plus size={14} aria-hidden="true" />
@@ -630,20 +758,12 @@ function Dialogs({
             />
 
             {stage === 'prepare' ? (
-              <div
-                className={`${ROW} ${draft.startBy.on ? '' : 'opacity-100'}`}
-              >
-                <Switch
-                  on={draft.startBy.on}
-                  label="Start the day note by"
-                  onChange={(on) => set({ startBy: { ...draft.startBy, on } })}
-                />
-                <span
-                  className={`${NAME} max-sm:basis-[calc(100%-50px)] ${draft.startBy.on ? '' : 'text-muted'}`}
-                >
-                  Start the day note by
-                </span>
-                <div className={CONTROLS}>
+              <BuiltInRow
+                on={draft.startBy.on}
+                label="Start the day note by"
+                onChange={(on) => set({ startBy: { ...draft.startBy, on } })}
+                error={{ id: errId('startBy'), text: errors.startBy }}
+                controls={
                   <TimeField
                     label="Start by time"
                     value={draft.startBy.time}
@@ -654,183 +774,142 @@ function Dialogs({
                       set({ startBy: { ...draft.startBy, time } })
                     }
                   />
-                </div>
-                {errors.startBy ? (
-                  <p id={errId('startBy')} className={ERROR}>
-                    {errors.startBy}
-                  </p>
-                ) : null}
-              </div>
+                }
+              />
             ) : null}
 
             {stage === 'trade' ? (
-              <div className={ROW}>
-                <Switch
-                  on={draft.hours.on}
-                  label="Trade only between"
-                  onChange={(on) => set({ hours: { ...draft.hours, on } })}
-                />
-                <span
-                  className={`${NAME} max-sm:basis-[calc(100%-50px)] ${draft.hours.on ? '' : 'text-muted'}`}
-                >
-                  Trade only between
-                </span>
-                <div className={CONTROLS}>
-                  <TimeField
-                    label="Trading hours from"
-                    value={draft.hours.from}
-                    disabled={!draft.hours.on}
-                    error={errors.hoursFrom}
-                    errorId={errId('hoursFrom')}
-                    onChange={(from) =>
-                      set({ hours: { ...draft.hours, from } })
-                    }
-                  />
-                  <span className={WORD}>and</span>
-                  <TimeField
-                    label="Trading hours to"
-                    value={draft.hours.to}
-                    disabled={!draft.hours.on}
-                    error={errors.hoursTo}
-                    errorId={errId('hoursTo')}
-                    onChange={(to) => set({ hours: { ...draft.hours, to } })}
-                  />
-                  <span className={WORD}>{gmtOffset(timeZone)}</span>
-                </div>
-                {errors.hoursFrom || errors.hoursTo ? (
-                  <p
-                    id={errId(errors.hoursFrom ? 'hoursFrom' : 'hoursTo')}
-                    className={ERROR}
-                  >
-                    {errors.hoursFrom ?? errors.hoursTo}
-                  </p>
-                ) : null}
-              </div>
+              <BuiltInRow
+                on={draft.hours.on}
+                label="Trade only between"
+                onChange={(on) => set({ hours: { ...draft.hours, on } })}
+                error={{
+                  id: errId(errors.hoursFrom ? 'hoursFrom' : 'hoursTo'),
+                  text: errors.hoursFrom ?? errors.hoursTo,
+                }}
+                controls={
+                  <>
+                    <TimeField
+                      label="Trading hours from"
+                      value={draft.hours.from}
+                      disabled={!draft.hours.on}
+                      error={errors.hoursFrom}
+                      errorId={errId('hoursFrom')}
+                      onChange={(from) =>
+                        set({ hours: { ...draft.hours, from } })
+                      }
+                    />
+                    <span className={WORD}>and</span>
+                    <TimeField
+                      label="Trading hours to"
+                      value={draft.hours.to}
+                      disabled={!draft.hours.on}
+                      error={errors.hoursTo}
+                      errorId={errId('hoursTo')}
+                      onChange={(to) => set({ hours: { ...draft.hours, to } })}
+                    />
+                    <span className={WORD}>{gmtOffset(timeZone)}</span>
+                  </>
+                }
+              />
             ) : null}
 
             {stage === 'reflect' ? (
               <>
-                <div className={ROW}>
-                  <Switch
-                    on={draft.strategy}
-                    label="Every trade has a strategy"
-                    onChange={(on) => set({ strategy: on })}
-                  />
-                  <span
-                    className={`${NAME} ${draft.strategy ? '' : 'text-muted'}`}
-                  >
-                    Every trade has a strategy
-                  </span>
-                </div>
-                <div className={ROW}>
-                  <Switch
-                    on={draft.stop}
-                    label="Every trade has a planned stop"
-                    onChange={(on) => set({ stop: on })}
-                  />
-                  <span className={`${NAME} ${draft.stop ? '' : 'text-muted'}`}>
-                    Every trade has a planned stop
-                  </span>
-                </div>
-                <div className={ROW}>
-                  <Switch
-                    on={draft.perTrade.on}
-                    label="Keep every loss to"
-                    onChange={(on) =>
-                      set({ perTrade: { ...draft.perTrade, on } })
-                    }
-                  />
-                  <span
-                    className={`${NAME} max-sm:basis-[calc(100%-50px)] ${draft.perTrade.on ? '' : 'text-muted'}`}
-                  >
-                    Keep every loss to
-                  </span>
-                  <div className={CONTROLS}>
-                    <Segmented
-                      label="Per-trade loss unit"
-                      options={[
-                        { value: 'amount', label: symbol },
-                        { value: 'percent', label: '%' },
-                      ]}
-                      value={draft.perTrade.unit}
-                      disabled={!draft.perTrade.on}
-                      coarseTargets
-                      onChange={(unit) =>
-                        set({ perTrade: { ...draft.perTrade, unit } })
-                      }
-                    />
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      aria-label="Per-trade loss limit"
-                      aria-invalid={errors.perTrade ? true : undefined}
-                      aria-describedby={
-                        errors.perTrade ? errId('perTrade') : undefined
-                      }
-                      disabled={!draft.perTrade.on}
-                      value={draft.perTrade.text}
-                      onChange={(e) =>
-                        set({
-                          perTrade: { ...draft.perTrade, text: e.target.value },
-                        })
-                      }
-                      className={`${FIELD} w-[72px]`}
-                    />
-                    <span className={WORD}>or less</span>
-                  </div>
-                  {errors.perTrade ? (
-                    <p id={errId('perTrade')} className={ERROR}>
-                      {errors.perTrade}
-                    </p>
-                  ) : null}
-                </div>
-                <div className={ROW}>
-                  <Switch
-                    on={draft.perDay.on}
-                    label="Keep the day's loss to"
-                    onChange={(on) => set({ perDay: { ...draft.perDay, on } })}
-                  />
-                  <span
-                    className={`${NAME} max-sm:basis-[calc(100%-50px)] ${draft.perDay.on ? '' : 'text-muted'}`}
-                  >
-                    Keep the day&apos;s loss to
-                  </span>
-                  <div className={CONTROLS}>
-                    <span className="relative inline-flex">
-                      <span
-                        aria-hidden="true"
-                        className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-[13.5px] text-faint"
-                      >
-                        {symbol}
-                      </span>
+                <BuiltInRow
+                  on={draft.strategy}
+                  label="Every trade has a strategy"
+                  onChange={(on) => set({ strategy: on })}
+                />
+                <BuiltInRow
+                  on={draft.stop}
+                  label="Every trade has a planned stop"
+                  onChange={(on) => set({ stop: on })}
+                />
+                <BuiltInRow
+                  on={draft.perTrade.on}
+                  label="Keep every loss to"
+                  onChange={(on) =>
+                    set({ perTrade: { ...draft.perTrade, on } })
+                  }
+                  error={{ id: errId('perTrade'), text: errors.perTrade }}
+                  controls={
+                    <>
+                      <Segmented
+                        label="Per-trade loss unit"
+                        options={[
+                          { value: 'amount', label: symbol },
+                          { value: 'percent', label: '%' },
+                        ]}
+                        value={draft.perTrade.unit}
+                        disabled={!draft.perTrade.on}
+                        coarseTargets
+                        onChange={(unit) =>
+                          set({ perTrade: { ...draft.perTrade, unit } })
+                        }
+                      />
                       <input
                         type="text"
                         inputMode="decimal"
                         autoComplete="off"
-                        aria-label="Daily loss limit"
-                        aria-invalid={errors.perDay ? true : undefined}
+                        aria-label="Per-trade loss limit"
+                        aria-invalid={errors.perTrade ? true : undefined}
                         aria-describedby={
-                          errors.perDay ? errId('perDay') : undefined
+                          errors.perTrade ? errId('perTrade') : undefined
                         }
-                        disabled={!draft.perDay.on}
-                        value={draft.perDay.text}
+                        disabled={!draft.perTrade.on}
+                        value={draft.perTrade.text}
                         onChange={(e) =>
                           set({
-                            perDay: { ...draft.perDay, text: e.target.value },
+                            perTrade: {
+                              ...draft.perTrade,
+                              text: e.target.value,
+                            },
                           })
                         }
-                        className={`${FIELD} w-[88px] pl-6`}
+                        className={`${FIELD} w-[72px]`}
                       />
-                    </span>
-                    <span className={WORD}>or less, across all accounts</span>
-                  </div>
-                  {errors.perDay ? (
-                    <p id={errId('perDay')} className={ERROR}>
-                      {errors.perDay}
-                    </p>
-                  ) : null}
-                </div>
+                      <span className={WORD}>or less</span>
+                    </>
+                  }
+                />
+                <BuiltInRow
+                  on={draft.perDay.on}
+                  label="Keep the day's loss to"
+                  onChange={(on) => set({ perDay: { ...draft.perDay, on } })}
+                  error={{ id: errId('perDay'), text: errors.perDay }}
+                  controls={
+                    <>
+                      <span className="relative inline-flex">
+                        <span
+                          aria-hidden="true"
+                          className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-[13.5px] text-faint"
+                        >
+                          {symbol}
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          autoComplete="off"
+                          aria-label="Daily loss limit"
+                          aria-invalid={errors.perDay ? true : undefined}
+                          aria-describedby={
+                            errors.perDay ? errId('perDay') : undefined
+                          }
+                          disabled={!draft.perDay.on}
+                          value={draft.perDay.text}
+                          onChange={(e) =>
+                            set({
+                              perDay: { ...draft.perDay, text: e.target.value },
+                            })
+                          }
+                          className={`${FIELD} w-[88px] pl-6`}
+                        />
+                      </span>
+                      <span className={WORD}>or less, across all accounts</span>
+                    </>
+                  }
+                />
               </>
             ) : null}
 

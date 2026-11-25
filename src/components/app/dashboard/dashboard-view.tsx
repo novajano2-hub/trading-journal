@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { Segmented } from '@/components/ui/segmented';
 import { buildDashboard, openPositions, pickPartition } from '@/data/dashboard';
 import { EMPTY_FILTERS, resolveRange } from '@/data/filters';
-import { goalsFor, withGoals } from '@/data/goals';
 import { metricContextOf } from '@/data/metrics';
 import {
   useGlobalFilters,
@@ -25,13 +24,11 @@ import {
   useTagCategories,
   useTags,
   useTrades,
-  useUpdatePrefs,
 } from '@/data/query/hooks';
 import { StorageUnavailableError } from '@/data/repository';
 import { SAMPLE_WORKSPACE } from '@/data/workspaces';
-import { dailyPnl, type DayStat } from '@/domain/metrics/days';
+import { dailyPnl } from '@/domain/metrics/days';
 import { isTradeUnit } from '@/domain/metrics/units';
-import { goalWeek } from '@/domain/metrics/goals';
 import { localDate } from '@/domain/time';
 import {
   expectancyFigure,
@@ -46,7 +43,6 @@ import { shortTime } from '@/lib/time-format';
 import type { Account, ImportJob } from '@/domain/types';
 import { hasActiveFilters, switchWorkspaceFilters } from '../filter-model';
 import { Drilldown } from './drilldown';
-import { GoalsCard } from './goals-card';
 import { MistakesCard } from './mistakes-card';
 import {
   equityLine,
@@ -55,6 +51,7 @@ import {
   PerformanceCard,
 } from './performance-card';
 import { PlanCard } from './plan-card';
+import { ProgressCard } from './progress-card';
 import { RecentTrades } from './recent-trades';
 import { DashboardEmpty, DashboardError, DashboardSkeleton } from './states';
 
@@ -166,7 +163,6 @@ export function DashboardView(): React.JSX.Element {
   const tags = useTags().data;
   const categories = useTagCategories().data;
   const setActive = useSetActiveWorkspace();
-  const updatePrefs = useUpdatePrefs();
   const queryClient = useQueryClient();
   const imports = useImportHistory().data;
   const userAccounts = useUserAccounts().data;
@@ -188,13 +184,11 @@ export function DashboardView(): React.JSX.Element {
       ? undefined
       : localDate(new Date().toISOString(), timeZone);
   const shownFilters = set.data?.filters;
-  const moneyDayTrades = set.data?.moneyDayTrades;
 
   const view = useMemo(() => {
     if (
       !metrics.data ||
       !shownFilters ||
-      !moneyDayTrades ||
       !prefs ||
       !workspace.data ||
       !strategies ||
@@ -209,15 +203,11 @@ export function DashboardView(): React.JSX.Element {
     const withClosed = metrics.data.filter((m) => m.summary.closedCount > 0);
     const range = resolveRange(shownFilters.range, today, prefs.weekStart);
     const caption = rangeCaption(range, today);
-    const goals = goalsFor(prefs, workspace.data);
     if (withClosed.length === 0)
       return {
         withClosed,
         caption,
-        goals,
         model: undefined,
-        weekLabel: '',
-        days: [] as DayStat[],
         trends: NO_TRENDS,
         line: undefined,
         source: undefined,
@@ -226,29 +216,13 @@ export function DashboardView(): React.JSX.Element {
       ? currency
       : undefined;
     const partition = pickPartition(metrics.data, chosen, prefs.baseCurrency);
-    // Day figures (the loss-limit grid, goals) take the exits dated in the range.
     const ctx = { ...metricContextOf(prefs), range };
-    // Goals are money targets: under a unit that narrows the set they still
-    // read every trade the filters match, on net.
-    const goalDays = ctx.unit
-      ? dailyPnl(
-          moneyDayTrades.filter((t) => t.pnlCurrency === partition.currency),
-          { ...ctx, pnlBasis: 'net' },
-        )
-      : partition.netDays;
     const model = buildDashboard(partition, {
       strategies,
       tags,
       tagCategories: categories,
-      goals,
-      baseCurrency: prefs.baseCurrency,
       ctx,
-      range,
-      today,
-      goalDays,
     });
-    // The daily loss limit's grid: every trading day, always on net, as the goal reads them.
-    const days = !model.goals.dailyLoss ? [] : goalDays;
     // What the display units divide by, and the trades behind each figure.
     const pctBase = pctBaseOf({
       accounts,
@@ -288,18 +262,10 @@ export function DashboardView(): React.JSX.Element {
       model.performance.equity,
       dailyPnl(partition.trades, metricContextOf(prefs)),
     );
-    // "this week" while the goal week is today's; a range that ended earlier reads "that week".
-    const week = model.goals.weekly?.window;
-    const weekLabel = week
-      ? `${week.from >= goalWeek({}, today, prefs?.weekStart)!.from ? 'this' : 'that'} week, ${rangeCaption(week, today)}`
-      : '';
     return {
       withClosed,
       caption,
-      goals,
       model,
-      weekLabel,
-      days,
       trends,
       line,
       source,
@@ -307,7 +273,6 @@ export function DashboardView(): React.JSX.Element {
   }, [
     metrics.data,
     shownFilters,
-    moneyDayTrades,
     prefs,
     workspace.data,
     strategies,
@@ -474,7 +439,7 @@ export function DashboardView(): React.JSX.Element {
           }
         />
         {/*
-          Row 2. From xl, Mistakes and Goals stack in one column beside
+          Row 2. From xl, Mistakes and the progress tracker stack in one column beside
           Performance, whose line takes the height they make together, so no
           card has a tail of empty space. Between md and xl the two sit side
           by side with Performance across both; on a phone, one column.
@@ -491,21 +456,7 @@ export function DashboardView(): React.JSX.Element {
                 open({ kind: 'mistake', tagId }, button)
               }
             />
-            <GoalsCard
-              // A workspace switch drops a half-edited form.
-              key={workspace.data?.id}
-              goals={m.goals}
-              days={view.days}
-              set={view.goals}
-              currency={prefs?.baseCurrency ?? m.currency}
-              weekLabel={view.weekLabel}
-              rangeLabel={caption}
-              onSave={async (next) => {
-                const ws = workspace.data;
-                if (!ws) throw new Error('No active workspace');
-                await updatePrefs.mutateAsync(withGoals(ws.id, next));
-              }}
-            />
+            <ProgressCard />
           </div>
           <div className="min-w-0 md:max-xl:col-span-2">
             <PerformanceCard

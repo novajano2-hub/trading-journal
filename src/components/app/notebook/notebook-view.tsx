@@ -381,7 +381,6 @@ export function NotebookView(): React.JSX.Element {
           {(
             [
               ['daily-review', 'Daily note'],
-              ['pre-market', 'Pre-market plan'],
               ['weekly-recap', 'Weekly recap'],
               ['note', 'Note'],
             ] as const

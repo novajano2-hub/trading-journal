@@ -423,10 +423,13 @@ test('templates: one default per kind, built-ins stay, a removed default falls b
   const { repo } = setup({ newId: () => 'tpl-mine' });
   const dailies = async () =>
     (await repo.templates.list(S)).filter((t) => t.kind === 'daily-review');
-  const builtIn = (await dailies()).find((t) => t.builtIn)!;
+  const builtIn = (await dailies()).find((t) => t.isDefault)!;
   expect(builtIn).toMatchObject({ name: 'Daily review', isDefault: true });
   expect((await repo.templates.list(S)).map((t) => t.name).sort()).toEqual([
+    'All-in-one day',
+    'Daily game plan',
     'Daily review',
+    'Intraday check-in',
     'Pre-market plan',
     'Weekly recap',
   ]);
@@ -454,9 +457,9 @@ test('templates: one default per kind, built-ins stay, a removed default falls b
   ).toHaveLength(3);
 
   await repo.templates.remove(S, mine.id);
-  expect((await dailies()).map((t) => [t.id, t.isDefault])).toEqual([
-    [builtIn.id, true],
-  ]);
+  expect((await dailies()).filter((t) => t.isDefault).map((t) => t.id)).toEqual(
+    [builtIn.id],
+  );
   await expect(repo.templates.setDefault(S, 'nope')).rejects.toBeInstanceOf(
     NotFoundError,
   );

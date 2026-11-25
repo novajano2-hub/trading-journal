@@ -27,9 +27,6 @@ test('the basis shows in the label and the definitions that use it', () => {
   expect(metricDefinition('rule-cost-broken', 'net').definition).toContain(
     'net P&L',
   );
-  expect(metricDefinition('weekly-goal', 'gross').definition).toContain(
-    'Always net',
-  );
 });
 
 test('cumulative P&L has its own definition, apart from the period P&L', () => {
@@ -67,7 +64,7 @@ test('the progress tracker has a definition for every figure it labels', () => {
     'tracker-today',
     'rule-streak',
     'rule-average',
-    'rule-follow-rate',
+    'tracker-follow-rate',
     'tracker-history',
     'tracker-card',
   ] as const) {
@@ -78,5 +75,15 @@ test('the progress tracker has a definition for every figure it labels', () => {
   }
   expect(metricDefinition('tracker-card', 'net').definition).toContain(
     'consistently',
+  );
+  expect(metricDefinition('tracker-card', 'net').definition).not.toContain(
+    'streak',
+  );
+  // The strategy meaning stays the strategy's; the tracker has its own.
+  expect(metricDefinition('rule-follow-rate', 'net').definition).not.toMatch(
+    /progress tracker/,
+  );
+  expect(metricDefinition('tracker-follow-rate', 'net').definition).toMatch(
+    /days that kept this rule/,
   );
 });

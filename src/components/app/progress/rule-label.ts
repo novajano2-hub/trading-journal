@@ -1,8 +1,18 @@
 import type { Cents, TrackerStage, TrackerVersion } from '@/domain/types';
 import type { RuleKey } from '@/domain/tracker/score';
+import { useDisplay } from '@/lib/display';
 
 /** An amount as text; the page builds it from `useDisplay().cash`, so Privacy masks it. */
 export type FormatMoney = (cents: Cents) => { text: string; label: string };
+
+/**
+ * The tracker's money formatter: always net, in the rule's own currency,
+ * through `display.cash` so Privacy masks it.
+ */
+export function useNetCash(currency: string): FormatMoney {
+  const display = useDisplay();
+  return (cents) => display.cash(cents, false, currency);
+}
 
 /** A fraction as a whole-number percent, "1%" or "2.5%". */
 const pct = (f: number): string => `${Number((f * 100).toFixed(2))}%`;
