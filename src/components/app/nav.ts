@@ -234,6 +234,8 @@ export function navHref(
 
 /** The item whose href is the longest prefix of `pathname`, by whole segments. */
 export function activeItem(pathname: string): NavItem | undefined {
+  // A day page sits under Trades (comps 04 and 05).
+  if (dayPageDate(pathname) !== undefined) return navItem('trades');
   let best: NavItem | undefined;
   for (const item of APP_NAV) {
     const inside =
@@ -241,6 +243,11 @@ export function activeItem(pathname: string): NavItem | undefined {
     if (inside && (!best || item.href.length > best.href.length)) best = item;
   }
   return best;
+}
+
+/** The date segment when `pathname` is a day page (`/app/day/<date>` or its plan or review), raw and undecoded. */
+export function dayPageDate(pathname: string): string | undefined {
+  return /^\/app\/day\/([^/]+)(?:\/(?:plan|review))?\/?$/.exec(pathname)?.[1];
 }
 
 /** The top bar's title: the active module, else the product name. */
@@ -304,7 +311,7 @@ export const datesOnly = (pathname: string): boolean =>
 
 /** Pages with no Display menu: money there is always net, in its own currency (P6A-03). */
 export const hidesDisplayMenu = (pathname: string): boolean =>
-  pathname === '/app/progress';
+  pathname === '/app/progress' || dayPageDate(pathname) !== undefined;
 
 /** The page where each group of trades has its own filters rather than the global ones. */
 export const isComparePage = (pathname: string): boolean =>

@@ -42,7 +42,7 @@ export interface ChartSeries {
 
 /** Each series' own colour when a chart holds several. */
 // Accent, then ink, then a lighter accent tint drawn dashed: cyan and marigold
-// are the hues of goals and mistakes, so a series never takes them.
+// keep their own jobs (mistakes among them), so a series never takes them.
 const COLOURS = [
   'var(--accent)',
   'var(--muted)',

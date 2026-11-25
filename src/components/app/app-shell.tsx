@@ -57,7 +57,10 @@ export function AppShell({
         Skip to content
       </a>
       <AppearanceSync />
-      <Sidebar switcher={<AccountSwitcher />} />
+      <Sidebar
+        switcher={<AccountSwitcher />}
+        railSwitcher={<AccountSwitcher compact />}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
           menu={<MobileNav switcher={<AccountSwitcher />} />}

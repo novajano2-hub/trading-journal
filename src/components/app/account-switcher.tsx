@@ -5,6 +5,7 @@ import {
   CaretUpDown,
   Check,
   MagnifyingGlass,
+  Stack,
 } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { DropdownMenu } from 'radix-ui';
@@ -35,6 +36,10 @@ const LABEL = 'px-2 pt-2 pb-1 text-[12px] font-medium text-faint';
  */
 const BOX =
   'flex h-[52px] w-full items-center gap-2 rounded-[12px] border border-line bg-surface-1 py-2 pl-3 text-left shadow-[var(--shadow-chip)] transition-[border-color] duration-200 ease-(--ease-glide) hover:border-line-2';
+
+/** The compact trigger: the workspace as a 40px icon tile, as the slim rail has it. */
+const RAIL_BOX =
+  'grid size-10 flex-none place-items-center rounded-[12px] border border-line bg-surface-1 text-muted shadow-[var(--shadow-chip)] transition-[border-color,color] duration-200 ease-(--ease-glide) hover:border-line-2 hover:text-text pointer-coarse:size-11';
 
 function Indicator(): React.JSX.Element {
   return (
@@ -71,9 +76,12 @@ function LabelledGroup({
  */
 export function AccountSwitcher({
   appearance = true,
+  compact = false,
 }: {
   /** The Appearance choice at the menu's foot: on desktop. The phone's More sheet has its own. */
   appearance?: boolean;
+  /** Only an icon, for the slim rail; the menu opens beside it. */
+  compact?: boolean;
 } = {}): React.JSX.Element {
   const { filters, shown: clean, setFilters } = useShownFilters();
   const workspaces = useWorkspaces().data ?? [];
@@ -86,6 +94,18 @@ export function AccountSwitcher({
   const list = useRef<HTMLDivElement>(null);
 
   if (!active && activeQuery.error) {
+    if (compact)
+      return (
+        <button
+          type="button"
+          aria-label="Workspace unavailable, try again"
+          title="Workspace unavailable, try again"
+          onClick={() => window.location.reload()}
+          className={RAIL_BOX}
+        >
+          <ArrowClockwise size={20} aria-hidden="true" />
+        </button>
+      );
     return (
       <button
         type="button"
@@ -111,7 +131,11 @@ export function AccountSwitcher({
     );
   }
   if (!active) {
-    return <SwitcherPlaceholder />;
+    return compact ? (
+      <div aria-hidden="true" className={`${RAIL_BOX} opacity-50`} />
+    ) : (
+      <SwitcherPlaceholder />
+    );
   }
 
   const selected = clean?.accountIds ?? [];
@@ -159,26 +183,37 @@ export function AccountSwitcher({
 
   return (
     <DropdownMenu.Root onOpenChange={(open) => !open && setQuery('')}>
-      <DropdownMenu.Trigger
-        className={`${BOX} pr-2 data-[state=open]:border-line-2`}
-      >
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-[13.5px] leading-[1.25] font-semibold text-text">
-            {active.name}
+      {compact ? (
+        <DropdownMenu.Trigger
+          aria-label={`Workspace: ${active.name}, ${summary.trim() || 'All accounts'}`}
+          title={`${active.name}, ${summary.trim() || 'All accounts'}`}
+          className={`${RAIL_BOX} data-[state=open]:border-line-2`}
+        >
+          <Stack size={20} aria-hidden="true" />
+        </DropdownMenu.Trigger>
+      ) : (
+        <DropdownMenu.Trigger
+          className={`${BOX} pr-2 data-[state=open]:border-line-2`}
+        >
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate text-[13.5px] leading-[1.25] font-semibold text-text">
+              {active.name}
+            </span>
+            <span className="truncate text-[12px] leading-[1.4] text-faint">
+              {summary}
+            </span>
           </span>
-          <span className="truncate text-[12px] leading-[1.4] text-faint">
-            {summary}
-          </span>
-        </span>
-        <CaretUpDown
-          size={14}
-          aria-hidden="true"
-          className="flex-none text-faint"
-        />
-      </DropdownMenu.Trigger>
+          <CaretUpDown
+            size={14}
+            aria-hidden="true"
+            className="flex-none text-faint"
+          />
+        </DropdownMenu.Trigger>
+      )}
       <DropdownMenu.Portal>
         <DropdownMenu.Content
           align="start"
+          side={compact ? 'right' : 'bottom'}
           sideOffset={6}
           collisionPadding={12}
           className="z-[60] max-h-(--radix-dropdown-menu-content-available-height) w-(--radix-dropdown-menu-trigger-width) min-w-60 origin-(--radix-dropdown-menu-content-transform-origin) overflow-y-auto rounded-[12px] border border-line bg-surface-1 p-1.5 text-text shadow-[var(--shadow)] outline-none motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in"

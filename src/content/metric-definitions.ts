@@ -11,8 +11,6 @@ export const METRIC_IDS = [
   'rule-followed-pf',
   'trade-rule-kept',
   'mistake-cost',
-  'weekly-goal',
-  'daily-loss-limit',
   'trades',
   'pnl',
   'cumulative-pnl',
@@ -168,16 +166,6 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Cost',
     definition:
       'Total {basis} P&L of closed trades tagged with this mistake. A trade with two mistakes counts in both.',
-  },
-  'weekly-goal': {
-    label: 'Weekly net goal',
-    definition:
-      'Net P&L after fees of closed trades from the first day of your week to today, or to the end of your date range, in your timezone. Always net.',
-  },
-  'daily-loss-limit': {
-    label: 'Daily loss limit',
-    definition:
-      'A day breaks the limit when its net P&L after fees falls below minus the limit. A day exactly at the limit keeps it. Always net.',
   },
   trades: {
     label: 'Trades',
