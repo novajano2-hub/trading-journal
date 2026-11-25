@@ -393,6 +393,14 @@ test('a day with only other-currency trades keeps the Day view call and lists th
   fireEvent.click(thu);
   const dialog = await screen.findByRole('dialog', { name: /Thu 26 Nov 2026/ });
   expect(dialog.textContent).toContain('1 trade in other currencies');
+  // The dialog's own description reads the count as the trades, not as "0 trades, 1 in other currencies".
+  const described = document.getElementById(
+    dialog.getAttribute('aria-describedby')!,
+  )!;
+  expect(described.textContent).toBe(
+    '1 trade in other currencies, listed apart',
+  );
+  expect(dialog.textContent).not.toContain('0 trades');
 });
 
 test('weeks load 8 at a time with a Show more button', async () => {

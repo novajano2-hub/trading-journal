@@ -23,6 +23,10 @@ const ICON_BUTTON =
  * Changes are held in the panel and saved only by Update; closing the panel
  * any other way throws them away. Keel's call (TradeZella unknown): at least
  * one column stays on.
+ *
+ * Keel's call (TradeZella unknown): Select all covers every column, not only
+ * the ones a search matches; Update closes the panel; closing any other way
+ * discards. (The record, lines 652 to 654, is silent on these.)
  */
 export function ColumnsMenu({
   columns,

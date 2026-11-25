@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import {
+  act,
   cleanup,
   fireEvent,
   screen,
@@ -702,6 +703,44 @@ test('a day table pages at 50 rows with a Show more', async () => {
   expect(
     within(first).queryByRole('button', { name: /^Show more/ }),
   ).toBeNull();
+});
+
+test('a changed filter starts a day table again at 50 rows', async () => {
+  await renderApp(<TradesDayView />, {
+    sample: sample({ trades: sixty(), journal: [], days: [] }),
+    url: '/app/trades/day?from=2026-11-24&to=2026-11-24',
+  });
+  const first = (await cards())[0]!;
+  fireEvent.click(
+    within(first).getByRole('button', { name: 'Expand Tue 24 Nov 2026' }),
+  );
+  const table = await within(first).findByRole('table', {
+    name: 'Trades on Tue 24 Nov 2026',
+  });
+  fireEvent.click(
+    within(first).getByRole('button', {
+      name: 'Show more, Trades on Tue 24 Nov 2026',
+    }),
+  );
+  await waitFor(() =>
+    expect(within(table).getAllByRole('row')).toHaveLength(61),
+  );
+  // The date range widens; the day's trades are the same sixty.
+  act(() => {
+    window.history.replaceState(
+      null,
+      '',
+      '/app/trades/day?from=2026-11-23&to=2026-11-24',
+    );
+  });
+  await waitFor(() =>
+    expect(within(table).getAllByRole('row')).toHaveLength(51),
+  );
+  expect(
+    within(first).getByRole('button', {
+      name: 'Show more, Trades on Tue 24 Nov 2026',
+    }),
+  ).toBeTruthy();
 });
 
 test('the phone rows page at 50 too', async () => {

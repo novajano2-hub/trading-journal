@@ -35,7 +35,11 @@ function DayDialog({
   // The tile's count: base-currency trades, with other currencies listed apart.
   const total = day ? day.trades.length : 0;
   const other = day ? day.otherCurrency.length : 0;
-  const count = `${total} ${plural(total, 'trade')}${other > 0 ? `, ${other} in other currencies, listed apart` : ''}`;
+  // A day with only other-currency trades names them as the trades: "2 trades in other currencies, listed apart".
+  const count =
+    total === 0 && other > 0
+      ? `${other} ${plural(other, 'trade')} in other currencies, listed apart`
+      : `${total} ${plural(total, 'trade')}${other > 0 ? `, ${other} in other currencies, listed apart` : ''}`;
   const net =
     day && day.stats.net !== null
       ? display.figure(

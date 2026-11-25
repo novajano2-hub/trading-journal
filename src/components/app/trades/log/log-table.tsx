@@ -166,7 +166,12 @@ export function LogTable({
   const phone = usePhone();
   const router = useRouter();
   const search = useSearchParams().toString();
-  const [shown, setShown] = useState(PAGE);
+  // A changed filter starts the table again at the first 50, as the card list's
+  // paging does (`usePaged`). The count is kept with the filters it was made under.
+  const [paging, setPaging] = useState({ key: search, shown: PAGE });
+  const shown = paging.key === search ? paging.shown : PAGE;
+  const setShown = (next: (n: number) => number) =>
+    setPaging({ key: search, shown: next(shown) });
   const rows = trades.slice(0, shown);
   const more =
     trades.length > shown ? (
