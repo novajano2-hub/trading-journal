@@ -396,6 +396,7 @@ Delivers B1 to B4.
   ```
 - Merge (B2, B3): the earliest-opened source is `kept` (id, serial, note, rating, reviewed, levels, rule checks); tags and strategies are the union, and the others' rule checks are added where `kept` has none; unpicked executions stay in their trade (`changed`, rebuilt); a source left empty is in `removedIds`; the others' `noteId`s are in `unlinkNoteIds`. Every result is `grouping: 'manual'`.
 - Split (B4): `original` keeps its record with the remaining fills; `created` copies tags and strategies only, takes `serial`, is not reviewed.
+- Swap (ledger R3): `buildGroupedTrade` carries `base.swap` and adds it to net; a merged trade's swap is the sum of its sources'; a split keeps swap on the original.
 
 - [ ] **Step 1: Write the failing tests:** `'merge across a flat point makes one trade'`; `'an unticked fill stays in its trade'`; `'the earliest-opened source keeps its record'`; `'tags and strategies are united'`; `'canMerge refuses mixed accounts and instruments'`; `'split leaves an open part when it does not end flat'`; `'split refuses moving all or none'`; `'the new part copies tags and strategies only'`.
 - [ ] **Step 2:** FAIL. **Step 3:** Implement. **Step 4:** PASS.
@@ -476,6 +477,7 @@ Delivers B15 to B19, B57, Review Focus 3.
   ```
 - Produces, storage: `TargetRulesRepo` and `FeeRulesRepo` `{ list; create; update; remove; applyExisting(ws, id, override: boolean): Promise<number> }`, hooks `useTargetRules()`, `useFeeRules()`, `useSaveTargetRule()`, `useSaveFeeRule()`, `useRemoveTargetRule()`, `useRemoveFeeRule()`, `useApplyRule()` (`{ kind, id, override }`), with history rows (rule types; applications logged per trade with source `rule`).
 - Import commit: for each new trade, the picked target rule applies when the trade has no levels; the picked fee rule applies when `!hasCosts(t)`. Net and gross are rebuilt from the fills.
+- Levels from a rule are written through `applyTradePatch(trade, { targets, stops })`, at import and on Apply to existing, so `initialRisk` is rewritten as Task 6 defines (ledger R1).
 - Edit and delete leave applied values (B57).
 
 - [ ] **Step 1: Write the failing tests:**
@@ -521,7 +523,7 @@ Delivers B49, B50, and E27's swap part. 6B owns the Overview's Swap figure; 6C's
 - `ImportedTrip.swap?: Cents` (signed, as the file has it). `buildTrips`: after building, `t.swap = swap; t.net = t.net + swap` (gross unchanged). Same-currency P&L checks compare against `gross` and the new `net`.
 - `costsOf(trades)` returns `{ commissions; fees; swap }`.
 
-- [ ] **Step 1: Write the failing tests:** `'a swap column is guessed and mapped'`; `'swap enters net, not gross'` (−4.86 on a +530.00 gross, −14.00 fees → net 511.14); `'a fills import has no swap'`; `'the Overview lists Swap in costs and can hide it'`; `'Privacy masks swap'`.
+- [ ] **Step 1: Write the failing tests:** `'a swap column is guessed and mapped'`; `'swap enters net, not gross'` (−4.86 on a +530.00 gross, −14.00 fees → net 511.14); `'swap survives a merge, a split and a fill-cost edit'` (ledger R3); `'a fills import has no swap'`; `'the Overview lists Swap in costs and can hide it'`; `'Privacy masks swap'`.
 - [ ] **Step 2:** FAIL. **Step 3:** Implement. **Step 4:** PASS.
 - [ ] **Step 5:** Commit: `feat: swap per trade, from the import into net (#55)`.
 
@@ -536,7 +538,7 @@ Delivers B58 and P6B-02. Comp: `01-trade-page.html?state=fill-costs`.
 - Modify: `src/data/repository.ts` (`TradesRepo.setFillCosts`), `src/data/local/trades.ts`, `src/data/query/hooks.ts`, `src/components/app/trades/trade-view.tsx` (`Executions`)
 
 **Interfaces:**
-- Produces: `setFillCosts(ws: string, tradeId: string, executionId: string, costs: { commission: Cents; fees: Cents }): Promise<Trade>` (rebuilds `fees`, `gross` and `net` with `buildGroupedTrade` on a manual grouping, or the account's builder otherwise; logs a history row, source you; refuses archived accounts); hook `useSetFillCosts()`.
+- Produces: `setFillCosts(ws: string, tradeId: string, executionId: string, costs: { commission: Cents; fees: Cents }): Promise<Trade>` (rebuilds `fees`, `gross` and `net` with `buildGroupedTrade` on the trade's own fills, ledger R2; logs a history row, source you; refuses archived accounts); hook `useSetFillCosts()`.
 - A row's commission and fee are inputs while editing, saved when the row is confirmed.
 
 - [ ] **Step 1: Write the failing tests:** `'editing a fill's costs recomputes the trade'`; `'it logs one history row'`; `'it is allowed on a finished day and leaves the frozen score'`; `'Privacy masks the inputs' values'`.
@@ -680,7 +682,7 @@ Delivers B37 to B40. Comp: `05-note-editor.html?state=history`.
 
 **Files:**
 - Create: `src/data/local/note-versions.ts` and a test; `src/components/app/notes/version-history.tsx`, `note-export.ts`, `dictation.ts`, and tests; `src/styles/print.css`
-- Modify: `src/data/repository.ts`, `src/data/query/{keys,hooks}.ts`, every editor host (`trade-journal.tsx` `TradeNote` and `DayNote`, the Notebook's entry pane, 6A's day page note and note dialog)
+- Modify: `src/data/repository.ts`, `src/data/query/{keys,hooks}.ts`, `src/components/app/notes/note-editor.tsx` (a `noteId` prop; the version keeper and the History control live inside `NoteEditor`, ledger R4), and every editor host to pass `noteId` (`trade-journal.tsx` `TradeNote` and `DayNote`, the Notebook's entry pane, 6A's day page note). Hosts under `src/components/app/trades/log/` (6A's note dialog) pass it with Task 18, after 6A lands
 
 **Interfaces:**
 - Produces: `NoteVersionsRepo { list(ws, noteId): Promise<NoteVersion[]>; keep(ws, noteId, body, kind): Promise<void>; restore(ws, noteId, versionId): Promise<JournalEntry> }` (purges older than 30 days; `restore` keeps the current body as `before-restore` first, then writes the body only; refuses a locked daily note); hooks `useNoteVersions(noteId)`, `useKeepVersion()`, `useRestoreVersion()`; `useVersionKeeper(noteId, body)` (B39 timing).
