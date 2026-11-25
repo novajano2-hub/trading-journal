@@ -23,7 +23,7 @@
 1. **The behaviour record,** `.superpowers/research/tradezella/plan6b-behaviour.md` in this worktree (git-ignored). **TradeZella's record wins on behaviour** over the spec's wording, the comps and this plan.
 2. **The spec,** including its corrections (§7) and its Keel's calls (§6.1).
 3. **The comps.** They are the binding look, and only the look:
-   - `.impeccable/mocks/plan6b/01-trade-page.html` to `09-patterns.html`, with `shell.css`, `shell.js` and `log.js`;
+   - `.impeccable/mocks/plan6b/01-trade-page.html` to `09-patterns.html` (04 is `04-settings-trading.html`), with `shell.css`, `shell.js` and `log.js`;
    - their `?state=` variants (listed in each task), and `?theme=dark` on any comp;
    - the captures in `.impeccable/mocks/plan6b/captures/` (git-ignored).
 4. **The parity audit,** `.superpowers/research/tradezella/plan6b-parity-audit.md` (P6B-01 to P6B-32, all fixed in the spec and comps).
@@ -353,7 +353,7 @@ Delivers B14 and the 6A tracker seam.
 
 ### Task 7: The trade page's targets and stops
 
-Delivers spec §5.2's screen. Comp: `01-trade-page.html`, `?state=over`, `?state=wrong-side`, `?state=stop-only`.
+Delivers spec §5.2's screen. Comp: `01-trade-page.html`, `?state=over`, `?state=wrong-side`, `?state=stop-only`. Everything on that comp that this task doesn't name (Choose stats, Attachments, Patterns, fill costs) belongs to Tasks 14, 15 and 17.
 
 **Files:**
 - Create: `src/components/app/trades/levels-block.tsx`, `size-helper.tsx`, and a test
@@ -438,7 +438,7 @@ Delivers B5 to B8, B55 and Review Focus 2.
 
 ### Task 10: The grouping screens
 
-Comps: `02-trade-log.html` (`?state=merge`, `?state=mixed`), `03-split-move.html` (default, `?state=move`, `?state=account-move`).
+Comps: `02-trade-log.html` (`?state=merge`, `?state=mixed`), `03-split-move.html` (default, `?state=move`, `?state=account-menu` for the menu, `?state=account-move` for the whole-account dialog).
 
 **Files:**
 - Create: `src/components/app/trades/group-dialogs.tsx` (`MergeDialog`, `SplitDialog`), `move-dialog.tsx`, and a test
@@ -493,7 +493,7 @@ Delivers B15 to B19, B57, Review Focus 3.
 
 ### Task 12: The rule cards
 
-Comps: `04-trade-defaults.html` (default, `?state=target-rule`, `?state=fees`, `?state=fee-rule`, `?state=apply`).
+Comps: `04-settings-trading.html` (default, `?state=target-rule`, `?state=target-rule-filled`, `?state=fees`, `?state=fee-rule`, `?state=apply`).
 
 **Files:**
 - Create: `src/components/app/settings/rule-cards.tsx`, `target-rule-dialog.tsx`, `fee-rule-dialog.tsx`, `apply-rule-dialog.tsx`, and a test
@@ -599,7 +599,7 @@ Delivers spec §5.5's table, B20 to B22.
 
 ### Task 17: Patterns in the log, the trade page and the filters
 
-Comps: `01-trade-page.html?state=patterns`, `02-trade-log.html` (the column), `?state=filter`.
+Comps: `01-trade-page.html?state=patterns`, `02-trade-log.html` (the column), `02-trade-log.html?state=filter`.
 
 **Files:**
 - Create: `src/components/app/trades/patterns-button.tsx` and a test
@@ -747,7 +747,7 @@ Delivers U3, B44 to B47, B59. Comps: `07-strategies.html` (`?state=templates`, `
 
 ### Task 24: Missed trades and the photo
 
-Delivers B43, B48. Comps: `07-strategies.html` (`?state=strategy`, `?state=missed-form`, `?state=form-photo`).
+Delivers B43, B48. Comps: `07-strategies.html` (`?state=strategy`, `?state=missed-form`, `?state=form-photo`; the last also shows B59's prefilled form).
 
 **Files:**
 - Create: `src/data/local/missed-trades.ts` and a test; `src/components/app/strategies/{missed-trades,photo-field}.tsx`, and tests

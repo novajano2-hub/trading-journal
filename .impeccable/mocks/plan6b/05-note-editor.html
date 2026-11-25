@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keel, note editor</title>
+<!-- Plan 6B comp 05 (spec 5.6). ?theme=dark for graphite. Variants: ?state=slash, history, insert -->
+<script src="shell.js"></script>
+<link rel="stylesheet" href="shell.css">
+<style>
+.nb3 { display: grid; grid-template-columns: 200px 300px minmax(0, 1fr); gap: 18px; align-items: start; }
+.fold { padding: 14px 12px; display: flex; flex-direction: column; gap: 2px; }
+.fold .btn { margin-bottom: 10px; }
+.fold a { display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 10px; border-radius: 9px; font-size: 14.5px; font-weight: 500; color: var(--muted); }
+.fold a svg.i { width: 17px; height: 17px; } .fold a small { margin-left: auto; font-size: 12px; color: var(--faint); }
+.fold a.on { background: var(--sunken); color: var(--text); font-weight: 600; } .fold a.on svg.i { color: var(--accent-ink); }
+.fold .gl2 { font-size: 12.5px; color: var(--faint); padding: 14px 10px 4px; }
+.nlist { padding: 14px; }
+.nlist .cap2 { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--faint); margin: 12px 4px 4px; }
+.ni { display: block; padding: 10px 4px; border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.ni:first-of-type { border-top: 0; }
+.ni b { display: block; font-size: 14px; font-weight: 600; }
+.ni span { display: block; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.ni small { display: block; font-size: 12px; color: var(--faint); margin-top: 4px; }
+.ni.on { background: var(--accent-soft); border-radius: 10px; padding-left: 10px; padding-right: 10px; margin: 0 -6px; border-color: transparent; }
+.ni.on + .ni { border-top-color: transparent; }
+.ncard { padding: 18px 26px 22px; min-width: 0; }
+.nmeta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12.5px; color: var(--faint); }
+.nmeta .kind { height: 26px; padding: 0 8px; border-radius: 7px; background: var(--sunken); color: var(--muted); font-weight: 500; display: inline-flex; align-items: center; }
+.nmeta .fsel { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 8px; border-radius: 7px; color: var(--muted); font-weight: 500; }
+.nmeta .fsel svg.i { width: 11px; height: 11px; }
+.nmeta .saved { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; } .nmeta .saved svg.i { width: 14px; height: 14px; color: var(--gain); }
+.nmeta .ib { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: var(--muted); } .nmeta .ib svg.i { width: 16px; height: 16px; }
+.ntitle { margin-top: 12px; font-size: 26px; line-height: 1.15; font-weight: 600; letter-spacing: -.03em; }
+.ntags { display: flex; gap: 6px; margin-top: 10px; align-items: center; }
+.ntags .chip { height: 26px; padding: 0 10px; font-size: 12.5px; color: var(--text); }
+.ntags .ph { font-size: 13px; color: var(--faint); margin-left: 4px; }
+/* The toolbar: formatting on one row, insert, history and view tools on the next where the note is narrow. */
+.etb { margin-top: 14px; flex-wrap: wrap; row-gap: 4px; position: sticky; top: 72px; z-index: 5; }
+.etb .r1, .etb .r2 { display: flex; align-items: center; gap: 2px; }
+.etb .r2 { flex: 1 1 auto; }
+.etb .tip { top: calc(100% + 6px); left: 50%; transform: translateX(-50%); white-space: nowrap; }
+.etb .anchor > .menu { top: calc(100% + 6px); left: 0; }
+.only-phone-tb { display: none; }
+.etb .g.push { margin-left: auto; }
+/* The note body, set by the Notebook settings (H1 28, H2 24, H3 20, body 14). */
+.eb { position: relative; padding: 14px 0 0 22px; font-size: 14px; line-height: 1.65; color: var(--text); }
+.eb h2 { font-size: 24px; font-weight: 600; letter-spacing: -.025em; line-height: 1.25; margin: 6px 0 4px; }
+.eb h3 { font-size: 20px; font-weight: 600; letter-spacing: -.02em; line-height: 1.3; margin: 2px 0 4px; }
+.eb p { margin: 4px 0; }
+.eb ul { margin: 4px 0 4px 20px; }
+.blk { position: relative; border-radius: 6px; }
+.blk.hov { background: color-mix(in srgb, var(--sunken) 55%, transparent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--sunken) 55%, transparent); }
+.bh { position: absolute; left: -46px; top: 2px; display: flex; gap: 2px; }
+.bh button { width: 20px; height: 22px; display: grid; place-items: center; border-radius: 5px; color: var(--faint); }
+.bh button:hover { background: var(--sunken); color: var(--text); }
+.bh svg.i { width: 15px; height: 15px; }
+figure.img { position: relative; margin: 14px 0 6px; width: 82%; }
+figure.img .frame { position: relative; border-radius: 8px; outline: 2px solid var(--accent); outline-offset: 2px; }
+figure.img svg { display: block; width: 100%; height: auto; border-radius: 8px; }
+figure.img .hdl { position: absolute; width: 10px; height: 10px; border-radius: 3px; background: var(--surface-1); border: 2px solid var(--accent); }
+.hdl.tl { left: -7px; top: -7px; } .hdl.tr { right: -7px; top: -7px; } .hdl.bl { left: -7px; bottom: -7px; } .hdl.br { right: -7px; bottom: -7px; }
+figure.img figcaption { margin-top: 10px; text-align: center; font-size: 13px; color: var(--muted); }
+.cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin: 14px 0 6px; border: 1px dashed var(--line-2); border-radius: 8px; }
+.cols2 > div { padding: 8px 14px; } .cols2 > div + div { border-left: 1px dashed var(--line-2); }
+.cols2 h3 { font-size: 15px; letter-spacing: -.01em; margin: 0 0 2px; }
+.tll { list-style: none; margin: 4px 0; }
+.tll li { display: flex; gap: 12px; padding: 2px 0; }
+.tll time { flex: none; width: 42px; font-weight: 600; color: var(--muted); }
+.tlink { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: 7px; background: var(--sunken); box-shadow: inset 0 0 0 1px var(--line); font-size: 13px; font-weight: 550; vertical-align: 1px; white-space: nowrap; }
+.tlink svg.i { width: 13px; height: 13px; color: var(--muted); }
+.tlink em { font-style: normal; color: var(--faint); font-weight: 500; }
+.caretl { display: inline-block; width: 1.5px; height: 1.2em; background: var(--accent); vertical-align: text-bottom; }
+/* Slash menu (slash-menu.tsx look). */
+.slash { top: calc(100% + 4px); left: 0; width: 280px; padding: 4px; }
+.slash ul { list-style: none; max-height: 336px; overflow: hidden; margin: 0; line-height: 1.4; }
+.slash li { display: flex; flex-direction: column; padding: 6px 12px; border-radius: 8px; }
+.slash li b { font-size: 13.5px; font-weight: 500; }
+.slash li span { font-size: 12px; color: var(--faint); }
+.slash li.on { background: var(--sunken); }
+.slash .more { font-size: 12px; color: var(--faint); padding: 6px 12px 4px; border-top: 1px solid var(--line); margin-top: 4px; }
+/* Insert menu. */
+.ins { width: 220px; }
+.etb .menu .it { justify-content: flex-start; height: auto; min-height: 36px; width: 100%; padding: 0 10px; font-size: 13.5px; font-weight: 400; color: var(--text); }
+.etb .menu .it:hover, .etb .menu .it.hl { background: var(--sunken); }
+/* Version history. */
+.vh { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 0; flex: 1; }
+.vl { border-right: 1px solid var(--line); padding: 4px 12px 16px 24px; overflow-y: auto; }
+.vl .dl { font-size: 12.5px; color: var(--faint); padding: 12px 10px 4px; }
+.vl button { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 0 10px; border-radius: 8px; font-size: 13.5px; font-weight: 500; text-align: left; }
+.vl button:hover { background: var(--sunken); }
+.vl button.on { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+.vl button .chip { margin-left: auto; }
+.vl button small { margin-left: auto; font-size: 12px; color: var(--faint); font-weight: 400; }
+.vp { padding: 12px 24px 20px; overflow-y: auto; }
+.vp .ro { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--faint); margin-bottom: 8px; }
+.vp .ro b { color: var(--text); font-weight: 600; font-size: 13.5px; }
+.vp .eb { padding-left: 0; }
+.vp .eb .chg { background: var(--accent-tint); border-radius: 3px; }
+html:not([data-state='slash']) .v-slash, html:not([data-state='history']) .v-history, html:not([data-state='insert']) .v-insert { display: none !important; }
+[data-state='slash'] .v-noslash { display: none !important; }
+@media (max-width: 1279.98px) { .nb3 { grid-template-columns: 200px minmax(0, 1fr); } .nlist { display: none; } }
+@media (max-width: 1023.98px) { .nb3 { grid-template-columns: minmax(0, 1fr); } .fold { display: none; } }
+@media (max-width: 639.98px) {
+  .ncard { padding: 14px 16px 18px; }
+  .nmeta .day { display: none; }
+  .etb { top: 60px; }
+  .etb .r1, .etb .r2 { flex: 1 1 100%; }
+  .etb .xs { display: none; }
+  .etb .r2 .ph-r2 { display: inline-flex; }
+  .only-phone-tb { display: flex; margin-left: auto; }
+  .eb { padding-left: 0; }
+  .bh { display: none; }
+  figure.img { width: 100%; }
+  .cols2 { grid-template-columns: minmax(0, 1fr); } .cols2 > div + div { border-left: 0; border-top: 1px dashed var(--line-2); }
+  .vh { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .vl { border-right: 0; border-bottom: 1px solid var(--line); padding: 0 20px 10px; max-height: 210px; }
+  .vp { padding: 12px 20px; }
+  .slash { width: min(300px, calc(100vw - 40px)); }
+}
+@media (min-width: 640px) { .menu.only-phone { display: none !important; } }
+</style>
+</head>
+<body data-nav="notebook" data-title="Notebook">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="shot-c" viewBox="0 0 560 250"><rect width="560" height="250" fill="#131722"/><g stroke="#2a2e39" stroke-width="1"><line x1="0" x2="560" y1="62" y2="62"/><line x1="0" x2="560" y1="125" y2="125"/><line x1="0" x2="560" y1="188" y2="188"/></g>
+    <rect x="40" y="128" width="120" height="44" fill="#7b83e8" opacity=".12"/><line x1="40" x2="560" y1="128" y2="128" stroke="#7b83e8" stroke-dasharray="4 4"/><line x1="40" x2="560" y1="172" y2="172" stroke="#7b83e8" stroke-dasharray="4 4"/>
+    <g stroke-width="2"><path d="M50 170v-30M66 166v-28M82 160v-26M98 168v-24M114 158v-26M130 150v-22M146 156v-20" stroke="#c56a6a"/><path d="M162 140v-26M178 126v-28M194 118v-24M210 112v-26M226 104v-22M242 98v-24M258 92v-22M274 90v-18M290 84v-22M306 80v-20M322 76v-22M338 72v-18M354 66v-20M370 64v-18" stroke="#5b9c8c"/><path d="M386 70v-14M402 74v-12M418 68v-14" stroke="#c56a6a"/><path d="M434 62v-20M450 56v-18M466 58v-14M482 52v-18M498 48v-16M514 46v-14M530 40v-16" stroke="#5b9c8c"/></g>
+    <polygon points="178,140 172,152 184,152" fill="#e8eaf6"/><text x="190" y="156" font-size="12" fill="#e8eaf6" font-family="system-ui">Long 2</text></symbol>
+</defs></svg>
+
+<main id="content" class="page">
+<div class="nb3">
+  <aside class="card fold" aria-label="Folders">
+    <button class="btn pri wide"><i data-i="Plus:bold"></i>New<i data-i="CaretDown:bold" style="width:12px;height:12px"></i></button>
+    <a href="#"><i data-i="Star"></i>Favourites<small>2</small></a><a href="#"><i data-i="TrendUp"></i>Trade notes<small>40</small></a><a href="#"><i data-i="CalendarCheck"></i>Daily journal<small>112</small></a><a href="#"><i data-i="ClipboardText"></i>Sessions recap<small>25</small></a><a class="on" href="#"><i data-i="NotePencil"></i>My notes<small>6</small></a>
+    <p class="gl2">Your folders</p><a href="#"><i data-i="Notebook"></i>Playbook<small>4</small></a>
+  </aside>
+  <section class="card nlist" aria-label="My notes">
+    <div class="inp sm"><i data-i="MagnifyingGlass" class="faint"></i><span class="faint">Search notes</span></div>
+    <p class="cap2"><span>My notes</span><span>Newest first</span></p>
+    <a class="ni on" href="#"><b>ES opening range: what's working</b><span>Five sessions of the opening range break on ES.</span><small>Wed 25 Nov &nbsp; Playbook</small></a>
+    <a class="ni" href="#"><b>Rules for news days</b><span>No entries 5 minutes either side of a release.</span><small>Fri 20 Nov &nbsp; Playbook</small></a>
+    <a class="ni" href="#"><b>USDJPY levels to watch</b><span>155.00 and 156.20 held all week.</span><small>Tue 17 Nov</small></a>
+    <a class="ni" href="#"><b>Sizing after a red day</b><span>Half size until two green trades in a row.</span><small>Mon 9 Nov &nbsp; Playbook</small></a>
+  </section>
+
+  <article class="card ncard" aria-label="ES opening range: what's working">
+    <div class="nmeta"><span class="kind">Note</span><span class="day">Wed 25 Nov</span><button class="fsel">Playbook<i data-i="CaretDown:bold"></i></button>
+      <span class="saved"><i data-i="CheckCircle:fill"></i>Saved</span><button class="ib" aria-label="Favourite"><i data-i="Star"></i></button><button class="ib" aria-label="Export or import"><i data-i="DownloadSimple"></i></button><button class="ib" aria-label="Move to Trash"><i data-i="Trash"></i></button></div>
+    <h2 class="ntitle">ES opening range: what's working</h2>
+    <div class="ntags"><span class="chip">playbook</span><span class="chip">es</span><span class="ph">Add another</span></div>
+
+    <div class="etb" role="toolbar" aria-label="Formatting">
+      <div class="r1">
+        <span class="g"><button aria-label="Undo"><i data-i="ArrowUUpLeft"></i></button><button aria-label="Redo"><i data-i="ArrowUUpRight"></i></button></span>
+        <span class="div"></span>
+        <span class="g"><button class="txt" aria-haspopup="menu" aria-label="Style: Normal text">Normal text<i data-i="CaretDown:bold" class="cd"></i></button>
+          <button class="txt xs" aria-haspopup="listbox" aria-label="Font: Sans">Sans<i data-i="CaretDown:bold" class="cd"></i></button>
+          <button class="txt xs" aria-haspopup="listbox" aria-label="Size: 14">14<i data-i="CaretDown:bold" class="cd"></i></button></span>
+        <span class="div"></span>
+        <span class="g"><button aria-label="Bold" aria-pressed="false"><i data-i="TextB:bold"></i></button><button aria-label="Italic" aria-pressed="false"><i data-i="TextItalic"></i></button><button aria-label="Underline" aria-pressed="false"><i data-i="TextUnderline"></i></button>
+          <button class="xs ph-r2" aria-label="Link"><i data-i="LinkSimple"></i></button>
+          <button class="txt xs" aria-haspopup="menu" aria-label="Format: strikethrough, inline code, superscript, subscript, clear formatting">Format<i data-i="CaretDown:bold" class="cd"></i></button></span>
+      </div>
+      <div class="r2">
+        <span class="g xs"><button class="colour" aria-label="Text colour" style="--sw: var(--accent)"><i data-i="TextAUnderline"></i></button><button aria-label="Highlight"><i data-i="Highlighter"></i></button></span>
+        <span class="div xs"></span>
+        <span class="g xs"><button aria-label="Paragraph: alignment and indent" aria-haspopup="menu"><i data-i="TextAlignLeft"></i><i data-i="CaretDown:bold" class="cd"></i></button></span>
+        <span class="div xs"></span>
+        <span class="g"><button class="ph-r2 only-phone" aria-label="Link"><i data-i="LinkSimple"></i></button><span class="anchor"><button aria-label="Insert" aria-haspopup="menu"><i data-i="Plus"></i>Insert<i data-i="CaretDown:bold" class="cd"></i></button>
+          <div class="menu ins v-insert only-desk" role="menu" aria-label="Insert">
+            <button class="it" role="menuitem">Image</button><button class="it" role="menuitem">Inline image</button><button class="it" role="menuitem">Table</button>
+            <div class="sep"></div><button class="it hl" role="menuitem">Two columns</button><button class="it" role="menuitem">Three columns</button>
+            <div class="sep"></div><button class="it" role="menuitem">Divider</button><button class="it" role="menuitem">Page break</button><button class="it" role="menuitem">Equation</button><button class="it" role="menuitem">Toggle</button>
+          </div></span>
+          <button class="xs" aria-label="Insert a template" aria-haspopup="menu"><i data-i="FileText"></i>Template</button>
+          <button class="xs" aria-label="Dictate. Your browser's speech service turns speech into text." title="Dictate. Your browser's speech service turns speech into text."><i data-i="Microphone"></i></button></span>
+        <span class="g xs push"><button aria-label="Version history"><i data-i="ClockCounterClockwise"></i></button><button aria-label="Full screen"><i data-i="ArrowsOut"></i></button></span>
+        <span class="only-phone-tb"><button aria-label="More tools" aria-haspopup="menu"><i data-i="DotsThree:bold"></i>More</button></span>
+      </div>
+    </div>
+
+    <div class="eb" aria-label="Note" role="textbox" aria-multiline="true">
+      <p>Five sessions of the opening range break on ES. Two rules held up, one did not, and the size rule needs a look.</p>
+      <figure class="img"><div class="frame"><svg viewBox="0 0 560 250"><use href="#shot-c"/></svg><span class="hdl tl"></span><span class="hdl tr"></span><span class="hdl bl"></span><span class="hdl br"></span></div>
+        <figcaption>ES 5-minute, 24 Nov. The break at 09:41 held the range high.</figcaption></figure>
+      <div class="cols2" aria-label="Two columns">
+        <div><h3>Working</h3><ul><li>Waiting for the full 15 minutes</li><li>Entry on a close outside the range</li></ul></div>
+        <div><h3>Not working</h3><ul><li>Adding after the first target</li><li>Trading the second break</li></ul></div>
+      </div>
+      <h3>Tuesday</h3>
+      <ul class="tll" aria-label="Timed list">
+        <li><time>09:30</time><span>Range set, 6,604.00 to 6,612.25.</span></li>
+        <li><time>09:41</time><span>Long 2 on the break, stops at 6,606.25 and 6,603.50.</span></li>
+        <li><time>09:52</time><span>Out at 6,618.75, both contracts.</span></li>
+      </ul>
+      <div class="blk hov v-noslash"><span class="bh"><button aria-label="Add a block below"><i data-i="Plus"></i></button><button aria-label="Drag to move this block"><i data-i="DotsSixVertical"></i></button></span>
+        <p>Fills are in <a class="tlink" href="#"><i data-i="ListBullets"></i>ES Dec 26 <em>1229</em> <span class="gain">+$676.82</span></a>, with the plan on the trade.</p></div>
+      <div class="blk v-slash"><span class="anchor" style="display:block"><p>Fills are in <a class="tlink" href="#"><i data-i="ListBullets"></i>ES Dec 26 <em>1229</em> <span class="gain">+$676.82</span></a>, with the plan on the trade.</p>
+        <p>/<span class="caretl"></span></p>
+        <div class="pop slash" role="listbox" aria-label="Insert a block">
+          <ul>
+            <li><b>Normal text</b><span>Plain paragraph text</span></li>
+            <li><b>Heading 1</b><span>A large section title</span></li>
+            <li><b>Heading 2</b><span>A medium section title</span></li>
+            <li><b>Heading 3</b><span>A small prompt or label</span></li>
+            <li><b>Bulleted list</b><span>Points in no set order</span></li>
+            <li><b>Numbered list</b><span>Steps in order</span></li>
+            <li><b>Checklist</b><span>Things to tick off</span></li>
+            <li class="on" aria-selected="true"><b>Timed list</b><span>Each line starts with the time</span></li>
+            <li><b>Quote</b><span>Set a line apart</span></li>
+            <li><b>Code block</b><span>Text as typed, in a fixed width</span></li>
+            <li><b>Collapsible section</b><span>A titled block you can fold away</span></li>
+            <li><b>Toggle</b><span>Folds the blocks under it</span></li>
+            <li><b>Toggle heading 1</b><span>A large title that folds</span></li>
+            <li><b>Toggle heading 2</b><span>A medium title that folds</span></li>
+            <li><b>Toggle heading 3</b><span>A small title that folds</span></li>
+            <li><b>Table</b><span>Rows and columns, 3 by 3</span></li>
+            <li><b>Divider</b><span>A line between sections</span></li>
+            <li><b>Image</b><span>Upload or paste a picture</span></li>
+            <li><b>Trade</b><span>Link a trade, found by search</span></li>
+            <li><b>Day</b><span>Link a day, picked by date</span></li>
+            <li><b>Align left</b><span>Line up on the left</span></li>
+            <li><b>Align centre</b><span>Centre the block</span></li>
+            <li><b>Align right</b><span>Line up on the right</span></li>
+            <li><b>Align justify</b><span>Even edges on both sides</span></li>
+            <li><b>YouTube video</b><span>Plays while the note is open and online</span></li>
+            <li><b>Post from X</b><span>Shows while the note is open and online</span></li>
+          </ul>
+          <p class="more">Keep typing to filter. Type : for emoji.</p>
+        </div></span></div>
+    </div>
+  </article>
+</div>
+</main>
+<div class="phveil v-insert"></div>
+<div class="menu sheet only-phone v-insert" role="menu" aria-label="Insert" style="display:block"><div class="sheet-hd"><b>Insert</b></div><button class="it" role="menuitem">Image</button><button class="it" role="menuitem">Inline image</button><button class="it" role="menuitem">Table</button><div class="sep"></div><button class="it hl" role="menuitem">Two columns</button><button class="it" role="menuitem">Three columns</button><div class="sep"></div><button class="it" role="menuitem">Divider</button><button class="it" role="menuitem">Page break</button><button class="it" role="menuitem">Equation</button><button class="it" role="menuitem">Toggle</button></div>
+
+<!-- Version history: Current, versions by time, a before-restore version, a read-only preview, Restore. -->
+<div class="v-history">
+  <div class="veil"></div>
+  <section class="dlg lg" role="dialog" aria-modal="true" aria-labelledby="vh-t">
+    <div class="dlg-hd"><div><h2 id="vh-t">Version history</h2><p>ES opening range: what's working. Versions are kept for 30 days.</p></div><button class="xbtn" aria-label="Close"><i data-i="X"></i></button></div>
+    <div class="vh">
+      <nav class="vl" aria-label="Versions">
+        <button><span>Current</span><small>Now</small></button>
+        <p class="dl">Today</p>
+        <button>16:42</button>
+        <button><span>15:58</span><span class="chip">Before restore</span></button>
+        <button class="on" aria-current="true">14:20</button>
+        <p class="dl">Yesterday</p>
+        <button>21:05</button><button>17:31</button>
+        <p class="dl">Mon 23 Nov</p>
+        <button>18:12</button>
+      </nav>
+      <div class="vp">
+        <p class="ro"><b>Wed 25 Nov, 14:20</b><span>Read only</span></p>
+        <div class="eb">
+          <h2 style="font-size:26px;margin-top:0">ES opening range: what's working</h2>
+          <p>Five sessions of the opening range break on ES. Two rules held up.</p>
+          <figure class="img" style="width:70%"><svg viewBox="0 0 560 250"><use href="#shot-c"/></svg><figcaption>ES 5-minute, 24 Nov.</figcaption></figure>
+          <h3>Tuesday</h3>
+          <ul class="tll"><li><time>09:30</time><span>Range set, 6,604.00 to 6,612.25.</span></li><li><time>09:41</time><span>Long 2 on the break.</span></li></ul>
+        </div>
+      </div>
+    </div>
+    <div class="dlg-ft"><span class="cap">Restoring saves the current note as a version first.</span><div class="end"><button class="btn">Close</button><button class="btn pri"><i data-i="ClockCounterClockwise"></i>Restore this version</button></div></div>
+  </section>
+</div>
+</body>
+</html>

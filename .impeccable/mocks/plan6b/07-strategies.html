@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keel, strategies</title>
+<!-- Plan 6B comp 07 (spec 5.7). ?theme=dark for graphite. Variants: ?state=chooser, templates, strategy, missed-form, copy, form-photo -->
+<script src="shell.js"></script>
+<link rel="stylesheet" href="shell.css">
+<style>
+.srow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+.srow .end { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.srow .cap { font-size: 13px; color: var(--muted); }
+/* Strategy card (strategies-view.tsx), with an optional photo band on top. */
+.scard { display: grid; grid-template-columns: minmax(0, 286px) minmax(0, 1fr) 228px; gap: 20px 28px; align-items: center; padding: 18px 22px; }
+.cover { grid-column: 1 / -1; margin: -18px -22px 0; height: 96px; border-radius: 15px 15px 0 0; overflow: hidden; border-bottom: 1px solid var(--line); }
+.cover svg { display: block; width: 100%; height: 100%; }
+.sname { display: flex; align-items: center; gap: 8px; }
+.sname svg.i { color: var(--muted); }
+.sname h2 { font-size: 17px; font-weight: 600; letter-spacing: -.02em; line-height: 1.375; }
+.sdesc { margin-top: 8px; max-width: 40ch; font-size: 14px; line-height: 1.5; color: var(--muted); }
+.achips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.sstats { display: grid; grid-template-columns: .72fr .74fr 1.2fr 1.06fr 1fr; }
+.sstats > div { padding: 0 16px; min-width: 0; } .sstats > div:first-child { padding-left: 0; } .sstats > div + div { border-left: 1px solid var(--line); }
+.sstats .k { display: block; font-size: 12.5px; color: var(--faint); }
+.sstats b { display: block; font-size: 20px; font-weight: 600; letter-spacing: -.03em; line-height: 1.4; white-space: nowrap; }
+.sstats small { display: block; font-size: 12.5px; color: var(--faint); line-height: 1.4; }
+.sstats .trk { display: block; margin-top: 8px; max-width: 96px; background: var(--sunken); }
+.sstats .trk > i { background: var(--accent); }
+.spanel { border-left: 1px solid var(--line); padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.spanel .top2 { display: flex; align-items: center; justify-content: space-between; }
+.spanel svg.eq { width: 100%; height: 80px; display: block; }
+.spanel p { font-size: 12.5px; color: var(--faint); }
+.foot2 { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); padding: 0 4px; }
+.foot2 svg.i { width: 15px; height: 15px; }
+/* Template card: the same row anatomy, the drawn cover where a strategy's equity sits. */
+.tcard { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr) 236px; gap: 20px 28px; align-items: center; padding: 18px 22px; }
+.chip.sty { background: transparent; box-shadow: inset 0 0 0 1px var(--line-2); }
+.tcard .by { font-size: 12.5px; color: var(--faint); font-weight: 500; margin-left: 2px; }
+.ex3 .k0 { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+.ex3 .k0 b { font-weight: 600; color: var(--text); }
+.ex3 .sstats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.tcov { position: relative; }
+.tcov svg { display: block; width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); }
+.tcov .addc { position: absolute; top: 8px; right: 8px; }
+.addc { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 9px; background: var(--surface-1); border: 1px solid var(--line-2); color: var(--text); box-shadow: var(--shadow-chip); }
+.addc svg.i { width: 15px; height: 15px; }
+.tfil { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.tfil .inp.sm { width: 260px; height: 32px; }
+.tfil .ck { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+/* The chooser: filter and search on one row, a single list that starts with Start blank. */
+.chr { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.chr .inp.sm { flex: 1; min-width: 180px; height: 34px; }
+.clist { list-style: none; margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.clist li > a { display: grid; grid-template-columns: 128px minmax(0, 1fr) 20px; gap: 16px; align-items: center; padding: 10px; border-radius: 12px; border: 1px solid var(--line); }
+.clist li > a:hover { border-color: color-mix(in srgb, var(--accent) 35%, transparent); background: color-mix(in srgb, var(--accent-soft) 40%, transparent); }
+.clist svg.cv { width: 128px; height: 72px; display: block; border-radius: 8px; border: 1px solid var(--line); }
+.clist b { font-size: 14.5px; font-weight: 600; letter-spacing: -.01em; }
+.clist .by { font-size: 12.5px; color: var(--faint); margin-left: 6px; }
+.clist p { font-size: 13px; color: var(--muted); line-height: 1.45; margin-top: 3px; }
+.clist .achips { margin-top: 6px; }
+.clist svg.go { width: 16px; height: 16px; color: var(--faint); }
+.clist .blank > a { border-style: dashed; border-color: var(--line-2); }
+.clist .blank .bk { width: 128px; height: 72px; border-radius: 8px; display: grid; place-items: center; color: var(--muted); border: 1px dashed var(--line-2); }
+.clist .blank .bk svg.i { width: 22px; height: 22px; }
+/* A strategy's page: the photo band in its header, the missed trades card. */
+.shead { padding: 16px 22px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+.shead .cover { flex: 0 0 calc(100% + 44px); margin: -16px -22px 2px; height: 140px; }
+.shead .who { flex: 1 1 260px; min-width: 0; }
+.shead h2 { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 600; letter-spacing: -.03em; }
+.shead h2 svg.i { width: 20px; height: 20px; color: var(--muted); }
+.shead p { margin-top: 2px; font-size: 14px; color: var(--muted); line-height: 1.5; }
+.shead .acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.shead .acts .missed { font-size: 13px; color: var(--muted); }
+.sgrid2 { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 16px; align-items: start; }
+.sgrid2 > div { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.mt td, .mt th { height: 44px; }
+.mt .rb { display: inline-flex; gap: 2px; }
+.mt .rb button { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: var(--muted); }
+.mt .rb button:hover { background: var(--sunken); color: var(--text); }
+.mt .rb svg.i { width: 16px; height: 16px; }
+.rlist .rrow { min-height: 44px; }
+.st2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; margin-top: 12px; }
+.st2 b { display: block; font-size: 18px; font-weight: 600; letter-spacing: -.02em; }
+.shead .from { font-size: 12.5px; color: var(--faint); margin-top: 4px; }
+.empty1 { margin-top: 10px; font-size: 13.5px; color: var(--muted); }
+.sform { max-width: 860px; width: 100%; margin: 0 auto; }
+.fh1 { margin-top: 4px; font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -.01em; }
+.fcol { display: grid; gap: 16px; margin-top: 16px; }
+.phf { display: flex; align-items: center; gap: 14px; }
+.pthumb { width: 168px; flex: none; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+.pthumb svg { display: block; width: 100%; height: auto; }
+.phf b { display: block; font-size: 13.5px; font-weight: 600; } .phf span { display: block; font-size: 12.5px; color: var(--faint); }
+.pbtns { display: flex; gap: 6px; margin-top: 8px; }
+.icrow { display: flex; flex-wrap: wrap; gap: 8px; }
+.icb { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-1); color: var(--muted); }
+.icb.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
+.tpills2 { display: flex; flex-wrap: wrap; gap: 8px; }
+.tp2 { display: inline-flex; align-items: center; height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-1); font-size: 13.5px; font-weight: 500; color: var(--muted); }
+.tp2.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
+.th2 { margin-top: 8px; font-size: 13px; color: var(--muted); }
+.rgf { margin-top: 14px; display: grid; gap: 8px; } .rgn { font-size: 13.5px; font-weight: 600; }
+.fbtns { display: flex; gap: 12px; margin-top: 16px; }
+@media (max-width: 639.98px) { .phf { align-items: flex-start; } .pthumb { width: 120px; } }
+html:not([data-state='chooser']) .v-chooser, html:not([data-state='missed-form']) .v-missed { display: none !important; }
+[data-state='strategy'] .v-list, [data-state='missed-form'] .v-list, [data-state='copy'] .v-list, [data-state='form-photo'] .v-list, [data-state='templates'] .v-mine, html:not([data-state='templates']) .v-tpl { display: none !important; }
+@media (max-width: 1279.98px) { .sgrid2 { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 1023.98px) { .scard, .tcard { grid-template-columns: minmax(0, 1fr); } .spanel { border: 0; padding: 0; } .sstats { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 14px; } .sstats > div:nth-child(4) { padding-left: 0; border: 0; } }
+@media (max-width: 639.98px) {
+  .scard, .tcard { padding: 16px; } .cover { margin: -16px -16px 0; }
+  .sstats { grid-template-columns: 1fr 1fr; } .sstats > div { padding: 0 !important; border: 0 !important; }
+  .ex3 .sstats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tcard .tcov { order: -1; }
+  .srow .cap { display: none; }
+  .tfil .inp.sm { width: 100%; order: 3; }
+  .tfil .ck { margin-left: 0; order: 4; }
+  .chr .seg { width: 100%; overflow-x: auto; scrollbar-width: none; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+  .clist li > a { grid-template-columns: 88px minmax(0, 1fr); }
+  .clist svg.cv, .clist .blank .bk { width: 88px; height: 56px; }
+  .clist svg.go { display: none; }
+  .shead { padding: 14px 16px; } .shead .cover { flex-basis: calc(100% + 32px); margin: -14px -16px 2px; height: 110px; }
+  .mt { display: none; }
+}
+@media (min-width: 640px) { .mt-ph { display: none; } }
+</style>
+</head>
+<body data-nav="strategies" data-title="Strategies" data-filters>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <!-- Template covers, drawn in Keel's own ink: a sunken field, muted lines, one accent mark. No photos. -->
+  <symbol id="cv-gap" viewBox="0 0 240 132"><rect width="240" height="132" fill="var(--sunken)"/><g stroke="var(--muted)" stroke-width="2"><path d="M30 104v-16M44 100v-14M58 102v-16M72 98v-14"/><path d="M120 54v-18M134 50v-16M148 46v-16M162 44v-14M176 40v-16M190 36v-14M204 34v-14"/></g><rect x="116" y="40" width="40" height="22" rx="2" fill="var(--accent)" opacity=".14" stroke="var(--accent)"/><path d="M84 92 L110 56" stroke="var(--faint)" stroke-dasharray="3 4"/></symbol>
+  <symbol id="cv-va" viewBox="0 0 240 132"><rect width="240" height="132" fill="var(--sunken)"/><rect x="0" y="52" width="240" height="34" fill="var(--accent)" opacity=".12"/><line x1="0" x2="240" y1="52" y2="52" stroke="var(--accent)" stroke-dasharray="4 4"/><line x1="0" x2="240" y1="86" y2="86" stroke="var(--accent)" stroke-dasharray="4 4"/><path d="M14 30 C40 26 56 34 74 28 S104 40 120 52 150 74 170 70 204 66 226 72" fill="none" stroke="var(--muted)" stroke-width="2"/></symbol>
+  <symbol id="cv-lrb" viewBox="0 0 240 132"><rect width="240" height="132" fill="var(--sunken)"/><rect x="20" y="62" width="110" height="30" rx="2" fill="none" stroke="var(--accent)"/><path d="M20 80 L36 72 L50 86 L66 70 L82 84 L98 68 L114 82 L130 74 L150 50 L170 56 L190 36 L216 28" fill="none" stroke="var(--muted)" stroke-width="2"/><line x1="130" x2="130" y1="20" y2="112" stroke="var(--faint)" stroke-dasharray="3 4"/></symbol>
+  <symbol id="cv-spr" viewBox="0 0 240 132"><rect width="240" height="132" fill="var(--sunken)"/><line x1="16" x2="224" y1="80" y2="80" stroke="var(--line-2)"/><path d="M16 98 H96 L148 44 H224" fill="none" stroke="var(--accent)" stroke-width="2.5"/><line x1="122" x2="122" y1="24" y2="112" stroke="var(--faint)" stroke-dasharray="3 4"/></symbol>
+  <symbol id="cv-tp" viewBox="0 0 240 132"><rect width="240" height="132" fill="var(--sunken)"/><path d="M14 112 C60 92 120 66 226 24" fill="none" stroke="var(--accent)" stroke-dasharray="5 4" stroke-width="1.5"/><path d="M14 104 L40 86 L52 98 L80 72 L94 84 L124 56 L138 68 L170 40 L184 50 L222 20" fill="none" stroke="var(--muted)" stroke-width="2"/><g fill="var(--accent)"><circle cx="52" cy="98" r="3.5"/><circle cx="94" cy="84" r="3.5"/><circle cx="138" cy="68" r="3.5"/><circle cx="184" cy="50" r="3.5"/></g></symbol>
+  <symbol id="cv-fh" viewBox="0 0 240 132"><rect width="240" height="132" fill="var(--sunken)"/><g stroke-linecap="round"><g stroke="var(--accent)" stroke-width="2.5" fill="none"><path d="M30 36 l6 6 l10 -12"/><path d="M30 64 l6 6 l10 -12"/></g><rect x="30" y="86" width="16" height="16" rx="4" fill="none" stroke="var(--faint)" stroke-width="2"/><g stroke="var(--muted)" stroke-width="5"><line x1="62" x2="170" y1="36" y2="36"/><line x1="62" x2="150" y1="64" y2="64"/></g><line x1="62" x2="190" y1="94" y2="94" stroke="var(--line-2)" stroke-width="5"/></g></symbol>
+  <!-- The trader's photo for Level reversal: a chart screenshot they uploaded. -->
+  <symbol id="ph-lr" viewBox="0 0 1200 140" preserveAspectRatio="xMidYMid slice"><rect width="1200" height="140" fill="#131722"/><g stroke="#2a2e39"><line x1="0" x2="1200" y1="35" y2="35"/><line x1="0" x2="1200" y1="70" y2="70"/><line x1="0" x2="1200" y1="105" y2="105"/></g><line x1="0" x2="1200" y1="30" y2="30" stroke="#c56a6a" stroke-dasharray="6 5"/><g fill="#5b9c8c" stroke="#5b9c8c"><line x1="20" x2="20" y1="104" y2="115" stroke-width="1"/><rect x="16" y="107" width="8" height="3"/><line x1="44" x2="44" y1="100" y2="110" stroke-width="1"/><rect x="40" y="104" width="8" height="2"/><line x1="68" x2="68" y1="98" y2="107" stroke-width="1"/><rect x="64" y="102" width="8" height="2"/><line x1="92" x2="92" y1="96" y2="105" stroke-width="1"/><rect x="88" y="98" width="8" height="4"/><line x1="116" x2="116" y1="89" y2="101" stroke-width="1"/><rect x="112" y="95" width="8" height="4"/><line x1="140" x2="140" y1="87" y2="101" stroke-width="1"/><rect x="136" y="92" width="8" height="3"/><line x1="164" x2="164" y1="84" y2="98" stroke-width="1"/><rect x="160" y="88" width="8" height="4"/><line x1="188" x2="188" y1="80" y2="91" stroke-width="1"/><rect x="184" y="85" width="8" height="2"/><line x1="212" x2="212" y1="80" y2="89" stroke-width="1"/><rect x="208" y="83" width="8" height="3"/><line x1="236" x2="236" y1="75" y2="87" stroke-width="1"/><rect x="232" y="78" width="8" height="5"/><line x1="260" x2="260" y1="69" y2="82" stroke-width="1"/><rect x="256" y="73" width="8" height="5"/><line x1="284" x2="284" y1="68" y2="76" stroke-width="1"/><rect x="280" y="71" width="8" height="2"/><line x1="308" x2="308" y1="62" y2="74" stroke-width="1"/><rect x="304" y="66" width="8" height="5"/><line x1="332" x2="332" y1="58" y2="69" stroke-width="1"/><rect x="328" y="62" width="8" height="4"/><line x1="356" x2="356" y1="52" y2="65" stroke-width="1"/><rect x="352" y="56" width="8" height="5"/><line x1="380" x2="380" y1="48" y2="62" stroke-width="1"/><rect x="376" y="52" width="8" height="4"/><line x1="404" x2="404" y1="44" y2="58" stroke-width="1"/><rect x="400" y="47" width="8" height="5"/><line x1="428" x2="428" y1="41" y2="52" stroke-width="1"/><rect x="424" y="45" width="8" height="2"/><line x1="452" x2="452" y1="38" y2="47" stroke-width="1"/><rect x="448" y="42" width="8" height="3"/><line x1="476" x2="476" y1="32" y2="46" stroke-width="1"/><rect x="472" y="38" width="8" height="5"/><line x1="620" x2="620" y1="38" y2="47" stroke-width="1"/><rect x="616" y="41" width="8" height="2"/></g><g fill="#c56a6a" stroke="#c56a6a"><line x1="500" x2="500" y1="34" y2="44" stroke-width="1"/><rect x="496" y="38" width="8" height="2"/><line x1="524" x2="524" y1="35" y2="43" stroke-width="1"/><rect x="520" y="39" width="8" height="2"/><line x1="548" x2="548" y1="34" y2="45" stroke-width="1"/><rect x="544" y="39" width="8" height="2"/><line x1="572" x2="572" y1="39" y2="46" stroke-width="1"/><rect x="568" y="41" width="8" height="2"/><line x1="596" x2="596" y1="35" y2="47" stroke-width="1"/><rect x="592" y="41" width="8" height="2"/><line x1="644" x2="644" y1="37" y2="45" stroke-width="1"/><rect x="640" y="41" width="8" height="2"/><line x1="668" x2="668" y1="40" y2="49" stroke-width="1"/><rect x="664" y="42" width="8" height="2"/><line x1="692" x2="692" y1="41" y2="49" stroke-width="1"/><rect x="688" y="44" width="8" height="2"/><line x1="716" x2="716" y1="43" y2="53" stroke-width="1"/><rect x="712" y="45" width="8" height="4"/><line x1="740" x2="740" y1="44" y2="58" stroke-width="1"/><rect x="736" y="50" width="8" height="3"/><line x1="764" x2="764" y1="50" y2="61" stroke-width="1"/><rect x="760" y="53" width="8" height="4"/><line x1="788" x2="788" y1="52" y2="66" stroke-width="1"/><rect x="784" y="57" width="8" height="2"/><line x1="812" x2="812" y1="57" y2="64" stroke-width="1"/><rect x="808" y="60" width="8" height="2"/><line x1="836" x2="836" y1="57" y2="68" stroke-width="1"/><rect x="832" y="61" width="8" height="2"/><line x1="860" x2="860" y1="61" y2="69" stroke-width="1"/><rect x="856" y="63" width="8" height="2"/><line x1="884" x2="884" y1="61" y2="74" stroke-width="1"/><rect x="880" y="65" width="8" height="2"/><line x1="908" x2="908" y1="64" y2="76" stroke-width="1"/><rect x="904" y="68" width="8" height="4"/><line x1="932" x2="932" y1="69" y2="81" stroke-width="1"/><rect x="928" y="72" width="8" height="4"/><line x1="956" x2="956" y1="70" y2="85" stroke-width="1"/><rect x="952" y="75" width="8" height="4"/><line x1="980" x2="980" y1="76" y2="84" stroke-width="1"/><rect x="976" y="79" width="8" height="3"/><line x1="1004" x2="1004" y1="80" y2="88" stroke-width="1"/><rect x="1000" y="82" width="8" height="4"/><line x1="1028" x2="1028" y1="83" y2="91" stroke-width="1"/><rect x="1024" y="86" width="8" height="2"/><line x1="1052" x2="1052" y1="85" y2="91" stroke-width="1"/><rect x="1048" y="87" width="8" height="2"/><line x1="1076" x2="1076" y1="85" y2="92" stroke-width="1"/><rect x="1072" y="89" width="8" height="2"/><line x1="1100" x2="1100" y1="86" y2="97" stroke-width="1"/><rect x="1096" y="90" width="8" height="4"/><line x1="1124" x2="1124" y1="91" y2="100" stroke-width="1"/><rect x="1120" y="94" width="8" height="2"/><line x1="1148" x2="1148" y1="91" y2="104" stroke-width="1"/><rect x="1144" y="96" width="8" height="2"/></g></symbol>
+</defs></svg>
+
+<main id="content" class="page">
+<!-- The list page: My strategies and Templates. -->
+<div class="srow v-list"><nav class="seg tabs" role="tablist" aria-label="Strategies"><a role="tab" href="#" class="v-mine-on on" aria-selected="true">My strategies</a><a role="tab" href="#" class="v-tpl-on">Templates</a></nav>
+  <div class="end"><button class="btn pri"><i data-i="Plus:bold"></i>New strategy</button></div></div>
+
+<div class="v-list v-mine stack">
+  <div class="srow"><div class="seg"><a class="on" href="#">Active</a><a href="#">Archived</a></div><span class="cap">Figures follow the date range and accounts, on net P&amp;L.</span></div>
+  <section class="card scard" aria-labelledby="s1">
+    <div class="cover" role="img" aria-label="Level reversal's photo"><svg><use href="#ph-lr"/></svg></div>
+    <div><div class="sname"><i data-i="Crosshair"></i><h2 id="s1">Level reversal</h2></div><p class="sdesc">Fade an extended move into a marked daily level once momentum stalls.</p><div class="achips"><span class="chip">Futures</span><span class="chip">Stocks</span><span class="chip">Forex</span><span class="chip">Crypto</span></div></div>
+    <div class="sstats"><div><span class="k">Rules</span><b>7</b><small>in 4 groups</small></div><div><span class="k">Trades</span><b>413</b><small>2 open, 3 missed</small></div><div><span class="k lbl">Net P&amp;L</span><b class="gain">+$10,204.85</b><small>PF 1.31</small></div><div><span class="k lbl">Win rate</span><b>51.1%</b><small>211 won, 202 lost</small></div><div><span class="k lbl">Adherence</span><b>87%</b><span class="trk"><i style="width:87%"></i></span></div></div>
+    <div class="spanel"><div class="top2"><span class="chip">Active</span><button class="rmenu" aria-label="Actions for Level reversal"><i data-i="DotsThree:bold"></i></button></div>
+      <svg class="eq" viewBox="0 0 200 80" preserveAspectRatio="none" aria-hidden="true"><path d="M0 70 L20 66 L36 68 L52 58 L70 52 L86 54 L104 40 L120 30 L132 18 L150 24 L168 20 L184 26 L200 22 V80 H0Z" fill="var(--accent)" opacity=".1"/><path d="M0 70 L20 66 L36 68 L52 58 L70 52 L86 54 L104 40 L120 30 L132 18 L150 24 L168 20 L184 26 L200 22" fill="none" stroke="var(--accent)" stroke-width="1.75" vector-effect="non-scaling-stroke"/></svg><p>Cumulative net P&amp;L by close</p></div>
+  </section>
+  <section class="card scard" aria-labelledby="s2">
+    <div><div class="sname"><i data-i="Target"></i><h2 id="s2">Opening range breakout</h2></div><p class="sdesc">Trade the first break of the 15-minute opening range when volume confirms it.</p><div class="achips"><span class="chip">Futures</span><span class="chip">Stocks</span><span class="chip">Options</span></div></div>
+    <div class="sstats"><div><span class="k">Rules</span><b>7</b><small>in 4 groups</small></div><div><span class="k">Trades</span><b>402</b><small>1 open, 2 missed</small></div><div><span class="k lbl">Net P&amp;L</span><b class="gain">+$5,531.42</b><small>PF 1.16</small></div><div><span class="k lbl">Win rate</span><b>50.0%</b><small>201 won, 201 lost</small></div><div><span class="k lbl">Adherence</span><b>87%</b><span class="trk"><i style="width:87%"></i></span></div></div>
+    <div class="spanel"><div class="top2"><span class="chip">Active</span><button class="rmenu" aria-label="Actions for Opening range breakout"><i data-i="DotsThree:bold"></i></button></div>
+      <svg class="eq" viewBox="0 0 200 80" preserveAspectRatio="none" aria-hidden="true"><path d="M0 52 L24 56 L40 50 L60 54 L80 44 L100 40 L120 42 L140 34 L156 46 L172 36 L200 32 V80 H0Z" fill="var(--accent)" opacity=".1"/><path d="M0 52 L24 56 L40 50 L60 54 L80 44 L100 40 L120 42 L140 34 L156 46 L172 36 L200 32" fill="none" stroke="var(--accent)" stroke-width="1.75" vector-effect="non-scaling-stroke"/></svg><p>Cumulative net P&amp;L by close</p></div>
+  </section>
+  <section class="card scard" aria-labelledby="s3">
+    <div><div class="sname"><i data-i="Lightning"></i><h2 id="s3">Session momentum</h2></div><p class="sdesc">Join the direction the London or New York session picks after the first hour.</p><div class="achips"><span class="chip">Forex</span><span class="chip">Crypto</span></div></div>
+    <div class="sstats"><div><span class="k">Rules</span><b>6</b><small>in 4 groups</small></div><div><span class="k">Trades</span><b>79</b><small>none open, 1 missed</small></div><div><span class="k lbl">Net P&amp;L</span><b class="loss">−$3,904.48</b><small>PF 0.51</small></div><div><span class="k lbl">Win rate</span><b>38.0%</b><small>30 won, 49 lost</small></div><div><span class="k lbl">Adherence</span><b>88%</b><span class="trk"><i style="width:88%"></i></span></div></div>
+    <div class="spanel"><div class="top2"><span class="chip">Active</span><button class="rmenu" aria-label="Actions for Session momentum"><i data-i="DotsThree:bold"></i></button></div>
+      <svg class="eq" viewBox="0 0 200 80" preserveAspectRatio="none" aria-hidden="true"><path d="M0 40 L30 39 L60 38 L90 44 L120 48 L150 54 L176 58 L200 60 V80 H0Z" fill="var(--accent)" opacity=".1"/><path d="M0 40 L30 39 L60 38 L90 44 L120 48 L150 54 L176 58 L200 60" fill="none" stroke="var(--accent)" stroke-width="1.75" vector-effect="non-scaling-stroke"/></svg><p>Cumulative net P&amp;L by close</p></div>
+  </section>
+  <p class="foot2"><i data-i="Info"></i>242 closed trades have no strategy, +$768.64 net. <a class="lnk" href="#">Assign them in Trades</a></p>
+</div>
+
+<!-- Templates tab. -->
+<div class="v-list v-tpl stack">
+  <div class="tfil"><button class="fchip">Asset<i data-i="CaretDown:bold"></i></button><button class="fchip">Style<i data-i="CaretDown:bold"></i></button><div class="inp sm"><i data-i="MagnifyingGlass" class="faint"></i><span class="faint">Search templates</span></div>
+    <label class="ck"><span class="cbx on"><i data-i="Check:bold"></i></span>Show templates when I make a strategy</label></div>
+</div>
+</main>
+
+<!-- The chooser on New strategy: an asset filter and search on one row, one list that starts with Start blank. -->
+<div class="v-chooser">
+  <div class="veil"></div>
+  <section class="dlg md" role="dialog" aria-modal="true" aria-labelledby="cz-t" style="width:min(680px, calc(100vw - 48px))">
+    <div class="dlg-hd"><div><h2 id="cz-t">New strategy</h2><p>Start from a template written by Keel, or from blank. A template becomes your own copy to edit.</p></div><button class="xbtn" aria-label="Close"><i data-i="X"></i></button></div>
+    <div class="dlg-bd">
+      <div class="chr"><div class="seg" role="radiogroup" aria-label="Asset class"><a class="on" href="#">All</a><a href="#">Stocks</a><a href="#">Futures</a><a href="#">Forex</a><a href="#">Options</a><a href="#">Crypto</a></div><div class="inp sm"><i data-i="MagnifyingGlass" class="faint"></i><span class="faint">Search templates</span></div></div>
+      <ul class="clist" id="clist"></ul>
+    </div>
+    <div class="dlg-ft"><label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)"><span class="cbx on"><i data-i="Check:bold"></i></span>Show templates when I make a strategy</label><div class="end"><button class="btn">Cancel</button></div></div>
+  </section>
+</div>
+
+<!-- A strategy's page: its photo as the header's band, and its missed trades. -->
+<div id="spage" hidden></div>
+<template id="tpl-strategy">
+<a class="back only-desk" href="#" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--accent-ink)"><i data-i="CaretLeft:bold"></i>Back to strategies</a>
+<section class="card shead" aria-labelledby="sh-h">
+  <div class="cover" role="img" aria-label="Level reversal's photo"><svg><use href="#ph-lr"/></svg></div>
+  <div class="who"><h2 id="sh-h"><i data-i="Crosshair"></i>Level reversal <span class="chip">Active</span></h2><p>Fade an extended move into a marked daily level once momentum stalls.</p></div>
+  <div class="achips" style="margin:0"><span class="chip">Futures</span><span class="chip">Stocks</span><span class="chip">Forex</span><span class="chip">Crypto</span></div>
+  <div class="acts"><button class="btn"><i data-i="PencilSimple"></i>Edit strategy</button><button class="btn"><i data-i="Archive"></i>Archive</button><a class="btn pri" href="#"><i data-i="ListBullets"></i>View 413 trades</a><span class="missed">3 missed</span></div>
+</section>
+<div class="sgrid2">
+  <div>
+    <section class="card" aria-labelledby="mt-h">
+      <div class="hd"><h2 id="mt-h">Missed trades</h2><span class="cap">Kept apart: no figure, filter or report counts them</span><div class="end"><button class="btn sm"><i data-i="Plus:bold"></i>Add</button></div></div>
+      <table class="mt" style="margin-top:8px">
+        <colgroup><col><col style="width:22%"><col style="width:16%"><col style="width:14%"><col style="width:12%"><col style="width:72px"></colgroup>
+        <thead><tr><th>Date and time</th><th>Symbol</th><th class="n">Price</th><th class="n">Commission</th><th class="n">Fees</th><th><span class="sr">Actions</span></th></tr></thead>
+        <tbody>
+          <tr><td class="tm">Tue 24 Nov <b>10:42</b></td><td><span class="sym"><b>ES</b> <span>Dec 26</span></span></td><td class="n f">6,618.50</td><td class="n muted">$2.58</td><td class="n muted">$2.76</td><td class="n"><span class="rb"><button aria-label="Edit"><i data-i="PencilSimple"></i></button><button aria-label="Delete"><i data-i="Trash"></i></button></span></td></tr>
+          <tr><td class="tm">Fri 20 Nov <b>09:58</b></td><td><span class="sym"><b>NQ</b> <span>Dec 26</span></span></td><td class="n f">22,512.25</td><td class="n muted">$2.58</td><td class="n muted">$2.76</td><td class="n"><span class="rb"><button aria-label="Edit"><i data-i="PencilSimple"></i></button><button aria-label="Delete"><i data-i="Trash"></i></button></span></td></tr>
+          <tr><td class="tm">Wed 18 Nov <b>14:20</b></td><td><span class="sym"><b>EURUSD</b></span></td><td class="n f">1.15840</td><td class="n muted">$7.00</td><td class="n muted">$0.00</td><td class="n"><span class="rb"><button aria-label="Edit"><i data-i="PencilSimple"></i></button><button aria-label="Delete"><i data-i="Trash"></i></button></span></td></tr>
+        </tbody>
+      </table>
+      <ul class="prows pick mt-ph" style="margin-top:6px"><li><a href="#"><span class="l1"><span class="sym"><b>ES</b> <span>Dec 26</span></span><b>6,618.50</b></span><span class="l2"><span>Tue 24 Nov 10:42</span><span>$2.58 commission</span><span>$2.76 fees</span></span></a><span class="rb" style="display:inline-flex"><button class="pbtn" style="display:grid" aria-label="Edit"><i data-i="PencilSimple"></i></button><button class="pbtn" style="display:grid" aria-label="Delete"><i data-i="Trash"></i></button></span></li><li><a href="#"><span class="l1"><span class="sym"><b>NQ</b> <span>Dec 26</span></span><b>22,512.25</b></span><span class="l2"><span>Fri 20 Nov 09:58</span><span>$2.58 commission</span><span>$2.76 fees</span></span></a><span class="rb" style="display:inline-flex"><button class="pbtn" style="display:grid" aria-label="Edit"><i data-i="PencilSimple"></i></button><button class="pbtn" style="display:grid" aria-label="Delete"><i data-i="Trash"></i></button></span></li><li><a href="#"><span class="l1"><span class="sym"><b>EURUSD</b> <span></span></span><b>1.15840</b></span><span class="l2"><span>Wed 18 Nov 14:20</span><span>$7.00 commission</span><span>$0.00 fees</span></span></a><span class="rb" style="display:inline-flex"><button class="pbtn" style="display:grid" aria-label="Edit"><i data-i="PencilSimple"></i></button><button class="pbtn" style="display:grid" aria-label="Delete"><i data-i="Trash"></i></button></span></li></ul>
+    </section>
+  </div>
+  <div>
+    <section class="card" aria-labelledby="st-h">
+      <div class="hd"><h2 id="st-h">Stats</h2></div>
+      <div class="st2"><div><span class="lbl">Net P&amp;L</span><b class="gain">+$10,204.85</b></div><div><span class="lbl">Win rate</span><b>51.1%</b></div><div><span class="lbl">Profit factor</span><b>1.31</b></div><div><span class="lbl">Expectancy</span><b class="gain">+$24.83</b></div><div><span class="lbl">Rule adherence</span><b>87%</b></div><div><span class="lbl">Broken rules cost</span><b class="loss">−$2,180.40</b></div></div>
+    </section>
+  </div>
+</div>
+</template>
+
+<!-- Add a missed trade: symbol, date and time, price, commission and fees, nothing else. -->
+<div class="v-missed">
+  <div class="veil"></div>
+  <section class="dlg sm fit" role="dialog" aria-modal="true" aria-labelledby="mf-t">
+    <div class="dlg-hd"><div><h2 id="mf-t">Add a missed trade</h2><p>Level reversal. A trade you saw and skipped; it counts in no figure, filter or report.</p></div><button class="xbtn" aria-label="Close"><i data-i="X"></i></button></div>
+    <div class="dlg-bd">
+      <div class="fgrid">
+        <div class="fld"><label>Symbol</label><div class="inp">ES</div></div>
+        <div class="fld"><label>Date and time</label><div class="inp">24 Nov 2026, 10:42<i data-i="CalendarBlank" class="sel" style="width:15px;height:15px"></i></div></div>
+        <div class="fld full"><label>Price</label><div class="inp">6,618.50</div></div>
+        <div class="fld"><label>Commission</label><div class="inp"><span class="pre">$</span>2.58</div></div>
+        <div class="fld"><label>Fees</label><div class="inp"><span class="pre">$</span>2.76</div></div>
+      </div>
+    </div>
+    <div class="dlg-ft"><div class="end"><button class="btn">Cancel</button><button class="btn pri">Add</button></div></div>
+  </section>
+</div>
+<template id="tpl-copy">
+<a class="back only-desk" href="#" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--accent-ink)"><i data-i="CaretLeft:bold"></i>Back to strategies</a>
+<section class="card shead" aria-labelledby="cp-h">
+  <div class="cover" role="img" aria-label="London range break's photo" style="background:var(--sunken)"><svg viewBox="0 0 240 132" preserveAspectRatio="xMidYMid meet"><use href="#cv-lrb"/></svg></div>
+  <div class="who"><h2 id="cp-h"><i data-i="Clock"></i>London range break <span class="chip">Active</span></h2><p>Trade the break of the Asian session range after the London open, stop inside the range.</p><p class="from">A copy of the London range break template by Keel. Yours to edit.</p></div>
+  <div class="achips" style="margin:0"><span class="chip">Forex</span></div>
+  <div class="acts"><button class="btn"><i data-i="PencilSimple"></i>Edit strategy</button><button class="btn"><i data-i="Archive"></i>Archive</button></div>
+</section>
+<div class="sgrid2">
+  <div>
+    <section class="card" aria-labelledby="ex-h2">
+      <div class="hd"><h2 id="ex-h2">Example trades</h2><span class="cap">From the template, to show the idea. Not your trades: no figure counts them.</span></div>
+      <table class="mt" style="margin-top:8px">
+        <colgroup><col><col style="width:18%"><col style="width:12%"><col style="width:16%"><col style="width:16%"><col style="width:12%"></colgroup>
+        <thead><tr><th>Date and time</th><th>Symbol</th><th>Side</th><th class="n">Entry</th><th class="n">Exit</th><th class="n">Result</th></tr></thead>
+        <tbody>
+          <tr><td class="tm">Example 1 <b>08:12</b></td><td><span class="sym"><b>GBPUSD</b></span></td><td><span class="sd">Long</span></td><td class="n">1.31120</td><td class="n">1.31450</td><td class="n gain">+2.2R</td></tr>
+          <tr><td class="tm">Example 2 <b>08:31</b></td><td><span class="sym"><b>EURUSD</b></span></td><td><span class="sd">Short</span></td><td class="n">1.15610</td><td class="n">1.15760</td><td class="n loss">−1.0R</td></tr>
+          <tr><td class="tm">Example 3 <b>08:05</b></td><td><span class="sym"><b>EURUSD</b></span></td><td><span class="sd">Long</span></td><td class="n">1.15240</td><td class="n">1.15540</td><td class="n gain">+2.0R</td></tr>
+          <tr><td class="tm">Example 4 <b>08:47</b></td><td><span class="sym"><b>GBPUSD</b></span></td><td><span class="sd">Short</span></td><td class="n">1.31880</td><td class="n">1.32030</td><td class="n loss">−1.0R</td></tr>
+        </tbody>
+      </table>
+      <ul class="prows pick mt-ph" style="margin-top:6px">
+        <li><a href="#"><span class="l1"><span class="sym"><b>GBPUSD</b></span><span class="tm">Example 1, 08:12</span><b class="gain">+2.2R</b></span><span class="l2"><span>Long</span><span>1.31120 to 1.31450</span></span></a></li>
+        <li><a href="#"><span class="l1"><span class="sym"><b>EURUSD</b></span><span class="tm">Example 2, 08:31</span><b class="loss">−1.0R</b></span><span class="l2"><span>Short</span><span>1.15610 to 1.15760</span></span></a></li>
+        <li><a href="#"><span class="l1"><span class="sym"><b>EURUSD</b></span><span class="tm">Example 3, 08:05</span><b class="gain">+2.0R</b></span><span class="l2"><span>Long</span><span>1.15240 to 1.15540</span></span></a></li>
+        <li><a href="#"><span class="l1"><span class="sym"><b>GBPUSD</b></span><span class="tm">Example 4, 08:47</span><b class="loss">−1.0R</b></span><span class="l2"><span>Short</span><span>1.31880 to 1.32030</span></span></a></li>
+      </ul>
+    </section>
+    <section class="card" aria-labelledby="mt2-h">
+      <div class="hd"><h2 id="mt2-h">Missed trades</h2><span class="cap">Kept apart: no figure, filter or report counts them</span><div class="end"><button class="btn sm"><i data-i="Plus:bold"></i>Add</button></div></div>
+      <p class="empty1">No missed trades yet.</p>
+    </section>
+  </div>
+  <div>
+    <section class="card" aria-labelledby="st2-h">
+      <div class="hd"><h2 id="st2-h">Stats</h2><span class="cap">From your own trades only</span></div>
+      <div class="st2"><div><span class="lbl">Net P&amp;L</span><b><span class="none">None</span></b></div><div><span class="lbl">Win rate</span><b><span class="none">None</span></b></div><div><span class="lbl">Profit factor</span><b><span class="none">None</span></b></div><div><span class="lbl">Expectancy</span><b><span class="none">None</span></b></div><div><span class="lbl">Rule adherence</span><b><span class="none">None</span></b></div><div><span class="lbl">Broken rules cost</span><b><span class="none">None</span></b></div></div>
+      <p class="empty1">No trades in this strategy yet.</p>
+    </section>
+  </div>
+</div>
+</template>
+<template id="tpl-form">
+<div class="sform">
+  <a href="#" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--accent-ink)"><i data-i="CaretLeft:bold"></i>Back to strategies</a>
+  <h1 class="fh1">New strategy</h1>
+  <p class="note" style="margin-top:10px"><i data-i="Info"></i><span>Filled from the London range break template. Nothing is saved until you create it.</span></p>
+  <section class="card" aria-labelledby="fb-h" style="margin-top:16px">
+    <div class="hd"><h2 id="fb-h">The strategy</h2></div>
+    <div class="fcol">
+      <div class="fld"><label>Name</label><div class="inp">London range break</div></div>
+      <div class="fld"><label>Description</label><div class="inp" style="height:auto;min-height:72px;align-items:flex-start;padding-top:9px;line-height:1.5">Trade the break of the Asian session range after the London open, stop inside the range.</div></div>
+      <div class="fld"><span class="flabel">Photo</span>
+        <div class="phf"><span class="pthumb"><svg viewBox="0 0 240 132" aria-label="Chosen photo"><use href="#cv-lrb"/></svg></span>
+          <div><b>london-range-break.png</b><span>1,240 KB</span><div class="pbtns"><button class="btn sm">Replace</button><button class="btn sm ghost">Remove</button></div></div></div>
+        <p class="hint">PNG, JPEG or WebP, up to 10 MB. It shows as a band on the strategy's card and page.</p></div>
+      <div class="fld"><span class="flabel">Icon</span><div class="icrow" role="radiogroup" aria-label="Icon"><span class="icb" role="radio" aria-checked="false" aria-label="Target"><i data-i="Target"></i></span><span class="icb" role="radio" aria-checked="false" aria-label="Lightning"><i data-i="Lightning"></i></span><span class="icb" role="radio" aria-checked="false" aria-label="TrendUp"><i data-i="TrendUp"></i></span><span class="icb" role="radio" aria-checked="false" aria-label="TrendDown"><i data-i="TrendDown"></i></span><span class="icb" role="radio" aria-checked="false" aria-label="Crosshair"><i data-i="Crosshair"></i></span><span class="icb" role="radio" aria-checked="false" aria-label="Waves"><i data-i="Waves"></i></span><span class="icb" role="radio" aria-checked="false" aria-label="Compass"><i data-i="Compass"></i></span><span class="icb" role="radio" aria-checked="false" aria-label="Flag"><i data-i="Flag"></i></span><span class="icb on" role="radio" aria-checked="true" aria-label="Clock"><i data-i="Clock"></i></span><span class="icb" role="radio" aria-checked="false" aria-label="Stack"><i data-i="Stack"></i></span><span class="icb" role="radio" aria-checked="false" aria-label="Shield"><i data-i="Shield"></i></span><span class="icb" role="radio" aria-checked="false" aria-label="Rocket"><i data-i="Rocket"></i></span></div></div>
+      <div class="fld"><span class="flabel">Asset classes</span><div class="tpills2"><span class="tp2">Futures</span><span class="tp2">Stocks</span><span class="tp2">Options</span><span class="tp2 on">Forex</span><span class="tp2">Crypto</span></div></div>
+    </div>
+  </section>
+  <section class="card" aria-labelledby="fr-h" style="margin-top:16px">
+    <div class="hd"><h2 id="fr-h">Rules</h2></div>
+    <p class="th2">Grouped as the template has them. Edit, add or remove before you create it.</p>
+    <div class="rgf"><p class="rgn">Setup</p><div class="inp sm">Mark the Asian session high and low before London opens</div></div>
+    <div class="rgf"><p class="rgn">Entry</p><div class="inp sm">Enter on a 15-minute close outside the range</div><div class="inp sm">No entry after 10:00 London time</div></div>
+    <div class="rgf"><p class="rgn">Risk</p><div class="inp sm">Stop inside the range, no more than 1R</div></div>
+  </section>
+  <div class="fbtns"><button class="btn pri lg">Create strategy</button><button class="btn lg">Cancel</button></div>
+</div>
+</template>
+
+<script>
+// Six Keel-written templates. Stats come from each template's example trades and say so.
+var T = [
+  ['cv-gap', 'Gap and hold', 'Buy a stock that gaps up on news and holds above its first 30-minute range.', ['Day trading'], ['Stocks'], 4, '75.0%', '1.62', 0],
+  ['cv-va', 'Value area return', 'Fade an open outside yesterday’s value area once the first hour fails to hold it.', ['Day trading'], ['Futures'], 5, '60.0%', '1.35', 0],
+  ['cv-lrb', 'London range break', 'Trade the break of the Asian session range after the London open, stop inside the range.', ['Day trading'], ['Forex'], 4, '50.0%', '2.10', 1],
+  ['cv-spr', 'Defined-risk earnings', 'Buy a debit spread before earnings, sized so the premium paid is the most you can lose.', ['Swing trading'], ['Options'], 3, '66.7%', '1.48', 0],
+  ['cv-tp', 'Weekly trend pullback', 'Buy pullbacks to the 20-day average while the weekly trend points up.', ['Swing trading'], ['Crypto'], 4, '75.0%', '1.90', 0],
+  ['cv-fh', 'First-hour playbook', 'A checklist for the first hour: levels marked, size set, two setups only, done by 10:30.', ['Day trading', 'Scalping'], ['Futures', 'Stocks'], 5, '60.0%', '1.55', 0],
+];
+var chips = function (t) { return t[3].concat(t[4]).map(function (c, i) { return '<span class="chip' + (i < t[3].length ? ' sty' : '') + '">' + c + '</span>'; }).join(''); };
+document.querySelector('.v-tpl').insertAdjacentHTML('beforeend', T.map(function (t, i) {
+  return '<section class="card tcard" aria-labelledby="t' + i + '"><div><div class="sname"><h2 id="t' + i + '">' + t[1] + '</h2><span class="by">by Keel</span>' + (t[8] ? '<span class="chip"><i data-i="Check:bold"></i>Added</span>' : '') + '</div>' +
+    '<p class="sdesc">' + t[2] + '</p><div class="achips">' + chips(t) + '</div></div>' +
+    '<div class="ex3"><span class="k0">From its <b>' + t[5] + ' example trades</b>, not your own</span><div class="sstats"><div><span class="k">Win rate</span><b>' + t[6] + '</b></div><div><span class="k">Example trades</span><b>' + t[5] + '</b></div><div><span class="k">Avg win/loss</span><b>' + t[7] + '</b></div></div></div>' +
+    '<div class="tcov"><svg viewBox="0 0 240 132" role="img" aria-label="' + t[1] + ' cover"><use href="#' + t[0] + '"/></svg><button class="addc" aria-label="Add a copy of ' + t[1] + ' to My strategies" title="Add a copy"><i data-i="Plus:bold"></i></button></div></section>';
+}).join(''));
+document.getElementById('clist').innerHTML = '<li class="blank"><a href="#"><span class="bk"><i data-i="Plus"></i></span><span><b>Start blank</b><p>An empty strategy: add your own rules, groups and assets.</p></span><i data-i="CaretRight:bold" class="go"></i></a></li>' +
+  T.map(function (t) { return '<li><a href="#"><svg class="cv" viewBox="0 0 240 132" aria-hidden="true"><use href="#' + t[0] + '"/></svg><span><b>' + t[1] + '</b><span class="by">Keel</span><p>' + t[2] + '</p><span class="achips">' + chips(t) + '</span></span><i data-i="CaretRight:bold" class="go"></i></a></li>'; }).join('');
+var st = document.documentElement.dataset.state;
+if (st === 'templates') { var tabs = document.querySelectorAll('.tabs a'); tabs[0].classList.remove('on'); tabs[0].removeAttribute('aria-selected'); tabs[1].classList.add('on'); tabs[1].setAttribute('aria-selected', 'true'); }
+var page = { strategy: ['tpl-strategy', 'Level reversal'], 'missed-form': ['tpl-strategy', 'Level reversal'], copy: ['tpl-copy', 'London range break'], 'form-photo': ['tpl-form', null] }[st];
+if (page) { var p = document.getElementById('spage'); p.hidden = false; p.className = 'stack'; p.appendChild(document.getElementById(page[0]).content.cloneNode(true)); document.querySelector('main').appendChild(p);
+  document.body.dataset.title = page[1] ? '<span class="crumb">Strategies</span><i data-i="CaretRight:bold" class="sep"></i><span class="nm">' + page[1] + '</span>' : 'Strategies';
+  if (!page[1]) delete document.body.dataset.filters; }
+</script>
+</body>
+</html>

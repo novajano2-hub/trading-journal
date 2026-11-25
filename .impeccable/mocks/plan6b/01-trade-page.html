@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keel, trade 1232</title>
+<!-- Plan 6B comp 01 (spec 5.2, 5.4, 5.5). ?theme=dark for graphite. Variants: ?state=chooser, patterns, over, fill-costs, stop-only, wrong-side -->
+<script src="shell.js"></script>
+<link rel="stylesheet" href="shell.css">
+<style>
+.back { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; font-size: 13px; font-weight: 600; color: var(--accent-ink); align-self: flex-start; }
+.back svg.i { width: 14px; height: 14px; }
+/* The trade's header card, as trade-view.tsx. */
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto auto; align-items: center; padding: 18px 22px; }
+.hero > div + div { border-left: 1px solid var(--line); padding: 0 28px; }
+.hero > .nbs { width: 188px; padding: 0 0 0 24px; display: flex; flex-direction: column; gap: 6px; }
+.hero h2 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 22px; font-weight: 600; letter-spacing: -.03em; line-height: 1.25; }
+.hero .meta { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13.5px; color: var(--muted); }
+.tog { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 8px; font-size: 13px; font-weight: 600; letter-spacing: 0; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line-2); }
+.tog:hover { color: var(--text); }
+.tog.on { background: var(--accent-soft); color: var(--accent-ink); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent); }
+.tog.open { color: var(--text); box-shadow: inset 0 0 0 1px var(--faint); }
+.tog svg.i { width: 16px; height: 16px; }
+.tog .n { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--sunken); color: var(--text); font-size: 12px; font-weight: 600; display: inline-grid; place-items: center; }
+.tog svg.cd { width: 11px; height: 11px; color: var(--faint); }
+.pbt .n { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--sunken); color: var(--text); font-size: 12px; font-weight: 600; display: inline-grid; place-items: center; }
+.pbt svg.cd { width: 11px !important; height: 11px !important; color: var(--faint); }
+[data-state='patterns'] .pbt { border-color: var(--faint); }
+.hf .k { display: block; font-size: 12px; color: var(--faint); }
+.hf b { display: block; font-size: 22px; font-weight: 600; letter-spacing: -.03em; line-height: 1.6; white-space: nowrap; }
+.hf b.big { font-size: 31px; letter-spacing: -.04em; line-height: 1.15; }
+.hf small { display: block; font-size: 12px; color: var(--faint); white-space: nowrap; }
+.nb { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-1); font-size: 13px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+.nb b { color: var(--text); font-weight: 600; } .nb svg.i { width: 13px; height: 13px; color: var(--faint); } .nb.nx { justify-content: flex-end; }
+.tgrid { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 16px; align-items: start; }
+.tgrid > div { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+/* Stats (the Stat cells): 4 columns on hairlines. */
+.sg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); }
+.sg > div { background: var(--surface-1); padding: 12px 14px; min-width: 0; }
+.sg > div:nth-child(4n+1) { padding-left: 0; }
+.sg .k { display: block; font-size: 12px; color: var(--faint); white-space: nowrap; }
+.sg b { display: block; margin-top: 2px; font-size: 17px; line-height: 32px; font-weight: 600; letter-spacing: -.02em; white-space: nowrap; }
+.sg b .none { font-size: 14px; font-weight: 400; letter-spacing: 0; }
+.sg small { display: block; font-size: 12px; line-height: 1.4; color: var(--faint); margin-top: 1px; }
+.sg.first { margin-top: 14px; border-top: 1px solid var(--line); }
+/* Plan: targets above the average entry, stops below it, the derived figures under them. */
+.plan { border-top: 1px solid var(--line); padding: 14px 0 6px; }
+.plan-hd { display: flex; align-items: baseline; gap: 10px; }
+.plan-hd b { font-size: 13.5px; font-weight: 600; }
+.plan-hd span { font-size: 12.5px; color: var(--faint); }
+.ladder { display: grid; grid-template-columns: 128px minmax(0, 1fr); column-gap: 18px; margin-top: 8px; }
+.ladder .lside { padding-top: 4px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.ladder .lside b { font-size: 13.5px; font-weight: 600; line-height: 30px; }
+.ladder .colh { grid-column: 2; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 32px; gap: 8px; font-size: 12px; color: var(--faint); padding-bottom: 4px; }
+.ladder .lvl { padding: 2px 0; }
+.entry { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; margin: 10px 0; font-size: 12.5px; color: var(--faint); white-space: nowrap; }
+.entry::before, .entry::after { content: ''; flex: 1; border-top: 1px dashed var(--line-2); }
+.entry::before { flex: 0 0 128px; }
+.entry b { color: var(--text); font-weight: 600; }
+.sg.der { margin-top: 12px; border-top: 1px solid var(--line); }
+/* Fills chart (fills only), executions table. */
+.fchart { margin-top: 12px; }
+.fchart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.fl { font-size: 11px; fill: var(--faint); font-family: inherit; }
+.fl.t { fill: var(--muted); font-weight: 600; }
+.info { display: flex; gap: 6px; align-items: flex-start; margin-top: 8px; font-size: 12.5px; color: var(--faint); }
+.info svg.i { width: 15px; height: 15px; margin-top: 1px; }
+.ex { margin-top: 12px; }
+.exwrap { position: relative; }
+.ex th { height: 36px; } .ex td { height: 36px; }
+.ex tfoot td { font-weight: 600; border: 0; height: 38px; }
+/* Right column. */
+.schips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.pill { display: inline-flex; align-items: center; height: 30px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--line-2); font-size: 13.5px; font-weight: 500; color: var(--text); }
+.pill.on { background: var(--accent-soft); color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+.rhd { display: flex; align-items: baseline; margin-top: 14px; font-size: 13.5px; font-weight: 600; } .rhd span { margin-left: auto; font-size: 12.5px; font-weight: 500; color: var(--muted); }
+.rr { display: flex; align-items: center; gap: 10px; min-height: 46px; border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); font-size: 13.5px; }
+.rr:first-of-type { border-top: 0; }
+.rr span { flex: 1; min-width: 0; }
+.kb { display: inline-flex; border-radius: 8px; background: var(--sunken); padding: 2px; font-size: 12.5px; font-weight: 600; flex: none; }
+.kb > * { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; border-radius: 6px; color: var(--faint); }
+.kb > .on { background: var(--surface-1); color: var(--text); box-shadow: var(--shadow-chip); }
+.kb .on svg.i { width: 13px; height: 13px; color: var(--gain-fill); }
+.tr { display: flex; align-items: center; gap: 10px; min-height: 46px; border-top: 1px solid var(--line); font-size: 13.5px; }
+.tr:first-of-type { border-top: 0; margin-top: 6px; }
+.tr > span:first-child { width: 96px; flex: none; color: var(--muted); }
+.tr .chip { height: 26px; font-size: 12.5px; }
+.tr .stars svg.i { width: 18px; height: 18px; }
+.files .thumbs { margin-top: 12px; }
+.files .frow { margin-top: 10px; }
+.files .drop { margin-top: 10px; }
+.ntabs { margin-top: 12px; }
+.nbody { margin-top: 10px; }
+.nbody .etb { overflow: hidden; }
+.nbody .etb .more { margin-left: auto; }
+.nbody p { margin-top: 10px; font-size: 14.5px; color: var(--faint); }
+/* The patterns popover and the stat chooser. */
+.ppop { top: calc(100% + 8px); right: 0; width: 380px; padding: 6px 0 4px; font-size: 13.5px; letter-spacing: 0; line-height: 1.4; font-weight: 400; }
+.ppop .ph { display: flex; align-items: baseline; gap: 8px; padding: 10px 16px 8px; }
+.ppop .ph b { font-size: 15px; font-weight: 600; letter-spacing: -.015em; }
+.ppop .ph span { font-size: 12.5px; color: var(--faint); }
+.ppop ul { list-style: none; }
+.ppop li { padding: 10px 16px 11px; border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.ppop li .t { display: flex; align-items: center; gap: 8px; }
+.ppop li .t b { font-weight: 600; font-size: 13.5px; color: var(--text); flex: 1; }
+.ppop li p { margin-top: 3px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.chs .tlist { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 20px; margin-top: 12px; }
+.chs .always { margin-top: 12px; font-size: 12.5px; color: var(--faint); }
+html:not([data-state='chooser']) .v-chooser, html:not([data-state='patterns']) .v-patterns, html:not([data-state='over']) .v-over { display: none !important; }
+[data-state='over'] .v-ok { display: none !important; }
+html:not([data-state='fill-costs']) .v-fill, [data-state='fill-costs'] .v-nofill { display: none !important; }
+html:not([data-state='stop-only']) .v-so, [data-state='stop-only'] .v-noso { display: none !important; }
+html:not([data-state='wrong-side']) .v-ws, [data-state='wrong-side'] .v-nows { display: none !important; }
+.nolv { font-size: 13px; color: var(--muted); padding: 8px 0 6px; }
+.cin { display: inline-flex; align-items: center; gap: 3px; width: 76px; height: 30px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--surface-1); box-shadow: var(--rest); color: var(--faint); font-size: 13px; justify-content: flex-end; }
+.cin b { color: var(--text); font-weight: 550; }
+.cin.focus { border-color: var(--accent); outline: 2px solid color-mix(in srgb, var(--accent) 25%, transparent); outline-offset: 0; }
+tr.editing td { overflow: visible; background: color-mix(in srgb, var(--accent-soft) 55%, transparent); }
+.rowok { display: inline-flex; gap: 4px; }
+.ex th.v-fill { width: 76px; }
+.okb, .nob { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; }
+.okb { background: var(--accent); color: var(--accent-fg); box-shadow: var(--raised); } .nob { color: var(--muted); border: 1px solid var(--line-2); }
+.okb svg.i, .nob svg.i { width: 13px; height: 13px; }
+@media (max-width: 1279.98px) { .tgrid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 1023.98px) { .hero { grid-template-columns: minmax(0, 1fr) auto auto auto; } .hero > .nbs { grid-column: 1 / -1; width: auto; flex-direction: row; padding: 14px 0 0; border: 0; } .hero > .nbs > * { flex: 1; } }
+@media (max-width: 639.98px) {
+  .hero { grid-template-columns: 1.5fr 1fr 1fr; gap: 16px 12px; align-items: start; padding: 16px; }
+  .hero > div + div { border: 0; padding: 0; }
+  .hero > div:first-child, .hero > .nbs { grid-column: 1 / -1; }
+  .hero > .nbs { padding: 0; flex-direction: column; }
+  .hf b, .hf b.big { font-size: 18px; line-height: 1.5; } .hf b.big { font-size: 22px; }
+  .hf small { white-space: normal; }
+  .sg { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sg > div:nth-child(4n+1) { padding-left: 14px; } .sg > div:nth-child(2n+1) { padding-left: 0; }
+  .ladder { grid-template-columns: minmax(0, 1fr); }
+  .ladder .lside { flex-direction: row; align-items: center; gap: 8px; padding-top: 0; }
+  .ladder .lside .addl { margin-left: auto; }
+  .ladder .colh { display: none; }
+  .ladder .lvl { padding: 6px 0; }
+  .entry::before { flex: 1; }
+  .exwrap { overflow-x: auto; margin: 0 -20px; padding: 0 20px; } .ex { min-width: 560px; }
+  .fl { display: none; }
+  .ppop { width: auto; }
+  .chs .tlist { grid-template-columns: minmax(0, 1fr); }
+  .tr > span:first-child { width: 84px; }
+}
+</style>
+</head>
+<body data-nav="trades" data-title='<span class="crumb">Trades</span><i data-i="CaretRight:bold" class="sep"></i>1232'>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <!-- A chart screenshot the trader attached: drawn, not a photo. -->
+  <symbol id="shot-a" viewBox="0 0 200 124"><rect width="200" height="124" fill="#131722"/><g stroke="#2a2e39" stroke-width=".6"><line x1="0" x2="200" y1="31" y2="31"/><line x1="0" x2="200" y1="62" y2="62"/><line x1="0" x2="200" y1="93" y2="93"/></g><g stroke-width="1.2"><path d="M14 92v-14M24 88v-16M34 84v-12M44 80v-16M54 76v-12M64 70v-16M74 72v-10M84 64v-16M94 58v-14M104 60v-10M114 52v-16M124 46v-12M134 48v-10M144 40v-14M154 34v-12M164 36v-10M174 28v-12M184 22v-12" stroke="#5b9c8c"/><path d="M19 94v-10M39 86v-8M69 74v-8M99 62v-6M129 50v-6M159 38v-6" stroke="#c56a6a"/></g><line x1="0" x2="200" y1="84" y2="84" stroke="#7b83e8" stroke-dasharray="3 3" stroke-width=".8"/><line x1="0" x2="200" y1="30" y2="30" stroke="#5b9c8c" stroke-dasharray="3 3" stroke-width=".8"/></symbol>
+  <symbol id="shot-b" viewBox="0 0 200 124"><rect width="200" height="124" fill="#f7f8fc"/><g stroke="#e3e6f0" stroke-width=".6"><line x1="0" x2="200" y1="31" y2="31"/><line x1="0" x2="200" y1="62" y2="62"/><line x1="0" x2="200" y1="93" y2="93"/></g><path d="M0 88 C20 84 30 90 46 80 S70 70 84 74 106 58 120 56 146 44 160 46 182 30 200 26" fill="none" stroke="#3d4473" stroke-width="1.4"/><rect x="84" y="50" width="44" height="30" fill="#2b35af" opacity=".08"/><line x1="84" x2="128" y1="50" y2="50" stroke="#2b35af" stroke-width=".8"/><line x1="84" x2="128" y1="80" y2="80" stroke="#2b35af" stroke-width=".8"/><circle cx="120" cy="56" r="2.4" fill="#2b35af"/></symbol>
+</defs></svg>
+
+<main id="content" class="page">
+<a class="back only-desk" href="#"><i data-i="CaretLeft:bold"></i>Back to trades</a>
+
+<section class="card hero" aria-label="Trade 1232">
+  <div>
+    <h2>EURUSD <span class="sd">Long</span><span class="chip">Win</span>
+      <button class="tog on" aria-pressed="true"><i data-i="SealCheck:fill"></i>Reviewed</button>
+    </h2>
+    <p class="meta"><span>Tue 24 Nov, 14:12:05 to Wed 25 Nov, 08:52:40</span><span>Forex evaluation</span><span>Session momentum</span></p>
+  </div>
+  <div class="hf"><span class="k lbl">Net P&amp;L</span><b class="big gain">+$511.14</b><small><span class="nowrap">+$530.00 gross,</span> <span class="nowrap">−$14.00 fees,</span> <span class="nowrap">−$4.86 swap</span></small></div>
+  <div class="hf"><span class="k lbl">Net ROI</span><b class="gain">+0.22%</b></div>
+  <div class="hf"><span class="k lbl">Realized R</span><b class="gain">+1.02R</b><small class="v-noso">of 1.14R planned</small><small class="v-so">add a target for planned R</small></div>
+  <div class="nbs"><a class="nb" href="#"><i data-i="CaretLeft:bold"></i><b>1231</b>USDJPY</a><a class="nb nx" href="#"><b>1233</b>ES Dec 26<i data-i="CaretRight:bold"></i></a></div>
+</section>
+
+<div class="tgrid">
+<div>
+  <section class="card" aria-labelledby="ex-h">
+    <div class="hd"><h2 id="ex-h">Execution</h2><span class="cap">EURUSD</span>
+      <div class="end"><span class="anchor"><button class="btn sm pbt" aria-haspopup="dialog">Patterns <span class="n">3</span><i data-i="CaretDown:bold" class="cd"></i></button>
+        <div class="pop sheet ppop v-patterns" role="dialog" aria-label="Patterns on this trade">
+          <div class="sheet-hd"><b>Patterns</b><button class="xbtn" aria-label="Close"><i data-i="X"></i></button></div>
+          <div class="ph only-desk"><b>3 patterns</b><span>read from this trade's fills</span></div>
+          <ul>
+            <li><div class="t"><b>Added to the position</b><span class="chip">Neutral</span></div><p>2 entries: 1 unit at 1.15420, then 1 more at 1.15360.</p></li>
+            <li><div class="t"><b>Exited in parts</b><span class="chip">Neutral</span></div><p>2 exits: 1 unit at 1.15610, the last at 1.15700.</p></li>
+            <li><div class="t"><b>Held longer than usual</b><span class="chip">Neutral</span></div><p>Held 18h 40m. 75% of your wins in the past 60 days closed within 2h 05m.</p></li>
+          </ul>
+        </div></span><button class="btn sm" aria-haspopup="dialog"><i data-i="SlidersHorizontal"></i>Choose stats</button></div></div>
+    <div class="sg first">
+      <div><span class="k">Avg entry</span><b>1.15390</b><small>2 buys, 2 units</small></div>
+      <div><span class="k">Avg exit</span><b>1.15655</b><small>2 sells, 2 units</small></div>
+      <div><span class="k">Quantity</span><b>2</b><small>max position, units</small></div>
+      <div><span class="k">Duration</span><b>18h 40m</b><small>entry to flat</small></div>
+      <div><span class="k">Gross P&amp;L</span><b class="gain">+$530.00</b><small>+0.00265 per unit on 2</small></div>
+      <div><span class="k">Fees</span><b>−$14.00</b><small>$14.00 commission, $0.00 exchange</small></div>
+      <div><span class="k lbl">Swap</span><b class="loss">−$4.86</b><small>from the import</small></div>
+      <div><span class="k">Cost basis</span><b>$230,780.00</b><small>entry price x size</small></div>
+    </div>
+
+    <div class="plan" role="group" aria-labelledby="plan-h">
+      <div class="plan-hd"><b id="plan-h">Plan</b></div>
+      <div class="ladder">
+        <div class="colh"><span>Level</span><span>Quantity</span><span></span></div>
+        <div class="lside"><b>Targets</b><button class="unit" aria-label="Targets unit: Price">Price<i data-i="CaretDown:bold"></i></button><button class="addl"><i data-i="Plus:bold"></i>Add level</button></div>
+        <div class="v-so"><p class="nolv">No target levels yet.</p></div>
+        <div class="v-noso">
+          <div class="lvl"><span class="f"><span>1.15750</span></span><span class="f q"><span>1</span><button class="share" aria-label="Fill from a share of the position"><i data-i="Percent"></i></button></span><button class="rm" aria-label="Remove target 1.15750"><i data-i="X:bold"></i></button></div>
+          <div class="lvl"><span class="f"><span>1.15600</span></span><span class="f q"><span>1</span><button class="share" aria-label="Fill from a share of the position"><i data-i="Percent"></i></button></span><button class="rm" aria-label="Remove target 1.15600"><i data-i="X:bold"></i></button></div>
+        </div>
+        <div class="entry"><span>Avg entry <b>1.15390</b>, 2 units</span></div>
+        <div class="lside"><b>Stops</b><button class="unit v-nows" aria-label="Stops unit: Pips">Pips<i data-i="CaretDown:bold"></i></button><button class="unit v-ws" aria-label="Stops unit: Price">Price<i data-i="CaretDown:bold"></i></button><button class="addl"><i data-i="Plus:bold"></i>Add level</button></div>
+        <div class="v-ws">
+          <div class="lvl"><span class="f err focus" aria-invalid="true" aria-describedby="ws-err"><span>1.15450</span></span><span class="f q"><span>1</span><button class="share" aria-label="Fill from a share of the position"><i data-i="Percent"></i></button></span><button class="rm" aria-label="Remove stop 1.15450"><i data-i="X:bold"></i></button>
+            <p class="ferr" id="ws-err" role="alert">A stop on a long goes below the average entry, 1.15390.</p></div>
+          <div class="lvl"><span class="f"><span>1.15090</span></span><span class="f q"><span>1</span><button class="share" aria-label="Fill from a share of the position"><i data-i="Percent"></i></button></span><button class="rm" aria-label="Remove stop 1.15090"><i data-i="X:bold"></i></button></div>
+        </div>
+        <div class="v-nows">
+          <div class="lvl"><span class="f"><span>20.0</span><small>pips</small></span><span class="f q"><span>1</span><button class="share" aria-label="Fill from a share of the position"><i data-i="Percent"></i></button></span><button class="rm" aria-label="Remove stop 20.0 pips"><i data-i="X:bold"></i></button></div>
+          <div class="lvl"><span class="f"><span>30.0</span><small>pips</small></span><span class="f q v-ok"><span>1</span><button class="share" aria-label="Fill from a share of the position"><i data-i="Percent"></i></button></span><span class="f q err focus v-over" aria-invalid="true" aria-describedby="over-err"><span>1.2</span><button class="share" aria-label="Fill from a share of the position"><i data-i="Percent"></i></button></span><button class="rm" aria-label="Remove stop 30.0 pips"><i data-i="X:bold"></i></button>
+            <p class="ferr v-over" id="over-err" role="alert">Stops cover 2.2 units, more than the position of 2.</p></div>
+        </div>
+      </div>
+      <div class="sg der v-noso">
+        <div><span class="k lbl">Planned R</span><b>1.14R</b><small>reward over risk</small></div>
+        <div><span class="k lbl">Realized R</span><b class="gain">+1.02R</b><small>net over $500.00 risk</small></div>
+        <div><span class="k lbl">Planned reward</span><b>$570.00</b><small>if every target fills</small></div>
+        <div><span class="k lbl">Planned risk</span><b>$500.00</b><small>if every stop fills</small></div>
+      </div>
+      <div class="sg der v-so">
+        <div><span class="k lbl">Planned R</span><b><span class="none">None</span></b><small>needs a target and a stop</small></div>
+        <div><span class="k lbl">Realized R</span><b class="gain">+1.02R</b><small>net over $500.00 risk</small></div>
+        <div><span class="k lbl">Planned reward</span><b><span class="none">None</span></b><small>needs a target and a stop</small></div>
+        <div><span class="k lbl">Planned risk</span><b><span class="none">None</span></b><small>needs a target and a stop</small></div>
+      </div>
+    </div>
+
+    <div class="sg">
+      <div><span class="k lbl">MAE</span><b><span class="none">Not recorded</span></b><small>worst open P&amp;L</small></div>
+      <div><span class="k lbl">MFE</span><b><span class="none">Not recorded</span></b><small>best open P&amp;L</small></div>
+      <div><span class="k">Pips</span><b class="gain">+26.5p</b></div>
+      <div><span class="k">Money per pip</span><b>$20.00</b><small>gross P&amp;L over pips</small></div>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="fl-h">
+    <div class="hd"><h2 id="fl-h">Fills</h2><span class="cap">4 executions</span></div>
+    <div class="fchart" role="img" aria-label="Fills: bought 1 at 1.15420 and 1 at 1.15360, sold 1 at 1.15610 and 1 at 1.15700">
+      <svg viewBox="0 0 720 168">
+        <line class="gl" x1="0" x2="600" y1="18" y2="18"/><line class="gl" x1="0" x2="600" y1="138" y2="138"/>
+        <line x1="0" x2="600" y1="56" y2="56" stroke="var(--muted)" stroke-dasharray="1 3"/>
+        <line x1="0" x2="600" y1="112" y2="112" stroke="var(--accent)"/>
+        <path d="M24 106 L92 124 L388 62 L588 46" fill="none" stroke="var(--faint)" stroke-dasharray="2 3"/>
+        <path d="M24 98 l-6 10 h12 z M92 116 l-6 10 h12 z" fill="var(--text)"/>
+        <path d="M382 54 h12 l-6 10 z M582 38 h12 l-6 10 z" fill="none" stroke="var(--text)" stroke-width="1.5"/>
+        <text class="fl t" x="24" y="94" text-anchor="middle">Buy 1</text><text class="fl t" x="92" y="146" text-anchor="middle">Buy 1</text>
+        <text class="fl t" x="388" y="48" text-anchor="middle">Sell 1</text><text class="fl t" x="588" y="32" text-anchor="middle">Sell 1</text>
+        <text class="fl" x="612" y="52">Avg exit</text><text class="fl t" x="612" y="66">1.15655</text>
+        <text class="fl" x="612" y="108" style="fill:var(--accent-ink)">Avg entry</text><text class="fl t" x="612" y="122">1.15390</text>
+        <text class="fl" x="0" y="162">24 Nov 14:00</text><text class="fl" x="200" y="162">20:00</text><text class="fl" x="400" y="162">25 Nov 02:00</text><text class="fl" x="560" y="162">08:00</text>
+      </svg>
+    </div>
+    <p class="info"><i data-i="Info"></i>Plotted from your fills only. The price path between fills needs market data, which Keel does not have yet.</p>
+    <div class="exwrap"><table class="ex">
+      <colgroup><col style="width:19%"><col style="width:10%"><col><col><col><col style="width:15%"><col style="width:14%"></colgroup>
+      <thead><tr><th>Time</th><th>Side</th><th class="n">Quantity</th><th class="n">Price</th><th class="n">Position</th><th class="n">Exchange fees</th><th class="n">Commission</th><th class="v-fill"><span class="sr">Save the row</span></th></tr></thead>
+      <tbody>
+        <tr><td class="b6">14:12:05</td><td><span class="sd">Buy</span></td><td class="n">1</td><td class="n f">1.15420</td><td class="n">+1</td><td class="n muted">$0.00</td><td class="n muted">$3.50</td><td class="v-fill"></td></tr>
+        <tr><td class="b6">15:03:48</td><td><span class="sd">Buy</span></td><td class="n">1</td><td class="n f">1.15360</td><td class="n">+2</td><td class="n muted">$0.00</td><td class="n muted">$3.50</td><td class="v-fill"></td></tr>
+        <tr class="editing"><td class="b6">25 Nov 02:41:10</td><td><span class="sd">Sell</span></td><td class="n">1</td><td class="n f">1.15610</td><td class="n">+1</td><td class="n muted"><span class="v-nofill">$0.00</span><span class="cin focus v-fill" aria-label="Exchange fee">$<b>2.43</b></span></td><td class="n muted"><span class="v-nofill">$3.50</span><span class="cin v-fill" aria-label="Commission">$<b>3.50</b></span></td><td class="v-fill"><span class="rowok"><button class="okb" aria-label="Save this row's costs"><i data-i="Check:bold"></i></button><button class="nob" aria-label="Cancel the edit"><i data-i="X:bold"></i></button></span></td></tr>
+        <tr><td class="b6">25 Nov 08:52:40</td><td><span class="sd">Sell</span></td><td class="n">1</td><td class="n f">1.15700</td><td class="n faint">Flat</td><td class="n muted">$0.00</td><td class="n muted">$3.50</td><td class="v-fill"></td></tr>
+      </tbody>
+      <tfoot><tr><td>Total</td><td></td><td class="n">4</td><td></td><td></td><td class="n">$0.00</td><td class="n">$14.00</td><td class="v-fill"></td></tr></tfoot>
+    </table></div>
+    <p class="info v-fill"><i data-i="Info"></i>Confirm the row to save. The trade's fees and net update, and the change is logged. A swap your broker charged goes in the fee.</p>
+  </section>
+</div>
+
+<div>
+  <section class="card" aria-labelledby="sr-h">
+    <div class="hd"><h2 id="sr-h">Strategies and rules</h2></div>
+    <div class="schips"><span class="pill">Level reversal</span><span class="pill">Opening range breakout</span><span class="pill on">Session momentum</span><span class="pill">Trend pullback</span></div>
+    <p class="rhd">Session momentum<span><b class="gain">3</b> kept&nbsp;&nbsp;<b>0</b> broken</span></p>
+    <div class="rr"><span>Wait for the London or New York open to set direction</span><span class="kb"><span class="on"><i data-i="CheckCircle:fill"></i>Kept</span><span>Broken</span></span></div>
+    <div class="rr"><span>Enter on the first pullback after the first hour</span><span class="kb"><span class="on"><i data-i="CheckCircle:fill"></i>Kept</span><span>Broken</span></span></div>
+    <div class="rr"><span>Stop beyond the session's first-hour range</span><span class="kb"><span class="on"><i data-i="CheckCircle:fill"></i>Kept</span><span>Broken</span></span></div>
+  </section>
+
+  <section class="card" aria-labelledby="tg-h">
+    <div class="hd"><h2 id="tg-h">Tags and rating</h2><div class="end"><a class="lnk" href="#">Manage tags</a></div></div>
+    <div class="tr"><span>Emotions</span><span class="chip">calm</span><span class="chip add">+ Emotions</span></div>
+    <div class="tr"><span>Mistakes</span><span class="chip add">+ Mistakes</span></div>
+    <div class="tr"><span>Setups</span><span class="chip">trend continuation</span></div>
+    <div class="tr"><span>Rating</span><span class="stars"><i data-i="Star:fill" class="f"></i><i data-i="Star:fill" class="f"></i><i data-i="Star:fill" class="f"></i><i data-i="Star:fill" class="f"></i><i data-i="Star"></i></span><span class="muted" style="font-size:13px">4 of 5</span></div>
+  </section>
+
+  <section class="card files" aria-labelledby="at-h">
+    <div class="hd"><h2 id="at-h">Attachments</h2><span class="cap">3 files</span></div>
+    <div class="thumbs">
+      <a class="thumb" href="#" aria-label="Open image, EURUSD 15m entry.png"><svg><use href="#shot-a"/></svg></a>
+      <a class="thumb" href="#" aria-label="Open image, EURUSD 1h context.png"><svg><use href="#shot-b"/></svg></a>
+    </div>
+    <div class="frow"><i data-i="FilePdf"></i><span class="fn" data-trunc>Statement 25 Nov.pdf</span><span class="fs">412 KB</span><a class="btn sm ghost" href="#"><i data-i="ArrowSquareOut"></i>Open</a></div>
+    <div class="drop"><i data-i="UploadSimple" class="sg"></i><b>Drop files here</b><span>Images show as thumbnails. Up to 10 MB each.</span><button class="btn sm">Choose files</button></div>
+  </section>
+
+  <section class="card" aria-labelledby="nt-h">
+    <div class="hd"><h2 id="nt-h">Notes</h2></div>
+    <div class="seg ntabs"><a class="on" href="#">Trade note</a><a href="#">Daily note</a></div>
+    <div class="nbody">
+      <div class="etb" role="toolbar" aria-label="Formatting">
+        <button class="txt">Normal text<i data-i="CaretDown:bold" class="cd"></i></button><span class="div"></span>
+        <button aria-label="Bold, more formatting"><i data-i="TextB:bold"></i><i data-i="CaretDown:bold" class="cd"></i></button>
+        <button aria-label="Link"><i data-i="LinkSimple"></i></button>
+        <button aria-label="Insert"><i data-i="Plus"></i><i data-i="CaretDown:bold" class="cd"></i></button>
+        <button class="more" aria-label="More tools"><i data-i="DotsThree:bold"></i></button>
+      </div>
+      <p>What did you see, and what would you do again?</p>
+    </div>
+  </section>
+</div>
+</div>
+</main>
+
+<!-- The stat chooser: search, every stat with a box, Reset to default, Save. -->
+<div class="v-chooser">
+  <div class="veil"></div>
+  <section class="dlg md chs" role="dialog" aria-modal="true" aria-labelledby="ch-t">
+    <div class="dlg-hd"><div><h2 id="ch-t">Choose stats</h2><p>Pick what the Execution card shows on every trade. The order stays as it is.</p></div><button class="xbtn" aria-label="Close"><i data-i="X"></i></button></div>
+    <div class="dlg-bd">
+      <div class="inp sm"><i data-i="MagnifyingGlass" class="faint"></i><span class="faint">Search stats</span></div>
+      <div class="tlist">
+        <label class="tick"><span class="cbx on"><i data-i="Check:bold"></i></span><span>Avg entry</span><span class="v">1.15390</span></label>
+        <label class="tick"><span class="cbx on"><i data-i="Check:bold"></i></span><span>Avg exit</span><span class="v">1.15655</span></label>
+        <label class="tick"><span class="cbx on"><i data-i="Check:bold"></i></span><span>Quantity</span><span class="v">2</span></label>
+        <label class="tick"><span class="cbx on"><i data-i="Check:bold"></i></span><span>Duration</span><span class="v">18h 40m</span></label>
+        <label class="tick"><span class="cbx on"><i data-i="Check:bold"></i></span><span>Gross P&amp;L</span><span class="v">+$530.00</span></label>
+        <label class="tick"><span class="cbx on"><i data-i="Check:bold"></i></span><span>Fees</span><span class="v">−$14.00</span></label>
+        <label class="tick"><span class="cbx on"><i data-i="Check:bold"></i></span><span>Swap</span><span class="v">−$4.86</span></label>
+        <label class="tick"><span class="cbx on"><i data-i="Check:bold"></i></span><span>Cost basis</span><span class="v">$230,780.00</span></label>
+        <label class="tick"><span class="cbx on"><i data-i="Check:bold"></i></span><span>Targets</span><span class="v">2 levels</span></label>
+        <label class="tick"><span class="cbx on"><i data-i="Check:bold"></i></span><span>Stops</span><span class="v">2 levels</span></label>
+        <label class="tick"><span class="cbx on"><i data-i="Check:bold"></i></span><span>Planned reward</span><span class="v">$570.00</span></label>
+        <label class="tick"><span class="cbx on"><i data-i="Check:bold"></i></span><span>Planned risk</span><span class="v">$500.00</span></label>
+        <label class="tick"><span class="cbx on"><i data-i="Check:bold"></i></span><span>Planned R</span><span class="v">1.14R</span></label>
+        <label class="tick"><span class="cbx on"><i data-i="Check:bold"></i></span><span>Realized R</span><span class="v">+1.02R</span></label>
+        <label class="tick"><span class="cbx on"><i data-i="Check:bold"></i></span><span>MAE</span><span class="v">Not recorded</span></label>
+        <label class="tick"><span class="cbx on"><i data-i="Check:bold"></i></span><span>MFE</span><span class="v">Not recorded</span></label>
+        <label class="tick"><span class="cbx on"><i data-i="Check:bold"></i></span><span>Pips</span><span class="v">+26.5p</span></label>
+        <label class="tick"><span class="cbx on"><i data-i="Check:bold"></i></span><span>Money per pip</span><span class="v">$20.00</span></label>
+      </div>
+      <p class="always">Net P&amp;L, Net ROI and Realized R at the top of the trade always show.</p>
+    </div>
+    <div class="dlg-ft"><button class="btn ghost" style="color:var(--accent-ink)">Reset to default</button><div class="end"><button class="btn">Cancel</button><button class="btn pri">Save</button></div></div>
+  </section>
+</div>
+<div class="phveil v-patterns"></div>
+</body>
+</html>

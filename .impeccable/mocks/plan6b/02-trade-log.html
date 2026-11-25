@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keel, trade log</title>
+<!-- Plan 6B comp 02 (spec 5.1, 5.5). ?theme=dark for graphite. Variants: ?state=merge, mixed, filter -->
+<script src="shell.js"></script>
+<link rel="stylesheet" href="shell.css">
+<style>
+html:not([data-state='merge']) .v-merge, html:not([data-state='mixed']) .v-mixed, html:not([data-state='filter']) .v-filter { display: none !important; }
+[data-state='filter'] .bulkwrap { display: none; }
+.mfp { width: 440px; max-height: 680px; display: flex; flex-direction: column; overflow: hidden; }
+.mfb { flex: 1; min-height: 0; overflow-y: auto; padding: 0 16px; }
+.mfs { display: flex; flex-direction: column; gap: 10px; padding: 16px 0; border-top: 1px solid var(--line); }
+.mfs:first-child { border-top: 0; }
+.mfs h3 { font-size: 14px; font-weight: 600; }
+.mfs-cut { padding-top: 10px; }
+.mfp .leg { font-size: 12px; font-weight: 500; color: var(--faint); margin: 6px 0 -4px; }
+.mfp .sall { border-bottom: 1px solid var(--line); border-radius: 8px 8px 0 0; font-weight: 600; }
+.plist { display: flex; flex-direction: column; max-height: 330px; overflow-y: auto; margin: -4px -8px 0; padding: 0 0 0 0; }
+.plist .leg { padding: 0 8px; margin: 10px 0 2px; }
+.plist .tick .chip { margin-left: auto; }
+.mff { flex: none; display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); }
+.mff .end { margin-left: auto; display: flex; gap: 8px; }
+@media (max-width: 639.98px) { .mfp { width: auto; max-height: 88dvh; padding-bottom: 0; } .plist { max-height: none; } }
+[data-state='mixed'] .v-same { display: none !important; }
+html[data-state='merge'] .bmenu { display: none; }
+html[data-state='merge'] .bulk .b.open { background: none; }
+@media (max-width: 639.98px) { html:not([data-state='mixed']) .bmenu { display: none; } html:not([data-state='mixed']) .bulk .b.open { background: none; } }
+@media (min-width: 640px) { .menu.only-phone { display: none !important; } }
+</style>
+</head>
+<body data-nav="trades" data-title="Trades" data-filters>
+<main id="content" class="page">
+<div class="vrow"><nav class="seg vseg" aria-label="Trade views"><a href="#">Day</a><a href="#">Week</a><a href="#" class="on" aria-current="page">All</a></nav></div>
+
+<section class="card sum" aria-label="Summary">
+  <div><span class="lbl">Trades</span><span class="fig">1,518</span><span class="sub">closed, 4 still open</span></div>
+  <div><span class="lbl">Net P&amp;L</span><span class="fig gain">+$17,486.25</span><span class="sub">after $12,853.38 fees</span></div>
+  <div><span class="lbl">Win rate</span><span class="fig">48.8%</span><span class="sub">741 won, 0 breakeven, 777 lost</span></div>
+  <div><span class="lbl">Profit factor</span><span class="fig">1.13</span><span class="sub">Avg win/loss 1.19</span></div>
+  <div class="x"><span class="lbl">Expectancy</span><span class="fig gain">+$11.52</span><span class="sub">per closed trade</span></div>
+  <div class="snote">Figures cover the closed trades in your filters, all time. <a class="lnk" href="#">Hide summary</a></div>
+</section>
+
+<section class="card log" aria-label="Trades">
+  <div class="tbar2">
+    <div class="seg"><a class="on" href="#">Closed <span class="ct">1,518</span></a><a href="#">Open <span class="ct">4</span></a></div>
+    <div class="seg only-desk"><a class="on" href="#">All</a><a href="#">Not reviewed <span class="ct">527</span></a><a href="#">Reviewed <span class="ct">991</span></a></div>
+    <div class="inp sm"><i data-i="MagnifyingGlass" class="faint"></i><span class="faint">Symbol, #serial, strategy, tag</span></div>
+    <div class="end"><button class="btn sm"><i data-i="Columns"></i>Columns</button><button class="btn sm"><i data-i="DownloadSimple"></i>Export CSV</button><button class="btn sm"><i data-i="Plus"></i>Add trade</button></div>
+  </div>
+  <div class="tscroll only-desk" data-trunc><table style="min-width:1250px">
+    <colgroup><col style="width:32px"><col style="width:86px"><col style="width:92px"><col style="width:56px"><col style="width:44px"><col style="width:70px"><col style="width:70px"><col style="width:76px"><col style="width:62px"><col style="width:54px"><col style="width:62px"><col style="width:160px"><col style="width:120px"><col style="width:64px"><col style="width:80px"><col style="width:60px"><col style="width:62px"></colgroup>
+    <thead><tr><th class="cb"><span class="cbx mid"></span></th><th>Open</th><th>Instrument</th><th>Side</th><th class="n">Qty</th><th class="n">Entry</th><th class="n">Exit</th><th class="n">Net P&amp;L</th><th class="n">Net ROI</th><th class="n">R</th><th class="n">Duration</th><th style="padding-left:10px">Strategy</th><th>Tags</th><th class="n">Patterns</th><th>Rules</th><th>Rating</th><th>Reviewed</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table></div>
+  <ul class="prows pick only-phone" id="prows"></ul>
+  <div class="pager"><span>1 to 50 of 1,518</span><span class="end"><button class="ibtn sm" aria-label="Previous page" aria-disabled="true"><i data-i="CaretLeft:bold"></i></button><button class="ibtn sm" aria-label="Next page"><i data-i="CaretRight:bold"></i></button></span></div>
+
+</section>
+  <div class="bulkwrap">
+  <div class="bulk" role="toolbar" aria-label="2 selected trades">
+    <span class="cnt"><i></i>2 selected</span>
+    <button class="b"><i data-i="Tag"></i><span>Tag</span><i data-i="CaretDown:bold" class="cd"></i></button>
+    <button class="b"><i data-i="StackPlus"></i><span>Add to strategy</span><i data-i="CaretDown:bold" class="cd"></i></button>
+    <button class="b"><i data-i="StackMinus"></i><span>Remove from strategy</span><i data-i="CaretDown:bold" class="cd"></i></button>
+    <button class="b"><i data-i="SealCheck"></i><span>Mark reviewed</span></button>
+    <button class="b"><i data-i="Seal"></i><span>Mark not reviewed</span></button>
+    <button class="b"><i data-i="DownloadSimple"></i><span>Export CSV</span></button>
+    <span class="dv" aria-hidden="true"></span>
+    <span class="anchor"><button class="b open ico" aria-haspopup="menu" aria-expanded="true" aria-label="Merge, split or move" title="Merge, split or move"><i data-i="DotsThree:bold"></i></button>
+      <div class="menu sheet bmenu" role="menu" aria-label="Merge, split or move">
+        <div class="sheet-hd"><b>2 selected</b></div>
+        <button class="it v-same" role="menuitem"><i data-i="ArrowsMerge"></i>Merge</button>
+        <button class="it dis two v-mixed" role="menuitem" aria-disabled="true"><span class="ln"><i data-i="ArrowsMerge"></i>Merge</span><span class="why">Merge needs one account and one instrument.</span></button>
+        <button class="it dis two" role="menuitem" aria-disabled="true"><span class="ln"><i data-i="ArrowsSplit"></i>Split</span><span class="why">Split works on one trade at a time.</span></button>
+        <button class="it" role="menuitem"><i data-i="ArrowsLeftRight"></i>Move to account</button>
+      </div></span>
+    <span class="dv" aria-hidden="true"></span>
+    <button class="b"><i data-i="Trash"></i><span>Delete</span></button>
+    <button class="b" aria-label="Clear selection" style="width:32px;justify-content:center;padding:0"><i data-i="X"></i></button>
+  </div>
+</div>
+</main>
+<div class="v-filter">
+<div class="phveil"></div>
+<div class="pop sheet mfp" id="mfp" role="dialog" aria-label="More filters">
+  <div class="sheet-hd"><b>More filters</b><button class="xbtn" aria-label="Close"><i data-i="X"></i></button></div>
+  <div class="mfb">
+    <section class="mfs mfs-cut"><p class="leg">Trade must have</p><div class="seg"><a class="on" href="#">Any selected</a><a href="#">All selected</a></div></section>
+    <section class="mfs" aria-labelledby="mf-p"><h3 id="mf-p">Patterns</h3>
+      <div class="inp sm"><i data-i="MagnifyingGlass" class="faint"></i><span class="faint">Search patterns</span></div>
+      <label class="tick sall"><span class="cbx mid"></span><span>Select all</span><span class="v">2 of 17</span></label>
+      <div class="plist"><p class="leg">Trade patterns</p><label class="tick"><span class="cbx"><i data-i="Check:bold"></i></span><span>Added to the position</span><span class="chip">Neutral</span></label><label class="tick"><span class="cbx"><i data-i="Check:bold"></i></span><span>Exited in parts</span><span class="chip">Neutral</span></label><label class="tick"><span class="cbx"><i data-i="Check:bold"></i></span><span>Held longer than usual</span><span class="chip">Neutral</span></label><label class="tick"><span class="cbx"><i data-i="Check:bold"></i></span><span>Large size</span><span class="chip">Neutral</span></label><label class="tick"><span class="cbx on"><i data-i="Check:bold"></i></span><span>Long hold on a loss</span><span class="chip">Hurts</span></label><label class="tick"><span class="cbx on"><i data-i="Check:bold"></i></span><span>Loss after a loss</span><span class="chip">Hurts</span></label><p class="leg">Day patterns</p><label class="tick"><span class="cbx"><i data-i="Check:bold"></i></span><span>Busier than a green day</span><span class="chip">Neutral</span></label><label class="tick"><span class="cbx"><i data-i="Check:bold"></i></span><span>Losses outweighed wins</span><span class="chip">Hurts</span></label><label class="tick"><span class="cbx"><i data-i="Check:bold"></i></span><span>Low return for the effort</span><span class="chip">Hurts</span></label><label class="tick"><span class="cbx"><i data-i="Check:bold"></i></span><span>More trades than usual</span><span class="chip">Hurts</span></label><label class="tick"><span class="cbx"><i data-i="Check:bold"></i></span><span>One strong trade</span><span class="chip">Helps</span></label><label class="tick"><span class="cbx"><i data-i="Check:bold"></i></span><span>Quick re-entries after a loss</span><span class="chip">Hurts</span></label><label class="tick"><span class="cbx"><i data-i="Check:bold"></i></span><span>Rushed red day</span><span class="chip">Hurts</span></label><label class="tick"><span class="cbx"><i data-i="Check:bold"></i></span><span>Sized up after wins</span><span class="chip">Hurts</span></label><label class="tick"><span class="cbx"><i data-i="Check:bold"></i></span><span>Switched sides, green</span><span class="chip">Hurts</span></label><label class="tick"><span class="cbx"><i data-i="Check:bold"></i></span><span>Switched sides, red</span><span class="chip">Hurts</span></label><label class="tick"><span class="cbx"><i data-i="Check:bold"></i></span><span>Waited, then won</span><span class="chip">Helps</span></label></div>
+    </section>
+    <section class="mfs"><h3>Ranges</h3></section>
+  </div>
+  <div class="mff"><button class="btn ghost" style="color:var(--accent-ink);margin-left:-10px">Reset</button><div class="end"><button class="btn">Cancel</button><button class="btn pri">Apply</button></div></div>
+</div>
+</div>
+<div class="phveil v-mixed"></div>
+<div class="menu sheet only-phone v-mixed" role="menu" aria-label="Merge, split or move" style="display:block"><div class="sheet-hd"><b>2 selected</b></div>
+  <button class="it dis two" role="menuitem" aria-disabled="true"><span class="ln"><i data-i="ArrowsMerge"></i>Merge</span><span class="why">Merge needs one account and one instrument.</span></button>
+  <button class="it dis two" role="menuitem" aria-disabled="true"><span class="ln"><i data-i="ArrowsSplit"></i>Split</span><span class="why">Split works on one trade at a time.</span></button>
+  <button class="it" role="menuitem"><i data-i="ArrowsLeftRight"></i>Move to account</button></div>
+
+<!-- Merge: every execution of the selected trades, all ticked, what will happen, confirm. -->
+<div class="v-merge">
+  <div class="veil"></div>
+  <section class="dlg md" role="dialog" aria-modal="true" aria-labelledby="mg-t">
+    <div class="dlg-hd"><div><h2 id="mg-t">Merge 2 trades</h2><p>ES Dec 26 in Futures live. Untick an execution to leave it in its trade.</p></div><button class="xbtn" aria-label="Close"><i data-i="X"></i></button></div>
+    <div class="dlg-bd">
+      <table class="ex2 only-desk">
+        <colgroup><col style="width:34px"><col style="width:74px"><col><col style="width:80px"><col style="width:84px"><col style="width:110px"></colgroup>
+        <thead><tr><th class="cb"><span class="cbx on"><i data-i="Check:bold"></i></span></th><th>Trade</th><th>Time</th><th>Side</th><th class="n">Quantity</th><th class="n">Price</th></tr></thead>
+        <tbody>
+          <tr><td class="cb"><span class="cbx on"><i data-i="Check:bold"></i></span></td><td>1229</td><td class="tm"><b>09:41:12</b></td><td><span class="sd">Buy</span></td><td class="n">1</td><td class="n f">6,612.25</td></tr>
+          <tr><td class="cb"><span class="cbx on"><i data-i="Check:bold"></i></span></td><td>1229</td><td class="tm"><b>09:44:30</b></td><td><span class="sd">Buy</span></td><td class="n">1</td><td class="n f">6,611.50</td></tr>
+          <tr><td class="cb"><span class="cbx on"><i data-i="Check:bold"></i></span></td><td>1229</td><td class="tm"><b>09:52:05</b></td><td><span class="sd">Sell</span></td><td class="n">2</td><td class="n f">6,618.75</td></tr>
+          <tr><td class="cb"><span class="cbx on"><i data-i="Check:bold"></i></span></td><td>1230</td><td class="tm"><b>09:58:40</b></td><td><span class="sd">Buy</span></td><td class="n">1</td><td class="n f">6,615.00</td></tr>
+          <tr><td class="cb"><span class="cbx on"><i data-i="Check:bold"></i></span></td><td>1230</td><td class="tm"><b>10:06:12</b></td><td><span class="sd">Sell</span></td><td class="n">1</td><td class="n f">6,619.25</td></tr>
+        </tbody>
+      </table>
+      <ul class="prows pick only-phone" aria-label="Executions">
+        <li><span class="cbx on"><i data-i="Check:bold"></i></span><a href="#"><span class="l1"><b class="seq" style="margin:0">09:41:12</b><span class="tm">Buy</span></span><span class="l2"><span>1 at 6,612.25</span><span>Trade 1229</span></span></a></li>
+        <li><span class="cbx on"><i data-i="Check:bold"></i></span><a href="#"><span class="l1"><b class="seq" style="margin:0">09:44:30</b><span class="tm">Buy</span></span><span class="l2"><span>1 at 6,611.50</span><span>Trade 1229</span></span></a></li>
+        <li><span class="cbx on"><i data-i="Check:bold"></i></span><a href="#"><span class="l1"><b class="seq" style="margin:0">09:52:05</b><span class="tm">Sell</span></span><span class="l2"><span>2 at 6,618.75</span><span>Trade 1229</span></span></a></li>
+        <li><span class="cbx on"><i data-i="Check:bold"></i></span><a href="#"><span class="l1"><b class="seq" style="margin:0">09:58:40</b><span class="tm">Buy</span></span><span class="l2"><span>1 at 6,615.00</span><span>Trade 1230</span></span></a></li>
+        <li><span class="cbx on"><i data-i="Check:bold"></i></span><a href="#"><span class="l1"><b class="seq" style="margin:0">10:06:12</b><span class="tm">Sell</span></span><span class="l2"><span>1 at 6,619.25</span><span>Trade 1230</span></span></a></li>
+      </ul>
+      <div class="wwh"><b>What will happen</b><ul>
+        <li><strong>1229</strong> opened first, so it keeps its record (note, rating, rule checks) and takes all 5 executions.</li>
+        <li><strong>1230</strong> is left with none, so it is removed. Its tags and strategies join 1229, its files move there, and its note stays in Trade notes, unlinked.</li>
+        <li>There is no undo. To separate them again, split 1229.</li>
+      </ul></div>
+    </div>
+    <div class="dlg-ft"><span class="cap">5 of 5 executions ticked</span><div class="end"><button class="btn">Cancel</button><button class="btn pri"><i data-i="ArrowsMerge"></i>Merge</button></div></div>
+  </section>
+</div>
+
+<script>
+// The More filters panel opens under the bar's More filters button (from md; a sheet below).
+document.addEventListener('DOMContentLoaded', function () {
+  if (document.documentElement.dataset.state !== 'filter' || innerWidth < 640) return;
+  var c = document.querySelector('.top .fchip.ico'), p = document.getElementById('mfp');
+  if (!c || !p) return;
+  c.style.borderColor = 'color-mix(in srgb, var(--accent) 35%, transparent)';
+  var r = c.getBoundingClientRect();
+  p.style.position = 'absolute'; p.style.top = (r.bottom + 6 + scrollY) + 'px'; p.style.left = Math.max(12, r.right - 440) + 'px';
+});
+</script>
+<script>var st0 = document.documentElement.dataset.state; window.LOG_PICKED = st0 === 'mixed' ? [1229, 1224] : st0 === 'filter' ? [] : [1229, 1230];</script>
+<script src="log.js"></script>
+</body>
+</html>

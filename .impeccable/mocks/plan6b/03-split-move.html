@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keel, split and move</title>
+<!-- Plan 6B comp 03 (spec 5.1). ?theme=dark for graphite. Variants: ?state=split (default), move, account-menu (an account's menu), account-move (the whole-account dialog) -->
+<script src="shell.js"></script>
+<link rel="stylesheet" href="shell.css">
+<style>
+.xt td, .xt th { height: 40px; }
+.acts { display: flex; flex-direction: column; margin-top: 4px; }
+.acct { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 12px; border-radius: 10px; border: 1px solid transparent; }
+.acct + .acct { margin-top: 2px; }
+.acct:hover { background: var(--sunken); }
+.acct.on { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+.acct b { font-weight: 600; font-size: 14px; }
+.acct .chip { margin-left: auto; }
+.acct small { font-size: 12.5px; color: var(--faint); width: 34px; text-align: right; }
+.acnote { margin-top: 8px; font-size: 12.5px; color: var(--faint); }
+.atbl td { white-space: nowrap; } .atbl td:last-child { overflow: visible; text-overflow: clip; }
+.atbl td.wr { white-space: normal; line-height: 1.35; }
+.rul.set svg.i { color: var(--accent); }
+.atbl td.nm b { font-weight: 600; }
+.atbl tr.cur td { background: var(--accent-soft); }
+.amenu { top: calc(100% + 4px); right: 0; width: 230px; }
+.atools { margin-top: 10px; }
+.atools .inp.sm { max-width: 320px; }
+@media (min-width: 640px) { .menu.only-phone { display: none !important; } }
+.cbx.sel { margin-right: 10px; vertical-align: -3px; }
+html:not([data-state='move']) .v-move, html:not([data-state='account-move']):not([data-state='account-menu']) .v-account, html:not([data-state='account-menu']) .v-amenu, html:not([data-state='account-move']) .v-adlg { display: none !important; }
+[data-state='account-move'] .v-log, [data-state='account-menu'] .v-log, [data-state='move'] .v-split { display: none !important; }
+@media (max-width: 639.98px) {
+  .xt { display: none; }
+}
+</style>
+</head>
+<body data-nav="trades" data-title="Trades" data-filters>
+<main id="content" class="page">
+<!-- The trade log behind the split and move dialogs. -->
+<div class="vrow v-log"><nav class="seg vseg" aria-label="Trade views"><a href="#">Day</a><a href="#">Week</a><a href="#" class="on" aria-current="page">All</a></nav></div>
+<section class="card log v-log" aria-label="Trades">
+  <div class="tbar2">
+    <div class="seg"><a class="on" href="#">Closed <span class="ct">1,518</span></a><a href="#">Open <span class="ct">4</span></a></div>
+    <div class="seg only-desk"><a class="on" href="#">All</a><a href="#">Not reviewed <span class="ct">527</span></a><a href="#">Reviewed <span class="ct">991</span></a></div>
+    <div class="inp sm"><i data-i="MagnifyingGlass" class="faint"></i><span class="faint">Symbol, #serial, strategy, tag</span></div>
+    <div class="end"><button class="btn sm"><i data-i="Columns"></i>Columns</button><button class="btn sm"><i data-i="DownloadSimple"></i>Export CSV</button><button class="btn sm"><i data-i="Plus"></i>Add trade</button></div>
+  </div>
+  <div class="tscroll only-desk" data-trunc><table style="min-width:1250px">
+    <colgroup><col style="width:32px"><col style="width:86px"><col style="width:92px"><col style="width:56px"><col style="width:44px"><col style="width:70px"><col style="width:70px"><col style="width:76px"><col style="width:62px"><col style="width:54px"><col style="width:62px"><col style="width:160px"><col style="width:120px"><col style="width:64px"><col style="width:80px"><col style="width:60px"><col style="width:62px"></colgroup>
+    <thead><tr><th class="cb"><span class="cbx mid"></span></th><th>Open</th><th>Instrument</th><th>Side</th><th class="n">Qty</th><th class="n">Entry</th><th class="n">Exit</th><th class="n">Net P&amp;L</th><th class="n">Net ROI</th><th class="n">R</th><th class="n">Duration</th><th style="padding-left:10px">Strategy</th><th>Tags</th><th class="n">Patterns</th><th>Rules</th><th>Rating</th><th>Reviewed</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table></div>
+  <ul class="prows pick only-phone" id="prows"></ul>
+</section>
+<div class="bulkwrap v-log">
+  <div class="bulk" role="toolbar" aria-label="Selected trades">
+    <span class="cnt"><i></i><span class="v-split">1 selected</span><span class="v-move">2 selected</span></span>
+    <button class="b"><i data-i="Tag"></i><span>Tag</span><i data-i="CaretDown:bold" class="cd"></i></button>
+    <button class="b"><i data-i="StackPlus"></i><span>Add to strategy</span><i data-i="CaretDown:bold" class="cd"></i></button>
+    <button class="b"><i data-i="StackMinus"></i><span>Remove from strategy</span><i data-i="CaretDown:bold" class="cd"></i></button>
+    <button class="b"><i data-i="SealCheck"></i><span>Mark reviewed</span></button>
+    <button class="b"><i data-i="Seal"></i><span>Mark not reviewed</span></button>
+    <button class="b"><i data-i="DownloadSimple"></i><span>Export CSV</span></button>
+    <span class="dv" aria-hidden="true"></span>
+    <button class="b ico" aria-haspopup="menu" aria-label="Merge, split or move" title="Merge, split or move"><i data-i="DotsThree:bold"></i></button>
+    <span class="dv" aria-hidden="true"></span>
+    <button class="b"><i data-i="Trash"></i><span>Delete</span></button>
+    <button class="b ico" aria-label="Clear selection"><i data-i="X"></i></button>
+  </div>
+</div>
+
+<!-- Settings, Accounts, with an account's menu open. -->
+<div class="sgrid v-account">
+  <nav class="snav" data-cur="accounts"></nav>
+  <div class="stack">
+    <section class="card flush" style="overflow:visible" aria-labelledby="ac-h">
+      <div class="hd px"><h2 id="ac-h">Accounts</h2><span class="cap">Sample workspace, 7 accounts</span><div class="end"><button class="btn pri"><i data-i="Plus:bold"></i>New account</button></div></div>
+      <div class="px atools"><div class="inp sm"><i data-i="MagnifyingGlass" class="faint"></i><span class="faint">Search by name or broker</span></div></div>
+      <table class="stbl atbl only-desk" style="margin-top:8px">
+        <colgroup><col style="width:170px"><col style="width:116px"><col style="width:120px"><col style="width:66px"><col style="width:108px"><col style="width:108px"><col style="width:70px"><col style="width:70px"><col style="width:92px"><col style="width:64px"></colgroup>
+        <thead><tr><th><span class="cbx sel"></span>Name</th><th>Broker</th><th>Type</th><th>Currency</th><th class="n">Starting balance</th><th class="n">Balance today</th><th>Time zone</th><th>Status</th><th>Prop rules</th><th><span class="sr">Actions</span></th></tr></thead>
+        <tbody>
+          <tr><td class="nm"><span class="cbx sel"></span><b>Euro futures</b></td><td class="muted wr">Sample futures broker</td><td><span class="chip">Live</span></td><td class="muted">EUR</td><td class="n">€25,000.00</td><td class="n b6">€26,180.40</td><td class="muted">Yours</td><td><span class="chip">Active</span></td><td class="muted wr">Does not apply</td><td class="n"><button class="rmenu" aria-label="Actions for Euro futures"><i data-i="DotsThree:bold"></i></button></td></tr>
+          <tr><td class="nm"><span class="cbx sel"></span><b>Forex evaluation</b></td><td class="muted wr">Sample prop firm</td><td><span class="chip ac">Prop evaluation</span></td><td class="muted">USD</td><td class="n">$100,000.00</td><td class="n b6">$103,394.44</td><td class="muted">Yours</td><td><span class="chip">Active</span></td><td><span class="rul set"><i data-i="CheckCircle:fill"></i>Set</span></td><td class="n"><button class="rmenu" aria-label="Actions for Forex evaluation"><i data-i="DotsThree:bold"></i></button></td></tr>
+          <tr><td class="nm"><span class="cbx sel"></span><b>Futures 100K evaluation</b></td><td class="muted wr">Sample prop firm</td><td><span class="chip ac">Prop evaluation</span></td><td class="muted">USD</td><td class="n">$100,000.00</td><td class="n b6">$95,763.25</td><td class="muted">Yours</td><td><span class="chip">Active</span></td><td><span class="rul set"><i data-i="CheckCircle:fill"></i>Set</span></td><td class="n"><button class="rmenu" aria-label="Actions for Futures 100K evaluation"><i data-i="DotsThree:bold"></i></button></td></tr>
+          <tr><td class="nm"><span class="cbx sel"></span><b>Futures 50K evaluation</b></td><td class="muted wr">Sample prop firm</td><td><span class="chip ac">Prop evaluation</span></td><td class="muted">USD</td><td class="n">$50,000.00</td><td class="n b6">$53,109.85</td><td class="muted">Yours</td><td><span class="chip">Active</span></td><td><span class="rul set"><i data-i="CheckCircle:fill"></i>Set</span></td><td class="n"><button class="rmenu" aria-label="Actions for Futures 50K evaluation"><i data-i="DotsThree:bold"></i></button></td></tr>
+          <tr><td class="nm"><span class="cbx sel"></span><b>Futures 50K funded</b></td><td class="muted wr">Sample prop firm</td><td><span class="chip ac">Prop funded</span></td><td class="muted">USD</td><td class="n">$50,000.00</td><td class="n b6">$52,132.60</td><td class="muted">Yours</td><td><span class="chip">Active</span></td><td><span class="rul set"><i data-i="CheckCircle:fill"></i>Set</span></td><td class="n"><button class="rmenu" aria-label="Actions for Futures 50K funded"><i data-i="DotsThree:bold"></i></button></td></tr>
+          <tr><td class="nm"><span class="cbx sel"></span><b>Futures live</b></td><td class="muted wr">Sample futures broker</td><td><span class="chip">Live</span></td><td class="muted">USD</td><td class="n">$50,000.00</td><td class="n b6">$60,860.55</td><td class="muted">Yours</td><td><span class="chip">Active</span></td><td class="muted wr">Does not apply</td>
+            <td class="n" style="overflow:visible"><span class="anchor"><button class="rmenu" aria-haspopup="menu" aria-label="Actions for Futures live"><i data-i="DotsThree:bold"></i></button>
+              <div class="menu sheet amenu v-amenu" role="menu" aria-label="Actions for Futures live">
+                <div class="sheet-hd"><b>Futures live</b></div>
+                <button class="it" role="menuitem">Edit</button>
+                <button class="it" role="menuitem">Add a trade</button>
+                <button class="it hl" role="menuitem">Move trades</button>
+                <button class="it" role="menuitem">Deposits and withdrawals</button>
+                <button class="it" role="menuitem">Archive</button>
+                <button class="it danger" role="menuitem">Clear trades</button>
+              </div></span></td></tr>
+          <tr><td class="nm"><span class="cbx sel"></span><b>Stocks &amp; options</b></td><td class="muted wr">Sample multi-asset broker</td><td><span class="chip">Live</span></td><td class="muted">USD</td><td class="n">$25,000.00</td><td class="n b6">$27,225.56</td><td class="muted">Yours</td><td><span class="chip">Active</span></td><td class="muted wr">Does not apply</td><td class="n"><button class="rmenu" aria-label="Actions for Stocks and options"><i data-i="DotsThree:bold"></i></button></td></tr>
+        </tbody>
+      </table>
+      <ul class="prows pick only-phone px" style="margin-top:8px">
+        <li><a href="#"><span class="l1"><b style="margin:0" class="b6">Euro futures</b><b>€26,180.40</b></span><span class="l2"><span class="chip">Live</span><span class="chip">Active</span><span>EUR</span></span></a><button class="rmenu" aria-label="Actions"><i data-i="DotsThree:bold"></i></button></li>
+        <li><a href="#"><span class="l1"><b style="margin:0" class="b6">Forex evaluation</b><b>$103,394.44</b></span><span class="l2"><span class="chip ac">Prop evaluation</span><span class="chip">Active</span><span>Rules set</span></span></a><button class="rmenu" aria-label="Actions"><i data-i="DotsThree:bold"></i></button></li>
+        <li><a href="#"><span class="l1"><b style="margin:0" class="b6">Futures 100K evaluation</b><b>$95,763.25</b></span><span class="l2"><span class="chip ac">Prop evaluation</span><span class="chip">Active</span><span>Rules set</span></span></a><button class="rmenu" aria-label="Actions"><i data-i="DotsThree:bold"></i></button></li>
+        <li><a href="#"><span class="l1"><b style="margin:0" class="b6">Futures 50K evaluation</b><b>$53,109.85</b></span><span class="l2"><span class="chip ac">Prop evaluation</span><span class="chip">Active</span><span>Rules set</span></span></a><button class="rmenu" aria-label="Actions"><i data-i="DotsThree:bold"></i></button></li>
+        <li><a href="#"><span class="l1"><b style="margin:0" class="b6">Futures 50K funded</b><b>$52,132.60</b></span><span class="l2"><span class="chip ac">Prop funded</span><span class="chip">Active</span><span>Rules set</span></span></a><button class="rmenu" aria-label="Actions"><i data-i="DotsThree:bold"></i></button></li>
+        <li><a href="#"><span class="l1"><b style="margin:0" class="b6">Futures live</b><b>$60,860.55</b></span><span class="l2"><span class="chip">Live</span><span class="chip">Active</span></span></a><button class="rmenu open" aria-label="Actions for Futures live"><i data-i="DotsThree:bold"></i></button></li>
+        <li><a href="#"><span class="l1"><b style="margin:0" class="b6">Stocks &amp; options</b><b>$25,225.56</b></span><span class="l2"><span class="chip">Live</span><span class="chip">Active</span></span></a><button class="rmenu" aria-label="Actions"><i data-i="DotsThree:bold"></i></button></li>
+      </ul>
+    </section>
+  </div>
+</div>
+</main>
+<div class="phveil v-amenu"></div>
+<div class="menu sheet only-phone v-amenu" role="menu" aria-label="Actions for Futures live" style="display:block">
+  <div class="sheet-hd"><b>Futures live</b></div>
+  <button class="it" role="menuitem">Edit</button><button class="it" role="menuitem">Add a trade</button><button class="it hl" role="menuitem">Move trades</button>
+  <button class="it" role="menuitem">Deposits and withdrawals</button><button class="it" role="menuitem">Archive</button><button class="it danger" role="menuitem">Clear trades</button>
+</div>
+
+<!-- Split: the trade's executions, two ticked to move into a new trade. -->
+<div class="v-split v-log">
+  <div class="veil"></div>
+  <section class="dlg md" role="dialog" aria-modal="true" aria-labelledby="sp-t">
+    <div class="dlg-hd"><div><h2 id="sp-t">Split trade 1219</h2><p>ES Dec 26, Mon 23 Nov. Tick the executions that move to a new trade.</p></div><button class="xbtn" aria-label="Close"><i data-i="X"></i></button></div>
+    <div class="dlg-bd">
+      <table class="xt">
+        <colgroup><col style="width:34px"><col><col style="width:80px"><col style="width:84px"><col style="width:104px"><col style="width:92px"></colgroup>
+        <thead><tr><th class="cb"><span class="cbx mid"></span></th><th>Time</th><th>Side</th><th class="n">Quantity</th><th class="n">Price</th><th class="n">Position</th></tr></thead>
+        <tbody>
+          <tr><td class="cb"><span class="cbx"></span></td><td class="tm"><b>09:41:12</b></td><td><span class="sd">Buy</span></td><td class="n">2</td><td class="n f">6,592.25</td><td class="n">+2</td></tr>
+          <tr class="sel"><td class="cb"><span class="cbx on"><i data-i="Check:bold"></i></span></td><td class="tm"><b>09:47:30</b></td><td><span class="sd">Buy</span></td><td class="n">1</td><td class="n f">6,589.50</td><td class="n">+3</td></tr>
+          <tr class="sel"><td class="cb"><span class="cbx on"><i data-i="Check:bold"></i></span></td><td class="tm"><b>09:55:02</b></td><td><span class="sd">Sell</span></td><td class="n">1</td><td class="n f">6,598.00</td><td class="n">+2</td></tr>
+          <tr><td class="cb"><span class="cbx"></span></td><td class="tm"><b>10:03:44</b></td><td><span class="sd">Sell</span></td><td class="n">2</td><td class="n f">6,600.75</td><td class="n faint">Flat</td></tr>
+        </tbody>
+      </table>
+      <ul class="prows pick only-phone" aria-label="Executions">
+        <li><span class="cbx"></span><a href="#"><span class="l1"><b class="b6" style="margin:0">09:41:12</b><span class="tm">Buy</span></span><span class="l2"><span>2 at 6,592.25</span></span></a></li>
+        <li class="sel"><span class="cbx on"><i data-i="Check:bold"></i></span><a href="#"><span class="l1"><b class="b6" style="margin:0">09:47:30</b><span class="tm">Buy</span></span><span class="l2"><span>1 at 6,589.50</span></span></a></li>
+        <li class="sel"><span class="cbx on"><i data-i="Check:bold"></i></span><a href="#"><span class="l1"><b class="b6" style="margin:0">09:55:02</b><span class="tm">Sell</span></span><span class="l2"><span>1 at 6,598.00</span></span></a></li>
+        <li><span class="cbx"></span><a href="#"><span class="l1"><b class="b6" style="margin:0">10:03:44</b><span class="tm">Sell</span></span><span class="l2"><span>2 at 6,600.75</span></span></a></li>
+      </ul>
+      <div class="wwh"><b>What will happen</b><ul>
+        <li><strong>1219</strong> keeps 2 executions, buy 2 and sell 2, and ends flat. It keeps its note, rating, rule checks, targets and stops.</li>
+        <li>A new trade, <strong>1241</strong>, takes the 2 ticked executions, buy 1 and sell 1, and ends flat. It copies 1219's tags and strategies.</li>
+        <li>There is no undo. To put them back, merge the two.</li>
+      </ul></div>
+    </div>
+    <div class="dlg-ft"><span class="cap">2 of 4 ticked</span><div class="end"><button class="btn">Cancel</button><button class="btn pri"><i data-i="ArrowsSplit"></i>Split</button></div></div>
+  </section>
+</div>
+
+<!-- Move: the active accounts other than the trades' own; what moves; confirm. -->
+<div class="v-move">
+  <div class="veil"></div>
+  <section class="dlg md fit" role="dialog" aria-modal="true" aria-labelledby="mv-t">
+    <div class="dlg-hd"><div><h2 id="mv-t">Move 2 trades</h2><p>1229 and 1230, ES Dec 26, now in Futures live. Pick where they go.</p></div><button class="xbtn" aria-label="Close"><i data-i="X"></i></button></div>
+    <div class="dlg-bd">
+      <div class="acts" role="radiogroup" aria-label="Account">
+        <label class="acct"><span class="rdo"></span><b>Futures 50K evaluation</b><span class="chip ac">Prop evaluation</span><small>USD</small></label>
+        <label class="acct"><span class="rdo"></span><b>Futures 50K funded</b><span class="chip ac">Prop funded</span><small>USD</small></label>
+        <label class="acct"><span class="rdo"></span><b>Futures 100K evaluation</b><span class="chip ac">Prop evaluation</span><small>USD</small></label>
+        <label class="acct"><span class="rdo"></span><b>Forex evaluation</b><span class="chip ac">Prop evaluation</span><small>USD</small></label>
+        <label class="acct"><span class="rdo"></span><b>Stocks &amp; options</b><span class="chip">Live</span><small>USD</small></label>
+        <label class="acct on"><span class="rdo on"></span><b>Euro futures</b><span class="chip">Live</span><small>EUR</small></label>
+      </div>
+      <p class="note" style="margin-top:10px"><i data-i="Info"></i><span>Euro futures is in EUR. These trades keep their own currency, USD, and every figure on them stays as it is.</span></p>
+      <p class="acnote">Only active accounts are listed. Archived accounts are read-only.</p>
+      <div class="wwh"><b>What moves</b><ul>
+        <li>Both trades, with everything on them: notes, tags, strategies, rule checks, targets and stops, rating, the reviewed mark and files.</li>
+        <li><strong>Futures live</strong> keeps its deposits, withdrawals and balance.</li>
+        <li>There is no undo. Move them back the same way.</li>
+      </ul></div>
+    </div>
+    <div class="dlg-ft"><div class="end"><button class="btn">Cancel</button><button class="btn pri"><i data-i="ArrowsLeftRight"></i>Move 2 trades</button></div></div>
+  </section>
+</div>
+
+<!-- Move trades from an account's menu: every trade in it, the same picker and what moves. -->
+<div class="v-adlg">
+  <div class="veil"></div>
+  <section class="dlg md fit" role="dialog" aria-modal="true" aria-labelledby="am-t">
+    <div class="dlg-hd"><div><h2 id="am-t">Move the trades in Futures live</h2><p>All 412 trades go to the account you pick. Futures live itself stays.</p></div><button class="xbtn" aria-label="Close"><i data-i="X"></i></button></div>
+    <div class="dlg-bd">
+      <div class="acts" role="radiogroup" aria-label="Account">
+        <label class="acct"><span class="rdo"></span><b>Futures 50K evaluation</b><span class="chip ac">Prop evaluation</span><small>USD</small></label>
+        <label class="acct on"><span class="rdo on"></span><b>Futures 50K funded</b><span class="chip ac">Prop funded</span><small>USD</small></label>
+        <label class="acct"><span class="rdo"></span><b>Futures 100K evaluation</b><span class="chip ac">Prop evaluation</span><small>USD</small></label>
+        <label class="acct"><span class="rdo"></span><b>Forex evaluation</b><span class="chip ac">Prop evaluation</span><small>USD</small></label>
+        <label class="acct"><span class="rdo"></span><b>Stocks &amp; options</b><span class="chip">Live</span><small>USD</small></label>
+        <label class="acct"><span class="rdo"></span><b>Euro futures</b><span class="chip">Live</span><small>EUR</small></label>
+      </div>
+      <p class="acnote">Only active accounts are listed. Archived accounts are read-only.</p>
+      <div class="wwh"><b>What moves</b><ul>
+        <li>All 412 trades, with everything on them: notes, tags, strategies, rule checks, targets and stops, rating, the reviewed mark and files.</li>
+        <li><strong>Futures live</strong> stays, with its deposits, withdrawals and balance.</li>
+        <li>There is no undo. Move them back the same way.</li>
+      </ul></div>
+    </div>
+    <div class="dlg-ft"><div class="end"><button class="btn">Cancel</button><button class="btn pri"><i data-i="ArrowsLeftRight"></i>Move 412 trades</button></div></div>
+  </section>
+</div>
+
+<script>
+var st = document.documentElement.dataset.state;
+if (st === 'account-move' || st === 'account-menu') { document.body.dataset.nav = 'settings'; document.body.dataset.title = 'Settings'; delete document.body.dataset.filters; }
+window.LOG_PICKED = st === 'move' ? [1229, 1230] : [1219];
+</script>
+<script src="log.js"></script>
+</body>
+</html>

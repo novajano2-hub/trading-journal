@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keel, Trading settings</title>
+<!-- Plan 6B comp 04 (spec 5.3). Settings > Trading: its existing card (trading.tsx), then the two default-rule cards under one note.
+     ?theme=dark for graphite. Variants: ?state=target-rule (opened, defaults), target-rule-filled, fees (a fee rule's menu),
+     fee-rule (opened, defaults, the instrument list open), apply -->
+<script src="shell.js"></script>
+<link rel="stylesheet" href="shell.css">
+<style>
+.rtbl td { padding-top: 10px; padding-bottom: 10px; }
+.rtbl td b { font-weight: 600; }
+.rtbl .sy { display: flex; flex-wrap: wrap; gap: 4px; }
+.rtbl .sy .chip { font-family: inherit; }
+.rmn { top: calc(100% + 4px); right: 0; width: 230px; }
+.lvlbox { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px 6px; }
+.lvlbox .lh { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.lvlbox .lh b { font-size: 13.5px; font-weight: 600; flex: 1; }
+.lvlbox .lvl + .lvl { margin-top: 6px; }
+.ladd { margin-top: 4px; }
+.lvl2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.swrow { display: flex; align-items: center; gap: 12px; min-height: 40px; }
+.swrow > span:first-child { flex: 1; font-size: 13.5px; font-weight: 500; }
+.cbrow { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 10px; border: 1px solid var(--line); margin-top: 14px; }
+.cbrow .cbx { margin-top: 1px; }
+.cbrow b { display: block; font-size: 13.5px; font-weight: 600; } .cbrow small { display: block; font-size: 12.5px; color: var(--muted); margin-top: 2px; line-height: 1.45; }
+.will { margin-top: 14px; font-size: 14px; } .will b { font-weight: 600; }
+.cbody { font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+.trc .trg { display: grid; gap: 28px; max-width: 560px; margin-top: 20px; }
+.tl1 { display: block; font-size: 14px; font-weight: 500; color: var(--text); }
+.tl2 { font-size: 13px !important; font-weight: 500; color: var(--muted) !important; }
+.th1 { margin-top: 4px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.tpills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.tp { display: inline-flex; align-items: center; height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--surface-1); font-size: 13.5px; font-weight: 500; color: var(--muted); }
+.tp.on { border-color: transparent; background: var(--accent-soft); color: var(--accent-ink); }
+.trow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.trow.tops { align-items: flex-start; flex-wrap: nowrap; } .trow.tops > div { flex: 1; min-width: 0; } .trow.tops .sw { margin-top: 2px; }
+.bef { display: flex; gap: 12px; margin-top: 12px; } .bef .fld { width: 130px; gap: 4px; }
+.ilist { top: calc(100% + 4px); left: 0; right: 0; min-width: 0; z-index: 50; }
+.inp.ph { color: var(--faint); }
+.pnote { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--muted); line-height: 1.5; padding: 2px 2px 0; }
+.pnote svg.i { width: 16px; height: 16px; margin-top: 1px; color: var(--muted); }
+.prr .rmenu { flex: none; }
+html:not([data-state]) .tmo, [data-state='fees'] .fmo { background: var(--sunken); color: var(--text); }
+html:not([data-state='target-rule']) .v-target, html:not([data-state='target-rule-filled']) .v-target-filled, html:not([data-state='fee-rule']) .v-fee, html:not([data-state='apply']) .v-apply, html:not([data-state='fees']) .v-fees { display: none !important; }
+[data-state='fees'] .v-tmenu, [data-state='target-rule'] .v-tmenu, [data-state='target-rule-filled'] .v-tmenu, [data-state='fee-rule'] .v-tmenu, [data-state='apply'] .v-tmenu { display: none !important; }
+@media (max-width: 639.98px) { .lvl2 { grid-template-columns: minmax(0, 1fr); } .lvl.lh2 { display: none; } }
+@media (min-width: 640px) { .menu.only-phone { display: none !important; } }
+</style>
+</head>
+<body data-nav="settings" data-title="Settings">
+<main id="content" class="page">
+<div class="sgrid">
+  <nav class="snav" data-cur="trading"></nav>
+  <div class="stack">
+    <section class="card trc" aria-labelledby="tr-h">
+      <div class="hd"><h2 id="tr-h">Trading</h2></div>
+      <div class="trg">
+        <fieldset><legend class="tl1">Instruments you trade</legend><p class="th1">Pick every kind of instrument you trade. Keel leaves the others out of its choices.</p>
+          <div class="tpills"><span class="tp on">Stocks</span><span class="tp on">Options</span><span class="tp on">Futures</span><span class="tp on">Forex</span><span class="tp on">Crypto</span><span class="tp">CFDs</span></div></fieldset>
+        <div><div class="trow"><span class="tl1">Breakeven range</span><div class="seg"><a class="on" href="#">$</a><a href="#">%</a></div></div>
+          <div class="bef"><div class="fld"><label class="tl2">From</label><div class="inp sm"><span class="pre">$</span>-5</div></div><div class="fld"><label class="tl2">To</label><div class="inp sm"><span class="pre">$</span>5</div></div></div>
+          <p class="th1">A trade that closes between these two amounts counts as breakeven, not a win or a loss.</p></div>
+        <div class="trow tops"><div><span class="tl1">Settle expired options at zero</span><p class="th1">An option still open past its expiry closes at zero on that day, so it books its full loss without a hand-made exit.</p></div><span class="sw on" role="switch" aria-checked="true" aria-label="Settle expired options at zero"></span></div>
+        <div><span class="tl1">Default P&amp;L basis</span><p class="th1">Net takes fees and commissions out. The P&amp;L choice in the Display menu changes the same setting.</p><div class="seg" style="margin-top:12px"><a class="on" href="#">Net</a><a href="#">Gross</a></div></div>
+        <div><span class="tl1">Weeks start on</span><p class="th1">The Calendar, the weekly totals, the This week and Last week dates and the weekday reports all begin their weeks on this day.</p><div class="seg" style="margin-top:12px"><a class="on" href="#">Sunday</a><a href="#">Monday</a></div></div>
+      </div>
+    </section>
+    <p class="pnote"><i data-i="Info"></i><span>Both kinds of rule below fill in trades as you import them. Trades already in Keel, and trades you add by hand, change only when you use Apply to existing trades on a rule.</span></p>
+
+    <section class="card flush" style="overflow:visible" aria-labelledby="ts-h">
+      <div class="hd px"><h2 id="ts-h">Targets and stops</h2><span class="cap">2 rules</span><div class="end"><button class="btn sm"><i data-i="Plus:bold"></i>Add rule</button></div></div>
+      <table class="stbl rtbl only-desk" style="margin-top:8px">
+        <colgroup><col style="width:22%"><col style="width:14%"><col style="width:18%"><col><col style="width:68px"></colgroup>
+        <thead><tr><th>Account</th><th>Instrument</th><th>Symbols</th><th>Levels</th><th><span class="sr">Actions</span></th></tr></thead>
+        <tbody>
+          <tr><td><b>Futures live</b></td><td>Future</td><td><span class="sy"><span class="chip">ES</span><span class="chip">MES</span></span></td><td>Targets 8 points (50%), 16 points (50%)<span class="l2">Stop 6 points (100%)</span></td>
+            <td class="n" style="overflow:visible"><span class="anchor"><button class="rmenu tmo" aria-haspopup="menu" aria-label="Actions for the Futures live rule"><i data-i="DotsThree:bold"></i></button>
+              <div class="menu rmn v-tmenu" role="menu"><button class="it hl" role="menuitem">Apply to existing trades</button><button class="it" role="menuitem">Edit</button><button class="it danger" role="menuitem">Delete</button></div></span></td></tr>
+          <tr><td><b>Forex evaluation</b></td><td>Forex</td><td class="muted">All symbols</td><td>Target 30 pips (100%)<span class="l2">Stops 15 pips (50%), 25 pips (50%)</span></td><td class="n"><button class="rmenu" aria-label="Actions for the Forex evaluation rule"><i data-i="DotsThree:bold"></i></button></td></tr>
+        </tbody>
+      </table>
+      <ul class="prows pick only-phone px" style="margin-top:6px">
+        <li class="prr"><a href="#"><span class="l1"><b style="margin:0" class="b6">Futures live</b><span class="tm">Future, ES and MES</span></span><span class="l2"><span>Targets 8 and 16 points, 50% each</span><span>Stop 6 points, 100%</span></span></a><button class="rmenu tmo" aria-label="Actions for the Futures live rule"><i data-i="DotsThree:bold"></i></button></li>
+        <li class="prr"><a href="#"><span class="l1"><b style="margin:0" class="b6">Forex evaluation</b><span class="tm">Forex, all symbols</span></span><span class="l2"><span>Target 30 pips, 100%</span><span>Stops 15 and 25 pips, 50% each</span></span></a><button class="rmenu" aria-label="Actions for the Forex evaluation rule"><i data-i="DotsThree:bold"></i></button></li>
+      </ul>
+    </section>
+
+    <section class="card flush" style="overflow:visible" aria-labelledby="cf-h">
+      <div class="hd px"><h2 id="cf-h">Commissions and fees</h2><span class="cap">2 rules</span><div class="end"><button class="btn sm"><i data-i="Plus:bold"></i>Add rule</button></div></div>
+      <table class="stbl rtbl only-desk" style="margin-top:8px">
+        <colgroup><col style="width:22%"><col style="width:14%"><col style="width:18%"><col><col style="width:68px"></colgroup>
+        <thead><tr><th>Account</th><th>Instrument</th><th>Symbols</th><th>Costs</th><th><span class="sr">Actions</span></th></tr></thead>
+        <tbody>
+          <tr><td><b>Futures live</b></td><td>Future</td><td class="muted">All symbols</td><td>$1.29 commission, $1.38 fee<span class="l2">Per contract, on every execution</span></td>
+            <td class="n" style="overflow:visible"><span class="anchor"><button class="rmenu fmo" aria-haspopup="menu" aria-label="Actions for the Futures live fee rule"><i data-i="DotsThree:bold"></i></button>
+              <div class="menu rmn v-fees" role="menu"><button class="it hl" role="menuitem">Apply to existing trades</button><button class="it" role="menuitem">Edit</button><button class="it danger" role="menuitem">Delete</button></div></span></td></tr>
+          <tr><td><b>Forex evaluation</b></td><td>Forex</td><td><span class="sy"><span class="chip">EURUSD</span><span class="chip">USDJPY</span></span></td><td>$7.00 commission, $0.00 fee<span class="l2">Per contract, on exits</span></td><td class="n"><button class="rmenu" aria-label="Actions for the Forex evaluation fee rule"><i data-i="DotsThree:bold"></i></button></td></tr>
+        </tbody>
+      </table>
+      <ul class="prows pick only-phone px" style="margin-top:6px">
+        <li class="prr"><a href="#"><span class="l1"><b style="margin:0" class="b6">Futures live</b><span class="tm">Future, all symbols</span></span><span class="l2"><span>$1.29 commission, $1.38 fee</span><span>Per contract, every execution</span></span></a><button class="rmenu" aria-label="Actions for the Futures live fee rule"><i data-i="DotsThree:bold"></i></button></li>
+        <li class="prr"><a href="#"><span class="l1"><b style="margin:0" class="b6">Forex evaluation</b><span class="tm">Forex, EURUSD and USDJPY</span></span><span class="l2"><span>$7.00 commission, $0.00 fee</span><span>Per contract, on exits</span></span></a><button class="rmenu" aria-label="Actions for the Forex evaluation fee rule"><i data-i="DotsThree:bold"></i></button></li>
+      </ul>
+    </section>
+  </div>
+</div>
+</main>
+
+<!-- Phone: the open rule menu is a sheet. -->
+<div class="v-tmenu only-phone"><div class="phveil"></div><div class="menu sheet only-phone" role="menu" style="display:block"><div class="sheet-hd"><b>Futures live, targets and stops</b></div><button class="it hl" role="menuitem">Apply to existing trades</button><button class="it" role="menuitem">Edit</button><button class="it danger" role="menuitem">Delete</button></div></div>
+<div class="v-fees only-phone"><div class="phveil"></div><div class="menu sheet only-phone" role="menu" style="display:block"><div class="sheet-hd"><b>Futures live, commissions and fees</b></div><button class="it hl" role="menuitem">Apply to existing trades</button><button class="it" role="menuitem">Edit</button><button class="it danger" role="menuitem">Delete</button></div></div>
+
+<!-- New target and stop rule, as it opens: nothing picked, each level at 100%. -->
+<div class="v-target">
+  <div class="veil"></div>
+  <section class="dlg md" role="dialog" aria-modal="true" aria-labelledby="tr0-t">
+    <div class="dlg-hd"><div><h2 id="tr0-t">New target and stop rule</h2><p>Fills targets and stops on matching trades as they are imported.</p></div><button class="xbtn" aria-label="Close"><i data-i="X"></i></button></div>
+    <div class="dlg-bd">
+      <div class="fgrid">
+        <div class="fld"><label>Account</label><div class="inp ph">Choose an account<i data-i="CaretDown:bold" class="sel"></i></div></div>
+        <div class="fld"><label>Instrument</label><div class="inp ph">Choose an instrument<i data-i="CaretDown:bold" class="sel"></i></div></div>
+        <div class="fld full"><label>Symbols</label><div class="inp chipin"><span class="ph">Add a symbol</span></div><p class="hint">Leave it empty to cover every symbol of the instrument in this account.</p></div>
+      </div>
+      <div class="lvl2" style="margin-top:16px">
+        <div class="lvlbox"><div class="lh"><b>Targets</b><button class="unit" aria-disabled="true" title="Pick an instrument first" style="color:var(--faint)">Unit<i data-i="CaretDown:bold"></i></button></div>
+          <div class="lvl lh2"><span class="hdr">Level</span><span class="hdr q">Share</span><span></span></div>
+          <div class="lvl"><span class="f"><span class="faint" style="font-weight:400">Not set</span></span><span class="f q"><span>100</span><small>%</small></span><button class="rm" aria-label="Remove level"><i data-i="X:bold"></i></button></div>
+          <div class="ladd"><button class="addl"><i data-i="Plus:bold"></i>Add level</button></div></div>
+        <div class="lvlbox"><div class="lh"><b>Stops</b><button class="unit" aria-disabled="true" title="Pick an instrument first" style="color:var(--faint)">Unit<i data-i="CaretDown:bold"></i></button></div>
+          <div class="lvl lh2"><span class="hdr">Level</span><span class="hdr q">Share</span><span></span></div>
+          <div class="lvl"><span class="f"><span class="faint" style="font-weight:400">Not set</span></span><span class="f q"><span>100</span><small>%</small></span><button class="rm" aria-label="Remove level"><i data-i="X:bold"></i></button></div>
+          <div class="ladd"><button class="addl"><i data-i="Plus:bold"></i>Add level</button></div></div>
+      </div>
+      <p class="hint" style="margin-top:10px">The units follow the instrument. A share becomes a quantity of each trade's largest position, rounded down; the last level takes what is left.</p>
+    </div>
+    <div class="dlg-ft"><div class="end"><button class="btn">Cancel</button><button class="btn pri" disabled aria-disabled="true">Create</button></div></div>
+  </section>
+</div>
+
+<!-- The same dialog filled in: an example. -->
+<div class="v-target-filled">
+  <div class="veil"></div>
+  <section class="dlg md" role="dialog" aria-modal="true" aria-labelledby="tr1-t">
+    <div class="dlg-hd"><div><h2 id="tr1-t">New target and stop rule</h2><p>Fills targets and stops on matching trades as they are imported.</p></div><button class="xbtn" aria-label="Close"><i data-i="X"></i></button></div>
+    <div class="dlg-bd">
+      <div class="fgrid">
+        <div class="fld"><label>Account</label><div class="inp">Futures live<i data-i="CaretDown:bold" class="sel"></i></div></div>
+        <div class="fld"><label>Instrument</label><div class="inp">Future<i data-i="CaretDown:bold" class="sel"></i></div></div>
+        <div class="fld full"><label>Symbols</label><div class="inp chipin"><span class="chip">ES<button aria-label="Remove ES"><i data-i="X:bold"></i></button></span><span class="chip">MES<button aria-label="Remove MES"><i data-i="X:bold"></i></button></span><span class="ph">Add a symbol</span></div><p class="hint">Leave it empty to cover every futures symbol in this account.</p></div>
+      </div>
+      <div class="lvl2" style="margin-top:16px">
+        <div class="lvlbox"><div class="lh"><b>Targets</b><button class="unit" aria-label="Targets unit: Points">Points<i data-i="CaretDown:bold"></i></button></div>
+          <div class="lvl lh2"><span class="hdr">Level</span><span class="hdr q">Share</span><span></span></div><div class="lvl"><span class="f"><span>8</span><small>points</small></span><span class="f q"><span>50</span><small>%</small></span><button class="rm" aria-label="Remove level 8"><i data-i="X:bold"></i></button></div><div class="lvl"><span class="f"><span>16</span><small>points</small></span><span class="f q"><span>50</span><small>%</small></span><button class="rm" aria-label="Remove level 16"><i data-i="X:bold"></i></button></div><div class="ladd"><button class="addl"><i data-i="Plus:bold"></i>Add level</button></div></div>
+        <div class="lvlbox"><div class="lh"><b>Stops</b><button class="unit" aria-label="Stops unit: Points">Points<i data-i="CaretDown:bold"></i></button></div>
+          <div class="lvl lh2"><span class="hdr">Level</span><span class="hdr q">Share</span><span></span></div><div class="lvl"><span class="f"><span>6</span><small>points</small></span><span class="f q"><span>100</span><small>%</small></span><button class="rm" aria-label="Remove level 6"><i data-i="X:bold"></i></button></div><div class="ladd"><button class="addl"><i data-i="Plus:bold"></i>Add level</button></div></div>
+      </div>
+      <p class="hint" style="margin-top:10px">A share becomes a quantity of each trade's largest position, rounded down. The last level takes what is left.</p>
+    </div>
+    <div class="dlg-ft"><div class="end"><button class="btn">Cancel</button><button class="btn pri">Create</button></div></div>
+  </section>
+</div>
+
+<!-- New commission and fee rule, as it opens: All symbols on, per execution, every execution, 0.00; the instrument list open. -->
+<div class="v-fee">
+  <div class="veil"></div>
+  <section class="dlg md" role="dialog" aria-modal="true" aria-labelledby="fr-t" style="overflow:visible">
+    <div class="dlg-hd"><div><h2 id="fr-t">New commission and fee rule</h2><p>Fills costs on matching executions as they are imported.</p></div><button class="xbtn" aria-label="Close"><i data-i="X"></i></button></div>
+    <div class="dlg-bd" style="overflow:visible">
+      <div class="fgrid">
+        <div class="fld"><label>Account</label><div class="inp">Futures live<i data-i="CaretDown:bold" class="sel"></i></div></div>
+        <div class="fld anchor"><label>Instrument</label><div class="inp ph focus">Choose an instrument<i data-i="CaretDown:bold" class="sel"></i></div>
+          <div class="menu ilist" role="listbox" aria-label="Instrument"><button class="it" role="option">Stock</button><button class="it" role="option">Option</button><button class="it" role="option">Future option</button><button class="it hl" role="option">Future</button><button class="it" role="option">Forex</button><button class="it" role="option">Crypto</button><button class="it" role="option">CFD</button></div></div>
+        <div class="fld full"><div class="swrow"><span>All symbols</span><span class="sw on" role="switch" aria-checked="true" aria-label="All symbols"></span></div></div>
+        <div class="fld full"><span class="flabel">Charge</span><div class="seg full"><a href="#">Per contract</a><a class="on" href="#">Per execution</a></div></div>
+        <div class="fld full"><span class="flabel">On</span><div class="seg full"><a class="on" href="#">Every execution</a><a href="#">Entries</a><a href="#">Exits</a></div></div>
+        <div class="fld"><label>Commission</label><div class="inp"><span class="pre">$</span>0.00</div></div>
+        <div class="fld"><label>Fee</label><div class="inp"><span class="pre">$</span>0.00</div></div>
+      </div>
+      <p class="hint" style="margin-top:10px">In the account's currency, USD. Per contract multiplies by each execution's quantity.</p>
+    </div>
+    <div class="dlg-ft"><div class="end"><button class="btn">Cancel</button><button class="btn pri" disabled aria-disabled="true">Create</button></div></div>
+  </section>
+</div>
+
+<!-- Apply to existing trades: the override box and the count it will touch. -->
+<div class="v-apply">
+  <div class="veil"></div>
+  <section class="dlg sm fit" role="dialog" aria-modal="true" aria-labelledby="ap-t">
+    <div class="dlg-hd"><div><h2 id="ap-t">Apply this rule to existing trades?</h2></div><button class="xbtn" aria-label="Close"><i data-i="X"></i></button></div>
+    <div class="dlg-bd">
+      <p class="cbody">Targets 8 and 16 points, stop 6 points. It matches 412 trades in Futures live on ES and MES, manual trades included.</p>
+      <label class="cbrow"><span class="cbx"><i data-i="Check:bold"></i></span><span><b>Replace targets and stops already set</b><small>Left unticked, only trades with no targets or stops get them.</small></span></label>
+      <p class="will"><b>268 trades</b> will change. Each change is logged in Logs.</p>
+    </div>
+    <div class="dlg-ft"><div class="end"><button class="btn">Cancel</button><button class="btn pri">Apply to 268 trades</button></div></div>
+  </section>
+</div>
+</body>
+</html>

@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keel, patterns</title>
+<!-- Plan 6B comp 09 (spec 5.5). The 6A day card with its patterns control open; ?state=report is Reports, Patterns on the breakdown anatomy.
+     ?theme=dark for graphite. -->
+<script src="shell.js"></script>
+<link rel="stylesheet" href="shell.css">
+<style>
+/* The 6A Trades Day view (06-trades-day.html), trimmed to what this comp needs. */
+.tl { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
+.tl-list { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.dc { padding: 14px 20px 16px; }
+.dc-hd { display: flex; align-items: center; gap: 10px; min-height: 36px; position: relative; }
+.dc-tog { width: 28px; height: 28px; margin-left: -6px; display: grid; place-items: center; border-radius: 8px; color: var(--muted); }
+.dc-tog svg.i { width: 14px; height: 14px; }
+.dc-hd h2 { font-size: 15px; font-weight: 600; letter-spacing: -.015em; white-space: nowrap; }
+.dc-net { font-size: 15px; font-weight: 600; white-space: nowrap; }
+.qa { margin-left: auto; display: flex; gap: 2px; align-items: center; }
+.qa .btn.sm { color: var(--muted); font-weight: 500; padding: 0 10px; }
+.qa .btn.sm svg.i { color: var(--muted); }
+.qa .btn .mw { color: var(--text); font-weight: 600; }
+.qa svg.cd { width: 12px !important; height: 12px !important; color: var(--faint) !important; }
+.qa .btn.open { background: var(--sunken); color: var(--text); }
+.qa .n2 { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--sunken); color: var(--text); font-size: 12px; font-weight: 600; display: inline-grid; place-items: center; }
+.qa .btn.open .n2 { background: var(--surface-1); }
+.dc-chart { position: relative; margin: 10px 0 14px; height: 94px; }
+.dc-chart svg { width: 100%; height: 100%; display: block; }
+.dc .dstats { padding-top: 12px; border-top: 1px solid var(--line); }
+.mcal { position: sticky; top: 84px; padding: 16px 16px 14px; }
+.mc-hd { display: flex; align-items: center; justify-content: space-between; }
+.mc-hd b { font-size: 15px; font-weight: 600; letter-spacing: -.015em; }
+.mc-wd, .mc-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+.mc-wd { margin-top: 12px; font-size: 11px; color: var(--faint); text-align: center; }
+.mc-grid { margin-top: 4px; row-gap: 2px; }
+.mc-d { height: 40px; border-radius: 9px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 13px; color: var(--muted); font-weight: 500; }
+.mc-d i { width: 14px; height: 2.5px; border-radius: 2px; } .mc-d i.up { background: var(--gain-fill); } .mc-d i.dn { background: var(--loss-fill); }
+.mc-d:not(:has(i)) span { margin-bottom: 6.5px; }
+.mc-d.fut { color: var(--faint); } .mc-d.today { color: var(--text); font-weight: 700; }
+/* The day's patterns popover: the date, net and trade count, then each pattern. */
+.dpop { top: calc(100% + 4px); right: -8px; width: 400px; padding: 4px 0; font-size: 13.5px; line-height: 1.4; }
+.dpop .ph2 { display: flex; align-items: baseline; gap: 10px; padding: 12px 16px 10px; }
+.dpop .ph2 b { font-size: 15px; font-weight: 600; letter-spacing: -.015em; }
+.dpop .ph2 .net { font-weight: 600; }
+.dpop .ph2 span:last-child { margin-left: auto; font-size: 12.5px; color: var(--faint); }
+.dpop ul { list-style: none; }
+.dpop li { padding: 10px 16px 11px; border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.dpop li .t { display: flex; align-items: center; gap: 8px; }
+.dpop li .t b { flex: 1; font-weight: 600; }
+.dpop li p { margin-top: 3px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+/* Reports, Patterns: the breakdown anatomy (chart and best-and-worst cards, then the table). */
+.rtabs { display: inline-flex; }
+.rtabs a svg.i { width: 12px; height: 12px; }
+.rg { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 16px; }
+.mchip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 9px; box-shadow: inset 0 0 0 1px var(--line-2); font-size: 13px; font-weight: 500; color: var(--muted); }
+.mchip i.bm { width: 10px; height: 10px; border-radius: 2px; background: var(--accent); }
+.bars { position: relative; margin-top: 14px; }
+.bars svg { display: block; width: 100%; height: auto; overflow: visible; }
+.bv { font-size: 11px; font-weight: 600; font-family: inherit; }
+.bl { font-size: 11px; fill: var(--muted); font-family: inherit; }
+.bw li { display: grid; grid-template-columns: minmax(6.25rem, 9.5rem) minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.bw li:last-child { border-bottom: 0; }
+.bw li b { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bw .tr2 { height: 8px; border-radius: 999px; background: var(--sunken); overflow: hidden; }
+.bw .tr2 i { display: block; height: 100%; border-radius: 999px; }
+.bw .v { text-align: right; font-size: 13.5px; font-weight: 600; }
+.bw small { grid-column: 2 / 4; font-size: 12px; color: var(--faint); }
+.hl2 { list-style: none; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.hl2 li { display: flex; flex-wrap: wrap; gap: 0 8px; align-items: baseline; padding: 4px 0; font-size: 13px; }
+.hl2 li .k { color: var(--faint); } .hl2 li b { font-weight: 600; } .hl2 li span:last-child { color: var(--muted); }
+.ptbl { margin-top: 10px; font-size: 13px; }
+.ptbl td { height: 38px; }
+.ptbl td:first-child a { color: var(--text); font-weight: 600; }
+.ptbl th.sorted { color: var(--text); }
+.ptbl th.sorted svg.i { width: 11px; height: 11px; color: var(--accent); margin-left: 3px; }
+.ptools { display: flex; gap: 8px; }
+.ptools .btn.sm { height: 30px; font-weight: 500; color: var(--muted); }
+html:not([data-state='report']) .v-report, [data-state='report'] .v-day { display: none !important; }
+@media (max-width: 1279.98px) { .tl { grid-template-columns: minmax(0, 1fr); } .mcal { display: none; } }
+@media (max-width: 1023.98px) { .rg { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 639.98px) {
+  .vrow { flex-direction: column; align-items: stretch; } .vseg { display: flex; } .vseg > a { flex: 1; }
+  .dc { padding: 12px 16px 14px; } .dc-tog { display: none; } .qa { margin-right: -10px; }
+  .qa .pbtn { position: relative; } .qa .pbtn .n2 { position: absolute; top: 4px; right: 2px; min-width: 16px; height: 16px; font-size: 11px; padding: 0 4px; }
+  .dpop { width: auto; }
+  .rtabs-wrap { overflow-x: auto; margin: 0 -20px; padding: 0 20px; scrollbar-width: none; }
+  .bars { overflow-x: auto; } .bars svg { min-width: 700px; }
+  .ptbl { display: none; }
+  .ptools { display: none; }
+}
+@media (min-width: 640px) { .p-rows { display: none; } }
+</style>
+</head>
+<body data-nav="trades" data-title="Trades" data-filters>
+<main id="content" class="page">
+<!-- Trades, Day view, the first day's patterns open. -->
+<div class="vrow v-day" style="display:flex;align-items:center;gap:10px"><nav class="seg vseg" aria-label="Trade views"><a href="#" class="on" aria-current="page" style="min-width:64px">Day</a><a href="#" style="min-width:64px">Week</a><a href="#" style="min-width:64px">All</a></nav></div>
+<div class="tl v-day">
+  <div class="tl-list">
+    <article class="card dc" aria-labelledby="d24">
+      <header class="dc-hd">
+        <button class="dc-tog" aria-expanded="false" aria-label="Expand Tue 24 Nov"><i data-i="CaretRight:bold"></i></button>
+        <h2 id="d24">Tue 24 Nov</h2><b class="dc-net gain">+$421.00</b>
+        <div class="qa only-desk">
+          <button class="btn sm ghost" aria-haspopup="menu">Mood <b class="mw">Good</b><i data-i="CaretDown:bold" class="cd"></i></button>
+          <a class="btn sm ghost" href="#"><i data-i="ClipboardText"></i>Review</a>
+          <button class="btn sm ghost"><i data-i="NotePencil"></i>View note</button>
+          <button class="btn sm ghost open" aria-haspopup="dialog" aria-expanded="true">Patterns <span class="n2">3</span><i data-i="CaretDown:bold" class="cd"></i></button>
+        </div>
+        <div class="qa only-phone">
+          <button class="pbtn" aria-label="Mood, Good"><i data-i="Smiley"></i></button><a class="pbtn" href="#" aria-label="Review the day"><i data-i="ClipboardText"></i></a><button class="pbtn" aria-label="View note"><i data-i="NotePencil"></i></button>
+          <button class="pbtn" aria-label="Patterns, 3" aria-haspopup="dialog"><i data-i="Pulse"></i><span class="n2">3</span></button>
+        </div>
+      <div class="pop sheet dpop" role="dialog" aria-label="Patterns on Tue 24 Nov">
+              <div class="sheet-hd"><b>Patterns</b><button class="xbtn" aria-label="Close"><i data-i="X"></i></button></div>
+              <div class="ph2"><b>Tue 24 Nov</b><span class="net gain">+$421.00</span><span>7 trades</span></div>
+              <ul>
+                <li><div class="t"><b>Waited, then won</b><span class="chip">Helps</span></div><p>First entry at 09:41, 1h 41m after you started the session at 08:00, and the day closed green.</p></li>
+                <li><div class="t"><b>More trades than usual</b><span class="chip">Hurts</span></div><p>7 trades, 40% more than your average of 5.0 a day over the past 60 days.</p></li>
+                <li><div class="t"><b>Busier than a green day</b><span class="chip">Neutral</span></div><p>7 trades, twice your average of 3.4 on green days in the past 60 days.</p></li>
+              </ul>
+            </div>
+      </header>
+      <div class="dc-chart" aria-hidden="true"><svg viewBox="0 0 600 94" preserveAspectRatio="none"><line class="zero" x1="0" x2="600" y1="81.9" y2="81.9" vector-effect="non-scaling-stroke"/><path d="M55.3 81.9 V30.3 H66.8 V34.8 H119.8 V15.5 H214.0 V38.9 H481.9 V17.9 H500.1 V29.2 H596.0 V14.1 V81.9 Z" fill="var(--gain-fill)" opacity=".14"/><path d="M55.3 81.9 V30.3 H66.8 V34.8 H119.8 V15.5 H214.0 V38.9 H481.9 V17.9 H500.1 V29.2 H596.0 V14.1" fill="none" stroke="var(--gain-fill)" stroke-width="1.75" vector-effect="non-scaling-stroke"/></svg></div>
+      <div class="dstats">
+        <div><span class="lbl">Trades</span><b>7</b></div><div><span class="lbl">Gross P&amp;L</span><b class="gain">+$449.50</b></div><div><span class="lbl">Won / lost</span><b>4 <span class="of">/</span> 3</b></div><div><span class="lbl">Commissions</span><b>$28.50</b></div><div><span class="lbl">Win rate</span><b>57.1%</b></div><div><span class="lbl">Volume</span><b>145</b></div><div><span class="lbl">Profit factor</span><b>2.73</b></div>
+      </div>
+    </article>
+    <article class="card dc" aria-labelledby="d23">
+      <header class="dc-hd">
+        <button class="dc-tog" aria-label="Expand Mon 23 Nov"><i data-i="CaretRight:bold"></i></button>
+        <h2 id="d23">Mon 23 Nov</h2><b class="dc-net gain">+$526.25</b>
+        <div class="qa only-desk">
+          <button class="btn sm ghost">Mood <b class="mw">Steady</b><i data-i="CaretDown:bold" class="cd"></i></button><a class="btn sm ghost" href="#"><i data-i="ClipboardText"></i>Review</a><button class="btn sm ghost"><i data-i="NotePencil"></i>View note</button>
+          <button class="btn sm ghost" aria-haspopup="dialog">Patterns <span class="n2">1</span><i data-i="CaretDown:bold" class="cd"></i></button>
+        </div>
+        <div class="qa only-phone"><button class="pbtn" aria-label="Mood, Steady"><i data-i="Smiley"></i></button><a class="pbtn" href="#" aria-label="Review the day"><i data-i="ClipboardText"></i></a><button class="pbtn" aria-label="View note"><i data-i="NotePencil"></i></button><button class="pbtn" aria-label="Patterns, 1"><i data-i="Pulse"></i><span class="n2">1</span></button></div>
+      </header>
+      <div class="dc-chart" aria-hidden="true"><svg viewBox="0 0 600 94" preserveAspectRatio="none"><line class="zero" x1="0" x2="600" y1="81.9" y2="81.9" vector-effect="non-scaling-stroke"/><path d="M46.1 81.9 V67.2 H334.8 V31.6 H364.0 V14.1 H379.5 V23.8 H434.5 V18.7 H596.0 V25.6 V81.9 Z" fill="var(--gain-fill)" opacity=".14"/><path d="M46.1 81.9 V67.2 H334.8 V31.6 H364.0 V14.1 H379.5 V23.8 H434.5 V18.7 H596.0 V25.6" fill="none" stroke="var(--gain-fill)" stroke-width="1.75" vector-effect="non-scaling-stroke"/></svg></div>
+      <div class="dstats">
+        <div><span class="lbl">Trades</span><b>6</b></div><div><span class="lbl">Gross P&amp;L</span><b class="gain">+$549.70</b></div><div><span class="lbl">Won / lost</span><b>4 <span class="of">/</span> 2</b></div><div><span class="lbl">Commissions</span><b>$23.45</b></div><div><span class="lbl">Win rate</span><b>66.7%</b></div><div><span class="lbl">Volume</span><b>100.4</b></div><div><span class="lbl">Profit factor</span><b>4.39</b></div>
+      </div>
+    </article>
+  </div>
+  <aside class="card mcal" aria-label="November 2026">
+    <div class="mc-hd"><b>November 2026</b><span style="display:flex;gap:6px"><button class="ibtn sm" aria-label="October"><i data-i="CaretLeft:bold"></i></button><button class="ibtn sm" aria-label="December"><i data-i="CaretRight:bold"></i></button></span></div>
+    <div class="mc-wd" aria-hidden="true"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
+    <div class="mc-grid" id="mcg"></div>
+  </aside>
+</div>
+
+<!-- Reports, Patterns. -->
+<div class="rtabs-wrap v-report"><nav class="seg rtabs" aria-label="Reports"><a href="#">Overview</a><a href="#">Performance</a><a href="#" class="on" aria-current="page"><span class="sr">Reports: </span>Patterns<i data-i="CaretDown:bold"></i></a><a href="#">Compare</a><a href="#">Calendar</a></nav></div>
+<div class="rg v-report">
+  <section class="card" aria-labelledby="pc-h">
+    <div class="hd"><h2 id="pc-h">By pattern</h2><span class="cap">A trade counts under each of its patterns; a day pattern counts that day's trades</span><div class="end"><button class="btn sm ghost" aria-haspopup="dialog" aria-label="Expand chart" style="color:var(--muted);font-weight:500"><i data-i="ArrowsOut"></i>Expand</button></div></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:10px"><span class="mchip"><i class="bm"></i>Net P&amp;L<i data-i="X:bold" style="width:11px;height:11px"></i></span></div>
+    <div class="bars" id="bars"></div>
+  </section>
+  <section class="card" aria-labelledby="bw-h">
+    <div class="hd"><h2 id="bw-h">Best and worst</h2><div class="end"><span class="cap">by net P&amp;L</span></div></div>
+    <ol class="bw" id="bw" style="list-style:none;margin-top:6px"></ol>
+    <ul class="hl2" aria-label="Highlights"><li><span class="k">Most active</span><b>Large size</b><span>371 trades</span></li><li><span class="k">Best win rate</span><b>One strong trade</b><span>100% won, 6 trades</span></li></ul>
+  </section>
+</div>
+<section class="card v-report" aria-labelledby="pt-h">
+  <div class="hd"><h2 id="pt-h">By pattern</h2><span class="cap">Click a header to sort</span><div class="end ptools"><button class="btn sm"><i data-i="Columns"></i>Columns</button><button class="btn sm"><i data-i="DownloadSimple"></i>Export CSV</button></div></div>
+  <table class="ptbl">
+    <colgroup><col style="width:22%"><col><col><col style="width:10%"><col><col><col><col><col style="width:9%"><col style="width:9%"><col style="width:8%"></colgroup>
+    <thead><tr><th>Pattern</th><th class="n">Trades</th><th class="n">Win rate</th><th class="n sorted">Net P&amp;L<i data-i="CaretDown:bold"></i></th><th class="n">Profit factor</th><th class="n">Average</th><th class="n">Average win</th><th class="n">Average loss</th><th class="n">Largest win</th><th class="n">Largest loss</th><th class="n" title="Average daily volume">Avg daily vol.</th></tr></thead>
+    <tbody id="prow"></tbody>
+  </table>
+  <ul class="prows p-rows" id="pph" style="margin-top:8px"></ul>
+</section>
+</main>
+<div class="phveil v-day"></div>
+<script>
+// The month, as the 6A day view's calendar shows it.
+var M = {2:'dn',3:'up',4:'up',5:'up',6:'up',9:'dn',10:'up',11:'dn',12:'up',13:'dn',16:'dn',17:'up',18:'up',19:'dn',20:'up',23:'up',24:'up'};
+var g = '';
+for (var d = 1; d <= 30; d++) g += '<button class="mc-d' + (d === 24 ? ' today' : d > 24 ? ' fut' : '') + '" aria-label="' + d + ' Nov"><span>' + d + '</span>' + (M[d] ? '<i class="' + M[d] + '"></i>' : '') + '</button>';
+document.getElementById('mcg').innerHTML = g;
+// [pattern, trades, win rate, net, pf, average, avg win, avg loss, largest win, largest loss, avg daily volume] (sample figures)
+var P = [
+  ['One strong trade', 6, '100.0%', 3912.00, 'None', '+$652.00', '+$652.00', 'None', '+$1,104.50', 'None', '1.0'],
+  ['Waited, then won', 48, '62.5%', 2955.10, '1.86', '+$61.56', '+$208.40', '−$183.10', '+$912.40', '−$402.60', '4.8'],
+  ['Held longer than usual', 184, '52.2%', 2140.60, '1.21', '+$11.63', '+$124.40', '−$111.70', '+$1,040.20', '−$612.50', '6.2'],
+  ['Switched sides, green', 33, '57.6%', 1188.40, '1.52', '+$36.01', '+$184.20', '−$165.30', '+$640.00', '−$388.20', '7.1'],
+  ['Exited in parts', 305, '55.4%', 4870.15, '1.33', '+$15.97', '+$121.30', '−$114.80', '+$980.70', '−$540.10', '5.6'],
+  ['Added to the position', 212, '49.5%', 1203.40, '1.08', '+$5.68', '+$145.20', '−$131.20', '+$1,212.00', '−$651.65', '5.9'],
+  ['Low return for the effort', 64, '53.1%', 402.60, '1.06', '+$6.29', '+$98.40', '−$98.10', '+$420.60', '−$310.40', '9.4'],
+  ['Sized up after wins', 27, '59.3%', -736.40, '0.80', '−$27.27', '+$182.10', '−$331.30', '+$520.00', '−$651.65', '8.2'],
+  ['Busier than a green day', 180, '47.8%', -842.10, '0.94', '−$4.68', '+$120.60', '−$119.40', '+$860.30', '−$598.20', '10.6'],
+  ['Large size', 371, '47.7%', -1264.90, '0.95', '−$3.41', '+$176.40', '−$167.30', '+$1,104.50', '−$651.65', '6.4'],
+  ['Losses outweighed wins', 42, '52.4%', -1930.20, '0.52', '−$45.96', '+$95.20', '−$201.10', '+$310.40', '−$612.50', '7.8'],
+  ['Quick re-entries after a loss', 38, '0.0%', -2206.30, '0.00', '−$58.06', 'None', '−$58.06', 'None', '−$402.60', '9.0'],
+  ['Switched sides, red', 58, '37.9%', -2412.75, '0.62', '−$41.60', '+$112.30', '−$135.70', '+$388.20', '−$540.10', '8.6'],
+  ['Rushed red day', 55, '32.7%', -3101.95, '0.48', '−$56.40', '+$90.10', '−$127.60', '+$310.00', '−$598.20', '11.2'],
+  ['More trades than usual', 221, '46.2%', -3540.85, '0.86', '−$16.02', '+$118.70', '−$131.60', '+$912.40', '−$651.65', '9.8'],
+  ['Loss after a loss', 61, '0.0%', -4120.35, '0.00', '−$67.55', 'None', '−$67.55', 'None', '−$612.50', '8.4'],
+  ['Long hold on a loss', 96, '0.0%', -9412.80, '0.00', '−$98.05', 'None', '−$98.05', 'None', '−$651.65', '5.2'],
+];
+var money = function (v) { var a = Math.abs(v).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); return (v < 0 ? '−$' : v > 0 ? '+$' : '$') + a; };
+var none = function (v) { return v === 'None' ? '<span class="none">None</span>' : v; };
+var tn = function (v) { return typeof v === 'number' ? (v < 0 ? 'loss' : 'gain') : v.charAt(0) === '−' ? 'loss' : v.charAt(0) === '+' ? 'gain' : ''; };
+var byNet = P.slice().sort(function (a, b) { return b[3] - a[3]; });
+document.getElementById('prow').innerHTML = byNet.map(function (p) {
+  return '<tr><td><a href="#" aria-label="' + p[0] + ', open ' + p[1] + ' trades in the trade log">' + p[0] + '</a></td><td class="n">' + p[1] + '</td><td class="n">' + p[2] + '</td><td class="n f ' + tn(p[3]) + '">' + money(p[3]) + '</td><td class="n">' + none(p[4]) + '</td>' +
+    '<td class="n ' + tn(p[5]) + '">' + none(p[5]) + '</td><td class="n ' + tn(p[6]) + '">' + none(p[6]) + '</td><td class="n ' + tn(p[7]) + '">' + none(p[7]) + '</td><td class="n ' + tn(p[8]) + '">' + none(p[8]) + '</td><td class="n ' + tn(p[9]) + '">' + none(p[9]) + '</td><td class="n">' + p[10] + '</td></tr>';
+}).join('');
+document.getElementById('pph').innerHTML = byNet.map(function (p) {
+  return '<li><a href="#"><span class="l1"><b style="margin:0;font-weight:600">' + p[0] + '</b><b class="' + tn(p[3]) + '">' + money(p[3]) + '</b></span><span class="l2"><span>' + p[1] + ' trades</span><span>' + p[2] + ' won</span><span>PF ' + p[4] + '</span></span></a></li>';
+}).join('');
+// Bars: net P&L by pattern, in the table's order, labels tilted as the breakdown chart does for unordered buckets.
+var W = 720, H = 200, base = 112, max = 9412.80, bw = 26, gap = (W - 40) / byNet.length;
+var svg = '<svg viewBox="-60 0 ' + (W + 60) + ' 350" role="img" aria-label="Net P&amp;L by pattern"><line class="base" x1="20" x2="' + (W - 10) + '" y1="' + base + '" y2="' + base + '"/>';
+byNet.forEach(function (p, i) {
+  var x = 30 + i * gap, h = Math.max(2, Math.abs(p[3]) / max * 92), y = p[3] >= 0 ? base - h : base;
+  svg += '<rect x="' + x + '" y="' + y.toFixed(1) + '" width="' + bw + '" height="' + h.toFixed(1) + '" rx="4" class="' + (p[3] >= 0 ? 'bar-g' : 'bar-l') + '"/>';
+  var lab = (p[3] >= 0 ? '+' : '−') + (Math.abs(p[3]) >= 1000 ? (Math.abs(p[3]) / 1000).toFixed(1) + 'k' : Math.abs(p[3]).toFixed(0));
+  svg += '<text class="bv" text-anchor="middle" x="' + (x + bw / 2) + '" y="' + (p[3] >= 0 ? y - 5 : y + h + 13).toFixed(1) + '" fill="' + (p[3] >= 0 ? 'var(--gain)' : 'var(--loss)') + '">' + lab + '</text>';
+  svg += '<text class="bl" text-anchor="end" transform="translate(' + (x + bw / 2 + 4) + ',' + (base + 124) + ') rotate(-40)">' + p[0] + '</text>';
+});
+document.getElementById('bars').innerHTML = svg + '</svg>';
+var big = 9412.80;
+var pick = byNet.slice(0, 3).concat(byNet.slice(-3));
+document.getElementById('bw').innerHTML = pick.map(function (p) {
+  return '<li><b>' + p[0] + '</b><span class="tr2"><i style="width:' + Math.max(3, Math.abs(p[3]) / big * 100).toFixed(0) + '%;background:var(' + (p[3] < 0 ? '--loss-fill' : '--gain-fill') + ')"></i></span><span class="v ' + tn(p[3]) + '">' + money(p[3]) + '</span><small>' + p[1] + ' trades, ' + p[2].replace('.0%', '%').replace(/\.\d%/, '%') + ' won</small></li>';
+}).join('');
+if (document.documentElement.dataset.state === 'report') { document.body.dataset.nav = 'reports'; document.body.dataset.title = 'Reports'; }
+</script>
+</body>
+</html>
