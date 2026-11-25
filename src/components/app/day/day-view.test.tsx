@@ -1,10 +1,16 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { afterEach, expect, test, vi } from 'vitest';
+import { fixtureSample } from '@/data/__fixtures__/sample';
+import { createLocalRepository } from '@/data/local/local-repository';
+import type { Repository } from '@/data/repository';
+import { SAMPLE_WORKSPACE } from '@/data/workspaces';
 import { renderApp } from '../__fixtures__/render-app';
 import { AppShell } from '../app-shell';
 import { TopBar } from '../top-bar';
 import { DayRedirect, DayView } from './day-view';
+import { useElapsed } from './session-button';
 
 vi.mock('next/navigation', () => import('../__fixtures__/navigation'));
 
@@ -12,6 +18,25 @@ afterEach(cleanup);
 
 // The fixture sample's routine today is 2026-11-19.
 const TODAY = '2026-11-19';
+const WS = SAMPLE_WORKSPACE.id;
+
+function repository(): Repository {
+  return createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+}
+
+/** Closes `date` the way Close the day does. */
+async function close(repo: Repository, date: string) {
+  const tracker = await repo.tracker.get(WS);
+  await repo.days.finish(WS, date, {
+    version: tracker.versions[0]!,
+    inputs: {},
+    ticks: {},
+  });
+}
 
 /** The bar over the day page, as the shell lays them out. */
 function Day({
@@ -81,8 +106,11 @@ test('stage links keep the date and push history', async () => {
   const review = bar.getByRole('link', { name: 'Review' });
   expect(review.getAttribute('href')).toBe('/app/day/2026-11-03/review');
   expect(review.getAttribute('aria-current')).toBe('step');
-  // Next's Link pushes; a stage never replaces the entry it leaves.
-  expect(bar.getAllByRole('link')).toHaveLength(2);
+  // Next's Link pushes; a stage never replaces the entry it leaves. Trade is
+  // the third link, disabled off today, and has no href.
+  expect(
+    bar.getAllByRole('link').filter((a) => a.hasAttribute('href')),
+  ).toHaveLength(2);
   expect(
     bar.getByRole('button', { name: 'Import' }).getAttribute('aria-haspopup'),
   ).toBe('dialog');
@@ -112,6 +140,8 @@ test('Trade starts the session today and is disabled on other dates', async () =
     selector: '[aria-disabled]',
   });
   expect(past.hasAttribute('href')).toBe(false);
+  // ARIA 1.2: aria-disabled on a link, not on a bare span.
+  expect(past.getAttribute('role')).toBe('link');
   expect(past.getAttribute('aria-disabled')).toBe('true');
   expect(past.textContent).toMatch(/today/i);
   expect(screen.queryByRole('button', { name: /session/i })).toBeNull();
@@ -228,4 +258,108 @@ test('day pages have no Display menu', () => {
     url: '/app/trades',
   });
   expect(screen.getByRole('button', { name: 'Display' })).toBeTruthy();
+});
+
+test('a closed today with no session offers no Start session, and Trade starts nothing', async () => {
+  const repo = repository();
+  await close(repo, TODAY);
+  renderApp(<Day date={TODAY} mode="plan" />, {
+    repository: repo,
+    url: `/app/day/${TODAY}/plan`,
+  });
+  const trade = await within(stages()).findByRole('link', { name: 'Trade' });
+  // Plan on a closed day: the session control is gone.
+  expect(screen.queryByRole('button', { name: 'Start session' })).toBeNull();
+  fireEvent.click(trade);
+  await new Promise((r) => setTimeout(r, 20));
+  expect(screen.queryByRole('alert')).toBeNull();
+  expect(screen.queryByRole('button', { name: /End session/ })).toBeNull();
+  const day = (await repo.days.list(WS)).find((d) => d.id === TODAY);
+  expect(day?.session).toBeUndefined();
+});
+
+test("a refused session write says Couldn't save", async () => {
+  const repo = repository();
+  repo.days.startSession = async () => {
+    throw new Error('refused');
+  };
+  renderApp(<Day date={TODAY} mode="plan" />, {
+    repository: repo,
+    url: `/app/day/${TODAY}/plan`,
+  });
+  fireEvent.click(await screen.findByRole('button', { name: 'Start session' }));
+  expect((await screen.findByRole('alert')).textContent).toBe("Couldn't save");
+  cleanup();
+
+  // The Trade stage starts the same session and says the same.
+  renderApp(<Day date={TODAY} mode="plan" />, {
+    repository: repo,
+    url: `/app/day/${TODAY}/plan`,
+  });
+  fireEvent.click(await within(stages()).findByRole('link', { name: 'Trade' }));
+  await vi.waitFor(() =>
+    expect(within(stages()).getByRole('alert').textContent).toBe(
+      "Couldn't save",
+    ),
+  );
+  cleanup();
+
+  // End session, on a session that is running.
+  const ending = repository();
+  await ending.days.startSession(WS, TODAY);
+  ending.days.endSession = async () => {
+    throw new Error('refused');
+  };
+  renderApp(<Day date={TODAY} mode="plan" />, {
+    repository: ending,
+    url: `/app/day/${TODAY}/plan`,
+  });
+  fireEvent.click(await screen.findByRole('button', { name: /End session/ }));
+  expect((await screen.findByRole('alert')).textContent).toBe("Couldn't save");
+});
+
+test('review on today has no session control', async () => {
+  const repo = repository();
+  await repo.days.startSession(WS, TODAY);
+  renderApp(<Day date={TODAY} mode="review" />, {
+    repository: repo,
+    url: `/app/day/${TODAY}/review`,
+  });
+  await screen.findByRole('region', { name: 'The day in figures' });
+  expect(screen.queryByRole('button', { name: /End session/ })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Start session' })).toBeNull();
+  // The running session still shows on the Trade stage.
+  expect(
+    within(stages()).getByRole('link', { name: /Trade/ }).textContent,
+  ).toMatch(/\d:\d\d/);
+});
+
+test("the clock ticks for today's running session only", async () => {
+  const running = { start: '2026-11-03T14:00:00.000Z' };
+  function Clock({ date }: { date: string }) {
+    useElapsed(date, TODAY, running);
+    return null;
+  }
+  const tick = vi.spyOn(globalThis, 'setInterval');
+  renderApp(<Clock date="2026-11-03" />);
+  await new Promise((r) => setTimeout(r, 20));
+  const ticks = () => tick.mock.calls.filter(([, ms]) => ms === 1000).length;
+  expect(ticks()).toBe(0);
+  cleanup();
+  renderApp(<Clock date={TODAY} />);
+  await vi.waitFor(() => expect(ticks()).toBeGreaterThan(0));
+  tick.mockRestore();
+});
+
+test('the header chip says Closed with no time; the time shows once, on the rules card', async () => {
+  const repo = repository();
+  await close(repo, '2026-11-18');
+  renderApp(<Day date="2026-11-18" mode="review" />, {
+    repository: repo,
+    url: '/app/day/2026-11-18/review',
+  });
+  const bar = screen.getByRole('banner');
+  const chip = await within(bar).findByText('Closed');
+  expect(chip.textContent).toBe('Closed');
+  expect(await screen.findAllByText(/Closed at \d\d:\d\d/)).toHaveLength(1);
 });

@@ -41,6 +41,7 @@ import type {
   NewChallenge,
   NewFile,
   ChallengePatch,
+  FirstRunInput,
   NewStrategy,
   NewTag,
   Repository,
@@ -958,5 +959,16 @@ export function useRemoveFile(): UseMutationResult<
 > {
   return useWorkspaceWrite('files.remove', (r, ws, v: { id: string }) =>
     r.files.remove(ws, v.id),
+  );
+}
+
+/** The first run's one write (K47, K55): prefs, My account, and My workspace active. */
+export function useCompleteFirstRun(): UseMutationResult<
+  void,
+  Error,
+  FirstRunInput
+> {
+  return useFixedWrite('onboarding.complete', '', (r, input: FirstRunInput) =>
+    r.onboarding.complete(input),
   );
 }

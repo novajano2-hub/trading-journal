@@ -2,6 +2,7 @@
 
 import { LockSimple } from '@phosphor-icons/react/dist/ssr';
 import { useDays, usePrefs } from '@/data/query/hooks';
+import { clock } from '../trades/trade-time';
 
 /**
  * Whether a date is finished (K3), and when: its record is stamped or
@@ -23,12 +24,7 @@ export function useDayFinished(date: string | undefined): {
     time:
       at === undefined || timeZone === undefined
         ? undefined
-        : new Intl.DateTimeFormat('en-GB', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-            timeZone,
-          }).format(new Date(at)),
+        : clock(at, timeZone, false),
   };
 }
 

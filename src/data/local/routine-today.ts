@@ -33,6 +33,19 @@ export function isLockedDay(day: DayRecord | undefined): boolean {
   return day?.locked !== undefined || day?.finishedAt !== undefined;
 }
 
+/** Whether `entry` is a daily note of a finished date. Call inside a transaction that includes `db.days`. */
+export async function isLockedNote(
+  db: KeelDb,
+  ws: string,
+  entry: Pick<JournalEntry, 'kind' | 'date'> | undefined,
+): Promise<boolean> {
+  return (
+    entry?.kind === 'daily-review' &&
+    entry.date !== undefined &&
+    (await isLocked(db, ws, entry.date))
+  );
+}
+
 /**
  * Throws LockedDayError for a daily note on a finished date. Call inside a
  * transaction that includes `db.days`.
@@ -42,10 +55,5 @@ export async function refuseLockedNote(
   ws: string,
   entry: Pick<JournalEntry, 'kind' | 'date'> | undefined,
 ): Promise<void> {
-  if (
-    entry?.kind === 'daily-review' &&
-    entry.date !== undefined &&
-    (await isLocked(db, ws, entry.date))
-  )
-    throw new LockedDayError();
+  if (await isLockedNote(db, ws, entry)) throw new LockedDayError();
 }

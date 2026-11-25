@@ -7,7 +7,7 @@ import { Popover } from 'radix-ui';
 import { usePrefs } from '@/data/query/hooks';
 import type { DayMode } from '@/lib/day-routes';
 import { dayHref } from '@/lib/day-routes';
-import { onTradingDate, weekdayOf } from '@/lib/time-format';
+import { dayLabel } from '@/lib/time-format';
 import { usePhone } from '@/lib/use-phone';
 import { Chip } from '@/components/ui/chip';
 import { MonthPicker } from '../routine/month-picker';
@@ -19,14 +19,6 @@ const PANEL =
   'z-50 w-[296px] max-w-[calc(100vw-24px)] origin-(--radix-popover-content-transform-origin) rounded-[12px] border border-line bg-surface-1 p-3 text-text shadow-[var(--shadow)] outline-none motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in';
 const TITLE =
   'text-[24px] leading-[1.2] font-[650] tracking-[-0.035em] whitespace-nowrap max-sm:text-[20px]';
-
-/** "Tue 24 Nov", with the year when it isn't today's. */
-export function dayLabel(date: string, today?: string): string {
-  const short = `${weekdayOf(date, 'short')} ${onTradingDate(date, { day: 'numeric', month: 'short' })}`;
-  return today !== undefined && today.slice(0, 4) !== date.slice(0, 4)
-    ? `${short} ${date.slice(0, 4)}`
-    : short;
-}
 
 /**
  * The day page's place in the top bar (K25): the date, then from `sm` the
@@ -49,7 +41,11 @@ export function DayHeader({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(date.slice(0, 7));
-  const label = dayLabel(date, today);
+  // "Tue 24 Nov", with the year when it isn't today's.
+  const label =
+    today !== undefined && today.slice(0, 4) !== date.slice(0, 4)
+      ? `${dayLabel(date)} ${date.slice(0, 4)}`
+      : dayLabel(date);
   const closed = useDayFinished(date);
 
   return (
@@ -107,9 +103,6 @@ export function DayHeader({
         <Chip className="mr-2 flex-none">
           <LockSimple size={13} aria-hidden="true" />
           Closed
-          {closed.time === undefined ? null : (
-            <span className="max-sm:sr-only">{closed.time}</span>
-          )}
         </Chip>
       ) : null}
       {phone ? null : (

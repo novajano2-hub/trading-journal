@@ -11,6 +11,7 @@ import { localFolders } from './folders';
 import { localHistory } from './history';
 import { localImports } from './imports';
 import { localJournal } from './journal';
+import { localOnboarding } from './onboarding';
 import { localPrefs } from './prefs';
 import { localStrategies } from './strategies';
 import { localTagCategories } from './tag-categories';
@@ -56,5 +57,6 @@ export function createLocalRepository(
     dayShots: localDayShots(ctx),
     files: localFiles(ctx),
     history: localHistory(ctx),
+    onboarding: localOnboarding(ctx),
   };
 }

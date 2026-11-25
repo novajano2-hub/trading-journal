@@ -4,7 +4,8 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { useStartSession } from '@/data/query/hooks';
 import type { DayRecord } from '@/domain/types';
-import type { DayMode } from '@/lib/day-routes';
+import { dayPlanHref, dayReviewHref, type DayMode } from '@/lib/day-routes';
+import { useDayFinished } from './day-lock';
 import { formatClock, useElapsed } from './session-button';
 
 const TRACK =
@@ -40,16 +41,18 @@ export function StageBar({
   full?: boolean;
 }): React.JSX.Element {
   const start = useStartSession();
+  const { finished } = useDayFinished(date);
   const elapsed = useElapsed(date, today, session);
   const isToday = today === date;
   const running = isToday && session !== undefined && session.end === undefined;
   const future = today !== undefined && date > today;
   const item = full ? 'min-w-0 flex-1 px-1.5' : '';
   const stage = (on: boolean) => `${STAGE} ${item} ${on ? ON : ''}`;
-  const planHref = `/app/day/${date}/plan`;
+  const planHref = dayPlanHref(date);
 
   const disabled = (label: string, reason: string): ReactNode => (
     <span
+      role="link"
       aria-disabled="true"
       title={reason}
       className={`${STAGE} ${item} ${OFF}`}
@@ -76,13 +79,18 @@ export function StageBar({
           href={planHref}
           aria-current={mode === 'plan' && running ? 'step' : undefined}
           onClick={() => {
-            if (session === undefined && !start.isPending)
+            // A closed day starts nothing: the stage only shows plan.
+            if (!finished && session === undefined && !start.isPending)
               start.mutate({ date });
           }}
           className={stage(mode === 'plan' && running)}
         >
           Trade
-          {running ? (
+          {start.isError ? (
+            <span role="alert" className="font-medium text-loss">
+              Couldn&apos;t save
+            </span>
+          ) : running ? (
             <span className="font-medium text-muted tabular-nums">
               {formatClock(elapsed ?? 0, false)}
             </span>
@@ -103,7 +111,7 @@ export function StageBar({
         disabled('Review', 'Review opens once the day has begun.')
       ) : (
         <Link
-          href={`/app/day/${date}/review`}
+          href={dayReviewHref(date)}
           aria-current={mode === 'review' ? 'step' : undefined}
           className={stage(mode === 'review')}
         >

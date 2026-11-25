@@ -10,7 +10,12 @@ import {
 import { dayLabel, parseYmd, ymd } from '../seed/calendar';
 import type { LocalContext } from './context';
 import { readPrefs } from './prefs';
-import { isLocked, refuseLockedNote, todayIn } from './routine-today';
+import {
+  isLocked,
+  isLockedNote,
+  refuseLockedNote,
+  todayIn,
+} from './routine-today';
 import { deleteOwnerFiles } from './files';
 import { rwTx } from './tx';
 import type { KeelDb } from './db';
@@ -135,14 +140,14 @@ export function localJournal(ctx: LocalContext): JournalRepo {
         e.deletedAt !== undefined && Date.parse(e.deletedAt) < cutoff;
       let rows = await db.journal.where('workspaceId').equals(ws).toArray();
       if (rows.some(expired)) {
-        await rwTx(db, [db.journal, db.trades, db.files], () =>
-          deleteEntries(
-            db,
-            ws,
-            rows.filter(expired).map((e) => e.id),
-          ),
-        );
-        rows = rows.filter((e) => !expired(e));
+        // A finished day's note is frozen, so the purge leaves it in Trash.
+        const purged = new Set<string>();
+        await rwTx(db, [db.journal, db.trades, db.days, db.files], async () => {
+          for (const e of rows.filter(expired))
+            if (!(await isLockedNote(db, ws, e))) purged.add(e.id);
+          await deleteEntries(db, ws, [...purged]);
+        });
+        rows = rows.filter((e) => !purged.has(e.id));
       }
       return rows.map(whole).sort(byRecency);
     },
@@ -270,6 +275,8 @@ export function localJournal(ctx: LocalContext): JournalRepo {
           date,
           title: `Daily review, ${dayLabel(date)}`,
           body: structuredClone(template?.body ?? EMPTY_DOC),
+          // The template it started from; a kind with no default starts empty.
+          ...(template ? { templateId: template.id } : {}),
           linkedTradeIds: [],
           tags: [],
           updatedAt: ctx.now().toISOString(),

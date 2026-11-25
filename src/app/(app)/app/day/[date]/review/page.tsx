@@ -1,15 +1,8 @@
 import type { Metadata } from 'next';
 import { DayView } from '@/components/app/day/day-view';
+import { decodedSegment } from '@/lib/route-param';
 
 export const metadata: Metadata = { title: 'Day review' };
-
-function decoded(segment: string): string {
-  try {
-    return decodeURIComponent(segment);
-  } catch {
-    return segment;
-  }
-}
 
 /** `params` is a Promise in this Next.js. */
 export default async function DayReviewPage({
@@ -18,5 +11,5 @@ export default async function DayReviewPage({
   params: Promise<{ date: string }>;
 }) {
   const { date } = await params;
-  return <DayView date={decoded(date)} mode="review" />;
+  return <DayView date={decodedSegment(date)} mode="review" />;
 }

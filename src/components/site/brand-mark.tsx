@@ -22,7 +22,7 @@ export function BrandMark({
       href={href}
       onClick={onClick}
       aria-label={compact ? 'Keel' : undefined}
-      className={`inline-flex items-center gap-2.5 text-[19px] font-[650] tracking-[-0.03em] text-text no-underline ${className}`}
+      className={`inline-flex items-center gap-2.5 text-[19px] font-[650] tracking-[-0.03em] text-text no-underline ${compact ? 'justify-center pointer-coarse:size-11' : ''} ${className}`}
     >
       <span
         aria-hidden="true"

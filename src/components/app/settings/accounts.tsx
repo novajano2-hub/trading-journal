@@ -4,7 +4,7 @@ import { CheckCircle, Lock, Plus } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { ConfirmDialog, ConfirmFailure } from '@/components/app/confirm-dialog';
 import { CARD, CardHeader } from '@/components/app/dashboard/shared';
 import { writeParam } from '@/components/app/reports/use-report-data';
@@ -63,7 +63,7 @@ const SELECTED_PILL = 'bg-surface-1! ring-1 ring-inset ring-line-2';
 const TD = TD_BASE.replace('px-1.5', 'px-1');
 
 type Dialog =
-  | { kind: 'new' }
+  | { kind: 'new'; type?: Account['type'] }
   | { kind: 'edit'; account: Account }
   /** `count`: the trades it held when asked, so the words hold while it closes. */
   | { kind: 'clear'; account: Account; count: number }
@@ -159,7 +159,15 @@ function AccountsBody(): React.JSX.Element {
   const clear = useClearAccountTrades();
   const remove = useRemoveAccount();
   const display = useDisplay();
-  const [dialog, setDialog] = useState<Dialog | null>(null);
+  // Home's first step links here with ?new=prop: the new-account dialog opens on
+  // a prop account, and the param leaves the address (below) so a reload or
+  // Back doesn't open it again. The page reads the address on the client only.
+  const params = useSearchParams();
+  const [dialog, setDialog] = useState<Dialog | null>(() =>
+    params.get('new') === 'prop'
+      ? { kind: 'new', type: 'prop-evaluation' }
+      : null,
+  );
   const [failed, setFailed] = useState<string | null>(null);
   // The account whose deposits and withdrawals the card below shows; none picked: the first active one.
   const [pickedId, setPickedId] = useState<string | null>(null);
@@ -167,7 +175,9 @@ function AccountsBody(): React.JSX.Element {
   const phone = usePhone();
 
   // The search and filters live in the address; the copy changes at once and follows it.
-  const params = useSearchParams();
+  useEffect(() => {
+    if (params.get('new') === 'prop') writeParam('new', null);
+  }, [params]);
   const addressKey = [SEARCH_PARAM, TYPE_PARAM, STATUS_PARAM, CCY_PARAM]
     .map((k) => params.get(k) ?? '')
     .join('|');
@@ -678,6 +688,7 @@ function AccountsBody(): React.JSX.Element {
         <AccountDialog
           open={dialog?.kind === 'new' || dialog?.kind === 'edit'}
           account={open}
+          initialType={dialog?.kind === 'new' ? dialog.type : undefined}
           hasTrades={open ? countOf(open.id) > 0 : false}
           onClose={() => setDialog(null)}
         />
