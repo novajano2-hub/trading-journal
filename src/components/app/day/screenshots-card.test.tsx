@@ -85,7 +85,6 @@ test('a PNG is kept and shows as a thumbnail', async () => {
     await screen.findByRole('button', { name: 'Open screenshot 1 of 1' }),
   ).toBeTruthy();
   expect(await repo.dayShots.list(WS, TODAY)).toHaveLength(1);
-  expect(screen.getByText('1 image')).toBeTruthy();
 });
 
 test('thumbnails revoke their object URLs on unmount', async () => {
@@ -141,4 +140,106 @@ test('the viewer pages previous and next', async () => {
   ).toBe(true);
   fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
   await screen.findByRole('dialog', { name: 'Screenshot 2 of 3' });
+});
+
+async function closeDay(repo: Repository, date: string) {
+  const tracker = await repo.tracker.get(WS);
+  await repo.days.finish(WS, date, {
+    version: tracker.versions[0]!,
+    inputs: {},
+    ticks: {},
+  });
+}
+
+test("a closed day's plan page keeps its shots with no drop zone and no Delete", async () => {
+  const repo = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+  await repo.prefs.update({ seenTips: ['day-plan-templates'] });
+  await repo.dayShots.add(WS, '2026-11-18', {
+    bytes: new Uint8Array([137, 80, 78, 71]).buffer,
+    type: 'image/png',
+    name: 'kept.png',
+  });
+  await closeDay(repo, '2026-11-18');
+  renderApp(<DayView date="2026-11-18" mode="plan" />, {
+    repository: repo,
+    url: '/app/day/2026-11-18/plan',
+  });
+  const thumb = await screen.findByRole('button', {
+    name: 'Open screenshot 1 of 1',
+  });
+  expect(screen.queryByText(/Drop chart screenshots/)).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Choose files' })).toBeNull();
+  expect((await card()).querySelector('input[type="file"]')).toBeNull();
+  fireEvent.click(thumb);
+  const viewer = await screen.findByRole('dialog', {
+    name: 'Screenshot 1 of 1',
+  });
+  expect(within(viewer).queryByRole('button', { name: 'Delete' })).toBeNull();
+});
+
+test('the card shows no image count', async () => {
+  await open(2);
+  await screen.findByRole('button', { name: 'Open screenshot 2 of 2' });
+  expect(screen.queryByText(/\d images?/)).toBeNull();
+});
+
+test('two refusals with the same file name are both listed', async () => {
+  await open();
+  const files = await input();
+  const gif = () =>
+    new File([new Uint8Array(8)], 'move.gif', { type: 'image/gif' });
+  fireEvent.change(files, { target: { files: [gif(), gif()] } });
+  await screen.findAllByText(/move\.gif isn.t a PNG or JPEG/);
+  expect(screen.getAllByText(/move\.gif isn.t a PNG or JPEG/)).toHaveLength(2);
+});
+
+test('the drop zone stays lit while the pointer crosses its children', async () => {
+  await open();
+  const zone = (await input()).parentElement!;
+  const lit = () => zone.className.includes('border-accent');
+  fireEvent.dragEnter(zone);
+  expect(lit()).toBe(true);
+  // Entering a child leaves the zone first, then enters it again.
+  const child = zone.querySelector('b')!;
+  fireEvent.dragEnter(child);
+  fireEvent.dragLeave(zone);
+  expect(lit()).toBe(true);
+  fireEvent.dragLeave(child);
+  expect(lit()).toBe(false);
+});
+
+test("a refused delete says Couldn't save, and the last delete returns focus to the drop zone", async () => {
+  const repo = await open(1);
+  const remove = repo.dayShots.remove.bind(repo.dayShots);
+  repo.dayShots.remove = async () => {
+    throw new Error('refused');
+  };
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Open screenshot 1 of 1' }),
+  );
+  fireEvent.click(
+    within(
+      await screen.findByRole('dialog', { name: 'Screenshot 1 of 1' }),
+    ).getByRole('button', { name: 'Delete' }),
+  );
+  const ask = await screen.findByRole('dialog', {
+    name: 'Delete this screenshot?',
+  });
+  fireEvent.click(
+    within(ask).getByRole('button', { name: 'Delete screenshot' }),
+  );
+  expect(await within(ask).findByText(/Couldn.t save/)).toBeTruthy();
+  repo.dayShots.remove = remove;
+  fireEvent.click(
+    within(ask).getByRole('button', { name: 'Delete screenshot' }),
+  );
+  await waitFor(async () =>
+    expect(await repo.dayShots.list(WS, TODAY)).toHaveLength(0),
+  );
+  const zone = (await input()).parentElement!;
+  await waitFor(() => expect(document.activeElement).toBe(zone));
 });

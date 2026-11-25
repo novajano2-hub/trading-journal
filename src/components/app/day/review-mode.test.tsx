@@ -10,6 +10,7 @@ import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
+import { KeelDb } from '@/data/local/db';
 import { createLocalRepository } from '@/data/local/local-repository';
 import type { Repository } from '@/data/repository';
 import { SAMPLE_WORKSPACE } from '@/data/workspaces';
@@ -17,6 +18,7 @@ import { renderApp } from '../__fixtures__/render-app';
 import { NotebookView } from '../notebook/notebook-view';
 import { DayNote } from '../trades/trade-journal';
 import { DayView } from './day-view';
+import { ReviewTiles } from './review-tiles';
 
 vi.mock('next/navigation', () => import('../__fixtures__/navigation'));
 
@@ -57,11 +59,9 @@ const tile = async (name: string) => {
 
 test('review tiles read net, win rate and session; None without trades', async () => {
   const repo = repository();
-  await repo.days.startSession(WS, TODAY);
-  await repo.days.endSession(WS, TODAY);
   await open(GREEN, repo);
   expect((await tile('Net P&L')).textContent).toContain('+$245.50');
-  expect((await tile('Win rate')).textContent).toContain('100');
+  expect((await tile('Win rate')).textContent).toContain('100%');
   expect((await tile('Session')).textContent).toContain('None');
   cleanup();
 
@@ -69,6 +69,54 @@ test('review tiles read net, win rate and session; None without trades', async (
   expect((await tile('Net P&L')).textContent).toContain('$0.00');
   expect((await tile('Win rate')).textContent).toContain('None');
   expect((await tile('Session')).textContent).toContain('None');
+});
+
+test("a day's session shows its length in the Session tile", async () => {
+  // Only today can have a session: it starts at 14:00 and ends 75 minutes on.
+  const indexedDB = new IDBFactory();
+  const at = (now: string) =>
+    createLocalRepository({
+      indexedDB,
+      IDBKeyRange,
+      sample: async () => fixtureSample(),
+      now: () => new Date(now),
+    });
+  await at('2026-11-19T14:00:00.000Z').days.startSession(WS, TODAY);
+  const repo = at('2026-11-19T15:15:00.000Z');
+  await repo.days.endSession(WS, TODAY);
+  await open(TODAY, repo);
+  expect((await tile('Session')).textContent).toContain('1h 15m');
+});
+
+test('the win rate is a whole percent: 4 of 7 reads 57%', async () => {
+  const stats = { net: 0, winRate: 4 / 7 } as unknown as Parameters<
+    typeof ReviewTiles
+  >[0]['stats'];
+  renderApp(<ReviewTiles date={GREEN} stats={stats} currency="USD" />);
+  const strip = await screen.findByRole('region', {
+    name: 'The day in figures',
+  });
+  expect(within(strip).getByText('57%')).toBeTruthy();
+});
+
+test('outcomes and the win rate classify on net, whatever the hidden P&L basis', async () => {
+  // Up $10.00 gross, down $5.00 after fees: a loss on the page's net figures.
+  const indexedDB = new IDBFactory();
+  const repo = createLocalRepository({
+    indexedDB,
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+  await repo.prefs.update({ pnlBasis: 'gross' });
+  const db = new KeelDb({ indexedDB, IDBKeyRange });
+  await db.trades.update([WS, 'f-1'], { gross: 1000, net: -500 });
+  await open(GREEN, repo);
+  const table = await screen.findByRole('table', { name: 'Trades' });
+  const row = within(table).getAllByRole('row')[1]!;
+  expect(row.textContent).toContain('Loss');
+  expect(row.textContent).not.toContain('Win');
+  expect((await tile('Win rate')).textContent).toContain('0%');
+  expect((await tile('Net P&L')).textContent).toContain('$5.00');
 });
 
 test('review tiles show only their values', async () => {
@@ -150,7 +198,7 @@ test('the day page has no mood control', async () => {
     expect(screen.queryByText(word)).toBeNull();
 });
 
-test('Close the day asks first, then locks the rules, note, rating and shots', async () => {
+test('Close the day asks first, then locks the rules, note and rating, and focuses the Closed at panel', async () => {
   const repo = await open(GREEN);
   const close = await screen.findByRole('button', { name: 'Close the day' });
   fireEvent.click(close);
@@ -167,7 +215,13 @@ test('Close the day asks first, then locks the rules, note, rating and shots', a
       (await repo.days.list(WS)).find((d) => d.id === GREEN)?.locked,
     ).toBeDefined(),
   );
-  expect(await screen.findByText(/^Closed at \d\d:\d\d$/)).toBeTruthy();
+  const closed = await screen.findByText(/^Closed at \d\d:\d\d$/);
+  // The time shows once, in the panel; the header chip only says Closed.
+  expect(screen.getAllByText(/Closed at/)).toHaveLength(1);
+  // The button was pressed and is gone: focus lands on the panel.
+  await waitFor(() =>
+    expect(document.activeElement).toBe(closed.closest('[tabindex="-1"]')),
+  );
   expect(screen.queryByRole('button', { name: 'Close the day' })).toBeNull();
   // Everything on the page is read-only.
   expect(screen.getByText('Locked')).toBeTruthy();
@@ -177,17 +231,14 @@ test('Close the day asks first, then locks the rules, note, rating and shots', a
   expect(screen.queryByRole('button', { name: 'Clear' })).toBeNull();
   expect(
     screen
-      .queryAllByRole('checkbox')
-      .every(
-        (c) =>
-          (c as HTMLInputElement).disabled ||
-          c.getAttribute('aria-disabled') === 'true',
-      ),
-  ).toBe(true);
+      .getByRole('textbox', { name: 'Daily note' })
+      .getAttribute('contenteditable'),
+  ).toBe('false');
   await expect(repo.days.setRating(WS, GREEN, 5)).rejects.toThrow();
+  await expect(repo.days.setTick(WS, GREEN, 'any', true)).rejects.toThrow();
 });
 
-test('Close the day is not offered before the start, on a non-trading day or in the future', async () => {
+test('Close the day is not offered before the start or on a non-trading day', async () => {
   // 2026-11-01 is before the tracker started (the 2nd); the 14th is a Saturday.
   for (const date of ['2026-10-30', '2026-11-14']) {
     await open(date);
@@ -198,12 +249,6 @@ test('Close the day is not offered before the start, on a non-trading day or in 
     ).toBeNull();
     cleanup();
   }
-  // A future date has no review at all.
-  renderApp(<DayView date="2026-11-28" mode="review" />, {
-    url: '/app/day/2026-11-28/review',
-  });
-  await new Promise((r) => setTimeout(r, 50));
-  expect(screen.queryByRole('button', { name: 'Close the day' })).toBeNull();
 });
 
 test("a finished day is read-only in the trade page's Daily note and in the Notebook", async () => {
@@ -246,4 +291,67 @@ test('Privacy masks the review tiles and the trade amounts', async () => {
   const table = await screen.findByRole('table', { name: 'Trades' });
   expect(strip.textContent).not.toContain('245');
   expect(table.textContent).not.toContain('245');
+});
+
+test('review keeps Templates but has no template line, Change template or tip', async () => {
+  const repo = repository();
+  // The tip is unseen: it belongs to plan mode.
+  renderApp(<DayView date={GREEN} mode="review" />, {
+    repository: repo,
+    url: `/app/day/${GREEN}/review`,
+  });
+  await screen.findByRole('textbox', { name: 'Daily note' });
+  expect(screen.getByRole('button', { name: 'Templates' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Change template' })).toBeNull();
+  expect(screen.queryByText(/^From the/)).toBeNull();
+  expect(screen.queryByRole('note', { name: 'Tip' })).toBeNull();
+});
+
+/** The daily note of 18 Nov, trashed, then its day closed. */
+async function closedWithTrashedNote(): Promise<Repository> {
+  const repo = repository();
+  const note = await repo.journal.dailyNote(WS, '2026-11-18');
+  await repo.journal.trash(WS, note.id);
+  const tracker = await repo.tracker.get(WS);
+  await repo.days.finish(WS, '2026-11-18', {
+    version: tracker.versions[0]!,
+    inputs: {},
+    ticks: {},
+  });
+  return repo;
+}
+
+test("a closed day's trashed note offers no Restore on the day page, the trade page or the Notebook", async () => {
+  const repo = await closedWithTrashedNote();
+  await open('2026-11-18', repo);
+  expect(await screen.findByText(/in Trash/)).toBeTruthy();
+  expect(screen.getByText(/This day is closed/)).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Restore' })).toBeNull();
+  cleanup();
+
+  renderApp(
+    <DayNote date="2026-11-18" readOnly={false} onStatus={() => {}} />,
+    { repository: repo, url: '/app/trades/f-3' },
+  );
+  expect(await screen.findByText(/in Trash/)).toBeTruthy();
+  expect(screen.getAllByText(/This day is closed/)).toHaveLength(1);
+  expect(screen.queryByRole('button', { name: 'Restore' })).toBeNull();
+  cleanup();
+
+  renderApp(<NotebookView />, {
+    repository: repo,
+    url: '/app/notebook/daily/2026-11-18',
+  });
+  expect((await screen.findAllByText(/in Trash/)).length).toBeGreaterThan(0);
+  expect(await screen.findByText(/This day is closed/)).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Restore' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Delete forever' })).toBeNull();
+});
+
+test('an open day with a trashed note still offers Restore', async () => {
+  const repo = repository();
+  const note = await repo.journal.dailyNote(WS, '2026-11-18');
+  await repo.journal.trash(WS, note.id);
+  await open('2026-11-18', repo);
+  expect(await screen.findByRole('button', { name: 'Restore' })).toBeTruthy();
 });

@@ -5,8 +5,8 @@ import { MetricTip } from '@/components/ui/metric-tip';
 import type { DayStats } from '@/data/day-log';
 import { formatMinutes } from '@/lib/format';
 import { useDisplay } from '@/lib/display';
-import type { PnlBasis } from '@/domain/types';
 import { CARD } from '../dashboard/shared';
+import { useDaySession, useElapsed } from './session-button';
 
 const CELL =
   'min-w-0 px-[18px] first:pl-0 max-sm:px-3 max-sm:first:pl-0 [&+&]:border-l [&+&]:border-line';
@@ -15,22 +15,23 @@ const VALUE =
 
 /**
  * TradeZella's three tiles, each a label and its value and nothing more
- * (P6A-11): net P&L, win rate, and the session's length. Money goes through
- * the Display, always net and in the base currency, so Privacy masks it.
+ * (P6A-11): net P&L, win rate (a whole percent: 4 of 7 reads 57%), and the
+ * session's length. Money goes through the Display, always net and in the
+ * base currency, so Privacy masks it. The page's figures are all net.
  */
 export function ReviewTiles({
+  date,
   stats,
-  sessionMs,
   currency,
-  basis,
 }: {
+  date: string;
   stats: DayStats | undefined;
-  /** The session's length; null when it was never started. */
-  sessionMs: number | null;
   currency: string;
-  basis: PnlBasis;
 }): React.JSX.Element {
   const display = useDisplay();
+  // Ticking lives here, so the clock re-renders the tiles and nothing else.
+  const { today, session } = useDaySession(date);
+  const sessionMs = useElapsed(date, today, session);
   const net = stats?.net ?? 0;
   const money = display.cash(net, true, currency);
   const winRate = stats?.winRate ?? null;
@@ -50,21 +51,17 @@ export function ReviewTiles({
         </b>
       </div>
       <div className={CELL}>
-        <MetricTip
-          id="win-rate"
-          basis={basis}
-          className="text-[13px] text-muted"
-        >
+        <MetricTip id="win-rate" basis="net" className="text-[13px] text-muted">
           Win rate
         </MetricTip>
         <b className={VALUE}>
-          {winRate === null ? 'None' : `${(winRate * 100).toFixed(1)}%`}
+          {winRate === null ? 'None' : `${Math.round(winRate * 100)}%`}
         </b>
       </div>
       <div className={CELL}>
         <MetricTip
           id="session-length"
-          basis={basis}
+          basis="net"
           className="text-[13px] text-muted"
         >
           Session
