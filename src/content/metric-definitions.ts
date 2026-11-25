@@ -107,6 +107,13 @@ export const METRIC_IDS = [
   'day-pips',
   'day-points',
   'day-rating',
+  'tracker-streak',
+  'tracker-score',
+  'tracker-today',
+  'rule-streak',
+  'rule-average',
+  'tracker-history',
+  'tracker-card',
 ] as const;
 
 export type MetricId = (typeof METRIC_IDS)[number];
@@ -136,7 +143,7 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'rule-follow-rate': {
     label: 'Follow rate',
     definition:
-      "Closed trades that kept this rule, divided by those that kept or broke it. Only trades the rule applies to count, and unanswered checks don't.",
+      "Closed trades that kept this rule, divided by those that kept or broke it. Only trades the rule applies to count, and unanswered checks don't. On the progress tracker it is the days that kept the rule, divided by the days it was decided; a day still pending doesn't count.",
   },
   'rule-followed-pnl': {
     label: 'P&L when followed',
@@ -629,6 +636,41 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Consistency',
     definition:
       "The best day's net P&L as a share of the phase's profit. The rule is kept while it stays at or under the limit. It reads only once the phase is in profit.",
+  },
+  'tracker-streak': {
+    label: 'Current streak',
+    definition:
+      "Scored days in a row on which you met every rule that applied. It counts back from today, or from yesterday while today is still open. One day that falls short ends it. Days that aren't scored, such as weekends, don't break it.",
+  },
+  'tracker-score': {
+    label: 'Score',
+    definition:
+      "The average share of rules met across the scored days in the range. Each day counts the same, however many rules applied that day. Days that aren't scored are left out.",
+  },
+  'tracker-today': {
+    label: 'Today',
+    definition:
+      'The rules met so far today, of the rules that apply. A rule that can still be met stays pending until the day ends or you close it.',
+  },
+  'rule-streak': {
+    label: 'Streak',
+    definition:
+      "Days in a row that this rule was met, counting back from today, or from yesterday while today's check is pending. A day it failed ends the run.",
+  },
+  'rule-average': {
+    label: 'Average',
+    definition:
+      "This rule's own figure averaged over the scored days in the range: the share of trades kept, the day's loss, the largest loss in a trade, or the time the day note was started. None when no day has one. Money here is always net.",
+  },
+  'tracker-history': {
+    label: 'History',
+    definition:
+      "Each square is a trading day, shaded by the share of rules you met that day: the darkest is every rule. Blank squares aren't scored: weekends and other non-trading days.",
+  },
+  'tracker-card': {
+    label: 'Progress tracker',
+    definition:
+      'How consistently you follow your own rules. Each square is a trading day, shaded by the share of rules you met, with your current streak beside it.',
   },
 };
 

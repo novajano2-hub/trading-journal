@@ -59,3 +59,24 @@ test('the figures a narrowing unit changes say how they read in it', () => {
       /R, ticks, pips or points/,
     );
 });
+
+test('the progress tracker has a definition for every figure it labels', () => {
+  for (const id of [
+    'tracker-streak',
+    'tracker-score',
+    'tracker-today',
+    'rule-streak',
+    'rule-average',
+    'rule-follow-rate',
+    'tracker-history',
+    'tracker-card',
+  ] as const) {
+    expect(METRIC_IDS, id).toContain(id);
+    expect(metricDefinition(id, 'net').definition.length, id).toBeGreaterThan(
+      20,
+    );
+  }
+  expect(metricDefinition('tracker-card', 'net').definition).toContain(
+    'consistently',
+  );
+});

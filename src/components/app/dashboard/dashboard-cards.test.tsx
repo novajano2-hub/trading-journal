@@ -703,6 +703,14 @@ test('every metric carries its definition', async () => {
     'rule-followed-pnl',
     'rule-followed-win-rate',
     'rule-followed-pf',
+    // On the progress tracker (Plan 6A Task 7); the dashboard's own card follows.
+    'tracker-streak',
+    'tracker-score',
+    'tracker-today',
+    'rule-streak',
+    'rule-average',
+    'tracker-history',
+    'tracker-card',
     // On a trade note's stats card (Task 21).
     'volume',
     // On a challenge's card (Task 19).
