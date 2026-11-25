@@ -198,6 +198,14 @@ function Switch({
   );
 }
 
+/** 00:00 to 23:45 in quarter hours: Keel's step (TradeZella's is unknown). */
+const TIMES = Array.from(
+  { length: 96 },
+  (_, i) =>
+    `${String(Math.floor(i / 4)).padStart(2, '0')}:${String((i % 4) * 15).padStart(2, '0')}`,
+);
+
+/** A 24-hour time select; a saved time off the quarter hour stays pickable. */
 function TimeField({
   label,
   value,
@@ -213,20 +221,24 @@ function TimeField({
   errorId: string;
   onChange(v: string): void;
 }): React.JSX.Element {
+  const options = TIMES.includes(value) ? TIMES : [...TIMES, value].sort();
   return (
     <span className="relative inline-flex">
-      <input
-        type="text"
-        inputMode="numeric"
-        autoComplete="off"
+      <select
         aria-label={label}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
         disabled={disabled}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`${FIELD} w-[88px] pr-7`}
-      />
+        className={`${FIELD} w-[88px] appearance-none pr-7`}
+      >
+        {options.map((t) => (
+          <option key={t} value={t}>
+            {t}
+          </option>
+        ))}
+      </select>
       <Clock
         size={14}
         aria-hidden="true"
@@ -586,7 +598,7 @@ function Dialogs({
         size="sheet"
         footer={footer}
       >
-        <p className="flex items-start gap-2 pt-1 text-[13px] leading-[1.5] text-muted">
+        <p className="mt-1 flex items-center gap-2.5 rounded-[10px] bg-sunken px-4 py-2.5 text-[13px] leading-[1.5] text-muted">
           <Info size={16} aria-hidden="true" className="mt-px flex-none" />
           Changes count from today. Earlier days keep the rules they were scored
           with.

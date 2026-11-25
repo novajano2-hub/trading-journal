@@ -60,6 +60,8 @@ export function MorphDialog({
   children: ReactNode;
 }): React.JSX.Element | null {
   const reduced = useReducedMotion();
+  // The sheet breathes a little more on a wide screen (comp 02).
+  const gutter = size === 'sheet' ? 'px-5 sm:px-6' : 'px-5';
   // Stays mounted while the exit plays, after `open` has already gone false.
   const [present, setPresent] = useState(open);
   const veil = useRef<HTMLDivElement>(null);
@@ -187,7 +189,9 @@ export function MorphDialog({
             ref={body}
             className={`flex min-h-0 flex-col ${size === 'full' ? 'h-full' : size === 'sheet' ? 'h-full sm:h-auto sm:max-h-[80dvh]' : 'max-h-[80dvh]'}`}
           >
-            <div className="flex items-start gap-3 border-b border-line px-5 pt-[18px] pb-4">
+            <div
+              className={`flex items-start gap-3 border-b border-line ${gutter} pt-[18px] pb-4`}
+            >
               {icon ? <div className="flex-none pt-px">{icon}</div> : null}
               <div className="min-w-0 flex-1">
                 <Dialog.Title className="text-[17px] leading-snug font-semibold tracking-[-0.015em] text-pretty text-text">
@@ -208,11 +212,15 @@ export function MorphDialog({
                 <X size={18} aria-hidden="true" />
               </Dialog.Close>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-2 pb-4">
+            <div
+              className={`min-h-0 flex-1 overflow-y-auto ${gutter} pt-2 pb-4`}
+            >
               {children}
             </div>
             {footer ? (
-              <div className="flex-none border-t border-line bg-surface-1 px-5 py-3">
+              <div
+                className={`flex-none border-t border-line bg-surface-1 ${gutter} py-3`}
+              >
                 {footer}
               </div>
             ) : null}

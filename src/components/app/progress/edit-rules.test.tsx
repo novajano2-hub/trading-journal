@@ -195,27 +195,34 @@ test('reset asks once, then restarts the tracker today', async () => {
   expect(t.versions[0]!.custom).toEqual([]);
 });
 
-test('invalid times keep Save disabled with a field error', async () => {
+test('times are 24-hour selects in quarter hours, and an hours range must run forward', async () => {
   show();
   await ready();
-  const start = screen.getByRole('textbox', { name: 'Start by time' });
-  fireEvent.change(start, { target: { value: '25:00' } });
-  expect(screen.getByText('Use a time as HH:mm.')).toBeTruthy();
-  expect((save() as HTMLButtonElement).disabled).toBe(true);
+  const start = screen.getByRole('combobox', {
+    name: 'Start by time',
+  }) as HTMLSelectElement;
+  const times = [...start.options].map((o) => o.value);
+  expect(times).toHaveLength(96);
+  expect(times[0]).toBe('00:00');
+  expect(times[1]).toBe('00:15');
+  expect(times[95]).toBe('23:45');
   fireEvent.change(start, { target: { value: '09:45' } });
-  expect(screen.queryByText('Use a time as HH:mm.')).toBeNull();
   expect((save() as HTMLButtonElement).disabled).toBe(false);
 
-  // Hours: from must come before to.
   fireEvent.click(screen.getByRole('switch', { name: 'Trade only between' }));
   fireEvent.change(
-    screen.getByRole('textbox', { name: 'Trading hours from' }),
+    screen.getByRole('combobox', { name: 'Trading hours from' }),
     {
       target: { value: '13:00' },
     },
   );
   expect(screen.getByText('The start must be before the end.')).toBeTruthy();
   expect((save() as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.change(screen.getByRole('combobox', { name: 'Trading hours to' }), {
+    target: { value: '14:30' },
+  });
+  expect(screen.queryByText('The start must be before the end.')).toBeNull();
+  expect((save() as HTMLButtonElement).disabled).toBe(false);
 });
 
 test('amounts and percents must be positive, a percent at most 100', async () => {
