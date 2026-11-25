@@ -27,9 +27,6 @@ test('the basis shows in the label and the definitions that use it', () => {
   expect(metricDefinition('rule-cost-broken', 'net').definition).toContain(
     'net P&L',
   );
-  expect(metricDefinition('weekly-goal', 'gross').definition).toContain(
-    'Always net',
-  );
 });
 
 test('cumulative P&L has its own definition, apart from the period P&L', () => {

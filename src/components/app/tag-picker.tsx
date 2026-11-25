@@ -31,7 +31,7 @@ export function ManageTagsLink({
   header = false,
 }: {
   className?: string;
-  /** Drawn as a card header's link ("Edit goals" style), for the right of a title. */
+  /** Drawn as a card header's link (a small accent link), for the right of a title. */
   header?: boolean;
 }): React.JSX.Element {
   return (

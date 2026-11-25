@@ -122,24 +122,6 @@ test('the Display menu hides every amount under Privacy and brings them back', a
   await expect(page.getByTestId('kpi-pnl')).toContainText(/\$\d/);
 });
 
-test('goals edit in place and keep the saved amount', async ({ page }) => {
-  await page.goto('/app/dashboard');
-  await ready(page);
-  const goals = page.getByRole('region', { name: 'Goals' });
-  await goals.getByRole('button', { name: 'Edit goals' }).click();
-  const weekly = goals.getByLabel('Weekly net goal');
-  await expect(weekly).toBeFocused();
-  await weekly.fill('750');
-  await goals.getByRole('button', { name: 'Save' }).click();
-  await expect(goals.getByRole('button', { name: 'Edit goals' })).toBeVisible();
-  await expect(goals).toContainText('$750.00');
-  await page.reload();
-  await ready(page);
-  await expect(page.getByRole('region', { name: 'Goals' })).toContainText(
-    '$750.00',
-  );
-});
-
 test('a filter that matches nothing and an empty workspace each show their own way out', async ({
   page,
 }, info) => {

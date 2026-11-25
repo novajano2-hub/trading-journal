@@ -1,5 +1,4 @@
 import { beforeAll, describe, expect, test } from 'vitest';
-import { SAMPLE_GOALS } from './goals';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import {
   defaultMetricContext,
@@ -40,7 +39,6 @@ const env = (ctx: MetricContext): DashboardEnv => ({
   strategies: s.strategies,
   tags: s.tags,
   tagCategories: s.tagCategories,
-  goals: { weeklyNet: 150000, dailyLossLimit: 50000 },
   baseCurrency: 'USD',
   ctx,
   range: {},
@@ -67,12 +65,6 @@ test('the dashboard is the engine, sorted by cost', () => {
   );
   expect(d.performance.equity[0]).toBe(37_500_000);
   expect(d.performance.equity).toHaveLength(m.summary.closedCount + 1);
-  expect(d.goals.unavailable).toBeNull();
-  expect(d.goals.weekly!.window).toEqual({
-    from: '2026-11-15',
-    to: '2026-11-20',
-  });
-  expect(d.goals.dailyLoss!.limit).toBe(50000);
   expect(d.tradesById.size).toBe(m.trades.length);
   expect(d.closedCount).toBe(m.summary.closedCount);
 });
@@ -96,27 +88,7 @@ test('a recent trade in two strategies names both', () => {
   ]);
 });
 
-test('goals need the base currency, and are absent when unset', () => {
-  const ctx = defaultMetricContext(NY),
-    m = usd(ctx);
-  const other = buildDashboard(m, { ...env(ctx), baseCurrency: 'GBP' });
-  expect(other.goals.weekly).toBeNull();
-  expect(other.goals.dailyLoss).toBeNull();
-  expect(other.goals.unavailable).toMatch(/base currency/);
-  const unset = buildDashboard(m, { ...env(ctx), goals: {} });
-  expect(unset.goals).toEqual({
-    weekly: null,
-    dailyLoss: null,
-    unavailable: null,
-  });
-  const past = buildDashboard(m, {
-    ...env(ctx),
-    range: { from: '2026-11-25' },
-  });
-  expect(past.goals.weekly).toBeNull();
-});
-
-test('Gross/Net moves costs and performance, never goals (Review Focus 3)', () => {
+test('Gross/Net moves costs and performance', () => {
   const net = defaultMetricContext(NY),
     gross = { ...net, pnlBasis: 'gross' as const };
   const a = buildDashboard(usd(net), env(net)),
@@ -132,33 +104,6 @@ test('Gross/Net moves costs and performance, never goals (Review Focus 3)', () =
   expect(b.performance.equity.at(-1)).toBeGreaterThan(
     a.performance.equity.at(-1)!,
   );
-  expect(b.goals).toEqual(a.goals);
-});
-
-test('goals use net even when the dashboard is on gross', () => {
-  const t = (id: string, net: number, gross: number, closedAt: string) =>
-    makeTrade({ id, net, gross, closedAt });
-  const trades = [
-    t('a', -48000, -40000, '2026-11-17T15:00:00Z'),
-    t('b', 20000, 30000, '2026-11-18T15:00:00Z'),
-  ];
-  const mk = (pnlBasis: 'net' | 'gross') => {
-    const ctx = { ...defaultMetricContext(NY), pnlBasis };
-    const [m] = metricsByCurrency(trades, {
-      accounts: [],
-      ctx,
-      baseCurrency: 'USD',
-    });
-    return buildDashboard(m!, {
-      ...env(ctx),
-      goals: { weeklyNet: 100000, dailyLossLimit: 45000 },
-    });
-  };
-  const net = mk('net'),
-    gross = mk('gross');
-  expect(gross.goals.weekly!.net).toBe(-28000);
-  expect(gross.goals.dailyLoss!.brokenDays).toHaveLength(1);
-  expect(gross.goals).toEqual(net.goals);
 });
 
 test('dashboard metrics for the sample compute well inside the 50 ms budget (spec §10, bound 150)', () => {
@@ -303,23 +248,6 @@ test('a trade’s rules column leaves out rules that do not apply or are not its
   expect(
     tradeRulesSummary({ ...winner, strategyIds: [] }, [strategy], ctx).kind,
   ).toBe('ungraded');
-});
-
-test('the sample at its default view: weekly goal in progress, loss limit kept this week', () => {
-  const ctx = defaultMetricContext(NY),
-    d = buildDashboard(usd(ctx), { ...env(ctx), goals: SAMPLE_GOALS });
-  const week = d.goals.weekly!;
-  expect(week.window).toEqual({ from: '2026-11-15', to: '2026-11-20' });
-  expect(week.reached).toBe(false);
-  expect(week.net).toBe(12916);
-  expect(week.fraction).toBeCloseTo(0.258, 3);
-  const loss = d.goals.dailyLoss!;
-  expect(loss.limit).toBe(SAMPLE_GOALS.dailyLossLimit);
-  expect(
-    loss.brokenDays.filter(
-      (x) => x.date >= week.window.from && x.date <= week.window.to,
-    ),
-  ).toEqual([]);
 });
 
 test('imported trades with no strategy and no rule checks (Review Focus 1)', () => {

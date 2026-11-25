@@ -104,6 +104,13 @@ test('today carries a mark only when asked', () => {
   expect(cell(/^Tue 24 Nov/).hasAttribute('data-today')).toBe(false);
 });
 
+test('compact squares are 11px apart by 3', () => {
+  grid({ compact: true });
+  const sized = screen.getByRole('grid').closest<HTMLElement>('[style*="--c"]');
+  expect(sized!.style.getPropertyValue('--c')).toBe('11px');
+  expect(sized!.style.getPropertyValue('--g')).toBe('3px');
+});
+
 test('hover and focus read the date and p of n rules met', () => {
   grid();
   const readout = screen.getByRole('status');

@@ -35,9 +35,13 @@ const STEP_BG: Record<GridStep, string> = {
 /** The weekday column's width and gap, in px. */
 const AXIS = 30;
 const AXIS_GAP = 8;
-/** Cell and gap sizes: the comp's 22 and 5 on a wide card, 14 and 4 on a narrow one. */
-const sizeFor = (width: number) =>
-  width > 0 && width < 520 ? { c: 14, g: 4 } : { c: 22, g: 5 };
+/** Cell and gap sizes: the comp's 22 and 5 on a wide card, 14 and 4 on a narrow one, 11 and 3 when compact. */
+const sizeFor = (width: number, compact: boolean) =>
+  compact
+    ? { c: 11, g: 3 }
+    : width > 0 && width < 520
+      ? { c: 14, g: 4 }
+      : { c: 22, g: 5 };
 
 const ICON_BUTTON =
   'grid size-[30px] place-items-center rounded-control border border-line bg-surface-1 text-muted transition-colors hover:border-accent/35 hover:text-text focus-visible:outline-2 focus-visible:outline-accent aria-disabled:opacity-55 aria-disabled:hover:border-line aria-disabled:hover:text-muted pointer-coarse:size-11';
@@ -59,6 +63,7 @@ export function HeatGrid({
   paging,
   label,
   controlsHost,
+  compact = false,
 }: {
   days: readonly DayScore[];
   today: string;
@@ -73,6 +78,8 @@ export function HeatGrid({
    * mounted yet, so they wait.
    */
   controlsHost?: HTMLElement | null;
+  /** The dashboard card's small squares (11px, 3px apart), so more weeks fit. */
+  compact?: boolean;
 }): React.JSX.Element {
   const textId = useId();
   const host = useRef<HTMLDivElement>(null);
@@ -109,7 +116,7 @@ export function HeatGrid({
         (7 * DAY_MS),
     ) + 1;
 
-  const { c, g } = sizeFor(width);
+  const { c, g } = sizeFor(width, compact);
   const fit =
     width > 0
       ? Math.max(
