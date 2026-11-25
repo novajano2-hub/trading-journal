@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keel, Trades, by day</title>
+<!-- Plan 6A comp. Open with ?theme=dark for graphite. -->
+<script>(function(){var q=new URLSearchParams(location.search),t=q.get('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'),d=document.documentElement;d.dataset.theme=t;var s=q.get('state');if(s)d.dataset.state=s;})();</script>
+<link rel="stylesheet" href="shell.css">
+<style>
+
+.vrow { display: flex; align-items: center; gap: 10px; }
+.vseg > a { min-width: 64px; }
+.vtools { margin-left: auto; display: flex; gap: 8px; }
+.tl { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
+.tl-list { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.dc { padding: 14px 20px 16px; }
+.dc-hd { display: flex; align-items: center; gap: 10px; min-height: 36px; }
+.dc-tog { width: 28px; height: 28px; margin-left: -6px; display: grid; place-items: center; border-radius: 8px; color: var(--muted); }
+.dc-tog:hover { background: var(--sunken); } .dc-tog svg.i { width: 14px; height: 14px; }
+.dc-hd h2 { font-size: 15px; font-weight: 600; letter-spacing: -.015em; white-space: nowrap; }
+.dc-net { font-size: 15px; font-weight: 600; white-space: nowrap; }
+.dc-cap { font-size: 12.5px; color: var(--faint); }
+.qa { margin-left: auto; display: flex; gap: 2px; align-items: center; }
+.qa .btn.sm { color: var(--muted); font-weight: 500; padding: 0 10px; }
+.qa .btn.sm svg.i { color: var(--muted); }
+.qa .btn .mw { color: var(--text); font-weight: 600; }
+.qa svg.cd { width: 12px !important; height: 12px !important; color: var(--faint) !important; }
+.dc-chart { position: relative; margin: 10px 0 14px; }
+.dc .dstats { padding-top: 12px; border-top: 1px solid var(--line); }
+.dc-trades { margin-top: 14px; border-top: 1px solid var(--line); }
+.dtab td { height: 40px; }
+.dc-none { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: 13.5px; color: var(--muted); }
+.mcal { position: sticky; top: 84px; padding: 16px 16px 14px; }
+.mc-hd { display: flex; align-items: center; justify-content: space-between; }
+.mc-hd b { font-size: 15px; font-weight: 600; letter-spacing: -.015em; }
+.mc-hd .end { display: flex; gap: 6px; }
+.mc-wd, .mc-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+.mc-wd { margin-top: 12px; font-size: 11px; color: var(--faint); text-align: center; }
+.mc-grid { position: relative; margin-top: 4px; row-gap: 2px; }
+.mc-d { height: 40px; border-radius: 9px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 13px; color: var(--muted); font-weight: 500; position: relative; }
+.mc-d:hover { background: var(--sunken); }
+.mc-d i { width: 14px; height: 2.5px; border-radius: 2px; }
+.mc-d i.up { background: var(--gain-fill); } .mc-d i.dn { background: var(--loss-fill); }
+.mc-d:not(:has(i)) span { margin-bottom: 6.5px; }
+.mc-d.fut { color: var(--faint); }
+.mc-d.today { color: var(--text); font-weight: 700; }
+.mc-d.sel { box-shadow: inset 0 0 0 1.5px var(--accent); color: var(--text); font-weight: 600; }
+.mc-d.hov { background: var(--sunken); }
+.mc-grid > .mc-d:first-child { grid-column: 1; }
+.mc-key { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--faint); line-height: 1.5; }
+.mc-grid .tt { position: absolute; }
+@media (max-width: 639.98px) {
+  .vrow { flex-direction: column; align-items: stretch; gap: 10px; }
+  .vseg { display: flex; } .vseg > a { flex: 1; }
+  .vtools { margin-left: 0; gap: 6px; } .vtools .btn { flex: 1; padding: 0 8px; }
+  .tl { display: block; }
+  .mcal { display: none; }
+  .dc { padding: 12px 16px 14px; }
+  .qa { margin-right: -10px; } .qa .pbtn svg.i { width: 20px; height: 20px; }
+  .dc-tog { display: none; }
+  .dc-trades { margin-top: 12px; }
+}
+
+</style>
+</head>
+<body class="">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><symbol id="i-CaretUpDown-bold" viewBox="0 0 256 256"><path d="M184.49,167.51a12,12,0,0,1,0,17l-48,48a12,12,0,0,1-17,0l-48-48a12,12,0,0,1,17-17L128,207l39.51-39.52A12,12,0,0,1,184.49,167.51Zm-96-79L128,49l39.51,39.52a12,12,0,0,0,17-17l-48-48a12,12,0,0,0-17,0l-48,48a12,12,0,0,0,17,17Z"/></symbol><symbol id="i-House-regular" viewBox="0 0 256 256"><path d="M219.31,108.68l-80-80a16,16,0,0,0-22.62,0l-80,80A15.87,15.87,0,0,0,32,120v96a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V160h32v56a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V120A15.87,15.87,0,0,0,219.31,108.68ZM208,208H160V152a8,8,0,0,0-8-8H104a8,8,0,0,0-8,8v56H48V120l80-80,80,80Z"/></symbol><symbol id="i-SquaresFour-regular" viewBox="0 0 256 256"><path d="M104,40H56A16,16,0,0,0,40,56v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,104,40Zm0,64H56V56h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,200,40Zm0,64H152V56h48v48Zm-96,32H56a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,104,136Zm0,64H56V152h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,200,136Zm0,64H152V152h48v48Z"/></symbol><symbol id="i-ListBullets-regular" viewBox="0 0 256 256"><path d="M80,64a8,8,0,0,1,8-8H216a8,8,0,0,1,0,16H88A8,8,0,0,1,80,64Zm136,56H88a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Zm0,64H88a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16ZM44,52A12,12,0,1,0,56,64,12,12,0,0,0,44,52Zm0,64a12,12,0,1,0,12,12A12,12,0,0,0,44,116Zm0,64a12,12,0,1,0,12,12A12,12,0,0,0,44,180Z"/></symbol><symbol id="i-CalendarBlank-regular" viewBox="0 0 256 256"><path d="M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM72,48v8a8,8,0,0,0,16,0V48h80v8a8,8,0,0,0,16,0V48h24V80H48V48ZM208,208H48V96H208V208Z"/></symbol><symbol id="i-ChartBar-regular" viewBox="0 0 256 256"><path d="M224,200h-8V40a8,8,0,0,0-8-8H152a8,8,0,0,0-8,8V80H96a8,8,0,0,0-8,8v40H48a8,8,0,0,0-8,8v64H32a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16ZM160,48h40V200H160ZM104,96h40V200H104ZM56,144H88v56H56Z"/></symbol><symbol id="i-Gauge-regular" viewBox="0 0 256 256"><path d="M207.06,72.67A111.24,111.24,0,0,0,128,40h-.4C66.07,40.21,16,91,16,153.13V176a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V152A111.25,111.25,0,0,0,207.06,72.67ZM224,176H119.71l54.76-75.3a8,8,0,0,0-12.94-9.42L99.92,176H32V153.13c0-3.08.15-6.12.43-9.13H56a8,8,0,0,0,0-16H35.27c10.32-38.86,44-68.24,84.73-71.66V80a8,8,0,0,0,16,0V56.33A96.14,96.14,0,0,1,221,128H200a8,8,0,0,0,0,16h23.67c.21,2.65.33,5.31.33,8Z"/></symbol><symbol id="i-Strategy-regular" viewBox="0 0 256 256"><path d="M76,152a36,36,0,1,0,36,36A36,36,0,0,0,76,152Zm0,56a20,20,0,1,1,20-20A20,20,0,0,1,76,208ZM42.34,106.34,56.69,92,42.34,77.66A8,8,0,0,1,53.66,66.34L68,80.69,82.34,66.34A8,8,0,0,1,93.66,77.66L79.31,92l14.35,14.34a8,8,0,0,1-11.32,11.32L68,103.31,53.66,117.66a8,8,0,0,1-11.32-11.32Zm187.32,96a8,8,0,0,1-11.32,11.32L204,199.31l-14.34,14.35a8,8,0,0,1-11.32-11.32L192.69,188l-14.35-14.34a8,8,0,0,1,11.32-11.32L204,176.69l14.34-14.35a8,8,0,0,1,11.32,11.32L215.31,188Zm-45.19-89.51c-6.18,22.33-25.32,41.63-46.53,46.93A8.13,8.13,0,0,1,136,160a8,8,0,0,1-1.93-15.76c15.63-3.91,30.35-18.91,35-35.68,3.19-11.5,3.22-29-14.71-46.9L152,59.31V80a8,8,0,0,1-16,0V40a8,8,0,0,1,8-8h40a8,8,0,0,1,0,16H163.31l2.35,2.34C183.9,68.59,190.58,90.78,184.47,112.83Z"/></symbol><symbol id="i-Notebook-regular" viewBox="0 0 256 256"><path d="M184,112a8,8,0,0,1-8,8H112a8,8,0,0,1,0-16h64A8,8,0,0,1,184,112Zm-8,24H112a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16Zm48-88V208a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V48A16,16,0,0,1,48,32H208A16,16,0,0,1,224,48ZM48,208H72V48H48Zm160,0V48H88V208H208Z"/></symbol><symbol id="i-UploadSimple-regular" viewBox="0 0 256 256"><path d="M224,144v64a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V144a8,8,0,0,1,16,0v56H208V144a8,8,0,0,1,16,0ZM93.66,77.66,120,51.31V144a8,8,0,0,0,16,0V51.31l26.34,26.35a8,8,0,0,0,11.32-11.32l-40-40a8,8,0,0,0-11.32,0l-40,40A8,8,0,0,0,93.66,77.66Z"/></symbol><symbol id="i-ShieldCheck-regular" viewBox="0 0 256 256"><path d="M208,40H48A16,16,0,0,0,32,56v56c0,52.72,25.52,84.67,46.93,102.19,23.06,18.86,46,25.26,47,25.53a8,8,0,0,0,4.2,0c1-.27,23.91-6.67,47-25.53C198.48,196.67,224,164.72,224,112V56A16,16,0,0,0,208,40Zm0,72c0,37.07-13.66,67.16-40.6,89.42A129.3,129.3,0,0,1,128,223.62a128.25,128.25,0,0,1-38.92-21.81C61.82,179.51,48,149.3,48,112l0-56,160,0ZM82.34,141.66a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35a8,8,0,0,1,11.32,11.32l-56,56a8,8,0,0,1-11.32,0Z"/></symbol><symbol id="i-ClockCounterClockwise-regular" viewBox="0 0 256 256"><path d="M136,80v43.47l36.12,21.67a8,8,0,0,1-8.24,13.72l-40-24A8,8,0,0,1,120,128V80a8,8,0,0,1,16,0Zm-8-48A95.44,95.44,0,0,0,60.08,60.15C52.81,67.51,46.35,74.59,40,82V64a8,8,0,0,0-16,0v40a8,8,0,0,0,8,8H72a8,8,0,0,0,0-16H49c7.15-8.42,14.27-16.35,22.39-24.57a80,80,0,1,1,1.66,114.75,8,8,0,1,0-11,11.64A96,96,0,1,0,128,32Z"/></symbol><symbol id="i-PlayCircle-regular" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm48.24-94.78-64-40A8,8,0,0,0,100,88v80a8,8,0,0,0,12.24,6.78l64-40a8,8,0,0,0,0-13.56ZM116,153.57V102.43L156.91,128Z"/></symbol><symbol id="i-UsersThree-regular" viewBox="0 0 256 256"><path d="M244.8,150.4a8,8,0,0,1-11.2-1.6A51.6,51.6,0,0,0,192,128a8,8,0,0,1-7.37-4.89,8,8,0,0,1,0-6.22A8,8,0,0,1,192,112a24,24,0,1,0-23.24-30,8,8,0,1,1-15.5-4A40,40,0,1,1,219,117.51a67.94,67.94,0,0,1,27.43,21.68A8,8,0,0,1,244.8,150.4ZM190.92,212a8,8,0,1,1-13.84,8,57,57,0,0,0-98.16,0,8,8,0,1,1-13.84-8,72.06,72.06,0,0,1,33.74-29.92,48,48,0,1,1,58.36,0A72.06,72.06,0,0,1,190.92,212ZM128,176a32,32,0,1,0-32-32A32,32,0,0,0,128,176ZM72,120a8,8,0,0,0-8-8A24,24,0,1,1,87.24,82a8,8,0,1,0,15.5-4A40,40,0,1,0,37,117.51,67.94,67.94,0,0,0,9.6,139.19a8,8,0,1,0,12.8,9.61A51.6,51.6,0,0,1,64,128,8,8,0,0,0,72,120Z"/></symbol><symbol id="i-Sparkle-regular" viewBox="0 0 256 256"><path d="M197.58,129.06,146,110l-19-51.62a15.92,15.92,0,0,0-29.88,0L78,110l-51.62,19a15.92,15.92,0,0,0,0,29.88L78,178l19,51.62a15.92,15.92,0,0,0,29.88,0L146,178l51.62-19a15.92,15.92,0,0,0,0-29.88ZM137,164.22a8,8,0,0,0-4.74,4.74L112,223.85,91.78,169A8,8,0,0,0,87,164.22L32.15,144,87,123.78A8,8,0,0,0,91.78,119L112,64.15,132.22,119a8,8,0,0,0,4.74,4.74L191.85,144ZM144,40a8,8,0,0,1,8-8h16V16a8,8,0,0,1,16,0V32h16a8,8,0,0,1,0,16H184V64a8,8,0,0,1-16,0V48H152A8,8,0,0,1,144,40ZM248,88a8,8,0,0,1-8,8h-8v8a8,8,0,0,1-16,0V96h-8a8,8,0,0,1,0-16h8V72a8,8,0,0,1,16,0v8h8A8,8,0,0,1,248,88Z"/></symbol><symbol id="i-GearSix-regular" viewBox="0 0 256 256"><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm109.94-52.79a8,8,0,0,0-3.89-5.4l-29.83-17-.12-33.62a8,8,0,0,0-2.83-6.08,111.91,111.91,0,0,0-36.72-20.67,8,8,0,0,0-6.46.59L128,41.85,97.88,25a8,8,0,0,0-6.47-.6A112.1,112.1,0,0,0,54.73,45.15a8,8,0,0,0-2.83,6.07l-.15,33.65-29.83,17a8,8,0,0,0-3.89,5.4,106.47,106.47,0,0,0,0,41.56,8,8,0,0,0,3.89,5.4l29.83,17,.12,33.62a8,8,0,0,0,2.83,6.08,111.91,111.91,0,0,0,36.72,20.67,8,8,0,0,0,6.46-.59L128,214.15,158.12,231a7.91,7.91,0,0,0,3.9,1,8.09,8.09,0,0,0,2.57-.42,112.1,112.1,0,0,0,36.68-20.73,8,8,0,0,0,2.83-6.07l.15-33.65,29.83-17a8,8,0,0,0,3.89-5.4A106.47,106.47,0,0,0,237.94,107.21Zm-15,34.91-28.57,16.25a8,8,0,0,0-3,3c-.58,1-1.19,2.06-1.81,3.06a7.94,7.94,0,0,0-1.22,4.21l-.15,32.25a95.89,95.89,0,0,1-25.37,14.3L134,199.13a8,8,0,0,0-3.91-1h-.19c-1.21,0-2.43,0-3.64,0a8.08,8.08,0,0,0-4.1,1l-28.84,16.1A96,96,0,0,1,67.88,201l-.11-32.2a8,8,0,0,0-1.22-4.22c-.62-1-1.23-2-1.8-3.06a8.09,8.09,0,0,0-3-3.06l-28.6-16.29a90.49,90.49,0,0,1,0-28.26L61.67,97.63a8,8,0,0,0,3-3c.58-1,1.19-2.06,1.81-3.06a7.94,7.94,0,0,0,1.22-4.21l.15-32.25a95.89,95.89,0,0,1,25.37-14.3L122,56.87a8,8,0,0,0,4.1,1c1.21,0,2.43,0,3.64,0a8.08,8.08,0,0,0,4.1-1l28.84-16.1A96,96,0,0,1,188.12,55l.11,32.2a8,8,0,0,0,1.22,4.22c.62,1,1.23,2,1.8,3.06a8.09,8.09,0,0,0,3,3.06l28.6,16.29A90.49,90.49,0,0,1,222.9,142.12Z"/></symbol><symbol id="i-CaretDown-bold" viewBox="0 0 256 256"><path d="M216.49,104.49l-80,80a12,12,0,0,1-17,0l-80-80a12,12,0,0,1,17-17L128,159l71.51-71.52a12,12,0,0,1,17,17Z"/></symbol><symbol id="i-SlidersHorizontal-regular" viewBox="0 0 256 256"><path d="M40,88H73a32,32,0,0,0,62,0h81a8,8,0,0,0,0-16H135a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16Zm64-24A16,16,0,1,1,88,80,16,16,0,0,1,104,64ZM216,168H199a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16h97a32,32,0,0,0,62,0h17a8,8,0,0,0,0-16Zm-48,24a16,16,0,1,1,16-16A16,16,0,0,1,168,192Z"/></symbol><symbol id="i-MagnifyingGlass-regular" viewBox="0 0 256 256"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/></symbol><symbol id="i-CalendarCheck-regular" viewBox="0 0 256 256"><path d="M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM72,48v8a8,8,0,0,0,16,0V48h80v8a8,8,0,0,0,16,0V48h24V80H48V48ZM208,208H48V96H208V208Zm-38.34-85.66a8,8,0,0,1,0,11.32l-48,48a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L116,164.69l42.34-42.35A8,8,0,0,1,169.66,122.34Z"/></symbol><symbol id="i-Funnel-regular" viewBox="0 0 256 256"><path d="M230.6,49.53A15.81,15.81,0,0,0,216,40H40A16,16,0,0,0,28.19,66.76l.08.09L96,139.17V216a16,16,0,0,0,24.87,13.32l32-21.34A16,16,0,0,0,160,194.66V139.17l67.74-72.32.08-.09A15.8,15.8,0,0,0,230.6,49.53ZM40,56h0Zm106.18,74.58A8,8,0,0,0,144,136v58.66L112,216V136a8,8,0,0,0-2.16-5.47L40,56H216Z"/></symbol><symbol id="i-Columns-regular" viewBox="0 0 256 256"><path d="M104,32H64A16,16,0,0,0,48,48V208a16,16,0,0,0,16,16h40a16,16,0,0,0,16-16V48A16,16,0,0,0,104,32Zm0,176H64V48h40ZM192,32H152a16,16,0,0,0-16,16V208a16,16,0,0,0,16,16h40a16,16,0,0,0,16-16V48A16,16,0,0,0,192,32Zm0,176H152V48h40Z"/></symbol><symbol id="i-Plus-regular" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"/></symbol><symbol id="i-ClipboardText-regular" viewBox="0 0 256 256"><path d="M168,152a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,168,152Zm-8-40H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16Zm56-64V216a16,16,0,0,1-16,16H56a16,16,0,0,1-16-16V48A16,16,0,0,1,56,32H92.26a47.92,47.92,0,0,1,71.48,0H200A16,16,0,0,1,216,48ZM96,64h64a32,32,0,0,0-64,0ZM200,48H173.25A47.93,47.93,0,0,1,176,64v8a8,8,0,0,1-8,8H88a8,8,0,0,1-8-8V64a47.93,47.93,0,0,1,2.75-16H56V216H200Z"/></symbol><symbol id="i-NotePencil-regular" viewBox="0 0 256 256"><path d="M229.66,58.34l-32-32a8,8,0,0,0-11.32,0l-96,96A8,8,0,0,0,88,128v32a8,8,0,0,0,8,8h32a8,8,0,0,0,5.66-2.34l96-96A8,8,0,0,0,229.66,58.34ZM124.69,152H104V131.31l64-64L188.69,88ZM200,76.69,179.31,56,192,43.31,212.69,64ZM224,128v80a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V48A16,16,0,0,1,48,32h80a8,8,0,0,1,0,16H48V208H208V128a8,8,0,0,1,16,0Z"/></symbol><symbol id="i-Smiley-regular" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216ZM80,108a12,12,0,1,1,12,12A12,12,0,0,1,80,108Zm96,0a12,12,0,1,1-12-12A12,12,0,0,1,176,108Zm-1.07,48c-10.29,17.79-27.4,28-46.93,28s-36.63-10.2-46.92-28a8,8,0,1,1,13.84-8c7.47,12.91,19.21,20,33.08,20s25.61-7.1,33.07-20a8,8,0,0,1,13.86,8Z"/></symbol><symbol id="i-Plus-bold" viewBox="0 0 256 256"><path d="M228,128a12,12,0,0,1-12,12H140v76a12,12,0,0,1-24,0V140H40a12,12,0,0,1,0-24h76V40a12,12,0,0,1,24,0v76h76A12,12,0,0,1,228,128Z"/></symbol><symbol id="i-CaretRight-bold" viewBox="0 0 256 256"><path d="M184.49,136.49l-80,80a12,12,0,0,1-17-17L159,128,87.51,56.49a12,12,0,1,1,17-17l80,80A12,12,0,0,1,184.49,136.49Z"/></symbol><symbol id="i-CaretLeft-bold" viewBox="0 0 256 256"><path d="M168.49,199.51a12,12,0,0,1-17,17l-80-80a12,12,0,0,1,0-17l80-80a12,12,0,0,1,17,17L97,128Z"/></symbol><symbol id="i-ListBullets-fill" viewBox="0 0 256 256"><path d="M208,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM68,188a12,12,0,1,1,12-12A12,12,0,0,1,68,188Zm0-48a12,12,0,1,1,12-12A12,12,0,0,1,68,140Zm0-48A12,12,0,1,1,80,80,12,12,0,0,1,68,92Zm124,92H104a8,8,0,0,1,0-16h88a8,8,0,0,1,0,16Zm0-48H104a8,8,0,0,1,0-16h88a8,8,0,0,1,0,16Zm0-48H104a8,8,0,0,1,0-16h88a8,8,0,0,1,0,16Z"/></symbol><symbol id="i-DotsThreeOutline-regular" viewBox="0 0 256 256"><path d="M128,96a32,32,0,1,0,32,32A32,32,0,0,0,128,96Zm0,48a16,16,0,1,1,16-16A16,16,0,0,1,128,144ZM48,96a32,32,0,1,0,32,32A32,32,0,0,0,48,96Zm0,48a16,16,0,1,1,16-16A16,16,0,0,1,48,144ZM208,96a32,32,0,1,0,32,32A32,32,0,0,0,208,96Zm0,48a16,16,0,1,1,16-16A16,16,0,0,1,208,144Z"/></symbol></defs></svg>
+<div class="app">
+<aside class="side" aria-label="Sidebar">
+  <a class="brand" href="#"><span class="mark">K</span>Keel</a>
+  <button class="ws" type="button"><span><b>Sample workspace</b><small>All accounts</small></span><svg class="i" aria-hidden="true"><use href="#i-CaretUpDown-bold"/></svg></button>
+  <nav aria-label="App" style="flex:1;display:flex;flex-direction:column">
+    <ul><li><a class="nv" href="#"><svg class="i" aria-hidden="true"><use href="#i-House-regular"/></svg><span>Home</span></a></li><li><a class="nv" href="#"><svg class="i" aria-hidden="true"><use href="#i-SquaresFour-regular"/></svg><span>Dashboard</span></a></li><li><a class="nv on" href="#" aria-current="page"><svg class="i" aria-hidden="true"><use href="#i-ListBullets-regular"/></svg><span>Trades</span></a></li><li><a class="nv" href="#"><svg class="i" aria-hidden="true"><use href="#i-CalendarBlank-regular"/></svg><span>Calendar</span></a></li><li><a class="nv" href="#"><svg class="i" aria-hidden="true"><use href="#i-ChartBar-regular"/></svg><span>Reports</span></a></li><li><a class="nv" href="#"><svg class="i" aria-hidden="true"><use href="#i-Gauge-regular"/></svg><span>Progress tracker</span></a></li><li><a class="nv" href="#"><svg class="i" aria-hidden="true"><use href="#i-Strategy-regular"/></svg><span>Strategies</span></a></li><li><a class="nv" href="#"><svg class="i" aria-hidden="true"><use href="#i-Notebook-regular"/></svg><span>Notebook</span></a></li><li><a class="nv" href="#"><svg class="i" aria-hidden="true"><use href="#i-UploadSimple-regular"/></svg><span>Import</span></a></li><li><a class="nv" href="#"><svg class="i" aria-hidden="true"><use href="#i-ShieldCheck-regular"/></svg><span>Prop firms</span></a></li></ul>
+    <p class="grp" id="nl">Not live yet</p>
+    <ul aria-labelledby="nl"><li><a class="nv off" href="#"><svg class="i" aria-hidden="true"><use href="#i-ClockCounterClockwise-regular"/></svg><span>Backtesting</span></a></li><li><a class="nv off" href="#"><svg class="i" aria-hidden="true"><use href="#i-PlayCircle-regular"/></svg><span>Replay</span></a></li><li><a class="nv off" href="#"><svg class="i" aria-hidden="true"><use href="#i-UsersThree-regular"/></svg><span>Mentors</span></a></li><li><a class="nv off" href="#"><svg class="i" aria-hidden="true"><use href="#i-Sparkle-regular"/></svg><span>Assistant</span></a></li></ul>
+    <ul class="foot"><li><a class="nv" href="#"><svg class="i" aria-hidden="true"><use href="#i-GearSix-regular"/></svg><span>Settings</span></a></li></ul>
+  </nav>
+</aside>
+<div class="col">
+<header class="top"><h1>Trades</h1><div class="fchips">
+  <button class="fchip"><svg class="i lead" aria-hidden="true"><use href="#i-CalendarBlank-regular"/></svg>All time<svg class="i" aria-hidden="true"><use href="#i-CaretDown-bold"/></svg></button>
+  <button class="fchip">Symbol<svg class="i" aria-hidden="true"><use href="#i-CaretDown-bold"/></svg></button>
+  <button class="fchip">Side<svg class="i" aria-hidden="true"><use href="#i-CaretDown-bold"/></svg></button>
+  <button class="fchip">Strategy<svg class="i" aria-hidden="true"><use href="#i-CaretDown-bold"/></svg></button>
+  <button class="fchip">Tags<svg class="i" aria-hidden="true"><use href="#i-CaretDown-bold"/></svg></button>
+  <button class="fchip ico" aria-label="More filters"><svg class="i" aria-hidden="true"><use href="#i-SlidersHorizontal-regular"/></svg></button>
+</div><div class="tools">
+  <button class="ibtn" aria-label="Search"><svg class="i" aria-hidden="true"><use href="#i-MagnifyingGlass-regular"/></svg></button>
+  <span class="sample">Sample data</span>
+  <button class="disp">Net, $<svg class="i" aria-hidden="true"><use href="#i-CaretDown-bold"/></svg></button>
+  <button class="btn" type="button" aria-haspopup="dialog"><svg class="i" aria-hidden="true"><use href="#i-CalendarCheck-regular"/></svg>Plan the day</button>
+  <button class="btn pri"><svg class="i" aria-hidden="true"><use href="#i-UploadSimple-regular"/></svg>Import</button>
+</div></header>
+<header class="ptop"><h1>Trades</h1><span class="badge">Sample</span><div class="end"><button class="pbtn" aria-label="Filters"><svg class="i" aria-hidden="true"><use href="#i-Funnel-regular"/></svg></button><button class="pbtn" aria-label="Search"><svg class="i" aria-hidden="true"><use href="#i-MagnifyingGlass-regular"/></svg></button><button class="pbtn" aria-label="Display: Dollar"><span class="unit">$</span></button></div></header>
+<main id="content" class="page">
+<div class="vrow">
+  <nav class="seg vseg" aria-label="Trade views"><a href="06-trades-day.html" class="on" aria-current="page">Day</a><a href="08-trades-week.html" class="">Week</a><a href="#" class="">All</a></nav>
+  <div class="vtools only-desk"><button class="btn sm"><svg class="i" aria-hidden="true"><use href="#i-Columns-regular"/></svg>Columns</button><button class="btn sm"><svg class="i" aria-hidden="true"><use href="#i-Plus-regular"/></svg>Add trade</button></div>
+  <div class="vtools only-phone"><button class="btn sm"><svg class="i" aria-hidden="true"><use href="#i-CalendarBlank-regular"/></svg>Calendar</button><button class="btn sm"><svg class="i" aria-hidden="true"><use href="#i-CalendarCheck-regular"/></svg>Plan the day</button><button class="btn sm"><svg class="i" aria-hidden="true"><use href="#i-Plus-regular"/></svg>Add trade</button></div>
+</div>
+<div class="tl">
+  <div class="tl-list">
+    <article class="card dc open" aria-labelledby="d-2026-11-24">
+  <header class="dc-hd">
+    <button class="dc-tog" aria-expanded="true" aria-label="Collapse Tue 24 Nov"><svg class="i" aria-hidden="true"><use href="#i-CaretDown-bold"/></svg></button>
+    <h2 id="d-2026-11-24">Tue 24 Nov</h2><b class="dc-net gain">+$421.00</b>
+    <div class="qa only-desk">
+    <button class="btn sm ghost" aria-haspopup="menu">Mood <b class="mw">Good</b><svg class="i cd" aria-hidden="true"><use href="#i-CaretDown-bold"/></svg></button>
+    <a class="btn sm ghost" href="05-day-review.html"><svg class="i" aria-hidden="true"><use href="#i-ClipboardText-regular"/></svg>Review</a>
+    <button class="btn sm ghost"><svg class="i" aria-hidden="true"><use href="#i-NotePencil-regular"/></svg>View note</button>
+  </div><div class="qa only-phone">
+    <button class="pbtn" aria-label="Mood, Good"><svg class="i" aria-hidden="true"><use href="#i-Smiley-regular"/></svg></button>
+    <a class="pbtn" href="#" aria-label="Review the day"><svg class="i" aria-hidden="true"><use href="#i-ClipboardText-regular"/></svg></a>
+    <button class="pbtn" aria-label="View note"><svg class="i" aria-hidden="true"><use href="#i-NotePencil-regular"/></svg></button>
+  </div>
+  </header>
+  <div class="dc-chart"><div class="ia" style="height:112px"><div class="ia-plot" style="height:94px"><svg class="intra" viewBox="0 0 600 94" preserveAspectRatio="none" role="img" aria-label="Running net through the day, ending +$421.00">
+  <defs>
+    <clipPath id="c2026-11-24-up"><rect x="0" y="-10" width="600" height="91.9"/></clipPath>
+    <clipPath id="c2026-11-24-dn"><rect x="0" y="81.9" width="600" height="94"/></clipPath>
+  </defs>
+  <line class="zero" x1="0" x2="600" y1="81.9" y2="81.9" vector-effect="non-scaling-stroke"/>
+  <path d="M55.3 81.9 V30.3 H66.8 V34.8 H119.8 V15.5 H214.0 V38.9 H481.9 V17.9 H500.1 V29.2 H596.0 V14.1 V81.9 Z" fill="var(--gain-fill)" opacity=".14" clip-path="url(#c2026-11-24-up)"/>
+  <path d="M55.3 81.9 V30.3 H66.8 V34.8 H119.8 V15.5 H214.0 V38.9 H481.9 V17.9 H500.1 V29.2 H596.0 V14.1 V81.9 Z" fill="var(--loss-fill)" opacity=".14" clip-path="url(#c2026-11-24-dn)"/>
+  <path d="M55.3 81.9 V30.3 H66.8 V34.8 H119.8 V15.5 H214.0 V38.9 H481.9 V17.9 H500.1 V29.2 H596.0 V14.1" fill="none" stroke="var(--gain-fill)" stroke-width="1.75" stroke-linejoin="round" vector-effect="non-scaling-stroke" clip-path="url(#c2026-11-24-up)"/>
+  <path d="M55.3 81.9 V30.3 H66.8 V34.8 H119.8 V15.5 H214.0 V38.9 H481.9 V17.9 H500.1 V29.2 H596.0 V14.1" fill="none" stroke="var(--loss-fill)" stroke-width="1.75" stroke-linejoin="round" vector-effect="non-scaling-stroke" clip-path="url(#c2026-11-24-dn)"/>
+</svg><i class="ia-pt up" style="left:35.67%;top:41.41%"></i></div><div class="ia-ax"><span style="left:0.67%" class="s">09:41</span><span style="left:50.00%" class="">12:40</span><span style="left:99.33%" class="e">15:39</span></div></div><div class="tt only-desk" style="left:35.7%;top:24px;transform:translate(-50%,-100%)"><b>11:48, TSLA 385 Call</b><span class="loss">−$145.30</span>, running net +$266.90</div></div>
+  <div class="dstats">
+  <div><span class="lbl">Trades</span><b class="">7</b></div>
+  <div><span class="lbl">Gross P&amp;L</span><b class="gain">+$449.50</b></div>
+  <div><span class="lbl">Won / lost</span><b class="">4 <span class="of">/</span> 3</b></div>
+  <div><span class="lbl">Commissions</span><b class="">$28.50</b></div>
+  <div><span class="lbl">Win rate</span><b class="">57.1%</b></div>
+  <div><span class="lbl">Volume</span><b class="">145</b></div>
+  <div><span class="lbl">Profit factor</span><b class="">2.73</b></div>
+</div>
+  <div class="dc-trades"><table class="dtab only-desk">
+  <colgroup><col style="width:62px"><col><col style="width:66px"><col style="width:76px"><col style="width:92px"><col style="width:78px"><col style="width:84px"><col style="width:164px"><col style="width:84px"></colgroup>
+  <thead><tr><th>Open</th><th>Symbol</th><th>Side</th><th>Instrument</th><th class="n">Net P&amp;L</th><th class="n">Net ROI</th><th class="n">Realized R</th><th>Strategy</th><th>Tags</th></tr></thead>
+  <tbody><tr><td class="tm"><b>15:21</b></td><td><span class="sym"><b>MNQ</b> <span>Dec 26</span></span></td><td><span class="sd">Long</span></td><td class="muted">Futures</td>
+<td class="n f gain">+$93.60</td><td class="n gain">+0.06%</td><td class="n gain">+0.98R</td><td>Session momentum</td><td><span class="tagc"><span class="chip">1 tag</span><button class="chip add" aria-label="Add tags"><svg class="i" aria-hidden="true"><use href="#i-Plus-bold"/></svg></button></span></td></tr><tr><td class="tm"><b>14:12</b></td><td><span class="sym"><b>GBPUSD</b></span></td><td><span class="sd">Short</span></td><td class="muted">Forex</td>
+<td class="n f loss">−$70.00</td><td class="n loss">−0.05%</td><td class="n loss">−0.33R</td><td>Level reversal</td><td><span class="tagc"><span class="chip wa">2 tags</span><button class="chip add" aria-label="Add tags"><svg class="i" aria-hidden="true"><use href="#i-Plus-bold"/></svg></button></span></td></tr><tr><td class="tm"><b>13:36</b></td><td><span class="sym"><b>EURUSD</b></span></td><td><span class="sd">Long</span></td><td class="muted">Forex</td>
+<td class="n f gain">+$130.50</td><td class="n gain">+0.08%</td><td class="n gain">+0.61R</td><td>Session momentum</td><td><span class="tagc"><span class="chip">1 tag</span><button class="chip add" aria-label="Add tags"><svg class="i" aria-hidden="true"><use href="#i-Plus-bold"/></svg></button></span></td></tr><tr><td class="tm"><b>11:14</b></td><td><span class="sym"><b>TSLA</b> <span>385 Call</span></span></td><td><span class="sd">Long</span></td><td class="muted">Option</td>
+<td class="n f loss">−$145.30</td><td class="n loss">−17.72%</td><td class="n loss">−1.45R</td><td>Trend pullback</td><td><span class="tagc"><span class="chip wa">2 tags</span><button class="chip add" aria-label="Add tags"><svg class="i" aria-hidden="true"><use href="#i-Plus-bold"/></svg></button></span></td></tr><tr><td class="tm"><b>10:22</b></td><td><span class="sym"><b>MES</b> <span>Dec 26</span></span></td><td><span class="sd">Short</span></td><td class="muted">Futures</td>
+<td class="n f gain">+$119.80</td><td class="n gain">+0.09%</td><td class="n gain">+1.04R</td><td>Level reversal</td><td><span class="tagc"><span class="chip">1 tag</span><button class="chip add" aria-label="Add tags"><svg class="i" aria-hidden="true"><use href="#i-Plus-bold"/></svg></button></span></td></tr><tr><td class="tm"><b>10:05</b></td><td><span class="sym"><b>NVDA</b></span></td><td><span class="sd">Long</span></td><td class="muted">Stock</td>
+<td class="n f loss">−$28.30</td><td class="n loss">−0.26%</td><td class="n loss">−0.31R</td><td>Trend pullback</td><td><span class="tagc"><span class="chip">1 tag</span><button class="chip add" aria-label="Add tags"><svg class="i" aria-hidden="true"><use href="#i-Plus-bold"/></svg></button></span></td></tr><tr><td class="tm"><b>09:41</b></td><td><span class="sym"><b>ES</b> <span>Dec 26</span></span></td><td><span class="sd">Long</span></td><td class="muted">Futures</td>
+<td class="n f gain">+$320.70</td><td class="n gain">+0.10%</td><td class="n gain">+2.79R</td><td>Opening range breakout</td><td><span class="tagc"><span class="chip">2 tags</span><button class="chip add" aria-label="Add tags"><svg class="i" aria-hidden="true"><use href="#i-Plus-bold"/></svg></button></span></td></tr></tbody>
+</table><div class="only-phone"><ul class="prows"><li><a href="#">
+  <span class="l1"><span class="sym"><b>MNQ</b> <span>Dec 26</span></span><span class="tm">15:21</span><b class="gain">+$93.60</b></span>
+  <span class="l2"><span>Long</span><span>+0.98R</span><span>Session momentum</span></span>
+</a></li><li><a href="#">
+  <span class="l1"><span class="sym"><b>GBPUSD</b></span><span class="tm">14:12</span><b class="loss">−$70.00</b></span>
+  <span class="l2"><span>Short</span><span>−0.33R</span><span>Level reversal</span><span class="chip wa">mistake</span></span>
+</a></li><li><a href="#">
+  <span class="l1"><span class="sym"><b>EURUSD</b></span><span class="tm">13:36</span><b class="gain">+$130.50</b></span>
+  <span class="l2"><span>Long</span><span>+0.61R</span><span>Session momentum</span></span>
+</a></li><li><a href="#">
+  <span class="l1"><span class="sym"><b>TSLA</b> <span>385 Call</span></span><span class="tm">11:14</span><b class="loss">−$145.30</b></span>
+  <span class="l2"><span>Long</span><span>−1.45R</span><span>Trend pullback</span><span class="chip wa">mistake</span></span>
+</a></li><li><a href="#">
+  <span class="l1"><span class="sym"><b>MES</b> <span>Dec 26</span></span><span class="tm">10:22</span><b class="gain">+$119.80</b></span>
+  <span class="l2"><span>Short</span><span>+1.04R</span><span>Level reversal</span></span>
+</a></li><li><a href="#">
+  <span class="l1"><span class="sym"><b>NVDA</b></span><span class="tm">10:05</span><b class="loss">−$28.30</b></span>
+  <span class="l2"><span>Long</span><span>−0.31R</span><span>Trend pullback</span></span>
+</a></li><li><a href="#">
+  <span class="l1"><span class="sym"><b>ES</b> <span>Dec 26</span></span><span class="tm">09:41</span><b class="gain">+$320.70</b></span>
+  <span class="l2"><span>Long</span><span>+2.79R</span><span>Opening range breakout</span></span>
+</a></li></ul></div></div>
+</article>
+    <article class="card dc" aria-labelledby="d-2026-11-23">
+  <header class="dc-hd">
+    <button class="dc-tog" aria-expanded="false" aria-label="Expand Mon 23 Nov"><svg class="i" aria-hidden="true"><use href="#i-CaretRight-bold"/></svg></button>
+    <h2 id="d-2026-11-23">Mon 23 Nov</h2><b class="dc-net gain">+$526.25</b>
+    <div class="qa only-desk">
+    <button class="btn sm ghost" aria-haspopup="menu">Mood <b class="mw">Steady</b><svg class="i cd" aria-hidden="true"><use href="#i-CaretDown-bold"/></svg></button>
+    <a class="btn sm ghost" href="05-day-review.html"><svg class="i" aria-hidden="true"><use href="#i-ClipboardText-regular"/></svg>Review</a>
+    <button class="btn sm ghost"><svg class="i" aria-hidden="true"><use href="#i-NotePencil-regular"/></svg>View note</button>
+  </div><div class="qa only-phone">
+    <button class="pbtn" aria-label="Mood, Steady"><svg class="i" aria-hidden="true"><use href="#i-Smiley-regular"/></svg></button>
+    <a class="pbtn" href="#" aria-label="Review the day"><svg class="i" aria-hidden="true"><use href="#i-ClipboardText-regular"/></svg></a>
+    <button class="pbtn" aria-label="View note"><svg class="i" aria-hidden="true"><use href="#i-NotePencil-regular"/></svg></button>
+  </div>
+  </header>
+  <div class="dc-chart"><div class="ia" style="height:112px"><div class="ia-plot" style="height:94px"><svg class="intra" viewBox="0 0 600 94" preserveAspectRatio="none" role="img" aria-label="Running net through the day, ending +$526.25">
+  <defs>
+    <clipPath id="c2026-11-23-up"><rect x="0" y="-10" width="600" height="91.9"/></clipPath>
+    <clipPath id="c2026-11-23-dn"><rect x="0" y="81.9" width="600" height="94"/></clipPath>
+  </defs>
+  <line class="zero" x1="0" x2="600" y1="81.9" y2="81.9" vector-effect="non-scaling-stroke"/>
+  <path d="M46.1 81.9 V67.2 H334.8 V31.6 H364.0 V14.1 H379.5 V23.8 H434.5 V18.7 H596.0 V25.6 V81.9 Z" fill="var(--gain-fill)" opacity=".14" clip-path="url(#c2026-11-23-up)"/>
+  <path d="M46.1 81.9 V67.2 H334.8 V31.6 H364.0 V14.1 H379.5 V23.8 H434.5 V18.7 H596.0 V25.6 V81.9 Z" fill="var(--loss-fill)" opacity=".14" clip-path="url(#c2026-11-23-dn)"/>
+  <path d="M46.1 81.9 V67.2 H334.8 V31.6 H364.0 V14.1 H379.5 V23.8 H434.5 V18.7 H596.0 V25.6" fill="none" stroke="var(--gain-fill)" stroke-width="1.75" stroke-linejoin="round" vector-effect="non-scaling-stroke" clip-path="url(#c2026-11-23-up)"/>
+  <path d="M46.1 81.9 V67.2 H334.8 V31.6 H364.0 V14.1 H379.5 V23.8 H434.5 V18.7 H596.0 V25.6" fill="none" stroke="var(--loss-fill)" stroke-width="1.75" stroke-linejoin="round" vector-effect="non-scaling-stroke" clip-path="url(#c2026-11-23-dn)"/>
+</svg></div><div class="ia-ax"><span style="left:0.67%" class="s">03:41</span><span style="left:50.07%" class="">09:26</span><span style="left:99.33%" class="e">15:10</span></div></div></div>
+  <div class="dstats">
+  <div><span class="lbl">Trades</span><b class="">6</b></div>
+  <div><span class="lbl">Gross P&amp;L</span><b class="gain">+$549.70</b></div>
+  <div><span class="lbl">Won / lost</span><b class="">4 <span class="of">/</span> 2</b></div>
+  <div><span class="lbl">Commissions</span><b class="">$23.45</b></div>
+  <div><span class="lbl">Win rate</span><b class="">66.7%</b></div>
+  <div><span class="lbl">Volume</span><b class="">100.4</b></div>
+  <div><span class="lbl">Profit factor</span><b class="">4.39</b></div>
+</div>
+  
+</article>
+    <article class="card dc dc-empty" aria-labelledby="d-22">
+      <header class="dc-hd"><button class="dc-tog" aria-label="No trades to show" disabled style="opacity:.4"><svg class="i" aria-hidden="true"><use href="#i-CaretRight-bold"/></svg></button><h2 id="d-22">Sun 22 Nov</h2><span class="dc-cap">Note only</span><div class="qa only-desk">
+    <button class="btn sm ghost" aria-haspopup="menu">Add mood<svg class="i cd" aria-hidden="true"><use href="#i-CaretDown-bold"/></svg></button>
+    
+    <button class="btn sm ghost"><svg class="i" aria-hidden="true"><use href="#i-NotePencil-regular"/></svg>View note</button>
+  </div><div class="qa only-phone">
+    <button class="pbtn" aria-label="Add mood"><svg class="i" aria-hidden="true"><use href="#i-Smiley-regular"/></svg></button>
+    
+    <button class="pbtn" aria-label="View note"><svg class="i" aria-hidden="true"><use href="#i-NotePencil-regular"/></svg></button>
+  </div></header>
+      <p class="dc-none">No trades this day.</p>
+    </article>
+    <article class="card dc" aria-labelledby="d-2026-11-20">
+  <header class="dc-hd">
+    <button class="dc-tog" aria-expanded="false" aria-label="Expand Fri 20 Nov"><svg class="i" aria-hidden="true"><use href="#i-CaretRight-bold"/></svg></button>
+    <h2 id="d-2026-11-20">Fri 20 Nov</h2><b class="dc-net gain">+$512.30</b>
+    <div class="qa only-desk">
+    <button class="btn sm ghost" aria-haspopup="menu">Mood <b class="mw">Great</b><svg class="i cd" aria-hidden="true"><use href="#i-CaretDown-bold"/></svg></button>
+    <a class="btn sm ghost" href="05-day-review.html"><svg class="i" aria-hidden="true"><use href="#i-ClipboardText-regular"/></svg>Review</a>
+    <button class="btn sm ghost"><svg class="i" aria-hidden="true"><use href="#i-NotePencil-regular"/></svg>View note</button>
+  </div><div class="qa only-phone">
+    <button class="pbtn" aria-label="Mood, Great"><svg class="i" aria-hidden="true"><use href="#i-Smiley-regular"/></svg></button>
+    <a class="pbtn" href="#" aria-label="Review the day"><svg class="i" aria-hidden="true"><use href="#i-ClipboardText-regular"/></svg></a>
+    <button class="pbtn" aria-label="View note"><svg class="i" aria-hidden="true"><use href="#i-NotePencil-regular"/></svg></button>
+  </div>
+  </header>
+  <div class="dc-chart"><div class="ia" style="height:112px"><div class="ia-plot" style="height:94px"><svg class="intra" viewBox="0 0 600 94" preserveAspectRatio="none" role="img" aria-label="Running net through the day, ending +$512.30">
+  <defs>
+    <clipPath id="c2026-11-20-up"><rect x="0" y="-10" width="600" height="77.3"/></clipPath>
+    <clipPath id="c2026-11-20-dn"><rect x="0" y="67.3" width="600" height="94"/></clipPath>
+  </defs>
+  <line class="zero" x1="0" x2="600" y1="67.3" y2="67.3" vector-effect="non-scaling-stroke"/>
+  <path d="M46.7 67.3 V81.9 H99.6 V72.7 H174.9 V45.5 H266.4 V68.6 H439.4 V37.3 H596.0 V14.1 V67.3 Z" fill="var(--gain-fill)" opacity=".14" clip-path="url(#c2026-11-20-up)"/>
+  <path d="M46.7 67.3 V81.9 H99.6 V72.7 H174.9 V45.5 H266.4 V68.6 H439.4 V37.3 H596.0 V14.1 V67.3 Z" fill="var(--loss-fill)" opacity=".14" clip-path="url(#c2026-11-20-dn)"/>
+  <path d="M46.7 67.3 V81.9 H99.6 V72.7 H174.9 V45.5 H266.4 V68.6 H439.4 V37.3 H596.0 V14.1" fill="none" stroke="var(--gain-fill)" stroke-width="1.75" stroke-linejoin="round" vector-effect="non-scaling-stroke" clip-path="url(#c2026-11-20-up)"/>
+  <path d="M46.7 67.3 V81.9 H99.6 V72.7 H174.9 V45.5 H266.4 V68.6 H439.4 V37.3 H596.0 V14.1" fill="none" stroke="var(--loss-fill)" stroke-width="1.75" stroke-linejoin="round" vector-effect="non-scaling-stroke" clip-path="url(#c2026-11-20-dn)"/>
+</svg></div><div class="ia-ax"><span style="left:0.67%" class="s">09:31</span><span style="left:50.17%" class="">11:57</span><span style="left:99.33%" class="e">14:22</span></div></div></div>
+  <div class="dstats">
+  <div><span class="lbl">Trades</span><b class="">6</b></div>
+  <div><span class="lbl">Gross P&amp;L</span><b class="gain">+$560.10</b></div>
+  <div><span class="lbl">Won / lost</span><b class="">4 <span class="of">/</span> 2</b></div>
+  <div><span class="lbl">Commissions</span><b class="">$47.80</b></div>
+  <div><span class="lbl">Win rate</span><b class="">66.7%</b></div>
+  <div><span class="lbl">Volume</span><b class="">168</b></div>
+  <div><span class="lbl">Profit factor</span><b class="">2.41</b></div>
+</div>
+  
+</article>
+    <article class="card dc" aria-labelledby="d-2026-11-19">
+  <header class="dc-hd">
+    <button class="dc-tog" aria-expanded="false" aria-label="Expand Thu 19 Nov"><svg class="i" aria-hidden="true"><use href="#i-CaretRight-bold"/></svg></button>
+    <h2 id="d-2026-11-19">Thu 19 Nov</h2><b class="dc-net loss">−$81.50</b>
+    <div class="qa only-desk">
+    <button class="btn sm ghost" aria-haspopup="menu">Mood <b class="mw">Low</b><svg class="i cd" aria-hidden="true"><use href="#i-CaretDown-bold"/></svg></button>
+    <a class="btn sm ghost" href="05-day-review.html"><svg class="i" aria-hidden="true"><use href="#i-ClipboardText-regular"/></svg>Review</a>
+    <button class="btn sm ghost"><svg class="i" aria-hidden="true"><use href="#i-NotePencil-regular"/></svg>View note</button>
+  </div><div class="qa only-phone">
+    <button class="pbtn" aria-label="Mood, Low"><svg class="i" aria-hidden="true"><use href="#i-Smiley-regular"/></svg></button>
+    <a class="pbtn" href="#" aria-label="Review the day"><svg class="i" aria-hidden="true"><use href="#i-ClipboardText-regular"/></svg></a>
+    <button class="pbtn" aria-label="View note"><svg class="i" aria-hidden="true"><use href="#i-NotePencil-regular"/></svg></button>
+  </div>
+  </header>
+  <div class="dc-chart"><div class="ia" style="height:112px"><div class="ia-plot" style="height:94px"><svg class="intra" viewBox="0 0 600 94" preserveAspectRatio="none" role="img" aria-label="Running net through the day, ending −$81.50">
+  <defs>
+    <clipPath id="c2026-11-19-up"><rect x="0" y="-10" width="600" height="49.3"/></clipPath>
+    <clipPath id="c2026-11-19-dn"><rect x="0" y="39.3" width="600" height="94"/></clipPath>
+  </defs>
+  <line class="zero" x1="0" x2="600" y1="39.3" y2="39.3" vector-effect="non-scaling-stroke"/>
+  <path d="M64.3 39.3 V77.0 H190.4 V14.1 H316.4 V44.6 H596.0 V81.9 V39.3 Z" fill="var(--gain-fill)" opacity=".14" clip-path="url(#c2026-11-19-up)"/>
+  <path d="M64.3 39.3 V77.0 H190.4 V14.1 H316.4 V44.6 H596.0 V81.9 V39.3 Z" fill="var(--loss-fill)" opacity=".14" clip-path="url(#c2026-11-19-dn)"/>
+  <path d="M64.3 39.3 V77.0 H190.4 V14.1 H316.4 V44.6 H596.0 V81.9" fill="none" stroke="var(--gain-fill)" stroke-width="1.75" stroke-linejoin="round" vector-effect="non-scaling-stroke" clip-path="url(#c2026-11-19-up)"/>
+  <path d="M64.3 39.3 V77.0 H190.4 V14.1 H316.4 V44.6 H596.0 V81.9" fill="none" stroke="var(--loss-fill)" stroke-width="1.75" stroke-linejoin="round" vector-effect="non-scaling-stroke" clip-path="url(#c2026-11-19-dn)"/>
+</svg></div><div class="ia-ax"><span style="left:0.67%" class="s">09:36</span><span style="left:50.00%" class="">11:24</span><span style="left:99.33%" class="e">13:12</span></div></div></div>
+  <div class="dstats">
+  <div><span class="lbl">Trades</span><b class="">4</b></div>
+  <div><span class="lbl">Gross P&amp;L</span><b class="loss">−$61.00</b></div>
+  <div><span class="lbl">Won / lost</span><b class="">1 <span class="of">/</span> 3</b></div>
+  <div><span class="lbl">Commissions</span><b class="">$20.50</b></div>
+  <div><span class="lbl">Win rate</span><b class="">25.0%</b></div>
+  <div><span class="lbl">Volume</span><b class="">148</b></div>
+  <div><span class="lbl">Profit factor</span><b class="">0.60</b></div>
+</div>
+  
+</article>
+  </div>
+  <aside class="card mcal" aria-label="November 2026">
+  <div class="mc-hd"><b>November 2026</b><span class="end"><button class="ibtn sm" aria-label="October"><svg class="i" aria-hidden="true"><use href="#i-CaretLeft-bold"/></svg></button><button class="ibtn sm" aria-label="December"><svg class="i" aria-hidden="true"><use href="#i-CaretRight-bold"/></svg></button></span></div>
+  <div class="mc-wd" aria-hidden="true"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
+  <div class="mc-grid"><button class="mc-d" aria-label="1 Nov"><span>1</span></button><button class="mc-d" aria-label="2 Nov, −$388.03, 5 trades"><span>2</span><i class="dn"></i></button><button class="mc-d" aria-label="3 Nov, +$641.71, 6 trades"><span>3</span><i class="up"></i></button><button class="mc-d" aria-label="4 Nov, +$210.40, 4 trades"><span>4</span><i class="up"></i></button><button class="mc-d" aria-label="5 Nov, +$425.15, 5 trades"><span>5</span><i class="up"></i></button><button class="mc-d" aria-label="6 Nov, +$513.07, 6 trades"><span>6</span><i class="up"></i></button><button class="mc-d" aria-label="7 Nov"><span>7</span></button><button class="mc-d" aria-label="8 Nov"><span>8</span></button><button class="mc-d" aria-label="9 Nov, −$120.40, 5 trades"><span>9</span><i class="dn"></i></button><button class="mc-d" aria-label="10 Nov, +$210.15, 4 trades"><span>10</span><i class="up"></i></button><button class="mc-d" aria-label="11 Nov, −$363.83, 6 trades"><span>11</span><i class="dn"></i></button><button class="mc-d" aria-label="12 Nov, +$196.24, 5 trades"><span>12</span><i class="up"></i></button><button class="mc-d" aria-label="13 Nov, −$240.80, 4 trades"><span>13</span><i class="dn"></i></button><button class="mc-d" aria-label="14 Nov"><span>14</span></button><button class="mc-d" aria-label="15 Nov"><span>15</span></button><button class="mc-d" aria-label="16 Nov, −$207.35, 5 trades"><span>16</span><i class="dn"></i></button><button class="mc-d" aria-label="17 Nov, +$386.10, 6 trades"><span>17</span><i class="up"></i></button><button class="mc-d" aria-label="18 Nov, +$631.87, 7 trades"><span>18</span><i class="up"></i></button><button class="mc-d" aria-label="19 Nov, −$81.50, 4 trades"><span>19</span><i class="dn"></i></button><button class="mc-d" aria-label="20 Nov, +$512.30, 6 trades"><span>20</span><i class="up"></i></button><button class="mc-d" aria-label="21 Nov"><span>21</span></button><button class="mc-d" aria-label="22 Nov, note only"><span>22</span></button><button class="mc-d" aria-label="23 Nov, +$526.25, 6 trades"><span>23</span><i class="up"></i></button><button class="mc-d today" aria-label="24 Nov, +$421.00, 7 trades" aria-current="date"><span>24</span><i class="up"></i></button><button class="mc-d fut" aria-label="25 Nov"><span>25</span></button><button class="mc-d fut" aria-label="26 Nov"><span>26</span></button><button class="mc-d fut" aria-label="27 Nov"><span>27</span></button><button class="mc-d fut" aria-label="28 Nov"><span>28</span></button><button class="mc-d fut" aria-label="29 Nov"><span>29</span></button><button class="mc-d fut" aria-label="30 Nov"><span>30</span></button>
+    <div class="tt" style="left:calc(5 * (100% / 7) + (100% / 14));top:calc(2 * 42px + 2px);transform:translate(-50%,-100%)"><b>Fri 20 Nov</b><span class="gain">+$512.30</span>, 6 trades</div>
+  </div>
+  <p class="mc-key">Underlined days have trades: green for a net gain, red for a net loss. Pick a day to see only its trades.</p>
+</aside>
+</div>
+</main>
+</div>
+</div>
+<nav class="tabbar" aria-label="Main"><a class="tab" href="#"><svg class="i" aria-hidden="true"><use href="#i-SquaresFour-regular"/></svg><span>Dashboard</span></a><a class="tab on" href="#" aria-current="page"><svg class="i" aria-hidden="true"><use href="#i-ListBullets-fill"/></svg><span>Trades</span></a><a class="tab" href="#"><svg class="i" aria-hidden="true"><use href="#i-CalendarBlank-regular"/></svg><span>Calendar</span></a><a class="tab" href="#"><svg class="i" aria-hidden="true"><use href="#i-ChartBar-regular"/></svg><span>Reports</span></a><a class="tab" href="#"><svg class="i" aria-hidden="true"><use href="#i-DotsThreeOutline-regular"/></svg><span>More</span></a></nav>
+
+</body>
+</html>

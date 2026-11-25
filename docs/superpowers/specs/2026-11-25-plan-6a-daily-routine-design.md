@@ -692,6 +692,7 @@ Every row below is Keel's call (TradeZella unknown). Q numbers are the spec's 41
 - **U3. The Notebook's Pre-market plan kind:** Notebook > New no longer offers it, and existing entries stay readable (option b).
 - **U4. Keel's Goals card** (weekly net goal, daily loss limit; Plan 5) has no TZ counterpart. It is removed, TZ's way: the progress tracker's rules (daily loss cap, per-trade cap and the rest) take its place on the dashboard, and the tracker card sits where Goals was. Existing goal settings are dropped, with no migration of values. Remove the Goals card, its editor, `goalDays` and the goal prefs, and their tests. This supersedes K22. E50 closes.
 - **Approved by the user, 2026-11-25.**
+- **The comps** (`.impeccable/mocks/plan6a/`) were approved by the user on 2026-11-25. Their labels are Keel's: "Plan the day", "Close the day", "Start session" and "End session"; the stages Plan, Trade, Import and Review; and the moods Rough, Low, Steady, Good and Great, as words.
 
 ## 7. Corrections to existing records
 
