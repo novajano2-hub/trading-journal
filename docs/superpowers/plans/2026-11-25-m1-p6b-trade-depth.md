@@ -421,7 +421,7 @@ Delivers B5 to B8, B55 and Review Focus 2.
   move(ws: string, ids: readonly string[], accountId: string): Promise<number>;
   moveAccount(ws: string, fromAccountId: string, toAccountId: string): Promise<number>;
   ```
-  hooks `useMergeTrades()`, `useSplitTrade()`, `useMoveTrades()`, `useMoveAccountTrades()`; `WriteKind`s `'trades.merge' | 'trades.split' | 'trades.move'` invalidating trades, journal, imports, history and days.
+  hooks `useMergeTrades()`, `useSplitTrade()`, `useMoveTrades()`, `useMoveAccountTrades()`; `WriteKind`s `'trades.merge' | 'trades.split' | 'trades.move'` invalidating trades, journal, imports, history, days and `keys.filesAll(ws)` (merge reassigns files with `FilesRepo.reassign`, which has no hook of its own).
 - Each runs in one `rwTx` over trades, journal, files, accounts, history; refuses archived accounts (source or destination) with `ArchivedAccountError`; writes history rows (merged, split, moved; source you; a move logs `field: 'accountId'`).
 - `imports.ts` `context`: `openTrades` excludes `grouping === 'manual'`. `undo`: refuses with `{ ok: false, reason: 'regrouped', tradeIds }` when any trade the import built was merged, split or moved since (history rows with those actions on its trade ids, or a missing id). Extend `UndoResult` with that reason.
 
@@ -756,7 +756,7 @@ Delivers B43, B48. Comps: `07-strategies.html` (`?state=strategy`, `?state=misse
 **Interfaces:**
 - Produces: `MissedTradesRepo { list(ws, strategyId); create(ws, input: Omit<MissedTrade, 'id' | 'workspaceId'>); update(ws, id, patch); remove(ws, id) }`; hooks `useMissedTrades(strategyId)`, `useSaveMissedTrade()`, `useRemoveMissedTrade()`.
 - The form holds exactly symbol, date and time, price, commission and fees. Missed trades live in their own table; no trade list, filter, summary, report, calendar, tracker or pattern reads it.
-- Photo: PNG, JPEG or WebP up to 10 MB; replace and remove; a cover band on the card and the page header; the icon stays.
+- Photo: PNG, JPEG or WebP up to 10 MB (the form enforces this itself: `FilesRepo.add` with `images: true` also accepts GIF, which B48 doesn't allow for a photo); replace and remove; a cover band on the card and the page header; the icon stays.
 
 - [ ] **Step 1: Write the failing tests:** `'a missed trade saves exactly its fields'`; `'missed trades never reach the summary, the log or patterns'` (Review Focus 4); `'deleting a strategy deletes its missed trades and photo'`; `'the photo shows as a band and can be removed'`.
 - [ ] **Step 2:** FAIL. **Step 3:** Implement. **Step 4:** PASS.
