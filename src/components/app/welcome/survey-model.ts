@@ -28,6 +28,7 @@ export function isAnswered(n: number, d: Draft): boolean {
     case 5:
       return (d.goals?.length ?? 0) > 0;
     case 6:
+      // INFERRED from [inv-1 008]: Other opens a text box, so Continue needs its words.
       return (
         !!d.heardFrom &&
         (d.heardFrom !== HEARD_OTHER || !!d.heardFromOther?.trim())

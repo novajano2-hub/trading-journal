@@ -105,3 +105,21 @@ test('the survey is optional', async () => {
   await repo.onboarding.complete({ ...INPUT, survey: undefined });
   expect((await repo.prefs.get()).onboarding?.survey).toBeUndefined();
 });
+
+test('complete is one transaction: a write that fails inside it leaves prefs, accounts and the active workspace as they were', async () => {
+  const repo = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    now: () => NOW,
+    // The account's id is made after the prefs are written, inside the transaction.
+    newId: () => {
+      throw new Error('no id');
+    },
+    sample: async () => fixtureSample(),
+  });
+  await expect(repo.onboarding.complete(INPUT)).rejects.toThrow('no id');
+  expect(isOnboarded(await repo.prefs.get())).toBe(false);
+  expect(await repo.prefs.saved()).toEqual({});
+  expect(await repo.accounts.list('mine')).toEqual([]);
+  expect((await repo.workspaces.getActive()).id).toBe('sample');
+});

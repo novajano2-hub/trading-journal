@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useId, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
+  BROKER_NONE,
+  BROKER_OTHER,
   BROKERS,
   CAPITAL,
   EXPERIENCE,
@@ -107,10 +109,19 @@ function BrokerBox({
   const [active, setActive] = useState(0);
   const needle = text.trim().toLowerCase();
   // A picked broker shows the whole list again when the field opens.
-  const matches =
+  // Other and None yet are offered whatever is typed, so a broker that is not
+  // listed can still be answered.
+  const named =
     typed && needle
       ? BROKERS.filter((b) => b.toLowerCase().includes(needle))
       : BROKERS;
+  const matches = [
+    ...named,
+    ...[BROKER_OTHER, BROKER_NONE].filter((b) => !named.includes(b)),
+  ];
+  const noNamedMatch = named.every(
+    (b) => b === BROKER_OTHER || b === BROKER_NONE,
+  );
   const pick = (broker: string) => {
     setText(broker);
     setTyped(false);
@@ -168,30 +179,29 @@ function BrokerBox({
           aria-label="Brokers"
           className="absolute inset-x-0 top-[calc(100%+4px)] z-20 max-h-60 overflow-y-auto rounded-[10px] border border-line bg-surface-1 p-1 shadow-[var(--shadow)]"
         >
-          {matches.length === 0 ? (
+          {typed && needle && noNamedMatch ? (
             <li
               role="presentation"
               className="px-3 py-2 text-[13px] text-muted"
             >
               No broker matches. Choose Other if yours isn&apos;t listed.
             </li>
-          ) : (
-            matches.map((b, i) => (
-              <li
-                key={b}
-                id={`${id}-${i}`}
-                role="option"
-                aria-selected={b === value}
-                // Keep focus in the field, so picking doesn't close the list first.
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => pick(b)}
-                onMouseMove={() => setActive(i)}
-                className={`flex min-h-9 cursor-pointer items-center rounded-lg px-3 text-[14px] pointer-coarse:min-h-11 ${i === active ? 'bg-sunken' : ''} ${b === value ? 'font-semibold text-accent-ink' : ''}`}
-              >
-                {b}
-              </li>
-            ))
-          )}
+          ) : null}
+          {matches.map((b, i) => (
+            <li
+              key={b}
+              id={`${id}-${i}`}
+              role="option"
+              aria-selected={b === value}
+              // Keep focus in the field, so picking doesn't close the list first.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => pick(b)}
+              onMouseMove={() => setActive(i)}
+              className={`flex min-h-9 cursor-pointer items-center rounded-lg px-3 text-[14px] pointer-coarse:min-h-11 ${i === active ? 'bg-sunken' : ''} ${b === value ? 'font-semibold text-accent-ink' : ''}`}
+            >
+              {b}
+            </li>
+          ))}
         </ul>
       ) : null}
     </div>
@@ -255,7 +265,7 @@ function Step({ step }: { step: string }): React.JSX.Element | null {
       return;
     }
     writeFirstRun({ ...state, finished: true });
-    router.push('/app/home');
+    router.replace('/app/home');
   };
 
   let body: React.ReactNode;

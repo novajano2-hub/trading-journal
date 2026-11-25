@@ -46,7 +46,7 @@ const COPY: Record<
 /**
  * The Get started card: "n of 3 complete" over a bar, then the three steps.
  * The first open step is the next one: its number is ringed and its button is
- * the filled one. A done step shows a tick, a struck-through title and a Done
+ * the filled one. A done step shows a green tick, a struck-through title and a green Done
  * chip, and no button. At 3 of 3 the card stays, with no dismiss (K51).
  */
 export function GettingStartedCard({
@@ -70,6 +70,10 @@ export function GettingStartedCard({
           </span>
         }
       />
+      <p className="mt-1.5 max-w-[62ch] text-[13px] leading-normal text-muted">
+        Set up your prop account and challenge, and track each rule as you
+        trade.
+      </p>
       <div
         role="progressbar"
         aria-valuemin={0}
@@ -96,10 +100,10 @@ export function GettingStartedCard({
               <span
                 className={`grid size-[30px] flex-none place-items-center rounded-full text-[13.5px] font-semibold tabular-nums ${
                   s.done
-                    ? 'bg-sunken text-muted'
+                    ? 'bg-gain-soft text-gain'
                     : isNext
-                      ? 'text-accent-ink shadow-[inset_0_0_0_2px_var(--accent)]'
-                      : 'text-muted shadow-[inset_0_0_0_1.5px_var(--line-2)]'
+                      ? 'text-accent-ink ring-2 ring-accent ring-inset'
+                      : 'text-muted ring-[1.5px] ring-line-2 ring-inset'
                 }`}
               >
                 {s.done ? (
@@ -128,7 +132,9 @@ export function GettingStartedCard({
                 </p>
               </div>
               {s.done ? (
-                <Chip className="max-sm:ml-11">Done</Chip>
+                <Chip tone="gain" className="max-sm:ml-11">
+                  Done
+                </Chip>
               ) : (
                 // Keel's call (TradeZella unknown): the record shows step 1
                 // (next) filled and step 2 outlined, not which rule decides,

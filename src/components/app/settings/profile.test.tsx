@@ -7,6 +7,7 @@ import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import { zoneLabel } from '@/lib/time-zone-label';
 import { renderApp } from '../__fixtures__/render-app';
+import { USERNAME_MESSAGE } from '@/data/onboarding';
 import { ProfileSettings } from './profile';
 
 vi.mock('next/navigation', () => import('../__fixtures__/navigation'));
@@ -142,7 +143,7 @@ test('a bad username is announced and not saved', async () => {
   fireEvent.change(user, { target: { value: 'a b' } });
   fireEvent.blur(user);
   const alert = await screen.findByRole('alert');
-  expect(alert.textContent).toContain('3 to 30 characters');
+  expect(alert.textContent).toBe(USERNAME_MESSAGE);
   expect(user.getAttribute('aria-describedby')).toBe(alert.id);
   expect((await r.prefs.saved()).username).toBeUndefined();
 });
@@ -158,4 +159,45 @@ test('an old display name reads as the first name, and is kept in storage', asyn
   await waitFor(() => expect(name.value).toBe('Alex'));
   expect((await r.prefs.saved()).displayName).toBe('Alex');
   expect((await r.prefs.saved()).firstName).toBeUndefined();
+});
+
+test('a set name can not be emptied: it shows the error and keeps the stored value', async () => {
+  const r = repo();
+  await r.prefs.update({
+    firstName: 'Sam',
+    lastName: 'Doe',
+    username: 'sam.doe',
+  });
+  renderApp(<ProfileSettings />, {
+    repository: r,
+    url: '/app/settings/profile',
+  });
+  for (const [label, message, key, value] of [
+    ['First name', 'Enter your first name.', 'firstName', 'Sam'],
+    ['Last name', 'Enter your last name.', 'lastName', 'Doe'],
+    ['Username', 'Enter a username.', 'username', 'sam.doe'],
+  ] as const) {
+    const input = await screen.findByLabelText(label);
+    fireEvent.change(input, { target: { value: '' } });
+    fireEvent.blur(input);
+    expect((await screen.findByText(message)).getAttribute('id')).toBe(
+      input.getAttribute('aria-describedby'),
+    );
+    expect((await r.prefs.saved())[key]).toBe(value);
+  }
+  expect(screen.queryByText('Optional.')).toBeNull();
+});
+
+test('a field that was never set may stay empty: nothing saved, no error', async () => {
+  const r = repo();
+  renderApp(<ProfileSettings />, {
+    repository: r,
+    url: '/app/settings/profile',
+  });
+  const last = await screen.findByLabelText('Last name');
+  fireEvent.change(last, { target: { value: '  ' } });
+  fireEvent.blur(last);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  expect(screen.queryByRole('alert')).toBeNull();
+  expect((await r.prefs.saved()).lastName).toBeUndefined();
 });

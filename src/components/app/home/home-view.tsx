@@ -23,7 +23,7 @@ import {
   usePrefs,
   useTrades,
 } from '@/data/query/hooks';
-import { dateLine, greeting } from './greeting';
+import { greeting } from './greeting';
 import { GettingStartedCard } from './getting-started';
 
 /**
@@ -187,6 +187,7 @@ function CardsSkeleton(): React.JSX.Element {
     <div
       role="status"
       aria-label="Loading Home"
+      // Keel's call: two columns from `lg` (see HomeView).
       className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_440px] lg:items-start"
     >
       {[
@@ -207,13 +208,16 @@ function CardsSkeleton(): React.JSX.Element {
 
 /**
  * Home: a greeting, then the Get started card with Explore, and Recommended
- * focus with Resources. `skeleton` is the greeting over skeleton cards and no
- * name, held as it is: the first run's dialog opens over it (Task 19).
+ * focus with Resources. `firstRun` is Home as an empty My workspace, held
+ * while the required preferences dialog is open over it [inv-1 013]: the
+ * greeting with no name, every step open (0 of 3), and nothing read from the
+ * workspace that happens to be active (the sample), so none of its progress
+ * shows through. Ordinary loading is the greeting over skeleton cards.
  */
 export function HomeView({
-  skeleton = false,
+  firstRun = false,
 }: {
-  skeleton?: boolean;
+  firstRun?: boolean;
 }): React.JSX.Element {
   const queryClient = useQueryClient();
   const prefs = usePrefs();
@@ -222,41 +226,40 @@ export function HomeView({
   const trades = useTrades();
   const error =
     prefs.error ?? accounts.error ?? challenges.error ?? trades.error;
-  if (error && !skeleton)
+  if (error && !firstRun)
     return (
       <StrategyError
+        title="Home couldn't load."
         error={error}
         onRetry={() => void queryClient.resetQueries({ queryKey: ['keel'] })}
       />
     );
 
   const p = prefs.data;
-  const progress =
-    !skeleton && accounts.data && challenges.data && trades.data
+  const progress = firstRun
+    ? gettingStarted([], [], [])
+    : accounts.data && challenges.data && trades.data
       ? gettingStarted(accounts.data, challenges.data, trades.data)
       : undefined;
   // An old display name reads as the first name until one is set.
-  const name = skeleton ? undefined : (p?.firstName ?? p?.displayName);
+  const name = firstRun ? undefined : (p?.firstName ?? p?.displayName);
   const now = new Date();
 
   return (
     <div className="flex flex-col gap-4 px-5 pt-0.5 pb-7">
       <header className="pt-1.5 pb-0.5">
         {p ? (
-          <>
-            <h2 className="text-2xl leading-[1.15] font-semibold tracking-[-0.03em] sm:text-[26px]">
-              {greeting(now, p.timeZone, name)}
-            </h2>
-            <p className="mt-1 text-sm text-muted">
-              {dateLine(now, p.timeZone)}
-            </p>
-          </>
+          <h2 className="text-2xl leading-[1.15] font-semibold tracking-[-0.03em] sm:text-[26px]">
+            {greeting(now, p.timeZone, name)}
+          </h2>
         ) : (
           // Prefs are still being read: the greeting's place, held empty.
-          <div aria-hidden="true" className="h-[62px]" />
+          <div aria-hidden="true" className="h-[31px]" />
         )}
       </header>
       {progress ? (
+        // Keel's call: two columns from `lg`, not comp 14's 640px: a fixed 440px
+        // right column beside the app sidebar leaves the left unusable below it.
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_440px] lg:items-start">
           <div className="flex min-w-0 flex-col gap-4">
             <GettingStartedCard progress={progress} />

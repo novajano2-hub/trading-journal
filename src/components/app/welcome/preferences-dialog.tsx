@@ -5,7 +5,7 @@ import { Dialog } from 'radix-ui';
 import { useId, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useCompleteFirstRun } from '@/data/query/hooks';
-import { USERNAME } from '@/data/onboarding';
+import { USERNAME, USERNAME_MESSAGE } from '@/data/onboarding';
 import { FieldError } from '../settings/settings-ui';
 import {
   currencyChoices,
@@ -85,8 +85,11 @@ function Select({
  * My workspace has one. Below `sm` it is a full-height sheet with a fixed foot.
  */
 export function PreferencesDialog({
+  onSaving,
   onSaved,
 }: {
+  /** True from the moment the save starts until it has settled, so Home holds. */
+  onSaving(saving: boolean): void;
   /** Called with the zone's name once the save has landed. */
   onSaved(zone: string): void;
 }): React.JSX.Element {
@@ -111,8 +114,7 @@ export function PreferencesDialog({
     const next: typeof errors = {};
     if (!first.trim()) next.first = 'Enter your first name.';
     if (!last.trim()) next.last = 'Enter your last name.';
-    if (!USERNAME.test(username.trim()))
-      next.username = 'Use 3 to 30 letters, digits, dots or underscores.';
+    if (!USERNAME.test(username.trim())) next.username = USERNAME_MESSAGE;
     setErrors(next);
     setFailed(false);
     const invalid = next.first
@@ -126,6 +128,7 @@ export function PreferencesDialog({
       form.current?.querySelector<HTMLElement>(`[id="${invalid}"]`)?.focus();
       return;
     }
+    onSaving(true);
     try {
       await complete.mutateAsync({
         firstName: first.trim(),
@@ -137,10 +140,12 @@ export function PreferencesDialog({
       });
     } catch {
       setFailed(true);
+      onSaving(false);
       return;
     }
     clearFirstRun();
     onSaved(zoneName(zone));
+    onSaving(false);
   }
 
   const field = (

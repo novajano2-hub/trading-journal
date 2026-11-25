@@ -3,6 +3,10 @@ import type { UserPrefs } from '@/domain/types';
 /** K48: letters, digits, dots and underscores, 3 to 30 characters. */
 export const USERNAME = /^[A-Za-z0-9._]{3,30}$/;
 
+/** What a username that breaks the rule is told, in the dialog and in Settings. */
+export const USERNAME_MESSAGE =
+  'Use 3 to 30 letters, digits, dots or underscores.';
+
 /** Whether the first run is over: the flag a first run or the v3 upgrade writes (K54). */
 export function isOnboarded(prefs: Pick<UserPrefs, 'onboarding'>): boolean {
   return prefs.onboarding?.status === 'done';

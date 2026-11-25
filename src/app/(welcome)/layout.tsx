@@ -22,6 +22,9 @@ export default function WelcomeLayout({
       className="flex flex-1 flex-col items-center px-5 [--tab-bar:0px]"
     >
       <header className="flex h-24 flex-none items-center justify-center max-sm:h-[72px]">
+        {/* Keel's call (TradeZella unknown): whether TradeZella's logo links out
+            isn't recorded. The mark links to the marketing home; leaving the
+            site isn't a trap, since the gate covers /app. */}
         <BrandMark className="rounded-control px-1.5 py-1" />
       </header>
       <main

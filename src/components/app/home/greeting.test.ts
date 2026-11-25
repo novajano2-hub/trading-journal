@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { dateLine, greeting } from './greeting';
+import { greeting } from './greeting';
 
 const at = (iso: string) => new Date(iso);
 
@@ -38,15 +38,5 @@ test('with no first name there is no name and no comma', () => {
   );
   expect(greeting(at('2026-11-25T09:00:00Z'), 'UTC', '  ')).toBe(
     'Good morning',
-  );
-});
-
-test('the date line is the weekday, day and month in the profile zone', () => {
-  expect(dateLine(at('2026-11-25T14:00:00Z'), 'America/New_York')).toBe(
-    'Wednesday 25 November',
-  );
-  // Already Thursday in Tokyo.
-  expect(dateLine(at('2026-11-25T20:00:00Z'), 'Asia/Tokyo')).toBe(
-    'Thursday 26 November',
   );
 });

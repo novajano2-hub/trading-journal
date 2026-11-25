@@ -180,7 +180,8 @@ test('the greeting uses the first name and the time of day in the profile zone',
   });
   renderApp(<HomeView />, { repository: r, url: '/app/home' });
   expect(await screen.findByText('Good morning, Sam')).toBeTruthy();
-  expect(screen.getByText('Wednesday 25 November')).toBeTruthy();
+  // The greeting stands alone: no date line under it.
+  expect(screen.queryByText('Wednesday 25 November')).toBeNull();
 });
 
 test('an old display name reads as the first name', async () => {
@@ -192,25 +193,68 @@ test('an old display name reads as the first name', async () => {
   expect(await screen.findByText('Good evening, Alex')).toBeTruthy();
 });
 
-test('skeleton mode is the greeting, with no name, over skeleton cards', async () => {
+test('first-run mode is an empty My workspace: no name, 0 of 3, and nothing read from the active sample', async () => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-11-25T09:00:00Z'));
-  const r = repo();
+  // The active (sample) workspace is 3 of 3 with a name saved.
+  const r = repo({ prop: true });
   await r.prefs.update({ firstName: 'Sam', timeZone: 'UTC' });
-  renderApp(<HomeView skeleton />, { repository: r, url: '/app/home' });
+  renderApp(<HomeView firstRun />, { repository: r, url: '/app/home' });
   expect(await screen.findByText('Good morning')).toBeTruthy();
   expect(screen.queryByText(/Sam/)).toBeNull();
-  expect(screen.queryByRole('region', { name: 'Get started' })).toBeNull();
-  expect(screen.getByRole('status', { name: 'Loading Home' })).toBeTruthy();
+  const card = await screen.findByRole('region', { name: 'Get started' });
+  expect(card.textContent).toContain('0 of 3 complete');
+  expect(within(card).getAllByRole('link')).toHaveLength(3);
+  expect(within(card).queryByText('Done')).toBeNull();
+  expect(screen.getByRole('region', { name: 'Explore' })).toBeTruthy();
+  expect(
+    screen.getByRole('region', { name: 'Recommended focus' }),
+  ).toBeTruthy();
+  expect(screen.getByRole('region', { name: 'Resources' })).toBeTruthy();
+  expect(screen.queryByRole('status', { name: 'Loading Home' })).toBeNull();
 });
 
-test('/app lands on Home until the checklist is complete, then on the Dashboard', async () => {
-  const first = renderApp(<AppLanding />, {
-    repository: await emptyRepo(),
-    url: '/app',
-  });
-  // Nothing renders while it reads.
+test('the Get started card has a prop-oriented subline, and a done step is green with the word Done', async () => {
+  renderApp(<HomeView />, { repository: repo(), url: '/app/home' });
+  const card = await screen.findByRole('region', { name: 'Get started' });
+  expect(card.textContent).toContain(
+    'Set up your prop account and challenge, and track each rule as you trade.',
+  );
+  const three = await step(3);
+  expect(
+    within(three).getByText('Done', { selector: 'span' }).className,
+  ).toContain('bg-gain-soft');
+  const tick = three.querySelector('span.grid');
+  expect(tick?.className).toContain('bg-gain-soft');
+  expect(tick?.className).toContain('text-gain');
+});
+
+test("Home's own failure says Home couldn't load", async () => {
+  const r = repo();
+  r.trades.list = async () => {
+    throw new Error('read failed');
+  };
+  renderApp(<HomeView />, { repository: r, url: '/app/home' });
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toContain("Home couldn't load.");
+  expect(alert.textContent).not.toContain('strategies');
+});
+
+test('/app makes no move while a read is pending, then lands on Home, and on the Dashboard once complete', async () => {
+  // One of the three reads never resolves: the landing waits at /app.
+  const held = await emptyRepo();
+  const trades = held.trades.list.bind(held.trades);
+  let release: () => void = () => {};
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  held.trades.list = async (...args: Parameters<typeof trades>) => {
+    await gate;
+    return trades(...args);
+  };
+  const first = renderApp(<AppLanding />, { repository: held, url: '/app' });
   expect(first.container.textContent).toBe('');
+  await new Promise((r) => setTimeout(r, 50));
+  expect(window.location.pathname).toBe('/app');
+  release();
   await waitFor(() => expect(window.location.pathname).toBe('/app/home'));
   cleanup();
 

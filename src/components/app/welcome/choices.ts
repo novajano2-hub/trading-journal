@@ -1,6 +1,12 @@
+import { offsetLabel } from '@/lib/time-zone-label';
+
 /** The currency and time-zone lists of the preferences dialog (R12, R13). */
 
-/** TradeZella's order for the top of the list [inv-1 014]; the rest follow A to Z. */
+/**
+ * TradeZella's order for the top of the list [inv-1 014].
+ * INFERRED from [inv-1 008]: the record shows the lists as selects but not the
+ * tail's order, so the rest follow A to Z by code.
+ */
 const CURRENCIES_FIRST = [
   'USD',
   'EUR',
@@ -86,22 +92,12 @@ export function zoneName(zone: string): string {
   return US_NAMES[zone] ?? zone;
 }
 
-/** Minutes east of UTC right now; 0 for a name the browser does not know. */
+/** Minutes east of UTC right now, from the shared offset label; 0 for a name the browser does not know. */
 function offsetMinutes(zone: string, at: Date): number {
-  try {
-    const text = new Intl.DateTimeFormat('en-US', {
-      timeZone: zone,
-      timeZoneName: 'longOffset',
-    })
-      .formatToParts(at)
-      .find((p) => p.type === 'timeZoneName')?.value;
-    const m = /^GMT([+\-−])(\d{2}):(\d{2})$/.exec(text ?? '');
-    if (!m) return 0;
-    const minutes = Number(m[2]) * 60 + Number(m[3]);
-    return m[1] === '+' ? minutes : -minutes;
-  } catch {
-    return 0;
-  }
+  const m = /^UTC([+-])(\d{2}):(\d{2})$/.exec(offsetLabel(zone, at));
+  if (!m) return 0;
+  const minutes = Number(m[2]) * 60 + Number(m[3]);
+  return m[1] === '+' ? minutes : -minutes;
 }
 
 /** "GMT−5", "GMT+5:30", "GMT" (a minus sign, not a dash). */
@@ -114,7 +110,12 @@ export function gmtLabel(zone: string, at: Date = new Date()): string {
   return `GMT${minutes < 0 ? '−' : '+'}${h}${m ? `:${String(m).padStart(2, '0')}` : ''}`;
 }
 
-/** Every zone the browser knows, west to east, each "GMT−5 US/Eastern". */
+/**
+ * Every zone the browser knows, west to east, each "GMT−5 US/Eastern".
+ * INFERRED from [inv-1 008]: the record shows a select of zones with an offset
+ * and a name, not their order or naming, so Keel orders them west to east (then
+ * by name) and shows the US names TradeZella uses for the six US zones.
+ */
 export function zoneChoices(at: Date = new Date()): Choice[] {
   let names: string[];
   try {

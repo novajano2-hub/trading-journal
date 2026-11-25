@@ -69,9 +69,9 @@ export const BROKERS: readonly string[] = [
 export const INSTRUMENTS: readonly Choice[] = [
   { id: 'stocks', label: 'Stocks' },
   { id: 'options', label: 'Options' },
-  { id: 'futures', label: 'Futures' },
   { id: 'forex', label: 'Forex' },
   { id: 'crypto', label: 'Crypto' },
+  { id: 'futures', label: 'Futures' },
   { id: 'cfd', label: 'CFDs' },
   { id: 'other', label: 'Other' },
 ];

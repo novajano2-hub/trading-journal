@@ -9,6 +9,7 @@ import {
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { SAMPLE_WORKSPACE } from '@/data/workspaces';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import { renderApp } from '../__fixtures__/render-app';
@@ -75,10 +76,11 @@ test('after the survey every app route shows Home with the preferences dialog, w
       .getAllByRole('button')
       .map((b) => b.textContent),
   ).toEqual(['Finish setup']);
-  // Home holds as a skeleton behind it: nothing saved, so no name.
+  // Home shows behind it as an empty My workspace: no name, 0 of 3.
   expect(
-    screen.getByRole('status', { name: 'Loading Home', hidden: true }),
-  ).toBeTruthy();
+    screen.getByRole('region', { name: 'Get started', hidden: true })
+      .textContent,
+  ).toContain('0 of 3 complete');
   fireEvent.keyDown(dialog, { key: 'Escape' });
   fireEvent.pointerDown(document.body);
   expect(screen.getByRole('dialog', { name: 'Your profile' })).toBeTruthy();
@@ -131,10 +133,6 @@ test('saving shows the time-zone toast', async () => {
     target: { value: 'EUR' },
   });
   finish();
-  const toast = await screen
-    .findByRole('status', { name: '' })
-    .catch(() => null);
-  void toast;
   expect(
     await screen.findByText('Re-timing your trades to US/Eastern.'),
   ).toBeTruthy();
@@ -151,6 +149,67 @@ test('saving shows the time-zone toast', async () => {
   );
   // The answers are spent.
   expect(sessionStorage.getItem('keel:first-run')).toBeNull();
+});
+
+test('Home never shows the sample as 3 of 3 on the way from the dialog to My workspace', async () => {
+  const sample = fixtureSample();
+  sample.accounts.push({
+    id: 'p-1',
+    workspaceId: SAMPLE_WORKSPACE.id,
+    name: 'Apex 50K',
+    broker: 'Apex',
+    type: 'prop-evaluation',
+    currency: 'USD',
+    startingBalance: 5_000_000,
+    status: 'active',
+  });
+  sample.challenges.push({
+    id: 'c-1',
+    workspaceId: SAMPLE_WORKSPACE.id,
+    name: 'Apex 50K',
+    firm: 'Apex',
+    steps: 1,
+    phases: [{ step: 'step-1', accountId: 'p-1' }, { step: 'funded' }],
+    phase: 'evaluation',
+    status: 'active',
+  });
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => sample,
+  });
+  await open(repository);
+  fill();
+  // Every DOM change from here to the end is checked for the sample's card.
+  const seen: string[] = [];
+  const watch = new MutationObserver(() => {
+    const card = document.querySelector(
+      'section[aria-labelledby="gs-heading"]',
+    );
+    if (card?.textContent) seen.push(card.textContent);
+  });
+  watch.observe(document.body, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+  });
+  finish();
+  expect(await screen.findByText('Profile saved')).toBeTruthy();
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  watch.disconnect();
+  const card = screen.getByRole('region', { name: 'Get started' });
+  expect(card.textContent).toContain('0 of 3 complete');
+  expect(seen.some((t) => t.includes('3 of 3'))).toBe(false);
+  expect(seen.some((t) => t.includes('1 of 3'))).toBe(false);
+});
+
+test('the time-zone notice region is always there, empty until it has something to say', async () => {
+  await open();
+  expect(
+    screen
+      .getAllByRole('status', { hidden: true })
+      .some((r) => r.textContent === ''),
+  ).toBe(true);
 });
 
 test('a failed save keeps the answers in the dialog, and a retry makes one My account', async () => {
