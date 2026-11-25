@@ -93,10 +93,22 @@ export function localStrategies(ctx: LocalContext): StrategiesRepo {
 
     async remove(ws, id) {
       const db = await ctx.db();
-      await rwTx(db, [db.strategies, db.trades], async () => {
+      await rwTx(db, [db.strategies, db.trades, db.challenges], async () => {
         const strategy = await db.strategies.get([ws, id]);
         if (!strategy) throw new NotFoundError('strategy', id);
         await onItsTrades(db, ws, id, ruleIdsOf(strategy), true);
+        // A challenge traded with it no longer lists it.
+        const using = await db.challenges
+          .where('workspaceId')
+          .equals(ws)
+          .filter((c) => c.strategyIds?.includes(id) ?? false)
+          .toArray();
+        await db.challenges.bulkPut(
+          using.map((c) => ({
+            ...c,
+            strategyIds: c.strategyIds!.filter((s) => s !== id),
+          })),
+        );
         await db.strategies.delete([ws, id]);
       });
     },

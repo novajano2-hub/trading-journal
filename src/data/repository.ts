@@ -7,9 +7,11 @@ import type { ManualTradeError } from '@/domain/manual-trade';
 import { isValidTimeZone } from '@/domain/time';
 import type {
   Account,
+  BreachReason,
   CashFlow,
   Cents,
   Challenge,
+  CostMethod,
   DayRecord,
   DayShot,
   FrozenDay,
@@ -18,6 +20,7 @@ import type {
   JournalEntry,
   NoteFolder,
   NoteTemplate,
+  PropTxn,
   Rule,
   RuleGroup,
   Side,
@@ -203,6 +206,15 @@ export interface AccountsRepo {
   remove(ws: string, id: string): Promise<void>;
   /** Removes its trades (and their journal links) and import jobs; returns the count of trades. */
   clearTrades(ws: string, id: string): Promise<number>;
+  /**
+   * Sets the account's cost method and rebuilds each of its trades from their
+   * stored executions under it, in one transaction (C40): ids, journal fields
+   * and everything not derived from the fills are kept. FIFO is stored as
+   * unset. Throws NotFoundError for a missing account and ArchivedAccountError,
+   * changing nothing, for an archived one. `update` with a `costMethod` that
+   * differs does the same.
+   */
+  setCostMethod(ws: string, id: string, method: CostMethod): Promise<Account>;
 }
 
 /** A rule or group without an id gets one. */
@@ -414,6 +426,47 @@ export interface ChallengesRepo {
   create(ws: string, input: NewChallenge): Promise<Challenge>;
   /** As `create` for what it sets; a key set to undefined is left unchanged, except `failureReason` and the fees, which it clears. Throws NotFoundError for an unknown id. */
   update(ws: string, id: string, patch: ChallengePatch): Promise<Challenge>;
+  /**
+   * Marks the challenge breached, for good: `status`, `breachReason` and
+   * `breachedOn` (a real YYYY-MM-DD) are written, and for 'other' a non-blank
+   * `note` becomes the failure reason; the phase and any earlier text stay.
+   * Throws ChallengeBreachedError, writing nothing, for a challenge already
+   * breached (one breached before reasons existed too), RangeError for a bad
+   * date or reason, NotFoundError for an unknown id. `update` refuses any
+   * status change on a breached challenge the same way. Removing a challenge
+   * unlinks its prop transactions and keeps them.
+   */
+  markBreached(
+    ws: string,
+    id: string,
+    input: { reason: BreachReason; note?: string; on: string },
+  ): Promise<Challenge>;
+  remove(ws: string, id: string): Promise<void>;
+}
+
+/** The challenge is breached, and a breach is permanent: it can't be marked again or move to another status. */
+export class ChallengeBreachedError extends Error {
+  override name = 'ChallengeBreachedError';
+  constructor(readonly challengeId: string) {
+    super(`Challenge "${challengeId}" is breached, and a breach is permanent`);
+  }
+}
+
+export type NewPropTxn = Omit<PropTxn, 'id' | 'workspaceId'>;
+export type PropTxnPatch = Partial<NewPropTxn>;
+export interface PropTxnsRepo {
+  /** Newest date first, then by id. */
+  list(ws: string): Promise<PropTxn[]>;
+  /**
+   * The text is trimmed (an empty description is left out; a blank firm reads
+   * None). Throws RangeError for a date that isn't a real YYYY-MM-DD, an
+   * amount that isn't a nonzero whole number of cents, or an unknown category
+   * or status; NotFoundError for a challenge that isn't in the workspace.
+   */
+  add(ws: string, input: NewPropTxn): Promise<PropTxn>;
+  /** As `add` for what it sets; a key set to undefined is left unchanged, except `description` and `challengeId`, which it clears. */
+  update(ws: string, id: string, patch: PropTxnPatch): Promise<PropTxn>;
+  /** For good. Throws NotFoundError for an unknown id. */
   remove(ws: string, id: string): Promise<void>;
 }
 
@@ -517,4 +570,5 @@ export interface Repository {
   dayShots: DayShotsRepo;
   imports: ImportRepo;
   onboarding: OnboardingRepo;
+  propTxns: PropTxnsRepo;
 }

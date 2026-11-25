@@ -5,7 +5,7 @@ import {
   canonicalSymbol,
   type BuildOptions,
 } from '../trade-builder';
-import type { Cents, Direction, Trade } from '../types';
+import type { Cents, CostMethod, Direction, Trade } from '../types';
 import type { ParsedCsv } from './csv';
 import {
   expiryCloseUtc,
@@ -24,6 +24,8 @@ export interface ImportContext {
   workspaceId: string;
   accountId: string;
   accountCurrency: string;
+  /** The account's cost method; absent reads FIFO. Every trade of the plan is built with it. */
+  costMethod?: CostMethod;
   nextSerial: number;
   /** The account's open trades. */
   openTrades: Trade[];
@@ -341,6 +343,7 @@ export function planImport(
     resolve: (s) =>
       resolveInstrument(s, { forexQtyUnit: mapping.forexQtyUnit, overrides }),
     accountCurrency: () => ctx.accountCurrency,
+    costMethodOf: () => ctx.costMethod ?? 'fifo',
   };
 
   const built =

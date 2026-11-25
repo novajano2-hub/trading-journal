@@ -1,5 +1,10 @@
-import { NotFoundError, type AccountsRepo } from '../repository';
+import {
+  ArchivedAccountError,
+  NotFoundError,
+  type AccountsRepo,
+} from '../repository';
 import type { LocalContext } from './context';
+import { applyCostMethod } from './cost-method';
 import { bumpImportRevision } from './imports';
 import { rwTx } from './tx';
 import { pruneJournalLinks } from './journal';
@@ -16,13 +21,15 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
     async create(ws, input) {
       const db = await ctx.db();
       const account = { ...input, id: ctx.newId(), workspaceId: ws };
+      // FIFO is the unset method.
+      if (account.costMethod === 'fifo') delete account.costMethod;
       await db.accounts.put(account);
       return account;
     },
 
     async update(ws, id, patch) {
       const db = await ctx.db();
-      return rwTx(db, [db.accounts], async () => {
+      return rwTx(db, [db.accounts, db.trades, db.meta], async () => {
         const account = await db.accounts.get([ws, id]);
         if (!account) throw new NotFoundError('account', id);
         const next = {
@@ -34,6 +41,19 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
           id,
           workspaceId: ws,
         };
+        // A change of method rebuilds the account's trades: the same path as setCostMethod.
+        const method = patch.costMethod;
+        if (method !== undefined && method !== (account.costMethod ?? 'fifo')) {
+          if (account.status === 'archived')
+            throw new ArchivedAccountError([id]);
+          return applyCostMethod(
+            db,
+            next,
+            method,
+            account.costMethod ?? 'fifo',
+          );
+        }
+        if (next.costMethod === 'fifo') delete next.costMethod;
         await db.accounts.put(next);
         return next;
       });
@@ -78,6 +98,16 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
           await db.accounts.delete([ws, id]);
         },
       );
+    },
+
+    async setCostMethod(ws, id, method) {
+      const db = await ctx.db();
+      return rwTx(db, [db.accounts, db.trades, db.meta], async () => {
+        const account = await db.accounts.get([ws, id]);
+        if (!account) throw new NotFoundError('account', id);
+        if (account.status === 'archived') throw new ArchivedAccountError([id]);
+        return applyCostMethod(db, account, method);
+      });
     },
 
     async clearTrades(ws, id) {

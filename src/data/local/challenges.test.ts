@@ -1,7 +1,7 @@
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
-import { expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { fixtureSample } from '../__fixtures__/sample';
-import { NotFoundError } from '../repository';
+import { ChallengeBreachedError, NotFoundError } from '../repository';
 import { createLocalRepository } from './local-repository';
 
 const S = 'sample';
@@ -138,4 +138,160 @@ test('removing an account unlinks its phase and keeps the challenge', async () =
     { step: 'step-1', startDate: '2026-11-02' },
     { step: 'funded' },
   ]);
+});
+
+describe('markBreached', () => {
+  const on = '2026-11-12';
+
+  test('writes the status, the reason and the date, and leaves the phase and the old text alone', async () => {
+    const repo = setup();
+    const c = await repo.challenges.create(S, {
+      ...input,
+      failureReason: 'Max drawdown limit broken on 12 Nov.',
+    });
+    const done = await repo.challenges.markBreached(S, c.id, {
+      reason: 'max-drawdown',
+      on,
+    });
+    expect(done).toMatchObject({
+      id: c.id,
+      status: 'breached',
+      breachReason: 'max-drawdown',
+      breachedOn: on,
+      phase: 'evaluation',
+      failureReason: 'Max drawdown limit broken on 12 Nov.',
+    });
+    expect(await repo.challenges.list(S)).toEqual([done]);
+  });
+
+  test("'other' keeps the trader's words in the failure reason, trimmed; a blank note keeps the old text", async () => {
+    const repo = setup();
+    const a = await repo.challenges.create(S, input);
+    const doneA = await repo.challenges.markBreached(S, a.id, {
+      reason: 'other',
+      note: '  Firm closed my account  ',
+      on,
+    });
+    expect(doneA).toMatchObject({
+      breachReason: 'other',
+      failureReason: 'Firm closed my account',
+    });
+    const b = await repo.challenges.create(S, {
+      ...input,
+      name: 'Other one',
+      phases: [{ step: 'step-1' }, { step: 'funded' }],
+      failureReason: 'Earlier text',
+    });
+    const doneB = await repo.challenges.markBreached(S, b.id, {
+      reason: 'other',
+      note: '   ',
+      on,
+    });
+    expect(doneB.failureReason).toBe('Earlier text');
+    // A note beside a listed reason is not stored.
+    const c = await repo.challenges.create(S, {
+      ...input,
+      name: 'Third',
+      phases: [{ step: 'step-1' }, { step: 'funded' }],
+    });
+    const doneC = await repo.challenges.markBreached(S, c.id, {
+      reason: 'overtrading',
+      note: 'ignored',
+      on,
+    });
+    expect('failureReason' in doneC).toBe(false);
+  });
+
+  test('a breach is permanent: a second one is refused and nothing changes', async () => {
+    const repo = setup();
+    const c = await repo.challenges.create(S, input);
+    const first = await repo.challenges.markBreached(S, c.id, {
+      reason: 'overtrading',
+      on,
+    });
+    const again = repo.challenges.markBreached(S, c.id, {
+      reason: 'time-pressure',
+      on: '2026-11-20',
+    });
+    await expect(again).rejects.toBeInstanceOf(ChallengeBreachedError);
+    await expect(again).rejects.toMatchObject({ challengeId: c.id });
+    expect(await repo.challenges.list(S)).toEqual([first]);
+  });
+
+  test('a challenge breached before 6C (a status and a text, no reason) is refused too', async () => {
+    const repo = setup();
+    const c = await repo.challenges.create(S, input);
+    await repo.challenges.update(S, c.id, {
+      status: 'breached',
+      failureReason: 'Daily loss limit broken.',
+    });
+    await expect(
+      repo.challenges.markBreached(S, c.id, { reason: 'other', on }),
+    ).rejects.toBeInstanceOf(ChallengeBreachedError);
+  });
+
+  test('update refuses any status change on a breached challenge, and allows the rest', async () => {
+    const repo = setup();
+    const c = await repo.challenges.create(S, input);
+    const done = await repo.challenges.markBreached(S, c.id, {
+      reason: 'max-drawdown',
+      on,
+    });
+    for (const status of ['active', 'passed'] as const)
+      await expect(
+        repo.challenges.update(S, c.id, { status }),
+      ).rejects.toBeInstanceOf(ChallengeBreachedError);
+    expect(await repo.challenges.list(S)).toEqual([done]);
+    // The same status is no change; other fields still edit.
+    await expect(
+      repo.challenges.update(S, c.id, { status: 'breached', name: 'Renamed' }),
+    ).resolves.toMatchObject({ name: 'Renamed', status: 'breached' });
+  });
+
+  test('a bad date or reason is refused; a missing challenge throws', async () => {
+    const repo = setup();
+    const c = await repo.challenges.create(S, input);
+    await expect(
+      repo.challenges.markBreached(S, c.id, {
+        reason: 'max-drawdown',
+        on: '12 Nov',
+      }),
+    ).rejects.toBeInstanceOf(RangeError);
+    await expect(
+      repo.challenges.markBreached(S, c.id, {
+        reason: 'luck' as never,
+        on,
+      }),
+    ).rejects.toBeInstanceOf(RangeError);
+    await expect(
+      repo.challenges.markBreached(S, 'nope', { reason: 'other', on }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    expect((await repo.challenges.list(S))[0]!.status).toBe('active');
+  });
+});
+
+test('strategies attach to a challenge, once each, and must exist', async () => {
+  const repo = setup();
+  const c = await repo.challenges.create(S, {
+    ...input,
+    strategyIds: ['str-1', 'str-1'],
+  });
+  expect(c.strategyIds).toEqual(['str-1']);
+  await expect(
+    repo.challenges.update(S, c.id, { strategyIds: ['nope'] }),
+  ).rejects.toBeInstanceOf(NotFoundError);
+  const cleared = await repo.challenges.update(S, c.id, { strategyIds: [] });
+  expect(cleared.strategyIds).toEqual([]);
+});
+
+test('deleting a strategy takes it off the challenges that use it', async () => {
+  const repo = setup();
+  const c = await repo.challenges.create(S, {
+    ...input,
+    strategyIds: ['str-1'],
+  });
+  await repo.strategies.remove(S, 'str-1');
+  const [after] = await repo.challenges.list(S);
+  expect(after!.id).toBe(c.id);
+  expect(after!.strategyIds).toEqual([]);
 });
