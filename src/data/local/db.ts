@@ -3,17 +3,20 @@ import type {
   Account,
   CashFlow,
   Challenge,
+  DayRecord,
+  DayShot,
   JournalEntry,
   NoteFolder,
   NoteTemplate,
   Strategy,
   Tag,
   TagCategory,
+  Tracker,
   Trade,
 } from '@/domain/types';
 import { builtInCategories, categoryIn, CATEGORIES } from '../seed/templates';
-import { WORKSPACES } from '../workspaces';
-import { DB_NAME, type ImportJobRecord, type MetaRecord } from './schema';
+import { USER_WORKSPACE, WORKSPACES } from '../workspaces';
+import { DB_NAME, META, type ImportJobRecord, type MetaRecord } from './schema';
 
 type Key = [workspaceId: string, id: string];
 
@@ -29,6 +32,9 @@ export class KeelDb extends Dexie {
   declare readonly folders: Table<NoteFolder, Key>;
   declare readonly cashflows: Table<CashFlow, Key>;
   declare readonly challenges: Table<Challenge, Key>;
+  declare readonly trackers: Table<Tracker, Key>;
+  declare readonly days: Table<DayRecord, Key>;
+  declare readonly dayShots: Table<DayShot, Key>;
   declare readonly meta: Table<MetaRecord, string>;
 
   /** Opens nothing: Dexie connects on `open()` or the first query. */
@@ -62,6 +68,13 @@ export class KeelDb extends Dexie {
         cashflows: '[workspaceId+id], workspaceId, [workspaceId+accountId]',
       })
       .upgrade(toVersion2);
+    this.version(3)
+      .stores({
+        trackers: '[workspaceId+id], workspaceId',
+        days: '[workspaceId+id], workspaceId',
+        dayShots: '[workspaceId+id], workspaceId, [workspaceId+date]',
+      })
+      .upgrade(toVersion3);
   }
 }
 
@@ -180,4 +193,33 @@ async function toVersion2(tx: Transaction): Promise<void> {
       delete e.folder;
       if (!Array.isArray(e.tags)) e.tags = [];
     });
+}
+
+// ---- version 2 to 3 --------------------------------------------------------
+// The daily routine adds three empty tables. A user who already has data is
+// marked onboarded, so the first-run gate never traps them.
+
+async function toVersion3(tx: Transaction): Promise<void> {
+  const mine = USER_WORKSPACE.id;
+  const [prefs, active, accounts, trades, journal] = await Promise.all([
+    tx.table('meta').get(META.prefs) as Promise<MetaRecord | undefined>,
+    tx.table('meta').get(META.activeWorkspace),
+    tx.table('accounts').where('workspaceId').equals(mine).count(),
+    tx.table('trades').where('workspaceId').equals(mine).count(),
+    tx.table('journal').where('workspaceId').equals(mine).count(),
+  ]);
+  if (!(prefs || active || accounts || trades || journal)) return;
+  const current =
+    typeof prefs?.value === 'object' && prefs.value !== null ? prefs.value : {};
+  await tx.table('meta').put({
+    key: META.prefs,
+    value: {
+      ...current,
+      onboarding: {
+        status: 'done',
+        at: new Date().toISOString(),
+        existing: true,
+      },
+    },
+  });
 }

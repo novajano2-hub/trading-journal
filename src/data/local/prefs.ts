@@ -19,6 +19,8 @@ const DISPLAY_UNITS: readonly DisplayUnit[] = [
   'pips',
   'points',
 ];
+/** K48. */
+const USERNAME = /^[A-Za-z0-9._]{3,30}$/;
 const APPEARANCES: readonly Appearance[] = ['system', 'light', 'dark'];
 const CALENDAR_STATS: readonly CalendarStat[] = [
   'net',
@@ -117,6 +119,32 @@ function validate(p: Partial<UserPrefs>): void {
     throw new RangeError(
       `Calendar stats must be one or more of ${CALENDAR_STATS.join(', ')}, each once, got ${stats.join(', ')}`,
     );
+  if (p.username !== undefined && !USERNAME.test(p.username))
+    throw new RangeError(
+      'A username is 3 to 30 letters, digits, dots or underscores',
+    );
+  const ob = p.onboarding;
+  if (
+    ob !== undefined &&
+    !(
+      typeof ob === 'object' &&
+      ob !== null &&
+      ob.status === 'done' &&
+      typeof ob.at === 'string' &&
+      new Date(ob.at).toISOString() === ob.at
+    )
+  )
+    throw new RangeError(
+      'Onboarding must be { status: "done", at: <ISO time> }',
+    );
+  for (const key of ['dayColumns', 'weekColumns', 'seenTips'] as const) {
+    const list = p[key];
+    if (
+      list !== undefined &&
+      !(Array.isArray(list) && list.every((k) => typeof k === 'string'))
+    )
+      throw new RangeError(`${key} must be a list of strings`);
+  }
   for (const [id, g] of Object.entries(p.goals ?? {})) {
     if (typeof g !== 'object' || g === null)
       throw new RangeError(`Goals for workspace "${id}" must be an object`);
