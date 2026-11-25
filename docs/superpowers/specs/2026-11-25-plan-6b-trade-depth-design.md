@@ -107,7 +107,7 @@ The next Dexie version adds six workspace tables. All join `DATA_TABLES`, so a w
 | `history` | `[workspaceId+id]`, index `[workspaceId+at]` | `at`, `type`, `action`, `source`, `entityId`, `label`, `field?`, `oldValue?`, `newValue?` |
 | `targetRules` | `[workspaceId+id]` | `accountId`, `assetClass`, `symbols[]`, `target {unit, levels[{value, pct}]}`, `stop {unit, levels[]}`, `createdAt` |
 | `feeRules` | `[workspaceId+id]` | `accountId`, `assetClass`, `symbols[]` (empty is all), `mode`, `applyOn`, `commission`, `fee`, `createdAt` |
-| `missedTrades` | `[workspaceId+id]`, index `[workspaceId+strategyId]` | `strategyId`, `symbol`, `side`, `qty`, `at`, `price`, `commission`, `fees` |
+| `missedTrades` | `[workspaceId+id]`, index `[workspaceId+strategyId]` | `strategyId`, `symbol`, `at`, `price`, `commission`, `fees` |
 
 **New optional fields** (no migration):
 
@@ -342,7 +342,7 @@ The next Dexie version adds six workspace tables. All join `DATA_TABLES`, so a w
 
 **States:** an empty history ("No earlier versions yet"); a refused image; voice unsupported (no microphone control); a version restored (a toast).
 
-**Phone:** the toolbar scrolls sideways in one row, with the overflow in a "More" menu; full screen is the default editing view; the History panel is a sheet.
+**Phone:** the toolbar scrolls sideways in one row, with the overflow in a "More" menu; full screen works as on desktop; the History panel is a sheet.
 
 ### 5.7 Strategies: missed trades, templates, the photo (#44, #53)
 
@@ -364,7 +364,7 @@ The next Dexie version adds six workspace tables. All join `DATA_TABLES`, so a w
 
 **Behaviour in Keel** (B43 to B48)
 
-- **Missed trades** (B43): the Missed tab lists them (date and time, symbol, side, quantity, price, costs) with Add, Edit and Delete. The form holds TZ's fields plus side and quantity, which TZ's manual trade form carries. They live in their own table, so no figure, filter or report sees them. A manual trade tagged "missed" needs nothing new.
+- **Missed trades** (B43): the Missed tab lists them (date and time, symbol, price, commission, fees) with Add, Edit and Delete. The form holds exactly TZ's fields: symbol, the date and time, price, commission and fees [help 7020769]. They live in their own table, so no figure, filter or report sees them [help 9737204]. A manual trade tagged "missed" needs nothing new.
 - **Templates** (B44, B46, B47; content U3: six templates): Keel-written, each with a name, description, styles, asset classes, rule groups, a cover image and example trades labelled as examples. A card's three stats come from its examples and say so. "+" adds a copy (groups, rules, description, asset classes, the cover as its photo) to My strategies and opens it; the card then marks it added, and "+" still adds another copy. The copy links to its template, and its page lists the examples apart, never in a figure.
 - **The chooser** (B45): opens on Create strategy while the preference is on; unticking "show every time" sends Create straight to the blank form. The Templates tab opens the chooser too, and its box shows the current setting.
 - **The photo** (B48): PNG, JPEG or WebP up to 10 MB; replace and remove; a cover band on the strategy's card and page header. The icon stays.
@@ -451,7 +451,7 @@ Every row below is Keel's call (TradeZella unknown). "Basis" names the evidence 
 | B21 | Thresholds TZ doesn't give | As in §5.5's table; the day ones marked "Keel threshold (U2)" are Keel's, for the owner to adjust | Examples in [help 12418995]; [connector] |
 | B22 | Breakeven trades | Not wins or losses for T3, T7, T8, D1, D13 | The breakeven range (Plan 5) |
 | B23 | Pattern text | Keel's own sentences with the figures; never TZ's | Copy rule |
-| B24 | Where they show; the report | Log column (default), trade page button, filter, day cards, day page, and a Patterns breakdown report on Keel's breakdown anatomy | [help 12418995; rec S31; connector]; the report's layout is unknown |
+| B24 | Where they show; the report | Log column (default), trade page button, filter, day cards, day page, and a Patterns breakdown report on Keel's breakdown anatomy | [help 12418995; rec S31; connector]; the report's layout is unknown, and TZ's report pages share one anatomy [plan5-features §4] |
 | B25 | Tone | A word on each pattern (Keel's: Strength, Watch, Neutral) | Tones [connector]; hue jobs keep green and red for money |
 
 **History**
@@ -486,7 +486,7 @@ Every row below is Keel's call (TradeZella unknown). "Basis" names the evidence 
 
 | Id | Question | Keel's call | Basis |
 | --- | --- | --- | --- |
-| B43 | Missed trade fields and tab | TZ's fields plus side and quantity; a list with add, edit, delete; own table | [help 7020769; help 9737204] |
+| B43 | The missed-trade tab | TZ's fields only (symbol, date and time, price, commission, fees); a list with add, edit and delete (TZ unknown); its own table | [help 7020769; help 9737204] |
 | B44 | Template stats; the author line | From the examples, labelled as examples; the author line reads Keel | [inv-3 099]; PRODUCT.md |
 | B45 | Turning the chooser back on | The Templates tab opens it, with the box | Only the box seen [inv-3 094] |
 | B46 | An added template | Marked added; "+" adds another copy | `is_downloaded` [connector] |
@@ -512,7 +512,7 @@ Every row below is Keel's call (TradeZella unknown). "Basis" names the evidence 
 
 ### 6.2 Decided by the owner (2026-11-25)
 
-The owner took the recommendation on all four questions.
+The owner took the recommendation on all four questions, and approved this doc on the condition that every behaviour is TZ's record, with Keel's calls only where TZ is unknown, each marked. A last pass removed the one call that added to a known TZ field list (B43).
 
 - **U1. Trade scale (#52)** moves to the market-data plan with #14. The evidence ties its "potential" side to MAE and MFE (record §7). 6A's week strip seam stays closed until then.
 - **U2. Patterns whose condition TZ gives only in words** (D1, D3, D4, D5, D7, D9, D11, D14, D15) are built with the thresholds in §5.5, each marked "Keel threshold (U2)" so the owner can adjust them. D8 waits with the price-path patterns.
