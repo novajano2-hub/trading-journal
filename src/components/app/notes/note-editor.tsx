@@ -8,6 +8,7 @@ import {
   EditorContent,
   useEditor,
   useEditorState,
+  type Content,
   type Editor,
 } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -52,6 +53,10 @@ import './note-prose.css';
 export interface NoteEditorHandle {
   /** Runs a slash-menu item by its label, at the current selection. */
   runSlashCommand: (label: string) => void;
+  /** Puts a Tiptap document's content at the cursor, or in place of everything with `replace`. */
+  insertContent: (doc: unknown, replace?: boolean) => void;
+  /** The document as it stands. */
+  getJSON: () => unknown;
 }
 
 export interface NoteEditorProps {
@@ -162,6 +167,14 @@ export function NoteEditor({
         const item = SLASH_ITEMS.find((i) => i.label === name);
         if (item) item.run(editor.chain().focus()).run();
       },
+      insertContent: (doc, replace = false) => {
+        const content = (doc as { content?: unknown } | null)?.content ?? doc;
+        const chain = replace
+          ? editor.chain().focus().clearContent()
+          : editor.chain().focus();
+        chain.insertContent(content as Content).run();
+      },
+      getJSON: () => editor.getJSON(),
     };
     return () => {
       handleRef.current = null;

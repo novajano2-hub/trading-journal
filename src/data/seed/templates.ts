@@ -1,4 +1,7 @@
 import {
+  DAILY_CHECKIN_BODY,
+  DAILY_FULL_BODY,
+  DAILY_PLAN_BODY,
   DAILY_REVIEW_BODY,
   PRE_MARKET_BODY,
   WEEKLY_RECAP_BODY,
@@ -46,20 +49,21 @@ export function builtInCategories(ws: string): TagCategory[] {
   ];
 }
 
-/** "Daily review", "Pre-market plan" and "Weekly recap", each the default for its kind. */
+/** "Daily review", "Pre-market plan" and "Weekly recap", each the default for its kind, and Keel's three other daily templates (K32), which are not defaults. */
 export function builtInTemplates(ws: string): NoteTemplate[] {
   const template = (
     id: string,
     name: string,
     kind: NoteTemplate['kind'],
     body: unknown,
+    isDefault = true,
   ): NoteTemplate => ({
     id,
     workspaceId: ws,
     name,
     kind,
     body: structuredClone(body),
-    isDefault: true,
+    isDefault,
     builtIn: true,
   });
   return [
@@ -80,6 +84,27 @@ export function builtInTemplates(ws: string): NoteTemplate[] {
       'Weekly recap',
       'weekly-recap',
       WEEKLY_RECAP_BODY,
+    ),
+    template(
+      'template-daily-plan',
+      'Daily game plan',
+      'daily-review',
+      DAILY_PLAN_BODY,
+      false,
+    ),
+    template(
+      'template-daily-full',
+      'All-in-one day',
+      'daily-review',
+      DAILY_FULL_BODY,
+      false,
+    ),
+    template(
+      'template-daily-checkin',
+      'Intraday check-in',
+      'daily-review',
+      DAILY_CHECKIN_BODY,
+      false,
     ),
   ];
 }

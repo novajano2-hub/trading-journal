@@ -723,6 +723,19 @@ test('New > Note makes a note and opens it', async () => {
   expect(made).toHaveLength(1);
 });
 
+test('New no longer offers Pre-market plan, and an existing pre-market entry still opens', async () => {
+  await openWith('/app/notebook');
+  fireEvent.keyDown(await screen.findByRole('button', { name: 'New' }), {
+    key: 'Enter',
+  });
+  expect(
+    (await screen.findAllByRole('menuitem')).map((i) => i.textContent),
+  ).toEqual(['Daily note', 'Weekly recap', 'Note']);
+  cleanup();
+  await openWith('/app/notebook/n-pm');
+  expect(await screen.findByDisplayValue('Opening bias')).toBeTruthy();
+});
+
 test('typing a title and moving to Trash at once leaves the note in Trash with the new title', async () => {
   const { repo } = await openWith('/app/notebook/n-plan');
   const title = await screen.findByRole('textbox', { name: 'Note title' });

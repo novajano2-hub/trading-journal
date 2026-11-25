@@ -302,7 +302,7 @@ export function RatingRow({
   );
 }
 
-type NoteStatus = 'idle' | 'saving' | 'saved' | 'failed';
+export type NoteStatus = 'idle' | 'saving' | 'saved' | 'failed';
 
 /** The editor and its autosave; mounts once the trade's note (if it has one) has loaded. */
 function NoteBody({
@@ -313,6 +313,7 @@ function NoteBody({
   ensure,
   readOnly,
   handleRef,
+  stamp,
   onStatus,
 }: {
   label: string;
@@ -324,6 +325,8 @@ function NoteBody({
   ensure(): Promise<JournalEntry>;
   readOnly: boolean;
   handleRef?: { current: NoteEditorHandle | null };
+  /** Fields the next save writes with the body (the template a body came from). */
+  stamp?: { current: Partial<JournalEntry> | undefined };
   onStatus(s: NoteStatus): void;
 }): React.JSX.Element {
   const save = useSaveJournalEntry();
@@ -369,7 +372,11 @@ function NoteBody({
           if (note.current === pending) note.current = null;
           throw e;
         }
-        const saved = await save.mutateAsync({ ...current, body });
+        const saved = await save.mutateAsync({
+          ...current,
+          ...stamp?.current,
+          body,
+        });
         note.current = Promise.resolve(saved);
         onStatus('saved');
       } catch {
@@ -464,19 +471,23 @@ export function dayNoteDate(trade: Trade, timeZone: string): string {
 }
 
 /**
- * The day note: the same editor and autosave, bound to the daily entry of the
- * trade's day. The entry is made on the first change (as the Notebook makes
- * it), never by looking. One editor per date.
+ * The day note's editor and autosave, bound to the daily entry of a date: no
+ * header, so a page can lay out its own. The entry is made on the first
+ * change (as the Notebook makes it), never by looking. A note in Trash shows
+ * read-only with Restore (E109). One editor per date. `stamp` is written with
+ * the next save, to record the template a replaced body came from.
  */
-export function DayNote({
+export function DayNoteBinding({
   date,
   readOnly,
   handleRef,
+  stamp,
   onStatus,
 }: {
   date: string;
   readOnly: boolean;
   handleRef?: { current: NoteEditorHandle | null };
+  stamp?: { current: Partial<JournalEntry> | undefined };
   onStatus(s: NoteStatus): void;
 }): React.JSX.Element {
   const journal = useJournal();
@@ -505,21 +516,6 @@ export function DayNote({
       ?.body ?? EMPTY_DOC;
   return (
     <>
-      <div className="mt-3 flex items-center justify-between gap-3 text-[12.5px] text-faint">
-        <span className="tabular-nums">
-          {dayLabel(`${date}T12:00:00Z`, 'UTC')}
-        </span>
-        <Link
-          href={
-            entry
-              ? `/app/notebook/${encodeURIComponent(entry.id)}`
-              : `/app/notebook/daily/${date}`
-          }
-          className="rounded-chip text-[13px] font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:py-3"
-        >
-          Open in the Notebook
-        </Link>
-      </div>
       {entry && trashed ? (
         <div
           role="note"
@@ -556,6 +552,51 @@ export function DayNote({
         entry={entry ?? null}
         fallback={template}
         readOnly={readOnly || trashed}
+        handleRef={handleRef}
+        stamp={stamp}
+        onStatus={onStatus}
+      />
+    </>
+  );
+}
+
+/**
+ * The day note on the trade page: a date row with a link to the Notebook,
+ * then the day note's editor.
+ */
+export function DayNote({
+  date,
+  readOnly,
+  handleRef,
+  onStatus,
+}: {
+  date: string;
+  readOnly: boolean;
+  handleRef?: { current: NoteEditorHandle | null };
+  onStatus(s: NoteStatus): void;
+}): React.JSX.Element {
+  const journal = useJournal();
+  const entry = findDailyEntry(journal.data, date);
+  return (
+    <>
+      <div className="mt-3 flex items-center justify-between gap-3 text-[12.5px] text-faint">
+        <span className="tabular-nums">
+          {dayLabel(`${date}T12:00:00Z`, 'UTC')}
+        </span>
+        <Link
+          href={
+            entry
+              ? `/app/notebook/${encodeURIComponent(entry.id)}`
+              : `/app/notebook/daily/${date}`
+          }
+          className="rounded-chip text-[13px] font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:py-3"
+        >
+          Open in the Notebook
+        </Link>
+      </div>
+      <DayNoteBinding
+        date={date}
+        readOnly={readOnly}
         handleRef={handleRef}
         onStatus={onStatus}
       />

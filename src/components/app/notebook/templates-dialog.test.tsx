@@ -105,9 +105,9 @@ test('built-in templates have no Delete, and deleting the default falls back to 
     ),
   );
   const builtIn = (await repo.templates.list(WS)).find(
-    (t) => t.kind === 'daily-review',
+    (t) => t.kind === 'daily-review' && t.isDefault,
   )!;
-  expect(builtIn).toMatchObject({ builtIn: true, isDefault: true });
+  expect(builtIn).toMatchObject({ builtIn: true, name: 'Daily review' });
 });
 
 test('Edit renames a template through its name field', async () => {
