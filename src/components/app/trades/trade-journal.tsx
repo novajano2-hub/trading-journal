@@ -432,6 +432,8 @@ export function DayNoteBinding({
   const [problem, setProblem] = useState<string | null>(null);
   const entry = findDailyEntry(journal.data, date);
   const trashed = entry?.deletedAt !== undefined;
+  // A finished date's trashed note stays where it is: no Restore.
+  const closed = useDayFinished(date).finished;
   // As in TradeNote: once mounted for this date the editor stays, even though
   // the first change adds the entry to the journal.
   const [mountedFor, setMountedFor] = useState<string | null>(null);
@@ -457,28 +459,33 @@ export function DayNoteBinding({
           className="mt-3 flex flex-wrap items-center gap-2 rounded-control bg-warn-soft px-3 py-2 text-[13.5px] text-text"
         >
           <span className="mr-auto">This day&apos;s note is in Trash.</span>
-          {problem ? (
-            <span role="alert" className="text-loss">
-              {problem}
-            </span>
-          ) : null}
-          <button
-            type="button"
-            onClick={async () => {
-              setProblem(null);
-              try {
-                await restore.mutateAsync(entry.id);
-              } catch {
-                setProblem("Couldn't restore that note. Try again.");
-              }
-            }}
-            disabled={restore.isPending}
-            className="inline-flex h-8 items-center rounded-control border border-line bg-surface-1 px-3 text-[13px] font-semibold text-text outline-offset-2 hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11"
-          >
-            Restore
-          </button>
+          {closed ? null : (
+            <>
+              {problem ? (
+                <span role="alert" className="text-loss">
+                  {problem}
+                </span>
+              ) : null}
+              <button
+                type="button"
+                onClick={async () => {
+                  setProblem(null);
+                  try {
+                    await restore.mutateAsync(entry.id);
+                  } catch {
+                    setProblem("Couldn't restore that note. Try again.");
+                  }
+                }}
+                disabled={restore.isPending}
+                className="inline-flex h-8 items-center rounded-control border border-line bg-surface-1 px-3 text-[13px] font-semibold text-text outline-offset-2 hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11"
+              >
+                Restore
+              </button>
+            </>
+          )}
         </div>
       ) : null}
+      {entry && trashed && closed ? <LockLine className="mt-3" /> : null}
       <NoteBody
         key={date}
         label="Daily note"
@@ -531,7 +538,9 @@ export function DayNote({
           Open in the Notebook
         </Link>
       </div>
-      {closed ? <LockLine className="mt-3" /> : null}
+      {closed && entry?.deletedAt === undefined ? (
+        <LockLine className="mt-3" />
+      ) : null}
       <DayNoteBinding
         date={date}
         readOnly={readOnly || closed}

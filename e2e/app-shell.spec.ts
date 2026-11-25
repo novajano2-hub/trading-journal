@@ -494,3 +494,24 @@ test('an empty workspace shows the chips and the P&L choice unavailable, still i
   await page.keyboard.press('Enter');
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
+
+// The sample is 3 of 3, so Home's step buttons are absent: the Recommended focus rows are always links.
+test('Home links open the new-account dialog on a prop account and the new-challenge form, and drop the param', async ({
+  page,
+}) => {
+  await page.goto('/app/home');
+  await page.getByRole('link', { name: /Add your prop account/ }).click();
+  const account = page.getByRole('dialog', { name: 'New account' });
+  await expect(account).toBeVisible();
+  await expect(account.getByLabel('Account type')).toHaveValue(
+    'prop-evaluation',
+  );
+  await expect(page).toHaveURL(/\/app\/settings\/accounts$/);
+
+  await page.goto('/app/home');
+  await page.getByRole('link', { name: /Set up rule monitoring/ }).click();
+  await expect(
+    page.getByRole('dialog', { name: 'New challenge' }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/prop-firms$/);
+});

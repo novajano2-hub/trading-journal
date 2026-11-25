@@ -10,20 +10,10 @@ import {
   useUnsetPrefs,
   useUpdatePrefs,
 } from '@/data/query/hooks';
+import { USERNAME, USERNAME_MESSAGE, isCurrencyCode } from '@/data/onboarding';
 import { zoneLabel } from '@/lib/time-zone-label';
 import { AppearanceControl } from '../appearance';
 import { FieldError } from './settings-ui';
-
-/** A three-letter currency code Intl knows. */
-function isCurrency(code: string): boolean {
-  if (!/^[A-Za-z]{3}$/.test(code)) return false;
-  try {
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: code });
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 /** What a field is doing with its save, for a screen reader and the eye. */
 export function SaveStatus({
@@ -50,18 +40,87 @@ interface Draft {
   text: string;
 }
 
-/** Name, time zone, base currency and appearance. Each saves as you finish it. */
+/**
+ * A text preference that saves when you leave the field. What is typed belongs
+ * to the saved value it was typed over: once that changes (a save lands, or
+ * another tab saves), the typing is stale.
+ *
+ * Keel's call (TradeZella unknown): the first run requires first name, last
+ * name and username [inv-1 013] but Settings' rule isn't recorded, so a field
+ * that is set can't be emptied: emptying it shows `required` and saves
+ * nothing. A field never set (the v3 upgrade onboards without names) may stay
+ * empty, with no error.
+ */
+function TextPref({
+  label,
+  saved,
+  hint,
+  autoComplete,
+  required,
+  invalid,
+  onSave,
+}: {
+  label: string;
+  saved: string;
+  hint: string;
+  autoComplete: string;
+  /** What an emptied field that was set says. */
+  required: string;
+  /** The message for a typed value that can't be saved, or none. */
+  invalid?(text: string): string | null;
+  onSave(next: string): void;
+}): React.JSX.Element {
+  const id = useId();
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const typed = draft?.base === saved ? draft.text : null;
+  return (
+    <div>
+      <label htmlFor={id} className={LABEL}>
+        {label}
+      </label>
+      <input
+        id={id}
+        value={typed ?? saved}
+        autoComplete={autoComplete}
+        spellCheck={false}
+        aria-invalid={error !== null || undefined}
+        aria-describedby={`${id}-${error !== null ? 'err' : 'help'}`}
+        onChange={(e) => {
+          setDraft({ base: saved, text: e.target.value });
+          setError(null);
+        }}
+        onBlur={() => {
+          if (typed === null) return;
+          const next = typed.trim();
+          if (next === saved) return setDraft(null);
+          const message = next === '' ? required : (invalid?.(next) ?? null);
+          if (message !== null) return setError(message);
+          onSave(next);
+        }}
+        className={INPUT}
+      />
+      {error !== null ? (
+        <FieldError id={`${id}-err`}>{error}</FieldError>
+      ) : (
+        <p id={`${id}-help`} className={HELP}>
+          {hint}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** First name, last name, username, time zone, base currency and appearance. Each saves as you finish it. */
 export function ProfileSettings(): React.JSX.Element {
   const prefs = usePrefs().data;
   const saved = useSavedPrefs().data;
   const update = useUpdatePrefs();
   const unset = useUnsetPrefs();
-  const nameId = useId();
   const currencyId = useId();
 
   // What is typed belongs to the saved value it was typed over: once that
   // changes (a save lands, or another tab saves), the typing is stale.
-  const [nameDraft, setNameDraft] = useState<Draft | null>(null);
   const [currencyDraft, setCurrencyDraft] = useState<Draft | null>(null);
   const [currencyError, setCurrencyError] = useState(false);
 
@@ -75,11 +134,8 @@ export function ProfileSettings(): React.JSX.Element {
     );
 
   const zoneSaved = saved.timeZone !== undefined;
-  const savedName = prefs.displayName ?? '';
-  const name = nameDraft?.base === savedName ? nameDraft.text : null;
   const currency =
     currencyDraft?.base === prefs.baseCurrency ? currencyDraft.text : null;
-  const shownName = name ?? savedName;
   const shownCurrency = currency ?? prefs.baseCurrency;
   const busy = update.isPending || unset.isPending;
 
@@ -90,29 +146,32 @@ export function ProfileSettings(): React.JSX.Element {
     >
       <CardHeader headingId="profile-heading" title="Profile" />
       <div className="mt-5 grid max-w-[460px] gap-5">
-        <div>
-          <label htmlFor={nameId} className={LABEL}>
-            Name
-          </label>
-          <input
-            id={nameId}
-            value={shownName}
-            autoComplete="name"
-            onChange={(e) =>
-              setNameDraft({ base: savedName, text: e.target.value })
-            }
-            onBlur={() => {
-              if (name === null) return;
-              const next = name.trim();
-              if (next === savedName) return setNameDraft(null);
-              // An empty name is no name: the key is forgotten, not saved empty.
-              if (next === '') unset.mutate(['displayName']);
-              else update.mutate({ displayName: next });
-            }}
-            className={INPUT}
-          />
-          <p className={HELP}>Shown in your workspace. Optional.</p>
-        </div>
+        <TextPref
+          label="First name"
+          // An old display name reads as the first name until one is saved.
+          saved={prefs.firstName ?? prefs.displayName ?? ''}
+          hint="Shown in your workspace, in your greeting."
+          autoComplete="given-name"
+          required="Enter your first name."
+          onSave={(next) => update.mutate({ firstName: next })}
+        />
+        <TextPref
+          label="Last name"
+          saved={prefs.lastName ?? ''}
+          hint="Your family name."
+          autoComplete="family-name"
+          required="Enter your last name."
+          onSave={(next) => update.mutate({ lastName: next })}
+        />
+        <TextPref
+          label="Username"
+          saved={prefs.username ?? ''}
+          hint="Letters, digits, dots and underscores, 3 to 30 characters."
+          autoComplete="username"
+          required="Enter a username."
+          invalid={(text) => (USERNAME.test(text) ? null : USERNAME_MESSAGE)}
+          onSave={(next) => update.mutate({ username: next })}
+        />
 
         <div>
           <TimeZoneField
@@ -158,7 +217,7 @@ export function ProfileSettings(): React.JSX.Element {
               if (currency === null) return;
               if (currency === prefs.baseCurrency)
                 return setCurrencyDraft(null);
-              if (!isCurrency(currency)) return setCurrencyError(true);
+              if (!isCurrencyCode(currency)) return setCurrencyError(true);
               update.mutate({ baseCurrency: currency.toUpperCase() });
             }}
             className={`${INPUT} max-w-[120px] uppercase`}

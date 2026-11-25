@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { isRealDate } from '@/components/app/notebook/notebook-model';
 import { useRoutineToday } from '@/data/query/derived';
-import { dayHref, type DayMode } from '@/lib/day-routes';
+import { dayHref, dayPlanHref, type DayMode } from '@/lib/day-routes';
 import { usePhone } from '@/lib/use-phone';
 import { BadDate } from './bad-date';
 import { useImportPicker } from './import-picker';
@@ -51,7 +51,7 @@ export function DayView({
   const real = isRealDate(date);
   const future = real && today !== undefined && date > today;
   useEffect(() => {
-    if (future && mode === 'review') router.replace(`/app/day/${date}/plan`);
+    if (future && mode === 'review') router.replace(dayPlanHref(date));
   }, [future, mode, date, router]);
 
   if (!real) return <BadDate today={today} />;

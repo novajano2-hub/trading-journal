@@ -115,7 +115,8 @@ function TemplateForm({
 
 /**
  * The templates, by kind: each can be edited and set as its kind's default,
- * and the ones you made can be deleted (a built-in stays as the fallback).
+ * and removed as the default (a kind may have none, and then starts empty);
+ * the ones you made can be deleted, and a built-in stays.
  */
 export function TemplatesDialog({
   open,
@@ -129,6 +130,7 @@ export function TemplatesDialog({
 }): React.JSX.Element {
   const templates = useTemplates().data;
   const setDefault = useSetDefaultTemplate();
+  const save = useSaveTemplate();
   const remove = useRemoveTemplate();
   const [editing, setEditing] = useState<Editing | null>(null);
   const [deleting, setDeleting] = useState<NoteTemplate | null>(null);
@@ -171,7 +173,8 @@ export function TemplatesDialog({
                     : 'Templates'}
                 </Dialog.Title>
                 <Dialog.Description className="mt-1 text-[14px] leading-[1.55] text-muted">
-                  A new note starts from its kind&apos;s default template.
+                  A new note starts from its kind&apos;s default template, or
+                  empty when it has none.
                 </Dialog.Description>
               </div>
               <Dialog.Close
@@ -268,7 +271,29 @@ export function TemplatesDialog({
                                 >
                                   Edit
                                 </button>
-                                {t.isDefault ? null : (
+                                {t.isDefault ? (
+                                  // TradeZella lets the default be removed: the kind then has none, and a new note of it starts empty.
+                                  <button
+                                    type="button"
+                                    aria-label={`Remove ${t.name} as default`}
+                                    onClick={() => {
+                                      setFailed(false);
+                                      save.mutate(
+                                        {
+                                          id: t.id,
+                                          kind: t.kind,
+                                          name: t.name,
+                                          body: t.body,
+                                          isDefault: false,
+                                        },
+                                        { onError: () => setFailed(true) },
+                                      );
+                                    }}
+                                    className={SMALL}
+                                  >
+                                    Remove default
+                                  </button>
+                                ) : (
                                   <button
                                     type="button"
                                     aria-label={`Set ${t.name} as default`}
@@ -311,7 +336,7 @@ export function TemplatesDialog({
         title={`Delete the template ${deleting?.name ?? ''}?`}
         body={
           deleting?.isDefault
-            ? 'It is the default for its kind. New notes start from the built-in template again.'
+            ? 'It is the default for its kind. New notes of that kind start empty until you set another default.'
             : 'Notes already made from it keep their text.'
         }
         confirmLabel="Delete template"

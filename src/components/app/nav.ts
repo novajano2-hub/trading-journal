@@ -5,6 +5,7 @@ import {
   ClockCounterClockwise,
   Gauge,
   GearSix,
+  House,
   ListBullets,
   Notebook,
   PlayCircle,
@@ -19,6 +20,7 @@ import { MODULES, type ModuleInfo } from '@/content/modules';
 import { parseFilters, serializeFilters } from '@/data/filters';
 
 export type AppModuleId =
+  | 'home'
   | 'dashboard'
   | 'trades'
   | 'calendar'
@@ -59,6 +61,17 @@ function oneLine(slug: ModuleInfo['slug']): string {
 const NEEDS_MARKET_DATA = "It needs market data, which Keel doesn't have yet.";
 
 export const APP_NAV: readonly NavItem[] = [
+  {
+    id: 'home',
+    label: 'Home',
+    href: '/app/home',
+    icon: House,
+    group: 'modules',
+    filterScoped: false,
+    built: true,
+    summary:
+      'Your first steps in Keel, a way into each part, and where to look next.',
+  },
   {
     id: 'dashboard',
     label: 'Dashboard',

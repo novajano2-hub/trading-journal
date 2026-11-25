@@ -85,19 +85,23 @@ test('the daily loop: plan, tick, review, rate, close the day', async ({
 
 test('a closed day refuses edits from the trade page and the Notebook', async ({
   page,
-}, info) => {
-  test.skip(info.project.name !== 'desktop');
+}) => {
   // The sample's past days are already closed.
   await page.goto(`/app/day/${PAST}/review`);
   await expect(page.getByText(/^Closed at \d\d:\d\d$/)).toBeVisible();
 
   // A trade of that day: its Daily note is the same note, read-only.
+  // (The phone lists the rows without a table, so find the trade by its link.)
   await page
-    .getByRole('table', { name: 'Trades' })
-    .getByRole('link')
+    .getByRole('region', { name: 'Trades' })
+    .locator('a[href^="/app/trades/"]')
     .first()
     .click();
-  await page.getByRole('radio', { name: 'Daily note' }).check({ force: true });
+  // The segmented control's input is visually hidden: click its label.
+  await page
+    .getByRole('radiogroup', { name: 'Note' })
+    .getByText('Daily note', { exact: true })
+    .click();
   await expect(page.getByText(/This day is closed/)).toBeVisible();
   await expect(
     page.getByRole('textbox', { name: 'Daily note' }),

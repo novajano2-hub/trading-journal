@@ -48,7 +48,7 @@ function NavRow({
         aria-label={rail ? item.label : undefined}
         title={rail ? item.label : undefined}
         onClick={onNavigate}
-        className={`${ROW} ${look}${rail ? ' w-10 justify-center px-0' : ''}`}
+        className={`${ROW} ${look}${rail ? ' w-10 justify-center px-0 pointer-coarse:w-11' : ''}`}
       >
         <Glyph
           size={18}

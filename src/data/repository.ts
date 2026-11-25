@@ -22,6 +22,7 @@ import type {
   RuleGroup,
   Side,
   Strategy,
+  SurveyAnswers,
   Tag,
   TagCategory,
   Tracker,
@@ -274,11 +275,12 @@ export interface TemplatesRepo {
   list(ws: string): Promise<NoteTemplate[]>;
   /**
    * Creates when `id` is absent, otherwise replaces (a built-in keeps its
-   * kind). The kind keeps one default: saving a default clears the others,
-   * and a kind left without one falls back to its built-in template.
+   * kind). The kind keeps at most one default: saving a default clears the
+   * others, and saving the default without `isDefault` leaves the kind with
+   * none (a new note of that kind then starts empty).
    */
   save(ws: string, t: TemplateDraft): Promise<NoteTemplate>;
-  /** Refuses a built-in template (`Error('built-in template')`). Removing the default makes the kind's built-in template the default. */
+  /** Refuses a built-in template (`Error('built-in template')`). Removing the default leaves the kind without one. */
   remove(ws: string, id: string): Promise<void>;
   /** Clears `isDefault` on the kind's other templates. */
   setDefault(ws: string, id: string): Promise<void>;
@@ -481,6 +483,22 @@ export interface DayShotsRepo {
   remove(ws: string, id: string): Promise<void>;
 }
 
+export interface FirstRunInput {
+  firstName: string;
+  lastName: string;
+  username: string;
+  baseCurrency: string;
+  timeZone: string;
+  survey?: SurveyAnswers;
+}
+export interface OnboardingRepo {
+  /**
+   * One transaction: prefs (names, currency, zone, the onboarding flag); "My account" in My workspace in that
+   * currency when it has none; My workspace active. RangeError for a bad username, zone or currency, with nothing written.
+   */
+  complete(input: FirstRunInput): Promise<void>;
+}
+
 export interface Repository {
   workspaces: WorkspacesRepo;
   prefs: PrefsRepo;
@@ -498,4 +516,5 @@ export interface Repository {
   days: DaysRepo;
   dayShots: DayShotsRepo;
   imports: ImportRepo;
+  onboarding: OnboardingRepo;
 }

@@ -106,18 +106,26 @@ async function deleteEntries(
     });
 }
 
+/** Whether `entry` is a daily note of a finished date. Call inside a transaction that includes `db.days`. */
+async function isLockedNote(
+  db: KeelDb,
+  ws: string,
+  entry: Pick<JournalEntry, 'kind' | 'date'> | undefined,
+): Promise<boolean> {
+  return (
+    entry?.kind === 'daily-review' &&
+    entry.date !== undefined &&
+    (await isLocked(db, ws, entry.date))
+  );
+}
+
 /** Throws LockedDayError for a daily note on a finished date. Call inside a transaction that includes `db.days`. */
 async function refuseLockedNote(
   db: KeelDb,
   ws: string,
   entry: Pick<JournalEntry, 'kind' | 'date'> | undefined,
 ): Promise<void> {
-  if (
-    entry?.kind === 'daily-review' &&
-    entry.date !== undefined &&
-    (await isLocked(db, ws, entry.date))
-  )
-    throw new LockedDayError();
+  if (await isLockedNote(db, ws, entry)) throw new LockedDayError();
 }
 
 export function localJournal(ctx: LocalContext): JournalRepo {
@@ -143,14 +151,14 @@ export function localJournal(ctx: LocalContext): JournalRepo {
         e.deletedAt !== undefined && Date.parse(e.deletedAt) < cutoff;
       let rows = await db.journal.where('workspaceId').equals(ws).toArray();
       if (rows.some(expired)) {
-        await rwTx(db, [db.journal, db.trades], () =>
-          deleteEntries(
-            db,
-            ws,
-            rows.filter(expired).map((e) => e.id),
-          ),
-        );
-        rows = rows.filter((e) => !expired(e));
+        // A finished day's note is frozen, so the purge leaves it in Trash.
+        const purged = new Set<string>();
+        await rwTx(db, [db.journal, db.trades, db.days], async () => {
+          for (const e of rows.filter(expired))
+            if (!(await isLockedNote(db, ws, e))) purged.add(e.id);
+          await deleteEntries(db, ws, [...purged]);
+        });
+        rows = rows.filter((e) => !purged.has(e.id));
       }
       return rows.map(whole).sort(byRecency);
     },
@@ -278,6 +286,8 @@ export function localJournal(ctx: LocalContext): JournalRepo {
           date,
           title: `Daily review, ${dayLabel(date)}`,
           body: structuredClone(template?.body ?? EMPTY_DOC),
+          // The template it started from; a kind with no default starts empty.
+          ...(template ? { templateId: template.id } : {}),
           linkedTradeIds: [],
           tags: [],
           updatedAt: ctx.now().toISOString(),

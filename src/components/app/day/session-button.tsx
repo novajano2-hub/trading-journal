@@ -12,6 +12,7 @@ import {
 } from '@/data/query/hooks';
 import { sessionLength } from '@/data/routine';
 import type { DayRecord } from '@/domain/types';
+import { useDayFinished } from './day-lock';
 
 /** The day's record session, and whether it is running now: today's, started and not ended. */
 export function useDaySession(date: string): {
@@ -42,7 +43,10 @@ export function formatClock(ms: number, seconds: boolean): string {
   return seconds ? `${h}:${mm}:${ss}` : `${h}:${mm}`;
 }
 
-/** The running session's length in ms, ticking each second while it runs; null when there is none. */
+/**
+ * The session's length in ms; null until it loads. It ticks each second only
+ * for today's running session: any other date's length is fixed.
+ */
 export function useElapsed(
   date: string,
   today: string | undefined,
@@ -50,7 +54,8 @@ export function useElapsed(
 ): number | null {
   const timeZone = usePrefs().data?.timeZone;
   const [now, setNow] = useState(() => new Date().toISOString());
-  const running = session !== undefined && session.end === undefined;
+  const running =
+    date === today && session !== undefined && session.end === undefined;
   useEffect(() => {
     if (!running) return;
     const id = setInterval(() => setNow(new Date().toISOString()), 1000);
@@ -58,6 +63,18 @@ export function useElapsed(
   }, [running]);
   if (today === undefined || timeZone === undefined) return null;
   return sessionLength(session, date, today, now, timeZone);
+}
+
+/** What a refused or failed session write says, beside the control. */
+function SaveFailed(): React.JSX.Element {
+  return (
+    <span
+      role="alert"
+      className="ml-2 flex-none text-[12.5px] whitespace-nowrap text-loss"
+    >
+      Couldn&apos;t save
+    </span>
+  );
 }
 
 /**
@@ -74,37 +91,46 @@ export function SessionButton({
   const elapsed = useElapsed(date, today, session);
   const start = useStartSession();
   const end = useEndSession();
-  if (!ready || today !== date) return null;
+  const { finished } = useDayFinished(date);
+  // A closed day takes no session: the repository refuses both, and ending it
+  // closed the one that was running.
+  if (!ready || today !== date || finished) return null;
   if (running) {
     return (
-      <button
-        type="button"
-        disabled={end.isPending}
-        onClick={() => end.mutate({ date })}
-        className={`${buttonClasses('secondary')} flex-none gap-[7px] border-accent pl-3 hover:border-accent max-sm:h-9 max-sm:px-3 max-sm:text-[13px]`}
-      >
-        <Stop
-          size={16}
-          aria-hidden="true"
-          className="flex-none text-accent-ink"
-        />
-        <span className="max-sm:sr-only">End session</span>
-        <span className="font-semibold tabular-nums">
-          {formatClock(elapsed ?? 0, true)}
-        </span>
-      </button>
+      <>
+        <button
+          type="button"
+          disabled={end.isPending}
+          onClick={() => end.mutate({ date })}
+          className={`${buttonClasses('secondary')} flex-none gap-[7px] border-accent pl-3 hover:border-accent max-sm:h-9 max-sm:px-3 max-sm:text-[13px]`}
+        >
+          <Stop
+            size={16}
+            aria-hidden="true"
+            className="flex-none text-accent-ink"
+          />
+          <span className="max-sm:sr-only">End session</span>
+          <span className="font-semibold tabular-nums">
+            {formatClock(elapsed ?? 0, true)}
+          </span>
+        </button>
+        {end.isError ? <SaveFailed /> : null}
+      </>
     );
   }
   if (session !== undefined) return null;
   return (
-    <button
-      type="button"
-      disabled={start.isPending}
-      onClick={() => start.mutate({ date })}
-      className={`${buttonClasses('secondary')} flex-none gap-[7px] pl-3 max-sm:h-9 max-sm:px-3 max-sm:text-[13px]`}
-    >
-      <Play size={16} aria-hidden="true" className="flex-none" />
-      Start session
-    </button>
+    <>
+      <button
+        type="button"
+        disabled={start.isPending}
+        onClick={() => start.mutate({ date })}
+        className={`${buttonClasses('secondary')} flex-none gap-[7px] pl-3 max-sm:h-9 max-sm:px-3 max-sm:text-[13px]`}
+      >
+        <Play size={16} aria-hidden="true" className="flex-none" />
+        Start session
+      </button>
+      {start.isError ? <SaveFailed /> : null}
+    </>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { LockSimple } from '@phosphor-icons/react/dist/ssr';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useDayScores, useRoutineToday } from '@/data/query/derived';
 import {
@@ -40,10 +40,25 @@ export function FinishDay({
   const prefs = usePrefs().data;
   const finish = useFinishDay();
   const [asking, setAsking] = useState(false);
+  const panel = useRef<HTMLDivElement>(null);
+  const closedHere = useRef(false);
+
+  // The button this page just pressed is gone: focus moves to the panel that
+  // replaces it. A day opened already closed takes no focus.
+  useEffect(() => {
+    if (!finished || !closedHere.current) return;
+    closedHere.current = false;
+    const id = setTimeout(() => panel.current?.focus(), 0);
+    return () => clearTimeout(id);
+  }, [finished]);
 
   if (finished)
     return (
-      <div className="mt-3 flex items-start gap-2.5 rounded-[10px] bg-sunken px-3.5 py-3">
+      <div
+        ref={panel}
+        tabIndex={-1}
+        className="mt-3 flex items-start gap-2.5 rounded-[10px] bg-sunken px-3.5 py-3 outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent"
+      >
         <LockSimple
           size={18}
           aria-hidden="true"
@@ -90,8 +105,10 @@ export function FinishDay({
       },
     );
     try {
+      closedHere.current = true;
       await finish.mutateAsync({ date, frozen });
     } catch (e) {
+      closedHere.current = false;
       if (e instanceof LockedDayError)
         throw new ConfirmFailure('This day is already closed.');
       throw e;

@@ -72,9 +72,12 @@ export function StrategySkeleton({
 export function StrategyError({
   error,
   onRetry,
+  title = "Your strategies couldn't load.",
 }: {
   error: Error;
   onRetry(): void;
+  /** What a failed read says outside the Strategies pages. */
+  title?: string;
 }): React.JSX.Element {
   const storage = error instanceof StorageUnavailableError;
   return (
@@ -84,7 +87,7 @@ export function StrategyError({
       title={
         storage
           ? "Keel can't open storage in this browser, so your workspace can't load."
-          : "Your strategies couldn't load."
+          : title
       }
       body={
         storage

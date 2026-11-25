@@ -278,7 +278,7 @@ export function TopBar({
       <header
         ref={bar}
         data-chips={showFilters ? fit : undefined}
-        className={`sticky top-0 z-30 flex items-center bg-bg px-5 max-sm:h-14 max-sm:border-b max-sm:border-line sm:gap-x-2 ${FIT.bar[fit]}`}
+        className={`sticky top-0 z-30 flex items-center bg-bg px-5 max-sm:h-14 max-sm:border-b max-sm:border-line sm:gap-x-2 ${dayDate !== undefined ? 'sm:h-[68px]' : ''} ${FIT.bar[fit]}`}
       >
         {/* Below sm the title and its badge take the room the icons leave; from sm its items join the bar's. */}
         <div className="flex min-w-0 flex-1 items-center gap-2 sm:contents">
@@ -366,8 +366,8 @@ export function TopBar({
               <PlanTheDay />
             </div>
           ) : null}
-          {/* The day's one session, on today's page. */}
-          {dayDate !== undefined ? (
+          {/* The day's one session, on today's plan page (K30); review has none. */}
+          {dayDate !== undefined && !pathname.endsWith('/review') ? (
             <div className="flex flex-none max-sm:ml-1">
               <SessionButton date={dayDate} />
             </div>
