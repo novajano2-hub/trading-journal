@@ -401,6 +401,19 @@ export function useDayScores(): Derived<ScoreHistory> {
   const timeZone = prefs.data?.timeZone;
   const baseCurrency = prefs.data?.baseCurrency;
 
+  // R8: while today is in the scored range, re-read the clock each minute, so
+  // a missed start time turns failed while the page is open.
+  const [now, setNow] = useState(() => new Date().toISOString());
+  const active =
+    tracker.data !== undefined &&
+    timeZone !== undefined &&
+    routineToday(tracker.data, now, timeZone) >= tracker.data.startedOn;
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => setNow(new Date().toISOString()), 60_000);
+    return () => clearInterval(id);
+  }, [active]);
+
   const data = useMemo(() => {
     if (
       !tracker.data ||
@@ -412,7 +425,6 @@ export function useDayScores(): Derived<ScoreHistory> {
       baseCurrency === undefined
     )
       return undefined;
-    const now = new Date().toISOString();
     return scoreHistory(
       tracker.data,
       days.data,
@@ -436,6 +448,7 @@ export function useDayScores(): Derived<ScoreHistory> {
     timeZone,
     baseCurrency,
     selection,
+    now,
   ]);
 
   return { ...state, data: state.status === 'success' ? data : undefined };

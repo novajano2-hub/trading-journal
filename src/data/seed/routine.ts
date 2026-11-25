@@ -1,5 +1,5 @@
 import { realizations } from '@/domain/metrics/realized';
-import { localDate, localParts } from '@/domain/time';
+import { localDate } from '@/domain/time';
 import { MON_TO_FRI, defaultVersion } from '@/domain/tracker/defaults';
 import type {
   Account,
@@ -38,9 +38,6 @@ const CUSTOM: readonly Pick<CustomRule, 'id' | 'name' | 'stage'>[] = [
   },
 ];
 
-const hhmm = (minutes: number): string =>
-  `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
-
 /** The value at fraction `p` of the sorted values; 0 with none. */
 function percentile(values: number[], p: number): number {
   if (values.length === 0) return 0;
@@ -51,22 +48,17 @@ function percentile(values: number[], p: number): number {
 const roundUp = (cents: number, to: number): number =>
   Math.ceil(cents / to) * to;
 
-function minuteOf(iso: string): number {
-  const p = localParts(iso, NY);
-  return p.hour * 60 + p.minute;
-}
-
 /**
  * The sample's tracker and the day records behind it (K23). Records go on the
  * dates that have a daily note; every one before `endDate` is finished.
  *
- * Rule values are sized to the sample so every state shows, whatever the end
- * date: the caps sit near the 95th and 85th percentile of the sample's own
- * losses, so some days break them, and the hours window and caps are stretched
- * to cover the two days before `endDate`, which are also given an early note
- * and every tick. That makes a streak of two. Strategy and stop are off,
- * because the sample leaves some trades without either and no cap could cover
- * that; My workspace keeps TradeZella's defaults.
+ * The rules keep TradeZella's on/off set and hours window (R7): start by 09:30,
+ * strategy, stop and both caps on, trading hours off. Only the two cap amounts
+ * are sized to the sample, near the 95th percentile of its trade losses and
+ * the 85th of its daily losses, raised to cover the days below, so some days
+ * break them. A day whose trades all carry a strategy and a stop can be
+ * perfect, so those days get an early note and every tick, and their trades
+ * are kept within the caps. No rule is turned on or off to make a state.
  */
 export function writeRoutine(
   rng: Random,
@@ -83,7 +75,19 @@ export function writeRoutine(
     .filter((e) => e.kind === 'daily-review' && e.date !== undefined)
     .map((e) => e.date!)
     .sort();
-  const keep = new Set(noteDays.filter((d) => d < endDate).slice(-2));
+
+  // The noted days before endDate on which every trade has a strategy and a stop.
+  const unplanned = new Set<string>();
+  for (const t of trades)
+    if (t.strategyIds.length === 0 || t.plannedStop === undefined)
+      unplanned.add(localDate(t.openedAt, NY));
+  const traded = new Set(trades.map((t) => localDate(t.openedAt, NY)));
+  const keep = new Set(
+    [...traded].filter((d) => d < endDate && !unplanned.has(d)),
+  );
+  // Noted days get a record, and so do the keep days: with the sample's trades
+  // left as they are, those are the only days that can be perfect.
+  const recordDays = [...new Set([...noteDays, ...keep])].sort();
 
   // What the sample loses, per trade and per day, and what the keep days need.
   const dayLoss = new Map<string, number>();
@@ -99,31 +103,21 @@ export function writeRoutine(
   const dayLosses = [...dayLoss.values()].filter((n) => n < 0).map((n) => -n);
   let perTrade = percentile(tradeLosses, 0.95);
   let perDay = percentile(dayLosses, 0.85);
-  let from = 9 * 60;
-  let to = 12 * 60;
   for (const d of keep) perDay = Math.max(perDay, -(dayLoss.get(d) ?? 0));
-  for (const t of trades) {
-    if (!keep.has(localDate(t.openedAt, NY))) continue;
-    if (t.pnlCurrency === BASE && t.net < 0)
+  for (const t of trades)
+    if (
+      keep.has(localDate(t.openedAt, NY)) &&
+      t.pnlCurrency === BASE &&
+      t.net < 0
+    )
       perTrade = Math.max(perTrade, -t.net);
-    from = Math.min(from, minuteOf(t.openedAt));
-    const last = t.closedAt ?? t.executions[t.executions.length - 1]?.time;
-    if (last && localDate(last, NY) === localDate(t.openedAt, NY))
-      to = Math.max(to, minuteOf(last));
-  }
 
   const base = defaultVersion(startedOn);
   const version: TrackerVersion = {
     ...base,
     builtIn: {
-      startBy: { on: true, time: '09:30' },
-      hours: {
-        on: true,
-        from: hhmm(Math.floor(from / 60) * 60),
-        to: hhmm(Math.ceil((to + 1) / 60) * 60),
-      },
-      strategy: { on: false },
-      stop: { on: false },
+      ...base.builtIn,
+      hours: { on: false, from: '09:00', to: '12:00' },
       lossPerTrade: {
         on: true,
         unit: 'amount',
@@ -144,13 +138,14 @@ export function writeRoutine(
     asOf: endDate,
   };
 
+  const recordSet = new Set(recordDays);
   const opened = new Map<string, Trade[]>();
   for (const t of trades) {
     const d = localDate(t.openedAt, NY);
-    if (noteDays.includes(d)) opened.set(d, [...(opened.get(d) ?? []), t]);
+    if (recordSet.has(d)) opened.set(d, [...(opened.get(d) ?? []), t]);
   }
 
-  const days: DayRecord[] = noteDays.map((date) => {
+  const days: DayRecord[] = recordDays.map((date) => {
     // Every draw is made whatever the day, so one day's choices never move another's.
     const early = rng.chance(0.8);
     const minute = rng.int(0, 89);
@@ -162,7 +157,7 @@ export function writeRoutine(
     const ratingValue = rng.int(1, 5) as 1 | 2 | 3 | 4 | 5;
     const finishMinute = rng.int(0, 29);
 
-    const sure = keep.has(date) || date === endDate;
+    const sure = keep.has(date);
     const stamp =
       early || sure
         ? nyMs(date, 8, minute)

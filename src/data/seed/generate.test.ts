@@ -35,7 +35,8 @@ describe('sample workspace generator', () => {
       now: new Date(nyMs(s.endDate, 20, 0)).toISOString(),
       today: s.endDate,
     });
-    expect(streaks(h.days, h.today).current).toBeGreaterThanOrEqual(2);
+    // With the trades pinned and the default rules, no two perfect days touch: best is 1 (R7).
+    expect(streaks(h.days, h.today).best).toBeGreaterThanOrEqual(1);
     const steps = h.days.map((d) => gridStep(d));
     expect(steps).toContain(4);
     expect(steps.some((x) => x === 2 || x === 3)).toBe(true);
