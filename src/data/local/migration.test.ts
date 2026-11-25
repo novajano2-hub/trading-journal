@@ -333,3 +333,59 @@ test('a v2 database with only the sample is not onboarded', async () => {
 test('a fresh database is not onboarded', async () => {
   expect(await onboardingOf(new IDBFactory())).toBeUndefined();
 });
+
+// ---- version 3 to 4 --------------------------------------------------------
+
+/** The stores as version 3 declared them: version 2's, with version 3's tables. */
+const V3_STORES = {
+  ...V2_STORES,
+  trackers: '[workspaceId+id], workspaceId',
+  days: '[workspaceId+id], workspaceId',
+  dayShots: '[workspaceId+id], workspaceId, [workspaceId+date]',
+};
+
+test('v3 to v4 keeps every v3 row and adds an empty propTxns', async () => {
+  const indexedDB = new IDBFactory();
+  const rows: V2Rows = {
+    trades: [v2Trade(M), v2Trade(S)],
+    accounts: [account(M), account(S)],
+    strategies: [M, S].map((ws) => ({ id: `s-${ws}`, workspaceId: ws })),
+    tags: [M, S].map((ws) => ({ id: `g-${ws}`, workspaceId: ws })),
+    journal: [v2Entry(M), v2Entry(S)],
+    imports: [M, S].map((ws) => ({ id: `i-${ws}`, workspaceId: ws })),
+    tagCategories: [M, S].map((ws) => ({ id: `c-${ws}`, workspaceId: ws })),
+    templates: [v2Template(M), v2Template(S)],
+    folders: [M, S].map((ws) => ({ id: `f-${ws}`, workspaceId: ws })),
+    cashflows: [M, S].map((ws) => ({
+      id: `cf-${ws}`,
+      workspaceId: ws,
+      accountId: `a-${ws}`,
+    })),
+    challenges: [M, S].map((ws) => ({ id: `ch-${ws}`, workspaceId: ws })),
+    trackers: [M, S].map((ws) => ({ id: `tr-${ws}`, workspaceId: ws })),
+    days: [M, S].map((ws) => ({ id: `d-${ws}`, workspaceId: ws })),
+    dayShots: [M, S].map((ws) => ({
+      id: `ds-${ws}`,
+      workspaceId: ws,
+      date: '2026-11-20',
+    })),
+  };
+  const v3 = new Dexie(DB_NAME, { indexedDB, IDBKeyRange });
+  v3.version(3).stores(V3_STORES);
+  for (const [table, list] of Object.entries(rows))
+    await v3.table(table).bulkPut(list ?? []);
+  await v3.table('meta').bulkPut([{ key: 'prefs', value: PREFS }, SEED_META]);
+  v3.close();
+
+  const db = new KeelDb({ indexedDB, IDBKeyRange });
+  await db.open();
+  for (const [table, list] of Object.entries(rows))
+    for (const row of list ?? []) {
+      const { workspaceId, id } = row as { workspaceId: string; id: string };
+      expect(await db.table(table).get([workspaceId, id])).toEqual(row);
+    }
+  expect((await db.meta.get('prefs'))?.value).toEqual(PREFS);
+  expect((await db.meta.get('seed:sample'))?.value).toEqual(SEED_META.value);
+  expect(await db.propTxns.count()).toBe(0);
+  db.close();
+});

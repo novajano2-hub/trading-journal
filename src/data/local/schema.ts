@@ -58,4 +58,5 @@ export const DATA_TABLES = [
   'trackers',
   'days',
   'dayShots',
+  'propTxns',
 ] as const;

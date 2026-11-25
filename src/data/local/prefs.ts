@@ -133,6 +133,20 @@ function validate(p: Partial<UserPrefs>): void {
     throw new RangeError(
       'Onboarding must be { status: "done", at: <ISO time> }',
     );
+  validateDashboards(p.dashboards);
+  if (
+    p.sidebar !== undefined &&
+    p.sidebar !== 'expanded' &&
+    p.sidebar !== 'collapsed'
+  )
+    throw new RangeError(`Unknown sidebar state "${String(p.sidebar)}"`);
+  if (
+    p.propLayout !== undefined &&
+    p.propLayout !== 'grid' &&
+    p.propLayout !== 'list'
+  )
+    throw new RangeError(`Unknown prop layout "${String(p.propLayout)}"`);
+  validatePropStart(p.propStart);
   for (const key of ['dayColumns', 'weekColumns', 'seenTips'] as const) {
     const list = p[key];
     if (
@@ -141,6 +155,53 @@ function validate(p: Partial<UserPrefs>): void {
     )
       throw new RangeError(`${key} must be a list of strings`);
   }
+}
+
+function validateDashboards(d: UserPrefs['dashboards']): void {
+  if (d === undefined) return;
+  const ok =
+    typeof d === 'object' &&
+    d !== null &&
+    Array.isArray(d.templates) &&
+    d.templates.length > 0 &&
+    d.templates.every(
+      (t) =>
+        typeof t === 'object' &&
+        t !== null &&
+        typeof t.id === 'string' &&
+        typeof t.name === 'string' &&
+        t.name.length >= 1 &&
+        t.name.length <= 40 &&
+        Array.isArray(t.upper) &&
+        t.upper.length <= 5 &&
+        Array.isArray(t.lower),
+    ) &&
+    d.templates.some((t) => t.id === d.inUse);
+  if (!ok)
+    throw new RangeError(
+      'Dashboards need one or more templates, each named 1 to 40 characters with at most 5 upper widgets, and inUse naming one',
+    );
+}
+
+function validatePropStart(v: UserPrefs['propStart']): void {
+  if (v === undefined) return;
+  const ok =
+    typeof v === 'object' &&
+    v !== null &&
+    Object.values(v).every(
+      (e) =>
+        typeof e === 'object' &&
+        e !== null &&
+        e.done === true &&
+        (e.answer === undefined ||
+          e.answer === 'own' ||
+          e.answer === 'prop' ||
+          e.answer === 'both'),
+    );
+  if (!ok)
+    throw new RangeError(
+      'propStart must map workspaces to { answer?: own | prop | both, done: true }',
+    );
 }
 
 const asPartial = (value: unknown): Partial<UserPrefs> =>

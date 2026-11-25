@@ -39,6 +39,8 @@ export interface RuleCheck {
 }
 export interface Trade {
   id: string;
+  /** Stamped when the trade is built from fills; unset reads FIFO. */
+  costMethod?: CostMethod;
   serial: number;
   workspaceId: string;
   accountId: string;
@@ -87,6 +89,8 @@ export interface PropRuleSet {
   drawdownFloor?: Cents;
 }
 export type AccountType = 'live' | 'demo' | 'prop-evaluation' | 'prop-funded';
+/** How a closing fill is matched to the opening ones. */
+export type CostMethod = 'fifo' | 'lifo' | 'average';
 export interface Account {
   id: string;
   workspaceId: string;
@@ -97,6 +101,8 @@ export interface Account {
   startingBalance: Cents;
   status: 'active' | 'archived';
   propRules?: PropRuleSet;
+  /** How closing fills pair with opening ones; undefined: FIFO. */
+  costMethod?: CostMethod;
   /** The zone fill times are read in; undefined: the trader's own (`UserPrefs.timeZone`). */
   timeZone?: string;
   /** The column mapping the account's last import used. */
@@ -224,6 +230,38 @@ export interface Challenge {
   failureReason?: string;
   evaluationFee?: Cents;
   activationFee?: Cents;
+  /** The strategies this challenge is traded with. */
+  strategyIds?: string[];
+  breachReason?: BreachReason;
+  /** YYYY-MM-DD */
+  breachedOn?: string;
+}
+export type BreachReason =
+  | 'max-drawdown'
+  | 'overtrading'
+  | 'time-pressure'
+  | 'risk-management'
+  | 'other';
+export type PropTxnCategory =
+  | 'payout'
+  | 'evaluation-fee'
+  | 'activation-fee'
+  | 'reset-fee'
+  | 'affiliate-income'
+  | 'uncategorized';
+export type PropTxnStatus = 'not-reviewed' | 'reviewed' | 'ignored';
+/** A prop firm money movement: a fee, a payout or affiliate income. */
+export interface PropTxn {
+  id: string;
+  workspaceId: string;
+  date: string;
+  description?: string;
+  firm: string;
+  challengeId?: string;
+  category: PropTxnCategory;
+  /** Negative is a cost, positive income; in the base currency. */
+  amount: Cents;
+  status: PropTxnStatus;
 }
 export interface ImportJob {
   id: string;
@@ -296,6 +334,60 @@ export interface UserPrefs {
   weekColumns?: string[];
   /** Tips the user has dismissed. */
   seenTips?: string[];
+  dashboards?: { inUse: string; templates: DashTemplate[] };
+  sidebar?: 'expanded' | 'collapsed';
+  propLayout?: 'grid' | 'list';
+  /** The prop first run, per workspace. */
+  propStart?: Record<string, { answer?: 'own' | 'prop' | 'both'; done: true }>;
+}
+
+// ---- Dashboards ------------------------------------------------------------
+
+export type WidgetKey =
+  | 'net-pnl'
+  | 'balance-pnl'
+  | 'trade-win'
+  | 'profit-factor'
+  | 'day-win'
+  | 'win-loss-ratio'
+  | 'expectancy'
+  | 'day-streak'
+  | 'trade-streak'
+  | 'streaks'
+  | 'max-drawdown'
+  | 'avg-drawdown'
+  | 'score'
+  | 'cum-pnl'
+  | 'win-avg'
+  | 'trade-time'
+  | 'trade-duration'
+  | 'daily-pnl'
+  | 'daily-cum'
+  | 'recent'
+  | 'calendar'
+  | 'balance'
+  | 'drawdown'
+  | 'challenge'
+  | 'calendar-mini'
+  | 'calendar-adv'
+  | 'progress'
+  | 'report'
+  | 'year';
+export interface WidgetSettings {
+  time?: 'entry' | 'exit';
+  /** At most 3 Performance series ids. */
+  metrics?: string[];
+  challengeId?: string;
+}
+export interface WidgetRef {
+  key: WidgetKey | string;
+  settings?: WidgetSettings;
+}
+export interface DashTemplate {
+  id: string;
+  name: string;
+  upper: WidgetRef[];
+  lower: WidgetRef[];
 }
 
 // ---- The daily routine -----------------------------------------------------
