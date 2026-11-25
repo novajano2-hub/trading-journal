@@ -32,6 +32,15 @@
 4. **`DESIGN.md`, `src/styles/theme.css` and `PRODUCT.md`.**
 5. **Plan 5,** `docs/superpowers/plans/2026-11-22-m1-p5-rest-of-the-app.md`, and its rulings file.
 
+**Where a comp differs from TradeZella's recorded behaviour, the record wins.** The comps set the look only. Four places were checked and corrected after the comps were approved:
+
+| Comp | TradeZella's record | The build |
+|---|---|---|
+| 01: the heat grid has five rows, Monday to Friday | Rows run Sunday to Saturday, and weekends are blank [rec S08 3:31] | Seven rows in week order. Non-trading days are blank, and cells after today aren't drawn (Task 7) |
+| 02: reset asks twice (spec K17) | One confirmation prompt after the button [inv-3 103; help 12141413] | One prompt (Task 9) |
+| 05: the review trades table adds a Time column; phone rows add side, R, strategy and tags | The columns are Symbol, Status, Entry, Exit, Net P&L, Net ROI [rec S23 8:46] | Exactly those columns, and phone rows carry only those fields (Task 13) |
+| 05: a mood control on the day page | The mood check-in is a day-card quick action in the Day view [help 5829446]. The day page's help lists only the day rating [help 16934706] | The day page has the day rating only. Mood is set on the Day view's cards, and the lock still freezes it (Tasks 13, 15) |
+
 **Execution:** one implementer at a time, never in parallel (the user's call), with a review after each module:
 
 | Module | Tasks |
@@ -153,7 +162,6 @@ These settle what the spec left to the builder (§8). Reviewers should not "fix"
 | Old goal prefs (U4) | Ignored on read and left in storage, so no row is rewritten |
 | The sample's rule values | The seed may size its caps to the sample's trades so every state shows (a streak, a perfect, partial, broken and finished day). My workspace keeps TradeZella's $100 defaults |
 | Trading hours | Read in the profile zone (K35). The dialog labels the times with that zone's current GMT offset, as comp 02 does |
-| Heat-grid rows | The weekdays that are trading days in any version, in week order (comp 01). Non-trading days stay blank |
 | Note-only day cards | Shown only while no trade-level filter is active, since a note can't match a symbol or a side |
 | The welcome flow | Its own route group, `(welcome)`, with DataProvider and the centred auth look, and no app shell. The gate sits in `(app)/layout.tsx` |
 | e2e | A Playwright setup project stores an onboarded state (IndexedDB) at the suite's frozen clock. First-run specs start from an empty state |
@@ -177,7 +185,7 @@ src/components/app/progress/      progress-view.tsx tiles.tsx heat-grid.tsx day-
 src/components/app/day/           day-view.tsx day-header.tsx stage-bar.tsx session-button.tsx bad-date.tsx
                                   plan-mode.tsx note-card.tsx template-menu.tsx first-visit-tip.tsx
                                   screenshots-card.tsx shot-viewer.tsx review-mode.tsx review-tiles.tsx
-                                  review-trades.tsx mood-rating-card.tsx finish-day.tsx
+                                  review-trades.tsx rating-card.tsx finish-day.tsx
 src/components/app/trades/log/    trades-switch.tsx day-view.tsx day-card.tsx intraday-chart.tsx stat-grid.tsx
                                   log-table.tsx day-note-dialog.tsx mini-calendar.tsx
                                   week-view.tsx week-card.tsx week-tiles.tsx week-bars.tsx
@@ -646,7 +654,9 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
   - `'tracker-streak'`, `'tracker-score'`, `'tracker-today'`;
   - `'rule-streak'`, `'rule-average'`, `'rule-follow-rate'`.
 - The `HeatGrid`:
-  - steps 0 to 4 as accent tints, and blank cells for unscored days;
+  - seven weekday rows in week order (Sunday first by default, as TradeZella's), with week columns and month labels [rec S08 3:31];
+  - it starts at the tracker's first day, so the first column may be partial, and cells after today aren't drawn;
+  - steps 0 to 4 as accent tints, and blank cells for unscored days (weekends and other non-trading days);
   - hover and focus read the date and "p of n rules met";
   - with `paging`, it fits as many weeks as it can (ResizeObserver), with back, forward and Today (K12);
   - it is a keyboard grid with a text alternative.
@@ -737,7 +747,7 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
       - for the per-trade cap, $ or % and a value;
       - for the daily cap, an amount;
     - its custom rules (a name, weekdays defaulting to Mon to Fri, and a delete), and an add-rule row.
-  - **Reset all progress:** two confirmations (K17).
+  - **Reset all progress:** one confirmation prompt after the button, as TradeZella's [inv-3 103; help 12141413].
   - **The footer:** Cancel, and Save changes, disabled until something changes.
   - **No streak-email control.** There is no email, and an inert control is an anti-goal.
 - Validation:
@@ -753,7 +763,7 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
   - `'Save stays disabled until something changes'`;
   - `'saving writes a version from today'`;
   - `'a new custom rule defaults to Monday to Friday'`;
-  - `'reset needs two confirmations and restarts the tracker today'`;
+  - `'reset asks once, then restarts the tracker today'`;
   - `'invalid times keep Save disabled with a field error'`;
   - `'trading hours show the zone's GMT offset'`;
   - `'on a phone it is a full-height sheet with a fixed footer'`.
@@ -909,12 +919,11 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
 
 ---
 
-### Task 13: Review mode, mood and rating, Close the day, and the locked day everywhere
+### Task 13: Review mode, the day rating, Close the day, and the locked day everywhere
 
 **Files:**
 - Create:
-  - `src/components/app/day/review-mode.tsx`, `review-tiles.tsx`, `review-trades.tsx`, `mood-rating-card.tsx`, `finish-day.tsx`;
-  - `src/components/app/routine/mood-control.tsx`;
+  - `src/components/app/day/review-mode.tsx`, `review-tiles.tsx`, `review-trades.tsx`, `rating-card.tsx`, `finish-day.tsx`;
   - `src/components/app/routine/rating-row.tsx`, moved from `trade-journal.tsx` with the same props; the trade page imports it;
   - `e2e/day.spec.ts`, and tests.
 - Modify, for the locked state:
@@ -925,10 +934,9 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
 **Interfaces:**
 - Consumes:
   - `dayOfTrade` and `groupDays` (Task 14 defines them; this task uses only `dayOfTrade`, so take it from `src/data/day-log.ts`, created here as just that function plus its test, which Task 14 extends);
-  - `useTradeSet` (accounts only), `useSetMood`, `useSetRating`, `useFinishDay`, `freezeDay`, `sessionLength` and `ConfirmDialog`.
+  - `useTradeSet` (accounts only), `useSetRating`, `useFinishDay`, `freezeDay`, `sessionLength` and `ConfirmDialog`.
 - Produces:
   - `ReviewMode({ date })`;
-  - `MoodControl({ value, note, readOnly, onChange(next: DayRecord['mood']): void, variant: 'segmented' | 'menu' })`;
   - `RatingRow`, unchanged.
 - Behaviour, per spec §5.2 Review mode and K29, K31, K34, comps 05 and 05-locked:
   - **Tiles:**
@@ -939,28 +947,29 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
     Without trades: net $0.00, and win rate and session None.
   - **Trades card:**
     - every trade of the day, by `dayOfTrade`, in the global account selection;
-    - the columns Time, Instrument, Outcome (`StatusChip`), Entry, Exit, Net P&L, Net ROI;
-    - a fixed height that scrolls inside the card on desktop. On a phone: two-line rows, five, then "Show all {n} trades", with no inner scroll;
+    - exactly TradeZella's columns: Symbol, Outcome (`StatusChip`), Entry, Exit, Net P&L, Net ROI [rec S23 8:46], with no Time column (comp 05 added one);
+    - a fixed height that scrolls inside the card on desktop. On a phone: two-line rows carrying only those fields, five, then "Show all {n} trades", with no inner scroll;
     - a row opens the trade;
     - an Import link, and an empty line with Import when there are no trades.
-  - **Mood and rating card:**
-    - the mood as five words, Rough, Low, Steady, Good, Great, with an optional note of up to 280 characters;
+  - **Day rating card** (K31):
     - the day rating, 1 to 5 stars, with Clear;
-    - it works today and on past days, with or without trades.
+    - it works today and on past days, with or without trades;
+    - no mood control: TradeZella's mood check-in lives on the Day view's cards (Task 15).
   - **Note card:** Task 12's `NoteCard`, under the trades card. Nothing sits below the note.
   - **Rules card:** `DayRules`, with Close the day at its foot and the comp's caption.
     - It is offered only on scored days, today or earlier (K20).
     - It asks first. On confirm, it writes `freezeDay(...)` through `useFinishDay`.
   - **Locked state** (comp 05-locked):
     - "Closed at {time}";
-    - every stage is read-only (rules, note with a "Locked" chip, mood, rating, screenshots, with no drop zone or delete);
+    - every stage is read-only (rules, note with a "Locked" chip, rating, screenshots, with no drop zone or delete), and the date's mood is locked on its Day view card;
     - the stages still navigate.
 
 - [ ] **Step 1: Write the failing tests:**
   - `'review tiles read net, win rate and session; None without trades'`;
   - `'the trades card lists every trade of the day and opens a trade'`;
-  - `'mood and rating write the day record and Clear removes the rating'`;
-  - `'Close the day asks first, then locks the rules, note, mood, rating and shots'`;
+  - `'the day rating writes the day record and Clear removes it'`;
+  - `'the day page has no mood control'`;
+  - `'Close the day asks first, then locks the rules, note, rating and shots'`;
   - `'Close the day is not offered before the start, on a non-trading day or in the future'`;
   - `'a finished day is read-only in the trade page's Daily note and in the Notebook'` (Review Focus 3).
   - `e2e/day.spec.ts`, on the sample at the frozen clock:
@@ -969,7 +978,7 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
 - [ ] **Step 2:** Run. Expected: FAIL.
 - [ ] **Step 3:** Implement against comps 05 and 05-locked.
 - [ ] **Step 4:** `npm test && npm run typecheck && npm run lint && npm run build && npx playwright test e2e/day.spec.ts`. Expected: PASS. This is the end of Module C.
-- [ ] **Step 5:** Commit: `feat(app): day review, mood and rating, and closing the day (#36)`.
+- [ ] **Step 5:** Commit: `feat(app): day review, the day rating, and closing the day (#36)`.
 
 ---
 
@@ -1046,10 +1055,11 @@ Delivers the shared start-my-day popover (K18, K25, K26), and the K35 correction
   - `e2e/app-shell.spec.ts`: Trades opens Day.
 
 **Interfaces:**
-- Consumes: `groupDays`, `useTradeSet`, `useGlobalFilters`, `advancedFilterCount`, `useJournal` (note dates), `useDays` (moods), `ColumnsMenu`, `buildColumns`, `TagPicker`, `useUpdateTrade`, `MoodControl`, `PlanTheDay` and `MorphDialog`
+- Consumes: `groupDays`, `useTradeSet`, `useGlobalFilters`, `advancedFilterCount`, `useJournal` (note dates), `useDays` (moods), `ColumnsMenu`, `buildColumns`, `TagPicker`, `useUpdateTrade`, `useSetMood`, `PlanTheDay` and `MorphDialog`
 - Produces:
   - `TradesSwitch({ view: 'day' | 'week' | 'all' })`;
   - `TradesDayView()`;
+  - `MoodControl({ value, note, readOnly, onChange(next: DayRecord['mood']): void })`, in `src/components/app/routine/mood-control.tsx`: a menu of the five mood words, with an optional note of up to 280 characters, read-only on a finished day;
   - `DayCard({ group, expanded, onToggle })`;
   - `IntradayChart({ series, label, large? })`;
   - `StatGrid({ stats })`;

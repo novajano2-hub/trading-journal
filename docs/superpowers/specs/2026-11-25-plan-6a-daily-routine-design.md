@@ -625,7 +625,7 @@ Every row below is Keel's call (TradeZella unknown). Q numbers are the spec's 41
 | K14 | Date range (Q12, Q13) | The range drives the period score and the rules table. The streak, today's progress, the checklist and the grid ignore it | INFERRED |
 | K15 | The $ or % unit (Q14) | Stored on the rule. % is a share of the trade's account balance at the start of its day (`balanceAt`) | [inv-3 103] |
 | K16 | Edits and today | They apply today at once. A second save the same day replaces that day's version | [inv-3 102] |
-| K17 | Reset (Q15, Q17) | There are no achievements. Reset restores the defaults, deletes custom rules, ticks, locks and history, and restarts the tracker today. Notes, timers, moods, ratings, shots and trades stay. Per workspace, two confirmations | [help 12141413] |
+| K17 | Reset (Q15, Q17) | There are no achievements. Reset restores the defaults, deletes custom rules, ticks, locks and history, and restarts the tracker today. Notes, timers, moods, ratings, shots and trades stay. Per workspace, one confirmation prompt after the button, as TradeZella's | [help 12141413; inv-3 103] |
 | K18 | Destinations (Q16) | The card's checklist button opens today's day page in plan mode. The page's start-my-day opens the date popover | INFERRED |
 | K19 | Marks and the face (Q17, Q18) | Met: gain CheckCircle. Failed: loss XCircle. Pending: faint clock. A rule is decided once met, once it can't be met, or at day's end. No streak face (no emoji) | [rec S08]; DESIGN.md |
 | K20 | Unscored dates and finishing | Before the tracker's start, the rules card quietly says the day isn't tracked yet and gives the start date. A non-trading day says it isn't a trading day. A future date opens plan mode only, with no rules state. Only scored days, today or earlier, can be finished, after a confirmation, so locked days never stretch the grid before the start | None seen |
@@ -692,6 +692,7 @@ Every row below is Keel's call (TradeZella unknown). Q numbers are the spec's 41
 - **U3. The Notebook's Pre-market plan kind:** Notebook > New no longer offers it, and existing entries stay readable (option b).
 - **U4. Keel's Goals card** (weekly net goal, daily loss limit; Plan 5) has no TZ counterpart. It is removed, TZ's way: the progress tracker's rules (daily loss cap, per-trade cap and the rest) take its place on the dashboard, and the tracker card sits where Goals was. Existing goal settings are dropped, with no migration of values. Remove the Goals card, its editor, `goalDays` and the goal prefs, and their tests. This supersedes K22. E50 closes.
 - **Approved by the user, 2026-11-25.**
+- **Checked against TradeZella's record after comp approval (2026-11-25).** The record wins over a comp on behaviour: the heat grid has seven rows, Sunday to Saturday, with weekends blank [rec S08 3:31]; reset asks once [inv-3 103]; the review trades table has exactly Symbol, Status, Entry, Exit, Net P&L, Net ROI [rec S23 8:46]; and mood is set on the Day view's cards only [help 5829446], not on the day page.
 - **The comps** (`.impeccable/mocks/plan6a/`) were approved by the user on 2026-11-25. Their labels are Keel's: "Plan the day", "Close the day", "Start session" and "End session"; the stages Plan, Trade, Import and Review; and the moods Rough, Low, Steady, Good and Great, as words.
 
 ## 7. Corrections to existing records
