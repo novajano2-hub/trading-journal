@@ -48,6 +48,21 @@ describe('periodScore', () => {
     expect(periodScore(days, '2026-11-17', '2026-11-17')).toBe(1);
   });
 
+  test('period score is null while no rule has been met in the range', () => {
+    const days = [day('2026-11-16', 0, 4), day('2026-11-17', 0, 4)];
+    expect(periodScore(days)).toBeNull();
+    expect(
+      periodScore(
+        [...days, day('2026-11-18', 1, 4)],
+        '2026-11-16',
+        '2026-11-17',
+      ),
+    ).toBeNull();
+    expect(periodScore([...days, day('2026-11-18', 1, 4)])).toBeCloseTo(
+      0.25 / 3,
+    );
+  });
+
   test('period score is null with no scored day', () => {
     expect(periodScore([])).toBeNull();
     expect(periodScore([unscored('2026-11-18')])).toBeNull();

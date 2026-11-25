@@ -609,7 +609,7 @@ Every row below is Keel's call (TradeZella unknown). Q numbers are the spec's 41
 
 | Id | Question | Keel's call | Basis |
 | --- | --- | --- | --- |
-| K1 | Period score (Q1) | The mean, over the range's scored days (clipped to the tracker's start and today), of points met over rules active, as a %. None with no scored day | INFERRED; today's score is met over active [connector] |
+| K1 | Period score (Q1) | The mean, over the range's scored days (clipped to the tracker's start and today), of points met over rules active, as a %. None with no scored day. None while no rule has been met in the range, as TradeZella's '--' (rec lines 140, 321) | INFERRED; today's score is met over active [connector] |
 | K2 | Current streak (Q2) | Consecutive perfect scored days (every active rule met). It ends today if today is perfect, else yesterday; today never breaks it early. The tile shows "N days" only, as TradeZella's page does [rec S08 3:31]; the best streak and perfect days are not shown (P6A-09) | The day streak read 0 on a day that earned a point [connector 2026-10-19] |
 | K3 | Unfinished days; the lock (Q2) | Unfinished days score live, with the version in effect that day. Finishing freezes each rule's inputs per account (counts, sums, largest loss) with the ticks, so any account selection rebuilds the frozen score | Points earned on an unfinished day [connector] |
 | K4 | Which trades a trade rule reads (Q3) | Trades opened on that date (TradeZella's, answered by the record: "every trade opened that day" [help 10371695]); the profile zone and the selected accounts are Keel's mapping | [help 10371695] (P6A-23) |

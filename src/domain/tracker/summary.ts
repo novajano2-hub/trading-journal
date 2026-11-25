@@ -10,17 +10,21 @@ const byDate = (days: readonly DayScore[]): DayScore[] =>
 const mean = (xs: readonly number[]): number | null =>
   xs.length === 0 ? null : xs.reduce((s, x) => s + x, 0) / xs.length;
 
-/** K1: the mean of met/active over scored days with active > 0 in [from, to]; null with none. */
+/**
+ * K1: the mean of met/active over scored days with active > 0 in [from, to].
+ * None while no rule has been met in the range (TradeZella's "--" in its
+ * nothing-done state), and with no scored day.
+ */
 export function periodScore(
   days: readonly DayScore[],
   from?: string,
   to?: string,
 ): number | null {
-  return mean(
-    days
-      .filter((d) => !d.unscored && d.active > 0 && inRange(d, from, to))
-      .map((d) => d.met / d.active),
+  const scored = days.filter(
+    (d) => !d.unscored && d.active > 0 && inRange(d, from, to),
   );
+  if (!scored.some((d) => d.met > 0)) return null;
+  return mean(scored.map((d) => d.met / d.active));
 }
 
 /** K2: current is the run of perfect days ending today if today is perfect, else yesterday. */
