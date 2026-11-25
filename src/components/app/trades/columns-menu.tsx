@@ -20,12 +20,15 @@ export function ColumnsMenu({
   columns,
   onChange,
   onReset,
+  choices = ALL_COLUMNS,
 }: {
+  /** Every column the menu may offer; the trade log's list unless a view widens it. */
+  choices?: readonly ColumnId[];
   columns: readonly ColumnId[];
   onChange(next: ColumnId[]): void;
   onReset(): void;
 }): React.JSX.Element {
-  const hidden = ALL_COLUMNS.filter((id) => !columns.includes(id));
+  const hidden = choices.filter((id) => !columns.includes(id));
   const move = (index: number, by: -1 | 1) => {
     const next = [...columns];
     const [item] = next.splice(index, 1);

@@ -125,7 +125,7 @@ test('sidebar by keyboard keeps the filters (desktop)', async ({
     page.getByRole('link', { name: 'Trades', exact: true }),
   ).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/app\/trades\?range=last-week$/);
+  await expect(page).toHaveURL(/\/app\/trades\/day\?range=last-week$/);
   await expect(
     page.getByRole('link', { name: 'Trades', exact: true }),
   ).toHaveAttribute('aria-current', 'page');

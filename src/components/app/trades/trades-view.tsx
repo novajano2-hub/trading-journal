@@ -85,6 +85,7 @@ import {
 } from './columns';
 import { ColumnsMenu } from './columns-menu';
 import { SummaryStrip } from './summary-strip';
+import { TradesSwitch } from './log/trades-switch';
 
 /** The rows a page can hold; the first used is the default. */
 const PAGE_SIZES = [25, 50, 100] as const;
@@ -208,7 +209,7 @@ function pageButtons(index: number, count: number): (number | null)[] {
   return out;
 }
 
-function StateBlock({
+export function StateBlock({
   icon,
   title,
   body,
@@ -701,6 +702,9 @@ export function TradesView(): React.JSX.Element {
 
   return (
     <div className="flex min-w-0 flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0">
+      <div className="flex">
+        <TradesSwitch view="all" />
+      </div>
       {hideSummary ? (
         <div className="flex">
           <button

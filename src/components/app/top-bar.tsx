@@ -344,8 +344,11 @@ export function TopBar({
               )}
             </div>
           ) : null}
-          {/* The start-my-day popover, before Import, on the Dashboard and Trades only. */}
-          {pathname === '/app/dashboard' || pathname === '/app/trades' ? (
+          {/* The start-my-day popover, before Import, on the Dashboard and the Trades views only. */}
+          {pathname === '/app/dashboard' ||
+          pathname === '/app/trades' ||
+          pathname === '/app/trades/day' ||
+          pathname === '/app/trades/week' ? (
             <div className="flex flex-none max-sm:hidden">
               <PlanTheDay />
             </div>

@@ -108,6 +108,13 @@ export const METRIC_IDS = [
   'tracker-streak',
   'tracker-score',
   'tracker-today',
+  'day-trades',
+  'day-gross',
+  'day-won-lost',
+  'day-commissions',
+  'day-win-rate',
+  'day-volume',
+  'day-profit-factor',
   'rule-streak',
   'rule-average',
   'tracker-history',
@@ -639,6 +646,41 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Today',
     definition:
       'The rules met so far today, of the rules that apply. A rule that can still be met stays pending until the day ends or you close it.',
+  },
+  'day-trades': {
+    label: 'Trades',
+    definition:
+      "Every trade on the day, open ones included. Open trades are counted here but aren't in the figures beside it.",
+  },
+  'day-gross': {
+    label: 'Gross P&L',
+    definition:
+      'P&L of the closed trades before fees and commissions. None while none has closed.',
+  },
+  'day-won-lost': {
+    label: 'Won / lost',
+    definition:
+      'Closed trades that ended in profit, then in loss, outside your breakeven range. Open trades are left out.',
+  },
+  'day-commissions': {
+    label: 'Commissions',
+    definition:
+      'Fees and commissions on the closed trades: gross P&L minus net P&L.',
+  },
+  'day-win-rate': {
+    label: 'Win rate',
+    definition:
+      'Winners divided by winners plus losers, on closed trades. Breakeven and open trades are left out. None without a winner or a loser.',
+  },
+  'day-volume': {
+    label: 'Volume',
+    definition:
+      'The quantity traded on the day, both sides: the buys and the sells are both counted, so a trade that opens and closes ten contracts adds twenty.',
+  },
+  'day-profit-factor': {
+    label: 'Profit factor',
+    definition:
+      'Total won divided by total lost, after fees and commissions. None when no closed trade lost.',
   },
   'rule-streak': {
     label: 'Streak',

@@ -46,13 +46,36 @@ test('filter-scoped links carry the canonical filters, others none', () => {
     '/app/strategies?range=this-week&side=long',
   );
   expect(navHref(item('prop-firms'), p)).toBe('/app/prop-firms');
-  expect(navHref(item('trades'), new URLSearchParams())).toBe('/app/trades');
+  expect(navHref(item('trades'), new URLSearchParams())).toBe(
+    '/app/trades/day',
+  );
 });
 
 test('active item and title', () => {
   expect(activeItem('/app/trades/abc')?.id).toBe('trades');
   expect(pageTitle('/app/prop-firms')).toBe('Prop firms');
   expect(activeItem('/app/nope')).toBeUndefined();
+});
+
+test('Trades in the sidebar opens Day, and /app/trades stays All', () => {
+  const trades = APP_NAV.find((i) => i.id === 'trades')!;
+  expect(navHref(trades, new URLSearchParams('side=long'))).toBe(
+    '/app/trades/day?side=long',
+  );
+  for (const p of [
+    '/app/trades',
+    '/app/trades/day',
+    '/app/trades/week',
+    '/app/trades/abc',
+    '/app/trades/new',
+  ])
+    expect(activeItem(p)?.id).toBe('trades');
+  expect(tradePageId('/app/trades/day')).toBeUndefined();
+  expect(tradePageId('/app/trades/week')).toBeUndefined();
+  expect(filtersApply('/app/trades')).toBe(true);
+  expect(filtersApply('/app/trades/day')).toBe(true);
+  expect(filtersApply('/app/trades/week')).toBe(true);
+  expect(filtersApply('/app/trades/abc')).toBe(false);
 });
 
 test('tradePageId reads the id of a trade page, decoded, and nothing else', () => {
