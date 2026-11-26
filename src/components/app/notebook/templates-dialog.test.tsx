@@ -88,7 +88,7 @@ test('Set as default on a new daily template makes the next daily note start fro
   );
 });
 
-test('built-in templates have no Delete, and deleting the default falls back to the built-in', async () => {
+test('deleting the default leaves the kind without one, and a new daily note starts empty', async () => {
   const { repo, made } = await open({ isDefault: true });
   const daily = await screen.findByRole('group', { name: 'Daily review' });
   const mine = await within(daily).findByRole('listitem', { name: 'My day' });
@@ -104,10 +104,49 @@ test('built-in templates have no Delete, and deleting the default falls back to 
       false,
     ),
   );
-  const builtIn = (await repo.templates.list(WS)).find(
-    (t) => t.kind === 'daily-review',
-  )!;
-  expect(builtIn).toMatchObject({ builtIn: true, isDefault: true });
+  expect(
+    (await repo.templates.list(WS)).filter(
+      (t) => t.kind === 'daily-review' && t.isDefault,
+    ),
+  ).toEqual([]);
+  const note = await repo.journal.dailyNote(WS, '2026-11-20');
+  expect(JSON.stringify(note.body)).not.toContain('"text"');
+});
+
+test('Remove default takes the built-in template off the default, and Set as default brings it back', async () => {
+  const { repo } = await open();
+  const daily = await screen.findByRole('group', { name: 'Daily review' });
+  const builtIn = await within(daily).findByRole('listitem', {
+    name: 'Daily review',
+  });
+  expect(within(builtIn).queryByRole('button', { name: /^Delete/ })).toBeNull();
+  fireEvent.click(
+    within(builtIn).getByRole('button', {
+      name: 'Remove Daily review as default',
+    }),
+  );
+  await waitFor(async () =>
+    expect(
+      (await repo.templates.list(WS)).filter(
+        (t) => t.kind === 'daily-review' && t.isDefault,
+      ),
+    ).toEqual([]),
+  );
+  await waitFor(() =>
+    expect(within(builtIn).queryByText('Default')).toBeNull(),
+  );
+  fireEvent.click(
+    within(builtIn).getByRole('button', {
+      name: 'Set Daily review as default',
+    }),
+  );
+  await waitFor(async () =>
+    expect(
+      (await repo.templates.list(WS)).find(
+        (t) => t.isDefault && t.kind === 'daily-review',
+      )?.name,
+    ).toBe('Daily review'),
+  );
 });
 
 test('Edit renames a template through its name field', async () => {

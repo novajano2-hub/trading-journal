@@ -1,6 +1,5 @@
 // @vitest-environment happy-dom
 import {
-  act,
   cleanup,
   fireEvent,
   screen,
@@ -23,6 +22,7 @@ import { keepHyphens } from '@/lib/format';
 import { dashboardFixture } from '../__fixtures__/dashboard-sample';
 import { renderApp } from '../__fixtures__/render-app';
 import { DashboardView } from './dashboard-view';
+import { ProgressCard } from './progress-card';
 
 vi.mock('next/navigation', () => import('../__fixtures__/navigation'));
 
@@ -51,10 +51,8 @@ const fomo = fx.tags.find((t) => t.id === 'tag-fomo')!.name;
 const ZERO_OR_NAN = /(?<![\d.])0%|NaN/;
 
 /**
- * The Dashboard over `dashboardFixture`, in New York, with a $100 weekly net
- * goal and a $300 daily loss limit on the sample, and `prefs` on top. Weeks
- * start on Monday here (the goal week and its caption read as 16-20 Nov);
- * the default Sunday week is pinned in data/dashboard.test.ts.
+ * The Dashboard over `dashboardFixture`, in New York, with `prefs` on top.
+ * Weeks start on Monday here.
  */
 async function renderDashboard(
   opts: {
@@ -79,353 +77,103 @@ async function renderDashboard(
   await base.prefs.update({
     timeZone: 'America/New_York',
     ...(opts.defaultWeek ? {} : { weekStart: 'monday' as const }),
-    goals: { sample: { weeklyNet: 10000, dailyLossLimit: 30000 } },
     ...opts.prefs,
   });
   const repository = { ...base, ...opts.patch?.(base) };
   return renderApp(<DashboardView />, { repository, url: opts.url });
 }
 
-const goalsCard = () => screen.findByRole('region', { name: 'Goals' });
+const trackerCard = () =>
+  screen.findByRole('region', { name: 'Progress tracker' });
 
-test('goals: reached this week; one day broke the loss limit', async () => {
+test("the card shows today's score and links to the tracker", async () => {
   await renderDashboard();
-  const goals = await goalsCard();
-  expect(goals.textContent).toContain('Weekly net goal');
-  expect(goals.textContent).toContain('$100.00');
-  expect(within(goals).getByText('Reached')).toBeTruthy();
-  expect(goals.textContent).not.toContain('of goal');
-  expect(goals.textContent).toContain('+$200.00 this week, 16-20 Nov');
-  expect(goals.textContent).toContain('Daily loss limit');
-  expect(goals.textContent).toContain('$300.00');
-  expect(goals.textContent).toContain('Kept 1 of 2 days');
-  expect(goals.textContent).toContain(
-    'Broken once, all time: Thu 19 Nov at −$400.00.',
-  );
-  // The kept count is said once, beside the label.
-  expect(goals.textContent?.match(/1 of 2 days/g)).toHaveLength(1);
+  const card = await trackerCard();
+  await waitFor(() => expect(card.textContent).toMatch(/\d+ of \d+ rules met/));
   expect(
-    within(goals).getByRole('button', { name: 'Edit goals' }),
-  ).toBeTruthy();
-});
-
-test('goals are money targets: under every narrowing unit they read every trade, in money', async () => {
-  // A −$500 forex loss on Thu 19 Nov, beside the two ES trades: Ticks,
-  // Points and R leave it out of the page, Pips keeps only it.
-  const edit = (s: SampleWorkspace) => {
-    s.trades.push({
-      ...s.trades.find((t) => t.id === 'f-1')!,
-      id: 'fx-1',
-      serial: 9,
-      instrument: resolveInstrument('EURUSD')!,
-      avgEntry: 1.07688,
-      avgExit: 1.07483,
-      net: -50_000,
-      gross: -49_500,
-      fees: 500,
-      strategyIds: [],
-      ruleChecks: [],
-      tagIds: [],
-      initialRisk: undefined,
-    });
-    s.trades.find((t) => t.id === 'f-1')!.initialRisk = 10_000;
-  };
-  for (const displayUnit of [
-    'dollar',
-    'r',
-    'ticks',
-    'pips',
-    'points',
-  ] as const) {
-    await renderDashboard({ prefs: { displayUnit }, edit });
-    const goals = await goalsCard();
-    // The week: +$600, −$400 and −$500. Thursday: −$900.
-    expect(goals.textContent, displayUnit).toContain(
-      '−$300.00 this week, 16-20 Nov',
-    );
-    expect(goals.textContent, displayUnit).toContain(
-      'Broken once, all time: Thu 19 Nov at −$900.00.',
-    );
-    expect(goals.textContent, displayUnit).toContain('Kept 1 of 2 days');
-    cleanup();
-  }
-});
-
-test('goals with the default Sunday weeks: the week and its caption start on Sunday 15 Nov', async () => {
-  await renderDashboard({ defaultWeek: true });
-  const goals = await goalsCard();
-  expect(goals.textContent).toContain('Weekly net goal');
-  expect(goals.textContent).toContain('+$200.00 this week, 15-20 Nov');
-  expect(goals.textContent).not.toContain('16-20 Nov');
-});
-
-test('goals: a week in progress, and a limit kept every day', async () => {
-  await renderDashboard({
-    prefs: { goals: { sample: { weeklyNet: 50000, dailyLossLimit: 50000 } } },
-  });
-  const goals = await goalsCard();
-  expect(goals.textContent).toContain('40% of goal');
-  expect(within(goals).queryByText('Reached')).toBeNull();
-  expect(goals.textContent).toContain('+$200.00 this week, 16-20 Nov');
-  expect(goals.textContent).toContain('2 of 2 days');
-  expect(goals.textContent).toContain('Kept every day, all time.');
-});
-
-test('percent of goal rounds down exactly: $145 of $500 is 29%, not 28%', async () => {
-  await renderDashboard({
-    prefs: { goals: { sample: { weeklyNet: 50000, dailyLossLimit: 50000 } } },
-    edit: (s) => {
-      s.trades.find((t) => t.id === 'f-2')!.net = 54_500; // week: +$545 − $400
-    },
-  });
-  const goals = await goalsCard();
-  expect(goals.textContent).toContain('+$145.00 this week');
-  expect(goals.textContent).toContain('29% of goal'); // 0.29 * 100 is 28.999… in floats
-});
-
-test('goals: several broken days name the latest and the count', async () => {
-  await renderDashboard({
-    prefs: { goals: { sample: { weeklyNet: 50000, dailyLossLimit: 10000 } } },
-    edit: (s) => {
-      const f2 = s.trades.find((t) => t.id === 'f-2')!;
-      f2.net = -20_000;
-      f2.gross = -19_500;
-    },
-  });
-  const goals = await goalsCard();
-  expect(goals.textContent).toContain(
-    'Last broken Thu 19 Nov at −$400.00. 2 days broken, all time.',
-  );
-  // A losing week reads 0% of its goal: an honest figure, not an empty one.
-  expect(goals.textContent).toContain('0% of goal');
-  expect(goals.textContent).toContain('−$600.00 this week, 16-20 Nov');
-});
-
-test("a range that ended before this week reads 'that week'", async () => {
-  await renderDashboard({
-    url: '/app/dashboard?from=2026-11-09&to=2026-11-15',
-    edit: (s) => {
-      const f2 = s.trades.find((t) => t.id === 'f-2')!;
-      f2.openedAt = '2026-11-12T14:00:00.000Z';
-      f2.closedAt = '2026-11-12T15:00:00.000Z';
-    },
-  });
-  const goals = await goalsCard();
-  expect(goals.textContent).toContain('+$600.00 that week, 9-15 Nov');
-  // The daily row names its own period: the range, as the other cards' captions do.
-  expect(goals.textContent).toContain('Kept every day, 9-15 Nov.');
-});
-
-test('unset goals say so, and the button reads Set goals', async () => {
-  await renderDashboard({ prefs: { goals: { sample: {} } } });
-  const goals = await goalsCard();
-  expect(goals.textContent).toContain('No weekly net goal set.');
-  expect(goals.textContent).toContain('No daily loss limit set.');
-  expect(within(goals).getByRole('button', { name: 'Set goals' })).toBeTruthy();
+    within(card)
+      .getByRole('link', { name: 'Open tracker' })
+      .getAttribute('href'),
+  ).toBe('/app/progress');
   expect(
-    within(goals).queryByRole('button', { name: 'Edit goals' }),
+    within(card).getByRole('button', { name: 'About the progress tracker' })
+      .dataset.metricTip,
+  ).toBe('tracker-card');
+  // The grid is there, today's square is not marked, and there is no paging.
+  expect(within(card).getByRole('grid')).toBeTruthy();
+  expect(card.querySelector('[data-today]')).toBeNull();
+  expect(
+    within(card).queryByRole('button', { name: 'Earlier weeks' }),
   ).toBeNull();
 });
 
-test('editing goals saves per workspace; bad input writes nothing', async () => {
-  const { repo } = await renderDashboard({
-    prefs: {
-      goals: {
-        sample: { weeklyNet: 10000, dailyLossLimit: 30000 },
-        mine: { dailyLossLimit: 20000 },
-      },
-    },
-  });
-  const goals = await goalsCard();
-  const edit = within(goals).getByRole('button', { name: 'Edit goals' });
-  fireEvent.click(edit);
-
-  const weekly = within(goals).getByRole('textbox', {
-    name: 'Weekly net goal',
-  }) as HTMLInputElement;
-  const daily = within(goals).getByRole('textbox', {
-    name: 'Daily loss limit',
-  }) as HTMLInputElement;
-  expect(weekly.inputMode).toBe('decimal');
-  expect(daily.inputMode).toBe('decimal');
-  expect(weekly.value).toBe('100');
-  expect(daily.value).toBe('300');
-  expect(document.activeElement).toBe(weekly);
-
-  fireEvent.change(weekly, { target: { value: '-5' } });
-  fireEvent.click(within(goals).getByRole('button', { name: 'Save' }));
-  const message = within(goals).getByText(
-    'Enter an amount above zero, or leave it empty.',
-  );
-  expect(weekly.getAttribute('aria-invalid')).toBe('true');
-  expect(weekly.getAttribute('aria-describedby')).toContain(
-    message.closest('[id]')!.id,
-  );
-  expect(document.activeElement).toBe(weekly);
-  // The message sits in a polite live region, and a second Save re-adds it so it is announced again.
-  expect(message.closest('[aria-live="polite"]')).toBeTruthy();
-  fireEvent.click(within(goals).getByRole('button', { name: 'Save' }));
-  const again = within(goals).getByText(
-    'Enter an amount above zero, or leave it empty.',
-  );
-  expect(again).not.toBe(message);
-  expect(message.isConnected).toBe(false);
-
-  // Too large never reaches the repository: a field error, not "Try again".
-  fireEvent.change(weekly, { target: { value: '99999999999999' } });
-  fireEvent.click(within(goals).getByRole('button', { name: 'Save' }));
-  expect(
-    within(goals).getByText('Enter an amount up to $10,000,000.'),
-  ).toBeTruthy();
-  expect(within(goals).queryByRole('alert')).toBeNull();
-  expect((await repo.prefs.get()).goals).toEqual({
-    sample: { weeklyNet: 10000, dailyLossLimit: 30000 },
-    mine: { dailyLossLimit: 20000 },
-  });
-
-  fireEvent.change(weekly, { target: { value: '1,500' } });
-  fireEvent.change(daily, { target: { value: '' } });
-  fireEvent.click(within(goals).getByRole('button', { name: 'Save' }));
-  await waitFor(async () =>
-    expect((await repo.prefs.get()).goals!.sample).toEqual({
-      weeklyNet: 150000,
-    }),
-  );
-  expect((await repo.prefs.get()).goals!.mine).toEqual({
-    dailyLossLimit: 20000,
-  });
-  await waitFor(() =>
-    expect(goals.textContent).toContain('No daily loss limit set.'),
-  );
-  expect(goals.textContent).toContain('$1,500.00');
-  expect(within(goals).queryByRole('textbox')).toBeNull();
-  // The form is gone: focus goes back to the button that opened it.
-  expect(document.activeElement).toBe(
-    within(goals).getByRole('button', { name: 'Edit goals' }),
-  );
-});
-
-test('Escape in the form cancels it, like Cancel', async () => {
-  const { repo } = await renderDashboard();
-  const goals = await goalsCard();
-  fireEvent.click(within(goals).getByRole('button', { name: 'Edit goals' }));
-  const weekly = within(goals).getByRole('textbox', {
-    name: 'Weekly net goal',
-  });
-  fireEvent.change(weekly, { target: { value: '9,999' } });
-  fireEvent.keyDown(weekly, { key: 'Escape' });
-  expect(within(goals).queryByRole('textbox')).toBeNull();
-  expect(goals.textContent).toContain('$100.00');
-  expect(document.activeElement).toBe(
-    within(goals).getByRole('button', { name: 'Edit goals' }),
-  );
-  expect((await repo.prefs.get()).goals!.sample).toEqual({
-    weeklyNet: 10000,
-    dailyLossLimit: 30000,
-  });
-});
-
-test('cancel leaves the goals as they were', async () => {
-  const { repo } = await renderDashboard();
-  const goals = await goalsCard();
-  fireEvent.click(within(goals).getByRole('button', { name: 'Edit goals' }));
-  fireEvent.change(
-    within(goals).getByRole('textbox', { name: 'Weekly net goal' }),
-    { target: { value: '9,999' } },
-  );
-  fireEvent.click(within(goals).getByRole('button', { name: 'Cancel' }));
-  expect(within(goals).queryByRole('textbox')).toBeNull();
-  expect(goals.textContent).toContain('$100.00');
-  expect(document.activeElement).toBe(
-    within(goals).getByRole('button', { name: 'Edit goals' }),
-  );
-  expect((await repo.prefs.get()).goals!.sample).toEqual({
-    weeklyNet: 10000,
-    dailyLossLimit: 30000,
-  });
-});
-
-test('a goals save that fails keeps the form with a plain error', async () => {
+test('Open tracker keeps the date range and the account selection', async () => {
   await renderDashboard({
-    patch: (repo) => ({
-      prefs: {
-        ...repo.prefs,
-        update: () => Promise.reject(new Error('disk full')),
-      },
-    }),
+    url: '/app/dashboard?from=2026-11-02&to=2026-11-19&account=acc-b',
   });
-  const goals = await goalsCard();
-  fireEvent.click(within(goals).getByRole('button', { name: 'Edit goals' }));
-  fireEvent.change(
-    within(goals).getByRole('textbox', { name: 'Weekly net goal' }),
-    { target: { value: '200' } },
-  );
-  fireEvent.click(within(goals).getByRole('button', { name: 'Save' }));
-  const alert = await within(goals).findByRole('alert');
-  expect(alert.textContent).toBe("Couldn't save your goals. Try again.");
-  expect(alert.className).not.toContain('loss');
+  const card = await trackerCard();
   expect(
-    within(goals).getByRole('textbox', { name: 'Weekly net goal' }),
-  ).toBeTruthy();
+    within(card)
+      .getByRole('link', { name: 'Open tracker' })
+      .getAttribute('href'),
+  ).toBe('/app/progress?from=2026-11-02&to=2026-11-19&account=acc-b');
 });
 
-test('Escape and Cancel wait for a save in flight, so its failure still shows', async () => {
-  let fail: ((e: Error) => void) | undefined;
+test('the checklist link keeps the date range and the account selection', async () => {
   await renderDashboard({
-    patch: (repo) => ({
-      prefs: {
-        ...repo.prefs,
-        update: () =>
-          new Promise((_, reject) => {
-            fail = reject;
-          }),
-      },
-    }),
+    url: '/app/dashboard?from=2026-11-02&to=2026-11-19&account=acc-b',
   });
-  const goals = await goalsCard();
-  fireEvent.click(within(goals).getByRole('button', { name: 'Edit goals' }));
-  const weekly = within(goals).getByRole('textbox', {
-    name: 'Weekly net goal',
-  });
-  fireEvent.change(weekly, { target: { value: '200' } });
-  fireEvent.click(within(goals).getByRole('button', { name: 'Save' }));
-  fireEvent.keyDown(weekly, { key: 'Escape' });
-  expect(weekly.isConnected).toBe(true);
-  const cancel = within(goals).getByRole('button', {
-    name: 'Cancel',
-  }) as HTMLButtonElement;
-  expect(cancel.disabled).toBe(true);
-  await waitFor(() => expect(fail).toBeDefined());
-  fireEvent.keyDown(weekly, { key: 'Escape' }); // and again, now the write has started
-  expect(weekly.isConnected).toBe(true);
-  await act(async () => fail!(new Error('disk full')));
-  expect((await within(goals).findByRole('alert')).textContent).toBe(
-    "Couldn't save your goals. Try again.",
+  const card = await trackerCard();
+  expect(
+    (
+      await within(card).findByRole('link', { name: "Today's checklist" })
+    ).getAttribute('href'),
+  ).toBe(
+    '/app/day/2026-11-19/plan?from=2026-11-02&to=2026-11-19&account=acc-b',
   );
-  expect(cancel.disabled).toBe(false);
 });
 
-test('goals in another currency say they use the base currency', async () => {
+test('a non-trading today reads 0 of 0 rules met, with the grid and no caption line', async () => {
   await renderDashboard({
     edit: (s) => {
-      s.trades.find((t) => t.id === 'f-2')!.pnlCurrency = 'EUR';
+      // Saturday 21 Nov.
+      s.tracker = { ...s.tracker, asOf: '2026-11-21' };
     },
   });
-  expect((await goalsCard()).textContent).toContain('Weekly net goal');
-  fireEvent.click(
-    within(screen.getByRole('radiogroup', { name: 'Currency' })).getByRole(
-      'radio',
-      { name: 'EUR' },
-    ),
-  );
-  await waitFor(() =>
-    expect(screen.getByRole('region', { name: 'Goals' }).textContent).toContain(
-      'Goals use your base currency (USD).',
-    ),
-  );
-  const goals = screen.getByRole('region', { name: 'Goals' });
-  expect(goals.textContent).not.toContain('Weekly net goal');
-  expect(goals.textContent).not.toContain('Daily loss limit');
+  const card = await trackerCard();
+  await waitFor(() => expect(card.textContent).toContain('0 of 0 rules met'));
+  expect(card.textContent).not.toContain('No rules apply');
+  expect(within(card).getByRole('grid')).toBeTruthy();
+  expect(card.textContent).not.toContain("Blank days aren't scored");
+});
+
+test('while it loads the card shows a skeleton and no figures', () => {
+  renderApp(<ProgressCard />, {
+    repository: createLocalRepository({
+      indexedDB: new IDBFactory(),
+      IDBKeyRange,
+      sample: async () => fixtureSample(),
+    }),
+  });
+  const card = screen.getByRole('region', { name: 'Progress tracker' });
+  expect(card.textContent).not.toMatch(/\d|None|rules met/);
+  expect(within(card).queryByRole('grid')).toBeNull();
+});
+
+test("its checklist button opens today's day page in plan mode", async () => {
+  await renderDashboard();
+  const card = await trackerCard();
+  const checklist = await within(card).findByRole('link', {
+    name: "Today's checklist",
+  });
+  expect(checklist.getAttribute('href')).toBe('/app/day/2026-11-19/plan'); // the sample's own today (Tracker.asOf)
+});
+
+test('the dashboard has no Goals region', async () => {
+  await renderDashboard();
+  await trackerCard();
+  expect(screen.queryByRole('region', { name: 'Goals' })).toBeNull();
+  expect(screen.queryByText(/Weekly net goal|Daily loss limit/)).toBeNull();
 });
 
 test('performance follows the basis', async () => {
@@ -450,7 +198,7 @@ test('performance follows the basis', async () => {
   ).toBe('equity');
 });
 
-test('gross drives the KPIs and the equity line; goals stay net (Review Focus 3)', async () => {
+test('gross drives the KPIs and the equity line', async () => {
   await renderDashboard({ prefs: { pnlBasis: 'gross' } });
   const perf = await screen.findByRole('region', { name: 'Performance' });
   const pnl = within(perf).getByTestId('kpi-pnl');
@@ -461,11 +209,6 @@ test('gross drives the KPIs and the equity line; goals stay net (Review Focus 3)
       name: 'Equity, from $50,000.00 to $50,210.00',
     }),
   ).toBeTruthy();
-  const goals = await goalsCard();
-  expect(goals.textContent).toContain('+$200.00 this week, 16-20 Nov');
-  expect(goals.textContent).toContain(
-    'Broken once, all time: Thu 19 Nov at −$400.00.',
-  );
   const table = screen.getByRole('table', { name: 'Recent trades' });
   expect(
     within(table).getByRole('columnheader', { name: 'Gross P&L' }),
@@ -703,6 +446,24 @@ test('every metric carries its definition', async () => {
     'rule-followed-pnl',
     'rule-followed-win-rate',
     'rule-followed-pf',
+    // On the progress tracker (Plan 6A Task 7).
+    'tracker-streak',
+    'tracker-score',
+    'tracker-today',
+    // On the trade log by day (Plan 6A Task 15).
+    'day-trades',
+    'day-gross',
+    'day-won-lost',
+    'day-commissions',
+    'day-win-rate',
+    'day-volume',
+    'day-profit-factor',
+    'rule-streak',
+    'rule-average',
+    'tracker-follow-rate',
+    'tracker-history',
+    // On the day page's review tiles (Plan 6A Task 13).
+    'session-length',
     // On a trade note's stats card (Task 21).
     'volume',
     // On a challenge's card (Task 19).
@@ -784,6 +545,18 @@ test('recent trades opens on the closed trades, with an Open positions tab besid
       .getAllByRole('radio')
       .map((r) => (r as HTMLInputElement).labels?.[0]?.textContent),
   ).toEqual(['Closed', 'Open positions']);
+});
+
+test('All trades is a drill-down to the All view, keeping the filters', async () => {
+  await renderDashboard({
+    url: '/app/dashboard?from=2026-11-02&to=2026-11-19&account=acc-b',
+  });
+  const region = await screen.findByRole('region', { name: 'Recent trades' });
+  expect(
+    within(region)
+      .getByRole('link', { name: 'All trades' })
+      .getAttribute('href'),
+  ).toBe('/app/trades?from=2026-11-02&to=2026-11-19&account=acc-b');
 });
 
 test('open positions: each open trade with its quantity, entry and realized P&L from a partial exit', async () => {

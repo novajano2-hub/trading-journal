@@ -55,4 +55,7 @@ export const DATA_TABLES = [
   'folders',
   'cashflows',
   'challenges',
+  'trackers',
+  'days',
+  'dayShots',
 ] as const;

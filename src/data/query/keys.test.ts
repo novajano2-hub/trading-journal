@@ -54,13 +54,27 @@ test('Plan 5 writes invalidate what they change', () => {
     ['challenges.create', k('challenges')],
     ['challenges.update', k('challenges')],
     ['challenges.remove', k('challenges')],
-    ['journal.trash', k('journal')],
-    ['journal.restore', k('journal')],
-    ['journal.ensureTradeNote', k('journal', 'trades', 'imports')],
-    ['journal.dailyNote', k('journal')],
+    ['journal.save', k('journal', 'days')],
+    ['journal.trash', k('journal', 'days')],
+    ['journal.restore', k('journal', 'days')],
+    ['journal.remove', k('trades', 'journal', 'imports', 'days')],
+    ['journal.ensureTradeNote', k('journal', 'trades', 'imports', 'days')],
+    ['journal.dailyNote', k('journal', 'days')],
+    ['tracker.save', k('tracker', 'days')],
+    ['tracker.reset', k('tracker', 'days')],
+    ['days.write', k('days')],
+    ['days.finish', k('days')],
+    ['dayShots.add', k('dayShotsAll')],
+    ['dayShots.remove', k('dayShotsAll')],
   ];
   for (const [write, expected] of table)
     expect(invalidationsFor(write, ws), write).toEqual(expected);
+});
+
+test('a day key covers a date, and the shots of one date sit under all shots', () => {
+  expect(keys.dayShots('mine', '2026-11-19').slice(0, 4)).toEqual(
+    keys.dayShotsAll('mine'),
+  );
 });
 
 test('every write that changes what an import context holds makes it stale', () => {

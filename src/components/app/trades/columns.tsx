@@ -23,7 +23,8 @@ import { type MetricContext } from '@/domain/metrics/context';
 import type { Trade } from '@/domain/types';
 import { formatDuration, formatQty, price } from '@/lib/format';
 import { formatUnitValue, tradeFigure, type Display } from '@/lib/display';
-import { shortTime } from '@/lib/time-format';
+import { dayLabel, shortTime } from '@/lib/time-format';
+import { dayOfTrade } from '@/data/day-log';
 import { InstrumentName, TradeTime, signTone } from '../dashboard/shared';
 import {
   MistakesCell,
@@ -31,6 +32,7 @@ import {
   ReviewedCell,
   RulesCell,
   StatusChip,
+  TickerPill,
   StrategiesCell,
   TagsCell,
   TradeLink,
@@ -57,6 +59,8 @@ export interface CellEnv {
   ctx: MetricContext;
   display: Display;
   facts: RowFacts;
+  /** The Day column as "Thu 19 Nov", for the Week view's table; elsewhere it carries the year. */
+  shortDay?: boolean;
 }
 
 /** How a column's text sits. */
@@ -102,6 +106,8 @@ export const COLUMN_WIDTHS: Record<ColumnId, number> = {
   rating: 54,
   reviewed: 58,
   status: 72,
+  ticker: 78,
+  day: 116,
 };
 
 /** Columns whose text starts after a gap, so a right-aligned neighbour's header never runs into it. */
@@ -124,6 +130,7 @@ const DESC_FIRST = new Set<ColumnId>([
   'rules',
   'rating',
   'reviewed',
+  'day',
 ]);
 
 const helper = createColumnHelper<typeof features, Trade>();
@@ -183,6 +190,10 @@ function sortValue(
       return t.reviewed === true ? 1 : 0;
     case 'status':
       return STATUS_RANK[statusOf(t, env.ctx)];
+    case 'ticker':
+      return t.instrument.root.toLowerCase();
+    case 'day':
+      return dayOfTrade(t, env.timeZone);
   }
 }
 
@@ -307,6 +318,14 @@ export function cellOf(id: ColumnId, t: Trade, env: CellEnv): React.ReactNode {
       return <ReviewedCell reviewed={t.reviewed === true} />;
     case 'status':
       return <StatusChip status={statusOf(t, env.ctx)} />;
+    case 'ticker':
+      return <TickerPill root={t.instrument.root} />;
+    case 'day':
+      return (
+        <span className="tabular-nums">
+          {dayLabel(dayOfTrade(t, timeZone), { year: !env.shortDay })}
+        </span>
+      );
   }
 }
 

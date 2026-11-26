@@ -3,13 +3,14 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { Popover } from 'radix-ui';
-import { Plus, Star, X } from '@phosphor-icons/react/dist/ssr';
+import { Plus, X } from '@phosphor-icons/react/dist/ssr';
 import {
   useDailyNote,
   useEnsureTradeNote,
   useJournal,
   useTemplates,
   useJournalEntry,
+  useRestoreJournalEntry,
   useSaveJournalEntry,
 } from '@/data/query/hooks';
 import type {
@@ -23,6 +24,8 @@ import { localDate } from '@/domain/time';
 import { dayLabel } from './trade-time';
 import { NoteEditor, type NoteEditorHandle } from '../notes/note-editor';
 import { TagPicker } from '../tag-picker';
+import { findDailyEntry } from '../notebook/notebook-model';
+import { LockLine, useDayFinished } from '../day/day-lock';
 
 /** How long typing rests before the note is saved. */
 export const NOTE_SAVE_DELAY_MS = 600;
@@ -234,73 +237,25 @@ export function TagRows({
   );
 }
 
-/** Five stars as a radio group: "Rating: 4 of 5". Choosing a star saves it; Clear takes it back. */
-export function RatingRow({
-  rating,
-  disabled,
-  onChange,
-}: {
-  rating: number | undefined;
-  disabled: boolean;
-  onChange(next: 1 | 2 | 3 | 4 | 5 | undefined): void;
-}): React.JSX.Element {
-  return (
-    <div className="mt-1.5 flex items-center gap-3 border-t border-line pt-3">
-      <span className="w-[84px] flex-none text-[12.5px] text-faint max-sm:w-[72px]">
-        Rating
-      </span>
-      <div
-        role="radiogroup"
-        aria-label={`Rating: ${rating === undefined ? 'none' : `${rating} of 5`}`}
-        className="flex gap-0.5"
-      >
-        {([1, 2, 3, 4, 5] as const).map((n) => (
-          <label
-            key={n}
-            className={`group relative grid size-7 place-items-center rounded-[8px] pointer-coarse:size-11 ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-          >
-            <input
-              type="radio"
-              name="trade-rating"
-              aria-label={`${n} ${n === 1 ? 'star' : 'stars'}`}
-              checked={rating === n}
-              disabled={disabled}
-              onChange={() => onChange(n)}
-              className="peer sr-only"
-            />
-            <Star
-              size={20}
-              weight={rating !== undefined && n <= rating ? 'fill' : 'regular'}
-              aria-hidden="true"
-              className={`${rating !== undefined && n <= rating ? 'text-accent' : 'text-line-2'} ${disabled ? '' : 'group-hover:text-accent/70'}`}
-            />
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 rounded-[8px] peer-focus-visible:outline-2 peer-focus-visible:outline-accent"
-            />
-          </label>
-        ))}
-      </div>
-      <span
-        aria-hidden="true"
-        className="text-[12.5px] whitespace-nowrap text-muted"
-      >
-        {rating === undefined ? 'Not rated' : `${rating} of 5`}
-      </span>
-      {rating !== undefined && !disabled ? (
-        <button
-          type="button"
-          onClick={() => onChange(undefined)}
-          className="ml-auto rounded-chip px-1.5 text-[12.5px] font-medium text-faint outline-offset-2 hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
-        >
-          Clear
-        </button>
-      ) : null}
-    </div>
-  );
-}
+export type NoteStatus = 'idle' | 'saving' | 'saved' | 'failed';
 
-type NoteStatus = 'idle' | 'saving' | 'saved' | 'failed';
+/** What a bound note editor offers the page around it. */
+export interface NoteControl {
+  /**
+   * Writes what is waiting (or tries again after a failed write), then waits
+   * for everything already on its way; `onStatus` says whether it landed.
+   */
+  settle(): Promise<void>;
+  /**
+   * Changes the stored note's fields (the star), in the editor's own queue and
+   * after what is waiting, so the text and the change never write over each
+   * other. `update` reads the note as stored just before. Rejects when the
+   * write fails.
+   */
+  patch(
+    update: (current: JournalEntry) => Partial<JournalEntry>,
+  ): Promise<void>;
+}
 
 /** The editor and its autosave; mounts once the trade's note (if it has one) has loaded. */
 function NoteBody({
@@ -311,6 +266,8 @@ function NoteBody({
   ensure,
   readOnly,
   handleRef,
+  stamp,
+  controlRef,
   onStatus,
 }: {
   label: string;
@@ -322,7 +279,11 @@ function NoteBody({
   ensure(): Promise<JournalEntry>;
   readOnly: boolean;
   handleRef?: { current: NoteEditorHandle | null };
-  onStatus(s: NoteStatus): void;
+  /** Fields the next save writes with the body (the template a body came from). */
+  stamp?: { current: Partial<JournalEntry> | undefined };
+  /** Receives the editor's `NoteControl`. */
+  controlRef?: { current: NoteControl | null };
+  onStatus(s: NoteStatus, error?: unknown): void;
 }): React.JSX.Element {
   const save = useSaveJournalEntry();
   // The editor owns the text from here on: the stored body seeds it once.
@@ -338,8 +299,11 @@ function NoteBody({
   // stored one (another tab may have renamed, moved or trashed it), so a save
   // builds on what is stored, never on the copy this editor opened with, as
   // the Notebook's pane does. A note gone from the store (trashed or deleted)
-  // is let go: the next change makes a new one rather than bring it back.
+  // is let go: the next change makes a new one rather than bring it back. (A
+  // daily note in Trash is not let go: its date keeps it, read-only, E109.)
   const waiting = useRef(0);
+  // The last write failed: the text on screen is not the stored one.
+  const failed = useRef(false);
   useEffect(() => {
     if (waiting.current === 0)
       note.current = entry ? Promise.resolve(entry) : null;
@@ -366,11 +330,17 @@ function NoteBody({
           if (note.current === pending) note.current = null;
           throw e;
         }
-        const saved = await save.mutateAsync({ ...current, body });
+        const saved = await save.mutateAsync({
+          ...current,
+          ...stamp?.current,
+          body,
+        });
         note.current = Promise.resolve(saved);
+        failed.current = false;
         onStatus('saved');
-      } catch {
-        onStatus('failed');
+      } catch (e) {
+        failed.current = true;
+        onStatus('failed', e);
       } finally {
         waiting.current -= 1;
       }
@@ -379,6 +349,50 @@ function NoteBody({
   const flushRef = useRef(flush);
   useEffect(() => {
     flushRef.current = flush;
+  });
+
+  // Writes what is waiting now (or tries again after a failed write), then
+  // waits for everything already on its way.
+  const settle = async () => {
+    if (timer.current !== undefined || failed.current) {
+      if (timer.current !== undefined) clearTimeout(timer.current);
+      flush();
+    }
+    await queue.current;
+  };
+  // A change to the note's fields joins the same queue, behind what is waiting,
+  // and builds on the note the last save returned.
+  const patch: NoteControl['patch'] = async (update) => {
+    if (timer.current !== undefined) {
+      clearTimeout(timer.current);
+      flush();
+    }
+    waiting.current += 1;
+    const job = queue.current.then(async () => {
+      try {
+        const current = await (note.current ??= ensureRef.current());
+        const saved = await save.mutateAsync({
+          ...current,
+          ...update(current),
+        });
+        note.current = Promise.resolve(saved);
+      } finally {
+        waiting.current -= 1;
+      }
+    });
+    // The queue goes on whatever this write does; the caller hears of a failure.
+    queue.current = job.then(
+      () => {},
+      () => {},
+    );
+    await job;
+  };
+  useEffect(() => {
+    if (!controlRef) return;
+    controlRef.current = { settle, patch };
+    return () => {
+      controlRef.current = null;
+    };
   });
 
   // Leaving the trade (or the page) saves what is still waiting.
@@ -424,7 +438,7 @@ export function TradeNote({
   trade: Trade;
   readOnly: boolean;
   handleRef?: { current: NoteEditorHandle | null };
-  onStatus(s: NoteStatus): void;
+  onStatus(s: NoteStatus, error?: unknown): void;
 }): React.JSX.Element {
   const ensureNote = useEnsureTradeNote();
   const entryQuery = useJournalEntry(trade.noteId ?? '');
@@ -455,42 +469,43 @@ export function TradeNote({
   );
 }
 
-/** The day note's date: the trade's last exit (its open date while it is open), on the account's clock. */
+/** The day note's date: the trade's last exit (its open date while it is open), on the trader's clock. */
 export function dayNoteDate(trade: Trade, timeZone: string): string {
   return localDate(trade.closedAt ?? trade.openedAt, timeZone);
 }
 
-/** The daily entry for a date, if the day has one that is not in Trash. */
-export function findDailyEntry(
-  entries: readonly JournalEntry[] | undefined,
-  date: string,
-): JournalEntry | undefined {
-  return entries?.find(
-    (e) =>
-      e.kind === 'daily-review' && e.date === date && e.deletedAt === undefined,
-  );
-}
-
 /**
- * The day note: the same editor and autosave, bound to the daily entry of the
- * trade's day. The entry is made on the first change (as the Notebook makes
- * it), never by looking. One editor per date.
+ * The day note's editor and autosave, bound to the daily entry of a date: no
+ * header, so a page can lay out its own. The entry is made on the first
+ * change (as the Notebook makes it), never by looking. A note in Trash shows
+ * read-only with Restore (E109). One editor per date. `stamp` is written with
+ * the next save, to record the template a replaced body came from.
  */
-export function DayNote({
+export function DayNoteBinding({
   date,
   readOnly,
   handleRef,
+  stamp,
+  controlRef,
   onStatus,
 }: {
   date: string;
   readOnly: boolean;
   handleRef?: { current: NoteEditorHandle | null };
-  onStatus(s: NoteStatus): void;
+  stamp?: { current: Partial<JournalEntry> | undefined };
+  /** Receives the editor's `NoteControl`: settle what is waiting, or change the note's fields in its queue. */
+  controlRef?: { current: NoteControl | null };
+  onStatus(s: NoteStatus, error?: unknown): void;
 }): React.JSX.Element {
   const journal = useJournal();
   const templates = useTemplates();
   const daily = useDailyNote();
+  const restore = useRestoreJournalEntry();
+  const [problem, setProblem] = useState<string | null>(null);
   const entry = findDailyEntry(journal.data, date);
+  const trashed = entry?.deletedAt !== undefined;
+  // A finished date's trashed note stays where it is: no Restore.
+  const closed = useDayFinished(date).finished;
   // As in TradeNote: once mounted for this date the editor stays, even though
   // the first change adds the entry to the journal.
   const [mountedFor, setMountedFor] = useState<string | null>(null);
@@ -510,6 +525,77 @@ export function DayNote({
       ?.body ?? EMPTY_DOC;
   return (
     <>
+      {entry && trashed ? (
+        <div
+          role="note"
+          className="mt-3 flex flex-wrap items-center gap-2 rounded-control bg-warn-soft px-3 py-2 text-[13.5px] text-text"
+        >
+          <span className="mr-auto">This day&apos;s note is in Trash.</span>
+          {closed ? null : (
+            <>
+              {problem ? (
+                <span role="alert" className="text-loss">
+                  {problem}
+                </span>
+              ) : null}
+              <button
+                type="button"
+                onClick={async () => {
+                  setProblem(null);
+                  try {
+                    await restore.mutateAsync(entry.id);
+                  } catch {
+                    setProblem("Couldn't restore that note. Try again.");
+                  }
+                }}
+                disabled={restore.isPending}
+                className="inline-flex h-8 items-center rounded-control border border-line bg-surface-1 px-3 text-[13px] font-semibold text-text outline-offset-2 hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11"
+              >
+                Restore
+              </button>
+            </>
+          )}
+        </div>
+      ) : null}
+      {entry && trashed && closed ? <LockLine className="mt-3" /> : null}
+      <NoteBody
+        key={date}
+        label="Daily note"
+        placeholder="How did the day go? Type / for blocks"
+        ensure={() => daily.mutateAsync(date)}
+        entry={entry ?? null}
+        fallback={template}
+        readOnly={readOnly || trashed}
+        handleRef={handleRef}
+        stamp={stamp}
+        controlRef={controlRef}
+        onStatus={onStatus}
+      />
+    </>
+  );
+}
+
+/**
+ * The day note on the trade page: a date row with a link to the Notebook,
+ * then the day note's editor.
+ */
+export function DayNote({
+  date,
+  readOnly,
+  handleRef,
+  onStatus,
+}: {
+  date: string;
+  readOnly: boolean;
+  handleRef?: { current: NoteEditorHandle | null };
+  onStatus(s: NoteStatus, error?: unknown): void;
+}): React.JSX.Element {
+  const journal = useJournal();
+  const entry = findDailyEntry(journal.data, date);
+  // A finished date's note is frozen with the day (K3).
+  const closed = useDayFinished(date).finished;
+  return (
+    <>
       <div className="mt-3 flex items-center justify-between gap-3 text-[12.5px] text-faint">
         <span className="tabular-nums">
           {dayLabel(`${date}T12:00:00Z`, 'UTC')}
@@ -525,14 +611,12 @@ export function DayNote({
           Open in the Notebook
         </Link>
       </div>
-      <NoteBody
-        key={date}
-        label="Daily note"
-        placeholder="How did the day go? Type / for blocks"
-        ensure={() => daily.mutateAsync(date)}
-        entry={entry ?? null}
-        fallback={template}
-        readOnly={readOnly}
+      {closed && entry?.deletedAt === undefined ? (
+        <LockLine className="mt-3" />
+      ) : null}
+      <DayNoteBinding
+        date={date}
+        readOnly={readOnly || closed}
         handleRef={handleRef}
         onStatus={onStatus}
       />

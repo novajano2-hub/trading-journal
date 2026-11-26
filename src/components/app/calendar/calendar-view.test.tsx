@@ -134,6 +134,30 @@ test('selecting 19 Nov lists its trades and links the daily note', async () => {
   expect(note.getAttribute('href')).toBe('/app/notebook/daily/2026-11-19');
 });
 
+test('the Calendar day panel opens the Day view on that date (equal from and to), with the current filters', async () => {
+  renderApp(<CalendarView />, {
+    sample: withTrades(NOV),
+    url: url('&side=long&symbol=ES'),
+  });
+  fireEvent.click(await screen.findByRole('button', { name: /^Thu 19 Nov/ }));
+  const panel = await screen.findByRole('complementary', {
+    name: /Thu 19 Nov/,
+  });
+  const link = within(panel).getByRole('link', { name: 'Open in Trades' });
+  const href = link.getAttribute('href')!;
+  const [path, query] = href.split('?') as [string, string];
+  // The Day view, filtered to the date (equal from and to), the filters kept.
+  expect(path).toBe('/app/trades/day');
+  const params = new URLSearchParams(query);
+  expect(params.get('from')).toBe('2026-11-19');
+  expect(params.get('to')).toBe('2026-11-19');
+  expect(params.get('side')).toBe('long');
+  expect(params.get('symbol')).toBe('ES');
+  // The calendar's own month and day are not carried over.
+  expect(params.has('month')).toBe(false);
+  expect(params.has('day')).toBe(false);
+});
+
 test('?day opens the panel on load', async () => {
   renderApp(<CalendarView />, {
     sample: withTrades(NOV),

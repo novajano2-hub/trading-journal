@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
+    "test:perf": "KEEL_PERF=1 vitest run --pool=forks --no-file-parallelism -t \"budget|under 50 ms\"",
     "test:watch": "vitest",
     "format": "prettier --write .",
     "e2e": "next build && playwright test"

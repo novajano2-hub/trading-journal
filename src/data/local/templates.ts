@@ -18,9 +18,10 @@ async function ofKind(
 }
 
 /**
- * Makes `id` the kind's only default, or, with no id, gives a kind left
- * without a default its built-in template. Call inside an rw transaction
- * that includes `db.templates`.
+ * Makes `id` the kind's only default. With no id it changes nothing: a kind
+ * may have no default (TradeZella lets it be removed), and a new note of that
+ * kind then starts empty. Call inside an rw transaction that includes
+ * `db.templates`.
  */
 async function settleDefault(
   db: KeelDb,
@@ -28,13 +29,9 @@ async function settleDefault(
   kind: JournalKind,
   id?: string,
 ): Promise<void> {
-  const all = await ofKind(db, ws, kind);
-  const chosen =
-    id ??
-    (all.some((t) => t.isDefault) ? undefined : all.find((t) => t.builtIn)?.id);
-  if (chosen === undefined) return;
-  for (const t of all) {
-    const isDefault = t.id === chosen;
+  if (id === undefined) return;
+  for (const t of await ofKind(db, ws, kind)) {
+    const isDefault = t.id === id;
     if (t.isDefault !== isDefault) await db.templates.put({ ...t, isDefault });
   }
 }
@@ -60,7 +57,7 @@ export function localTemplates(ctx: LocalContext): TemplatesRepo {
           ...draft,
           id: draft.id ?? ctx.newId(),
           workspaceId: ws,
-          // A built-in stays its kind's fallback.
+          // A built-in keeps its kind.
           kind: stored?.builtIn ? stored.kind : draft.kind,
           builtIn: stored?.builtIn ?? false,
         };
@@ -71,8 +68,6 @@ export function localTemplates(ctx: LocalContext): TemplatesRepo {
           template.kind,
           template.isDefault ? template.id : undefined,
         );
-        if (stored && stored.kind !== template.kind)
-          await settleDefault(db, ws, stored.kind);
         return (await db.templates.get([ws, template.id]))!;
       });
     },
@@ -84,7 +79,6 @@ export function localTemplates(ctx: LocalContext): TemplatesRepo {
         if (!template) throw new NotFoundError('template', id);
         if (template.builtIn) throw new Error('built-in template');
         await db.templates.delete([ws, id]);
-        await settleDefault(db, ws, template.kind);
       });
     },
 

@@ -14,6 +14,8 @@ import {
   type Rule,
   type Side,
   type Challenge,
+  type DayRecord,
+  type Tracker,
   type Strategy,
   type Tag,
   type TagCategory,
@@ -48,6 +50,7 @@ import {
 } from './instruments';
 import { writeDailyNotes, writeJournal } from './journal';
 import { addPropFirms } from './prop';
+import { writeRoutine } from './routine';
 import { createRandom, type Random } from './random';
 import { CATEGORIES, categoryIn } from './templates';
 
@@ -66,6 +69,8 @@ export interface SampleWorkspace {
   trades: Trade[];
   journal: JournalEntry[];
   challenges: Challenge[];
+  tracker: Tracker;
+  days: DayRecord[];
 }
 
 /** The last weekday strictly before `now`'s New York date. */
@@ -330,16 +335,32 @@ export function generateSampleWorkspace(opts: {
 
   markReviewed(createRandom(opts.seed + 105), prop.trades, endDate);
 
+  // The routine comes last, from a stream of its own, so nothing above moves.
+  const allAccounts = [...accounts, ...prop.accounts];
+  const allTrades = [...trades, ...prop.trades];
+  const startedOn = allTrades
+    .map((t) => localDate(t.openedAt, NY))
+    .reduce((a, b) => (a < b ? a : b));
+  const routine = writeRoutine(createRandom(opts.seed + 106), {
+    trades: allTrades,
+    journal,
+    accounts: allAccounts,
+    startedOn,
+    endDate,
+  });
+
   return {
     seed: opts.seed,
     endDate,
-    accounts: [...accounts, ...prop.accounts],
+    accounts: allAccounts,
     strategies,
     tagCategories,
     tags,
-    trades: [...trades, ...prop.trades],
-    journal,
+    trades: allTrades,
+    journal: [...journal, ...routine.notes],
     challenges: prop.challenges,
+    tracker: routine.tracker,
+    days: routine.days,
   };
 }
 

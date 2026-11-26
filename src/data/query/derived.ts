@@ -24,13 +24,23 @@ import {
   metricsByCurrency,
   type CurrencyMetrics,
 } from '../metrics';
+import { routineNow, routineToday } from '@/domain/tracker/defaults';
+import {
+  msToLocalMidnight,
+  routineCurrency,
+  scoreHistory,
+  type ScoreHistory,
+} from '../routine';
 import {
   useAccounts,
+  useActiveWorkspace,
   useCashFlows,
+  useDays,
   useImportContext,
   usePrefs,
   useStrategies,
   useTags,
+  useTracker,
   useTrades,
 } from './hooks';
 
@@ -142,11 +152,6 @@ export interface TradeSet {
   trades: Trade[];
   /** The same filters except the date, narrowed the same way: what the day figures are built from. */
   dayTrades: Trade[];
-  /**
-   * `dayTrades` before the display unit narrows them. Money targets (the
-   * Dashboard's goals) read these under every unit, as Prop firms do.
-   */
-  moneyDayTrades: Trade[];
   /** The selected accounts: the active ones when no account is filtered. */
   accounts: Account[];
   /** The trades the filters matched that the display unit leaves out (R, ticks, pips, points); 0 otherwise. */
@@ -166,7 +171,7 @@ export interface TradeSet {
  * - A date range matches a trade's day: the local date of `closedAt`, or of
  *   `openedAt` while it is open, in the prefs timezone (`today` too). That
  *   picks the trades for the log, win rate and profit factor. Day figures
- *   (calendar, daily bars, day stats, goals) take instead the exits dated
+ *   (calendar, daily bars, day stats) take instead the exits dated
  *   inside the range (`MetricContext.range`), so a trade held over several
  *   days books each exit on its own day and only those in the range. They
  *   are built from `dayTrades` (every filter but the date), so an exit in the
@@ -222,7 +227,6 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
       filters: clean,
       trades: kept,
       dayTrades: narrowToUnit(dayMatched, unit),
-      moneyDayTrades: dayMatched,
       accounts: selectedAccounts(accounts.data, clean),
       unitLeftOut: matched.length - kept.length,
     };
@@ -364,4 +368,118 @@ export function useImportPlan(input: ImportInput | null): Derived<ImportPlan> {
     error: state.error,
     data,
   };
+}
+
+/**
+ * The clock for the routine's today. A one-shot timer re-reads it at the next
+ * local midnight, so the date rolls over while the page is open.
+ */
+function useRoutineClock(timeZone: string | undefined): [string, () => void] {
+  const [now, setNow] = useState(() => new Date().toISOString());
+  const refresh = useCallback(() => setNow(new Date().toISOString()), []);
+  useEffect(() => {
+    if (timeZone === undefined) return;
+    const id = setTimeout(refresh, msToLocalMidnight(now, timeZone) + 100);
+    return () => clearTimeout(id);
+  }, [now, timeZone, refresh]);
+  return [now, refresh];
+}
+
+/** The routine's today (K23): the sample's fixed date, else the local date in the profile zone. */
+export function useRoutineToday(): string | undefined {
+  const tracker = useTracker().data;
+  const timeZone = usePrefs().data?.timeZone;
+  const [now] = useRoutineClock(timeZone);
+  return useMemo(
+    () =>
+      tracker && timeZone !== undefined
+        ? routineToday(tracker, now, timeZone)
+        : undefined,
+    [tracker, timeZone, now],
+  );
+}
+
+/**
+ * Every day's score from the tracker's start to the routine's today. It
+ * follows only the global account selection (K14): no other filter applies.
+ * Call it under a `<Suspense>` boundary, as `useGlobalFilters` needs.
+ */
+export function useDayScores(): Derived<ScoreHistory> {
+  const { filters } = useGlobalFilters();
+  const tracker = useTracker();
+  const days = useDays();
+  const trades = useTrades();
+  const accounts = useAccounts();
+  const flows = useCashFlows();
+  const prefs = usePrefs();
+  const workspace = useActiveWorkspace();
+  const state = combine([
+    tracker,
+    days,
+    trades,
+    accounts,
+    flows,
+    prefs,
+    workspace,
+  ]);
+  const selection = filters.accountIds.join(',');
+  const timeZone = prefs.data?.timeZone;
+  const baseCurrency =
+    prefs.data && workspace.data
+      ? routineCurrency(workspace.data.id, prefs.data.baseCurrency)
+      : undefined;
+
+  const [now, refresh] = useRoutineClock(timeZone);
+
+  const data = useMemo(() => {
+    if (
+      !tracker.data ||
+      !days.data ||
+      !trades.data ||
+      !accounts.data ||
+      !flows.data ||
+      timeZone === undefined ||
+      baseCurrency === undefined
+    )
+      return undefined;
+    return scoreHistory(
+      tracker.data,
+      days.data,
+      trades.data,
+      accounts.data,
+      flows.data,
+      {
+        timeZone,
+        baseCurrency,
+        now: routineNow(tracker.data, now, timeZone),
+        today: routineToday(tracker.data, now, timeZone),
+        ...(selection ? { accountIds: selection.split(',') } : {}),
+      },
+    );
+  }, [
+    tracker.data,
+    days.data,
+    trades.data,
+    accounts.data,
+    flows.data,
+    timeZone,
+    baseCurrency,
+    selection,
+    now,
+  ]);
+
+  // R8: only while today's score is live (scored, not finished), re-read the
+  // clock each minute, so a missed start time turns failed while the page is open.
+  const todayScore = data?.scoreOn(data.today);
+  const live =
+    todayScore !== undefined &&
+    todayScore.unscored === undefined &&
+    !todayScore.finished;
+  useEffect(() => {
+    if (!live) return;
+    const id = setInterval(refresh, 60_000);
+    return () => clearInterval(id);
+  }, [live, refresh]);
+
+  return { ...state, data: state.status === 'success' ? data : undefined };
 }

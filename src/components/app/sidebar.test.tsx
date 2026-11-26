@@ -83,3 +83,16 @@ test("a placeholder's way back keeps the filters", () => {
       .getAttribute('href'),
   ).toBe('/app/dashboard?range=last-week&symbol=ES');
 });
+
+test('Progress tracker sits right after Reports in the sidebar', () => {
+  render(
+    <SidebarNav pathname="/app/progress" params={new URLSearchParams()} />,
+  );
+  const names = screen.getAllByRole('link').map((a) => a.textContent);
+  expect(names.indexOf('Progress tracker')).toBe(names.indexOf('Reports') + 1);
+  expect(
+    screen
+      .getByRole('link', { name: 'Progress tracker' })
+      .getAttribute('aria-current'),
+  ).toBe('page');
+});

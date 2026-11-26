@@ -2,17 +2,9 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { StrategyView } from '@/components/app/strategies/strategy-view';
 import { StrategySkeleton } from '@/components/app/strategies/strategy-states';
+import { decodedSegment } from '@/lib/route-param';
 
 export const metadata: Metadata = { title: 'Strategy' };
-
-/** Next hands the segment over percent-encoded. */
-function decoded(segment: string): string {
-  try {
-    return decodeURIComponent(segment);
-  } catch {
-    return segment;
-  }
-}
 
 /** `params` is a Promise in this Next.js: the view fills in on the client from the local data. */
 export default async function StrategyPage({
@@ -25,7 +17,7 @@ export default async function StrategyPage({
     <Suspense
       fallback={<StrategySkeleton label="Loading the strategy" rows={2} />}
     >
-      <StrategyView id={decoded(id)} />
+      <StrategyView id={decodedSegment(id)} />
     </Suspense>
   );
 }

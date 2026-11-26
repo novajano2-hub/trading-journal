@@ -23,13 +23,16 @@ import { createLocalRepository } from '../local/local-repository';
 import type { Repository } from '../repository';
 import { SAMPLE_WORKSPACE, USER_WORKSPACE } from '../workspaces';
 import {
+  useDayScores,
   useGlobalFilters,
   useImportPlan,
   useMetrics,
+  useRoutineToday,
   useTradeSet,
   type Derived,
   type ImportInput,
 } from './derived';
+import { defaultVersion } from '@/domain/tracker/defaults';
 import { useCommitImport, useUndoImport } from './hooks';
 import { DataProvider } from './provider';
 
@@ -495,4 +498,150 @@ test('useMetrics under Ticks reads only the futures trades, and its profit facto
   // f-1 made 5 points (20 ticks), f-2 lost 2.5 (10 ticks).
   expect(usd.summary.profitFactor).toBeCloseTo(2, 10);
   expect(usd.days.map((d) => d.date)).toEqual(['2026-11-16', '2026-11-17']);
+});
+
+test('useDayScores re-reads the clock each minute, so a missed start time turns failed (R8)', async () => {
+  const { repository, Wrapper } = setup();
+  await repository.prefs.update({ timeZone: 'America/New_York' });
+  // 09:29 in New York on the fixture sample's today (its tracker's asOf).
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-11-19T14:29:00Z'));
+  const intervals: { fn: () => void; ms: number | undefined; id: number }[] =
+    [];
+  const real = globalThis.setInterval;
+  const setSpy = vi.spyOn(globalThis, 'setInterval').mockImplementation(((
+    fn: () => void,
+    ms?: number,
+  ) => {
+    const id = real(() => {}, 1 << 30) as unknown as number;
+    if (ms === 60_000) intervals.push({ fn, ms, id });
+    return id;
+  }) as unknown as typeof setInterval);
+  const clearSpy = vi.spyOn(globalThis, 'clearInterval');
+  onTestFinished(() => {
+    vi.useRealTimers();
+    setSpy.mockRestore();
+    clearSpy.mockRestore();
+  });
+  const startBy = (
+    r: Derived<{
+      scoreOn(d: string): { rules: { key: string; status: string }[] };
+    }>,
+  ) =>
+    r.data?.scoreOn('2026-11-19').rules.find((x) => x.key === 'startBy')
+      ?.status;
+
+  const { result, unmount } = renderHook(() => useDayScores(), {
+    wrapper: Wrapper,
+  });
+  // waitFor polls on a clock this test has frozen, so poll by hand.
+  for (let i = 0; i < 100 && result.current.status !== 'success'; i++)
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+  expect(result.current.status).toBe('success');
+  expect(startBy(result.current)).toBe('pending');
+  expect(intervals).toHaveLength(1);
+
+  vi.setSystemTime(new Date('2026-11-19T14:31:00Z'));
+  act(() => intervals[0]!.fn());
+  expect(startBy(result.current)).toBe('failed');
+
+  unmount();
+  expect(clearSpy).toHaveBeenCalledWith(intervals[0]!.id);
+});
+
+/** Fakes the date and records the timers a hook sets with these delays; every other timer runs for real. */
+function spyTimers(setMs: number, intervalMs = 60_000) {
+  const real = globalThis.setTimeout;
+  const realInterval = globalThis.setInterval;
+  const timeouts: (() => void)[] = [];
+  const intervals: (() => void)[] = [];
+  const t = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+    fn: () => void,
+    ms?: number,
+    ...rest: unknown[]
+  ) => {
+    if (ms === setMs) {
+      timeouts.push(fn);
+      return real(() => {}, 1 << 30);
+    }
+    return real(fn, ms, ...rest);
+  }) as unknown as typeof setTimeout);
+  const i = vi.spyOn(globalThis, 'setInterval').mockImplementation(((
+    fn: () => void,
+    ms?: number,
+    ...rest: unknown[]
+  ) => {
+    if (ms === intervalMs) {
+      intervals.push(fn);
+      return realInterval(() => {}, 1 << 30);
+    }
+    return realInterval(fn, ms, ...rest);
+  }) as unknown as typeof setInterval);
+  onTestFinished(() => {
+    vi.useRealTimers();
+    t.mockRestore();
+    i.mockRestore();
+  });
+  return { timeouts, intervals };
+}
+
+const settle = async (done: () => boolean) => {
+  for (let i = 0; i < 100 && !done(); i++)
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+};
+
+test('useDayScores sets no minute timer once today is finished (R8, M5)', async () => {
+  const { repository, Wrapper } = setup();
+  await repository.prefs.update({ timeZone: 'America/New_York' });
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-11-19T14:29:00Z'));
+  const { intervals } = spyTimers(-1);
+  await repository.days.finish(SAMPLE_WORKSPACE.id, '2026-11-19', {
+    version: defaultVersion('2026-11-02'),
+    inputs: {},
+    ticks: {},
+  });
+  const { result } = renderHook(() => useDayScores(), { wrapper: Wrapper });
+  await settle(() => result.current.status === 'success');
+  expect(result.current.status).toBe('success');
+  expect(result.current.data!.scoreOn('2026-11-19').finished).toBe(true);
+  expect(intervals).toHaveLength(0);
+});
+
+test('useRoutineToday and useDayScores roll over at local midnight (M5, M6)', async () => {
+  const { repository, Wrapper } = setup();
+  await repository.workspaces.setActive(USER_WORKSPACE.id);
+  await repository.prefs.update({ timeZone: 'America/New_York' });
+  // 30 s before midnight in New York on a Thursday; the timer fires 100 ms after midnight.
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-11-19T23:59:30-05:00'));
+  const { timeouts } = spyTimers(30_100);
+  const { result } = renderHook(
+    () => ({ today: useRoutineToday(), scores: useDayScores() }),
+    { wrapper: Wrapper },
+  );
+  await settle(() => result.current?.scores.status === 'success');
+  expect(result.current.today).toBe('2026-11-19');
+  expect(result.current.scores.data!.today).toBe('2026-11-19');
+  expect(timeouts.length).toBeGreaterThan(0);
+
+  vi.setSystemTime(new Date('2026-11-20T00:00:10-05:00'));
+  act(() => timeouts.forEach((fn) => fn()));
+  expect(result.current.today).toBe('2026-11-20');
+  expect(result.current.scores.data!.today).toBe('2026-11-20');
+});
+
+test("the sample workspace's money rules count its own USD trades under a EUR base currency (R23)", async () => {
+  const { repository, Wrapper } = setup();
+  await repository.prefs.update({
+    timeZone: 'America/New_York',
+    baseCurrency: 'EUR',
+  });
+  const { result } = renderHook(() => useDayScores(), { wrapper: Wrapper });
+  await waitFor(() => expect(result.current.status).toBe('success'));
+  const cap = result.current
+    .data!.scoreOn('2026-11-17')
+    .rules.find((r) => r.key === 'lossPerDay')!;
+  // The day's USD loss of 129.50 reads against the cap, not as zero.
+  expect(cap.value).toMatchObject({ kind: 'money', cents: 12_950 });
 });

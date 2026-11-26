@@ -13,6 +13,9 @@ import type {
   Account,
   CashFlow,
   Challenge,
+  DayRecord,
+  DayShot,
+  FrozenDay,
   ImportJob,
   JournalEntry,
   NoteFolder,
@@ -20,6 +23,8 @@ import type {
   Strategy,
   Tag,
   TagCategory,
+  Tracker,
+  TrackerVersion,
   Trade,
   UserPrefs,
   Workspace,
@@ -33,6 +38,7 @@ import type {
   NewCashFlow,
   NewChallenge,
   ChallengePatch,
+  FirstRunInput,
   NewStrategy,
   NewTag,
   Repository,
@@ -158,6 +164,22 @@ export function useCashFlows(): UseQueryResult<CashFlow[]> {
 
 export function useChallenges(): UseQueryResult<Challenge[]> {
   return useWorkspaceQuery(keys.challenges, (r, ws) => r.challenges.list(ws));
+}
+
+export function useTracker(): UseQueryResult<Tracker> {
+  return useWorkspaceQuery(keys.tracker, (r, ws) => r.tracker.get(ws));
+}
+
+export function useDays(): UseQueryResult<DayRecord[]> {
+  return useWorkspaceQuery(keys.days, (r, ws) => r.days.list(ws));
+}
+
+/** The day's screenshots, in upload order. */
+export function useDayShots(date: string): UseQueryResult<DayShot[]> {
+  return useWorkspaceQuery(
+    (ws) => keys.dayShots(ws, date),
+    (r, ws) => r.dayShots.list(ws, date),
+  );
 }
 
 export function useTrades(): UseQueryResult<Trade[]> {
@@ -772,5 +794,132 @@ export function useUpdateChallenge(): UseMutationResult<
 export function useRemoveChallenge(): UseMutationResult<void, Error, string> {
   return useWorkspaceWrite('challenges.remove', (r, ws, id: string) =>
     r.challenges.remove(ws, id),
+  );
+}
+
+// The daily routine. A variable is the repo method's arguments after `ws`.
+
+type Rating = 1 | 2 | 3 | 4 | 5 | undefined;
+
+export function useSaveTracker(): UseMutationResult<
+  Tracker,
+  Error,
+  { rules: Omit<TrackerVersion, 'from'> }
+> {
+  return useWorkspaceWrite(
+    'tracker.save',
+    (r, ws, v: { rules: Omit<TrackerVersion, 'from'> }) =>
+      r.tracker.save(ws, v.rules),
+  );
+}
+
+export function useResetTracker(): UseMutationResult<Tracker, Error, void> {
+  return useWorkspaceWrite('tracker.reset', (r, ws) => r.tracker.reset(ws));
+}
+
+export function useStartSession(): UseMutationResult<
+  DayRecord,
+  Error,
+  { date: string }
+> {
+  return useWorkspaceWrite('days.write', (r, ws, v: { date: string }) =>
+    r.days.startSession(ws, v.date),
+  );
+}
+
+export function useEndSession(): UseMutationResult<
+  DayRecord,
+  Error,
+  { date: string }
+> {
+  return useWorkspaceWrite('days.write', (r, ws, v: { date: string }) =>
+    r.days.endSession(ws, v.date),
+  );
+}
+
+export function useSetTick(): UseMutationResult<
+  DayRecord,
+  Error,
+  { date: string; ruleId: string; ticked: boolean }
+> {
+  return useWorkspaceWrite(
+    'days.write',
+    (r, ws, v: { date: string; ruleId: string; ticked: boolean }) =>
+      r.days.setTick(ws, v.date, v.ruleId, v.ticked),
+  );
+}
+
+export function useSetRating(): UseMutationResult<
+  DayRecord,
+  Error,
+  { date: string; rating: Rating }
+> {
+  return useWorkspaceWrite(
+    'days.write',
+    (r, ws, v: { date: string; rating: Rating }) =>
+      r.days.setRating(ws, v.date, v.rating),
+  );
+}
+
+export function useSetMood(): UseMutationResult<
+  DayRecord,
+  Error,
+  { date: string; mood: DayRecord['mood'] }
+> {
+  return useWorkspaceWrite(
+    'days.write',
+    (r, ws, v: { date: string; mood: DayRecord['mood'] }) =>
+      r.days.setMood(ws, v.date, v.mood),
+  );
+}
+
+export function useFinishDay(): UseMutationResult<
+  DayRecord,
+  Error,
+  { date: string; frozen: FrozenDay }
+> {
+  return useWorkspaceWrite(
+    'days.finish',
+    (r, ws, v: { date: string; frozen: FrozenDay }) =>
+      r.days.finish(ws, v.date, v.frozen),
+  );
+}
+
+export function useAddDayShot(): UseMutationResult<
+  DayShot,
+  Error,
+  { date: string; file: { bytes: ArrayBuffer; type: string; name: string } }
+> {
+  return useWorkspaceWrite(
+    'dayShots.add',
+    (
+      r,
+      ws,
+      v: {
+        date: string;
+        file: { bytes: ArrayBuffer; type: string; name: string };
+      },
+    ) => r.dayShots.add(ws, v.date, v.file),
+  );
+}
+
+export function useRemoveDayShot(): UseMutationResult<
+  void,
+  Error,
+  { id: string }
+> {
+  return useWorkspaceWrite('dayShots.remove', (r, ws, v: { id: string }) =>
+    r.dayShots.remove(ws, v.id),
+  );
+}
+
+/** The first run's one write (K47, K55): prefs, My account, and My workspace active. */
+export function useCompleteFirstRun(): UseMutationResult<
+  void,
+  Error,
+  FirstRunInput
+> {
+  return useFixedWrite('onboarding.complete', '', (r, input: FirstRunInput) =>
+    r.onboarding.complete(input),
   );
 }

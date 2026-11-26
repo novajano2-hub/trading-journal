@@ -281,6 +281,36 @@ test('Trash restores, and deletes forever only after a confirmation', async () =
   );
 });
 
+test("Trash offers no Restore or Delete forever on a closed day's note, and says why (M3)", async () => {
+  await openWith('/app/notebook', {
+    prepare: async (r) => {
+      await r.journal.trash(WS, 'daily-2026-11-18');
+      await r.journal.trash(WS, 'n-idea');
+      const tracker = await r.tracker.get(WS);
+      await r.days.finish(WS, '2026-11-18', {
+        version: tracker.versions[0]!,
+        inputs: {},
+        ticks: {},
+      });
+    },
+  });
+  await screen.findByRole('navigation', { name: 'Folders' });
+  fireEvent.click(await within(rail()).findByRole('button', { name: /Trash/ }));
+  await waitFor(() => expect(listItems()).toHaveLength(2));
+  const closed = listItems().find((li) =>
+    li.textContent?.includes('Daily review, 2026-11-18'),
+  )!;
+  expect(within(closed).queryByRole('button', { name: /Restore/ })).toBeNull();
+  expect(within(closed).queryByRole('button', { name: /forever/ })).toBeNull();
+  expect(within(closed).getByRole('note').textContent).toContain(
+    'This day is closed',
+  );
+  // The open note keeps both, and the 30-day line still covers it.
+  const open = listItems().find((li) => li.textContent?.includes('Idea note'))!;
+  expect(within(open).getByRole('button', { name: /Restore/ })).toBeTruthy();
+  expect(screen.getByText(/deleted after 30 days/)).toBeTruthy();
+});
+
 test('deleting a user folder moves its notes to My notes', async () => {
   const { repo } = await openWith('/app/notebook', {
     prepare: async (r, ideasId) => {
@@ -359,6 +389,33 @@ test("the daily note route shows the day card with that day's net and trades", a
   expect(
     await screen.findByRole('textbox', { name: 'Note title' }),
   ).toBeTruthy();
+});
+
+test('a trashed day note shows read-only with Restore', async () => {
+  const { repo } = await openWith('/app/notebook/daily/2026-11-19', {
+    prepare: (r) => r.journal.trash(WS, 'daily-2026-11-19'),
+  });
+  await screen.findByText("This day's note is in Trash.");
+  expect(
+    (
+      (await screen.findByRole('textbox', {
+        name: 'Note title',
+      })) as HTMLInputElement
+    ).readOnly,
+  ).toBe(true);
+  // It is still the date's note: no second one was made.
+  expect(
+    (await repo.journal.list(WS)).filter(
+      (e) => e.date === '2026-11-19' && e.kind === 'daily-review',
+    ),
+  ).toHaveLength(1);
+  fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
+  await waitFor(() =>
+    expect(screen.queryByText("This day's note is in Trash.")).toBeNull(),
+  );
+  expect(
+    (await repo.journal.get(WS, 'daily-2026-11-19'))!.deletedAt,
+  ).toBeUndefined();
 });
 
 const dailyNotes = async (repo: Repository, date: string) =>
@@ -694,6 +751,22 @@ test('New > Note makes a note and opens it', async () => {
     (e) => e.kind === 'note' && e.title === 'Untitled note',
   );
   expect(made).toHaveLength(1);
+});
+
+test('New no longer offers Pre-market plan, and an existing pre-market entry still opens', async () => {
+  await openWith('/app/notebook');
+  expect((await screen.findByText(/Or start one from New/)).textContent).toBe(
+    'Or start one from New: a daily note, a weekly recap or a plain note.',
+  );
+  fireEvent.keyDown(await screen.findByRole('button', { name: 'New' }), {
+    key: 'Enter',
+  });
+  expect(
+    (await screen.findAllByRole('menuitem')).map((i) => i.textContent),
+  ).toEqual(['Daily note', 'Weekly recap', 'Note']);
+  cleanup();
+  await openWith('/app/notebook/n-pm');
+  expect(await screen.findByDisplayValue('Opening bias')).toBeTruthy();
 });
 
 test('typing a title and moving to Trash at once leaves the note in Trash with the new title', async () => {

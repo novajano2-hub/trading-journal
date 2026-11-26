@@ -45,7 +45,7 @@ import { toCents } from '@/domain/money';
 import { localDate } from '@/domain/time';
 import type { Account, Side, Trade } from '@/domain/types';
 import { zoneLabel } from '@/lib/time-zone-label';
-import { clock } from './trade-time';
+import { clock } from '@/lib/time-format';
 
 const INPUT =
   'block h-[38px] w-full rounded-control border border-line-2 bg-surface-1 px-3 text-[14px] font-[550] text-text tabular-nums shadow-[var(--shadow-chip)] transition-[border-color,box-shadow] duration-200 ease-[var(--ease-glide)] outline-none placeholder:text-faint hover:border-faint focus-visible:border-accent focus-visible:shadow-[0_0_0_3px_var(--accent-soft)] aria-invalid:border-muted read-only:bg-sunken read-only:text-muted pointer-coarse:h-11';

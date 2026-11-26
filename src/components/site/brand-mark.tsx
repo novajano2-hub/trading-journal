@@ -9,16 +9,20 @@ export function BrandMark({
   href = '/',
   className = '',
   onClick,
+  compact = false,
 }: {
   href?: string;
   className?: string;
   onClick?(): void;
+  /** The tile alone, for the slim rail. */
+  compact?: boolean;
 }) {
   return (
     <Link
       href={href}
       onClick={onClick}
-      className={`inline-flex items-center gap-2.5 text-[19px] font-[650] tracking-[-0.03em] text-text no-underline ${className}`}
+      aria-label={compact ? 'Keel' : undefined}
+      className={`inline-flex items-center gap-2.5 text-[19px] font-[650] tracking-[-0.03em] text-text no-underline ${compact ? 'justify-center pointer-coarse:size-11' : ''} ${className}`}
     >
       <span
         aria-hidden="true"
@@ -26,7 +30,7 @@ export function BrandMark({
       >
         K
       </span>
-      Keel
+      {compact ? null : 'Keel'}
     </Link>
   );
 }

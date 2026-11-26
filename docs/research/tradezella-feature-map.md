@@ -45,7 +45,7 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | TR4 | Bulk actions on selected trades: tag, add to strategy, mark reviewed, export CSV, delete. A trade carries several strategies, so the bulk bar adds or removes one | Gap 2 | P5, Done |
 | TR5 | Net ROI column, plus % display | Gap 5 | P5, Done |
 | TR6 | Export trades to CSV | Backlog #7 | P5, Done |
-| TR7 | Day-grouped view (one card per day with its net and a link to that day's note) and a week view, with a mini month calendar to jump between dates | New | P6 |
+| TR7 | Day-grouped view (one card per day with its net and a link to that day's note) and a week view, with a mini month calendar to jump between dates. **Built in Plan 6A (Tasks 14 to 17):** `/app/trades/day` and `/app/trades/week`, the mini calendar, the note dialog and the mood quick action. Rows read newest open time first. Left out: the insights and replay quick actions (E151, E153) and the scale strip (#52). | Built | P6, Done in Plan 6A |
 | TR8 | Merge and split trades by hand | Gap 3, E10 | P6 |
 | TR9 | Move trades to another account | Research "Later" | P6 |
 | TR10 | Trade scale: where a trade's P&L sits between the largest loss and largest win of the set, as a trade-log column, a trade-page row, a strip on week cards and an average on reports. The two ends are not settled | New (recording) | P6 (BACKLOG #52, with TR7) |
@@ -141,14 +141,14 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 
 | ID | Feature | Keel today | Goes |
 |---|---|---|---|
-| DV1 | **A page for each trading day.** A plan mode (before and during the session) holds the daily note and a place for chart screenshots. A review mode (after the session) shows that day's trades, net, win rate and session length. Both show the day's discipline checklist | New ("Start my day" in research "Later") | P6 |
+| DV1 | **A page for each trading day.** A plan mode (before and during the session) holds the daily note and a place for chart screenshots. A review mode (after the session) shows that day's trades, net, win rate and session length (the timer's, corrected in Plan 6A). Both show the day's discipline checklist. **Built in Plan 6A (Tasks 11 to 13):** `/app/day/[date]/plan` and `/review`, the stage bar, the timer, the day rating and Close the day, which locks the whole day. Session is the timer's length, not first entry to last exit. Left out: the AI strip and auto-tagger (#22) and the events list (E152). | Built | P6, Done in Plan 6A |
 
 ## Progress tracker (daily discipline score)
 
 | ID | Feature | Keel today | Goes |
 |---|---|---|---|
-| PT1 | **Trading days and a daily score from rules in three stages: prepare, trade, reflect.** Built-in rules, each switchable with a limit: journaled by a set time, traded only within set hours, every trade linked to a strategy, every trade has a stop, max loss per trade, max loss per day. You can add your own checklist rules per stage and weekday | New (E50 asks for some of these) | P6 |
-| PT2 | Score history as a heatmap, current and best streak, perfect days, follow rate per rule. A rule change applies from today on and never rescores past days | New | P6 |
+| PT1 | **Trading days and a daily score from rules in three stages: prepare, trade, reflect.** Built-in rules, each switchable with a limit: journaled by a set time, traded only within set hours, every trade linked to a strategy, every trade has a stop, max loss per trade, max loss per day. You can add your own checklist rules per stage and weekday. **Built in Plan 6A (Tasks 2, 4, 5, 7 to 9):** the six built-in rules, custom rules per stage and weekday, Edit rules and Reset. Left out: the streak email reminder (E150). | Built | P6, Done in Plan 6A |
+| PT2 | Score history as a heatmap, current and best streak, perfect days, follow rate per rule. A rule change applies from today on and never rescores past days. **Built in Plan 6A (Tasks 3, 7, 8):** the heat grid, the current streak, rule streaks and follow rates, with rule edits counted from today. The current streak is the run of perfect days, and the tile shows it alone. | Built | P6, Done in Plan 6A |
 | PT3 | Daily reminder before a streak breaks | Backlog #26 | B#26 |
 
 ## Accounts (`/app/settings/accounts`)
@@ -195,16 +195,16 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 |---|---|---|---|
 | DA1 | Saved dashboard layouts with widgets you add and remove | E51 | P6 |
 | DA2 | Charts for account balance, drawdown, performance by time of day and by duration | Built (partly) | P6 |
-| DA3 | The progress tracker's score and heatmap as a dashboard card | New | P6 (with PT) |
+| DA3 | The progress tracker's score and heatmap as a dashboard card. **Built in Plan 6A (Task 10):** the dashboard's Progress tracker card, which took the Goals card's place (U4). It becomes a removable widget with #46. | Built | P6, Done in Plan 6A |
 | DA4 | A composite performance score of our own | Backlog #23 | B#23 |
 
 ## Getting started
 
 | ID | Feature | Keel today | Goes |
 |---|---|---|---|
-| ON1 | First-run setup: what you trade, live or prop or both, time zone, base currency. It hides the prop pages for traders who don't use prop firms | New | P6 |
-| ON2 | A getting-started checklist (add an account, import trades, set up a strategy) | New | P6 |
-| ON3 | Sign-up survey: experience level, what capital you trade (own, prop, not yet), main broker, instruments, goals (journal, analyse, backtest, learn), how you heard of us. It tailors the defaults, for example hiding prop pages | New | P6 (with ON1) |
+| ON1 | First-run setup: what you trade, live or prop or both, time zone, base currency. It hides the prop pages for traders who don't use prop firms. **Built in Plan 6A (Task 19):** the preferences dialog (name, username, currency, time zone) and a default account. The survey stores answers and changes no default (U2); no source shows TradeZella hiding prop pages. | Built | P6, Done in Plan 6A |
+| ON2 | A getting-started checklist (add an account, import trades, set up a strategy). **Built in Plan 6A (Task 18):** Home's Get started card of three prop-led steps (add your prop firm, create a challenge, add a trade), each with a done look. | Built | P6, Done in Plan 6A |
+| ON3 | Sign-up survey: experience level, what capital you trade (own, prop, not yet), main broker, instruments, goals (journal, analyse, backtest, learn), how you heard of us. It tailors the defaults, for example hiding prop pages. **Built in Plan 6A (Task 19):** the six-step survey, stored only (U2). It tailors nothing. | Built | P6, Done in Plan 6A |
 | ON4 | Paywall, plan choice, retention offers | New | B#3 |
 | ON5 | Referral programme | New | B#3 |
 

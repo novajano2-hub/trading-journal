@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keel, How long have you been trading?</title>
+<!-- Plan 6A comp. Open with ?theme=dark for graphite. -->
+<script>(function(){var q=new URLSearchParams(location.search),t=q.get('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'),d=document.documentElement;d.dataset.theme=t;var s=q.get('state');if(s)d.dataset.state=s;})();</script>
+<link rel="stylesheet" href="shell.css">
+<style>
+
+.ob { min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 0 20px; }
+.ob-top { height: 96px; display: flex; align-items: center; justify-content: center; flex: none; }
+.ob-top .brand { align-self: center; }
+.ob-main { width: 100%; max-width: 400px; flex: 1; padding-bottom: 32px; }
+.ob-card { padding: 30px 32px 28px; }
+.ob-step { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--faint); margin-bottom: 8px; }
+.ob-card .trk { margin-bottom: 26px; }
+.ob-card h1 { font-size: 26px; font-weight: 600; letter-spacing: -.03em; line-height: 1.15; text-align: center; text-wrap: balance; }
+.ob-card .lede { font-size: 14px; color: var(--muted); text-align: center; margin-top: 8px; line-height: 1.55; text-wrap: pretty; }
+.ob-body { margin-top: 24px; display: flex; flex-direction: column; gap: 8px; }
+.ob-actions { display: flex; gap: 8px; margin-top: 26px; }
+.ob-actions .btn { height: 44px; font-size: 15px; font-weight: 500; }
+.ob-actions .btn.pri { flex: 1; }
+.ob-actions .btn:not(.pri) { width: 104px; }
+.ob-foot { height: 64px; display: flex; gap: 20px; align-items: center; justify-content: center; font-size: 13px; color: var(--faint); flex: none; }
+.opt { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--surface-1); font-size: 14.5px; font-weight: 500; color: var(--text); box-shadow: var(--rest); }
+.opt:hover { border-color: var(--faint); }
+.opt .rd { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--line-2); flex: none; display: grid; place-items: center; background: var(--surface-1); }
+.opt.on { border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; box-shadow: none; }
+.opt.on .rd { border-color: var(--accent); background: var(--accent); }
+.opt.on .rd::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #fff; }
+.tiles2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tl2 { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--surface-1); font-size: 14.5px; font-weight: 500; box-shadow: var(--rest); }
+.tl2 .cbx { width: 18px; height: 18px; border-radius: 6px; }
+.tl2 .cbx svg { width: 18px; height: 18px; }
+.tl2.on { border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; box-shadow: none; }
+.what { list-style: none; margin-top: 22px; border-top: 1px solid var(--line); }
+.what li { display: grid; grid-template-columns: 1fr; gap: 2px; padding: 13px 0; border-bottom: 1px solid var(--line); }
+.what b { font-size: 14px; font-weight: 600; } .what span { font-size: 13px; color: var(--muted); line-height: 1.5; }
+.ob-note { font-size: 12.5px; color: var(--faint); text-align: center; margin-top: 14px; line-height: 1.5; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fld .inp { height: 44px; }
+@media (max-width: 639.98px) {
+  .ob-top { height: 72px; }
+  .ob-main { padding-bottom: 120px; }
+  .ob-card { padding: 22px 20px 22px; }
+  .ob-actions { position: fixed; left: 0; right: 0; bottom: 0; margin: 0; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--line); z-index: 10; }
+  .ob-foot { display: none; }
+}
+
+</style>
+</head>
+<body class="no-tabs">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs></defs></svg>
+<div class="ob">
+  <header class="ob-top"><a class="brand" href="#" aria-label="Keel"><span class="mark">K</span>Keel</a></header>
+  <main class="ob-main" id="content"><div class="card ob-card">
+  <div class="ob-step"><span>Step 1 of 6</span><span>About your trading</span></div><div class="trk" role="progressbar" aria-valuemin="1" aria-valuemax="6" aria-valuenow="1" aria-label="Step 1 of 6"><i style="width:16.7%"></i></div>
+  <h1 id="q">How long have you been trading?</h1>
+  <p class="lede">Pick the closest.</p>
+  <div class="ob-body" role="radiogroup" aria-labelledby="q"><label class="opt"><span class="rd" aria-hidden="true"></span><input class="sr" type="radio" name="exp">Less than a year</label><label class="opt on"><span class="rd" aria-hidden="true"></span><input class="sr" type="radio" name="exp" checked>1 to 3 years</label><label class="opt"><span class="rd" aria-hidden="true"></span><input class="sr" type="radio" name="exp">3 to 5 years</label><label class="opt"><span class="rd" aria-hidden="true"></span><input class="sr" type="radio" name="exp">More than 5 years</label></div>
+  <div class="ob-actions"><button class="btn pri">Continue</button></div>
+</div></main>
+  <footer class="ob-foot"><a href="#">Privacy</a><a href="#">Terms</a></footer>
+</div>
+</body>
+</html>

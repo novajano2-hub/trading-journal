@@ -1,6 +1,11 @@
 'use client';
 
-import { CaretDown, Funnel, X } from '@phosphor-icons/react/dist/ssr';
+import {
+  CalendarBlank,
+  CaretDown,
+  Funnel,
+  X,
+} from '@phosphor-icons/react/dist/ssr';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Dialog } from 'radix-ui';
 import { useId, useRef, useState, type ReactNode } from 'react';
@@ -99,6 +104,8 @@ function Row({
  * bottom edge holding the same controls as the chips' popovers, one row each
  * showing what it is set to, and the More filters entry. A choice applies at
  * once, as in a popover. Focus returns to the button when the sheet closes.
+ * With `dateOnly` (the progress tracker) it is a calendar glyph and a sheet of
+ * the date range alone.
  */
 export function FilterSheet({
   filters: f,
@@ -107,6 +114,7 @@ export function FilterSheet({
   onChange,
   disabled = false,
   noTrades = false,
+  dateOnly = false,
 }: {
   filters: GlobalFilters;
   options: FilterOptions;
@@ -114,17 +122,23 @@ export function FilterSheet({
   onChange(next: GlobalFilters): void;
   disabled?: boolean;
   noTrades?: boolean;
+  dateOnly?: boolean;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [row, setRow] = useState<Key | null>(null);
   const reduced = useReducedMotion();
   const noteId = useId();
   const heading = useRef<HTMLHeadingElement>(null);
-  const count = activeFilterCount(f);
-  const name = count > 0 ? `Filters, ${count} active` : 'Filters';
+  const count = dateOnly ? 0 : activeFilterCount(f);
+  const name = dateOnly
+    ? `Date, ${rangeChipLabel(f.range, datesOf(f.range, today))}`
+    : count > 0
+      ? `Filters, ${count} active`
+      : 'Filters';
+  const Glyph = dateOnly ? CalendarBlank : Funnel;
   const face = (
     <>
-      <Funnel
+      <Glyph
         size={20}
         weight={count > 0 ? 'fill' : 'regular'}
         aria-hidden="true"
@@ -141,7 +155,7 @@ export function FilterSheet({
     </>
   );
 
-  if (disabled || noTrades) {
+  if (disabled || (noTrades && !dateOnly)) {
     return (
       <>
         <button
@@ -228,7 +242,7 @@ export function FilterSheet({
                     tabIndex={-1}
                     className="text-[15px] font-semibold outline-none!"
                   >
-                    Filters
+                    {dateOnly ? 'Date' : 'Filters'}
                   </Dialog.Title>
                   <Dialog.Close
                     aria-label="Close"
@@ -252,78 +266,85 @@ export function FilterSheet({
                       close={() => setRow(null)}
                     />
                   </Row>
-                  <Row
-                    title="Symbol"
-                    value={symbol.active ? symbol.text : 'Any'}
-                    set={symbol.active}
-                    open={row === 'symbol'}
-                    onToggle={() => toggle('symbol')}
-                    onClear={() => onChange({ ...f, symbols: [] })}
-                  >
-                    <SymbolBody
-                      symbols={options.symbols}
-                      selected={f.symbols}
-                      onChange={(symbols) => onChange({ ...f, symbols })}
-                    />
-                  </Row>
-                  <Row
-                    title="Side"
-                    value={side.active ? side.text : 'Both'}
-                    set={side.active}
-                    open={row === 'side'}
-                    onToggle={() => toggle('side')}
-                  >
-                    <RadioRows
-                      legend="Side"
-                      options={SIDE_OPTIONS}
-                      value={f.side ?? 'both'}
-                      onChange={(v) =>
-                        onChange({ ...f, side: v === 'both' ? undefined : v })
-                      }
-                    />
-                  </Row>
-                  <Row
-                    title="Strategy"
-                    value={strategy.active ? strategy.text : 'Any'}
-                    set={strategy.active}
-                    open={row === 'strategy'}
-                    onToggle={() => toggle('strategy')}
-                    onClear={() => onChange({ ...f, strategyIds: [] })}
-                  >
-                    <StrategyBody
-                      strategies={options.strategies}
-                      selected={f.strategyIds}
-                      onChange={(strategyIds) =>
-                        onChange({ ...f, strategyIds })
-                      }
-                    />
-                  </Row>
-                  <Row
-                    title="Tags"
-                    value={tag.active ? tag.text : 'Any'}
-                    set={tag.active}
-                    open={row === 'tags'}
-                    onToggle={() => toggle('tags')}
-                    onClear={() => onChange({ ...f, tagIds: [] })}
-                  >
-                    <TagBody
-                      tags={options.tags}
-                      categories={options.categories}
-                      selected={f.tagIds}
-                      onChange={(tagIds) => onChange({ ...f, tagIds })}
-                    />
-                  </Row>
-                  <div className="pt-1">
-                    <MoreFilters
-                      row
-                      filters={f}
-                      options={options}
-                      onChange={onChange}
-                    />
-                  </div>
+                  {dateOnly ? null : (
+                    <>
+                      <Row
+                        title="Symbol"
+                        value={symbol.active ? symbol.text : 'Any'}
+                        set={symbol.active}
+                        open={row === 'symbol'}
+                        onToggle={() => toggle('symbol')}
+                        onClear={() => onChange({ ...f, symbols: [] })}
+                      >
+                        <SymbolBody
+                          symbols={options.symbols}
+                          selected={f.symbols}
+                          onChange={(symbols) => onChange({ ...f, symbols })}
+                        />
+                      </Row>
+                      <Row
+                        title="Side"
+                        value={side.active ? side.text : 'Both'}
+                        set={side.active}
+                        open={row === 'side'}
+                        onToggle={() => toggle('side')}
+                      >
+                        <RadioRows
+                          legend="Side"
+                          options={SIDE_OPTIONS}
+                          value={f.side ?? 'both'}
+                          onChange={(v) =>
+                            onChange({
+                              ...f,
+                              side: v === 'both' ? undefined : v,
+                            })
+                          }
+                        />
+                      </Row>
+                      <Row
+                        title="Strategy"
+                        value={strategy.active ? strategy.text : 'Any'}
+                        set={strategy.active}
+                        open={row === 'strategy'}
+                        onToggle={() => toggle('strategy')}
+                        onClear={() => onChange({ ...f, strategyIds: [] })}
+                      >
+                        <StrategyBody
+                          strategies={options.strategies}
+                          selected={f.strategyIds}
+                          onChange={(strategyIds) =>
+                            onChange({ ...f, strategyIds })
+                          }
+                        />
+                      </Row>
+                      <Row
+                        title="Tags"
+                        value={tag.active ? tag.text : 'Any'}
+                        set={tag.active}
+                        open={row === 'tags'}
+                        onToggle={() => toggle('tags')}
+                        onClear={() => onChange({ ...f, tagIds: [] })}
+                      >
+                        <TagBody
+                          tags={options.tags}
+                          categories={options.categories}
+                          selected={f.tagIds}
+                          onChange={(tagIds) => onChange({ ...f, tagIds })}
+                        />
+                      </Row>
+                      <div className="pt-1">
+                        <MoreFilters
+                          row
+                          filters={f}
+                          options={options}
+                          onChange={onChange}
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
                 <div className="flex flex-none items-center gap-2 border-t border-line px-4 py-3">
-                  {hasActiveFilters(f) ? (
+                  {!dateOnly && hasActiveFilters(f) ? (
                     <button
                       type="button"
                       onClick={() => onChange(EMPTY_FILTERS)}

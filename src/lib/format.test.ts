@@ -178,3 +178,12 @@ describe('format', () => {
     expect(formatDuration(0)).toBe('0s');
   });
 });
+
+test('trimmedPercent keeps up to two decimals and drops trailing zeros', async () => {
+  const { trimmedPercent } = await import('./format');
+  expect(trimmedPercent(0.5)).toBe('50%');
+  expect(trimmedPercent(16 / 33)).toBe('48.48%');
+  expect(trimmedPercent(4 / 7)).toBe('57.14%');
+  expect(trimmedPercent(1)).toBe('100%');
+  expect(trimmedPercent(0)).toBe('0%');
+});

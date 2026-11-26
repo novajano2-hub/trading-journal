@@ -59,7 +59,7 @@ export interface CurrencyMetrics {
   summary: Summary;
   /** On ctx.pnlBasis, the exits dated inside ctx.range. */
   days: DayStat[];
-  /** The same days always on net, as goals and the risk ratios read them. */
+  /** The same days always on net, as the risk ratios read them. */
   netDays: DayStat[];
   daySummary: ReturnType<typeof daySummary>;
   equity: EquityPoint[];
@@ -98,7 +98,7 @@ export function metricsByCurrency(
     baseCurrency: string;
     /**
      * The trades with every filter but the date, for the day-level figures
-     * (days, day durations, goals, risk); `ctx.range` clips their exits.
+     * (days, day durations, risk); `ctx.range` clips their exits.
      * Defaults to `trades`.
      */
     dayTrades?: readonly Trade[];

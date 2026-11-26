@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { AppShell } from '@/components/app/app-shell';
+import { FirstRunGate, GateLoading } from '@/components/app/first-run-gate';
 import { DataProvider } from '@/data/query/provider';
 
 export const metadata: Metadata = { robots: { index: false } };
@@ -20,7 +21,15 @@ export default function AppGroupLayout({
       className="flex flex-1 flex-col [--tab-bar:0px] max-sm:[--tab-bar:calc(56px+env(safe-area-inset-bottom))]"
     >
       <DataProvider>
-        <AppShell>{children}</AppShell>
+        <FirstRunGate
+          fallback={
+            <AppShell>
+              <GateLoading />
+            </AppShell>
+          }
+        >
+          <AppShell>{children}</AppShell>
+        </FirstRunGate>
       </DataProvider>
     </div>
   );

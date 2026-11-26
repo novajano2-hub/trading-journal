@@ -3,7 +3,9 @@ import {
   CalendarBlank,
   ChartBar,
   ClockCounterClockwise,
+  Gauge,
   GearSix,
+  House,
   ListBullets,
   Notebook,
   PlayCircle,
@@ -16,12 +18,15 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import { MODULES, type ModuleInfo } from '@/content/modules';
 import { parseFilters, serializeFilters } from '@/data/filters';
+import { decodedSegment } from '@/lib/route-param';
 
 export type AppModuleId =
+  | 'home'
   | 'dashboard'
   | 'trades'
   | 'calendar'
   | 'reports'
+  | 'progress'
   | 'strategies'
   | 'notebook'
   | 'import'
@@ -58,6 +63,17 @@ const NEEDS_MARKET_DATA = "It needs market data, which Keel doesn't have yet.";
 
 export const APP_NAV: readonly NavItem[] = [
   {
+    id: 'home',
+    label: 'Home',
+    href: '/app/home',
+    icon: House,
+    group: 'modules',
+    filterScoped: false,
+    built: true,
+    summary:
+      'Your first steps in Keel, a way into each part, and where to look next.',
+  },
+  {
     id: 'dashboard',
     label: 'Dashboard',
     href: '/app/dashboard',
@@ -71,7 +87,8 @@ export const APP_NAV: readonly NavItem[] = [
   {
     id: 'trades',
     label: 'Trades',
-    href: '/app/trades',
+    // Trades opens the Day view (K36); /app/trades stays the All view.
+    href: '/app/trades/day',
     icon: ListBullets,
     group: 'modules',
     filterScoped: true,
@@ -99,6 +116,17 @@ export const APP_NAV: readonly NavItem[] = [
     built: false,
     summary:
       'Your results by time of day, weekday, symbol, strategy, tag, side, duration and R.',
+  },
+  {
+    id: 'progress',
+    label: 'Progress tracker',
+    href: '/app/progress',
+    icon: Gauge,
+    group: 'modules',
+    filterScoped: true,
+    built: true,
+    summary:
+      'How consistently you follow your own rules: your streak, your score and every rule.',
   },
   {
     id: 'strategies',
@@ -221,6 +249,11 @@ export function navHref(
 
 /** The item whose href is the longest prefix of `pathname`, by whole segments. */
 export function activeItem(pathname: string): NavItem | undefined {
+  // A day page sits under Trades (comps 04 and 05).
+  if (dayPageDate(pathname) !== undefined) return navItem('trades');
+  // Every Trades page: All, Day, Week and one trade (Trades' own href is the Day view).
+  if (pathname === '/app/trades' || pathname.startsWith('/app/trades/'))
+    return navItem('trades');
   let best: NavItem | undefined;
   for (const item of APP_NAV) {
     const inside =
@@ -230,56 +263,63 @@ export function activeItem(pathname: string): NavItem | undefined {
   return best;
 }
 
+/** The date segment when `pathname` is a day page (`/app/day/<date>` or its plan or review), raw and undecoded. */
+export function dayPageDate(pathname: string): string | undefined {
+  return /^\/app\/day\/([^/]+)(?:\/(?:plan|review))?\/?$/.exec(pathname)?.[1];
+}
+
 /** The top bar's title: the active module, else the product name. */
 export function pageTitle(pathname: string): string {
   return activeItem(pathname)?.label ?? 'Keel';
 }
 
-/** The trade id when `pathname` is one trade's page (not the log, the new-trade form or an edit), decoded. */
+/** The trade id when `pathname` is one trade's page (not a log view, the new-trade form or an edit), decoded. */
 export function tradePageId(pathname: string): string | undefined {
   const m = /^\/app\/trades\/([^/]+)$/.exec(pathname);
-  if (!m || m[1] === 'new') return undefined;
-  try {
-    return decodeURIComponent(m[1]!);
-  } catch {
-    return m[1];
-  }
+  if (!m || m[1] === 'new' || m[1] === 'day' || m[1] === 'week')
+    return undefined;
+  return decodedSegment(m[1]!);
 }
-
-const decoded = (raw: string): string => {
-  try {
-    return decodeURIComponent(raw);
-  } catch {
-    return raw;
-  }
-};
 
 /** The strategy id when `pathname` is one strategy's page (not the list, the new form or the editor), decoded. */
 export function strategyPageId(pathname: string): string | undefined {
   const m = /^\/app\/strategies\/([^/]+)$/.exec(pathname);
-  return !m || m[1] === 'new' ? undefined : decoded(m[1]!);
+  return !m || m[1] === 'new' ? undefined : decodedSegment(m[1]!);
 }
 
 /** The strategy id when `pathname` is one strategy's editor, decoded. */
 export function strategyEditId(pathname: string): string | undefined {
   const m = /^\/app\/strategies\/([^/]+)\/edit$/.exec(pathname);
-  return m ? decoded(m[1]!) : undefined;
+  return m ? decodedSegment(m[1]!) : undefined;
 }
 
 /**
  * Whether the global filters drive this page: Dashboard, the trade log, Calendar,
- * Strategies (the list and one strategy) and Reports, except Compare, whose two groups each own their filters.
+ * Strategies (the list and one strategy), the progress tracker (its date range only) and Reports, except Compare, whose two groups each own their filters.
  * Elsewhere the bar shows no chips.
  */
 export function filtersApply(pathname: string): boolean {
   return (
     /^\/app\/(dashboard|trades|calendar|strategies)$/.test(pathname) ||
+    /^\/app\/trades\/(day|week)$/.test(pathname) ||
     (/^\/app\/strategies\/[^/]+$/.test(pathname) &&
       pathname !== '/app/strategies/new') ||
     (/^\/app\/reports(\/|$)/.test(pathname) &&
-      !/^\/app\/reports\/compare\/?$/.test(pathname))
+      !/^\/app\/reports\/compare\/?$/.test(pathname)) ||
+    pathname === '/app/progress'
   );
 }
+
+/**
+ * Pages where the bar shows the date range alone: the progress tracker, which
+ * has no Filters and takes its accounts from the switcher (K14).
+ */
+export const datesOnly = (pathname: string): boolean =>
+  pathname === '/app/progress';
+
+/** Pages with no Display menu: money there is always net, in its own currency (P6A-03). */
+export const hidesDisplayMenu = (pathname: string): boolean =>
+  pathname === '/app/progress' || dayPageDate(pathname) !== undefined;
 
 /** The page where each group of trades has its own filters rather than the global ones. */
 export const isComparePage = (pathname: string): boolean =>

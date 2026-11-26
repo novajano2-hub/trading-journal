@@ -183,6 +183,8 @@ export interface JournalEntry {
   deletedAt?: string;
   /** The note's own tags, separate from trade tags. */
   tags: string[];
+  /** The template the note started from. */
+  templateId?: string;
   updatedAt: string;
 }
 export interface NoteFolder {
@@ -263,18 +265,11 @@ export type CalendarStat =
   | 'ticks'
   | 'pips'
   | 'points';
-/** One workspace's goals, in its base currency. A missing field means that goal isn't set. */
-export interface Goals {
-  weeklyNet?: Cents;
-  dailyLossLimit?: Cents;
-}
 export interface UserPrefs {
   timeZone: string;
   baseCurrency: string;
   breakevenRange: BreakevenRange;
   pnlBasis: PnlBasis;
-  /** Goals per workspace id; a workspace with no entry has none set (the sample workspace falls back to its defaults). */
-  goals?: Record<string, Goals>;
   displayName?: string;
   /** How every money figure shows. */
   displayUnit: DisplayUnit;
@@ -291,4 +286,121 @@ export interface UserPrefs {
   settleExpiredOptions: boolean;
   /** Light, dark, or the device's preference; undefined: System. */
   appearance?: Appearance;
+  onboarding?: Onboarding;
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  /** The Day view's columns; undefined: its default set. */
+  dayColumns?: string[];
+  /** The Week view's columns; undefined: its default set. */
+  weekColumns?: string[];
+  /** Tips the user has dismissed. */
+  seenTips?: string[];
+}
+
+// ---- The daily routine -----------------------------------------------------
+
+export type TrackerStage = 'prepare' | 'trade' | 'reflect';
+/** Sunday first, as Date#getDay. */
+export type Weekdays = [
+  boolean,
+  boolean,
+  boolean,
+  boolean,
+  boolean,
+  boolean,
+  boolean,
+];
+export interface BuiltInRules {
+  startBy: { on: boolean; time: string /* HH:mm */ };
+  hours: { on: boolean; from: string; to: string /* HH:mm, profile zone */ };
+  strategy: { on: boolean };
+  stop: { on: boolean };
+  lossPerTrade: {
+    on: boolean;
+    unit: 'amount' | 'percent';
+    value: number /* Cents, or a fraction: 0.01 = 1% */;
+  };
+  lossPerDay: { on: boolean; amount: Cents };
+}
+export interface CustomRule {
+  id: string;
+  name: string;
+  stage: TrackerStage;
+  days: Weekdays;
+}
+export interface TrackerVersion {
+  from: string /* YYYY-MM-DD */;
+  tradingDays: Weekdays;
+  builtIn: BuiltInRules;
+  custom: CustomRule[];
+}
+export interface Tracker {
+  id: 'tracker';
+  workspaceId: string;
+  startedOn: string;
+  versions: TrackerVersion[] /* oldest first */;
+  /** The sample's fixed today. */
+  asOf?: string;
+}
+/** One account's inputs to a day's trade rules; summed across the selected accounts. */
+export interface AccountDayInputs {
+  opened: number;
+  withStrategy: number;
+  withStop: number;
+  inHours: number;
+  /** Opened in the base currency: the per-trade cap's y (K5, K24). */
+  moneyOpened: number;
+  /** Of those, within the per-trade cap, winners included (K5, K7). */
+  withinTradeLoss: number;
+  /** The largest single-trade loss among them, positive; 0 if none (K6). */
+  largestLoss: Cents;
+  /** Realized net booked on the date, base currency (K8, K24). */
+  dayNet: Cents;
+  /** A trade opened or exited on the date (K8). */
+  booked: boolean;
+  /** Trades left out of the money rules (K24). */
+  otherCurrency: number;
+}
+export interface FrozenDay {
+  version: TrackerVersion;
+  inputs: Record<string /* accountId */, AccountDayInputs>;
+  ticks: Record<string, boolean>;
+  noteStartedAt?: string;
+}
+export interface DayRecord {
+  id: string /* YYYY-MM-DD */;
+  workspaceId: string;
+  noteStartedAt?: string /* UTC ISO */;
+  session?: { start: string; end?: string };
+  ticks?: Record<string, boolean>;
+  finishedAt?: string;
+  locked?: FrozenDay;
+  mood?: { value: 1 | 2 | 3 | 4 | 5; note?: string };
+  rating?: 1 | 2 | 3 | 4 | 5;
+}
+export interface DayShot {
+  id: string;
+  workspaceId: string;
+  date: string;
+  bytes: ArrayBuffer;
+  type: 'image/png' | 'image/jpeg';
+  name: string;
+  size: number;
+  createdAt: string;
+}
+export interface SurveyAnswers {
+  experience: string;
+  capital: string[];
+  broker: string;
+  instruments: string[];
+  goals: string[];
+  heardFrom: string;
+  heardFromOther?: string;
+}
+export interface Onboarding {
+  status: 'done';
+  at: string;
+  survey?: SurveyAnswers;
+  existing?: true;
 }

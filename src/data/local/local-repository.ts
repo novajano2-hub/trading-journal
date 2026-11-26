@@ -4,14 +4,18 @@ import { createLocalContext, defaultSample } from './context';
 import { localAccounts } from './accounts';
 import { localCashFlows } from './cashflows';
 import { localChallenges } from './challenges';
+import { localDays } from './days';
+import { localDayShots } from './day-shots';
 import { localFolders } from './folders';
 import { localImports } from './imports';
 import { localJournal } from './journal';
+import { localOnboarding } from './onboarding';
 import { localPrefs } from './prefs';
 import { localStrategies } from './strategies';
 import { localTagCategories } from './tag-categories';
 import { localTags } from './tags';
 import { localTemplates } from './templates';
+import { localTracker } from './tracker';
 import { localTrades } from './trades';
 import { localWorkspaces } from './workspaces';
 
@@ -46,5 +50,9 @@ export function createLocalRepository(
     folders: localFolders(ctx),
     journal: localJournal(ctx),
     imports: localImports(ctx),
+    tracker: localTracker(ctx),
+    days: localDays(ctx),
+    dayShots: localDayShots(ctx),
+    onboarding: localOnboarding(ctx),
   };
 }

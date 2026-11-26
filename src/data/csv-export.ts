@@ -1,6 +1,7 @@
 import { localParts } from '@/domain/time';
 import { csvField, decimalOf } from '@/lib/csv';
 import type { Trade } from '@/domain/types';
+import { dayOfTrade } from './day-log';
 import { COLUMN_LABELS, type ColumnId } from './trade-columns';
 import {
   heldMs,
@@ -93,6 +94,10 @@ export function tradesCsv(
         return t.reviewed === true ? 'Yes' : 'No';
       case 'status':
         return statusOf(t, env.ctx);
+      case 'ticker':
+        return t.instrument.root;
+      case 'day':
+        return dayOfTrade(t, env.timeZone);
     }
   };
   const header = columns.map((id) => {

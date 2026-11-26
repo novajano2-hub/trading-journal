@@ -10,6 +10,7 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import type { JournalEntry, JournalKind, WeekStart } from '@/domain/types';
 import { weekFirstDay } from '@/domain/week';
+import { decodedSegment } from '@/lib/route-param';
 import { docText } from '@/lib/note-text';
 
 export type BuiltInFolder =
@@ -143,19 +144,13 @@ export type Selection =
   | { type: 'entry'; id: string }
   | { type: 'daily'; date: string };
 
-const decoded = (raw: string): string => {
-  try {
-    return decodeURIComponent(raw);
-  } catch {
-    return raw;
-  }
-};
-
 export function selectionOf(pathname: string): Selection {
   const day = /^\/app\/notebook\/daily\/([^/]+)\/?$/.exec(pathname);
-  if (day) return { type: 'daily', date: decoded(day[1]!) };
+  if (day) return { type: 'daily', date: decodedSegment(day[1]!) };
   const one = /^\/app\/notebook\/([^/]+)\/?$/.exec(pathname);
-  return one ? { type: 'entry', id: decoded(one[1]!) } : { type: 'none' };
+  return one
+    ? { type: 'entry', id: decodedSegment(one[1]!) }
+    : { type: 'none' };
 }
 
 /** A real calendar date written YYYY-MM-DD. */
@@ -168,4 +163,15 @@ export function isRealDate(date: string): boolean {
     at.getUTCMonth() === m - 1 &&
     at.getUTCDate() === d
   );
+}
+
+/** The date's daily note: one out of Trash, else the trashed one, which is still the date's note (E109). */
+export function findDailyEntry(
+  entries: readonly JournalEntry[] | undefined,
+  date: string,
+): JournalEntry | undefined {
+  const onDate = entries?.filter(
+    (e) => e.kind === 'daily-review' && e.date === date,
+  );
+  return onDate?.find((e) => e.deletedAt === undefined) ?? onDate?.[0];
 }

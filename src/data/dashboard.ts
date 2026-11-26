@@ -1,12 +1,4 @@
 import type { MetricContext } from '@/domain/metrics/context';
-import type { DayStat } from '@/domain/metrics/days';
-import {
-  dailyLossProgress,
-  goalWeek,
-  weeklyGoalProgress,
-  type DailyLossProgress,
-  type WeeklyGoalProgress,
-} from '@/domain/metrics/goals';
 import {
   mistakeCosts,
   mistakeTags,
@@ -25,7 +17,6 @@ import { closedInOrder } from '@/domain/trade-status';
 import {
   strategyRules,
   type Cents,
-  type Goals,
   type PnlBasis,
   type Strategy,
   type Tag,
@@ -138,18 +129,7 @@ export interface DashboardEnv {
   strategies: readonly Strategy[];
   tags: readonly Tag[];
   tagCategories: readonly TagCategory[];
-  goals: Goals;
-  /** Goals are in the base currency only. */
-  baseCurrency: string;
   ctx: MetricContext;
-  /** The resolved date range. */
-  range: { from?: string; to?: string };
-  today: string;
-  /**
-   * The net days the goals read, when they are not the bundle's own: under a
-   * display unit that narrows the set, goals still read every trade, in money.
-   */
-  goalDays?: readonly DayStat[];
 }
 
 export interface DashboardModel {
@@ -165,12 +145,6 @@ export interface DashboardModel {
     rules: RuleScore[];
   };
   mistakes: MistakeCost[];
-  /** `unavailable` is a plain reason when goals can't be shown for this currency; the goals are then null. */
-  goals: {
-    weekly: WeeklyGoalProgress | null;
-    dailyLoss: DailyLossProgress | null;
-    unavailable: string | null;
-  };
   performance: {
     pnl: Cents;
     winRate: number | null;
@@ -216,35 +190,6 @@ export function buildDashboard(
   const kept = rules.reduce((n, r) => n + r.kept, 0);
   const checks = rules.reduce((n, r) => n + r.kept + r.broken, 0);
 
-  // Goals run on net P&L whatever the Gross/Net switch says, and only in the base currency.
-  let goals: DashboardModel['goals'] = {
-    weekly: null,
-    dailyLoss: null,
-    unavailable: null,
-  };
-  if (m.currency !== env.baseCurrency) {
-    goals = {
-      ...goals,
-      unavailable: `Goals use your base currency (${env.baseCurrency}).`,
-    };
-  } else {
-    // Goals read the net days, whatever the basis shows, and every trade
-    // whatever the unit: they are money targets.
-    const days = env.goalDays ?? m.netDays;
-    const window = goalWeek(env.range, env.today, env.ctx.weekStart);
-    goals = {
-      weekly:
-        env.goals.weeklyNet !== undefined && window !== null
-          ? weeklyGoalProgress(days, env.goals.weeklyNet, window)
-          : null,
-      dailyLoss:
-        env.goals.dailyLossLimit !== undefined
-          ? dailyLossProgress(days, env.goals.dailyLossLimit)
-          : null,
-      unavailable: null,
-    };
-  }
-
   const outcomes = winsVsLosses(m.trades, env.ctx);
   const recent = closed
     .slice()
@@ -270,7 +215,6 @@ export function buildDashboard(
       rules,
     },
     mistakes: mistakeCosts(m.trades, env.tags, env.tagCategories, env.ctx),
-    goals,
     performance: {
       pnl: summary.basis === 'gross' ? summary.grossPnl : summary.netPnl,
       winRate: summary.winRate,

@@ -28,6 +28,7 @@ MotionGlobalConfig.skipAnimations = true;
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  window.sessionStorage.clear();
 });
 
 const WS = fixtureSample().trades[0]!.workspaceId;
@@ -122,6 +123,39 @@ test('Previous and Next stay within ?symbol=ES, by open time, and keep the param
   expect(
     screen.getByRole('link', { name: /Back to trades/ }).getAttribute('href'),
   ).toBe('/app/trades?symbol=ES');
+});
+
+test('Back to trades, the delete redirect and the not-found link return to the log view last used, with the filters', async () => {
+  window.sessionStorage.setItem('keel.tradeLogView', 'week');
+  const manual = renderApp(<TradeView id="t-c" />, {
+    sample: sample({ source: 'manual' }),
+    url: URL_C,
+  });
+  expect(
+    (await screen.findByRole('link', { name: /Back to trades/ })).getAttribute(
+      'href',
+    ),
+  ).toBe('/app/trades/week?symbol=ES');
+  fireEvent.click(screen.getByRole('button', { name: 'Delete trade' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+  await waitFor(async () =>
+    expect(await manual.repo.trades.get(WS, 't-c')).toBeUndefined(),
+  );
+  await waitFor(() =>
+    expect(window.location.pathname).toBe('/app/trades/week'),
+  );
+  expect(window.location.search).toBe('?symbol=ES');
+  cleanup();
+
+  window.sessionStorage.setItem('keel.tradeLogView', 'day');
+  renderApp(<TradeView id="nope" />, {
+    sample: sample(),
+    url: '/app/trades/nope?symbol=ES',
+  });
+  await screen.findByText("This trade isn't in this workspace.");
+  expect(
+    screen.getByRole('link', { name: 'Back to trades' }).getAttribute('href'),
+  ).toBe('/app/trades/day?symbol=ES');
 });
 
 test('trade ids with a slash are encoded in every link', async () => {
@@ -715,6 +749,57 @@ test('the notes card switches between the trade note and the day note, and links
   await screen.findByRole('textbox', { name: 'Trade note' });
 });
 
+test('a trashed day note shows read-only with Restore', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: sample(),
+  });
+  const note = await repository.journal.dailyNote(WS, '2026-11-09');
+  await repository.journal.trash(WS, note.id);
+  renderApp(<TradeView id="t-c" />, { repository, url: URL_C });
+  await screen.findByRole('textbox', { name: 'Trade note' });
+  fireEvent.click(screen.getByRole('radio', { name: 'Daily note' }));
+  await screen.findByText("This day's note is in Trash.");
+  // The link opens the trashed note itself.
+  expect(
+    screen
+      .getByRole('link', { name: 'Open in the Notebook' })
+      .getAttribute('href'),
+  ).toBe(`/app/notebook/${note.id}`);
+  fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
+  await waitFor(() =>
+    expect(screen.queryByText("This day's note is in Trash.")).toBeNull(),
+  );
+  const days = (await repository.journal.list(WS)).filter(
+    (e) => e.kind === 'daily-review' && e.date === '2026-11-09',
+  );
+  expect(days).toHaveLength(1);
+  expect(days[0]!.deletedAt).toBeUndefined();
+});
+
+test('a refused Restore on the trade page says so and leaves the note in Trash', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: sample(),
+  });
+  const note = await repository.journal.dailyNote(WS, '2026-11-09');
+  await repository.journal.trash(WS, note.id);
+  vi.spyOn(repository.journal, 'restore').mockRejectedValue(
+    new Error('The day is finished'),
+  );
+  renderApp(<TradeView id="t-c" />, { repository, url: URL_C });
+  await screen.findByRole('textbox', { name: 'Trade note' });
+  fireEvent.click(screen.getByRole('radio', { name: 'Daily note' }));
+  await screen.findByText("This day's note is in Trash.");
+  fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
+  expect((await screen.findByRole('alert')).textContent).toBe(
+    "Couldn't restore that note. Try again.",
+  );
+  expect(screen.getByText("This day's note is in Trash.")).toBeTruthy();
+});
+
 test('editing the day note creates the daily entry for the exit date once, and the link then opens it', async () => {
   const handle: { current: NoteEditorHandle | null } = { current: null };
   const { repo } = renderApp(<TradeView id="t-c" noteHandleRef={handle} />, {
@@ -755,7 +840,7 @@ test('editing the day note creates the daily entry for the exit date once, and t
   );
 });
 
-test('a day note trashed in another tab is not brought back by the next keystroke (M5)', async () => {
+test("a day note trashed in another tab stays the date's note, read-only (M5, E109)", async () => {
   const handle: { current: NoteEditorHandle | null } = { current: null };
   const { repo } = renderApp(<TradeView id="t-c" noteHandleRef={handle} />, {
     sample: async () => {
@@ -789,25 +874,14 @@ test('a day note trashed in another tab is not brought back by the next keystrok
   const other = new BroadcastChannel('keel-data');
   other.postMessage({ keys: [['keel', 'ws', WS, 'journal']] });
   other.close();
-  await waitFor(() =>
-    expect(
-      screen
-        .getByRole('link', { name: 'Open in the Notebook' })
-        .getAttribute('href'),
-    ).toBe('/app/notebook/daily/2026-11-09'),
+  // The trashed note is still the day's note (E109): read-only, with Restore.
+  await screen.findByText("This day's note is in Trash.");
+  expect(screen.getByRole('button', { name: 'Restore' })).toBeTruthy();
+  const rows = (await repo.journal.list(WS)).filter(
+    (e) => e.kind === 'daily-review' && e.date === '2026-11-09',
   );
-  act(() => handle.current!.runSlashCommand('Divider'));
-  await screen.findByText('Saved', undefined, { timeout: 3000 });
-  // The trashed note stays in the Trash; the change made a new day note.
-  expect((await repo.journal.get(WS, 'd-9'))?.deletedAt).toBeDefined();
-  const live = (await repo.journal.list(WS)).filter(
-    (e) =>
-      e.kind === 'daily-review' &&
-      e.date === '2026-11-09' &&
-      e.deletedAt === undefined,
-  );
-  expect(live).toHaveLength(1);
-  expect(JSON.stringify(live[0]!.body)).toContain('horizontalRule');
+  expect(rows.map((e) => e.id)).toEqual(['d-9']);
+  expect(rows[0]!.deletedAt).toBeDefined();
 });
 
 test('a note trashed elsewhere during the save delay is saved onto a whole note, never a body alone (re-review N1)', async () => {
@@ -857,17 +931,11 @@ test('a note trashed elsewhere during the save delay is saved onto a whole note,
     const other = new BroadcastChannel('keel-data');
     other.postMessage({ keys: [['keel', 'ws', WS, 'journal']] });
     other.close();
-    await waitFor(() =>
-      expect(
-        screen
-          .getByRole('link', { name: 'Open in the Notebook' })
-          .getAttribute('href'),
-      ).toBe('/app/notebook/daily/2026-11-09'),
-    );
+    await screen.findByText("This day's note is in Trash.");
     // The delay ends.
     act(() => held.at(-1)!());
     await screen.findByText('Saved', undefined, { timeout: 3000 });
-    // Every stored note is whole, and the change went into a new day note.
+    // Every stored note is whole, and the change went onto the trashed day note, which stays in Trash (E109).
     const rows = await repo.journal.list(WS);
     for (const row of rows) {
       expect(row.kind, row.id).toBeDefined();
@@ -875,14 +943,11 @@ test('a note trashed elsewhere during the save delay is saved onto a whole note,
       expect(Array.isArray(row.tags), row.id).toBe(true);
     }
     expect((await repo.journal.get(WS, 'd-9'))?.deletedAt).toBeDefined();
-    const live = rows.filter(
-      (e) =>
-        e.kind === 'daily-review' &&
-        e.date === '2026-11-09' &&
-        e.deletedAt === undefined,
+    const day = rows.filter(
+      (e) => e.kind === 'daily-review' && e.date === '2026-11-09',
     );
-    expect(live).toHaveLength(1);
-    expect(JSON.stringify(live[0]!.body)).toContain('horizontalRule');
+    expect(day).toHaveLength(1);
+    expect(JSON.stringify(day[0]!.body)).toContain('horizontalRule');
   } finally {
     spy.mockRestore();
   }
@@ -978,54 +1043,6 @@ test('the day note opens with the default daily template and the first save keep
   );
 });
 
-test('a trashed daily entry for the date is ignored, as the Notebook does: a fresh one is made', async () => {
-  const handle: { current: NoteEditorHandle | null } = { current: null };
-  const base = sample();
-  const { repo } = renderApp(<TradeView id="t-c" noteHandleRef={handle} />, {
-    sample: async () => ({
-      ...(await base()),
-      journal: [
-        {
-          id: 'j-trashed',
-          workspaceId: WS,
-          kind: 'daily-review',
-          date: '2026-11-09',
-          title: 'Old day',
-          body: { type: 'doc', content: [{ type: 'paragraph' }] },
-          linkedTradeIds: [],
-          tags: [],
-          updatedAt: '2026-11-10T00:00:00.000Z',
-          deletedAt: '2026-11-11T00:00:00.000Z',
-        },
-      ],
-    }),
-    url: URL_C,
-  });
-  await screen.findByRole('textbox', { name: 'Trade note' });
-  fireEvent.click(screen.getByRole('radio', { name: 'Daily note' }));
-  await screen.findByRole('textbox', { name: 'Daily note' });
-  expect(
-    screen
-      .getByRole('link', { name: 'Open in the Notebook' })
-      .getAttribute('href'),
-  ).toBe('/app/notebook/daily/2026-11-09');
-  await waitFor(() => expect(handle.current).not.toBeNull());
-  act(() => handle.current!.runSlashCommand('Divider'));
-  await waitFor(
-    async () => {
-      const live = (await repo.journal.list(WS)).filter(
-        (e) =>
-          e.kind === 'daily-review' &&
-          e.date === '2026-11-09' &&
-          e.deletedAt === undefined,
-      );
-      expect(live).toHaveLength(1);
-      expect(live[0]!.id).not.toBe('j-trashed');
-    },
-    { timeout: 3000 },
-  );
-});
-
 test('the trade note tab does not read the journal', async () => {
   const { repo } = renderApp(<TradeView id="t-c" />, {
     sample: sample(),
@@ -1034,4 +1051,36 @@ test('the trade note tab does not read the journal', async () => {
   const list = vi.spyOn(repo.journal, 'list');
   await screen.findByRole('textbox', { name: 'Trade note' });
   expect(list).not.toHaveBeenCalled();
+});
+
+test("the Daily note dates by the trader's zone, not the account's (K35)", async () => {
+  const base = sample(
+    {
+      openedAt: '2026-11-20T03:00:00Z',
+      closedAt: '2026-11-20T03:30:00Z',
+      executions: [],
+    },
+    'acc-a',
+  );
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => {
+      const w = await base();
+      return {
+        ...w,
+        accounts: w.accounts.map((a) =>
+          a.id === 'acc-a' ? { ...a, timeZone: 'Asia/Tokyo' } : a,
+        ),
+      };
+    },
+  });
+  await repository.prefs.update({ timeZone: 'America/New_York' });
+  renderApp(<TradeView id="t-c" />, { repository, url: URL_C });
+  await screen.findByRole('textbox', { name: 'Trade note' });
+  fireEvent.click(screen.getByRole('radio', { name: 'Daily note' }));
+  const link = await screen.findByRole('link', {
+    name: 'Open in the Notebook',
+  });
+  expect(link.getAttribute('href')).toBe('/app/notebook/daily/2026-11-19');
 });

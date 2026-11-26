@@ -1,14 +1,7 @@
 // @vitest-environment happy-dom
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
-import { commitNavigation } from './__fixtures__/navigation';
 import { renderApp } from './__fixtures__/render-app';
 import { TopBar } from './top-bar';
 
@@ -16,6 +9,7 @@ vi.mock('next/navigation', () => import('./__fixtures__/navigation'));
 
 afterEach(() => {
   cleanup();
+  window.sessionStorage.clear();
   vi.restoreAllMocks();
 });
 
@@ -58,13 +52,12 @@ function layOut({
 }
 
 function renderBar(path = '/app/dashboard'): HTMLElement {
-  window.history.replaceState(null, '', path);
-  commitNavigation();
-  render(
+  renderApp(
     <TopBar
       filters={<div data-testid="chips" />}
       search={<button data-testid="search">Search</button>}
     />,
+    { url: path },
   );
   return screen.getByRole('banner');
 }
@@ -127,7 +120,7 @@ test('below sm the bar is one 56px row pinned to the top, unmeasured', () => {
 
 test('the source reads as the bar does: menu, title, badge, chips, search, label, Display menu, Import; none reordered by CSS', () => {
   layOut({ titleWidth: 115, chipsWidth: 100 });
-  render(
+  renderApp(
     <TopBar
       menu={<button data-testid="menu">Menu</button>}
       filters={<div data-testid="chips" />}
@@ -155,6 +148,7 @@ test('the source reads as the bar does: menu, title, badge, chips, search, label
     'search',
     'label',
     'basis',
+    'Plan the day',
     'Import',
   ]);
   // No theme toggle at any width: Appearance lives in Settings and the menus.
@@ -163,7 +157,7 @@ test('the source reads as the bar does: menu, title, badge, chips, search, label
 });
 
 test('below sm the title keeps the menu slot and the sample badge beside it, and Import leaves the bar', () => {
-  render(
+  renderApp(
     <TopBar
       menu={<button data-testid="menu">Menu</button>}
       filters={<div data-testid="chips" />}
@@ -200,6 +194,22 @@ test('a trade page titles the bar "Trades" then the trade number, and shows no f
   await waitFor(() => expect(title.textContent).toContain(String(id.serial)));
   expect(screen.queryByTestId('chips')).toBeNull();
   expect(screen.getByRole('banner').dataset.chips).toBeUndefined();
+});
+
+test('the Trades crumb returns to the log view last used in this tab', () => {
+  window.sessionStorage.setItem('keel.tradeLogView', 'day');
+  const id = fixtureSample().trades[0]!;
+  renderApp(
+    <TopBar
+      filters={<div data-testid="chips" />}
+      search={<button data-testid="search">Search</button>}
+    />,
+    { url: `/app/trades/${encodeURIComponent(id.id)}?symbol=ES` },
+  );
+  const title = screen.getByRole('heading', { level: 1 });
+  expect(
+    within(title).getByRole('link', { name: 'Trades' }).getAttribute('href'),
+  ).toBe('/app/trades/day?symbol=ES');
 });
 
 test('the trade log keeps its plain title and its chips', () => {
@@ -249,4 +259,48 @@ test('the strategy list and the new-strategy form keep their plain titles', () =
   const title = screen.getByRole('heading', { level: 1 });
   expect(title.textContent).toBe('Strategies');
   expect(within(title).queryByRole('link')).toBeNull();
+});
+
+test('Plan the day sits before Import on the Dashboard and Trades only', () => {
+  for (const path of ['/app/dashboard', '/app/trades']) {
+    const bar = renderBar(path);
+    const plan = within(bar).getByRole('button', { name: 'Plan the day' });
+    const imp = within(bar).getByRole('link', { name: 'Import' });
+    expect(
+      plan.compareDocumentPosition(imp) & Node.DOCUMENT_POSITION_FOLLOWING,
+      path,
+    ).toBeTruthy();
+    cleanup();
+  }
+  for (const path of ['/app/calendar', '/app/import', '/app/trades/t-1']) {
+    const bar = renderBar(path);
+    expect(
+      within(bar).queryByRole('button', { name: 'Plan the day' }),
+      path,
+    ).toBeNull();
+    cleanup();
+  }
+});
+
+test('the bar publishes its measured height for what pins under it, and Plan the day shows on the day and week views', () => {
+  layOut({ titleWidth: 115, chipsWidth: 100 });
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+    function (this: HTMLElement) {
+      return {
+        left: 0,
+        width: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        height: this.tagName === 'HEADER' ? 104 : 0,
+      } as DOMRect;
+    },
+  );
+  renderBar('/app/trades/day');
+  expect(document.documentElement.style.getPropertyValue('--top-bar')).toBe(
+    '104px',
+  );
+  expect(screen.getByRole('button', { name: 'Plan the day' })).toBeTruthy();
+  cleanup();
+  expect(document.documentElement.style.getPropertyValue('--top-bar')).toBe('');
 });

@@ -1,3 +1,4 @@
+import { USERNAME } from '../onboarding';
 import { isValidTimeZone } from '@/domain/time';
 import type {
   Appearance,
@@ -52,10 +53,6 @@ export function localPrefs(ctx: LocalContext): PrefsRepo {
       await db.transaction('rw', db.meta, async () => {
         const current = asPartial((await db.meta.get(META.prefs))?.value);
         stored = { ...current, ...changes };
-        // Goals merge per workspace, so a stale caller can't clobber other workspaces' goals.
-        if (changes.goals)
-          stored.goals = { ...current.goals, ...changes.goals };
-        validate({ goals: stored.goals });
         await db.meta.put({ key: META.prefs, value: stored });
       });
       return withDefaults(stored);
@@ -79,7 +76,7 @@ export function localPrefs(ctx: LocalContext): PrefsRepo {
   };
 }
 
-function validate(p: Partial<UserPrefs>): void {
+export function validate(p: Partial<UserPrefs>): void {
   if (p.timeZone !== undefined && !isValidTimeZone(p.timeZone))
     throw new RangeError(`Unknown time zone "${p.timeZone}"`);
   const range = p.breakevenRange;
@@ -117,26 +114,47 @@ function validate(p: Partial<UserPrefs>): void {
     throw new RangeError(
       `Calendar stats must be one or more of ${CALENDAR_STATS.join(', ')}, each once, got ${stats.join(', ')}`,
     );
-  for (const [id, g] of Object.entries(p.goals ?? {})) {
-    if (typeof g !== 'object' || g === null)
-      throw new RangeError(`Goals for workspace "${id}" must be an object`);
-    for (const [field, cents] of Object.entries(g))
-      if (cents !== undefined && !(Number.isSafeInteger(cents) && cents > 0))
-        throw new RangeError(
-          `Goal ${field} for workspace "${id}" must be a positive whole number of cents, got ${cents}`,
-        );
+  if (p.username !== undefined && !USERNAME.test(p.username))
+    throw new RangeError(
+      'A username is 3 to 30 letters, digits, dots or underscores',
+    );
+  const ob = p.onboarding;
+  if (
+    ob !== undefined &&
+    !(
+      typeof ob === 'object' &&
+      ob !== null &&
+      ob.status === 'done' &&
+      typeof ob.at === 'string' &&
+      new Date(ob.at).toISOString() === ob.at
+    )
+  )
+    throw new RangeError(
+      'Onboarding must be { status: "done", at: <ISO time> }',
+    );
+  for (const key of ['dayColumns', 'weekColumns', 'seenTips'] as const) {
+    const list = p[key];
+    if (
+      list !== undefined &&
+      !(Array.isArray(list) && list.every((k) => typeof k === 'string'))
+    )
+      throw new RangeError(`${key} must be a list of strings`);
   }
 }
 
-const asPartial = (value: unknown): Partial<UserPrefs> =>
+export const asPartial = (value: unknown): Partial<UserPrefs> =>
   typeof value === 'object' && value !== null
     ? (value as Partial<UserPrefs>)
     : {};
 
-const withDefaults = (stored: unknown): UserPrefs => ({
-  ...defaultPrefs(),
-  ...asPartial(stored),
-});
+/** A `goals` key left by an older version is ignored on read, and stays in storage. */
+const withDefaults = (stored: unknown): UserPrefs => {
+  const kept: Partial<UserPrefs> & { goals?: unknown } = {
+    ...asPartial(stored),
+  };
+  delete kept.goals;
+  return { ...defaultPrefs(), ...kept };
+};
 
 /** A key set to undefined means "unchanged", not "erase". */
 function definedOnly(patch: Partial<UserPrefs>): Partial<UserPrefs> {

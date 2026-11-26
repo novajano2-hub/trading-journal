@@ -42,6 +42,7 @@ import { DRAFT_ID, EntryPane } from './entry-pane';
 import { FolderRail } from './folder-rail';
 import {
   BUILT_IN_FOLDERS,
+  findDailyEntry,
   folderOfKind,
   inFolder,
   isRealDate,
@@ -122,10 +123,7 @@ function DailyPane({
   props: Omit<React.ComponentProps<typeof EntryPane>, 'entry' | 'ensure'>;
 }): React.JSX.Element {
   const { mutateAsync } = useDailyNote();
-  const existing = entries.find(
-    (e) =>
-      e.kind === 'daily-review' && e.date === date && e.deletedAt === undefined,
-  );
+  const existing = findDailyEntry(entries, date);
   const draft = useMemo(
     (): JournalEntry => ({
       id: DRAFT_ID,
@@ -205,17 +203,15 @@ export function NotebookView(): React.JSX.Element {
     if (noticeId !== undefined) undoButton.current?.focus();
   }, [noticeId]);
 
-  const open: JournalEntry | undefined =
-    selection.type === 'entry'
-      ? entries?.find((e) => e.id === selection.id)
-      : selection.type === 'daily'
-        ? entries?.find(
-            (e) =>
-              e.kind === 'daily-review' &&
-              e.date === selection.date &&
-              e.deletedAt === undefined,
-          )
-        : undefined;
+  const open: JournalEntry | undefined = useMemo(
+    () =>
+      selection.type === 'entry'
+        ? entries?.find((e) => e.id === selection.id)
+        : selection.type === 'daily'
+          ? findDailyEntry(entries, selection.date)
+          : undefined,
+    [entries, selection],
+  );
 
   // A folder you picked wins; before that, the one the open note belongs to.
   const known = (key: FolderKey) =>
@@ -385,7 +381,6 @@ export function NotebookView(): React.JSX.Element {
           {(
             [
               ['daily-review', 'Daily note'],
-              ['pre-market', 'Pre-market plan'],
               ['weekly-recap', 'Weekly recap'],
               ['note', 'Note'],
             ] as const
@@ -416,7 +411,7 @@ export function NotebookView(): React.JSX.Element {
       <StateBlock
         visual={<StateGlyph icon={NotePencil} />}
         title="Pick a note to read it."
-        body="Or start one from New: a daily note, a pre-market plan, a weekly recap or a plain note."
+        body="Or start one from New: a daily note, a weekly recap or a plain note."
       />
     );
   else if (selection.type === 'daily')

@@ -2,6 +2,7 @@ import type { PnlBasis } from '@/domain/types';
 
 export const METRIC_IDS = [
   'rule-adherence',
+  'session-length',
   'broken-rules-cost',
   'rule-kept',
   'rule-cost-broken',
@@ -11,8 +12,6 @@ export const METRIC_IDS = [
   'rule-followed-pf',
   'trade-rule-kept',
   'mistake-cost',
-  'weekly-goal',
-  'daily-loss-limit',
   'trades',
   'pnl',
   'cumulative-pnl',
@@ -107,6 +106,21 @@ export const METRIC_IDS = [
   'day-pips',
   'day-points',
   'day-rating',
+  'tracker-streak',
+  'tracker-score',
+  'tracker-today',
+  'day-trades',
+  'day-gross',
+  'day-won-lost',
+  'day-commissions',
+  'day-win-rate',
+  'day-volume',
+  'day-profit-factor',
+  'rule-streak',
+  'rule-average',
+  'tracker-history',
+  'tracker-card',
+  'tracker-follow-rate',
 ] as const;
 
 export type MetricId = (typeof METRIC_IDS)[number];
@@ -161,16 +175,6 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Cost',
     definition:
       'Total {basis} P&L of closed trades tagged with this mistake. A trade with two mistakes counts in both.',
-  },
-  'weekly-goal': {
-    label: 'Weekly net goal',
-    definition:
-      'Net P&L after fees of closed trades from the first day of your week to today, or to the end of your date range, in your timezone. Always net.',
-  },
-  'daily-loss-limit': {
-    label: 'Daily loss limit',
-    definition:
-      'A day breaks the limit when its net P&L after fees falls below minus the limit. A day exactly at the limit keeps it. Always net.',
   },
   trades: {
     label: 'Trades',
@@ -366,6 +370,11 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Volume',
     definition:
       'Contracts, lots or shares traded, each trade counted once by the quantity it opened, not by every fill. On a day, a trade counts what its exits closed that day, so a trade that exits over several days is shared among them by exited size. What an open trade still holds counts on the day it opened.',
+  },
+  'session-length': {
+    label: 'Session',
+    definition:
+      "How long the day's session ran, from Start session to End session. A session left running ends at midnight. None when the day's session was never started.",
   },
   'day-rating': {
     label: 'Day rating',
@@ -629,6 +638,81 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Consistency',
     definition:
       "The best day's net P&L as a share of the phase's profit. The rule is kept while it stays at or under the limit. It reads only once the phase is in profit.",
+  },
+  'tracker-streak': {
+    label: 'Current streak',
+    definition:
+      "Scored days in a row on which you met every rule that applied. It counts back from today, or from yesterday while today is still open. One day that falls short ends it. Days that aren't scored, such as weekends, don't break it.",
+  },
+  'tracker-score': {
+    label: 'Score',
+    definition:
+      "The average share of rules met across the scored days in the range. Each day counts the same, however many rules applied that day. Days that aren't scored are left out. It reads None until you have met a rule in the range.",
+  },
+  'tracker-today': {
+    label: 'Today',
+    definition:
+      'The rules met so far today, of the rules that apply. A rule that can still be met stays pending until the day ends or you close it.',
+  },
+  'day-trades': {
+    label: 'Trades',
+    definition:
+      "Every trade in the day or week, open ones included. Open trades are counted here but aren't in the figures beside it.",
+  },
+  'day-gross': {
+    label: 'Gross P&L',
+    definition:
+      'P&L of the closed trades before fees and commissions. None while none has closed.',
+  },
+  'day-won-lost': {
+    label: 'Won / lost',
+    definition:
+      'Closed trades that ended in profit, then in loss, outside your breakeven range. Open trades are left out.',
+  },
+  'day-commissions': {
+    label: 'Commissions',
+    definition:
+      'Fees and commissions on the closed trades: gross P&L minus net P&L.',
+  },
+  'day-win-rate': {
+    label: 'Win rate',
+    definition:
+      'Winners divided by winners plus losers, on closed trades. Breakeven and open trades are left out. None without a winner or a loser.',
+  },
+  'day-volume': {
+    label: 'Volume',
+    definition:
+      'The quantity traded in the day or week, both sides: the buys and the sells are both counted, so a trade that opens and closes ten contracts adds twenty.',
+  },
+  'day-profit-factor': {
+    label: 'Profit factor',
+    definition:
+      'Total won divided by total lost, after fees and commissions. None when no closed trade lost.',
+  },
+  'rule-streak': {
+    label: 'Streak',
+    definition:
+      "Days in a row that this rule was met, counting back from today, or from yesterday while today's check is pending. A day it failed ends the run.",
+  },
+  'rule-average': {
+    label: 'Average',
+    definition:
+      "This rule's own figure averaged over the scored days in the range: the share of trades kept, the day's loss, the largest loss in a trade, or the time the day note was started. None when no day has one. Money here is always net.",
+  },
+  'tracker-history': {
+    label: 'History',
+    definition:
+      "Each square is a trading day, shaded by the share of rules you met that day: the darkest is every rule. Blank squares aren't scored: weekends and other non-trading days.",
+  },
+  'tracker-card': {
+    label: 'Progress tracker',
+    definition:
+      'How consistently you follow your own rules. Each square is a trading day, shaded by the share of rules you met.',
+  },
+  'tracker-follow-rate': {
+    label: 'Follow rate',
+    definition:
+      "The days that kept this rule, divided by the days it was decided, in the date range. A day still pending doesn't count, and a rule with no decided day reads 0%.",
   },
 };
 

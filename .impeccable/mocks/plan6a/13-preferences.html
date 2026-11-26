@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keel, Your profile</title>
+<!-- Plan 6A comp. Open with ?theme=dark for graphite. Variants: saved -->
+<script>(function(){var q=new URLSearchParams(location.search),t=q.get('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'),d=document.documentElement;d.dataset.theme=t;var s=q.get('state');if(s)d.dataset.state=s;})();</script>
+<link rel="stylesheet" href="shell.css">
+<style>
+
+.greet { padding: 6px 0 2px; }
+.greet h2 { font-size: 26px; font-weight: 600; letter-spacing: -.03em; line-height: 1.15; }
+.greet p { font-size: 14px; color: var(--muted); margin-top: 4px; }
+.hm { display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 16px; align-items: start; }
+.steps { list-style: none; margin-top: 8px; }
+.steps li { display: flex; align-items: center; gap: 14px; padding: 16px 0; border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.steps li:first-child { border-top: 0; }
+.sn { width: 30px; height: 30px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 13.5px; font-weight: 600; color: var(--muted); box-shadow: inset 0 0 0 1.5px var(--line-2); }
+.steps .next .sn { box-shadow: inset 0 0 0 2px var(--accent); color: var(--accent-ink); }
+.steps .done .sn { background: var(--sunken); box-shadow: none; color: var(--muted); }
+.steps .done .sn svg.i { width: 15px; height: 15px; }
+.st { flex: 1; min-width: 0; }
+.st b { display: block; font-size: 14.5px; font-weight: 600; }
+.st p { font-size: 13px; color: var(--muted); margin-top: 2px; line-height: 1.5; max-width: 62ch; }
+.steps .done .st b { color: var(--faint); text-decoration: line-through; text-decoration-thickness: 1.5px; font-weight: 500; }
+.steps .done .st p { color: var(--faint); }
+.hlist { list-style: none; margin-top: 6px; }
+.hlist li + li { border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.hrow { display: flex; align-items: center; gap: 14px; min-height: 60px; padding: 10px 0; }
+.hrow svg.hg { width: 18px; height: 18px; color: var(--muted); }
+.ht { flex: 1; min-width: 0; } .ht b { display: block; font-size: 14px; font-weight: 500; } .ht span { display: block; font-size: 12.5px; color: var(--faint); margin-top: 2px; line-height: 1.45; }
+.hrow svg.car { width: 13px; height: 13px; color: var(--faint); }
+.hrow.off b { color: var(--muted); } .hrow.off svg.hg { color: var(--faint); opacity: .7; }
+@media (max-width: 639.98px) {
+  .hm { display: flex; flex-direction: column; gap: 14px; }
+  .steps li { flex-wrap: wrap; align-items: flex-start; }
+  .steps .st { flex: 0 0 calc(100% - 44px); }
+  .steps li .btn, .steps li .chip { margin-left: 44px; }
+  .greet h2 { font-size: 24px; }
+}
+
+/* Preferences: a required modal over Home while it loads. ?state=saved shows Home after saving. */
+html:not([data-state='saved']) .v-saved { display: none !important; }
+[data-state='saved'] .v-load { display: none !important; }
+.sk { display: block; border-radius: 6px; background: color-mix(in srgb, var(--line) 85%, var(--surface-1)); }
+.sk-list { margin-top: 8px; }
+.sk-row { display: flex; align-items: center; gap: 14px; min-height: 62px; padding: 14px 0; }
+.sk-row + .sk-row { border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.sk-lines { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+@media (min-width: 640px) { .pf { width: min(520px, calc(100vw - 48px)); max-height: calc(100vh - 40px); } }
+.pf-body { display: flex; flex-direction: column; gap: 16px; padding-top: 2px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pf .caret { display: inline-block; width: 1.5px; height: 18px; background: var(--accent); margin-left: -6px; }
+.tzo { color: var(--muted); font-weight: 500; }
+.toast { position: fixed; right: 24px; bottom: 24px; z-index: 45; display: flex; align-items: flex-start; gap: 10px; width: min(360px, calc(100vw - 32px));
+  padding: 12px 16px 12px 14px; border-radius: 12px; background: var(--surface-1); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.toast svg.i { width: 18px; height: 18px; color: var(--accent-ink); margin-top: 1px; }
+.toast b { display: block; font-size: 13.5px; font-weight: 600; }
+.toast span { display: block; font-size: 12.5px; color: var(--muted); margin-top: 2px; line-height: 1.45; }
+@media (max-width: 639.98px) {
+  .pf .dlg-ft .end { flex: 1; } .pf .dlg-ft .btn { flex: 1; height: 44px; font-size: 15px; font-weight: 500; }
+  .toast { left: 16px; right: 16px; width: auto; bottom: calc(var(--tab-bar) + 12px); }
+}
+</style>
+</head>
+<body class="">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><symbol id="i-CaretUpDown-bold" viewBox="0 0 256 256"><path d="M184.49,167.51a12,12,0,0,1,0,17l-48,48a12,12,0,0,1-17,0l-48-48a12,12,0,0,1,17-17L128,207l39.51-39.52A12,12,0,0,1,184.49,167.51Zm-96-79L128,49l39.51,39.52a12,12,0,0,0,17-17l-48-48a12,12,0,0,0-17,0l-48,48a12,12,0,0,0,17,17Z"/></symbol><symbol id="i-House-regular" viewBox="0 0 256 256"><path d="M219.31,108.68l-80-80a16,16,0,0,0-22.62,0l-80,80A15.87,15.87,0,0,0,32,120v96a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V160h32v56a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V120A15.87,15.87,0,0,0,219.31,108.68ZM208,208H160V152a8,8,0,0,0-8-8H104a8,8,0,0,0-8,8v56H48V120l80-80,80,80Z"/></symbol><symbol id="i-SquaresFour-regular" viewBox="0 0 256 256"><path d="M104,40H56A16,16,0,0,0,40,56v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,104,40Zm0,64H56V56h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,200,40Zm0,64H152V56h48v48Zm-96,32H56a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,104,136Zm0,64H56V152h48v48Zm96-64H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,200,136Zm0,64H152V152h48v48Z"/></symbol><symbol id="i-ListBullets-regular" viewBox="0 0 256 256"><path d="M80,64a8,8,0,0,1,8-8H216a8,8,0,0,1,0,16H88A8,8,0,0,1,80,64Zm136,56H88a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Zm0,64H88a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16ZM44,52A12,12,0,1,0,56,64,12,12,0,0,0,44,52Zm0,64a12,12,0,1,0,12,12A12,12,0,0,0,44,116Zm0,64a12,12,0,1,0,12,12A12,12,0,0,0,44,180Z"/></symbol><symbol id="i-CalendarBlank-regular" viewBox="0 0 256 256"><path d="M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM72,48v8a8,8,0,0,0,16,0V48h80v8a8,8,0,0,0,16,0V48h24V80H48V48ZM208,208H48V96H208V208Z"/></symbol><symbol id="i-ChartBar-regular" viewBox="0 0 256 256"><path d="M224,200h-8V40a8,8,0,0,0-8-8H152a8,8,0,0,0-8,8V80H96a8,8,0,0,0-8,8v40H48a8,8,0,0,0-8,8v64H32a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16ZM160,48h40V200H160ZM104,96h40V200H104ZM56,144H88v56H56Z"/></symbol><symbol id="i-Gauge-regular" viewBox="0 0 256 256"><path d="M207.06,72.67A111.24,111.24,0,0,0,128,40h-.4C66.07,40.21,16,91,16,153.13V176a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V152A111.25,111.25,0,0,0,207.06,72.67ZM224,176H119.71l54.76-75.3a8,8,0,0,0-12.94-9.42L99.92,176H32V153.13c0-3.08.15-6.12.43-9.13H56a8,8,0,0,0,0-16H35.27c10.32-38.86,44-68.24,84.73-71.66V80a8,8,0,0,0,16,0V56.33A96.14,96.14,0,0,1,221,128H200a8,8,0,0,0,0,16h23.67c.21,2.65.33,5.31.33,8Z"/></symbol><symbol id="i-Strategy-regular" viewBox="0 0 256 256"><path d="M76,152a36,36,0,1,0,36,36A36,36,0,0,0,76,152Zm0,56a20,20,0,1,1,20-20A20,20,0,0,1,76,208ZM42.34,106.34,56.69,92,42.34,77.66A8,8,0,0,1,53.66,66.34L68,80.69,82.34,66.34A8,8,0,0,1,93.66,77.66L79.31,92l14.35,14.34a8,8,0,0,1-11.32,11.32L68,103.31,53.66,117.66a8,8,0,0,1-11.32-11.32Zm187.32,96a8,8,0,0,1-11.32,11.32L204,199.31l-14.34,14.35a8,8,0,0,1-11.32-11.32L192.69,188l-14.35-14.34a8,8,0,0,1,11.32-11.32L204,176.69l14.34-14.35a8,8,0,0,1,11.32,11.32L215.31,188Zm-45.19-89.51c-6.18,22.33-25.32,41.63-46.53,46.93A8.13,8.13,0,0,1,136,160a8,8,0,0,1-1.93-15.76c15.63-3.91,30.35-18.91,35-35.68,3.19-11.5,3.22-29-14.71-46.9L152,59.31V80a8,8,0,0,1-16,0V40a8,8,0,0,1,8-8h40a8,8,0,0,1,0,16H163.31l2.35,2.34C183.9,68.59,190.58,90.78,184.47,112.83Z"/></symbol><symbol id="i-Notebook-regular" viewBox="0 0 256 256"><path d="M184,112a8,8,0,0,1-8,8H112a8,8,0,0,1,0-16h64A8,8,0,0,1,184,112Zm-8,24H112a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16Zm48-88V208a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V48A16,16,0,0,1,48,32H208A16,16,0,0,1,224,48ZM48,208H72V48H48Zm160,0V48H88V208H208Z"/></symbol><symbol id="i-UploadSimple-regular" viewBox="0 0 256 256"><path d="M224,144v64a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V144a8,8,0,0,1,16,0v56H208V144a8,8,0,0,1,16,0ZM93.66,77.66,120,51.31V144a8,8,0,0,0,16,0V51.31l26.34,26.35a8,8,0,0,0,11.32-11.32l-40-40a8,8,0,0,0-11.32,0l-40,40A8,8,0,0,0,93.66,77.66Z"/></symbol><symbol id="i-ShieldCheck-regular" viewBox="0 0 256 256"><path d="M208,40H48A16,16,0,0,0,32,56v56c0,52.72,25.52,84.67,46.93,102.19,23.06,18.86,46,25.26,47,25.53a8,8,0,0,0,4.2,0c1-.27,23.91-6.67,47-25.53C198.48,196.67,224,164.72,224,112V56A16,16,0,0,0,208,40Zm0,72c0,37.07-13.66,67.16-40.6,89.42A129.3,129.3,0,0,1,128,223.62a128.25,128.25,0,0,1-38.92-21.81C61.82,179.51,48,149.3,48,112l0-56,160,0ZM82.34,141.66a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35a8,8,0,0,1,11.32,11.32l-56,56a8,8,0,0,1-11.32,0Z"/></symbol><symbol id="i-ClockCounterClockwise-regular" viewBox="0 0 256 256"><path d="M136,80v43.47l36.12,21.67a8,8,0,0,1-8.24,13.72l-40-24A8,8,0,0,1,120,128V80a8,8,0,0,1,16,0Zm-8-48A95.44,95.44,0,0,0,60.08,60.15C52.81,67.51,46.35,74.59,40,82V64a8,8,0,0,0-16,0v40a8,8,0,0,0,8,8H72a8,8,0,0,0,0-16H49c7.15-8.42,14.27-16.35,22.39-24.57a80,80,0,1,1,1.66,114.75,8,8,0,1,0-11,11.64A96,96,0,1,0,128,32Z"/></symbol><symbol id="i-PlayCircle-regular" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm48.24-94.78-64-40A8,8,0,0,0,100,88v80a8,8,0,0,0,12.24,6.78l64-40a8,8,0,0,0,0-13.56ZM116,153.57V102.43L156.91,128Z"/></symbol><symbol id="i-UsersThree-regular" viewBox="0 0 256 256"><path d="M244.8,150.4a8,8,0,0,1-11.2-1.6A51.6,51.6,0,0,0,192,128a8,8,0,0,1-7.37-4.89,8,8,0,0,1,0-6.22A8,8,0,0,1,192,112a24,24,0,1,0-23.24-30,8,8,0,1,1-15.5-4A40,40,0,1,1,219,117.51a67.94,67.94,0,0,1,27.43,21.68A8,8,0,0,1,244.8,150.4ZM190.92,212a8,8,0,1,1-13.84,8,57,57,0,0,0-98.16,0,8,8,0,1,1-13.84-8,72.06,72.06,0,0,1,33.74-29.92,48,48,0,1,1,58.36,0A72.06,72.06,0,0,1,190.92,212ZM128,176a32,32,0,1,0-32-32A32,32,0,0,0,128,176ZM72,120a8,8,0,0,0-8-8A24,24,0,1,1,87.24,82a8,8,0,1,0,15.5-4A40,40,0,1,0,37,117.51,67.94,67.94,0,0,0,9.6,139.19a8,8,0,1,0,12.8,9.61A51.6,51.6,0,0,1,64,128,8,8,0,0,0,72,120Z"/></symbol><symbol id="i-Sparkle-regular" viewBox="0 0 256 256"><path d="M197.58,129.06,146,110l-19-51.62a15.92,15.92,0,0,0-29.88,0L78,110l-51.62,19a15.92,15.92,0,0,0,0,29.88L78,178l19,51.62a15.92,15.92,0,0,0,29.88,0L146,178l51.62-19a15.92,15.92,0,0,0,0-29.88ZM137,164.22a8,8,0,0,0-4.74,4.74L112,223.85,91.78,169A8,8,0,0,0,87,164.22L32.15,144,87,123.78A8,8,0,0,0,91.78,119L112,64.15,132.22,119a8,8,0,0,0,4.74,4.74L191.85,144ZM144,40a8,8,0,0,1,8-8h16V16a8,8,0,0,1,16,0V32h16a8,8,0,0,1,0,16H184V64a8,8,0,0,1-16,0V48H152A8,8,0,0,1,144,40ZM248,88a8,8,0,0,1-8,8h-8v8a8,8,0,0,1-16,0V96h-8a8,8,0,0,1,0-16h8V72a8,8,0,0,1,16,0v8h8A8,8,0,0,1,248,88Z"/></symbol><symbol id="i-GearSix-regular" viewBox="0 0 256 256"><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm109.94-52.79a8,8,0,0,0-3.89-5.4l-29.83-17-.12-33.62a8,8,0,0,0-2.83-6.08,111.91,111.91,0,0,0-36.72-20.67,8,8,0,0,0-6.46.59L128,41.85,97.88,25a8,8,0,0,0-6.47-.6A112.1,112.1,0,0,0,54.73,45.15a8,8,0,0,0-2.83,6.07l-.15,33.65-29.83,17a8,8,0,0,0-3.89,5.4,106.47,106.47,0,0,0,0,41.56,8,8,0,0,0,3.89,5.4l29.83,17,.12,33.62a8,8,0,0,0,2.83,6.08,111.91,111.91,0,0,0,36.72,20.67,8,8,0,0,0,6.46-.59L128,214.15,158.12,231a7.91,7.91,0,0,0,3.9,1,8.09,8.09,0,0,0,2.57-.42,112.1,112.1,0,0,0,36.68-20.73,8,8,0,0,0,2.83-6.07l.15-33.65,29.83-17a8,8,0,0,0,3.89-5.4A106.47,106.47,0,0,0,237.94,107.21Zm-15,34.91-28.57,16.25a8,8,0,0,0-3,3c-.58,1-1.19,2.06-1.81,3.06a7.94,7.94,0,0,0-1.22,4.21l-.15,32.25a95.89,95.89,0,0,1-25.37,14.3L134,199.13a8,8,0,0,0-3.91-1h-.19c-1.21,0-2.43,0-3.64,0a8.08,8.08,0,0,0-4.1,1l-28.84,16.1A96,96,0,0,1,67.88,201l-.11-32.2a8,8,0,0,0-1.22-4.22c-.62-1-1.23-2-1.8-3.06a8.09,8.09,0,0,0-3-3.06l-28.6-16.29a90.49,90.49,0,0,1,0-28.26L61.67,97.63a8,8,0,0,0,3-3c.58-1,1.19-2.06,1.81-3.06a7.94,7.94,0,0,0,1.22-4.21l.15-32.25a95.89,95.89,0,0,1,25.37-14.3L122,56.87a8,8,0,0,0,4.1,1c1.21,0,2.43,0,3.64,0a8.08,8.08,0,0,0,4.1-1l28.84-16.1A96,96,0,0,1,188.12,55l.11,32.2a8,8,0,0,0,1.22,4.22c.62,1,1.23,2,1.8,3.06a8.09,8.09,0,0,0,3,3.06l28.6,16.29A90.49,90.49,0,0,1,222.9,142.12Z"/></symbol><symbol id="i-MagnifyingGlass-regular" viewBox="0 0 256 256"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/></symbol><symbol id="i-CaretDown-bold" viewBox="0 0 256 256"><path d="M216.49,104.49l-80,80a12,12,0,0,1-17,0l-80-80a12,12,0,0,1,17-17L128,159l71.51-71.52a12,12,0,0,1,17,17Z"/></symbol><symbol id="i-Check-bold" viewBox="0 0 256 256"><path d="M232.49,80.49l-128,128a12,12,0,0,1-17,0l-56-56a12,12,0,1,1,17-17L96,183,215.51,63.51a12,12,0,0,1,17,17Z"/></symbol><symbol id="i-CaretRight-bold" viewBox="0 0 256 256"><path d="M184.49,136.49l-80,80a12,12,0,0,1-17-17L159,128,87.51,56.49a12,12,0,1,1,17-17l80,80A12,12,0,0,1,184.49,136.49Z"/></symbol><symbol id="i-ArrowUpRight-bold" viewBox="0 0 256 256"><path d="M204,64V168a12,12,0,0,1-24,0V93L72.49,200.49a12,12,0,0,1-17-17L163,76H88a12,12,0,0,1,0-24H192A12,12,0,0,1,204,64Z"/></symbol><symbol id="i-DotsThreeOutline-fill" viewBox="0 0 256 256"><path d="M156,128a28,28,0,1,1-28-28A28,28,0,0,1,156,128ZM48,100a28,28,0,1,0,28,28A28,28,0,0,0,48,100Zm160,0a28,28,0,1,0,28,28A28,28,0,0,0,208,100Z"/></symbol><symbol id="i-Info-regular" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm16-40a8,8,0,0,1-8,8,16,16,0,0,1-16-16V128a8,8,0,0,1,0-16,16,16,0,0,1,16,16v40A8,8,0,0,1,144,176ZM112,84a12,12,0,1,1,12,12A12,12,0,0,1,112,84Z"/></symbol><symbol id="i-CircleNotch-bold" viewBox="0 0 256 256"><path d="M236,128a108,108,0,0,1-216,0c0-42.52,24.73-81.34,63-98.9A12,12,0,1,1,93,50.91C63.24,64.57,44,94.83,44,128a84,84,0,0,0,168,0c0-33.17-19.24-63.43-49-77.09A12,12,0,1,1,173,29.1C211.27,46.66,236,85.48,236,128Z"/></symbol></defs></svg>
+<div class="app">
+<aside class="side" aria-label="Sidebar">
+  <a class="brand" href="#"><span class="mark">K</span>Keel</a>
+  <button class="ws v-load" type="button"><span><b>Sample workspace</b><small>All accounts</small></span><svg class="i" aria-hidden="true"><use href="#i-CaretUpDown-bold"/></svg></button>
+  <button class="ws v-saved" type="button"><span><b>My workspace</b><small>My account</small></span><svg class="i" aria-hidden="true"><use href="#i-CaretUpDown-bold"/></svg></button>
+  <nav aria-label="App" style="flex:1;display:flex;flex-direction:column">
+    <ul><li><a class="nv on" href="#" aria-current="page"><svg class="i" aria-hidden="true"><use href="#i-House-regular"/></svg><span>Home</span></a></li><li><a class="nv" href="#"><svg class="i" aria-hidden="true"><use href="#i-SquaresFour-regular"/></svg><span>Dashboard</span></a></li><li><a class="nv" href="#"><svg class="i" aria-hidden="true"><use href="#i-ListBullets-regular"/></svg><span>Trades</span></a></li><li><a class="nv" href="#"><svg class="i" aria-hidden="true"><use href="#i-CalendarBlank-regular"/></svg><span>Calendar</span></a></li><li><a class="nv" href="#"><svg class="i" aria-hidden="true"><use href="#i-ChartBar-regular"/></svg><span>Reports</span></a></li><li><a class="nv" href="#"><svg class="i" aria-hidden="true"><use href="#i-Gauge-regular"/></svg><span>Progress tracker</span></a></li><li><a class="nv" href="#"><svg class="i" aria-hidden="true"><use href="#i-Strategy-regular"/></svg><span>Strategies</span></a></li><li><a class="nv" href="#"><svg class="i" aria-hidden="true"><use href="#i-Notebook-regular"/></svg><span>Notebook</span></a></li><li><a class="nv" href="#"><svg class="i" aria-hidden="true"><use href="#i-UploadSimple-regular"/></svg><span>Import</span></a></li><li><a class="nv" href="#"><svg class="i" aria-hidden="true"><use href="#i-ShieldCheck-regular"/></svg><span>Prop firms</span></a></li></ul>
+    <p class="grp" id="nl">Not live yet</p>
+    <ul aria-labelledby="nl"><li><a class="nv off" href="#"><svg class="i" aria-hidden="true"><use href="#i-ClockCounterClockwise-regular"/></svg><span>Backtesting</span></a></li><li><a class="nv off" href="#"><svg class="i" aria-hidden="true"><use href="#i-PlayCircle-regular"/></svg><span>Replay</span></a></li><li><a class="nv off" href="#"><svg class="i" aria-hidden="true"><use href="#i-UsersThree-regular"/></svg><span>Mentors</span></a></li><li><a class="nv off" href="#"><svg class="i" aria-hidden="true"><use href="#i-Sparkle-regular"/></svg><span>Assistant</span></a></li></ul>
+    <ul class="foot"><li><a class="nv" href="#"><svg class="i" aria-hidden="true"><use href="#i-GearSix-regular"/></svg><span>Settings</span></a></li></ul>
+  </nav>
+</aside>
+<div class="col">
+<header class="top"><h1>Home</h1><div class="tools">
+  <button class="ibtn" aria-label="Search"><svg class="i" aria-hidden="true"><use href="#i-MagnifyingGlass-regular"/></svg></button>
+  
+  <button class="disp">Net, $<svg class="i" aria-hidden="true"><use href="#i-CaretDown-bold"/></svg></button>
+  
+  <button class="btn pri"><svg class="i" aria-hidden="true"><use href="#i-UploadSimple-regular"/></svg>Import</button>
+</div></header>
+<header class="ptop"><h1>Home</h1><div class="end"><button class="pbtn" aria-label="Search"><svg class="i" aria-hidden="true"><use href="#i-MagnifyingGlass-regular"/></svg></button><button class="pbtn" aria-label="Display: Dollar"><span class="unit">$</span></button></div></header>
+<main id="content" class="page v-load" aria-busy="true">
+<header class="greet"><h2>Good morning</h2><p>Wednesday 25 November</p></header>
+<div class="hm">
+  <div class="stack">
+    <section class="card" aria-hidden="true"><div class="hd"><span class="sk" style="width:104px;height:14px"></span></div><span class="sk" style="width:100%;height:6px;margin-top:12px"></span><div class="sk-list"><div class="sk-row"><span class="sk" style="width:30px;height:30px;border-radius:50%;flex:none"></span><span class="sk-lines"><span class="sk" style="width:46%;height:12px"></span><span class="sk" style="width:82%;height:10px"></span></span><span class="sk" style="width:96px;height:30px;border-radius:10px;flex:none"></span></div><div class="sk-row"><span class="sk" style="width:30px;height:30px;border-radius:50%;flex:none"></span><span class="sk-lines"><span class="sk" style="width:52%;height:12px"></span><span class="sk" style="width:74%;height:10px"></span></span><span class="sk" style="width:96px;height:30px;border-radius:10px;flex:none"></span></div><div class="sk-row"><span class="sk" style="width:30px;height:30px;border-radius:50%;flex:none"></span><span class="sk-lines"><span class="sk" style="width:40%;height:12px"></span><span class="sk" style="width:66%;height:10px"></span></span><span class="sk" style="width:96px;height:30px;border-radius:10px;flex:none"></span></div></div></section>
+    <section class="card" aria-hidden="true"><div class="hd"><span class="sk" style="width:72px;height:14px"></span></div><div class="sk-list"><div class="sk-row"><span class="sk" style="width:18px;height:18px;flex:none"></span><span class="sk-lines"><span class="sk" style="width:30%;height:12px"></span><span class="sk" style="width:70%;height:10px"></span></span></div><div class="sk-row"><span class="sk" style="width:18px;height:18px;flex:none"></span><span class="sk-lines"><span class="sk" style="width:26%;height:12px"></span><span class="sk" style="width:62%;height:10px"></span></span></div><div class="sk-row"><span class="sk" style="width:18px;height:18px;flex:none"></span><span class="sk-lines"><span class="sk" style="width:34%;height:12px"></span><span class="sk" style="width:78%;height:10px"></span></span></div></div></section>
+  </div>
+  <div class="stack">
+    <section class="card" aria-hidden="true"><div class="hd"><span class="sk" style="width:150px;height:14px"></span></div><div class="sk-list"><div class="sk-row"><span class="sk-lines"><span class="sk" style="width:56%;height:12px"></span><span class="sk" style="width:86%;height:10px"></span></span></div><div class="sk-row"><span class="sk-lines"><span class="sk" style="width:48%;height:12px"></span><span class="sk" style="width:80%;height:10px"></span></span></div><div class="sk-row"><span class="sk-lines"><span class="sk" style="width:62%;height:12px"></span><span class="sk" style="width:72%;height:10px"></span></span></div><div class="sk-row"><span class="sk-lines"><span class="sk" style="width:58%;height:12px"></span><span class="sk" style="width:84%;height:10px"></span></span></div></div></section>
+    <section class="card" aria-hidden="true"><div class="hd"><span class="sk" style="width:90px;height:14px"></span></div><div class="sk-list"><div class="sk-row"><span class="sk-lines"><span class="sk" style="width:28%;height:12px"></span><span class="sk" style="width:60%;height:10px"></span></span></div></div></section>
+  </div>
+</div>
+</main>
+<main id="content-saved" class="page v-saved">
+<header class="greet"><h2>Good morning, Sam</h2><p>Wednesday 25 November</p></header>
+<div class="hm">
+  <div class="stack">
+    <section class="card gs" aria-labelledby="gs-t">
+      <div class="hd"><h2 id="gs-t">Get started</h2><div class="end"><span class="cap"><b class="b6" style="color:var(--text)">0</b> of 3 complete</span></div></div>
+      <div class="trk" style="margin-top:10px" role="progressbar" aria-valuemin="0" aria-valuemax="3" aria-valuenow="0" aria-label="0 of 3 steps complete"><i style="width:0%"></i></div>
+      <ol class="steps">
+        <li class="next"><span class="sn">1</span><div class="st"><b>Add your prop firm</b><p>Set up your prop account and its rules. Automatic sync isn't live yet, so its trades come in by import.</p></div><a class="btn sm" href="#">Add account</a></li>
+        <li><span class="sn">2</span><div class="st"><b>Create your first challenge</b><p>Enter the profit target, drawdown and daily loss limit, and Keel tracks the evaluation day by day.</p></div><a class="btn sm" href="#">New challenge</a></li>
+        <li><span class="sn">3</span><div class="st"><b>Add your first trade</b><p>Import a file from your broker or enter a trade by hand.</p></div><a class="btn sm" href="#">Add trade</a></li>
+      </ol>
+    </section>
+    <section class="card" aria-labelledby="ex-t">
+      <div class="hd"><h2 id="ex-t">Explore</h2></div>
+      <ul class="hlist">
+        <li><a class="hrow " href="#"><svg class="i hg" aria-hidden="true"><use href="#i-ShieldCheck-regular"/></svg><span class="ht"><b>Prop firms</b><span>Track evaluations and funded accounts against their rules.</span></span><svg class="i car" aria-hidden="true"><use href="#i-CaretRight-bold"/></svg></a></li>
+        <li><a class="hrow " href="#"><svg class="i hg" aria-hidden="true"><use href="#i-SquaresFour-regular"/></svg><span class="ht"><b>Dashboard</b><span>Your plan, what breaking it cost, and your results.</span></span><svg class="i car" aria-hidden="true"><use href="#i-CaretRight-bold"/></svg></a></li>
+        <li><a class="hrow off" href="#"><svg class="i hg" aria-hidden="true"><use href="#i-ClockCounterClockwise-regular"/></svg><span class="ht"><b>Backtesting</b><span>Test a fix before you trade it. It needs market data, which Keel doesn’t have yet.</span></span><span class="chip">Not live yet</span><svg class="i car" aria-hidden="true"><use href="#i-CaretRight-bold"/></svg></a></li>
+      </ul>
+    </section>
+  </div>
+  <div class="stack">
+    <section class="card" aria-labelledby="rf-t">
+      <div class="hd"><h2 id="rf-t">Recommended focus</h2></div>
+      <ul class="hlist">
+        <li><a class="hrow " href="#"><span class="ht"><b>Add your prop account</b><span>Automatic sync isn't live yet, so you import its trades.</span></span><svg class="i car" aria-hidden="true"><use href="#i-CaretRight-bold"/></svg></a></li>
+        <li><a class="hrow " href="#"><span class="ht"><b>Set up rule monitoring</b><span>A challenge checks your daily and max drawdown limits.</span></span><svg class="i car" aria-hidden="true"><use href="#i-CaretRight-bold"/></svg></a></li>
+        <li><a class="hrow " href="#"><span class="ht"><b>Add your first challenge trade</b><span>Import it from your broker, or enter it by hand.</span></span><svg class="i car" aria-hidden="true"><use href="#i-CaretRight-bold"/></svg></a></li>
+        <li><a class="hrow " href="#"><span class="ht"><b>Review your challenge dashboard</b><span>See how close you are to the target and each limit.</span></span><svg class="i car" aria-hidden="true"><use href="#i-CaretRight-bold"/></svg></a></li>
+      </ul>
+    </section>
+    <section class="card" aria-labelledby="rs-t">
+      <div class="hd"><h2 id="rs-t">Resources</h2></div>
+      <ul class="hlist"><li><a class="hrow " href="#"><span class="ht"><b>Changelog</b><span>What changed in Keel, newest first.</span></span><svg class="i car" aria-hidden="true"><use href="#i-ArrowUpRight-bold"/></svg></a></li></ul>
+    </section>
+  </div>
+</div>
+</main>
+</div>
+</div>
+<nav class="tabbar" aria-label="Main"><a class="tab" href="#"><svg class="i" aria-hidden="true"><use href="#i-SquaresFour-regular"/></svg><span>Dashboard</span></a><a class="tab" href="#"><svg class="i" aria-hidden="true"><use href="#i-ListBullets-regular"/></svg><span>Trades</span></a><a class="tab" href="#"><svg class="i" aria-hidden="true"><use href="#i-CalendarBlank-regular"/></svg><span>Calendar</span></a><a class="tab" href="#"><svg class="i" aria-hidden="true"><use href="#i-ChartBar-regular"/></svg><span>Reports</span></a><a class="tab on" href="#" aria-current="page"><svg class="i" aria-hidden="true"><use href="#i-DotsThreeOutline-fill"/></svg><span>More</span></a></nav>
+<div class="veil v-load"></div>
+<div class="dlg pf v-load" role="dialog" aria-modal="true" aria-labelledby="pf-t" aria-describedby="pf-d">
+  <div class="dlg-hd"><div><h2 id="pf-t">Your profile</h2><p id="pf-d">You can change any of this later in Settings.</p></div></div>
+  <div class="dlg-bd"><div class="pf-body">
+    <div class="row2">
+      <div class="fld"><label>First name</label><span class="inp">Sam</span></div>
+      <div class="fld"><label>Last name</label><span class="inp focus">Doe<span class="caret" aria-hidden="true"></span></span></div>
+    </div>
+    <div class="fld"><label>Username</label><span class="inp">sam.doe</span><span class="hint">Letters, digits, dots and underscores, 3 to 30 characters.</span></div>
+    <div class="fld"><label>Default currency</label><span class="inp" role="combobox" aria-expanded="false">USD (US dollar)<svg class="i sel" aria-hidden="true"><use href="#i-CaretUpDown-bold"/></svg></span></div>
+    <div class="fld"><label>Time zone</label><span class="inp" role="combobox" aria-expanded="false"><span class="tzo">GMT−5</span>US/Eastern<svg class="i sel" aria-hidden="true"><use href="#i-CaretUpDown-bold"/></svg></span><span class="hint">Keel shows every trade's times in this zone. Changing it later re-times them all.</span></div>
+    <div class="note"><svg class="i" aria-hidden="true"><use href="#i-Info-regular"/></svg><span>Finishing makes one account, <b>My account</b>, in US dollars, so you can add trades straight away.</span></div>
+  </div></div>
+  <div class="dlg-ft"><div class="end"><button class="btn pri">Finish setup</button></div></div>
+</div>
+<div class="toast v-saved" role="status"><svg class="i" aria-hidden="true"><use href="#i-CircleNotch-bold"/></svg><div><b>Profile saved</b><span>Re-timing your trades to US/Eastern.</span></div></div>
+</body>
+</html>

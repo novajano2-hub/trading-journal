@@ -66,6 +66,7 @@ import {
   useDisplay,
 } from '@/lib/display';
 import { formatCount, plural } from '@/lib/format';
+import { useRememberLogView } from '@/lib/log-view';
 import { docText } from '@/lib/note-text';
 import { rangeCaption } from '@/lib/range-label';
 import { usePhone } from '@/lib/use-phone';
@@ -85,6 +86,7 @@ import {
 } from './columns';
 import { ColumnsMenu } from './columns-menu';
 import { SummaryStrip } from './summary-strip';
+import { TradesSwitch } from './log/trades-switch';
 
 /** The rows a page can hold; the first used is the default. */
 const PAGE_SIZES = [25, 50, 100] as const;
@@ -208,7 +210,7 @@ function pageButtons(index: number, count: number): (number | null)[] {
   return out;
 }
 
-function StateBlock({
+export function StateBlock({
   icon,
   title,
   body,
@@ -321,6 +323,7 @@ const download = (csv: string, day: string): void =>
  * table, which sorts by any column and pages at 50.
  */
 export function TradesView(): React.JSX.Element {
+  useRememberLogView('all');
   const { filters, setFilters } = useGlobalFilters();
   // Every status and review state: the switches' counts need both sides of each.
   const set = useTradeSet({
@@ -701,6 +704,9 @@ export function TradesView(): React.JSX.Element {
 
   return (
     <div className="flex min-w-0 flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0">
+      <div className="flex">
+        <TradesSwitch view="all" />
+      </div>
       {hideSummary ? (
         <div className="flex">
           <button
@@ -833,10 +839,8 @@ export function TradesView(): React.JSX.Element {
             {phone ? null : (
               <ColumnsMenu
                 columns={columnIds}
-                onChange={(next) => savePrefs({ tradeColumns: next })}
-                onReset={() =>
-                  savePrefs({ tradeColumns: [...DEFAULT_COLUMNS] })
-                }
+                defaults={DEFAULT_COLUMNS}
+                onSave={(next) => savePrefs({ tradeColumns: next })}
               />
             )}
             <button

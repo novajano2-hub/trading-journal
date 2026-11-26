@@ -419,14 +419,17 @@ test('categories: names and colours are checked; a user category takes its tags 
   );
 });
 
-test('templates: one default per kind, built-ins stay, a removed default falls back', async () => {
+test('templates: one default per kind, built-ins stay, a removed default leaves the kind without one', async () => {
   const { repo } = setup({ newId: () => 'tpl-mine' });
   const dailies = async () =>
     (await repo.templates.list(S)).filter((t) => t.kind === 'daily-review');
-  const builtIn = (await dailies()).find((t) => t.builtIn)!;
+  const builtIn = (await dailies()).find((t) => t.isDefault)!;
   expect(builtIn).toMatchObject({ name: 'Daily review', isDefault: true });
   expect((await repo.templates.list(S)).map((t) => t.name).sort()).toEqual([
+    'All-in-one day',
+    'Daily game plan',
     'Daily review',
+    'Intraday check-in',
     'Pre-market plan',
     'Weekly recap',
   ]);
@@ -453,10 +456,24 @@ test('templates: one default per kind, built-ins stay, a removed default falls b
     (await repo.templates.list(S)).filter((t) => t.isDefault),
   ).toHaveLength(3);
 
+  // Removing the default leaves the kind without one (TradeZella allows it).
   await repo.templates.remove(S, mine.id);
-  expect((await dailies()).map((t) => [t.id, t.isDefault])).toEqual([
-    [builtIn.id, true],
-  ]);
+  expect((await dailies()).filter((t) => t.isDefault)).toEqual([]);
+  // A built-in can't be deleted, but it can stop being the default.
+  await repo.templates.setDefault(S, builtIn.id);
+  await repo.templates.save(S, {
+    id: builtIn.id,
+    name: builtIn.name,
+    kind: builtIn.kind,
+    body: builtIn.body,
+    isDefault: false,
+  });
+  expect((await dailies()).filter((t) => t.isDefault)).toEqual([]);
+  expect(
+    (await repo.templates.list(S)).filter(
+      (t) => t.kind !== 'daily-review' && t.isDefault,
+    ),
+  ).toHaveLength(2);
   await expect(repo.templates.setDefault(S, 'nope')).rejects.toBeInstanceOf(
     NotFoundError,
   );
@@ -580,6 +597,51 @@ test('dailyNote opens the day, creating it from the default daily template', asy
   await expect(repo.journal.dailyNote(S, '2026-02-30')).rejects.toBeInstanceOf(
     RangeError,
   );
+});
+
+test('dailyNote records the template it started from, and starts empty when the kind has no default', async () => {
+  let n = 0;
+  const { repo } = setup({ newId: () => `daily-${++n}` });
+  const first = await repo.journal.dailyNote(S, '2026-11-19');
+  expect(first.templateId).toBe('template-daily-review');
+  // A later default doesn't change what the earlier note started from.
+  await repo.templates.setDefault(S, 'template-daily-plan');
+  expect((await repo.journal.dailyNote(S, '2026-11-19')).templateId).toBe(
+    'template-daily-review',
+  );
+  const second = await repo.journal.dailyNote(S, '2026-11-20');
+  expect(second.templateId).toBe('template-daily-plan');
+  // With no default the note starts empty and names no template.
+  const plan = (await repo.templates.list(S)).find(
+    (t) => t.id === 'template-daily-plan',
+  )!;
+  await repo.templates.save(S, { ...plan, isDefault: false });
+  const third = await repo.journal.dailyNote(S, '2026-11-23');
+  expect(third).not.toHaveProperty('templateId');
+  expect(JSON.stringify(third.body)).not.toContain('"text"');
+});
+
+test('the Trash purge leaves the daily note of a finished day', async () => {
+  const now = new Date('2026-11-20T12:00:00.000Z');
+  const day = 86_400_000;
+  let n = 0;
+  const { repo, make } = setup({ now: () => now, newId: () => `d-${++n}` });
+  const tracker = await repo.tracker.get(S);
+  const locked = await repo.journal.dailyNote(S, '2026-11-18');
+  const open = await repo.journal.dailyNote(S, '2026-11-17');
+  await repo.journal.trash(S, open.id);
+  await repo.journal.trash(S, locked.id);
+  await repo.days.finish(S, '2026-11-18', {
+    version: tracker.versions[0]!,
+    inputs: {},
+    ticks: {},
+  });
+  const later = make({ now: () => new Date(+now + 31 * day) });
+  const ids = (await later.journal.list(S)).map((e) => e.id);
+  // The unlocked note is purged; the finished day's stays in Trash.
+  expect(ids).not.toContain(open.id);
+  expect(ids).toContain(locked.id);
+  expect((await later.journal.get(S, locked.id))?.deletedAt).toBeDefined();
 });
 
 test('updateMany patches exactly the given trades', async () => {

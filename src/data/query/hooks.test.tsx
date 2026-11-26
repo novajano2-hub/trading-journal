@@ -74,7 +74,7 @@ test('categories and templates load, and category writes refresh tags and trades
       'Setups',
     ]),
   );
-  await waitFor(() => expect(result.current.templates.data).toHaveLength(3));
+  await waitFor(() => expect(result.current.templates.data).toHaveLength(6));
   await waitFor(() => expect(result.current.trades.data).toHaveLength(3));
   await act(async () => {
     await result.current.create.mutateAsync({

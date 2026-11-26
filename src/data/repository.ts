@@ -10,6 +10,9 @@ import type {
   CashFlow,
   Cents,
   Challenge,
+  DayRecord,
+  DayShot,
+  FrozenDay,
   ImportJob,
   Instrument,
   JournalEntry,
@@ -19,8 +22,11 @@ import type {
   RuleGroup,
   Side,
   Strategy,
+  SurveyAnswers,
   Tag,
   TagCategory,
+  Tracker,
+  TrackerVersion,
   Trade,
   UserPrefs,
   Workspace,
@@ -83,12 +89,10 @@ export interface PrefsRepo {
   get(): Promise<UserPrefs>;
   /**
    * Shallow-merges `patch` over the stored prefs; a key set to undefined is left
-   * unchanged. `goals` merges per workspace inside the write: each workspace the
-   * patch names replaces that workspace's goals whole, and the others are kept,
-   * so `{ goals: { [id]: {} } }` clears one workspace (see `withGoals`).
-   * Throws RangeError for an unknown time zone, a breakeven range with
-   * from > to, a goals entry that isn't an object of positive whole cents,
-   * an unknown display unit, or calendar stats that aren't 1 to 3 known ones.
+   * unchanged. A `goals` key an older version stored is ignored on read and
+   * left in storage. Throws RangeError for an unknown time zone, a breakeven
+   * range with from > to, an unknown display unit, or calendar stats that
+   * aren't 1 to 3 known ones.
    */
   update(patch: Partial<UserPrefs>): Promise<UserPrefs>;
   /** Only the prefs the user has set: the rest follow the defaults (the browser's time zone, say). */
@@ -271,11 +275,12 @@ export interface TemplatesRepo {
   list(ws: string): Promise<NoteTemplate[]>;
   /**
    * Creates when `id` is absent, otherwise replaces (a built-in keeps its
-   * kind). The kind keeps one default: saving a default clears the others,
-   * and a kind left without one falls back to its built-in template.
+   * kind). The kind keeps at most one default: saving a default clears the
+   * others, and saving the default without `isDefault` leaves the kind with
+   * none (a new note of that kind then starts empty).
    */
   save(ws: string, t: TemplateDraft): Promise<NoteTemplate>;
-  /** Refuses a built-in template (`Error('built-in template')`). Removing the default makes the kind's built-in template the default. */
+  /** Refuses a built-in template (`Error('built-in template')`). Removing the default leaves the kind without one. */
   remove(ws: string, id: string): Promise<void>;
   /** Clears `isDefault` on the kind's other templates. */
   setDefault(ws: string, id: string): Promise<void>;
@@ -306,9 +311,13 @@ export interface JournalRepo {
   get(ws: string, id: string): Promise<JournalEntry | undefined>;
   /** The entries linked to the trade that are out of Trash. */
   listForTrade(ws: string, tradeId: string): Promise<JournalEntry[]>;
-  /** Creates when `id` is absent, otherwise replaces; stamps `updatedAt`. */
+  /**
+   * Creates when `id` is absent, otherwise replaces; stamps `updatedAt`. Throws
+   * LockedDayError for a daily note on a finished date. The first save of a
+   * daily note on the routine's today stamps the day's `noteStartedAt` (K9).
+   */
   save(ws: string, draft: JournalDraft): Promise<JournalEntry>;
-  /** Deletes for good and clears `noteId` on trades pointing at it. */
+  /** Deletes for good and clears `noteId` on trades pointing at it. Trash, restore and remove throw LockedDayError for a finished date's daily note. */
   remove(ws: string, id: string): Promise<void>;
   /** Moves it to Trash (`deletedAt`). */
   trash(ws: string, id: string): Promise<void>;
@@ -319,7 +328,7 @@ export interface JournalRepo {
    * `trade.noteId` in one transaction. Throws NotFoundError for a missing trade.
    */
   ensureTradeNote(ws: string, tradeId: string): Promise<JournalEntry>;
-  /** Opens the day's note or creates it from the default daily template. */
+  /** The date's daily note, trashed or not (E109), or a new one from the default daily template. Throws LockedDayError rather than create one on a finished date. */
   dailyNote(ws: string, date: string): Promise<JournalEntry>;
 }
 
@@ -408,6 +417,88 @@ export interface ChallengesRepo {
   remove(ws: string, id: string): Promise<void>;
 }
 
+/** The date is finished: nothing on it can change. */
+export class LockedDayError extends Error {
+  override name = 'LockedDayError';
+  constructor() {
+    super('day is finished');
+  }
+}
+
+/** A screenshot Keel won't keep. */
+export class ShotRejected extends Error {
+  override name = 'ShotRejected';
+  constructor(readonly reason: 'type' | 'size' | 'quota') {
+    super(`The screenshot was refused: ${reason}`);
+  }
+}
+
+export const SHOT_MAX_BYTES = 10 * 1024 * 1024;
+
+export interface TrackerRepo {
+  /** Created on first read, in one transaction, with startedOn = today and defaultVersion(today); two calls never make two rows. */
+  get(ws: string): Promise<Tracker>;
+  /** K16: a version from today, replacing one already dated today. */
+  save(ws: string, rules: Omit<TrackerVersion, 'from'>): Promise<Tracker>;
+  /**
+   * K17: defaultVersion(today), startedOn today, asOf kept; clears the ticks of unfinished days.
+   * Finished days stay locked: TradeZella shows no unlock (P6A-04), and days before the new start are unscored anyway.
+   */
+  reset(ws: string): Promise<Tracker>;
+}
+
+export interface DaysRepo {
+  list(ws: string): Promise<DayRecord[]>;
+  /** Today only, once a day; RangeError otherwise. */
+  startSession(ws: string, date: string): Promise<DayRecord>;
+  endSession(ws: string, date: string): Promise<DayRecord>;
+  setTick(
+    ws: string,
+    date: string,
+    ruleId: string,
+    ticked: boolean,
+  ): Promise<DayRecord>;
+  setRating(
+    ws: string,
+    date: string,
+    rating: 1 | 2 | 3 | 4 | 5 | undefined,
+  ): Promise<DayRecord>;
+  setMood(
+    ws: string,
+    date: string,
+    mood: DayRecord['mood'],
+  ): Promise<DayRecord>;
+  /** Refuses (RangeError) a date after today, before startedOn, or not a trading day; LockedDayError when finished. Ends a running session. */
+  finish(ws: string, date: string, frozen: FrozenDay): Promise<DayRecord>;
+}
+
+export interface DayShotsRepo {
+  /** Upload order. */
+  list(ws: string, date: string): Promise<DayShot[]>;
+  add(
+    ws: string,
+    date: string,
+    file: { bytes: ArrayBuffer; type: string; name: string },
+  ): Promise<DayShot>;
+  remove(ws: string, id: string): Promise<void>;
+}
+
+export interface FirstRunInput {
+  firstName: string;
+  lastName: string;
+  username: string;
+  baseCurrency: string;
+  timeZone: string;
+  survey?: SurveyAnswers;
+}
+export interface OnboardingRepo {
+  /**
+   * One transaction: prefs (names, currency, zone, the onboarding flag); "My account" in My workspace in that
+   * currency when it has none; My workspace active. RangeError for a bad username, zone or currency, with nothing written.
+   */
+  complete(input: FirstRunInput): Promise<void>;
+}
+
 export interface Repository {
   workspaces: WorkspacesRepo;
   prefs: PrefsRepo;
@@ -421,5 +512,9 @@ export interface Repository {
   templates: TemplatesRepo;
   folders: FoldersRepo;
   journal: JournalRepo;
+  tracker: TrackerRepo;
+  days: DaysRepo;
+  dayShots: DayShotsRepo;
   imports: ImportRepo;
+  onboarding: OnboardingRepo;
 }

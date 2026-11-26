@@ -235,6 +235,40 @@ export function writeDailyNotes(
       id: `sample-daily-${date}`,
       workspaceId: WS,
       kind: 'daily-review',
+      templateId: 'template-daily-review',
+      date,
+      title: `Daily review, ${dayLabel(date)}`,
+      body,
+      linkedTradeIds: day.map((t) => t.id),
+      tags: [],
+      updatedAt: nyIso(date, 16, 30 + rng.int(0, 25)),
+    };
+  });
+}
+
+/**
+ * Short daily reviews for dates the routine stamps a note on that have none:
+ * the daily template with its first prompts filled in. Ids start `routine-note-`.
+ */
+export function writeRoutineNotes(
+  rng: Random,
+  trades: readonly Trade[],
+  dates: readonly string[],
+): JournalEntry[] {
+  const byDay = tradesByDay(trades);
+  return dates.map((date) => {
+    const day = byDay.get(date) ?? [];
+    const roots = [...new Set(day.map((t) => t.instrument.root))];
+    const body = fillPrompts(DAILY_REVIEW_BODY, {
+      Watchlist: `${roots.join(', ')}.`,
+      'Game plan': rng.pick(PHRASES.planItems),
+      'Session log': daySummary(day),
+    });
+    return {
+      id: `routine-note-${date}`,
+      workspaceId: WS,
+      kind: 'daily-review',
+      templateId: 'template-daily-review',
       date,
       title: `Daily review, ${dayLabel(date)}`,
       body,

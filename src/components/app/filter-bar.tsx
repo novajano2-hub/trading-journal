@@ -9,6 +9,7 @@ import {
   useState,
   type RefObject,
 } from 'react';
+import { usePathname } from 'next/navigation';
 import { EMPTY_FILTERS, type GlobalFilters } from '@/data/filters';
 import {
   usePrefs,
@@ -35,6 +36,7 @@ import {
   TagBody,
 } from './filter-popovers';
 import { FilterSheet } from './filter-sheet';
+import { datesOnly } from './nav';
 import { MoreFilters } from './more-filters';
 import { usePhone } from '@/lib/use-phone';
 import { symbolOptions } from './search';
@@ -117,6 +119,8 @@ interface FilterBarProps {
   disabled?: boolean;
   /** The workspace has no trades to filter. */
   noTrades?: boolean;
+  /** Only the date range, as the progress tracker has it. */
+  dateOnly?: boolean;
 }
 
 function FilterRow({
@@ -126,9 +130,10 @@ function FilterRow({
   onChange,
   disabled = false,
   noTrades = false,
+  dateOnly = false,
 }: FilterBarProps): React.JSX.Element {
   const noteId = useId();
-  const unavailableNote = noTrades ? noteId : undefined;
+  const unavailableNote = noTrades && !dateOnly ? noteId : undefined;
   const first = useRef<HTMLButtonElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const row = useRef<HTMLDivElement>(null);
@@ -147,7 +152,7 @@ function FilterRow({
   const side = chipLabel('side', f, names);
   const strategy = chipLabel('strategy', f, names);
   const tag = chipLabel('tag', f, names);
-  const cleared = !hasActiveFilters(f);
+  const cleared = dateOnly || !hasActiveFilters(f);
 
   return (
     <div
@@ -196,84 +201,90 @@ function FilterRow({
               />
             )}
           </FilterChip>
-          <FilterChip
-            label={symbol.text}
-            title="Symbol"
-            active={symbol.active}
-            disabled={disabled}
-            unavailableNote={unavailableNote}
-            onClear={() => onChange({ ...f, symbols: [] })}
-          >
-            {() => (
-              <SymbolBody
-                symbols={options.symbols}
-                selected={f.symbols}
-                onChange={(symbols) => onChange({ ...f, symbols })}
-              />
-            )}
-          </FilterChip>
-          <FilterChip
-            label={side.text}
-            title="Side"
-            active={side.active}
-            disabled={disabled}
-            unavailableNote={unavailableNote}
-            onClear={() => onChange({ ...f, side: undefined })}
-          >
-            {() => (
-              <RadioRows
-                legend="Side"
-                options={SIDE_OPTIONS}
-                value={f.side ?? 'both'}
-                onChange={(v) =>
-                  onChange({ ...f, side: v === 'both' ? undefined : v })
-                }
-              />
-            )}
-          </FilterChip>
-          <FilterChip
-            label={strategy.text}
-            title="Strategy"
-            active={strategy.active}
-            disabled={disabled}
-            unavailableNote={unavailableNote}
-            onClear={() => onChange({ ...f, strategyIds: [] })}
-          >
-            {() => (
-              <StrategyBody
-                strategies={options.strategies}
-                selected={f.strategyIds}
-                onChange={(strategyIds) => onChange({ ...f, strategyIds })}
-              />
-            )}
-          </FilterChip>
-          <FilterChip
-            label={tag.text}
-            title="Tags"
-            active={tag.active}
-            disabled={disabled}
-            unavailableNote={unavailableNote}
-            onClear={() => onChange({ ...f, tagIds: [] })}
-          >
-            {() => (
-              <TagBody
-                tags={options.tags}
-                categories={options.categories}
-                selected={f.tagIds}
-                onChange={(tagIds) => onChange({ ...f, tagIds })}
-              />
-            )}
-          </FilterChip>
+          {dateOnly ? null : (
+            <>
+              <FilterChip
+                label={symbol.text}
+                title="Symbol"
+                active={symbol.active}
+                disabled={disabled}
+                unavailableNote={unavailableNote}
+                onClear={() => onChange({ ...f, symbols: [] })}
+              >
+                {() => (
+                  <SymbolBody
+                    symbols={options.symbols}
+                    selected={f.symbols}
+                    onChange={(symbols) => onChange({ ...f, symbols })}
+                  />
+                )}
+              </FilterChip>
+              <FilterChip
+                label={side.text}
+                title="Side"
+                active={side.active}
+                disabled={disabled}
+                unavailableNote={unavailableNote}
+                onClear={() => onChange({ ...f, side: undefined })}
+              >
+                {() => (
+                  <RadioRows
+                    legend="Side"
+                    options={SIDE_OPTIONS}
+                    value={f.side ?? 'both'}
+                    onChange={(v) =>
+                      onChange({ ...f, side: v === 'both' ? undefined : v })
+                    }
+                  />
+                )}
+              </FilterChip>
+              <FilterChip
+                label={strategy.text}
+                title="Strategy"
+                active={strategy.active}
+                disabled={disabled}
+                unavailableNote={unavailableNote}
+                onClear={() => onChange({ ...f, strategyIds: [] })}
+              >
+                {() => (
+                  <StrategyBody
+                    strategies={options.strategies}
+                    selected={f.strategyIds}
+                    onChange={(strategyIds) => onChange({ ...f, strategyIds })}
+                  />
+                )}
+              </FilterChip>
+              <FilterChip
+                label={tag.text}
+                title="Tags"
+                active={tag.active}
+                disabled={disabled}
+                unavailableNote={unavailableNote}
+                onClear={() => onChange({ ...f, tagIds: [] })}
+              >
+                {() => (
+                  <TagBody
+                    tags={options.tags}
+                    categories={options.categories}
+                    selected={f.tagIds}
+                    onChange={(tagIds) => onChange({ ...f, tagIds })}
+                  />
+                )}
+              </FilterChip>
+            </>
+          )}
         </div>
       </div>
-      <MoreFilters
-        filters={f}
-        options={options}
-        onChange={onChange}
-        disabled={disabled}
-        unavailableNote={unavailableNote}
-      />
-      {noTrades ? (
+      {dateOnly ? null : (
+        <MoreFilters
+          filters={f}
+          options={options}
+          onChange={onChange}
+          disabled={disabled}
+          unavailableNote={unavailableNote}
+        />
+      )}
+      {noTrades && !dateOnly ? (
         <span id={noteId} hidden>
           No trades to filter yet.
         </span>
@@ -304,6 +315,7 @@ function FilterRow({
  */
 export function FilterBar(): React.JSX.Element {
   const { filters, shown, setFilters } = useShownFilters();
+  const dateOnly = datesOnly(usePathname());
   const trades = useTrades().data;
   const strategies = useStrategies().data;
   const tags = useTags().data;
@@ -327,6 +339,7 @@ export function FilterBar(): React.JSX.Element {
         today=""
         onChange={setFilters}
         disabled
+        dateOnly={dateOnly}
       />
     );
   }
@@ -337,6 +350,7 @@ export function FilterBar(): React.JSX.Element {
       today={localDate(new Date().toISOString(), timeZone)}
       onChange={setFilters}
       noTrades={trades?.length === 0}
+      dateOnly={dateOnly}
     />
   );
 }

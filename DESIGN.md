@@ -278,7 +278,7 @@ Rejected, and recorded so they are not rebuilt: metaphor worlds (the earlier tra
 **Key Characteristics:**
 
 - Periwinkle canvas, white cards, brand-tinted shadows; depth comes from the card shadow and a hairline. In graphite dark, depth is the surface lift and the hairline.
-- One brand hue: Keel Ultramarine, spent on primary actions, the active state, focus and series 1 only. Data hues have fixed jobs: marigold for mistakes, cyan for goal progress, green and red for signed money and kept or broken.
+- One brand hue: Keel Ultramarine, spent on primary actions, the active state, focus and series 1 only. Data hues have fixed jobs: marigold for mistakes, green and red for signed money and kept or broken. Cyan has no standing job since the Goals card went.
 - Instrument Sans for everything, with tabular figures wherever a number is read.
 - Tight negative tracking on large type, generous leading on body.
 - Motion is short and decelerating; it announces arrival and selection, then stops.
@@ -307,7 +307,7 @@ Light is periwinkle-tinted; dark is graphite, every grey with equal red, green a
 - **Canvas** (#eceef8 / #0b0b0b): the page, the sidebar, the top bar and the tab bar, scrollbar track.
 - **Surface** (#ffffff / #141414): cards, the app window's controls, secondary buttons, popovers, sheets, the chosen segment.
 - **Sunken** (#f0f1f8 / #1b1b1b): neutral chips, ghost hover, the plan card's cost band, the current settings row, the search key hint.
-- **Line** (#e7e9f3 / #252525): hairline borders and row dividers, the goal track rail, the phone bar's rule.
+- **Line** (#e7e9f3 / #252525): hairline borders and row dividers, the progress bar's track rail in dark, the phone bar's rule.
 - **Line Strong** (#d5d8ea / #313131): control borders, scrollbar thumb, the dark chosen-segment fill.
 - **Text** (#121633 / #ededed): headings and primary copy.
 - **Muted** (#4b5175 / #a3a3a3): body copy, labels, inactive nav, plain glyphs.
@@ -318,17 +318,17 @@ Light is periwinkle-tinted; dark is graphite, every grey with equal red, green a
 
 Each has a text token, a `-fill` for bars and marks, and a `-soft` for chip fills and calendar day tones.
 
-- **Gain** (#0a7a52 / #3fc08e, fill #19a672 / #2fb27f, soft #ddf3e8 / #10261c): positive P&L, kept rules, a reached goal. On a graphite card the text holds 8.0:1.
+- **Gain** (#0a7a52 / #3fc08e, fill #19a672 / #2fb27f, soft #ddf3e8 / #10261c): positive P&L, kept rules. On a graphite card the text holds 8.0:1.
 - **Loss** (#c22e3a / #f06a78, fill #e5484d, soft #fceced / #2b1517): negative P&L, broken rules and the days that broke the daily loss limit. On a graphite card the text holds 6.2:1.
 - **Marigold, warn** (#9a5700 / #f0b44a, fill #e9a21a, soft #fcf1dc / #2a2010): mistakes: mistake chips, the "Costliest" chip.
-- **Cyan, info** (#0a6f94 / #4db8e0, fill #1693be, soft #e0f1f8 / #0d2330): goal progress: the weekly goal track and its percentage.
+- **Cyan, info** (#0a6f94 / #4db8e0, fill #1693be, soft #e0f1f8 / #0d2330): held in reserve: no surface uses it now that the Goals card is gone.
 
 ### Named Rules
 
 **The One Brand Hue Rule.** Ultramarine is the only brand colour. Never use it for money, and never add another hue for brand, emphasis or decoration.
 **The Accent Restraint Rule.** The accent marks what acts or is chosen: primary actions, the active state (current tab, nav glyph, selected segment), focus, and series 1 in a chart. It never fills a panel or a card, in either theme; the "Your plan" card is a neutral surface with the accent on its kept bar alone.
 **The Neutral Graphite Rule.** Dark greys carry no hue: canvas, surfaces, lines and text each have equal red, green and blue.
-**The Fixed Jobs Rule.** Marigold means a mistake, cyan means goal progress, green and red mean signed money or kept and broken. A hue never takes a second job. Zero is uncoloured.
+**The Fixed Jobs Rule.** Marigold means a mistake, green and red mean signed money or kept and broken. A hue never takes a second job. Zero is uncoloured.
 **The Neutral Error Rule.** Failures to load or save (storage unavailable, dashboard could not load, "Couldn't save") are neutral: sunken or faint, with a Warning or ArrowClockwise glyph in muted ink. Loss red is money and broken rules, never an error state, and marigold is mistakes, never a warning state.
 **The Never Colour Alone Rule.** Sign and state also carry text or an icon (a leading sign in the figure, "Kept" and "Broken" for screen readers and the plan card's Kept and Broken labels, "Broke:" in a trade's rules cell). Long and Short are neutral words, never a result colour.
 
@@ -353,7 +353,7 @@ The ramp as shipped. Half-pixel sizes are deliberate steps between 15 and 17, no
 | P&L figure      | 31px                                       | 600    | 1.15             | -0.04em  | Performance card net P&L                                     |
 | App title       | 24px (20px on phones)                      | 650    | 1.2              | -0.035em | Top bar page title                                           |
 | Cost figure     | 21px                                       | 600    | default          | -0.02em  | Cost band on the plan card                                   |
-| Goal figure     | 22px                                       | 600    | 1.25             | -0.03em  | Weekly net on the Goals card                                 |
+| Tracker figure  | 22px                                       | 600    | 1.25             | -0.03em  | Today's "x of y rules met" on the Progress tracker card      |
 | KPI figure      | 22px marketing; 20px app, shrinking to fit | 600    | 1.25             | -0.03em  | Marketing KPI strip; app rolling KPIs via NumberTicker       |
 | Card title      | 15px                                       | 600    | 1.375 (snug)     | -0.015em | Every dashboard and product card heading                     |
 | Brand           | 19px                                       | 650    | default          | -0.03em  | Brand mark                                                   |
@@ -377,7 +377,7 @@ Also in use: 24px (`text-2xl`) for mobile menu links, 16px (`text-base`) default
 ### Named Rules
 
 **The Tabular Numbers Rule.** Every number a trader reads uses tabular figures (`tnum` or `font-mono`, both the same face). Never set a figure with proportional digits where it sits in a column or beside another figure.
-**The Figure Ramp Rule.** Big figures take their own sizes (88/104 hero numeral, 31 P&L, 21 cost, 22 goal, 20 KPI); everything else in `/app` is a row above. Do not mint a size for one surface.
+**The Figure Ramp Rule.** Big figures take their own sizes (88/104 hero numeral, 31 P&L, 21 cost, 22 tracker card, 20 KPI); everything else in `/app` is a row above. Do not mint a size for one surface.
 **The Measure Rule.** Display headings cap at 11 to 20ch, ledes at 40 to 60ch, reading prose at 68ch.
 
 ## Layout
@@ -397,7 +397,7 @@ The app is a labelled **220px sidebar** (sticky, full height, no fill and no div
 - **Top bar:** sticky, canvas fill (no border from `sm`, no white strip), 20px side padding. Order from the left: menu, title (24px/650), the phone's sample badge, chips, then search, sample label, the Display menu and Import. There is no theme toggle. The source keeps that order at every width and nothing is reordered by CSS, so Tab reads the bar as the eye does. One row while the chips fit beside the title; where they do not (measured, not guessed) the chips lead a second row with the controls after them at its end.
 - **Filter row:** leaves the title's row only when it overflows. Where even the second row is short, the chips scroll sideways inside their own scroller with an edge fade at whichever side has more past it. "Clear filters" (shown only while a filter is set) sits outside the scroller so it never fades or scrolls away.
 - **Below `sm`:** one 56px row pinned to the top with a hairline beneath it. The title (20px/650) on the left with a quiet "Sample" badge beside it in the sample workspace (a 20px neutral pill, 11.5px/550); on the right, plain 44px icon buttons with no box: Filters (where the page has filters; a funnel, filled in accent ink with a count on its shoulder while any filter is set), search (it opens over the row, from the left gutter to the Display button) and Display (the unit's mark: "$", "%", "R", "ticks", "pips", "pts", or a crossed eye for Privacy). Import is in More and in the empty states. The page keeps clear of the tab bar at the foot: `main` pads by `--tab-bar` (56px plus `env(safe-area-inset-bottom)`, zero from `sm`), the trade log's bulk bar floats 16px above it, and on a phone `scroll-padding` keeps focus clear of both bars.
-- **Dashboard grid:** page padding 20px, 16px gaps. Row 1 is the plan: the plan card (340px column from `xl`, 400px from 1440) beside the Rules card, stacked below. Row 2 is three cards (one column, two from `md` with Performance spanning, three from `xl`): Performance, Mistakes, Goals. Row 3 is the recent trades card.
+- **Dashboard grid:** page padding 20px, 16px gaps. Row 1 is the plan: the plan card (340px column from `xl`, 400px from 1440) beside the Rules card, stacked below. Row 2 is three cards (one column, two from `md` with Performance spanning, three from `xl`): Performance, Mistakes, Progress tracker. Row 3 is the recent trades card.
 - **Plain pages** (module placeholders, error and empty states): a centred 520px column with an optional plain glyph (the state glyph), a 17px/600 title, 15px muted body and one action.
 
 ## Elevation & Depth
@@ -490,8 +490,8 @@ Positive is gain, negative is loss, zero stays text colour. Applies to ticker fi
 - **Breakdown bars:** `BreakdownChart` is a 220px area with a `line-strong` baseline; each slot holds a bar that slides up from the baseline (transform only), 6px top radius, max 56px wide, `gain-fill` or `loss-fill`, with a signed value above (11px, 12px from `sm`) and an axis label under. Bars reveal in order on first view; finished without JS or under reduced motion.
 - **Cost bars (Mistakes card):** a 4px bar anchored at the right foot of each row, gradient from the fill to 18% transparent (`loss-fill` for negative cost, `gain-fill` for positive), 80% opacity, 100% on row hover.
 - **Adherence track:** 6px, 3px ends, an accent-soft rail under a left-to-right accent gradient (accent mixed 78% with white up to accent).
-- **Goal tracks:** 6px on a `line` rail, 3px ends. The weekly net goal fills with a cyan gradient (info-fill mixed 70% with white up to info-fill) and turns solid `gain-fill` once reached.
-- **Day grid (Goals card):** the daily loss limit as 32 columns of square cells, 2px gap, 1.5px radius: a kept day is `gain-fill` at 35%, a day that broke the limit is solid `loss-fill`, each with a title ("19 Nov, -$480.00, broke the limit"). The grid has an accessible label and the card's sentence says the same in words.
+- **Progress bars:** 6px on an `accent-soft` track (`line` in dark), 3px ends, filled with an accent gradient (accent mixed 78% with white up to accent). One component serves the tracker's tiles, rules table and dashboard card.
+- **Heat grid (Progress tracker):** one square per scored day, five accent steps (`--hg0` to `--hg4`) by the share of rules met, blank for days that aren't scored. 22px squares 5px apart on a wide card, 14 and 4 narrow, 11 and 3 on the dashboard card. A keyboard grid with one tab stop; arrow keys page past the edge of the window. Each square's label reads "Tue 24 Nov, 4 of 8 rules met".
 
 ### Accordion
 
@@ -548,7 +548,7 @@ System, Light and Dark, System by default, saved as `UserPrefs.appearance` (no m
 
 #### Gross/Net segmented control
 
-The shared Segmented radio group, with two app props: `coarseTargets` makes each option at least 44px high on coarse pointers (otherwise it stays 28px), and `disabled` (no trades) shows the control faint, keeps it in the tab order, marks it `aria-disabled` and changes nothing. Gross and Net are a user preference, saved; a pending change shows at once. Goals ignore it and are always net.
+The shared Segmented radio group, with two app props: `coarseTargets` makes each option at least 44px high on coarse pointers (otherwise it stays 28px), and `disabled` (no trades) shows the control faint, keeps it in the tab order, marks it `aria-disabled` and changes nothing. Gross and Net are a user preference, saved; a pending change shows at once. The progress tracker ignores it and is always net.
 
 #### Expanding search (HorizonX)
 
@@ -574,7 +574,7 @@ Every card follows Cards above: a plain title, no tile.
 
 - **Plan.** Two columns from `xl` (340px plan card, 400px from 1440): the plan card (see The plan card) beside the **Rules card**, a white card holding a table with 36px rows on hairline dividers that stop at the content edge while the hover fill reaches 8px past it; columns Rule, Kept, Adherence (with the percentage) and Cost when broken, sorted by cost with an accent arrow. Rule text is 13.5px/500; Kept reads "x of y" at 13px/550, tabular, with a faint "of". Adherence is the 6px accent track beside the percentage, which never displays 100% or 0% unless exact (it gains one decimal short of it). Cost is signed, gain or loss text; "none" in faint when nothing broke. The costliest broken rule, first in cost order and negative, carries a warn "Costliest" chip. A rule that was broken opens its trades; the whole row is the target, the left button is the keyboard's way in. Five rules show, with "Show all n rules" in accent-ink. Column widths: Kept 92px (100 from 1440), Adherence 150px (180 from 1440; 52px, percentage only, below `sm`), Cost 128px (140 from 1440; 100px below `sm`); below `sm` Kept hides and the track moves under the rule text. With no graded trades the plan is one card: its header, "No graded trades in this range." and a muted line.
 - **Mistakes.** Rows 35px: a warn-toned mistake name, "n trades" in faint, signed cost, costliest first, each with a cost bar at its foot (see Charts); each row opens its trades.
-- **Goals.** Goals are **always net** and shown only in the base currency, whatever Gross/Net says. Weekly net goal: label with metric tip and amount, "n% of goal" (floored in integer cents, so never 100% short of it) in info text or a gain "Reached" chip, the week's signed net at 22px/600, a 6px goal track (cyan, gain once reached). Daily loss limit: the same label, "Kept n of m days" with a gain "Kept", the day grid, and a sentence naming the latest broken day. "Edit goals" (or "Set goals", an accent-ink header link) turns the card into a form in place (Save and Cancel); **Escape cancels** (not while a save is in flight), and focus returns to the Edit button.
+- **Progress tracker card.** The history grid, today's score as "x of y rules met" (0 of 0 on a non-trading day) over a progress bar, an "Open tracker" link that keeps the account selection and range, and a "Today's checklist" button to the day page. No caption line; while loading it shows a skeleton and no figures. The tracker is **always net**, in the base currency.
 - **Performance.** The P&L at 31px/600 counted up by the ticker with its metric tip, the equity area (see Charts) from the starting balance through each trading day's close, then a three-column strip under a hairline: win rate, profit factor, expectancy, each a 12px faint metric-tip label over a 20px/600 figure with its rolling sparkline, columns divided by hairlines; missing values read "None yet". The header shows the start and end balance in faint, tabular.
 - **Recent trades.** A table of the newest closed trades with columns Time, Symbol, Side, Strategy, P&L, Rules at 13.5px, rows on `line` at 70% that lift to sunken at 60% on hover. The instrument is written in words: "TSLA 370 Put" with the root in 600 and the contract muted, its expiry faint beside it ("20 Nov"), futures as "ES Dec 26"; the title keeps the traded symbol. Time shows the date muted and the clock time in 600. Where the table folds the time under the symbol (below `md`) the expiry is hidden so two dates never stack. Side uses the neutral side chip. Widths: Time 96px (112 from `xl`), Symbol 100px (128 from `md`, 176 from `xl`), Side 78px, Strategy 128px (144 from `lg`, 180 from `xl`, 272 from 1440), P&L 92px (104 from `sm`); **Rules flexes** and from `xl` every row is one 34px line. Strategy cells carry a warn chip for the first mistake and a neutral "+n" chip for the rest. Rules cell: "n of m kept" muted with a `gain-fill` mark, "Not graded" in faint, or a 14px `loss-fill` XCircle with a loss "Broke:" and the rule text, plus a "+n" loss chip. The "+n" chip sits inline after the rule text from `xl`, and under the text below it, where the rule text clamps to two lines (one line, truncated, from `xl`). Below `sm` Side and Strategy hide.
 
@@ -625,7 +625,7 @@ Every report section is a card (see Cards) with a 28px header: a 15px/600 title,
 
 ##### Calendar
 
-- **Month grid:** seven columns and, from 600px of card width (a container query on the card, not the viewport), an eighth week-total column (76 to 112px). A cell is `rounded-[10px]`, 58px high (92px from 600px), 6px padding, filled by day tone: gain-soft with a gain-fill hairline at 28%, loss-soft with loss-fill at 26%, `accent-soft` for a flat day, `surface-1` with a `line` hairline for none. A 3px bar at the foot carries the tone. Today has a 1.5px accent ring at 45%; the selected day a 2px accent ring and the chip shadow. Hover lifts 1px (not under reduced motion). Weeks start on Sunday unless Settings > Trading says Monday (the column heads, the rows, the week totals, the week presets, the weekly goal, the weekday reports and the Notebook's weekly recap, which is titled and keyed on the week's first day and found again under either setting, all follow it), so November 2026 has five rows, or six with Monday weeks. The month shows every one of its days: the page's date range does not clip it, so there is no muted out-of-range cell and no range note, and month navigation is free. The other filters still apply.
+- **Month grid:** seven columns and, from 600px of card width (a container query on the card, not the viewport), an eighth week-total column (76 to 112px). A cell is `rounded-[10px]`, 58px high (92px from 600px), 6px padding, filled by day tone: gain-soft with a gain-fill hairline at 28%, loss-soft with loss-fill at 26%, `accent-soft` for a flat day, `surface-1` with a `line` hairline for none. A 3px bar at the foot carries the tone. Today has a 1.5px accent ring at 45%; the selected day a 2px accent ring and the chip shadow. Hover lifts 1px (not under reduced motion). Weeks start on Sunday unless Settings > Trading says Monday (the column heads, the rows, the week totals, the week presets, the weekday reports and the Notebook's weekly recap, which is titled and keyed on the week's first day and found again under either setting, all follow it), so November 2026 has five rows, or six with Monday weeks. The month shows every one of its days: the page's date range does not clip it, so there is no muted out-of-range cell and no range note, and month navigation is free. The other filters still apply.
 - **Figures in a cell:** the day number at 12.5px/600 top left, the first chosen stat at 12 to 14.5px/600 tabular in the tone's ink, the rest at 11.5 to 12px muted. There is no cap: the Stats shown menu ticks any number of the eight stats, and a cell stacks every chosen line in the order chosen, growing taller (the lines under the first wrap rather than truncate) while the grid row follows its tallest cell. Below 600px a cell shows **one compact figure** only: "+1.1k" in dollars, "+64t" in ticks, "+12.5p" in pips, "+3.5pt" in points, "+1.25R" in R, a percentage to one decimal. The suffix is part of the figure and never spaced.
 - **Day panel:** at `xl` (1280px) and up it sits beside the grid; below that it is a bottom sheet that never opens by itself. A 15px/600 heading (no tile), the day's net at 30px/600 in tone, a three-column definition list under a hairline (12px faint terms, 15px/600 values; it lists every figure of the day, so every stat the cells can show), a by-exit-time strip, then the day's trades. A day with none says so in 14px muted.
 - **Month KPI strip:** under the header, `border-y` `line`, two columns on phones and a wrapping row from `sm`, columns divided by hairlines: a 12.5px `faint` MetricTip label, a 19px/600 tabular figure, a 12px muted second line (truncating) and, where useful, a link. Figures are in the display unit; an absent one is "None".
@@ -642,8 +642,48 @@ Every report section is a card (see Cards) with a 28px header: a 15px/600 title,
 - **Unit suffixes** go with the figure, unspaced: `%`, `R`, `t` (ticks), `p` (pips), `pt` (points). Money is signed with a leading `+` or `-` where sign matters; the minus on a chart axis is the true minus sign.
 - **Empty values:** "None", per Empty values below, in `faint` at the figure's size.
 - **Privacy:** hides every money figure and the ratios built from money amounts (profit factor, average win to loss, average daily win to loss), the way TradeZella hides its profit factor. A hidden amount reads `$•••` (sign kept); a hidden ratio reads `•••` with an sr-only "hidden ratio" (`RatioText`, `Display.ratio`), in the summary strip, Overview, the Dashboard card, strategies, report columns and matrices, Compare, the calendar day panel and the Performance series (readout, axis ticks and table). Counts, percentages, R, ticks, pips and points stay visible, and CSV files keep real values.
-- **Numeric ranges are written "a to b":** "$100 to $500", "5 to 10 trades", "1m to 5m", "26 to 100". No hyphen, en dash or em dash between the ends. **Date ranges keep the hyphen:** "1-20 Nov", "16-20 Nov", "10-15 Nov 2026" (ruling E122), in the range caption, the filter chip and the goals card.
+- **Numeric ranges are written "a to b":** "$100 to $500", "5 to 10 trades", "1m to 5m", "26 to 100". No hyphen, en dash or em dash between the ends. **Date ranges keep the hyphen:** "1-20 Nov", "16-20 Nov", "10-15 Nov 2026" (ruling E122), in the range caption and the filter chip.
 - **Copy has no em or en dashes**, anywhere in the app.
+
+#### Plan 6A components
+
+The daily routine: the progress tracker, the day page, the Day and Week views and the first run. Recorded from the shipped code. They use only the tokens above; accent marks adherence and what is chosen, green and red mark money and kept or broken, and a green or red mark always travels with a word or a sign.
+
+##### Heat grid
+
+The tracker's history, on the page and on the dashboard card (see Charts for sizes and the five `--hg0` to `--hg4` steps). Weekday rows, week columns, a month label over the first column of each month, and a Less to More legend. Blank squares are days that aren't scored (non-trading days, before the tracker's start, the future). On the page the grid pages by weeks with back, forward and Today in the card's header, and today wears a 1.5px ring in `text`; on the card today is not marked and the grid does not page. It is one `role="grid"` with a single tab stop; arrow keys move between squares and page past the edge. A square's readout is "date, p of n rules met", shown on hover and focus and read by assistive tech.
+
+##### Stage bar
+
+The day page's four stages, Plan, Trade, Import, Review, as a segmented track in the top bar (28px segments in a `track` well with an inset shadow; the current stage is a `surface-1` chip with the chip shadow, 13.5px/600). Plan, Trade and Review are links that push a history entry; Import opens the method picker. While the day's timer runs, Trade is current and carries the elapsed clock in muted tabular figures. A stage that cannot open (Trade on any date but today, Review on a future date) is faint and `aria-disabled`, with its reason in a title and in screen-reader text. On a phone the bar sits under the header at full width.
+
+##### Day rules list
+
+One list serves the tracker's checklist and the day page's rules card. Rows are grouped Prepare, Trade, Reflect. Each row is a 20px status mark, the rule name at 13.5px, and, in the tracker's checklist, the live value on the right (13px/550 tabular over a 12px faint unit line; a loss reads in `loss`). The mark is a `CheckCircle` in `gain-fill` for met, an `XCircle` in `loss-fill` for failed and a faint `Clock` for pending, each with its word in text for screen readers. A hand-ticked rule is a Task checkbox in the mark's place; on a finished day it is disabled. The day page's card shows names only, plus the start rule's logged time.
+
+##### Mood control
+
+Five words, Rough, Low, Steady, Good and Great, in a 280px popover from a quiet glyph button (a 44px glyph on a phone), with an optional note of up to 280 characters and a counter, and Save. The words carry no colour and no emoji. On a finished day it reads as the word alone, and as nothing when no mood was logged. It sits on the Day view's cards only.
+
+##### Slim rail
+
+On a day page, from `lg`, the sidebar becomes a 68px rail: the brand mark, a 36px add-trade "+" button, the compact account switcher and the sidebar's links as glyphs with their names in `aria-label` and `title`. Below `lg` the usual menu and tab bar serve, as everywhere.
+
+##### Mini calendar
+
+The Day and Week views' month grid, a card in a 280px column from `xl` and a sheet from a Calendar button below it. A month title in plain text with previous and next arrows, and a weekday header following Weeks start on. Each day is a 40px button (44px on coarse pointers) over a 2.5px underline: `gain-fill` for a net gain, `loss-fill` for a net loss, `faint` for a flat day, none for no trades. Today is bold; the selected day has a 1.5px accent inset ring. Hover and focus show a tooltip with the day's net and trade count. A pick filters the list to that day and the date chip gains a clear control. One tab stop; arrows move by day and week.
+
+##### Day card and week card
+
+Both are a `CARD` with a header and a collapsed body.
+
+- **Day card.** A chevron toggle, the date and the net (always net, through the display formatter; "None" with no closed trade), then the quick actions: Mood, Review and the note action (Add note or View note), as 44px glyphs on a phone. The body is the intraday cumulative chart (green above zero, red below, with a hover readout, and a click that opens it large in a full `MorphDialog`) beside the stat grid of seven: Trades, Gross P&L, Won / lost, Commissions, then Win rate, Volume, Profit factor, in two columns on a phone and seven from `sm`. Expanded, it adds the trade table.
+- **Week card.** A chevron, the week's span and its net, then seven tiles. A tile has a trend glyph, the weekday and date and the net in compact figures; a day with trades is tinted `gain-soft` or `loss-soft` with a hairline in the fill hue, and is a button that opens the day's card in a `MorphDialog`; a day without trades is blank and not a button. Under the tiles come the daily bars, the stat grid and, expanded, the week's trades with the Day column first. Below `sm` the tiles are one row of seven narrow tiles. The first card is open; the rest start collapsed.
+- A card for a day with a note and no trades shows its date, a no-trades line and View note.
+
+##### First-run dialog and welcome
+
+The first run is three screens on the auth pages' centred layout: a welcome with one action, a six-step survey (a progress bar, Back from step 2, Continue disabled until the step is answered; one option per row, instruments two to a row on a phone, a type-ahead for the broker, a text box when Other is chosen) and the preferences dialog. The dialog is a centred 520px card (a full-height sheet below `sm`) that has no close control and cannot be skipped: first name, last name, username, currency (USD first) and time zone (US/Eastern first, shown as a GMT offset). Its submit makes "My account" and opens Home behind it. A quiet notice then says the new time zone is being applied to trades.
 
 #### Empty and error states
 
@@ -684,7 +724,7 @@ Tokens in `src/lib/motion.ts`, mirrored as CSS variables. Several patterns are a
 ### Do:
 
 - **Do** use Keel Ultramarine (#2b35af) as the one brand hue, sparingly: primary action, the active state, focus, adherence bars and series 1.
-- **Do** give each data hue its one job: marigold for mistakes, cyan for goal progress, green and red for signed money and kept or broken.
+- **Do** give each data hue its one job: marigold for mistakes, green and red for signed money and kept or broken.
 - **Do** set every number with tabular figures, and colour only signed P&L green or red.
 - **Do** use the three radii: 6 chips, 10 buttons and inner panels, 16 cards, and only the documented role exceptions beside them.
 - **Do** put cards on the canvas as white surfaces with the card shadow and a hairline, the "Your plan" card included.
@@ -695,11 +735,11 @@ Tokens in `src/lib/motion.ts`, mirrored as CSS variables. Several patterns are a
 - **Do** head a card with its title alone; set a meaningful glyph plain, muted and at text size; give a state block at most the 28px faint state glyph.
 - **Do** navigate a phone from the bottom tab bar (Dashboard, Trades, Calendar, Reports, More) and keep every page clear of it.
 - **Do** centre the auth pages: the mark on top, one 400px column, the switch link under it, no site navigation.
-- **Do** give every metric a MetricTip definition, keep 8px between a tip and adjacent controls, and keep goals net and in the base currency.
+- **Do** give every metric a MetricTip definition, keep 8px between a tip and adjacent controls, and keep the progress tracker net and in the base currency.
 - **Do** open a rule's or a mistake's exact trades through the Morph dialog, and return focus to the opener.
 - **Do** show loading failures neutrally, and show Long and Short as neutral words.
 - **Do** keep every adherence figure honest: never 100% or 0% unless exact.
-- **Do** give chart series one job each: series 1 accent, series 2 ink (`muted`), series 3 the accent tint, dashed. Cyan stays with goals and marigold with mistakes, so a chart never takes either.
+- **Do** give chart series one job each: series 1 accent, series 2 ink (`muted`), series 3 the accent tint, dashed. Marigold stays with mistakes, so a chart never takes it.
 - **Do** replace a desktop table with two-line rows below `sm`, carrying the same facts, link and figures.
 - **Do** keep a dialog's body in a scroller and its actions in a fixed footer (Choose figures, the expanded chart).
 - **Do** set every number with a thousands separator and its unit suffix, write an absent value as "None", and write numeric ranges as "a to b" (date ranges keep the hyphen).
