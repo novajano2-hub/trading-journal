@@ -645,6 +645,46 @@ Every report section is a card (see Cards) with a 28px header: a 15px/600 title,
 - **Numeric ranges are written "a to b":** "$100 to $500", "5 to 10 trades", "1m to 5m", "26 to 100". No hyphen, en dash or em dash between the ends. **Date ranges keep the hyphen:** "1-20 Nov", "16-20 Nov", "10-15 Nov 2026" (ruling E122), in the range caption and the filter chip.
 - **Copy has no em or en dashes**, anywhere in the app.
 
+#### Plan 6A components
+
+The daily routine: the progress tracker, the day page, the Day and Week views and the first run. Recorded from the shipped code. They use only the tokens above; accent marks adherence and what is chosen, green and red mark money and kept or broken, and a green or red mark always travels with a word or a sign.
+
+##### Heat grid
+
+The tracker's history, on the page and on the dashboard card (see Charts for sizes and the five `--hg0` to `--hg4` steps). Weekday rows, week columns, a month label over the first column of each month, and a Less to More legend. Blank squares are days that aren't scored (non-trading days, before the tracker's start, the future). On the page the grid pages by weeks with back, forward and Today in the card's header, and today wears a 1.5px ring in `text`; on the card today is not marked and the grid does not page. It is one `role="grid"` with a single tab stop; arrow keys move between squares and page past the edge. A square's readout is "date, p of n rules met", shown on hover and focus and read by assistive tech.
+
+##### Stage bar
+
+The day page's four stages, Plan, Trade, Import, Review, as a segmented track in the top bar (28px segments in a `track` well with an inset shadow; the current stage is a `surface-1` chip with the chip shadow, 13.5px/600). Plan, Trade and Review are links that push a history entry; Import opens the method picker. While the day's timer runs, Trade is current and carries the elapsed clock in muted tabular figures. A stage that cannot open (Trade on any date but today, Review on a future date) is faint and `aria-disabled`, with its reason in a title and in screen-reader text. On a phone the bar sits under the header at full width.
+
+##### Day rules list
+
+One list serves the tracker's checklist and the day page's rules card. Rows are grouped Prepare, Trade, Reflect. Each row is a 20px status mark, the rule name at 13.5px, and, in the tracker's checklist, the live value on the right (13px/550 tabular over a 12px faint unit line; a loss reads in `loss`). The mark is a `CheckCircle` in `gain-fill` for met, an `XCircle` in `loss-fill` for failed and a faint `Clock` for pending, each with its word in text for screen readers. A hand-ticked rule is a Task checkbox in the mark's place; on a finished day it is disabled. The day page's card shows names only, plus the start rule's logged time.
+
+##### Mood control
+
+Five words, Rough, Low, Steady, Good and Great, in a 280px popover from a quiet glyph button (a 44px glyph on a phone), with an optional note of up to 280 characters and a counter, and Save. The words carry no colour and no emoji. On a finished day it reads as the word alone, and as nothing when no mood was logged. It sits on the Day view's cards only.
+
+##### Slim rail
+
+On a day page, from `lg`, the sidebar becomes a 68px rail: the brand mark, a 36px add-trade "+" button, the compact account switcher and the sidebar's links as glyphs with their names in `aria-label` and `title`. Below `lg` the usual menu and tab bar serve, as everywhere.
+
+##### Mini calendar
+
+The Day and Week views' month grid, a card in a 280px column from `xl` and a sheet from a Calendar button below it. A month title in plain text with previous and next arrows, and a weekday header following Weeks start on. Each day is a 40px button (44px on coarse pointers) over a 2.5px underline: `gain-fill` for a net gain, `loss-fill` for a net loss, `faint` for a flat day, none for no trades. Today is bold; the selected day has a 1.5px accent inset ring. Hover and focus show a tooltip with the day's net and trade count. A pick filters the list to that day and the date chip gains a clear control. One tab stop; arrows move by day and week.
+
+##### Day card and week card
+
+Both are a `CARD` with a header and a collapsed body.
+
+- **Day card.** A chevron toggle, the date and the net (always net, through the display formatter; "None" with no closed trade), then the quick actions: Mood, Review and the note action (Add note or View note), as 44px glyphs on a phone. The body is the intraday cumulative chart (green above zero, red below, with a hover readout, and a click that opens it large in a full `MorphDialog`) beside the stat grid of seven: Trades, Gross P&L, Won / lost, Commissions, then Win rate, Volume, Profit factor, in two columns on a phone and seven from `sm`. Expanded, it adds the trade table.
+- **Week card.** A chevron, the week's span and its net, then seven tiles. A tile has a trend glyph, the weekday and date and the net in compact figures; a day with trades is tinted `gain-soft` or `loss-soft` with a hairline in the fill hue, and is a button that opens the day's card in a `MorphDialog`; a day without trades is blank and not a button. Under the tiles come the daily bars, the stat grid and, expanded, the week's trades with the Day column first. Below `sm` the tiles are one row of seven narrow tiles. The first card is open; the rest start collapsed.
+- A card for a day with a note and no trades shows its date, a no-trades line and View note.
+
+##### First-run dialog and welcome
+
+The first run is three screens on the auth pages' centred layout: a welcome with one action, a six-step survey (a progress bar, Back from step 2, Continue disabled until the step is answered; one option per row, instruments two to a row on a phone, a type-ahead for the broker, a text box when Other is chosen) and the preferences dialog. The dialog is a centred 520px card (a full-height sheet below `sm`) that has no close control and cannot be skipped: first name, last name, username, currency (USD first) and time zone (US/Eastern first, shown as a GMT offset). Its submit makes "My account" and opens Home behind it. A quiet notice then says the new time zone is being applied to trades.
+
 #### Empty and error states
 
 - **No trades** (empty workspace): a ghosted "Your plan" preview (rule rows with empty tracks and no numbers, the last row fading out) captioned "Your rules and what breaking them costs will show here.", then the title, one line of body, Import and "Open the sample workspace". Chips are dashed and inert.
