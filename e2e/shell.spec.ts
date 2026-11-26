@@ -495,13 +495,18 @@ test('on a phone the Settings pills keep their words, whatever the saved choice 
 const BUSY =
   '?from=2026-10-05&to=2026-11-20&symbol=AUDUSD&symbol=BTCUSD&side=short&strategy=sample-strategy-1&tag=sample-tag-4';
 
-/** The lowest edge of what is pinned at the top: the bar, and the trade views' switch row under it. */
+/**
+ * The lowest edge of what is pinned at the top: the bar, and the trade views' switch row under it.
+ * (The sidebar is pinned too, but down the side, not across the top: it covers no content.)
+ */
 const pinnedBottom = (page: Page) =>
   page.evaluate(() =>
     Math.max(
-      ...[...document.querySelectorAll('[data-pinned]')].map(
-        (el) => el.getBoundingClientRect().bottom,
-      ),
+      ...[
+        ...document.querySelectorAll(
+          '[data-pinned]:not([aria-label="Sidebar"])',
+        ),
+      ].map((el) => el.getBoundingClientRect().bottom),
     ),
   );
 
@@ -599,4 +604,88 @@ test('a control in the bar takes focus without moving the page, chips scroller i
     await expect(stop).toBeFocused();
     expect(await page.evaluate(() => scrollY)).toBe(y);
   }
+});
+
+// The sidebar and the rail are `sticky top-0` in the page's own scroller, so
+// their head controls sit in the band the scroll padding keeps clear for the
+// bar. Focus there with the page scrolled must not move the page (it would
+// try to uncover what it never can); it is why they are pinned rows too.
+
+/** The Trades log, long enough to scroll, scrolled; returns where it stopped. */
+async function scrolledTrades(page: Page) {
+  await page.goto('/app/trades');
+  await settled(page);
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollHeight))
+    .toBeGreaterThan(1800);
+  await page.evaluate(() => scrollTo(0, 500));
+  const y = await page.evaluate(() => scrollY);
+  expect(y).toBeGreaterThan(100);
+  return y;
+}
+
+const pageY = (page: Page) => page.evaluate(() => scrollY);
+
+test('the sidebar takes focus without moving the page: wordmark, toggle and Add trade, expanded and collapsed (desktop)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop');
+  const y = await scrolledTrades(page);
+  const barBottom = (await page.getByRole('banner').first().boundingBox())!;
+  const band = barBottom.y + barBottom.height;
+
+  const stops = async (names: Locator[]) => {
+    for (const stop of names) {
+      // Each one sits inside the band the page's scroll padding holds for the bar
+      // (Add trade, lower down, is the control).
+      await stop.focus();
+      await expect(stop).toBeFocused();
+      expect(await pageY(page), await stop.innerText()).toBe(y);
+    }
+  };
+  const wordmark = sidebar(page).getByRole('link', { name: 'Keel' });
+  expect((await wordmark.boundingBox())!.y).toBeLessThan(band);
+  expect((await collapseButton(page).boundingBox())!.y).toBeLessThan(band);
+  await stops([wordmark, collapseButton(page)]);
+
+  // A mouse collapse leaves focus where it is; the rail's head is then the same band.
+  await collapseButton(page).click();
+  await expect(expandButton(page)).toBeVisible();
+  expect(await pageY(page)).toBe(y);
+  expect((await expandButton(page).boundingBox())!.y).toBeLessThan(band);
+  await stops([wordmark, expandButton(page), addTrade(page)]);
+});
+
+test('a keyboard collapse and expand with the page scrolled keep the page where it was (desktop)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop');
+  const y = await scrolledTrades(page);
+  await collapseButton(page).focus();
+  await expect(collapseButton(page)).toBeFocused();
+  expect(await pageY(page)).toBe(y);
+  // The toggle that replaces the pressed one takes focus, up at the rail's head.
+  await page.keyboard.press('Enter');
+  await expect(expandButton(page)).toBeFocused();
+  expect(await pageY(page)).toBe(y);
+  await page.keyboard.press('Enter');
+  await expect(collapseButton(page)).toBeFocused();
+  expect(await pageY(page)).toBe(y);
+});
+
+// ---- The padding belongs to the shell (E-03) --------------------------------
+// (The welcome, which has no bar and so none, is checked in onboarding.spec.ts.)
+
+test('the app pages keep clear of the bar, and a phone of its tab bar too', async ({
+  page,
+}, info) => {
+  const mobile = info.project.name === 'mobile';
+  await page.goto('/app/trades');
+  await settled(page);
+  const css = await page.evaluate(() => {
+    const style = getComputedStyle(document.documentElement);
+    return { top: style.scrollPaddingTop, bottom: style.scrollPaddingBottom };
+  });
+  expect(parseFloat(css.top)).toBeGreaterThanOrEqual(mobile ? 56 : 68);
+  if (mobile) expect(parseFloat(css.bottom)).toBeGreaterThanOrEqual(56);
 });

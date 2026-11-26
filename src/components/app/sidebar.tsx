@@ -224,6 +224,7 @@ function Rail({
     <RailTips>
       <aside
         aria-label="Sidebar"
+        data-pinned=""
         className="sticky top-0 hidden h-dvh w-[68px] flex-none flex-col items-center overflow-y-auto px-2 pt-5 pb-[18px] lg:flex"
       >
         <WithDashboardHref>
@@ -297,6 +298,7 @@ export function Sidebar({
     // gutter makes up the rest of the space before the cards.
     <aside
       aria-label="Sidebar"
+      data-pinned=""
       className="sticky top-0 hidden h-dvh w-[220px] flex-none flex-col overflow-y-auto pt-5 pr-1.5 pb-[18px] pl-[18px] lg:flex"
     >
       {/* The wordmark goes to the Dashboard, filters kept; the toggle is at the head's far end. */}

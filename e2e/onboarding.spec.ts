@@ -109,3 +109,22 @@ test('the first run: gate, welcome, six steps, the dialog, then the toast', asyn
     ).toBeVisible();
   }
 });
+
+test('the welcome has no top bar, so no top scroll padding; a phone keeps its foot clear of the fixed Continue bar', async ({
+  page,
+}, info) => {
+  await page.goto('/app/welcome');
+  await expect(
+    page.getByRole('heading', { name: 'Welcome to Keel' }),
+  ).toBeVisible({ timeout: 30_000 });
+  // The app's tokens, but not the app's shell: the top padding is `auto`, the browser's own.
+  await expect(page.locator('[data-surface="app"]')).toBeVisible();
+  const css = await page.evaluate(() => {
+    const style = getComputedStyle(document.documentElement);
+    return { top: style.scrollPaddingTop, bottom: style.scrollPaddingBottom };
+  });
+  expect(css.top).toBe('auto');
+  if (info.project.name === 'mobile')
+    expect(parseFloat(css.bottom)).toBeGreaterThanOrEqual(56);
+  else expect(css.bottom).toBe('auto');
+});

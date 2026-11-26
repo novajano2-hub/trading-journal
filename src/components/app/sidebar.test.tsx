@@ -223,6 +223,25 @@ test('hovering or tabbing to a rail icon names it in a tooltip', async () => {
   }
 });
 
+// A pinned row is one the page's scroll padding must not apply to while focus
+// is in it (globals.css, E52): the sidebar and the rail are `sticky top-0` in
+// the page's own scroller, so their head controls sit inside the padded band
+// and a focus there would send the page scrolling for good.
+test.each([
+  ['the expanded sidebar', 'expanded', '/app/trades'],
+  ['the collapsed rail', 'collapsed', '/app/trades'],
+  ['the day page rail', 'expanded', '/app/day/2026-11-20/plan'],
+] as const)('%s is a pinned row', async (_name, choice, url) => {
+  renderApp(<Sidebar switcher={SWITCHER} railSwitcher={SWITCHER} />, {
+    url,
+    repository: await repoWith(choice),
+  });
+  if (choice === 'collapsed') await expand();
+  const sidebars = screen.getAllByRole('complementary', { name: 'Sidebar' });
+  expect(sidebars).toHaveLength(1);
+  expect(sidebars[0]?.hasAttribute('data-pinned')).toBe(true);
+});
+
 test('the choice shows once the prefs load: expanded until then, collapsed after', async () => {
   renderApp(<Sidebar railSwitcher={SWITCHER} switcher={SWITCHER} />, {
     url: '/app/trades',
