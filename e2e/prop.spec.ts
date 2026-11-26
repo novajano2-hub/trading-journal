@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 test.use({ timezoneId: 'America/New_York' });
 
@@ -375,6 +375,181 @@ test('the Transactions and Accounts tabs do not overflow sideways from 390 to 16
     });
     if (route.endsWith('transactions'))
       await page.getByRole('button', { name: 'Add transaction' }).click();
+    for (const width of [390, 640, 768, 1024, 1280, 1440, 1680]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect
+        .poll(
+          () =>
+            page.evaluate(
+              () => document.documentElement.scrollWidth - innerWidth,
+            ),
+          { message: `${route} at ${width}` },
+        )
+        .toBeLessThanOrEqual(0);
+    }
+  }
+});
+
+const card = (page: Page, name: string) =>
+  page.getByRole('region', { name, exact: true });
+
+test('the dashboard moves with the books: add a transaction, log a payout, mark a challenge breached, and read it', async ({
+  page,
+}) => {
+  await page.goto('/app/prop-firms');
+  // The sample: nine transactions and three challenges.
+  await expect(card(page, 'Total spent')).toContainText('−$1,519.00');
+  await expect(card(page, 'Total earned')).toContainText('+$4,500.00');
+  await expect(card(page, 'Total earned')).toContainText('2 payouts');
+  await expect(card(page, 'Net')).toContainText('+$2,981.00');
+  await expect(card(page, 'Net')).toContainText('Return on spend 196.2%');
+  await expect(card(page, 'Evaluation')).toContainText(
+    '1 active evaluation account',
+  );
+  await expect(card(page, 'Funded')).toContainText('1 active funded account');
+  const breaches = page.getByRole('list', { name: 'Reasons for breaches' });
+  await expect(breaches).toContainText('Broke the max drawdown');
+  await expect(card(page, 'Pass rate')).toContainText(
+    '1 of 2 evaluations passed',
+  );
+  await expect(
+    page.getByRole('img', { name: /^Return over time, 1 year to 20 Nov/ }),
+  ).toHaveAccessibleName(
+    'Return over time, 1 year to 20 Nov: income +$4,500.00, costs −$1,519.00, net +$2,981.00',
+  );
+
+  // A cost, added on Transactions.
+  const tabs = page.getByRole('navigation', { name: 'Prop firms' });
+  await tabs.getByRole('link', { name: 'Transactions' }).click();
+  await page.getByRole('button', { name: 'Add transaction' }).click();
+  await page
+    .getByLabel('Description', { exact: true })
+    .fill('E2E chart package');
+  await page.getByLabel('Amount', { exact: true }).fill('-300');
+  await page.getByLabel('Amount', { exact: true }).press('Enter');
+  await expect(
+    page
+      .getByRole('table', { name: 'Transactions' })
+      .locator('tr[data-txn]')
+      .filter({ hasText: 'E2E chart package' }),
+  ).toContainText('−$300.00');
+
+  // A payout on the funded account.
+  await page.getByRole('button', { name: 'Log payout' }).click();
+  const payout = page.getByRole('dialog', { name: 'Log a payout' });
+  await payout.getByLabel('Amount', { exact: true }).fill('1500');
+  await payout.getByRole('button', { name: 'Add payout' }).click();
+  await expect(payout).toBeHidden();
+
+  // The evaluation that is still going breaks.
+  await tabs.getByRole('link', { name: 'Accounts' }).click();
+  await page.getByRole('button', { name: 'Actions for Forex 100K' }).click();
+  await page.getByRole('menuitem', { name: 'Mark as breached' }).click();
+  const breach = page.getByRole('dialog', {
+    name: 'Mark Forex 100K as breached',
+  });
+  await breach.getByText('Time pressure').click();
+  await breach.getByRole('button', { name: 'Mark as breached' }).click();
+  await expect(breach).toBeHidden();
+
+  // The dashboard reads all three.
+  await tabs.getByRole('link', { name: 'Dashboard' }).click();
+  await expect(card(page, 'Total spent')).toContainText('−$1,819.00');
+  await expect(card(page, 'Total earned')).toContainText('+$6,000.00');
+  await expect(card(page, 'Total earned')).toContainText('3 payouts');
+  await expect(card(page, 'Net')).toContainText('+$4,181.00');
+  await expect(card(page, 'Net')).toContainText('Return on spend 229.9%');
+  await expect(card(page, 'Evaluation')).toContainText(
+    'No active evaluation account',
+  );
+  await expect(
+    page.getByRole('img', { name: /^Return over time, 1 year to 20 Nov/ }),
+  ).toHaveAccessibleName(
+    'Return over time, 1 year to 20 Nov: income +$6,000.00, costs −$1,819.00, net +$4,181.00',
+  );
+  await expect(breaches.getByRole('listitem')).toHaveCount(2);
+  await expect(breaches).toContainText('Time pressure');
+  await expect(breaches).toContainText('Broke the max drawdown');
+  await expect(card(page, 'Pass rate')).toContainText(
+    '1 of 3 evaluations passed',
+  );
+  await expect(card(page, 'Pass rate')).toContainText('33.3%');
+  // Where the money went: the new cost joins the one other uncategorized cost under its fee type.
+  await page
+    .getByRole('radiogroup', { name: 'Break down by' })
+    .getByText('Fee', { exact: true })
+    .click();
+  await expect(
+    page
+      .getByRole('table', { name: 'Where the money went, by fee type' })
+      .getByRole('row', { name: /^Uncategorized/ }),
+  ).toContainText('−$329.00');
+});
+
+test('the filters narrow the dashboard from the address, stay over a reload, and Accounts follows them', async ({
+  page,
+}) => {
+  await page.goto('/app/prop-firms');
+  await expect(card(page, 'Total spent')).toContainText('−$1,519.00');
+  await page.getByRole('button', { name: 'Filters', exact: true }).click();
+  const popover = page.getByRole('dialog', { name: 'Filters' });
+  await popover.getByRole('checkbox', { name: 'Sample data feed' }).check();
+  await expect(page).toHaveURL(/[?&]pfirm=Sample\+data\+feed(&|$)/);
+  await expect(card(page, 'Total spent')).toContainText('−$29.00');
+  await page.keyboard.press('Escape');
+
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Filters 1' })).toBeVisible();
+  await expect(card(page, 'Total spent')).toContainText('−$29.00');
+
+  // The date chip is the global range and leaves the filter alone.
+  await page.getByRole('button', { name: 'All time' }).click();
+  await page
+    .getByRole('dialog', { name: 'Date' })
+    .getByRole('radio', { name: 'Last 30 days' })
+    .check({ force: true });
+  await page.keyboard.press('Escape');
+  await expect(page).toHaveURL(/range=last-30-days/);
+  await expect(page).toHaveURL(/pfirm=Sample\+data\+feed/);
+
+  // Clear filters drops both.
+  await page.getByRole('button', { name: 'Clear filters' }).click();
+  await expect(card(page, 'Total spent')).toContainText('−$1,519.00');
+  await expect(page).not.toHaveURL(/pfirm|range/);
+
+  // Accounts: the sub-tab counts follow the filters; Transactions has no chips.
+  await page.goto('/app/prop-firms/accounts?pstatus=breached');
+  await expect(
+    page
+      .getByRole('tablist', { name: 'Challenges' })
+      .getByRole('tab')
+      .filter({ hasText: 'Breached' }),
+  ).toContainText('1');
+  await expect(page.getByRole('tab', { name: 'Evaluations 0' })).toBeVisible();
+  await page.goto('/app/prop-firms/accounts?pfirm=Nobody');
+  await expect(
+    page.getByText('No challenges match these filters.'),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Clear filters' }).first().click();
+  await expect(page.getByRole('tab', { name: 'Evaluations 1' })).toBeVisible();
+  await page.goto('/app/prop-firms/transactions');
+  await expect(page.getByRole('table', { name: 'Transactions' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Filters/ })).toHaveCount(0);
+});
+
+test('the Dashboard does not overflow sideways from 390 to 1680, filtered or not', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  for (const route of [
+    '/app/prop-firms',
+    '/app/prop-firms?pfirm=Sample+prop+firm&pphase=funded&range=last-30-days',
+  ]) {
+    await page.goto(route);
+    await expect(page.locator('[aria-label^="Loading"]')).toHaveCount(0, {
+      timeout: 30_000,
+    });
+    await expect(card(page, 'Net')).toBeVisible();
     for (const width of [390, 640, 768, 1024, 1280, 1440, 1680]) {
       await page.setViewportSize({ width, height: 900 });
       await expect

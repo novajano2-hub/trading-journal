@@ -47,6 +47,8 @@ test('every app route renders its title without overflow; placeholders state it 
         '/app/calendar',
         '/app/reports',
         '/app/strategies',
+        // The prop Dashboard: the date range and Filters (its Transactions has none).
+        '/app/prop-firms',
       ].includes(path)
         ? 1
         : 0,
