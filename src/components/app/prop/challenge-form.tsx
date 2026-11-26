@@ -1,7 +1,7 @@
 'use client';
 
 import { Check, Info } from '@phosphor-icons/react/dist/ssr';
-import { useId, useRef, useState, type ReactNode } from 'react';
+import { useId, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { ConfirmDialog } from '@/components/app/confirm-dialog';
 import { SelectField } from '@/components/app/import/select-field';
 import { HELP, INPUT, LABEL } from '@/components/app/import/styles';
@@ -527,9 +527,12 @@ const FIELD_OF: Record<keyof RuleErrors, string> = {
 /** A challenge's form, in a dialog: a new one, or `challenge` to edit. */
 export function ChallengeForm({
   challenge,
+  returnFocus,
   onClose,
 }: {
   challenge?: Challenge;
+  /** Where focus goes back to on close, when the form opened from a menu. */
+  returnFocus?: RefObject<HTMLElement | null>;
   onClose(): void;
 }): React.JSX.Element {
   const ids = useId();
@@ -747,6 +750,7 @@ export function ChallengeForm({
       <SettingsDialog
         open
         wide
+        returnFocus={returnFocus}
         onClose={onClose}
         title={challenge ? 'Edit challenge' : 'New challenge'}
         description="A challenge is one or two evaluation steps, then the funded phase. Each phase has its own account and rules."
@@ -807,7 +811,7 @@ export function ChallengeForm({
                   id={id('quantity')}
                   label="Quantity"
                   error={errors[id('quantity')]}
-                  help={`Makes this many of the same challenge, named "${name.trim() || 'name'}", "${name.trim() || 'name'} 2" and so on, each with its own new accounts. 1 to ${MAX_QUANTITY}.`}
+                  help={`Makes this many of the same challenge (1 to ${MAX_QUANTITY}), named "${name.trim() || 'name'}", "${name.trim() || 'name'} 2" and so on, each with its own new accounts.`}
                 >
                   {(p) => (
                     <input

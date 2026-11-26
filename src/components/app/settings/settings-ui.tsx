@@ -3,7 +3,7 @@
 import { DotsThree, X } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { Dialog, DropdownMenu } from 'radix-ui';
-import { Fragment, useRef, type ReactNode } from 'react';
+import { Fragment, useRef, type ReactNode, type RefObject } from 'react';
 
 /** Table header and cell looks shared by the settings tables (the comp's 46px rows). */
 export const TH =
@@ -120,6 +120,7 @@ export function SettingsDialog({
   title,
   description,
   wide = false,
+  returnFocus,
   children,
 }: {
   open: boolean;
@@ -127,6 +128,8 @@ export function SettingsDialog({
   title: string;
   description?: ReactNode;
   wide?: boolean;
+  /** Where focus goes back to on close; a dialog opened from a menu has no button of its own to return to. */
+  returnFocus?: RefObject<HTMLElement | null>;
   children: ReactNode;
 }): React.JSX.Element {
   return (
@@ -139,6 +142,11 @@ export function SettingsDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-veil" />
         <Dialog.Content
+          onCloseAutoFocus={(e) => {
+            if (!returnFocus) return;
+            e.preventDefault();
+            returnFocus.current?.focus();
+          }}
           className={`fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100dvh-32px)] ${wide ? 'w-[min(680px,calc(100vw-32px))]' : 'w-[min(480px,calc(100vw-32px))]'} -translate-x-1/2 -translate-y-1/2 flex-col rounded-[16px] border border-line bg-surface-1 text-text shadow-[var(--shadow)] outline-none motion-safe:data-[state=open]:animate-pop-in`}
         >
           <div className="flex items-start gap-3 px-6 pt-5">

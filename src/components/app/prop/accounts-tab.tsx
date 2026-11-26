@@ -15,6 +15,7 @@ import { useSearchParams } from 'next/navigation';
 import {
   useId,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
   type RefObject,
@@ -42,7 +43,11 @@ import {
   useUpdatePrefs,
 } from '@/data/query/hooks';
 import { checkChallenge, urgencyOf } from '@/domain/prop/challenge';
-import { accountsGroup, type AccountsGroup } from '@/domain/prop/finance';
+import {
+  accountsGroup,
+  firstStart,
+  type AccountsGroup,
+} from '@/domain/prop/finance';
 import { localDate } from '@/domain/time';
 import type { Challenge, Trade } from '@/domain/types';
 import { FigureSourceContext } from '@/lib/display';
@@ -91,25 +96,6 @@ const LAYOUTS = [
 ] as const;
 
 /**
- * Where focus goes back to when a dialog opened from a row's menu closes: that
- * row's menu button, else the chosen sub-tab (the row has left the tab).
- */
-function focusAfter(challengeId: string | null): RefObject<HTMLElement | null> {
-  return {
-    get current() {
-      return (
-        document.querySelector<HTMLElement>(
-          `[data-menu-of="${challengeId}"] button[aria-haspopup="menu"]`,
-        ) ??
-        document.querySelector<HTMLElement>(
-          '[role="tab"][aria-selected="true"]',
-        )
-      );
-    },
-  };
-}
-
-/**
  * The Accounts tab: each challenge by where it stands, as Evaluations, Funded
  * or Breached with their counts (C62), in a List or a Grid that is remembered
  * (C63). A row's menu views its details, moves it to funded (after a
@@ -134,6 +120,24 @@ export function AccountsTab(): React.JSX.Element {
   const [breaching, setBreaching] = useState<string | null>(null);
   const [moving, setMoving] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  // A dialog opened from a row's menu hands focus back to that row's menu
+  // button, else (the row has left the tab) to the chosen sub-tab.
+  const lastRow = useRef<string | null>(null);
+  const returnFocus = useMemo<RefObject<HTMLElement | null>>(
+    () => ({
+      get current() {
+        return (
+          document.querySelector<HTMLElement>(
+            `[data-menu-of="${lastRow.current}"] button[aria-haspopup="menu"]`,
+          ) ??
+          document.querySelector<HTMLElement>(
+            '[role="tab"][aria-selected="true"]',
+          )
+        );
+      },
+    }),
+    [],
+  );
   const error =
     challenges.error ??
     accounts.error ??
@@ -155,6 +159,13 @@ export function AccountsTab(): React.JSX.Element {
     )
       return undefined;
     const ctx = metricContextOf(prefs.data);
+    // The day each account first traded, for a challenge with no start date.
+    const firstTrade = new Map<string, string>();
+    for (const t of trades.data) {
+      const day = localDate(t.openedAt, prefs.data.timeZone);
+      const seen = firstTrade.get(t.accountId);
+      if (seen === undefined || day < seen) firstTrade.set(t.accountId, day);
+    }
     const rows: AccountRow[] = challenges.data
       .map((c) => ({
         c,
@@ -166,6 +177,13 @@ export function AccountsTab(): React.JSX.Element {
           today,
           flows.data,
         ),
+        started:
+          firstStart(c) ??
+          c.phases
+            .map((p) => firstTrade.get(p.accountId ?? ''))
+            .filter((d): d is string => d !== undefined)
+            .sort()[0] ??
+          null,
       }))
       .sort((a, b) => urgencyOf(a.c, a.check) - urgencyOf(b.c, b.check));
     return { rows, ctx };
@@ -213,6 +231,22 @@ export function AccountsTab(): React.JSX.Element {
   const shown = rows.filter((r) => accountsGroup(r.c) === group);
   const rowOf = (challengeId: string | null) =>
     challengeId === null ? undefined : rows.find((r) => r.c.id === challengeId);
+  const startMoving = (id: string) => {
+    lastRow.current = id;
+    setMoving(id);
+  };
+  const startBreaching = (id: string) => {
+    lastRow.current = id;
+    setBreaching(id);
+  };
+  const startDeleting = (id: string) => {
+    lastRow.current = id;
+    setDeleting(id);
+  };
+  const startEditing = (c: Challenge) => {
+    lastRow.current = c.id;
+    setEditing(c);
+  };
   const breachingRow = rowOf(breaching);
   const movingRow = rowOf(moving);
   const deletingRow = rowOf(deleting);
@@ -231,7 +265,7 @@ export function AccountsTab(): React.JSX.Element {
             {
               label: 'Move to funded',
               icon: <ArrowUpRight size={16} weight="bold" />,
-              onSelect: () => setMoving(c.id),
+              onSelect: () => startMoving(c.id),
             },
           ]
         : []),
@@ -240,21 +274,20 @@ export function AccountsTab(): React.JSX.Element {
             {
               label: 'Mark as breached',
               icon: <Prohibit size={16} />,
-              onSelect: () => setBreaching(c.id),
+              onSelect: () => startBreaching(c.id),
             },
           ]
         : []),
       {
         label: 'Edit',
         icon: <PencilSimple size={16} />,
-        onSelect: () => setEditing(c),
+        onSelect: () => startEditing(c),
       },
       {
         label: 'Delete',
         icon: <Trash size={16} />,
-        danger: true,
         separated: true,
-        onSelect: () => setDeleting(c.id),
+        onSelect: () => startDeleting(c.id),
       },
     ];
   };
@@ -331,9 +364,9 @@ export function AccountsTab(): React.JSX.Element {
               <PropView
                 rows={shown}
                 menuFor={menuFor}
-                onEdit={({ c }) => setEditing(c)}
-                onMarkBreached={({ c }) => setBreaching(c.id)}
-                onMoveToFunded={({ c }) => setMoving(c.id)}
+                onEdit={({ c }) => startEditing(c)}
+                onMarkBreached={({ c }) => startBreaching(c.id)}
+                onMoveToFunded={({ c }) => startMoving(c.id)}
               />,
             )
           : null}
@@ -345,7 +378,7 @@ export function AccountsTab(): React.JSX.Element {
           challenge={breachingRow.c}
           check={breachingRow.check}
           today={today}
-          returnFocus={focusAfter(breachingRow.c.id)}
+          returnFocus={returnFocus}
           onClose={() => setBreaching(null)}
         />
       ) : null}
@@ -361,6 +394,7 @@ export function AccountsTab(): React.JSX.Element {
             : 'The evaluation'
         } passes and its results stay viewable. The challenge moves to its funded phase.`}
         confirmLabel="Move to funded"
+        returnFocus={returnFocus}
         onConfirm={async () => {
           if (movingRow)
             await update.mutateAsync({
@@ -376,6 +410,7 @@ export function AccountsTab(): React.JSX.Element {
         body="Its accounts and their trades stay. Only the challenge, its status and its fees are removed."
         confirmLabel="Delete"
         danger
+        returnFocus={returnFocus}
         onConfirm={async () => {
           if (deletingRow) await remove.mutateAsync(deletingRow.c.id);
         }}
@@ -385,6 +420,7 @@ export function AccountsTab(): React.JSX.Element {
         <ChallengeForm
           key={editing === 'new' ? 'new' : editing.id}
           challenge={editing === 'new' ? undefined : editing}
+          returnFocus={returnFocus}
           onClose={() => setEditing(null)}
         />
       ) : null}

@@ -11,7 +11,7 @@ test.beforeEach(async ({ page }, info) => {
 test('create a 1-step challenge on a new prop account and see its card', async ({
   page,
 }) => {
-  await page.goto('/app/prop-firms');
+  await page.goto('/app/prop-firms/accounts');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
     'Prop firms',
   );
@@ -41,15 +41,25 @@ test('create a 1-step challenge on a new prop account and see its card', async (
   await dialog.getByRole('button', { name: 'Create challenge' }).click();
   await expect(dialog).toBeHidden();
 
-  // Its card: named, with the firm, the account and its rules.
+  // Its row in the list, then its card in the grid: named, with the firm, the
+  // account and its rules.
+  await expect(
+    page
+      .getByRole('table', { name: 'Challenges' })
+      .getByRole('link', { name: 'E2E 25K challenge' }),
+  ).toBeVisible();
+  await page
+    .getByRole('radiogroup', { name: 'Layout' })
+    .getByText('Grid')
+    .click();
   const card = page.getByRole('article', { name: /E2E 25K challenge/ });
   await expect(card).toBeVisible();
-  await expect(card).toContainText('E2E Funding');
-  await expect(card).toContainText('Evaluation');
+  await expect(card).toContainText('E2E Funding, evaluation');
   await expect(card).toContainText('Active');
-  await expect(card).toContainText('Balance $25,000.00 from $25,000.00');
-  await expect(card).toContainText('0% of $1,500.00');
-  await expect(card).toContainText('Max drawdown left');
+  await expect(card).toContainText('$25,000.00 from $25,000.00, 1-step');
+  await expect(card).toContainText('E2E 25K eval');
+  await expect(card).toContainText('$0.00 of $1,500.00');
+  await expect(card).toContainText('Max drawdown');
 
   // And the account it made is in Settings, as a prop account.
   await page.goto('/app/settings/accounts');

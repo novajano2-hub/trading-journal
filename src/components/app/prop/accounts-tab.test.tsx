@@ -247,6 +247,28 @@ test('the list reads challenge, firm, trading account, type, size, phase, status
   expect(link.getAttribute('href')).toBe('/app/prop-firms/accounts/c-f100');
 });
 
+test('with no start date typed, Started is the day of the first trade; with neither it reads None', async () => {
+  const undated = challenge('c-und', {
+    name: 'No start date',
+    phases: [{ step: 'step-1', accountId: 'p-f100' }, { step: 'funded' }],
+  });
+  const empty = challenge('c-none', {
+    name: 'Nothing yet',
+    phases: [{ step: 'step-1', accountId: 'p-x100' }, { step: 'funded' }],
+  });
+  renderApp(<AccountsTab />, {
+    repository: repo({ challenges: [undated, empty] }),
+    url: URL,
+  });
+  const started = async (name: string) =>
+    within(await rowOf(name))
+      .getAllByRole('cell')
+      .map((c) => c.textContent)[8];
+  // The $1,236.75 loss on p-f100 closed on 10 Nov.
+  expect(await started('No start date')).toBe('10 Nov 2026');
+  expect(await started('Nothing yet')).toBe('None');
+});
+
 test('a challenge created in the funded phase reads as straight to funded, derived, never stored (C30)', async () => {
   const s2f = challenge('c-s2f', {
     name: 'Funded direct',
@@ -296,6 +318,50 @@ test('the List and Grid switch is remembered in prefs (propLayout); the grid sho
   expect(await screen.findByRole('table', { name: 'Challenges' })).toBeTruthy();
   await waitFor(async () =>
     expect((await r.prefs.get()).propLayout).toBe('list'),
+  );
+});
+
+test("a breached card says when and why: the listed reason, the trader's words for other, and what a breach before reasons kept; September is Sep", async () => {
+  const r = repo({
+    challenges: [
+      F50S,
+      {
+        ...X50,
+        failureReason: 'Max drawdown limit broken on 16 Oct (rule text).',
+      },
+      challenge('c-other', {
+        name: 'Other words',
+        phases: [{ step: 'step-1', accountId: 'p-f100' }, { step: 'funded' }],
+        status: 'breached',
+        breachReason: 'other',
+        failureReason: 'Held through news',
+        breachedOn: '2026-11-03',
+      }),
+      challenge('c-old', {
+        name: 'Before reasons',
+        phases: [{ step: 'step-1', accountId: 'p-x100' }, { step: 'funded' }],
+        status: 'breached',
+        failureReason:
+          'Daily loss limit broken on 10 Nov (−$1,500.00 of −$1,000.00).',
+      }),
+    ],
+  });
+  await r.prefs.update({ propLayout: 'grid' });
+  renderApp(<AccountsTab />, { repository: r, url: `${URL}?tab=breached` });
+  const text = async (name: string) =>
+    (await screen.findByRole('article', { name })).textContent;
+  const sep = await text('Futures 50K September');
+  expect(sep).toContain('started 2 Sep 2026');
+  expect(sep).toContain('Breached Thu 17 Sep: Overtrading or forcing trades');
+  // A stored rule sentence beside a listed reason adds nothing.
+  const listed = await text('Forex 50K');
+  expect(listed).toContain('Breached Fri 16 Oct: Broke the max drawdown');
+  expect(listed).not.toContain('rule text');
+  expect(await text('Other words')).toContain(
+    'Breached Tue 3 Nov: Other: Held through news',
+  );
+  expect(await text('Before reasons')).toContain(
+    'Breached: Daily loss limit broken on 10 Nov',
   );
 });
 
@@ -363,6 +429,21 @@ test('Move to funded asks first; Cancel leaves the challenge as it was', async (
   expect(
     (await r.challenges.list(WS)).find((c) => c.id === 'c-f100'),
   ).toMatchObject({ phase: 'evaluation', status: 'active' });
+});
+
+test("a dialog from the row menu hands focus back to that row's menu button when it closes", async () => {
+  renderApp(<AccountsTab />, { repository: repo(), url: URL });
+  await openMenu('Forex 100K');
+  fireEvent.click(
+    await screen.findByRole('menuitem', { name: 'Move to funded' }),
+  );
+  const dialog = await screen.findByRole('dialog');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() =>
+    expect(document.activeElement).toBe(
+      screen.getByRole('button', { name: 'Actions for Forex 100K' }),
+    ),
+  );
 });
 
 test('confirming Move to funded passes the evaluation: funded phase, active, and the counts follow', async () => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useId, useState, type RefObject } from 'react';
 import { Dialog } from 'radix-ui';
 import { Button } from '@/components/ui/button';
 
@@ -22,6 +22,7 @@ export function ConfirmDialog({
   cancelLabel = 'Cancel',
   danger = false,
   requireText,
+  returnFocus,
   onConfirm,
   onClose,
 }: {
@@ -33,6 +34,8 @@ export function ConfirmDialog({
   cancelLabel?: string;
   danger?: boolean;
   requireText?: string;
+  /** Where focus goes back to on close; a dialog opened from a menu has no button of its own to return to. */
+  returnFocus?: RefObject<HTMLElement | null>;
   onConfirm(): Promise<void>;
   onClose(): void;
 }): React.JSX.Element {
@@ -79,7 +82,14 @@ export function ConfirmDialog({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-veil" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 z-50 w-[min(440px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 rounded-[16px] border border-line bg-surface-1 p-6 text-text shadow-[var(--shadow)] outline-none motion-safe:data-[state=open]:animate-pop-in">
+        <Dialog.Content
+          onCloseAutoFocus={(e) => {
+            if (!returnFocus) return;
+            e.preventDefault();
+            returnFocus.current?.focus();
+          }}
+          className="fixed top-1/2 left-1/2 z-50 w-[min(440px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 rounded-[16px] border border-line bg-surface-1 p-6 text-text shadow-[var(--shadow)] outline-none motion-safe:data-[state=open]:animate-pop-in"
+        >
           <Dialog.Title className="text-[17px] leading-snug font-semibold tracking-[-0.015em] text-balance">
             {title}
           </Dialog.Title>

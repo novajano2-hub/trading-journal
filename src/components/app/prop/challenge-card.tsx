@@ -12,7 +12,6 @@ import {
   BREACH_REASON_LABELS,
   CHALLENGE_TYPE_LABELS,
   challengeType,
-  firstStart,
 } from '@/domain/prop/finance';
 import {
   drawdownLabel,
@@ -23,24 +22,41 @@ import {
 import type { Cents, Challenge, ChallengeStep } from '@/domain/types';
 import { useDisplay } from '@/lib/display';
 
+// Spelled out, not read from Intl: the en-GB short month for September is
+// "Sept" in current engines, and Keel writes "Sep".
+const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+
+/** "19 Nov" from YYYY-MM-DD. */
+function dayMonth(date: string): string {
+  const [, m, d] = date.split('-');
+  return `${Number(d)} ${MONTHS[Number(m) - 1]}`;
+}
+
 /** "Thu 19 Nov". */
 function dayLabel(date: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
+  const weekday = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'UTC',
     weekday: 'short',
-    day: 'numeric',
-    month: 'short',
   }).format(new Date(`${date}T00:00:00Z`));
+  return `${weekday} ${dayMonth(date)}`;
 }
 
 /** "1 Oct 2026". */
 export function dateLabel(date: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'UTC',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(`${date}T00:00:00Z`));
+  return `${dayMonth(date)} ${date.slice(0, 4)}`;
 }
 
 /** The phase the card reads: the funded one once the trader says so, else the current evaluation step. */
@@ -145,9 +161,14 @@ function BreachLine({
   privacy: boolean;
 }): React.JSX.Element {
   const reason = c.breachReason ? BREACH_REASON_LABELS[c.breachReason] : null;
-  const words = c.failureReason
-    ? maskedReason(c.failureReason, privacy).replace(/−(?=\S)/g, '−\u2060')
-    : null;
+  // The words are the trader's for "other", and all a breach before the list
+  // kept; for a listed reason the label says it (a stored rule sentence adds
+  // nothing).
+  const words =
+    c.failureReason &&
+    (c.breachReason === undefined || c.breachReason === 'other')
+      ? maskedReason(c.failureReason, privacy).replace(/−(?=\S)/g, '−\u2060')
+      : null;
   const detail = [reason, words].filter(Boolean).join(': ');
   return (
     <p className="mt-2 text-[12.5px] font-semibold text-loss">
@@ -194,6 +215,7 @@ export function challengeChip(
 export function ChallengeCard({
   challenge: c,
   check,
+  started,
   menu,
   onEdit,
   onMarkBreached,
@@ -201,6 +223,8 @@ export function ChallengeCard({
 }: {
   challenge: Challenge;
   check: ChallengeCheck;
+  /** The day it started (YYYY-MM-DD), when it is known. */
+  started: string | null;
   /** The row menu, at the head's end. */
   menu?: ReactNode;
   onEdit(): void;
@@ -232,8 +256,6 @@ export function ChallengeCard({
     check.currentStep === lastEval &&
     check.phases.find((p) => p.step === lastEval)?.state?.overall ===
       'target-reached';
-  const started = firstStart(c);
-
   const sentence = finding
     ? (() => {
         const shown = findingText(finding, (v) => text(v).text);
@@ -281,7 +303,7 @@ export function ChallengeCard({
         <p className="mt-2.5 flex flex-wrap items-baseline gap-x-2.5">
           <b className="text-[24px] leading-tight font-semibold tracking-[-0.03em] tabular-nums">
             {money(phase.balance)}
-          </b>
+          </b>{' '}
           <span className="text-[12.5px] text-muted">
             from {money(account.startingBalance)},{' '}
             {CHALLENGE_TYPE_LABELS[challengeType(c)]}

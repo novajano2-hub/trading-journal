@@ -4,8 +4,11 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ScrollFade } from '@/components/ui/scroll-fade';
 import { FigureText } from '@/components/product/figure-text';
-import { accountSize, firstStart } from '@/domain/prop/finance';
-import { CHALLENGE_TYPE_LABELS, challengeType } from '@/domain/prop/finance';
+import {
+  accountSize,
+  CHALLENGE_TYPE_LABELS,
+  challengeType,
+} from '@/domain/prop/finance';
 import type { ChallengeCheck } from '@/domain/prop/challenge';
 import type { Account, Challenge } from '@/domain/types';
 import { useDisplay } from '@/lib/display';
@@ -21,6 +24,8 @@ import {
 export interface AccountRow {
   c: Challenge;
   check: ChallengeCheck;
+  /** The day it started: the earliest phase start date, else the day of its first trade; null with neither. */
+  started: string | null;
 }
 
 /** The address of a challenge's details page. */
@@ -34,13 +39,15 @@ const TD =
 const NUM = 'text-right tabular-nums';
 
 /** What a row shows of a challenge, read from its shown phase. */
-function useRowFigures({ c, check }: AccountRow, accounts: readonly Account[]) {
+function useRowFigures(
+  { c, check, started }: AccountRow,
+  accounts: readonly Account[],
+) {
   const display = useDisplay();
   const phase = shownPhase(c, check);
   const account = phase?.account;
   const currency = account?.currency ?? 'USD';
   const size = accountSize(c, accounts);
-  const started = firstStart(c);
   return {
     account: account?.name ?? null,
     type: CHALLENGE_TYPE_LABELS[challengeType(c)],

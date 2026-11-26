@@ -28,6 +28,7 @@ export function PropView({
           <ChallengeCard
             challenge={row.c}
             check={row.check}
+            started={row.started}
             menu={menuFor(row)}
             onEdit={() => onEdit(row)}
             onMarkBreached={() => onMarkBreached(row)}
