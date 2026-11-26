@@ -475,6 +475,30 @@ test('below lg Settings keeps its labelled row, whatever the sidebar choice (des
   }
 });
 
+test('a Settings link keeps its focus as the width crosses lg, folded or not (desktop)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop');
+  await page.goto('/app/settings/profile');
+  await settled(page);
+  await collapseButton(page).click();
+  await expect.poll(() => saved(page)).toBe('collapsed');
+  await navLink(page, 'Accounts').focus();
+  await expect(page.getByRole('tooltip')).toHaveText('Accounts');
+  // Below lg the row has words and no tip; the same link, still the focused one.
+  await page.setViewportSize({ width: 800, height: 900 });
+  await expect(page.getByRole('tooltip')).toHaveCount(0);
+  await expect(navLink(page, 'Accounts')).toBeFocused();
+  // Back at lg the icon column returns with its tip, and focus has not moved.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect
+    .poll(async () => (await boxOf(settingsNav(page))).width)
+    .toBe(60);
+  await expect(navLink(page, 'Accounts')).toBeFocused();
+  await navLink(page, 'Trading').focus();
+  await expect(page.getByRole('tooltip')).toHaveText('Trading');
+});
+
 test('on a phone the Settings pills keep their words, whatever the saved choice (mobile)', async ({
   page,
 }, info) => {
