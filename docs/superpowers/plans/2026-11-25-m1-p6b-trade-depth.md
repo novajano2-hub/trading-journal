@@ -668,6 +668,7 @@ Delivers B32, B34 to B36, B42, B54. Comp: `05-note-editor.html` (default, `?stat
 
 **Interfaces:**
 - Consumes: `useAddFile`, `useFile`, `FileViewer` (Tasks 2, 15).
+- First (Module E review, minor 2): `FilesRepo.list` currently reads every file's bytes, so a trade or note with many images holds two copies of each in memory and every upload re-reads them all. Change `list` to metadata only (id, owner, type, name, size, createdAt) and fetch a file's bytes with `get` when its thumbnail or image mounts (revoking the object URL on unmount); update `TradeFiles` and its tests to match, and test that listing does not return bytes.
 - Images: paste, drop or insert, block or inline, PNG, JPEG, GIF or WebP up to 10 MB; stored as `keel-file:<id>`; corner resize stores a width percentage; double-click opens the viewer; a caption under a block image. A refused file or a locked day shows its reason.
 - Link chips: Trade (a search picker over the workspace's trades) and Day (a date picker); each opens its page.
 - Embeds (U4): a pasted YouTube or X link offers to embed; YouTube through `youtube-nocookie.com`; X loads its widget script only when the node mounts and online; the source shows under the embed; offline, the plain link.
