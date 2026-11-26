@@ -270,3 +270,122 @@ test('a challenge page does not overflow sideways from 390 to 1680', async ({
     }
   }
 });
+
+test('Transactions: filter, add a row with Enter, set a status, change a category, Log a payout and delete, each in its place', async ({
+  page,
+}) => {
+  await page.goto('/app/prop-firms/transactions');
+  const table = page.getByRole('table', { name: 'Transactions' });
+  const rows = table.locator('tr[data-txn]');
+  await expect(rows).toHaveCount(9);
+  // The filter keeps 9, 3, 6 and 3 rows of the sample, and shows no counts.
+  const show = page.getByRole('radiogroup', { name: 'Show' });
+  await expect(show).toHaveText('AllIncomeCostsTo review');
+  for (const [name, count] of [
+    ['Income', 3],
+    ['Costs', 6],
+    ['To review', 3],
+    ['All', 9],
+  ] as const) {
+    await show.getByText(name, { exact: true }).click();
+    await expect(rows, name).toHaveCount(count);
+  }
+
+  // A new row: today, uncategorized, not reviewed; Enter saves it.
+  await page.getByRole('button', { name: 'Add transaction' }).click();
+  await expect(page.getByLabel('Date', { exact: true })).toHaveValue(
+    '2026-11-20',
+  );
+  await expect(page.getByLabel('Category', { exact: true })).toHaveValue(
+    'uncategorized',
+  );
+  await expect(page.getByLabel('Status', { exact: true })).toHaveValue(
+    'not-reviewed',
+  );
+  await page
+    .getByLabel('Description', { exact: true })
+    .fill('E2E chart package');
+  await page.getByLabel('Amount', { exact: true }).fill('-300');
+  await page.getByLabel('Amount', { exact: true }).press('Enter');
+  const added = rows.filter({ hasText: 'E2E chart package' });
+  await expect(added).toContainText('−$300.00');
+  await expect(added).toContainText('Not reviewed');
+  await expect(rows).toHaveCount(10);
+  await expect(
+    page.getByRole('button', { name: 'Add transaction' }),
+  ).toBeFocused();
+
+  // The category's edit control, and the row's menu.
+  await page
+    .getByRole('button', { name: 'Edit the category of E2E chart package' })
+    .click();
+  await page.getByRole('menuitemradio', { name: 'Reset fee' }).click();
+  await expect(added).toContainText('Reset fee');
+  await page
+    .getByRole('button', { name: 'Actions for E2E chart package' })
+    .click();
+  await page.getByRole('menuitem', { name: 'Mark as ignored' }).click();
+  await expect(added).toHaveAttribute('data-ignored', 'true');
+  await expect(added).toContainText('Ignored');
+
+  // Log a payout: only the funded challenge is listed, and it shows at once.
+  await page.getByRole('button', { name: 'Log payout' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Log a payout' });
+  await expect(dialog.getByLabel('Funded account')).toHaveText(
+    'Futures 50K, Sample prop firm',
+  );
+  await dialog.getByLabel('Amount', { exact: true }).fill('1500');
+  await dialog.getByRole('button', { name: 'Add payout' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(rows).toHaveCount(11);
+  await expect(rows.filter({ hasText: '+$1,500.00' })).toContainText('Payout');
+  await expect(page.getByRole('button', { name: 'Log payout' })).toBeFocused();
+
+  // Delete asks first and is for good.
+  await page
+    .getByRole('button', { name: 'Actions for E2E chart package' })
+    .click();
+  await page.getByRole('menuitem', { name: 'Delete' }).click();
+  const confirm = page.getByRole('dialog', {
+    name: 'Delete this transaction?',
+  });
+  await confirm.getByRole('button', { name: 'Cancel' }).click();
+  await expect(rows).toHaveCount(11);
+  await page
+    .getByRole('button', { name: 'Actions for E2E chart package' })
+    .click();
+  await page.getByRole('menuitem', { name: 'Delete' }).click();
+  await confirm.getByRole('button', { name: 'Delete' }).click();
+  await expect(rows).toHaveCount(10);
+  await page.reload();
+  await expect(rows).toHaveCount(10);
+});
+
+test('the Transactions and Accounts tabs do not overflow sideways from 390 to 1680, with the add row open', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  for (const route of [
+    '/app/prop-firms/transactions',
+    '/app/prop-firms/accounts',
+  ]) {
+    await page.goto(route);
+    await expect(page.locator('[aria-label^="Loading"]')).toHaveCount(0, {
+      timeout: 30_000,
+    });
+    if (route.endsWith('transactions'))
+      await page.getByRole('button', { name: 'Add transaction' }).click();
+    for (const width of [390, 640, 768, 1024, 1280, 1440, 1680]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect
+        .poll(
+          () =>
+            page.evaluate(
+              () => document.documentElement.scrollWidth - innerWidth,
+            ),
+          { message: `${route} at ${width}` },
+        )
+        .toBeLessThanOrEqual(0);
+    }
+  }
+});

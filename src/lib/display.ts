@@ -218,7 +218,7 @@ function compactUnit(value: number, on: boolean): string {
 }
 
 /** The currency's own symbol, so Privacy hides a euro as it does a dollar. */
-function symbolOf(currency: string): string {
+export function symbolOf(currency: string): string {
   const part = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,

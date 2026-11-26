@@ -57,15 +57,42 @@ test('each tab marks itself current', async () => {
   }
 });
 
-test('New challenge opens the form; Log payout waits for the payout dialog', async () => {
+test('New challenge opens the form', async () => {
   renderApp(<PropTabs active="dashboard">{null}</PropTabs>, {
     url: '/app/prop-firms',
   });
-  expect(screen.queryByRole('button', { name: /Log payout/ })).toBeNull();
   fireEvent.click(await screen.findByRole('button', { name: 'New challenge' }));
   expect(
     await screen.findByRole('dialog', { name: 'New challenge' }),
   ).toBeTruthy();
+});
+
+test('Log payout sits beside New challenge on every tab and opens the payout dialog', async () => {
+  for (const active of ['dashboard', 'accounts', 'transactions'] as const) {
+    renderApp(<PropTabs active={active}>{null}</PropTabs>, {
+      url: '/app/prop-firms',
+    });
+    const buttons = await screen.findAllByRole('button', {
+      name: /Log payout|New challenge/,
+    });
+    expect(buttons.map((b) => b.textContent)).toEqual([
+      'Log payout',
+      'New challenge',
+    ]);
+    fireEvent.click(buttons[0]!);
+    expect(
+      await screen.findByRole('dialog', { name: 'Log a payout' }),
+    ).toBeTruthy();
+    fireEvent.keyDown(document.activeElement ?? document.body, {
+      key: 'Escape',
+    });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    // Focus is back on the button that opened it.
+    expect(document.activeElement).toBe(
+      screen.getByRole('button', { name: 'Log payout' }),
+    );
+    cleanup();
+  }
 });
 
 test('?new=challenge opens the new-challenge form once and leaves the address clean', async () => {

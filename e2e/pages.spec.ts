@@ -262,6 +262,7 @@ const APP_ROUTES = [
   '/app/import',
   '/app/prop-firms',
   '/app/prop-firms/accounts',
+  '/app/prop-firms/transactions',
   '/app/prop-firms/accounts/sample-challenge-futures-50k',
   '/app/settings/profile',
   '/app/settings/accounts',

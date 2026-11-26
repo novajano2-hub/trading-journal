@@ -12,9 +12,10 @@ export const TD =
   'h-[46px] px-1.5 align-middle first:pl-5 last:pr-5 border-t border-line';
 export const NUM = 'text-right tabular-nums';
 
-const MENU =
+/** The look of a menu's panel and its items, for a menu a row builds for itself (a category's, say). */
+export const MENU =
   'z-[60] min-w-[180px] origin-(--radix-dropdown-menu-content-transform-origin) rounded-[12px] border border-line bg-surface-1 p-1.5 text-text shadow-[var(--shadow)] outline-none motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in';
-const MENU_ITEM =
+export const MENU_ITEM =
   'flex min-h-9 cursor-pointer items-center rounded-[8px] px-2.5 text-[13.5px] outline-none data-[highlighted]:bg-sunken pointer-coarse:min-h-11';
 
 export interface MenuAction {
