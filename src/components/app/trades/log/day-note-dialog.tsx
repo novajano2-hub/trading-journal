@@ -20,6 +20,7 @@ import {
   useTemplates,
   useTrashJournalEntry,
 } from '@/data/query/hooks';
+import { LockedDayError } from '@/data/repository';
 import { isClosed } from '@/domain/trade-status';
 import { useDisplay } from '@/lib/display';
 import { dayLabel } from '@/lib/day-label';
@@ -96,6 +97,10 @@ export function DayNoteDialog({
   const [status, setStatus] = useState<NoteStatus>('idle');
   const [expanded, setExpanded] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  // The last write failed because the day was closed meanwhile: nothing can save.
+  const lockedOut = useRef(false);
+  // A close left text the store still refuses: offer to let it go.
+  const [stuck, setStuck] = useState(false);
 
   const entry = findDailyEntry(journal.data, date);
   const trashed = entry?.deletedAt !== undefined;
@@ -103,24 +108,36 @@ export function DayNoteDialog({
   const readOnly = finished || trashed;
   const group = groups?.get(date);
 
-  const onStatus = (s: NoteStatus) => {
+  const onStatus = (s: NoteStatus, error?: unknown) => {
     lastStatus.current = s;
+    lockedOut.current = s === 'failed' && error instanceof LockedDayError;
     setStatus(s);
-    if (s === 'saved') setProblem(null);
+    if (s === 'saved') {
+      setProblem(null);
+      setStuck(false);
+    }
   };
 
   // Keel's call (TradeZella unknown): the record says Save stores the note and is
   // silent on unsaved edits (K43, spec 5.3); Keel's editors autosave. So closing
   // with unsaved edits (record line 706) neither warns nor discards: closing any
   // way, Save, the X or Escape, writes what is waiting first, and a write that
-  // still fails keeps the dialog open with the alert, so no text is lost.
+  // still fails keeps the dialog open with the alert, so no text is lost. Two
+  // ways out, so the modal is never a trap: a closed day (the write can never
+  // land) closes at once, and after a failed close "Close without saving" lets
+  // the waiting text go.
   const close = async (next: boolean) => {
     if (next) {
       onOpenChange(true);
       return;
     }
-    await control.current?.settle();
-    if (lastStatus.current === 'failed') return;
+    if (!finished) {
+      await control.current?.settle();
+      if (lastStatus.current === 'failed' && !lockedOut.current) {
+        setStuck(true);
+        return;
+      }
+    }
     onOpenChange(false);
   };
 
@@ -300,10 +317,24 @@ export function DayNoteDialog({
           </span>
           {status === 'failed' || problem ? (
             <span role="alert" className="min-w-0 text-[12.5px] text-loss">
-              {problem ?? "Couldn't save. Press Save to try again."}
+              {problem ??
+                (lockedOut.current
+                  ? 'That day was closed, so this note can no longer change.'
+                  : "Couldn't save. Press Save to try again.")}
             </span>
           ) : null}
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            {stuck && status === 'failed' ? (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setStuck(false);
+                  onOpenChange(false);
+                }}
+              >
+                Close without saving
+              </Button>
+            ) : null}
             {/* Keel's call (TradeZella unknown): with nothing to save (a finished day, a note in Trash) the button reads Done and only closes. */}
             <Button onClick={() => void close(false)}>
               {readOnly ? 'Done' : 'Save'}

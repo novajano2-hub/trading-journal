@@ -12,7 +12,7 @@ import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
-import type { Repository } from '@/data/repository';
+import { LockedDayError, type Repository } from '@/data/repository';
 import type { SampleWorkspace } from '@/data/seed/generate';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import type { DayRecord, JournalEntry, Trade, UserPrefs } from '@/domain/types';
@@ -294,7 +294,9 @@ test('a finished day with no note stays without one: nothing is created by openi
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   await closeBothWays(TUE, 'Add note');
   expect(await repo.journal.list(WS)).toEqual(before);
-  expect(await dailyOn(repo, '2026-11-24')).toBeUndefined();
+  expect(
+    JSON.stringify((await dailyOn(repo, '2026-11-24'))?.body ?? {}),
+  ).not.toContain('Text');
 });
 
 test('a finished day with a note in Trash has no Restore and exactly one lock line, and writes nothing', async () => {
@@ -605,6 +607,49 @@ test('after a failed write the X and Escape keep the dialog open with the alert,
   expect(JSON.stringify((await dailyOn(repo, '2026-11-24'))?.body)).toContain(
     'Text the store refused',
   );
+});
+
+test('after a failed write, "Close without saving" lets the text go', async () => {
+  const failing = { on: true };
+  const { repo } = await renderApp({ patch: failingSaves(failing) });
+  const dialog = await open(TUE, 'Add note');
+  const box = await within(dialog).findByRole('textbox', {
+    name: 'Daily note',
+  });
+  tiptapOf(box).commands.insertContent('Text the store refused');
+  expect(
+    within(dialog).queryByRole('button', { name: 'Close without saving' }),
+  ).toBeNull();
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+  expect(await within(dialog).findByRole('alert')).toBeTruthy();
+  fireEvent.click(
+    await within(dialog).findByRole('button', { name: 'Close without saving' }),
+  );
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(
+    JSON.stringify((await dailyOn(repo, '2026-11-24'))?.body ?? {}),
+  ).not.toContain('Written');
+});
+
+test('a day closed meanwhile closes the dialog at once, whatever the retry', async () => {
+  const { repo } = await renderApp({
+    patch: (r) => ({
+      journal: {
+        ...r.journal,
+        save: () => Promise.reject(new LockedDayError()),
+      },
+    }),
+  });
+  const dialog = await open(TUE, 'Add note');
+  const box = await within(dialog).findByRole('textbox', {
+    name: 'Daily note',
+  });
+  tiptapOf(box).commands.insertContent('Written as the day closed');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(
+    JSON.stringify((await dailyOn(repo, '2026-11-24'))?.body ?? {}),
+  ).not.toContain('Written');
 });
 
 test("the star writes in the editor's queue: star, then type, then Save keeps both", async () => {

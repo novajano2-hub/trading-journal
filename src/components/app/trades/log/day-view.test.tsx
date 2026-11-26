@@ -874,3 +874,38 @@ test('the enlarged chart has a group focus stop, and the card chart readout sits
     }),
   ).toBeTruthy();
 });
+
+test('the Review action keeps the account selection', async () => {
+  await renderApp(<TradesDayView />, {
+    sample: sample(),
+    url: '/app/trades/day?account=acc-a',
+  });
+  const first = (await cards())[0]!;
+  expect(
+    within(first)
+      .getByRole('link', { name: /Review/ })
+      .getAttribute('href'),
+  ).toBe('/app/day/2026-11-24/review?account=acc-a');
+});
+
+test('a failed mood write says so', async () => {
+  await renderApp(<TradesDayView />, {
+    sample: sample(),
+    url: '/app/trades/day',
+    patch: (repo) => ({
+      days: {
+        ...repo.days,
+        setMood: async () => {
+          throw new Error('storage full');
+        },
+      },
+    }),
+  });
+  const first = (await cards())[0]!;
+  fireEvent.click(within(first).getByRole('button', { name: 'Mood, Good' }));
+  fireEvent.click(await screen.findByRole('radio', { name: 'Great' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  expect((await within(first).findByRole('alert')).textContent).toContain(
+    'mood',
+  );
+});

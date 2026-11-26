@@ -1,12 +1,12 @@
 'use client';
 
 import { CaretDown, LockSimple } from '@phosphor-icons/react/dist/ssr';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { Popover } from 'radix-ui';
 import { usePrefs } from '@/data/query/hooks';
 import type { DayMode } from '@/lib/day-routes';
-import { dayHref } from '@/lib/day-routes';
+import { dayHref, dayQuery } from '@/lib/day-routes';
 import { dayLabel } from '@/lib/time-format';
 import { usePhone } from '@/lib/use-phone';
 import { Chip } from '@/components/ui/chip';
@@ -39,6 +39,7 @@ export function DayHeader({
   const phone = usePhone();
   const weekStart = usePrefs().data?.weekStart;
   const router = useRouter();
+  const query = dayQuery(useSearchParams());
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(date.slice(0, 7));
   // "Tue 24 Nov", with the year when it isn't today's.
@@ -89,7 +90,7 @@ export function DayHeader({
                   label="Pick a day"
                   onPick={(picked) => {
                     setOpen(false);
-                    router.push(dayHref(picked, today));
+                    router.push(dayHref(picked, today, query));
                   }}
                 />
               </Popover.Content>

@@ -1,10 +1,10 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
 import { isRealDate } from '@/components/app/notebook/notebook-model';
 import { useRoutineToday } from '@/data/query/derived';
-import { dayHref, dayPlanHref, type DayMode } from '@/lib/day-routes';
+import { dayHref, dayPlanHref, dayQuery, type DayMode } from '@/lib/day-routes';
 import { usePhone } from '@/lib/use-phone';
 import { BadDate } from './bad-date';
 import { useImportPicker } from './import-picker';
@@ -25,10 +25,12 @@ export function DayRedirect({
 }): React.JSX.Element | null {
   const today = useRoutineToday();
   const router = useRouter();
+  const query = dayQuery(useSearchParams());
   const real = isRealDate(date);
   useEffect(() => {
-    if (real && today !== undefined) router.replace(dayHref(date, today));
-  }, [real, today, date, router]);
+    if (real && today !== undefined)
+      router.replace(dayHref(date, today, query));
+  }, [real, today, date, query, router]);
   return real ? null : <BadDate today={today} />;
 }
 
@@ -46,13 +48,14 @@ export function DayView({
 }): React.JSX.Element | null {
   const { today, session } = useDaySession(date);
   const router = useRouter();
+  const query = dayQuery(useSearchParams());
   const phone = usePhone();
   const imports = useImportPicker();
   const real = isRealDate(date);
   const future = real && today !== undefined && date > today;
   useEffect(() => {
-    if (future && mode === 'review') router.replace(dayPlanHref(date));
-  }, [future, mode, date, router]);
+    if (future && mode === 'review') router.replace(dayPlanHref(date, query));
+  }, [future, mode, date, query, router]);
 
   if (!real) return <BadDate today={today} />;
   if (future && mode === 'review') return null;

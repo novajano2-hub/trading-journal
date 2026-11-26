@@ -40,3 +40,20 @@ test('the label can be changed', async () => {
     await screen.findByRole('button', { name: 'Pick a day' }),
   ).toBeTruthy();
 });
+
+test('the day it opens keeps the account selection', async () => {
+  renderApp(<PlanTheDay />, { url: '/app/trades/day?account=acc-a' });
+  await vi.waitFor(() =>
+    expect(
+      screen
+        .getByRole('button', { name: 'Plan the day' })
+        .hasAttribute('disabled'),
+    ).toBe(false),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Plan the day' }));
+  fireEvent.click(
+    await screen.findByRole('gridcell', { name: '28 November 2026' }),
+  );
+  expect(window.location.pathname).toBe('/app/day/2026-11-28/plan');
+  expect(window.location.search).toBe('?account=acc-a');
+});
