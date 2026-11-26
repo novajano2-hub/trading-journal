@@ -43,7 +43,7 @@ export const FIGURE_GROUPS = [
   {
     id: 'gross-net',
     title: 'Gross to net',
-    figures: ['gross-pnl', 'fees', 'net-pnl'],
+    figures: ['gross-pnl', 'fees', 'swap', 'net-pnl'],
   },
   {
     id: 'risk',

@@ -88,7 +88,7 @@ describe('day grouping', () => {
     }),
     makeTrade({
       net: -50,
-      fees: -5,
+      fees: 5,
       gross: -45,
       executions: [fill('buy', 1), fill('sell', 1)],
     }),
@@ -121,6 +121,22 @@ describe('day grouping', () => {
       volume: 2 + 2 + 1 + 1 + 3 + 3 + 4,
     });
     expect(day!.series.map((p) => p.cumulative)).toEqual([100, 50, 50]);
+  });
+
+  test("swap is not a commission: the day carries the trades' fees, with net below gross by fees and swap", () => {
+    const [day] = groupDays(
+      [
+        // Gross 530.00, fees 14.00, swap -4.86: net 511.14.
+        makeTrade({ gross: 53000, fees: 1400, swap: -486, net: 51114 }),
+        makeTrade({ gross: 1000, fees: 100, swap: 120, net: 1020 }),
+      ],
+      env(),
+    );
+    expect(day!.stats).toMatchObject({
+      gross: 54000,
+      net: 52134,
+      commissions: 1500,
+    });
   });
 
   test('a day without a loss has profit factor null', () => {

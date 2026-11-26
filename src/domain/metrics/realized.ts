@@ -10,6 +10,8 @@ export interface Realization {
   gross: Cents;
   fees: Cents;
   net: Cents;
+  /** The swap booked with this exit, inside `net`; absent when it books none. */
+  swap?: Cents;
 }
 
 /**
@@ -91,6 +93,7 @@ export function sizedRealizations(trade: Trade): SizedRealization[] {
         gross: trade.gross,
         fees: trade.fees,
         net: trade.net,
+        ...(trade.swap ? { swap: trade.swap } : {}),
         qty: Number.POSITIVE_INFINITY,
       },
     ];
@@ -113,6 +116,7 @@ export function sizedRealizations(trade: Trade): SizedRealization[] {
       gross,
       fees,
       net: gross - fees + swap,
+      ...(swap !== 0 ? { swap } : {}),
       qty: x.qty,
       price: x.price,
     };
@@ -126,5 +130,6 @@ export function realizations(trade: Trade): Realization[] {
     gross: r.gross,
     fees: r.fees,
     net: r.net,
+    ...(r.swap === undefined ? {} : { swap: r.swap }),
   }));
 }

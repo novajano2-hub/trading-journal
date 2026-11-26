@@ -130,7 +130,8 @@ export function DayPanel({
   inSheet?: boolean;
 }): React.JSX.Element {
   const decided = day.wins + day.losses;
-  const other = basis === 'net' ? day.gross : day.gross - day.fees;
+  // The other basis's P&L: net is gross less the fees plus the swap, which is a cost of its own.
+  const other = basis === 'net' ? day.gross : day.gross - day.fees + day.swap;
   // The Day view's address: this date as the range (equal from and to) and the page's filters.
   const query = serializeFilters({
     ...filters,

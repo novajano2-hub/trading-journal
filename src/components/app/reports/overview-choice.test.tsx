@@ -46,14 +46,80 @@ async function openDialog() {
 const group = (dialog: HTMLElement, name: string) =>
   within(dialog).getByRole('group', { name });
 
+/** Drawn only while a closed trade carries a swap, listed in the dialog always. */
+const WHILE_SWAPPED = ['gross-net:swap'];
+
 test('every figure on the page is in the list, and every figure in the list is on the page', async () => {
   const { root } = await page();
-  expect(shown(root).sort()).toEqual([...figureKeys()].sort());
+  expect(shown(root).sort()).toEqual(
+    figureKeys()
+      .filter((k) => !WHILE_SWAPPED.includes(k))
+      .sort(),
+  );
   const dialog = await openDialog();
   const boxes = within(dialog).getAllByRole('checkbox');
   expect(boxes).toHaveLength(figureKeys().length);
   // All on by default.
   expect(boxes.every((b) => (b as HTMLInputElement).checked)).toBe(true);
+});
+
+test('with a swap on a trade, the page draws every figure in the list', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => {
+      const s = await reportsSample();
+      s.trades = s.trades.map((t, i) => (i === 0 ? { ...t, swap: -486 } : t));
+      return s;
+    },
+  });
+  renderApp(<OverviewView />, { repository, url: URL });
+  const root = await screen.findByTestId('reports-overview');
+  expect(shown(root).sort()).toEqual([...figureKeys()].sort());
+});
+
+test('the Swap line of Gross to net hides as gross-net:swap, apart from the Costs figure', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => {
+      const s = await reportsSample();
+      s.trades = s.trades.map((t, i) => (i === 0 ? { ...t, swap: -486 } : t));
+      return s;
+    },
+  });
+  const view = renderApp(<OverviewView />, { repository, url: URL });
+  const root = await screen.findByTestId('reports-overview');
+  expect(shown(root)).toContain('gross-net:swap');
+  const dialog = await openDialog();
+  const box = within(group(dialog, 'Gross to net')).getByRole('checkbox', {
+    name: 'Swap',
+  }) as HTMLInputElement;
+  expect(box.checked).toBe(true);
+  fireEvent.click(box);
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+  await waitFor(() =>
+    expect(root.querySelector('[data-figure="gross-net:swap"]')).toBeNull(),
+  );
+  // The Costs card's own Swap is a different figure and stays.
+  expect(shown(root)).toContain('costs:swap');
+  await waitFor(async () =>
+    expect((await view.repo.prefs.get()).overviewHidden).toEqual([
+      'gross-net:swap',
+    ]),
+  );
+});
+
+test('with no swap the dialog still lists the Gross to net Swap line, reading None', async () => {
+  await page();
+  const dialog = await openDialog();
+  const box = within(group(dialog, 'Gross to net')).getByRole('checkbox', {
+    name: 'Swap',
+  }) as HTMLInputElement;
+  expect(box.checked).toBe(true);
+  expect(
+    document.getElementById(box.getAttribute('aria-describedby')!)!.textContent,
+  ).toBe('None');
 });
 
 test('the dialog shows each figure with its current value', async () => {

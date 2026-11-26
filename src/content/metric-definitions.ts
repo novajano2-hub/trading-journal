@@ -690,7 +690,7 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'day-commissions': {
     label: 'Commissions',
     definition:
-      'Fees and commissions on the closed trades: gross P&L minus net P&L.',
+      'The fees and commissions on the closed trades. A swap is a cost of its own and is not in it.',
   },
   'day-win-rate': {
     label: 'Win rate',

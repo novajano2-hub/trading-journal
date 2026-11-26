@@ -106,6 +106,9 @@ function statsOf(trades: readonly Trade[], ctx: MetricContext): DayStats {
   let losses = 0;
   let net = 0;
   let gross = 0;
+  // The fees and commissions of the closed trades: not gross less net, which
+  // would carry the swap (a cost of its own, inside net) into them.
+  let fees = 0;
   let closed = 0;
   let positive = 0;
   let negative = 0;
@@ -116,6 +119,7 @@ function statsOf(trades: readonly Trade[], ctx: MetricContext): DayStats {
     closed += 1;
     net += t.net;
     gross += t.gross;
+    fees += t.fees;
     if (t.net > 0) positive += t.net;
     else if (t.net < 0) negative += t.net;
     // Keel's call (TradeZella unknown): winners and losers follow the user's P&L basis and
@@ -130,7 +134,7 @@ function statsOf(trades: readonly Trade[], ctx: MetricContext): DayStats {
     losses,
     net: closed > 0 ? net : null,
     gross: closed > 0 ? gross : null,
-    commissions: closed > 0 ? gross - net : 0,
+    commissions: closed > 0 ? fees : 0,
     winRate: wins + losses > 0 ? wins / (wins + losses) : null,
     profitFactor: negative < 0 ? positive / -negative : null,
     volume: Math.round(volume * 1e6) / 1e6,

@@ -99,23 +99,26 @@ function GrossRow({
   fill,
   widest,
   data,
+  absent = false,
   children,
 }: {
-  id: 'gross-pnl' | 'fees' | 'net-pnl';
+  id: 'gross-pnl' | 'fees' | 'swap' | 'net-pnl';
   cents: number;
   fill: string;
   widest: number;
   data: ReportData;
+  /** Nothing to show: the page leaves the line out, and the choice list reads None. */
+  absent?: boolean;
   children: ReactNode;
 }): React.JSX.Element | null {
   const slot = useFigureSlot(id);
   if (slot.mode === 'list')
     return (
       <ChoiceRow figure={id} label={metricDefinition(id, data.basis).label}>
-        {children}
+        {absent ? null : children}
       </ChoiceRow>
     );
-  if (slot.hidden) return null;
+  if (slot.hidden || absent) return null;
   return (
     <div
       data-figure={slot.key}
@@ -250,7 +253,16 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
   const r = (v: number, signed: boolean) =>
     formatUnitValue('r', v, { currency, signed });
   const feeShare = s.grossPnl > 0 ? s.fees / s.grossPnl : null;
-  const widest = Math.max(1, Math.abs(s.grossPnl), s.fees, Math.abs(s.netPnl));
+  // Swap sits between the fees and the net, so gross, fees, swap and net add
+  // up; the line is there only while some closed trade carries one.
+  const swap = p.costs.swap;
+  const widest = Math.max(
+    1,
+    Math.abs(s.grossPnl),
+    s.fees,
+    Math.abs(swap ?? 0),
+    Math.abs(s.netPnl),
+  );
 
   const long = closed.filter((t) => t.direction === 'long');
   const short = closed.filter((t) => t.direction === 'short');
@@ -452,6 +464,11 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
         [
           ['gross-pnl', s.grossPnl, 'bg-gain-fill'],
           ['fees', -s.fees, 'bg-loss-fill'],
+          [
+            'swap',
+            swap ?? 0,
+            (swap ?? 0) < 0 ? 'bg-loss-fill' : 'bg-gain-fill',
+          ],
           ['net-pnl', s.netPnl, 'bg-accent'],
         ] as const
       ).map(([id, cents, fill]) => (
@@ -462,6 +479,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
           fill={fill}
           widest={widest}
           data={data}
+          absent={id === 'swap' && swap === null}
         >
           <FigureText f={display.cash(cents, true, currency)} />
         </GrossRow>

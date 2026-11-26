@@ -130,6 +130,9 @@ describe('realizations', () => {
       [100000, 300, 99700 - 486],
     ]);
     expect(rs.reduce((s, r) => s + r.net, 0)).toBe(swapped.net);
+    // The exit that books it says so; the others (and a trade with none) carry no swap field.
+    expect(rs.map((r) => r.swap)).toEqual([undefined, -486]);
+    expect(realizations(t).some((r) => 'swap' in r)).toBe(false);
   });
 
   test('a swap on a closed trade without fills is already in its one realization', () => {
@@ -146,6 +149,7 @@ describe('realizations', () => {
         gross: 700,
         fees: 0,
         net: 214,
+        swap: -486,
       },
     ]);
   });
