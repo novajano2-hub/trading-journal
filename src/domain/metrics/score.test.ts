@@ -149,18 +149,19 @@ describe('SCORE_WEIGHTS', () => {
 });
 
 describe('scoreOf', () => {
-  test("the 2 Nov forex trades score 76.43, within 0.2 of TradeZella's 76.3", () => {
+  test("the 2 Nov forex trades score 76.44, within 0.2 of TradeZella's 76.3", () => {
     const trades = forexTrades();
     expect(trades.map((t) => t.net).sort((a, b) => a - b)).toEqual([
       -19380, 20100, 31175, 33280,
     ]);
     const r = scoreOf(trades, ctx)!;
     expect(r).not.toBeNull();
-    // The total is to two decimals: count hundredths so 76.44 reads as 1 off
-    // 76.43, not as 0.01000000000000001 (the method gives 76.4434; the
-    // research's 76.43 reads the under-1.8 slope as 33.3 where the ratio
-    // tests above pin 100 / 3).
-    expect(Math.abs(Math.round(r.total * 100) - 7643)).toBeLessThanOrEqual(1);
+    // The total is to two decimals: pin 76.44 +-0.01 (Ruling 8) by counting
+    // hundredths, so 76.45 is 1 off and 76.46 fails, and the float noise of
+    // r.total - 76.44 never decides it. The method gives 76.4434; the
+    // research's 76.43 reads the under-1.8 slope as 33.3 where the ratio tests
+    // above pin 100 / 3.
+    expect(Math.abs(Math.round(r.total * 100) - 7644)).toBeLessThanOrEqual(1);
     expect(Math.abs(r.total - 76.3)).toBeLessThanOrEqual(0.2);
     const { parts } = r;
     expect(parts.winRate.score).toBe(100);
