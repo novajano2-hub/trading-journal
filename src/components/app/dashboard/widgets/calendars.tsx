@@ -293,6 +293,7 @@ function MonthCard({
             data={model}
             stats={stats}
             fmt={fmt}
+            currency={currency}
           />
         </>
       ) : null}

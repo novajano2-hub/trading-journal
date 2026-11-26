@@ -67,6 +67,7 @@ const opts = (
 ): CalendarImageOptions => ({
   stats: ['net', 'trades', 'winRate'] satisfies CalendarStat[],
   fig: money,
+  currency: 'USD',
   theme: 'light',
   title: 'November 2026',
   subtitle: 'Sample workspace, all accounts',

@@ -344,12 +344,15 @@ export function CalendarSnapshot({
   data,
   stats,
   fmt,
+  currency,
 }: {
   /** `YYYY-MM`. */
   month: string;
   data: ReturnType<typeof calendarMonth>;
   stats: readonly CalendarStat[];
   fmt: FormatMoney;
+  /** The month's currency. */
+  currency: string;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
@@ -368,6 +371,7 @@ export function CalendarSnapshot({
     ? calendarSvg(data, {
         stats,
         fig: (money, r, units) => fmt(money, r, false, units).text,
+        currency,
         theme: resolveTheme(
           prefs?.appearance ?? 'system',
           typeof matchMedia === 'function' &&

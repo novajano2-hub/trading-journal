@@ -8,23 +8,22 @@ import {
   weekIndex,
   type CalendarDay,
   type CalendarWeek,
-  type UnitSums,
 } from '@/data/calendar';
-import type { CalendarStat, Cents, WeekStart } from '@/domain/types';
+import type { CalendarStat, WeekStart } from '@/domain/types';
 import { rotateFromWeekStart } from '@/domain/week';
-import { formatUnitValue } from '@/lib/display';
-import { formatPct, plural } from '@/lib/format';
+import {
+  ratingText,
+  STAT_LABELS,
+  textLinesOf,
+  type FormatMoney,
+  type TextLine,
+} from '@/lib/calendar-lines';
+import { plural } from '@/lib/format';
 import { dayLabel } from '@/lib/time-format';
 
-/** A figure as text and label; the view builds it from the display unit. */
-export type FormatMoney = (
-  money: Cents,
-  r?: number | null,
-  /** A short figure for the phone's small cell: `+1.1k`. */
-  compact?: boolean,
-  /** The ticks, pips and points of the day, week or month, so it reads in those display units. */
-  units?: UnitSums,
-) => { text: string; label: string };
+// Defined beside the lines they belong to, and kept here for the calendar's components.
+export { ratingText, STAT_LABELS };
+export type { FormatMoney };
 
 export { dayLabel };
 
@@ -48,21 +47,6 @@ export const TONE_INK: Record<CalendarDay['tone'], string> = {
   none: 'text-text',
 };
 
-export const STAT_LABELS: Record<CalendarStat, string> = {
-  net: 'Net P&L',
-  trades: 'Trades',
-  winRate: 'Win rate',
-  rating: 'Day rating',
-  r: 'R',
-  fees: 'Fees',
-  ticks: 'Ticks',
-  pips: 'Pips',
-  points: 'Points',
-};
-
-/** One decimal: 4.3. */
-export const ratingText = (rating: number): string => rating.toFixed(1);
-
 /** A line under the lead reads short in a narrow cell and in full once the cell is wide enough to hold it. */
 const FULL_FROM_HIDE = '@[1000px]/cal:hidden';
 const FULL_FROM_SHOW = 'hidden @[1000px]/cal:inline';
@@ -70,17 +54,9 @@ const FULL_FROM_SHOW = 'hidden @[1000px]/cal:inline';
 /** The longest lead figure that fits the cell as written ('+$951.10'); a longer one reads short until the cell is wide. */
 const LEAD_FITS = 8;
 
-export interface Line {
-  key: CalendarStat;
+/** A line of the cell: its text (see `calendar-lines.ts`, which the Calendar image shares) and what the grid draws for it. */
+export interface Line extends TextLine {
   node: React.ReactNode;
-  /** Money and R take the day's tone; counts stay quiet. */
-  toned: boolean;
-  /** The short form (`+1.1k`, `+64t`), for the phone's small cell and for a line under the lead in a narrow cell. */
-  compact?: string;
-  /** The full value as plain text, to tell whether it fits a narrow cell. */
-  text: string;
-  /** The full value in words: the cell's tooltip and its accessible label. */
-  label: string;
 }
 
 /** The lines a day's cell stacks, in the order of the chosen stats: the Calendar image writes the same ones. */
@@ -90,123 +66,20 @@ export function linesOf(
   fmt: FormatMoney,
   currency: string,
 ): Line[] {
-  return stats.flatMap<Line>((key) => {
-    switch (key) {
-      case 'net': {
-        const full = fmt(day.net, day.r, false, day);
-        return [
-          {
-            key,
-            toned: true,
-            node: <FigureText f={full} />,
-            text: full.text,
-            compact: fmt(day.net, day.r, true, day).text,
-            label: full.label,
-          },
-        ];
-      }
-      case 'trades': {
-        const text = `${day.trades} ${plural(day.trades, 'trade')}`;
-        return [{ key, toned: false, node: text, text, label: text }];
-      }
-      case 'winRate': {
-        const decided = day.wins + day.losses;
-        if (decided === 0) return [];
-        const rate = formatPct(day.wins / decided);
-        return [
-          {
-            key,
-            toned: false,
-            node: `${rate} win rate`,
-            text: `${rate} win rate`,
-            compact: `${rate} win`,
-            label: `${rate} win rate`,
-          },
-        ];
-      }
-      case 'rating': {
-        // Nothing rated, nothing shown: the cell omits the line.
-        if (day.rating === null) return [];
-        const text = `${ratingText(day.rating)}★`;
-        return [
-          {
-            key,
-            toned: false,
-            node: text,
-            text,
-            label: `Day rating ${ratingText(day.rating)} of 5`,
-          },
-        ];
-      }
-      case 'r': {
-        if (day.r === null) return [];
-        const full = formatUnitValue('r', day.r, { currency, signed: true });
-        return [
-          {
-            key,
-            toned: true,
-            node: full,
-            text: full,
-            compact: formatUnitValue('r', day.r, {
-              currency,
-              signed: true,
-              compact: true,
-            }),
-            label: full,
-          },
-        ];
-      }
-      case 'ticks':
-      case 'pips':
-      case 'points': {
-        const value = day[key];
-        // A day without an eligible trade says None, never a dash.
-        if (value === null)
-          return [
-            {
-              key,
-              toned: false,
-              node: 'None',
-              text: 'None',
-              compact: 'None',
-              label: `${STAT_LABELS[key]}: None`,
-            },
-          ];
-        const full = formatUnitValue(key, value, { currency, signed: true });
-        return [
-          {
-            key,
-            toned: true,
-            node: full,
-            text: full,
-            compact: formatUnitValue(key, value, {
-              currency,
-              signed: true,
-              compact: true,
-            }),
-            label: full,
-          },
-        ];
-      }
-      case 'fees': {
-        const full = fmt(-day.fees);
-        return [
-          {
-            key,
-            toned: false,
-            node: (
-              <>
-                <FigureText f={full} /> fees
-              </>
-            ),
-            text: `${full.text} fees`,
-            compact: `${fmt(-day.fees, null, true).text} fees`,
-            label: `${full.label} fees`,
-          },
-        ];
-      }
-    }
-  });
+  return textLinesOf(day, stats, fmt, currency).map((line) => ({
+    ...line,
+    node: line.figure ? (
+      line.key === 'fees' ? (
+        <>
+          <FigureText f={line.figure} /> fees
+        </>
+      ) : (
+        <FigureText f={line.figure} />
+      )
+    ) : (
+      line.text
+    ),
+  }));
 }
 
 /** What a screen reader gets for a day: the date, its net, its trades, its note. */

@@ -437,6 +437,7 @@ export function CalendarView(): React.JSX.Element {
               data={model}
               stats={stats}
               fmt={fmt}
+              currency={currency}
             />
             <Link href={yearHref} className={TEXT_BUTTON}>
               <CalendarBlank

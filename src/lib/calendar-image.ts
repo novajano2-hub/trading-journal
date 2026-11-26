@@ -1,7 +1,3 @@
-import {
-  linesOf,
-  type FormatMoney,
-} from '@/components/app/calendar/month-grid';
 import type {
   CalendarDay,
   CalendarWeek,
@@ -9,6 +5,7 @@ import type {
   calendarMonth,
 } from '@/data/calendar';
 import type { CalendarStat, Cents } from '@/domain/types';
+import { textLinesOf, type FormatMoney } from './calendar-lines';
 import { plural } from './format';
 
 /*
@@ -30,6 +27,8 @@ export interface CalendarImageOptions {
   /** The cell stats, in the order they lead; as `UserPrefs.calendarStats`. */
   stats: readonly CalendarStat[];
   fig: CalendarFigure;
+  /** The month's currency, as the grid reads its cells in. */
+  currency: string;
   theme: 'light' | 'dark';
   /** The month: "November 2026". */
   title: string;
@@ -178,14 +177,16 @@ const LINE_STEP = 16;
 export function calendarSvg(month: Month, opts: CalendarImageOptions): string {
   const p = PALETTE[opts.theme];
   const { weeks, summary } = month;
-  // One adapter for the grid's own `linesOf`: the picture takes its figures from `fig`, always in full.
+  // One adapter for the grid's own lines (`calendar-lines.ts`): the picture takes its figures from `fig`, always in full.
   const fmt: FormatMoney = (money, r, _compact, units) => {
     const written = opts.fig(money, r, units);
     return { text: written, label: written };
   };
   const lineSets = weeks.map((w) =>
     w.days.map((d) =>
-      d !== null && d.trades > 0 ? linesOf(d, opts.stats, fmt, 'USD') : [],
+      d !== null && d.trades > 0
+        ? textLinesOf(d, opts.stats, fmt, opts.currency)
+        : [],
     ),
   );
   const tallest = Math.max(1, ...lineSets.flat().map((l) => l.length));
@@ -277,7 +278,7 @@ export function calendarSvg(month: Month, opts: CalendarImageOptions): string {
   return out.join('');
 }
 
-type Lines = ReturnType<typeof linesOf>;
+type Lines = ReturnType<typeof textLinesOf>;
 
 /** One day: its tint and hairline, its number, a note mark and the chosen stats stacked under it. */
 function cell(
