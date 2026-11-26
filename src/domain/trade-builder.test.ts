@@ -279,6 +279,35 @@ describe('buildTrades', () => {
   });
 });
 
+describe('a symbol with a very long history', () => {
+  test('its trades are gathered one by one: no call takes them all as arguments, which a worker, with a small stack, cannot', () => {
+    const fills = Array.from({ length: 3_000 }, (_, i) =>
+      fill(
+        `f${i}`,
+        i % 2 === 0 ? 'buy' : 'sell',
+        1,
+        6000 + (i % 7),
+        new Date(Date.UTC(2026, 0, 5, 14, 0, i)).toISOString(),
+      ),
+    );
+    const push = Array.prototype.push;
+    let widest = 0;
+    Array.prototype.push = function (this: unknown[], ...items: unknown[]) {
+      widest = Math.max(widest, items.length);
+      return push.apply(this, items);
+    };
+    let built: ReturnType<typeof build>;
+    try {
+      built = build(fills, 'ESZ6');
+    } finally {
+      Array.prototype.push = push;
+    }
+    expect(built.trades).toHaveLength(1_500);
+    // A call with many arguments overflows the stack at some tens of thousands; this holds at a few.
+    expect(widest).toBeLessThan(100);
+  });
+});
+
 describe('cost methods (#49)', () => {
   const T5 = '2026-03-02T15:04:00Z';
   const build2 = (

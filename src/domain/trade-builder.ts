@@ -364,7 +364,9 @@ export function buildTrades(
     const sorted = [...group].sort(
       (a, b) => Date.parse(a.time) - Date.parse(b.time),
     );
-    all.push(...buildGroup(sorted, inst, accountId, opts));
+    // One at a time: a symbol with tens of thousands of trades would overflow a call's arguments (a worker's stack is smaller than the page's).
+    for (const trade of buildGroup(sorted, inst, accountId, opts))
+      all.push(trade);
   }
 
   all.sort((a, b) => Date.parse(a.openedAt) - Date.parse(b.openedAt));
