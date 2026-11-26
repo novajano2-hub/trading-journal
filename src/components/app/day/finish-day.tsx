@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useDayScores, useRoutineToday } from '@/data/query/derived';
 import {
   useAccounts,
+  useActiveWorkspace,
   useCashFlows,
   useDays,
   useFinishDay,
@@ -13,7 +14,7 @@ import {
   useTrades,
 } from '@/data/query/hooks';
 import { LockedDayError } from '@/data/repository';
-import { freezeDay } from '@/data/routine';
+import { freezeDay, routineCurrency } from '@/data/routine';
 import { ConfirmDialog, ConfirmFailure } from '../confirm-dialog';
 import { useDayFinished } from './day-lock';
 
@@ -38,6 +39,7 @@ export function FinishDay({
   const accounts = useAccounts().data;
   const flows = useCashFlows().data;
   const prefs = usePrefs().data;
+  const workspace = useActiveWorkspace().data;
   const finish = useFinishDay();
   const [asking, setAsking] = useState(false);
   const panel = useRef<HTMLDivElement>(null);
@@ -85,7 +87,8 @@ export function FinishDay({
     !trades ||
     !accounts ||
     !flows ||
-    !prefs
+    !prefs ||
+    !workspace
   )
     return null;
 
@@ -99,7 +102,7 @@ export function FinishDay({
       flows,
       {
         timeZone: prefs.timeZone,
-        baseCurrency: prefs.baseCurrency,
+        baseCurrency: routineCurrency(workspace?.id, prefs.baseCurrency),
         now: new Date().toISOString(),
         today,
       },

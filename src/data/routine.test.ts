@@ -5,6 +5,7 @@ import type { Account, DayRecord, Trade, Tracker } from '@/domain/types';
 import { generateSampleWorkspace, SAMPLE_SEED } from './seed/generate';
 import {
   freezeDay,
+  routineCurrency,
   scoreHistory,
   sessionLength,
   type RoutineEnv,
@@ -253,6 +254,14 @@ describe('scoreHistory', () => {
     }
     times.sort((a, b) => a - b);
     expect(times[2]!).toBeLessThan(50);
+  });
+});
+
+describe('routineCurrency', () => {
+  test("the sample counts its own USD; my workspace keeps the user's base (R23)", () => {
+    expect(routineCurrency('sample', 'EUR')).toBe('USD');
+    expect(routineCurrency('mine', 'EUR')).toBe('EUR');
+    expect(routineCurrency(undefined, 'EUR')).toBe('EUR');
   });
 });
 
