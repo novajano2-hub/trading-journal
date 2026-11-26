@@ -121,6 +121,7 @@ function largeFills(trips: number): string {
 interface Probe {
   __tasks: { start: number; ms: number }[];
   __readDone: number;
+  __observer: PerformanceObserver;
 }
 
 test('a file of 100,000 fills is planned off the page: the right trade count, and no task over the 50 ms budget once the file is read', async ({
@@ -135,10 +136,11 @@ test('a file of 100,000 fills is planned off the page: the right trade count, an
   await page.evaluate(() => {
     const probe = window as unknown as Probe;
     probe.__tasks = [];
-    new PerformanceObserver((list) => {
+    probe.__observer = new PerformanceObserver((list) => {
       for (const e of list.getEntries())
         probe.__tasks.push({ start: e.startTime, ms: e.duration });
-    }).observe({ type: 'longtask', buffered: true });
+    });
+    probe.__observer.observe({ type: 'longtask', buffered: true });
   });
 
   const csv = largeFills(50_000);
@@ -180,8 +182,14 @@ test('a file of 100,000 fills is planned off the page: the right trade count, an
   await expect(tiles).toContainText('Rows with issues0');
   await expect(page.getByRole('main')).toContainText('+$2,500,000.00');
 
-  const late = await page.evaluate(() => {
+  // The observer hands over its entries in a task of its own, so a long task that ended
+  // just before Preview showed may not have been delivered: one turn of the event loop,
+  // then what is queued but not yet delivered, before the tasks are read.
+  const late = await page.evaluate(async () => {
     const probe = window as unknown as Probe;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    for (const e of probe.__observer.takeRecords())
+      probe.__tasks.push({ start: e.startTime, ms: e.duration });
     return probe.__tasks.filter((t) => t.start >= probe.__readDone);
   });
   expect(late, 'tasks over 50 ms after the file was read').toEqual([]);
