@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 // The collapsible sidebar (#50, C47 to C49): the rail on every desktop page,
 // remembered across loads; Home with no rail at all; day pages and phones
@@ -339,4 +339,153 @@ test('a phone has the tab bar and More, and no sidebar toggle, whatever the save
       ).toBe(true);
     }
   }
+});
+
+// ---- The Settings menu: in groups, and collapsed with the sidebar (C48) -----
+
+const settingsNav = (page: Page) =>
+  page.getByRole('navigation', { name: 'Settings' });
+/** The box of what is drawn, once it is: a link remounts as the viewport crosses lg. */
+async function boxOf(el: Locator) {
+  let box: Awaited<ReturnType<Locator['boundingBox']>> = null;
+  await expect.poll(async () => (box = await el.boundingBox())).not.toBeNull();
+  return box!;
+}
+const navLink = (page: Page, name: string) =>
+  settingsNav(page).getByRole('link', { name });
+/** A link's name as drawn: the box of the span that holds its words. */
+const nameBox = (page: Page, name: string) =>
+  boxOf(navLink(page, name).locator('span'));
+const divider = (page: Page) =>
+  settingsNav(page).locator('li[aria-hidden="true"]');
+
+test('Settings folds to an icon column with the sidebar and stays folded across a reload (desktop)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop');
+  await page.goto('/app/settings/profile');
+  await settled(page);
+  const nav = settingsNav(page);
+  const section = page.getByRole('region', { name: 'Profile' });
+
+  // Expanded: the 180px card, names beside the glyphs, a divider after Profile.
+  await expect(collapseButton(page)).toBeVisible();
+  expect((await boxOf(nav)).width).toBeCloseTo(180, 0);
+  expect((await nameBox(page, 'Accounts')).width).toBeGreaterThan(30);
+  await expect(divider(page)).toHaveCount(1);
+  const rule = await boxOf(divider(page));
+  expect(rule.height).toBeLessThanOrEqual(1);
+  expect(rule.width).toBeGreaterThan(100);
+  const before = (await boxOf(section)).width;
+
+  // Collapsed with the sidebar: 60px, glyphs alone, the divider kept, the page wider.
+  await collapseButton(page).click();
+  await expect(expandButton(page)).toBeVisible();
+  await expect.poll(async () => (await boxOf(nav)).width).toBe(60);
+  for (const name of ['Profile', 'Accounts', 'Trading', 'Tags', 'Logs']) {
+    expect((await nameBox(page, name)).width, name).toBeLessThanOrEqual(1);
+    const link = await boxOf(navLink(page, name));
+    expect(link.width, name).toBeCloseTo(42, 0);
+    expect(link.height, name).toBeGreaterThanOrEqual(36);
+  }
+  await expect(divider(page)).toHaveCount(1);
+  expect((await boxOf(divider(page))).width).toBeGreaterThan(20);
+  await expect
+    .poll(async () => (await boxOf(section)).width)
+    .toBeGreaterThan(before + 100);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await expect.poll(() => saved(page)).toBe('collapsed');
+
+  // By keyboard each icon is named by a tooltip, and still by its link name.
+  await navLink(page, 'Profile').focus();
+  for (const name of ['Accounts', 'Trading', 'Tags', 'Logs']) {
+    await page.keyboard.press('Tab');
+    await expect(page.locator(':focus')).toHaveAccessibleName(name);
+    await expect(page.getByRole('tooltip')).toHaveText(name);
+  }
+  await expect(navLink(page, 'Profile')).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+
+  // Reload: still folded, and on another section.
+  await page.reload();
+  await settled(page);
+  await expect.poll(async () => (await boxOf(nav)).width).toBe(60);
+  await navLink(page, 'Tags').click();
+  await expect(page).toHaveURL(/\/app\/settings\/tags$/);
+  await expect.poll(async () => (await boxOf(nav)).width).toBe(60);
+
+  // Expanding the sidebar brings the words back.
+  await expandButton(page).click();
+  await expect.poll(async () => (await boxOf(nav)).width).toBe(180);
+  expect((await nameBox(page, 'Tags')).width).toBeGreaterThan(20);
+  await expect.poll(() => saved(page)).toBe('expanded');
+});
+
+test('below lg Settings keeps its labelled row, whatever the sidebar choice (desktop)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop');
+  await page.goto('/app/settings/profile');
+  await settled(page);
+  await collapseButton(page).click();
+  await expect.poll(() => saved(page)).toBe('collapsed');
+  for (const width of [640, 768, 1023]) {
+    await page.setViewportSize({ width, height: 900 });
+    // A row: the pills side by side with their words, a divider upright between.
+    await expect
+      .poll(
+        async () => {
+          const profile = await boxOf(navLink(page, 'Profile'));
+          const accounts = await boxOf(navLink(page, 'Accounts'));
+          return (
+            Math.abs(accounts.y - profile.y) < 2 &&
+            accounts.x > profile.x + profile.width
+          );
+        },
+        { message: `${width}` },
+      )
+      .toBe(true);
+    expect((await nameBox(page, 'Accounts')).width, `${width}`).toBeGreaterThan(
+      30,
+    );
+    const rule = await boxOf(divider(page));
+    expect(rule.width, `${width}`).toBeLessThanOrEqual(1);
+    expect(rule.height, `${width}`).toBeGreaterThan(15);
+    // No tooltip where the words show.
+    await navLink(page, 'Accounts').focus();
+    await page.waitForTimeout(350);
+    await expect(page.getByRole('tooltip')).toHaveCount(0);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+      `${width}`,
+    ).toBe(true);
+  }
+});
+
+test('on a phone the Settings pills keep their words, whatever the saved choice (mobile)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'mobile');
+  await page.goto('/app/settings/profile');
+  await settled(page);
+  await save(page, 'collapsed');
+  await page.goto('/app/settings/accounts');
+  await settled(page);
+  await expect.poll(() => saved(page)).toBe('collapsed');
+  await page.waitForTimeout(300);
+  expect((await nameBox(page, 'Accounts')).width).toBeGreaterThan(30);
+  expect((await boxOf(settingsNav(page))).height).toBeLessThan(80);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
 });
