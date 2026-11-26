@@ -220,7 +220,7 @@ function WeekList({
     () => sanitizeDayColumns(prefs.dayColumns),
     [prefs.dayColumns],
   );
-  const env = useCellEnv(lists);
+  const env = useCellEnv(lists, true);
   const records = useMemo(() => new Map<string, DayRecord>(), []);
 
   const toggle = (start: string) => {

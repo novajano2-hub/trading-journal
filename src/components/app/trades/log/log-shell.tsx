@@ -128,7 +128,7 @@ export interface LogLists {
 }
 
 /** The table cells' environment: the zone, the metrics context, the display and the row facts. */
-export function useCellEnv(lists: LogLists): CellEnv {
+export function useCellEnv(lists: LogLists, shortDay = false): CellEnv {
   const prefs = usePrefs().data!;
   const display = useDisplay();
   const ctx = metricContextOf(prefs);
@@ -145,7 +145,7 @@ export function useCellEnv(lists: LogLists): CellEnv {
       lists.categories,
     ],
   );
-  return { timeZone, ctx, display, facts };
+  return { timeZone, ctx, display, facts, ...(shortDay ? { shortDay } : {}) };
 }
 
 /**

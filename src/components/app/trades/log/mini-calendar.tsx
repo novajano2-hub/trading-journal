@@ -28,9 +28,8 @@ import { localDate } from '@/domain/time';
 import type { WeekStart } from '@/domain/types';
 import { weekIndexOf } from '@/domain/week';
 import { FigureSourceContext } from '@/lib/display';
-import { onTradingDate } from '@/lib/time-format';
+import { dayLabel, onTradingDate } from '@/lib/time-format';
 import { plural } from '@/lib/format';
-import { tileLabel } from '@/lib/day-label';
 import { CARD } from '../../dashboard/shared';
 import { figureSourceOf } from './log-shell';
 import { useTileFigures, type Trend } from './week-tiles';
@@ -286,14 +285,14 @@ export function MiniCalendar({
                   : 'None';
           // The name carries the same facts as the preview, in words (Privacy: no amount).
           const name = f
-            ? `${tileLabel(date)}, ${
+            ? `${dayLabel(date)}, ${
                 f.trend === 'other'
                   ? `${count} ${plural(count, 'trade')} in other currencies`
                   : f.full
                     ? `${f.full.label}, ${countText}`
                     : `no closed trades, ${countText}`
               }`
-            : tileLabel(date);
+            : dayLabel(date);
           const isToday = date === today;
           const isSelected = date === selected;
           const col = (lead + i) % 7;
@@ -344,7 +343,7 @@ export function MiniCalendar({
                   }`}
                 >
                   <b className="block text-[13px] font-semibold text-text">
-                    {tileLabel(date)}
+                    {dayLabel(date)}
                   </b>
                   <span className={TIP_TONE[f.trend]}>{net}</span>, {countText}
                 </span>

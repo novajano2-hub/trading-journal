@@ -3,6 +3,7 @@ import { expect, test } from 'vitest';
 import { defaultVersion, versionOn } from '@/domain/tracker/defaults';
 import type { FrozenDay, TrackerVersion } from '@/domain/types';
 import { fixtureSample } from '../__fixtures__/sample';
+import { SAMPLE_WORKSPACE } from '../workspaces';
 import { LockedDayError, SHOT_MAX_BYTES, ShotRejected } from '../repository';
 import { KeelDb } from './db';
 import { createLocalRepository } from './local-repository';
@@ -284,4 +285,22 @@ test('shots: wrong type and over 10 MB are refused; list keeps upload order', as
     a.id,
     b.id,
   ]);
+});
+
+test("on the sample, sessions and the note stamp sit on asOf at the real wall-clock time (M1)", async () => {
+  // The fixture sample's asOf is 2026-11-19; the clock is days later, 10:00 in New York.
+  const { repo } = await setup('2026-11-25');
+  const SAMPLE = SAMPLE_WORKSPACE.id;
+  const tracker = await repo.tracker.get(SAMPLE);
+  expect(tracker.asOf).toBe('2026-11-19');
+  const day = await repo.days.startSession(SAMPLE, '2026-11-19');
+  expect(day.session?.start).toBe('2026-11-19T13:47:00.000Z');
+  const note = await repo.journal.dailyNote(SAMPLE, '2026-11-19');
+  await repo.journal.save(SAMPLE, { ...note });
+  const stamp = (await repo.days.list(SAMPLE)).find(
+    (d) => d.id === '2026-11-19',
+  )!.noteStartedAt;
+  expect(stamp).toBe('2026-11-19T13:47:00.000Z');
+  const ended = await repo.days.endSession(SAMPLE, '2026-11-19');
+  expect(ended.session?.end).toBe('2026-11-19T13:47:00.000Z');
 });

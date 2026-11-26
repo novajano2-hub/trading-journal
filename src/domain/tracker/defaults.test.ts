@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   MON_TO_FRI,
   defaultVersion,
+  routineNow,
   routineToday,
   versionOn,
   weekdayOf,
@@ -54,5 +55,17 @@ describe('tracker defaults', () => {
       '2026-03-01',
     );
     expect(routineToday({}, now, 'America/New_York')).toBe('2026-11-19');
+  });
+
+  test("now is the real instant, or asOf at the real wall-clock time (M1)", () => {
+    const now = '2026-11-26T15:04:05.250Z'; // 10:04:05 in New York
+    expect(routineNow({}, now, 'America/New_York')).toBe(now);
+    expect(routineNow({ asOf: '2026-11-19' }, now, 'America/New_York')).toBe(
+      '2026-11-19T15:04:05.250Z',
+    );
+    // A different offset on that date still reads as the same local time.
+    expect(routineNow({ asOf: '2026-07-01' }, now, 'America/New_York')).toBe(
+      '2026-07-01T14:04:05.250Z',
+    );
   });
 });

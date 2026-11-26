@@ -32,10 +32,16 @@ import {
   type PropFinanceView,
 } from '../prop-finance';
 import { widgetData, type WidgetData } from '../widget-data';
-import { routineToday } from '@/domain/tracker/defaults';
-import { msToLocalMidnight, scoreHistory, type ScoreHistory } from '../routine';
+import { routineNow, routineToday } from '@/domain/tracker/defaults';
+import {
+  msToLocalMidnight,
+  routineCurrency,
+  scoreHistory,
+  type ScoreHistory,
+} from '../routine';
 import {
   useAccounts,
+  useActiveWorkspace,
   useCashFlows,
   useChallenges,
   useDays,
@@ -419,10 +425,22 @@ export function useDayScores(): Derived<ScoreHistory> {
   const accounts = useAccounts();
   const flows = useCashFlows();
   const prefs = usePrefs();
-  const state = combine([tracker, days, trades, accounts, flows, prefs]);
+  const workspace = useActiveWorkspace();
+  const state = combine([
+    tracker,
+    days,
+    trades,
+    accounts,
+    flows,
+    prefs,
+    workspace,
+  ]);
   const selection = filters.accountIds.join(',');
   const timeZone = prefs.data?.timeZone;
-  const baseCurrency = prefs.data?.baseCurrency;
+  const baseCurrency =
+    prefs.data && workspace.data
+      ? routineCurrency(workspace.data.id, prefs.data.baseCurrency)
+      : undefined;
 
   const [now, refresh] = useRoutineClock(timeZone);
 
@@ -446,7 +464,7 @@ export function useDayScores(): Derived<ScoreHistory> {
       {
         timeZone,
         baseCurrency,
-        now,
+        now: routineNow(tracker.data, now, timeZone),
         today: routineToday(tracker.data, now, timeZone),
         ...(selection ? { accountIds: selection.split(',') } : {}),
       },

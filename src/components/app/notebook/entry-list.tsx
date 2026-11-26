@@ -10,6 +10,7 @@ import {
   Trash,
 } from '@phosphor-icons/react/dist/ssr';
 import {
+  useDays,
   useRemoveJournalEntry,
   useRestoreJournalEntry,
 } from '@/data/query/hooks';
@@ -18,6 +19,7 @@ import { dayLabel } from '@/data/seed/calendar';
 import { plural } from '@/lib/format';
 import { docExcerpt } from '@/lib/note-text';
 import { ConfirmDialog } from '../confirm-dialog';
+import { LockLine } from '../day/day-lock';
 import { KIND_LABEL, entryDay } from './notebook-model';
 
 /** "Fri 20 Nov", or "20 Nov 2025" for another year. */
@@ -59,6 +61,17 @@ export function EntryList({
   const remove = useRemoveJournalEntry();
   const [deleting, setDeleting] = useState<JournalEntry | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  // A closed day's note is frozen: the repository refuses to restore or delete it, and the purge spares it.
+  const days = useDays().data;
+  const closedDates = new Set(
+    (days ?? [])
+      .filter((d) => d.finishedAt !== undefined || d.locked !== undefined)
+      .map((d) => d.id),
+  );
+  const isClosed = (e: JournalEntry): boolean =>
+    e.kind === 'daily-review' &&
+    e.date !== undefined &&
+    closedDates.has(e.date);
 
   return (
     <section
@@ -84,7 +97,7 @@ export function EntryList({
         <span aria-live="polite">{heading}</span>
         <span>Newest first</span>
       </div>
-      {trash ? (
+      {trash && entries.some((e) => !isClosed(e)) ? (
         <p className="px-[18px] pb-1.5 text-[12.5px] leading-snug text-muted">
           Notes in Trash are deleted after 30 days.
         </p>
@@ -153,32 +166,36 @@ export function EntryList({
                 {trash ? (
                   <div className="px-2.5 pt-2.5 pb-2">
                     {body}
-                    <span className="mt-1.5 flex gap-1">
-                      <button
-                        type="button"
-                        aria-label={`Restore ${e.title}`}
-                        disabled={restore.isPending}
-                        onClick={() =>
-                          restore.mutate(e.id, {
-                            onError: () =>
-                              setFailed("Couldn't restore that note."),
-                          })
-                        }
-                        className={ACTION}
-                      >
-                        <ArrowCounterClockwise size={14} aria-hidden="true" />
-                        Restore
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`Delete ${e.title} forever`}
-                        onClick={() => setDeleting(e)}
-                        className={`${ACTION} hover:text-loss`}
-                      >
-                        <Trash size={14} aria-hidden="true" />
-                        Delete forever
-                      </button>
-                    </span>
+                    {isClosed(e) ? (
+                      <LockLine className="mt-2 !py-1.5 !text-[12.5px]" />
+                    ) : (
+                      <span className="mt-1.5 flex gap-1">
+                        <button
+                          type="button"
+                          aria-label={`Restore ${e.title}`}
+                          disabled={restore.isPending}
+                          onClick={() =>
+                            restore.mutate(e.id, {
+                              onError: () =>
+                                setFailed("Couldn't restore that note."),
+                            })
+                          }
+                          className={ACTION}
+                        >
+                          <ArrowCounterClockwise size={14} aria-hidden="true" />
+                          Restore
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Delete ${e.title} forever`}
+                          onClick={() => setDeleting(e)}
+                          className={`${ACTION} hover:text-loss`}
+                        >
+                          <Trash size={14} aria-hidden="true" />
+                          Delete forever
+                        </button>
+                      </span>
+                    )}
                   </div>
                 ) : (
                   <Link

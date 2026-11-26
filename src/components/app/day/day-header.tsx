@@ -1,14 +1,14 @@
 'use client';
 
 import { CaretDown, LockSimple } from '@phosphor-icons/react/dist/ssr';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { Popover } from 'radix-ui';
 import { usePrefs } from '@/data/query/hooks';
 import type { DayMode } from '@/lib/day-routes';
-import { dayHref } from '@/lib/day-routes';
+import { dayHref, dayQuery } from '@/lib/day-routes';
 import { dayLabel } from '@/lib/time-format';
-import { usePhone } from '@/lib/use-phone';
+import { useBelowLg } from '@/lib/use-phone';
 import { Chip } from '@/components/ui/chip';
 import { MonthPicker } from '../routine/month-picker';
 import { useDayFinished } from './day-lock';
@@ -23,7 +23,7 @@ const TITLE =
 /**
  * The day page's place in the top bar (K25): the date, then from `sm` the
  * stage bar. In plan the date is a plain label; in review it is a popover of
- * months that opens any day's page. On a phone the stage bar moves under the
+ * months that opens any day's page. Below `lg` the stage bar moves under the
  * bar (`DayView`).
  */
 export function DayHeader({
@@ -36,9 +36,10 @@ export function DayHeader({
   onImport(from: HTMLElement): void;
 }): React.JSX.Element {
   const { today, session } = useDaySession(date);
-  const phone = usePhone();
+  const stacked = useBelowLg();
   const weekStart = usePrefs().data?.weekStart;
   const router = useRouter();
+  const query = dayQuery(useSearchParams());
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(date.slice(0, 7));
   // "Tue 24 Nov", with the year when it isn't today's.
@@ -89,7 +90,7 @@ export function DayHeader({
                   label="Pick a day"
                   onPick={(picked) => {
                     setOpen(false);
-                    router.push(dayHref(picked, today));
+                    router.push(dayHref(picked, today, query));
                   }}
                 />
               </Popover.Content>
@@ -105,7 +106,7 @@ export function DayHeader({
           Closed
         </Chip>
       ) : null}
-      {phone ? null : (
+      {stacked ? null : (
         <StageBar
           date={date}
           mode={mode}

@@ -7,7 +7,7 @@ import { usePrefs } from '@/data/query/hooks';
 import { useDisplay } from '@/lib/display';
 import { plural } from '@/lib/format';
 import { signTone } from '../../dashboard/shared';
-import { clockOf } from '@/lib/day-label';
+import { clock } from '@/lib/time-format';
 
 /**
  * The span of the day's trading the x axis covers (see `daySpan`, Keel's call:
@@ -98,7 +98,7 @@ export function IntradayChart({
   const final = series.at(-1)!;
   const high = Math.max(...cums);
   const low = Math.min(...cums);
-  const aria = `Running net on ${label}: ${series.length} closed ${plural(series.length, 'trade')} from ${clockOf(new Date(start).toISOString(), timeZone)} to ${clockOf(new Date(end).toISOString(), timeZone)}, ending ${amount(ids, final.cumulative).label}, high ${display.cash(high).label}, low ${display.cash(low).label}`;
+  const aria = `Running net on ${label}: ${series.length} closed ${plural(series.length, 'trade')} from ${clock(new Date(start).toISOString(), timeZone, false)} to ${clock(new Date(end).toISOString(), timeZone, false)}, ending ${amount(ids, final.cumulative).label}, high ${display.cash(high).label}, low ${display.cash(low).label}`;
 
   const pick = (e: React.PointerEvent) => {
     const rect = plot.current?.getBoundingClientRect();
@@ -142,7 +142,7 @@ export function IntradayChart({
         className="pointer-events-none absolute z-10 w-max max-w-[min(320px,80vw)] -translate-x-1/2 -translate-y-full rounded-control border border-line bg-surface-1 px-3 py-2 text-[12.5px] leading-[1.4] text-muted shadow-[var(--shadow)]"
       >
         <b className="font-semibold text-text">
-          {clockOf(hit.time, timeZone)}, {nameOf(hit.tradeId)}
+          {clock(hit.time, timeZone, false)}, {nameOf(hit.tradeId)}
         </b>{' '}
         <span className={signTone(hit.net)}>
           {amount([hit.tradeId], hit.net).text}
@@ -265,7 +265,7 @@ export function IntradayChart({
         >
           {[start, (start + end) / 2, end].map((ms, i) => (
             <li key={i}>
-              {clockOf(new Date(Math.round(ms)).toISOString(), timeZone, true)}
+              {clock(new Date(Math.round(ms)).toISOString(), timeZone)}
             </li>
           ))}
         </ul>

@@ -6,9 +6,9 @@ import { isClosed } from '@/domain/trade-status';
 import { useDisplay } from '@/lib/display';
 import { plural } from '@/lib/format';
 import { usePhone } from '@/lib/use-phone';
-import { onTradingDate, weekdayOf } from '@/lib/time-format';
+import { dayLabel, onTradingDate, weekdayOf } from '@/lib/time-format';
 import { signTone } from '../../dashboard/shared';
-import { tileLabel, weekLabel } from '@/lib/day-label';
+import { weekLabel } from '@/lib/day-label';
 
 /** The plot's height in px, and the room a value label takes above or below a bar. */
 const PLOT = 132;
@@ -90,7 +90,7 @@ export function WeekBars({ week }: { week: WeekGroup }): React.JSX.Element {
         style={{ left: `${Math.min(85, Math.max(15, xOf(at.i)))}%`, top: 0 }}
         className="pointer-events-none absolute z-10 w-max max-w-[min(320px,80vw)] -translate-x-1/2 rounded-control border border-line bg-surface-1 px-3 py-2 text-[12.5px] leading-[1.4] text-muted shadow-[var(--shadow)]"
       >
-        <b className="font-semibold text-text">{tileLabel(dates[at.i]!)}</b>{' '}
+        <b className="font-semibold text-text">{dayLabel(dates[at.i]!)}</b>{' '}
         <span className={nets[at.i] != null ? signTone(nets[at.i]!) : ''}>
           {hitFigure ? display.figure(hitFigure).text : 'No closed trades'}
         </span>

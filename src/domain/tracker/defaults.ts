@@ -1,3 +1,4 @@
+import { TZDate } from '@date-fns/tz';
 import { localDate } from '../time';
 import type { Tracker, TrackerVersion, Weekdays } from '../types';
 
@@ -56,4 +57,35 @@ export function routineToday(
   timeZone: string,
 ): string {
   return tracker.asOf ?? localDate(nowIso, timeZone);
+}
+
+/**
+ * The routine's "now" as an instant: the real one, or, when the sample has an
+ * `asOf` date, that date at the current wall-clock time in the zone. The
+ * sample's today is always behind the real date, so a stamp, a session or a
+ * clock reading taken on it must sit on it, not on the real day.
+ */
+export function routineNow(
+  tracker: Pick<Tracker, 'asOf'>,
+  nowIso: string,
+  timeZone: string,
+): string {
+  if (tracker.asOf === undefined) return nowIso;
+  const [y, m, d] = tracker.asOf.split('-').map(Number) as [
+    number,
+    number,
+    number,
+  ];
+  const at = new TZDate(Date.parse(nowIso), timeZone);
+  const onAsOf = new TZDate(
+    y,
+    m - 1,
+    d,
+    at.getHours(),
+    at.getMinutes(),
+    at.getSeconds(),
+    at.getMilliseconds(),
+    timeZone,
+  );
+  return new Date(onAsOf.getTime()).toISOString();
 }

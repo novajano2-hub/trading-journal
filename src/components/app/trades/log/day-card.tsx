@@ -6,6 +6,7 @@ import {
   ClipboardText,
 } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useId } from 'react';
 import { daySpan, type DayGroup } from '@/data/day-log';
 import { useSetMood } from '@/data/query/hooks';
@@ -17,7 +18,8 @@ import { formatInstrument, plural } from '@/lib/format';
 import { CARD, CARD_PAD, signTone } from '../../dashboard/shared';
 import { MoodControl } from '../../routine/mood-control';
 import { usePhone } from '@/lib/use-phone';
-import { dayLabel } from '@/lib/day-label';
+import { dayLabel } from '@/lib/time-format';
+import { dayQuery, dayReviewHref } from '@/lib/day-routes';
 import { IntradayChart } from './intraday-chart';
 import { useLogEnv } from './log-env';
 import { LogTable } from './log-table';
@@ -159,11 +161,12 @@ export function DayCard({
   const display = useDisplay();
   const phone = usePhone();
   const setMood = useSetMood();
+  const query = dayQuery(useSearchParams());
   const heading = useId();
   const panel = useId();
-  const date = dayLabel(group.date);
+  const date = dayLabel(group.date, { year: true });
   // Below sm the header drops the year ("Tue 24 Nov", as comp 06 at 390 shows).
-  const headerDate = phone ? dayLabel(group.date, false) : date;
+  const headerDate = phone ? dayLabel(group.date) : date;
   const record = records.get(group.date);
 
   const noteOnly =
@@ -225,7 +228,7 @@ export function DayCard({
           {/* The record's source (inv-2 052) shows no review icon on a note-only card. */}
           {noteOnly ? null : (
             <Link
-              href={`/app/day/${group.date}/review`}
+              href={dayReviewHref(group.date, query)}
               aria-label={phone ? `Review ${date}` : undefined}
               className={phone ? `${QUICK} w-11 justify-center px-0` : QUICK}
             >
@@ -236,6 +239,11 @@ export function DayCard({
           {noteAction}
         </div>
       </header>
+      {setMood.isError ? (
+        <p role="alert" className="mt-2 text-[13px] text-loss">
+          Couldn&apos;t save that mood. Try again.
+        </p>
+      ) : null}
 
       {noteOnly ? (
         <>

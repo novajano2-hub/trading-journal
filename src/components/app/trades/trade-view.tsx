@@ -72,7 +72,8 @@ import { qty } from './columns';
 import { FillsTimeline, positions, sortedFills } from './fills-timeline';
 import { RatingRow } from '../routine/rating-row';
 import { RuleChecklist } from './rule-checklist';
-import { clock, clockOnDay, dayLabel } from './trade-time';
+import { clock } from '@/lib/time-format';
+import { clockOnDay, dayLabel } from './trade-time';
 import {
   DayNote,
   dayNoteDate,

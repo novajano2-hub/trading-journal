@@ -24,16 +24,30 @@ import {
 } from '../columns';
 import { TagsCell } from '../cells';
 import { PhoneRows } from '../phone-rows';
-import { clockOf, dayLabel } from '@/lib/day-label';
+import { clock, dayLabel } from '@/lib/time-format';
 
-/** The widths the day table wants over the trade log's: HH:MM:SS, a ticker pill, a contract with its expiry. */
-const WIDTHS: Record<ColumnId, number> = {
+/**
+ * The widths the day table wants over the trade log's (D1): HH:MM:SS, a ticker
+ * pill, a contract with its expiry, and a Net P&L that never wraps (an open
+ * trade prints "(open) -$1,234.56"). Strategy and Tags take what is left, each
+ * at least `FLEX_MIN`, and end in an ellipsis when it runs out, so the table
+ * fits its card at 1440 and keeps Tags in the Week view.
+ */
+const WIDTHS: Partial<Record<ColumnId, number>> = {
   ...COLUMN_WIDTHS,
-  open: 84,
-  ticker: 96,
-  instrument: 170,
-  tags: 132,
+  open: 76,
+  ticker: 74,
+  side: 52,
+  instrument: 112,
+  net: 116,
+  roi: 66,
+  realizedR: 58,
+  day: 84,
+  strategies: undefined,
+  tags: undefined,
 };
+const FLEX_MIN = 96;
+const widthOf = (id: ColumnId): number | undefined => WIDTHS[id];
 
 /** Headers the day table spells out where the trade log is terse. */
 const HEADER_LABEL: Partial<Record<ColumnId, string>> = {
@@ -56,7 +70,7 @@ function TagsWithPicker({
 }): React.JSX.Element {
   const update = useUpdateTrades();
   const title = useId();
-  const date = dayLabel(dayOfTrade(trade, env.timeZone));
+  const date = dayLabel(dayOfTrade(trade, env.timeZone), { year: true });
   return (
     <span className="flex min-w-0 items-center gap-1.5">
       <span className="min-w-0 flex-1">
@@ -67,7 +81,7 @@ function TagsWithPicker({
       </span>
       <Popover.Root>
         <Popover.Trigger
-          aria-label={`Add tags to ${trade.instrument.root}, ${dayLabel(dayOfTrade(trade, env.timeZone))}`}
+          aria-label={`Add tags to ${trade.instrument.root}, ${dayLabel(dayOfTrade(trade, env.timeZone), { year: true })}`}
           className="grid size-[22px] flex-none place-items-center rounded-full border border-line text-muted outline-offset-1 hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent data-[state=open]:bg-sunken pointer-coarse:size-11"
         >
           <Plus size={12} weight="bold" aria-hidden="true" />
@@ -120,7 +134,7 @@ function Cell({
     case 'open':
       return (
         <TradeTime
-          text={`${clockOf(t.openedAt, env.timeZone, true)}`}
+          text={`${clock(t.openedAt, env.timeZone)}`}
           className="text-[13px]"
         />
       );
@@ -200,13 +214,13 @@ export function LogTable({
         <table
           aria-label={label}
           style={{
-            minWidth: `${columns.reduce((n, id) => n + WIDTHS[id], 0)}px`,
+            minWidth: `${columns.reduce((n, id) => n + (widthOf(id) ?? FLEX_MIN), 0)}px`,
           }}
           className="w-full table-fixed border-collapse text-[13px] whitespace-nowrap [font-stretch:90%]"
         >
           <colgroup>
             {columns.map((id) => (
-              <col key={id} style={{ width: WIDTHS[id] }} />
+              <col key={id} style={{ width: widthOf(id) }} />
             ))}
           </colgroup>
           <thead>

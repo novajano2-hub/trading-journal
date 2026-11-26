@@ -2,7 +2,7 @@ import { versionOn, weekdayOf } from '@/domain/tracker/defaults';
 import type { DayRecord } from '@/domain/types';
 import { LockedDayError, type DaysRepo } from '../repository';
 import type { LocalContext } from './context';
-import { isLocked, todayIn } from './routine-today';
+import { isLocked, routineNowIn, todayIn } from './routine-today';
 import { ensureTracker } from './tracker';
 import { rwTx } from './tx';
 
@@ -11,7 +11,11 @@ export function localDays(ctx: LocalContext): DaysRepo {
   async function edit(
     ws: string,
     date: string,
-    change: (day: DayRecord, today: string) => DayRecord | Promise<DayRecord>,
+    change: (
+      day: DayRecord,
+      today: string,
+      now: string,
+    ) => DayRecord | Promise<DayRecord>,
   ): Promise<DayRecord> {
     const db = await ctx.db();
     return rwTx(db, [db.days, db.trackers, db.meta], async () => {
@@ -21,7 +25,11 @@ export function localDays(ctx: LocalContext): DaysRepo {
         id: date,
         workspaceId: ws,
       };
-      const next = await change(day, today);
+      const next = await change(
+        day,
+        today,
+        await routineNowIn(db, ws, ctx.now()),
+      );
       await db.days.put(next);
       return next;
     });
@@ -35,21 +43,21 @@ export function localDays(ctx: LocalContext): DaysRepo {
     },
 
     startSession: (ws, date) =>
-      edit(ws, date, (day, today) => {
+      edit(ws, date, (day, today, now) => {
         if (date !== today)
           throw new RangeError('A session can start on today only');
         if (day.session !== undefined)
           throw new RangeError('The day has had its session');
-        return { ...day, session: { start: ctx.now().toISOString() } };
+        return { ...day, session: { start: now } };
       }),
 
     endSession: (ws, date) =>
-      edit(ws, date, (day) => {
+      edit(ws, date, (day, _today, now) => {
         if (day.session === undefined || day.session.end !== undefined)
           throw new RangeError('The day has no running session');
         return {
           ...day,
-          session: { ...day.session, end: ctx.now().toISOString() },
+          session: { ...day.session, end: now },
         };
       }),
 
