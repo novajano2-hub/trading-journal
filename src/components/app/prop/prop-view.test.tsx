@@ -148,6 +148,32 @@ test('a broken rule on an active challenge offers Mark as breached, and saves th
   ).toBeNull();
 });
 
+test('Mark as breached dates the breach on the day the rule broke, not today (C34)', async () => {
+  const r = repo({
+    accounts: [prop('p-forex', 'Forex evaluation')],
+    challenges: [challenge({})],
+    loss: true,
+  });
+  renderApp(<PropView />, { repository: r, url: '/app/prop-firms' });
+  const card = await screen.findByRole('article', { name: 'Forex 100K' });
+  fireEvent.click(
+    await within(card).findByRole('button', { name: 'Mark as breached' }),
+  );
+  // The finding is dated 10 Nov, the loss's day: a breach is permanent, so
+  // the date it keeps is that one, whenever the trader confirms it.
+  await waitFor(async () => {
+    const [saved] = await r.challenges.list(WS);
+    expect(saved).toMatchObject({
+      status: 'breached',
+      breachedOn: '2026-11-10',
+    });
+  });
+  const todayNy = new Date().toLocaleDateString('en-CA', {
+    timeZone: 'America/New_York',
+  });
+  expect(todayNy > '2026-11-10').toBe(true);
+});
+
 test('a target met on the last evaluation step offers Mark step passed, which moves the challenge to funded and active', async () => {
   const r = repo({
     accounts: [

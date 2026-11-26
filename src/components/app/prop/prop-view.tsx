@@ -208,7 +208,8 @@ export function PropView(): React.JSX.Element {
                   // A breach is recorded through markBreached (update refuses
                   // it). Until the Mark as breached dialog (Task 11) asks for
                   // a reason, the rule's finding is kept as 'other' with its
-                  // text, dated today.
+                  // text, dated the day the rule broke (the breach is
+                  // permanent and drives the insights), else today.
                   patch.status === 'breached'
                     ? markBreached.mutate({
                         id: c.id,
@@ -216,7 +217,7 @@ export function PropView(): React.JSX.Element {
                         ...(patch.failureReason !== undefined && {
                           note: patch.failureReason,
                         }),
-                        on: today,
+                        on: check.finding?.date ?? today,
                       })
                     : update.mutate({ id: c.id, patch })
                 }

@@ -187,7 +187,6 @@ export function scoreOf(
 
   // No wins and a loss is a ratio of 0; no loss has no ratio.
   const winLoss = s.losses === 0 ? null : s.wins === 0 ? 0 : s.winLossRatio;
-  // (ratioPart scores either as no-profit when there is no win.)
 
   let drawdown: ScorePartResult;
   if (dd.amount === 0) drawdown = part(0, 100);
