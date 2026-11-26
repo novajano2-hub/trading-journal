@@ -324,6 +324,92 @@ describe('withFeeRule', () => {
   });
 });
 
+describe('the fills new in an import', () => {
+  const run = { override: false, accountCurrency: 'USD' };
+  /** A trade whose entry an earlier import costed; its two exits are the new fills. */
+  const carried = () => {
+    const t = scaled();
+    const [entry, ...exits] = t.executions;
+    return {
+      t: {
+        ...t,
+        executions: [{ ...entry!, commission: 150, fees: 20 }, ...exits],
+        fees: 170,
+        net: t.net - 170,
+      },
+      fresh: new Set(exits.map((e) => e.id)),
+      exits,
+    };
+  };
+
+  test('only the fills in scope are costed, and a costed fill outside it does not stop the rule', () => {
+    const { t, fresh } = carried();
+    expect(hasCosts(t)).toBe(true);
+    expect(hasCosts(t, fresh)).toBe(false);
+    const out = withFeeRule(t, rule(), { ...run, fills: fresh })!;
+    expect(costs(out.executions)).toEqual([
+      [150, 20],
+      [150, 20],
+      [150, 20],
+    ]);
+    // The costs come off the net by the change only: two fills at 170.
+    expect(out.fees).toBe(170 + 340);
+    expect(out.net).toBe(t.net - 340);
+    expect(out.gross).toBe(t.gross);
+  });
+
+  test('a fill in scope that carries costs from the file keeps them, and the rule skips the scope', () => {
+    const { t, exits } = carried();
+    const filed = {
+      ...t,
+      executions: t.executions.map((e) =>
+        e.id === exits[1]!.id ? { ...e, commission: 250 } : e,
+      ),
+    };
+    const fresh = new Set(exits.map((e) => e.id));
+    expect(
+      withFeeRule(filed, rule(), { ...run, fills: fresh }),
+    ).toBeUndefined();
+    // With override the fills in scope are replaced, and the others stay.
+    const over = withFeeRule(filed, rule(), {
+      ...run,
+      override: true,
+      fills: fresh,
+    })!;
+    expect(costs(over.executions)).toEqual([
+      [150, 20],
+      [150, 20],
+      [150, 20],
+    ]);
+  });
+
+  test('entry and exit are read from the whole position, not from the fills in scope', () => {
+    const { t, exits } = carried();
+    // Alone, the closing fill would read as an entry from flat; in the trade it is an exit.
+    const closing = new Set([exits[1]!.id]);
+    expect(
+      withFeeRule(t, rule({ applyOn: 'entry' }), { ...run, fills: closing }),
+    ).toBeUndefined();
+    const out = withFeeRule(t, rule({ applyOn: 'exit' }), {
+      ...run,
+      fills: closing,
+    })!;
+    expect(costs(out.executions)).toEqual([
+      [150, 20],
+      [0, 0],
+      [150, 20],
+    ]);
+    expect(out.fees).toBe(170 + 170);
+  });
+
+  test('an empty scope changes nothing', () => {
+    const { t } = carried();
+    expect(
+      withFeeRule(t, rule(), { ...run, fills: new Set() }),
+    ).toBeUndefined();
+  });
+});
+
 describe('feeRuleError', () => {
   const input = (p: Partial<FeeRule> = {}) => ({
     assetClass: 'future' as const,

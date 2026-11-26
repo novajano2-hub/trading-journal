@@ -72,35 +72,124 @@ describe('the rules on import', () => {
     expect(aapl.fees).toBe(0);
   });
 
-  test('a trade a later import carries on keeps what it has: the rules are for new trades', async () => {
+  test('a trade a later import closes keeps its levels, and the fill the import adds is costed', async () => {
     const { repo, acc, commit } = await rulesSetup();
     const target = await repo.targetRules.create(M, targetInput(acc.id));
-    const fee = await repo.feeRules.create(M, feeInput(acc.id));
+    await repo.feeRules.create(M, feeInput(acc.id));
     await commit(H + '2026-11-16 09:30:00,ESZ5,Buy,2,6000,,\n', 'imp-1');
     const [open] = await repo.trades.list(M);
     expect(open!.status).toBe('open');
     expect(costs(open!)).toEqual([[150, 20]]);
     expect(open!.stops!.levels).toEqual([{ value: 5995, qty: 2 }]);
 
-    // The rules change; the next file closes the same trade.
+    // The levels rule changes; the next file closes the same trade.
     await repo.targetRules.update(M, target.id, {
       stop: { unit: 'price', levels: [{ value: 5900, pct: 100 }] },
     });
-    await repo.feeRules.update(M, fee.id, { commission: 999 });
     await commit(H + '2026-11-16 09:40:00,ESZ5,Sell,2,6004,,\n', 'imp-2');
     const [closed] = await repo.trades.list(M);
     expect(closed!.id).toBe(open!.id);
     expect(closed!.status).toBe('closed');
-    // Its levels are as the first import left them, and the new fill is not costed.
+    // Its levels are as the first import left them (B17), and the full charge is on it.
     expect(closed!.stops!.levels).toEqual([{ value: 5995, qty: 2 }]);
     expect(costs(closed!)).toEqual([
       [150, 20],
-      [0, 0],
+      [150, 20],
     ]);
-    expect(closed!.fees).toBe(170);
+    expect(closed!.fees).toBe(340);
+    expect(closed!.gross).toBe(40000);
+    expect(closed!.net).toBe(40000 - 340);
   });
 
-  test('a trade left open by an import before the rules existed is not given them by the next import', async () => {
+  test('the new fill of a carried-on trade is costed by the rule as it is then, once', async () => {
+    const { repo, acc, commit } = await rulesSetup();
+    const fee = await repo.feeRules.create(M, feeInput(acc.id));
+    await commit(H + '2026-11-16 09:30:00,ESZ5,Buy,2,6000,,\n', 'imp-1');
+    await repo.feeRules.update(M, fee.id, { commission: 999 });
+    await commit(H + '2026-11-16 09:40:00,ESZ5,Sell,1,6004,,\n', 'imp-2');
+    await commit(H + '2026-11-16 09:50:00,ESZ5,Sell,1,6006,,\n', 'imp-3');
+    const [t] = await repo.trades.list(M);
+    // Each import costs the fills it brought and leaves the earlier ones as they were.
+    expect(costs(t!)).toEqual([
+      [150, 20],
+      [999, 20],
+      [999, 20],
+    ]);
+    expect(t!.fees).toBe(170 + 1019 * 2);
+  });
+
+  test('Apply on reads the whole position: an exit rule costs the closing fill, an entry rule leaves it', async () => {
+    for (const [applyOn, expected] of [
+      [
+        'exit',
+        [
+          [0, 0],
+          [150, 20],
+        ],
+      ],
+      [
+        'entry',
+        [
+          [150, 20],
+          [0, 0],
+        ],
+      ],
+    ] as const) {
+      const { repo, acc, commit } = await rulesSetup();
+      await repo.feeRules.create(M, feeInput(acc.id, { applyOn }));
+      await commit(H + '2026-11-16 09:30:00,ESZ5,Buy,2,6000,,\n', 'imp-1');
+      await commit(H + '2026-11-16 09:40:00,ESZ5,Sell,2,6004,,\n', 'imp-2');
+      const [t] = await repo.trades.list(M);
+      expect(costs(t!), applyOn).toEqual(expected);
+      expect(t!.fees, applyOn).toBe(170);
+    }
+  });
+
+  test('a new fill that carries costs from the file is left as it is', async () => {
+    const { repo, acc, commit } = await rulesSetup();
+    await repo.feeRules.create(M, feeInput(acc.id));
+    await commit(H + '2026-11-16 09:30:00,ESZ5,Buy,2,6000,,\n', 'imp-1');
+    await commit(H + '2026-11-16 09:40:00,ESZ5,Sell,2,6004,2.50,\n', 'imp-2');
+    const [t] = await repo.trades.list(M);
+    expect(costs(t!)).toEqual([
+      [150, 20],
+      [250, 0],
+    ]);
+    expect(t!.fees).toBe(420);
+  });
+
+  test('a rule that does not match leaves the new fill of a carried-on trade alone', async () => {
+    const { repo, acc, commit } = await rulesSetup();
+    // A stock rule does not cover an ES trade; neither does a rule of another account.
+    await repo.feeRules.create(M, feeInput(acc.id, { assetClass: 'stock' }));
+    await commit(H + '2026-11-16 09:30:00,ESZ5,Buy,2,6000,,\n', 'imp-1');
+    await commit(H + '2026-11-16 09:40:00,ESZ5,Sell,2,6004,,\n', 'imp-2');
+    const [t] = await repo.trades.list(M);
+    expect(costs(t!)).toEqual([
+      [0, 0],
+      [0, 0],
+    ]);
+    expect(t!.fees).toBe(0);
+  });
+
+  test('the settlement of an expired option is not a fill that costs', async () => {
+    const { repo, acc, commit } = await rulesSetup();
+    await repo.feeRules.create(M, feeInput(acc.id, { assetClass: 'option' }));
+    // Planned after the expiry, so the import closes the option at 0 with a fill of its own.
+    await commit(
+      H + '2026-11-18 10:00:00,AAPL  261120C00150000,Buy,1,1.50,,\n',
+      'imp-1',
+    );
+    const [t] = await repo.trades.list(M);
+    expect(t!.status).toBe('closed');
+    expect(costs(t!)).toEqual([
+      [150, 20],
+      [0, 0],
+    ]);
+    expect(t!.fees).toBe(170);
+  });
+
+  test('a trade left open before the rules existed is given no levels by the next import, and costs only on its new fill', async () => {
     const { repo, acc, commit } = await rulesSetup();
     await commit(H + '2026-11-16 09:30:00,ESZ5,Buy,2,6000,,\n', 'imp-1');
     await repo.targetRules.create(M, targetInput(acc.id));
@@ -108,9 +197,14 @@ describe('the rules on import', () => {
     await commit(H + '2026-11-16 09:40:00,ESZ5,Sell,2,6004,,\n', 'imp-2');
     const [t] = await repo.trades.list(M);
     expect(t!.status).toBe('closed');
+    // Levels are not given to a trade that already exists (B17); the fill the import added is costed.
     expect(t!.targets).toBeUndefined();
     expect(t!.stops).toBeUndefined();
-    expect(t!.fees).toBe(0);
+    expect(costs(t!)).toEqual([
+      [0, 0],
+      [150, 20],
+    ]);
+    expect(t!.fees).toBe(170);
     // A new trade in the same file would have had them: the later import brings one.
     await commit(
       H +

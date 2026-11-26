@@ -328,6 +328,27 @@ test('the dialogs open with the defaults', async () => {
   ]);
 });
 
+test('the All symbols switch has a 44px hit area on a coarse pointer and keeps its look on a fine one', async () => {
+  show(repo());
+  const f = await card('Commissions and fees');
+  const fee = await addRule(f, /^Add rule for commissions and fees/);
+  const classes = within(fee)
+    .getByRole('switch', { name: 'All symbols' })
+    .className.split(/\s+/);
+  // The fine pointer's track is as it was; the coarse track stays 28px tall
+  // and a pseudo-element adds 8px above and below it, to 44px.
+  expect(classes).toEqual(expect.arrayContaining(['h-6', 'w-10']));
+  expect(classes).toEqual(
+    expect.arrayContaining([
+      'pointer-coarse:h-7',
+      'pointer-coarse:before:absolute',
+      'pointer-coarse:before:inset-x-0',
+      'pointer-coarse:before:-inset-y-2',
+      "pointer-coarse:before:content-['']",
+    ]),
+  );
+});
+
 test('Create waits for an account, an instrument and a level, in either dialog', async () => {
   show(repo());
   const t = await card('Targets and stops');

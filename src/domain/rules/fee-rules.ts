@@ -11,9 +11,15 @@ import { ruleAssetError } from './match';
 
 const costOf = (e: Execution): Cents => e.commission + e.fees;
 
-/** Whether any fill of the trade carries a commission or a fee. TradeZella leaves such a trade alone unless the rule overrides. */
-export function hasCosts(t: Trade): boolean {
-  return t.executions.some((e) => e.commission !== 0 || e.fees !== 0);
+/**
+ * Whether any fill of the trade carries a commission or a fee. TradeZella
+ * leaves such a fill alone unless the rule overrides. `fills` (execution ids)
+ * narrows the question to those fills: at import, the ones the import brought.
+ */
+export function hasCosts(t: Trade, fills?: ReadonlySet<string>): boolean {
+  return t.executions.some(
+    (e) => (!fills || fills.has(e.id)) && (e.commission !== 0 || e.fees !== 0),
+  );
 }
 
 type Leg = 'entry' | 'exit';
@@ -49,9 +55,15 @@ function costed(e: Execution, rule: FeeRule): Execution {
  * The trade's executions with the rule's commission and fee written on every
  * fill it covers (all, entries or exits); the others keep what they have. This
  * replaces whatever those fills carried: whether a trade may be written at all
- * is `withFeeRule`'s question.
+ * is `withFeeRule`'s question. With `fills` (execution ids) only those fills
+ * may be written; which of them are entries and exits is still read from the
+ * whole trade's position.
  */
-export function applyFeeRule(t: Trade, rule: FeeRule): Execution[] {
+export function applyFeeRule(
+  t: Trade,
+  rule: FeeRule,
+  fills?: ReadonlySet<string>,
+): Execution[] {
   // Legs are read in time order; a stable sort keeps the stored order for equal times.
   const order = t.executions
     .map((_, index) => index)
@@ -63,7 +75,8 @@ export function applyFeeRule(t: Trade, rule: FeeRule): Execution[] {
   const legs = legsOf(order.map((index) => t.executions[index]!));
   const legAt = new Map(order.map((index, at) => [index, legs[at]!]));
   return t.executions.map((e, index) =>
-    rule.applyOn === 'all' || legAt.get(index) === rule.applyOn
+    (!fills || fills.has(e.id)) &&
+    (rule.applyOn === 'all' || legAt.get(index) === rule.applyOn)
       ? costed(e, rule)
       : { ...e },
   );
@@ -76,6 +89,11 @@ export function applyFeeRule(t: Trade, rule: FeeRule): Execution[] {
  * amounts are in the account's currency, so a trade settled in another one is
  * left alone too.
  *
+ * `fills` (execution ids) is the scope: at import, the fills that import
+ * brought, since TradeZella skips rows that already carry fees. Only those are
+ * looked at for costs and only those are written; a fill an earlier import
+ * costed does not stop the rule, and the others keep what they have.
+ *
  * Fees and net move by the change in the fills' costs, and everything else
  * stays: the gross, the swap that sits inside the net, a P&L a closed-trade
  * file gave, the excursions. For a trade built from its fills this is exactly
@@ -84,11 +102,15 @@ export function applyFeeRule(t: Trade, rule: FeeRule): Execution[] {
 export function withFeeRule(
   t: Trade,
   rule: FeeRule,
-  o: { override: boolean; accountCurrency: string },
+  o: {
+    override: boolean;
+    accountCurrency: string;
+    fills?: ReadonlySet<string>;
+  },
 ): Trade | undefined {
   if (t.pnlCurrency !== o.accountCurrency) return undefined;
-  if (!o.override && hasCosts(t)) return undefined;
-  const executions = applyFeeRule(t, rule);
+  if (!o.override && hasCosts(t, o.fills)) return undefined;
+  const executions = applyFeeRule(t, rule, o.fills);
   const before = t.executions.reduce((sum, e) => sum + costOf(e), 0);
   const after = executions.reduce((sum, e) => sum + costOf(e), 0);
   const changed = executions.some(

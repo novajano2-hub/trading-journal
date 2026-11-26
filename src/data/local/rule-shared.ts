@@ -1,6 +1,7 @@
 import { ASSET_TYPES } from '@/domain/manual-trade';
 import { sidesOf } from '@/domain/risk';
 import { withFeeRule } from '@/domain/rules/fee-rules';
+import { isExpirySettlement } from '@/domain/import/expiry';
 import { pickRule } from '@/domain/rules/match';
 import { targetRulePatch } from '@/domain/rules/target-rules';
 import { canonicalSymbol } from '@/domain/trade-builder';
@@ -86,20 +87,24 @@ export function feeRows(
 
 /**
  * The trades of an import with the account's default rules applied (B15 to
- * B18): for each trade the plan makes that was not already stored (`continued`
- * holds the ids it carries on), the picked target rule when it has no levels
- * and the picked fee rule when no fill of it carries a cost. A trade the
- * import carries on is left as it is: its first import already had its turn.
- * No history row is written per trade: the import's own row stands for them
- * (B27). Call inside a transaction that includes `db.targetRules` and
- * `db.feeRules`.
+ * B18). Levels go to each trade the plan makes that was not already stored,
+ * the picked target rule when it has no levels; a trade the import carries on
+ * keeps its levels (B17: a trade that grows is not re-levelled). Costs go by
+ * the fills the import brought: the picked fee rule writes them on those fills
+ * when none of them carries a cost from the file, whether they make a new
+ * trade or join one an earlier import opened. A fill an earlier import costed
+ * stays as it is, and so does the synthetic fill that settles an expired
+ * option, which is not an execution. `continued` holds the stored trades the
+ * plan carries on, by id. No history row is written per trade: the import's
+ * own row stands for them (B27). Call inside a transaction that includes
+ * `db.targetRules` and `db.feeRules`.
  */
 export async function withDefaultRules(
   db: KeelDb,
   ws: string,
   account: Account,
   trades: readonly Trade[],
-  continued: ReadonlySet<string>,
+  continued: ReadonlyMap<string, Trade>,
 ): Promise<Trade[]> {
   // `pickRule` leaves out the rules of other accounts.
   const targetRules = await db.targetRules
@@ -109,17 +114,23 @@ export async function withDefaultRules(
   const feeRules = await db.feeRules.where('workspaceId').equals(ws).toArray();
   if (targetRules.length === 0 && feeRules.length === 0) return [...trades];
   return trades.map((t) => {
-    if (continued.has(t.id)) return t;
-    const target = pickRule(targetRules, t);
+    const stored = continued.get(t.id);
+    const target = stored ? undefined : pickRule(targetRules, t);
     const levelled = (target && levelledBy(t, target, false)) ?? t;
     const fee = pickRule(feeRules, levelled);
+    if (!fee) return levelled;
+    const had = new Set(stored?.executions.map((e) => e.id));
+    const fills = new Set(
+      levelled.executions
+        .filter((e) => !had.has(e.id) && !isExpirySettlement(e))
+        .map((e) => e.id),
+    );
     return (
-      (fee &&
-        withFeeRule(levelled, fee, {
-          override: false,
-          accountCurrency: account.currency,
-        })) ??
-      levelled
+      withFeeRule(levelled, fee, {
+        override: false,
+        accountCurrency: account.currency,
+        fills,
+      }) ?? levelled
     );
   });
 }

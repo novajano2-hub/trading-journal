@@ -322,7 +322,7 @@ export function FieldSelect({
   );
 }
 
-/** A switch with the Settings page's look. */
+/** A switch with the Settings page's look; on a coarse pointer its hit area is 44px tall (the 28px track plus 8px above and below). */
 export function Switch({
   checked,
   onChange,
@@ -339,7 +339,7 @@ export function Switch({
       aria-checked={checked}
       aria-label={label}
       onClick={() => onChange(!checked)}
-      className={`relative h-6 w-10 flex-none rounded-full transition-colors duration-200 outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-7 pointer-coarse:w-12 ${checked ? 'bg-accent' : 'bg-line-2'}`}
+      className={`relative h-6 w-10 flex-none rounded-full transition-colors duration-200 outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-7 pointer-coarse:w-12 pointer-coarse:before:absolute pointer-coarse:before:inset-x-0 pointer-coarse:before:-inset-y-2 pointer-coarse:before:content-[''] ${checked ? 'bg-accent' : 'bg-line-2'}`}
     >
       <span
         aria-hidden="true"

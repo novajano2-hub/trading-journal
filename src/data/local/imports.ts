@@ -439,14 +439,15 @@ export function localImports(ctx: LocalContext): ImportRepo {
               .map((t) => t.id)
               .filter((id) => !written.has(id)),
           );
-          // The account's default rules give each new trade its levels and
-          // costs (B15 to B18); a trade the import carries on keeps its own.
+          // The account's default rules give each new trade its levels (B15,
+          // B17) and the fills this import brought their costs (B18); a trade
+          // the import carries on keeps its levels.
           const ruled = await withDefaultRules(
             db,
             ws,
             account,
             plan.trades,
-            new Set(plan.replacedTrades.map((t) => t.id)),
+            new Map(plan.replacedTrades.map((t) => [t.id, t])),
           );
           // The plan carries journaling read with its context.
           await db.trades.bulkPut(await withLiveReferences(db, ws, ruled));
