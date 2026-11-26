@@ -16,6 +16,14 @@ test('the phone badge says "Sample" beside the title, and folds into its words f
   expect(screen.getByText('Sample').getAttribute('aria-hidden')).toBe('true');
 });
 
+test('the phone badge changes between pill and words at once, even where the reduced-motion rule gives every element a 0.01 ms transition', async () => {
+  renderApp(<SampleLabel badge />);
+  const badge = (await screen.findByText('Sample data. Not a real account.'))
+    .parentElement!;
+  // That rule holds the old padding for a frame after the viewport crosses 375px, so the pill measured 16px instead of 1px (a flaky e2e at 374).
+  expect(badge.className).toContain('transition-none');
+});
+
 test('the label beside the controls is for sm and up', async () => {
   renderApp(<SampleLabel />);
   const words = await screen.findByText('Sample data. Not a real account.');
