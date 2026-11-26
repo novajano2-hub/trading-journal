@@ -11,6 +11,7 @@ import type {
   PropTxnCategory,
   Trade,
 } from '../types';
+import { TXN_CATEGORY_LABELS } from './transactions';
 
 /**
  * What the prop dashboard reads, as pure functions over the workspace's
@@ -383,14 +384,17 @@ export function roiSeries(
   return out;
 }
 
-const FEE_ORDER: { category: PropTxnCategory; label: string }[] = [
-  { category: 'evaluation-fee', label: 'Evaluation fee' },
-  { category: 'activation-fee', label: 'Activation fee' },
-  { category: 'reset-fee', label: 'Reset fee' },
-  { category: 'payout', label: 'Payout' },
-  { category: 'affiliate-income', label: 'Affiliate income' },
-  { category: 'uncategorized', label: 'Uncategorized' },
-];
+/** The fee rows' order in the breakdown: the fees first, then the incomes, then the rest. */
+const FEE_ORDER: { category: PropTxnCategory; label: string }[] = (
+  [
+    'evaluation-fee',
+    'activation-fee',
+    'reset-fee',
+    'payout',
+    'affiliate-income',
+    'uncategorized',
+  ] as const
+).map((category) => ({ category, label: TXN_CATEGORY_LABELS[category] }));
 
 /**
  * Spent, earned and net by firm, account type or account size; a row with no
