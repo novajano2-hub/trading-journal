@@ -93,12 +93,21 @@ export function align(all: readonly SeriesPoint[][]): {
   };
 }
 
+const RUNNING = ' (running)';
+
 /** What a plotted metric is called: its name, and "(running)" when it is the running value. */
 export function seriesLabel(pick: Pick, basis: PnlBasis): string {
   const name = labelOf(pick.metric, basis);
   return modeOf(pick) === 'running' && !SERIES_META[pick.metric].running
-    ? `${name} (running)`
+    ? `${name}${RUNNING}`
     : name;
+}
+
+/** A series' label as a printed caption has it: "Net P&L, running", not "Net P&L (running)". */
+export function paperLabel(label: string): string {
+  return label.endsWith(RUNNING)
+    ? `${label.slice(0, -RUNNING.length)}, running`
+    : label;
 }
 
 /** Why a metric has no value in a period, where it is not simply that nothing happened. */

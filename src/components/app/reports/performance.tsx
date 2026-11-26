@@ -31,6 +31,7 @@ import {
   GAP_REASONS,
   METRIC_POPOVER,
   MetricCatalogue,
+  paperLabel,
   PlottedMetrics,
   SERIES_TIPS,
   seriesLabel,
@@ -206,6 +207,7 @@ function ChartSlot({
 
   const period = periodOf(bucket);
   const named = series.map((s) => s.label).join(', ');
+  const onPaper = series.map((s) => paperLabel(s.label)).join(', ');
   const gapNote = (x: ChartSeries, pick: Pick) =>
     `${x.label} ${GAP_REASONS[pick.metric] ?? 'has no value in some periods.'}`;
   const gaps = series.flatMap((x, i) =>
@@ -248,7 +250,7 @@ function ChartSlot({
             {/* On paper the metric rows are gone: the caption names what is plotted. */}
             {named ? (
               <span className="hidden text-[12.5px] text-faint print:inline">
-                {named}, by {bucket}
+                {onPaper}, by {bucket}
               </span>
             ) : null}
           </>

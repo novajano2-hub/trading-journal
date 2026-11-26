@@ -199,6 +199,21 @@ test('a unit that left trades out says so in the header', async () => {
   );
 });
 
+test('on paper a running series is named "Net P&L, running", as the comp has it, not "(running)"', async () => {
+  renderApp(<PerformanceView />, {
+    sample: reportsSample,
+    url: `${URL}?m=net:bar:running&bucket=week&m2=`,
+  });
+  const one = within(await screen.findByRole('region', { name: 'Chart 1' }));
+  expect(one.getByText('Net P&L, running, by week').className).toContain(
+    'print:inline',
+  );
+  // On screen the series keeps its "(running)" in the label and the table's header.
+  expect(
+    one.getByRole('img', { name: /^Net P&L \(running\) by week/ }),
+  ).toBeTruthy();
+});
+
 test('an empty report has nothing to export and prints its empty state', async () => {
   const empty = async () => ({ ...fixtureSample(), trades: [], journal: [] });
   renderApp(<PerformanceView />, { sample: empty, url: URL });
