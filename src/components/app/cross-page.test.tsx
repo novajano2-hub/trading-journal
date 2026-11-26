@@ -16,7 +16,6 @@ import { resolveInstrument } from '@/domain/instruments';
 import type { DisplayUnit, Execution, Trade } from '@/domain/types';
 import { renderApp } from './__fixtures__/render-app';
 import { CalendarView } from './calendar/calendar-view';
-import { DashboardView } from './dashboard/dashboard-view';
 import { CompareView } from './reports/compare';
 import { OverviewView } from './reports/overview';
 import { PerformanceView } from './reports/performance';
@@ -179,15 +178,6 @@ async function stripKpi(unit: DisplayUnit, id: string) {
   return text(strip.querySelector(`[data-kpi="${id}"]`));
 }
 
-async function dashboardKpi(unit: DisplayUnit, id: string) {
-  renderApp(<DashboardView />, {
-    repository: await inUnit(unit),
-    url: '/app/dashboard',
-  });
-  const perf = await screen.findByRole('region', { name: 'Performance' });
-  return text(perf.querySelector(`[data-kpi="${id}"]`));
-}
-
 async function compareRow(unit: DisplayUnit, name: RegExp) {
   renderApp(<CompareView />, {
     repository: await inUnit(unit),
@@ -236,9 +226,8 @@ describe('expectancy reads the decided trades on every page (I1)', () => {
     expect(await stripKpi(unit, 'expectancy')).toContain(want);
   });
 
-  test.each(cases)('in %s, the Dashboard KPI', async (unit, want) => {
-    expect(await dashboardKpi(unit, 'expectancy')).toContain(want);
-  });
+  // The Dashboard's Performance card is retired (D2); the Trade expectancy widget (Task 8) reads the same two figures.
+  test.todo('in ticks and R, the Dashboard Trade expectancy widget');
 
   test.each(cases)('in %s, Compare', async (unit, want) => {
     const cells = await compareRow(unit, /^Expectancy/);

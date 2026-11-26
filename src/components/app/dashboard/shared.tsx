@@ -1,4 +1,4 @@
-// What the Dashboard's cards and its drill-down share.
+// What the Dashboard's cards share.
 import type { ReactNode } from 'react';
 import type { Cents, Trade } from '@/domain/types';
 import { formatInstrument } from '@/lib/format';

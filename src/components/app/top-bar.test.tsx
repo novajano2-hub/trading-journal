@@ -149,6 +149,7 @@ test('the source reads as the bar does: menu, title, badge, chips, search, label
     'label',
     'basis',
     'Plan the day',
+    'Dashboard template',
     'Import',
   ]);
   // No theme toggle at any width: Appearance lives in Settings and the menus.
@@ -276,6 +277,30 @@ test('Plan the day sits before Import on the Dashboard and Trades only', () => {
     const bar = renderBar(path);
     expect(
       within(bar).queryByRole('button', { name: 'Plan the day' }),
+      path,
+    ).toBeNull();
+    cleanup();
+  }
+});
+
+test('the template button follows Plan the day, before Import, on the Dashboard only', async () => {
+  const bar = renderBar('/app/dashboard');
+  const plan = within(bar).getByRole('button', { name: 'Plan the day' });
+  const template = await within(bar).findByRole('button', {
+    name: 'Dashboard template: Main',
+  });
+  const imp = within(bar).getByRole('link', { name: 'Import' });
+  expect(
+    plan.compareDocumentPosition(template) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(
+    template.compareDocumentPosition(imp) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  cleanup();
+  for (const path of ['/app/trades', '/app/calendar', '/app/trades/day']) {
+    const other = renderBar(path);
+    expect(
+      within(other).queryByRole('button', { name: /^Dashboard template/ }),
       path,
     ).toBeNull();
     cleanup();

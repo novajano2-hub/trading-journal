@@ -1,23 +1,21 @@
 // No 'use client': the page prerenders the skeleton as its Suspense fallback.
 import Link from 'next/link';
 import { useId, type ReactNode } from 'react';
-import {
-  Archive,
-  ClockCounterClockwise,
-  FunnelSimple,
-  Warning,
-} from '@phosphor-icons/react/dist/ssr';
+import { Archive, Warning } from '@phosphor-icons/react/dist/ssr';
 import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { StateGlyph } from '@/components/ui/state-glyph';
-import { unitEmptyCopy } from '@/content/display-units';
+import { DEFAULT_TEMPLATE } from '@/domain/dashboard/templates';
+import { isWidgetKey, WIDGETS } from '@/domain/dashboard/widgets';
 import { StorageUnavailableError } from '@/data/repository';
-import type { TradeUnit } from '@/domain/metrics/units';
 import { CARD, CARD_PAD } from './shared';
-
-function Bar({ className }: { className: string }): React.JSX.Element {
-  return <span className={`block rounded-chip bg-sunken ${className}`} />;
-}
+import {
+  Bar,
+  LowerGrid,
+  SkeletonBody,
+  UpperStrip,
+  WidgetCell,
+} from './widgets/layout';
 
 /** A card's header while it loads: the title's place. */
 function HeaderBars({ title = 'w-28' }: { title?: string }): React.JSX.Element {
@@ -29,8 +27,8 @@ function HeaderBars({ title = 'w-28' }: { title?: string }): React.JSX.Element {
 }
 
 /**
- * The Dashboard's shape while its data loads: the plan card and its rules,
- * the three cards of row 2 and the recent trades, without figures.
+ * The Dashboard's shape while its data loads: the default template's upper
+ * strip and lower grid, in the sizes the widgets take, without figures.
  */
 export function DashboardSkeleton(): React.JSX.Element {
   return (
@@ -39,67 +37,35 @@ export function DashboardSkeleton(): React.JSX.Element {
       aria-label="Loading your dashboard"
       className="flex flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0"
     >
-      <div
-        aria-hidden="true"
-        className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)] min-[90rem]:grid-cols-[400px_minmax(0,1fr)]"
-      >
-        <div
-          className={`${CARD} flex min-h-[262px] flex-col overflow-hidden px-[22px] pt-[18px]`}
-        >
-          <div className="flex h-7 items-center">
-            <Bar className="h-3.5 w-20" />
-          </div>
-          <Bar className="mt-5 h-[72px] w-32 rounded-control" />
-          <Bar className="mt-[26px] h-2 rounded-[3px]" />
-          <div className="-mx-[22px] mt-auto h-[54px] border-t border-line bg-sunken/60" />
-        </div>
-        <div className={`${CARD} flex flex-col px-5 pt-1.5 pb-4`}>
-          <div className="flex h-[34px] items-center">
-            <Bar className="h-3 w-12" />
-          </div>
-          {[0, 1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="flex h-9 items-center gap-4 border-t border-line"
-            >
-              <Bar className="h-3.5 w-2/5" />
-              <Bar className="ml-auto h-1.5 w-1/5 max-sm:hidden" />
-              <Bar className="h-3.5 w-16" />
-            </div>
+      <div aria-hidden="true" className="flex flex-col gap-4">
+        <UpperStrip>
+          {DEFAULT_TEMPLATE.upper.map((ref) => (
+            <WidgetCell key={ref.key}>
+              <div
+                className={`${CARD} flex min-h-32 flex-col px-[18px] pt-4 pb-3.5 max-sm:min-h-0 max-sm:px-3.5`}
+              >
+                <div className="flex h-[22px] items-center">
+                  <Bar className="h-3 w-20" />
+                </div>
+                <SkeletonBody section="upper" />
+              </div>
+            </WidgetCell>
           ))}
-        </div>
-      </div>
-      <div
-        aria-hidden="true"
-        className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)_minmax(0,1.38fr)]"
-      >
-        {[0, 1, 2].map((i) => (
-          <div
-            key={i}
-            className={`${CARD} ${CARD_PAD} flex h-[256px] flex-col gap-4 md:max-xl:last:col-span-2`}
-          >
-            <HeaderBars />
-            <Bar className="h-3.5 w-full" />
-            <Bar className="h-3.5 w-4/5" />
-            <Bar className="h-3.5 w-3/5" />
-          </div>
-        ))}
-      </div>
-      <div aria-hidden="true" className={`${CARD} ${CARD_PAD}`}>
-        <HeaderBars title="w-32" />
-        <div className="mt-3">
-          {[0, 1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="flex h-[34px] items-center gap-6 border-t border-line first:border-t-0"
-            >
-              <Bar className="h-3 w-20" />
-              <Bar className="h-3 w-24" />
-              <Bar className="h-3 w-1/4 max-sm:hidden" />
-              <Bar className="ml-auto h-3 w-16" />
-            </div>
-          ))}
-        </div>
+        </UpperStrip>
+        <LowerGrid>
+          {DEFAULT_TEMPLATE.lower.map((ref) => {
+            const wide =
+              isWidgetKey(ref.key) && WIDGETS[ref.key].size === 'wide';
+            return (
+              <WidgetCell key={ref.key} wide={wide}>
+                <div className={`${CARD} ${CARD_PAD} flex flex-col`}>
+                  <HeaderBars />
+                  <SkeletonBody section="lower" wide={wide} />
+                </div>
+              </WidgetCell>
+            );
+          })}
+        </LowerGrid>
       </div>
     </div>
   );
@@ -142,16 +108,12 @@ function StateBlock({
   );
 }
 
-/** Rule text widths for the preview's rows. */
-const GHOST_RULES = ['w-3/4', 'w-1/2', 'w-2/3'];
-
 /**
- * "Your plan" before there is anything to grade: rule rows with empty tracks
- * and no numbers, labelled with what will fill them.
+ * The dashboard before there is anything to show: ghost figures and cards in
+ * its own layout, with no numbers, labelled with what will fill them.
  */
-function PlanPreview(): React.JSX.Element {
+function DashboardPreview(): React.JSX.Element {
   const captionId = useId();
-  const columns = 'grid grid-cols-[minmax(0,1fr)_28%_56px] items-center gap-4';
   return (
     <figure
       aria-labelledby={captionId}
@@ -161,102 +123,55 @@ function PlanPreview(): React.JSX.Element {
         id={captionId}
         className="text-[13.5px] leading-snug font-medium text-text"
       >
-        Your rules and what breaking them costs will show here.
+        Your figures, charts and calendar will show here.
       </figcaption>
-      {/* The last row fades: the list goes on. */}
+      {/* The lower row fades: the dashboard goes on. */}
       <div
         aria-hidden="true"
-        className="mt-3 [mask-image:linear-gradient(to_bottom,black_55%,transparent)]"
+        className="mt-3 [mask-image:linear-gradient(to_bottom,black_45%,transparent)]"
       >
-        <div
-          className={`${columns} h-[34px] border-b border-line text-xs font-medium text-faint`}
-        >
-          <span>Rule</span>
-          <span>Adherence</span>
-          <span className="text-right">Cost</span>
+        <div className="grid grid-cols-3 gap-3">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="rounded-control border border-line p-3">
+              <Bar className="h-2.5 w-2/3" />
+              <Bar className="mt-3 h-4 w-3/4" />
+              <span className="mt-3 block h-1.5 rounded-[3px] bg-accent-soft" />
+            </div>
+          ))}
         </div>
-        {GHOST_RULES.map((width) => (
-          <div
-            key={width}
-            className={`${columns} h-9 border-t border-line first:border-t-0`}
-          >
-            <Bar className={`h-2.5 ${width}`} />
-            <span className="block h-1.5 rounded-[3px] bg-accent-soft" />
-            <Bar className="ml-auto h-2.5 w-12" />
-          </div>
-        ))}
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          {[0, 1].map((i) => (
+            <div key={i} className="rounded-control border border-line p-3">
+              <Bar className="h-2.5 w-1/3" />
+              <Bar className="mt-3 h-16 rounded-control" />
+            </div>
+          ))}
+        </div>
       </div>
     </figure>
   );
 }
 
 /**
- * No closed trade the display unit reads: "No closed futures trades in these
- * filters." The way back to Dollar is the line under the top bar, which says
- * how many trades the unit left out.
- */
-function UnitEmpty({
-  unit,
-  onClearFilters,
-}: {
-  unit: TradeUnit;
-  /** Given while a filter is set: the filters may be what left nothing. */
-  onClearFilters?: () => void;
-}): React.JSX.Element {
-  const { title, body } = unitEmptyCopy(unit);
-  return (
-    <StateBlock
-      visual={<StateGlyph icon={FunnelSimple} />}
-      title={title}
-      body={body}
-      actions={
-        onClearFilters ? (
-          <Button onClick={onClearFilters}>Clear filters</Button>
-        ) : undefined
-      }
-    />
-  );
-}
-
-/**
- * Why there is nothing to show, with the way out:
+ * Why there is no dashboard to show, with the way out. Every other kind of
+ * nothing (filters that match no trade, only open trades, a unit that keeps
+ * none) leaves the widgets on the page, each saying so in its own words.
  * - `no-trades`: the workspace is empty, so Import or open the sample.
- * - `no-matches`: trades exist but the filters leave none, so Clear filters.
  * - `archived`: every account is archived, so their trades are out of view
  *   until one is unarchived or picked in the account filter.
- * - `no-closed`: every trade shown is still open. When `filtered`, it says
- *   the filters hold none closed and offers Clear filters.
- * - `unit`: the display unit (`unit`) left out every closed trade the
- *   filters matched; the line under the top bar switches back to Dollar.
- *   When `filtered`, it offers Clear filters too.
  */
 export function DashboardEmpty({
   variant,
-  filtered = false,
-  unit = 'r',
-  onClearFilters,
   onOpenSample,
 }: {
-  variant: 'no-trades' | 'no-matches' | 'no-closed' | 'archived' | 'unit';
-  /** Any filter is set. */
-  filtered?: boolean;
-  /** For `unit`: the unit that narrowed the trades. */
-  unit?: TradeUnit;
-  onClearFilters(): void;
+  variant: 'no-trades' | 'archived';
   onOpenSample(): void;
 }): React.JSX.Element {
   switch (variant) {
-    case 'unit':
-      return (
-        <UnitEmpty
-          unit={unit}
-          onClearFilters={filtered ? onClearFilters : undefined}
-        />
-      );
     case 'no-trades':
       return (
         <StateBlock
-          visual={<PlanPreview />}
+          visual={<DashboardPreview />}
           title="No trades in My workspace yet."
           body="Import a CSV from your broker, or open the sample workspace to look around."
           actions={
@@ -284,31 +199,6 @@ export function DashboardEmpty({
             >
               Open Accounts
             </Link>
-          }
-        />
-      );
-    case 'no-matches':
-      return (
-        <StateBlock
-          visual={<StateGlyph icon={FunnelSimple} />}
-          title="No trades match these filters."
-          actions={<Button onClick={onClearFilters}>Clear filters</Button>}
-        />
-      );
-    case 'no-closed':
-      return (
-        <StateBlock
-          visual={<StateGlyph icon={ClockCounterClockwise} />}
-          title={
-            filtered
-              ? 'No closed trades in these filters yet.'
-              : 'No closed trades yet.'
-          }
-          body="Open positions count here once they close."
-          actions={
-            filtered ? (
-              <Button onClick={onClearFilters}>Clear filters</Button>
-            ) : undefined
           }
         />
       );

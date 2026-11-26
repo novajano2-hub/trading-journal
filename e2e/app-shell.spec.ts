@@ -306,10 +306,7 @@ test('below sm the bar is one row pinned to the top, and the page scrolls clear 
   const tabs = (await page
     .getByRole('navigation', { name: 'Main' })
     .boundingBox())!;
-  const last = await page
-    .locator('section')
-    .filter({ has: page.getByRole('heading', { name: 'Recent trades' }) })
-    .boundingBox();
+  const last = await page.locator('[data-widget]').last().boundingBox();
   expect(last!.y + last!.height).toBeLessThanOrEqual(tabs.y);
 });
 
@@ -365,7 +362,7 @@ async function walkBar(page: Page, from: Locator, stops: Locator[]) {
   }
 }
 
-test('Tab walks the top bar in the order it reads: title, chips, search, Display, Import', async ({
+test('Tab walks the top bar in the order it reads: title, chips, search, Display, template, Import', async ({
   page,
 }, info) => {
   const mobile = info.project.name === 'mobile';
@@ -377,12 +374,10 @@ test('Tab walks the top bar in the order it reads: title, chips, search, Display
   const tail = [
     bar.getByRole('combobox', { name: 'Search' }),
     bar.getByRole('button', { name: /show as / }),
-    ...(mobile
-      ? []
-      : [
-          bar.getByRole('button', { name: 'Plan the day' }),
-          bar.getByRole('link', { name: 'Import' }),
-        ]),
+    ...(mobile ? [] : [bar.getByRole('button', { name: 'Plan the day' })]),
+    // The Dashboard's template button follows Plan the day; on a phone it ends the bar.
+    bar.getByRole('button', { name: /^Dashboard template/ }),
+    ...(mobile ? [] : [bar.getByRole('link', { name: 'Import' })]),
   ];
   // What comes before the bar: the skip link on phones, the sidebar's last link on desktop.
   const before = mobile
@@ -431,7 +426,7 @@ test('the chips sit beside the title while they fit, and never clip "Clear filte
 }, info) => {
   test.skip(info.project.name !== 'desktop');
   const bar = page.getByRole('banner');
-  // Busy chips are wider since the rebrand's 13.5px chips; they share the title's row from 1680 (the Display button is narrower than the Gross/Net switch was).
+  // Busy chips are wider since the rebrand's 13.5px chips; they share the title's row from 1920 (the Display button is narrower than the Gross/Net switch was, and the Dashboard's template button takes 42px of it).
   for (const width of [1280, 1366, 1440, 1680, 1920]) {
     await page.setViewportSize({ width, height: 800 });
     await page.goto('/app/dashboard');
@@ -449,7 +444,7 @@ test('the chips sit beside the title while they fit, and never clip "Clear filte
     await expect(clear, `${width} busy`).toBeInViewport({ ratio: 1 });
     await expect(bar).toHaveAttribute(
       'data-chips',
-      width >= 1680 ? 'inline' : 'wrapped',
+      width >= 1920 ? 'inline' : 'wrapped',
     );
     expect(
       await page.evaluate(

@@ -12,6 +12,7 @@ import {
   type RefObject,
 } from 'react';
 import { RAISED } from '@/components/ui/button-styles';
+import { TemplateMenu } from './dashboard/template-menu';
 import { DayHeader } from './day/day-header';
 import { useImportPicker } from './day/import-picker';
 import { SessionButton } from './day/session-button';
@@ -220,8 +221,8 @@ function StrategyCrumb({
  * The bar over every app page, on the canvas with no rule under it. Its
  * source order is its reading order at every width, so Tab follows what the
  * eye does: the menu (`sm` to `lg`), the page title, the filter chips, then
- * search, the sample label, the Display menu and Import. Nothing is
- * reordered by CSS.
+ * search, the sample label, the Display menu, Plan the day, the Dashboard's
+ * template button and Import. Nothing is reordered by CSS.
  * - From `sm` up it is one sticky bar, 68px while the chips fit beside the
  *   title. Where they don't, measured, the title keeps the first row and the
  *   chips lead a second one, the controls after them; where even that row is
@@ -364,6 +365,12 @@ export function TopBar({
           pathname === '/app/trades/week' ? (
             <div className="flex flex-none max-sm:hidden">
               <PlanTheDay />
+            </div>
+          ) : null}
+          {/* The dashboard's template, beside it (comp 01). */}
+          {pathname === '/app/dashboard' ? (
+            <div className="flex flex-none">
+              <TemplateMenu />
             </div>
           ) : null}
           {/* The day's one session, on today's plan page (K30); review has none. */}
