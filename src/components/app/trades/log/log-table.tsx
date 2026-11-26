@@ -26,14 +26,28 @@ import { TagsCell } from '../cells';
 import { PhoneRows } from '../phone-rows';
 import { clock, dayLabel } from '@/lib/time-format';
 
-/** The widths the day table wants over the trade log's: HH:MM:SS, a ticker pill, a contract with its expiry. */
-const WIDTHS: Record<ColumnId, number> = {
+/**
+ * The widths the day table wants over the trade log's (D1): HH:MM:SS, a ticker
+ * pill, a contract with its expiry, and a Net P&L that never wraps (an open
+ * trade prints "(open) -$1,234.56"). Strategy and Tags take what is left, each
+ * at least `FLEX_MIN`, and end in an ellipsis when it runs out, so the table
+ * fits its card at 1440 and keeps Tags in the Week view.
+ */
+const WIDTHS: Partial<Record<ColumnId, number>> = {
   ...COLUMN_WIDTHS,
-  open: 84,
-  ticker: 96,
-  instrument: 170,
-  tags: 132,
+  open: 76,
+  ticker: 74,
+  side: 52,
+  instrument: 112,
+  net: 116,
+  roi: 66,
+  realizedR: 58,
+  day: 84,
+  strategies: undefined,
+  tags: undefined,
 };
+const FLEX_MIN = 96;
+const widthOf = (id: ColumnId): number | undefined => WIDTHS[id];
 
 /** Headers the day table spells out where the trade log is terse. */
 const HEADER_LABEL: Partial<Record<ColumnId, string>> = {
@@ -200,13 +214,13 @@ export function LogTable({
         <table
           aria-label={label}
           style={{
-            minWidth: `${columns.reduce((n, id) => n + WIDTHS[id], 0)}px`,
+            minWidth: `${columns.reduce((n, id) => n + (widthOf(id) ?? FLEX_MIN), 0)}px`,
           }}
           className="w-full table-fixed border-collapse text-[13px] whitespace-nowrap [font-stretch:90%]"
         >
           <colgroup>
             {columns.map((id) => (
-              <col key={id} style={{ width: WIDTHS[id] }} />
+              <col key={id} style={{ width: widthOf(id) }} />
             ))}
           </colgroup>
           <thead>

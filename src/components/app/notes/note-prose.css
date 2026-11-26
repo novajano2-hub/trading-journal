@@ -285,3 +285,36 @@
 .note-prose div[data-type='detailsContent'] h3 {
   margin-top: 10px;
 }
+
+/*
+ * The day note (comps 04, 05 and 07): the editor fills its card or dialog, the
+ * toolbar spans it, template field labels are quiet, section headings 16px,
+ * and no rules sit between sections.
+ */
+.note-day .note-prose {
+  max-width: none;
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+.note-day [role='toolbar'] {
+  align-self: stretch;
+  padding: 4px 6px;
+}
+.note-day .note-prose h3 {
+  margin-top: 10px;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+.note-day .note-prose div[data-type='details'] {
+  margin: 6px 0;
+  padding: 2px 0;
+  border-top: 0;
+}
+.note-day .note-prose div[data-type='detailsSummary'],
+.note-day .note-prose summary {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}

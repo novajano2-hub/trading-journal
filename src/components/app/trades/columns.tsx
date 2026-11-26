@@ -321,7 +321,7 @@ export function cellOf(id: ColumnId, t: Trade, env: CellEnv): React.ReactNode {
     case 'day':
       return (
         <span className="tabular-nums">
-          {dayLabel(dayOfTrade(t, timeZone), { year: true })}
+          {dayLabel(dayOfTrade(t, timeZone))}
         </span>
       );
   }

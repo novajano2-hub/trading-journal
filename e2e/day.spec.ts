@@ -113,3 +113,21 @@ test('a closed day refuses edits from the trade page and the Notebook', async ({
     page.getByRole('textbox', { name: 'Note', exact: true }),
   ).toHaveAttribute('contenteditable', 'false');
 });
+
+test('a day page never scrolls sideways from phone to wide desktop (D3)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop');
+  for (const width of [390, 768, 1024, 1280, 1680]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const path of [`${TODAY}/plan`, `${PAST}/review`]) {
+      await page.goto(`/app/day/${path}`);
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      const [scroll, inner] = await page.evaluate(() => [
+        document.documentElement.scrollWidth,
+        window.innerWidth,
+      ]);
+      expect(scroll, `${path} at ${width}`).toBeLessThanOrEqual(inner);
+    }
+  }
+});

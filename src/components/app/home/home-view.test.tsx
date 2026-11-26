@@ -180,8 +180,8 @@ test('the greeting uses the first name and the time of day in the profile zone',
   });
   renderApp(<HomeView />, { repository: r, url: '/app/home' });
   expect(await screen.findByText('Good morning, Sam')).toBeTruthy();
-  // The greeting stands alone: no date line under it.
-  expect(screen.queryByText('Wednesday 25 November')).toBeNull();
+  // The date line sits under it (D8, comp 14).
+  expect(screen.getByText('Wednesday 25 November')).toBeTruthy();
 });
 
 test('an old display name reads as the first name', async () => {

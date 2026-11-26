@@ -356,3 +356,14 @@ test('an open day with a trashed note still offers Restore', async () => {
   await open('2026-11-18', repo);
   expect(await screen.findByRole('button', { name: 'Restore' })).toBeTruthy();
 });
+
+test('the Trades card scrolls inside itself: a labelled, keyboard-focusable region with no fade over a row (D4)', async () => {
+  await open(GREEN);
+  const region = await screen.findByRole('region', {
+    name: 'Trades, scrolling',
+  });
+  expect(region.getAttribute('tabindex')).toBe('0');
+  expect(region.className).toContain('overflow-auto');
+  expect(region.className).not.toContain('mask');
+  expect(within(region).getByRole('table', { name: 'Trades' })).toBeTruthy();
+});

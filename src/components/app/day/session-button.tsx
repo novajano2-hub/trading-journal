@@ -113,14 +113,14 @@ export function SessionButton({
           type="button"
           disabled={end.isPending}
           onClick={() => end.mutate({ date })}
-          className={`${buttonClasses('secondary')} flex-none gap-[7px] border-accent pl-3 hover:border-accent max-sm:h-9 max-sm:px-3 max-sm:text-[13px]`}
+          className={`${buttonClasses('secondary')} flex-none gap-[7px] border-accent pl-3 hover:border-accent max-lg:px-3 max-sm:h-9 max-sm:text-[13px]`}
         >
           <Stop
             size={16}
             aria-hidden="true"
             className="flex-none text-accent-ink"
           />
-          <span className="max-sm:sr-only">End session</span>
+          <span className="max-lg:sr-only">End session</span>
           <span className="font-semibold tabular-nums">
             {formatClock(elapsed ?? 0, true)}
           </span>
@@ -136,10 +136,10 @@ export function SessionButton({
         type="button"
         disabled={start.isPending}
         onClick={() => start.mutate({ date })}
-        className={`${buttonClasses('secondary')} flex-none gap-[7px] pl-3 max-sm:h-9 max-sm:px-3 max-sm:text-[13px]`}
+        className={`${buttonClasses('secondary')} flex-none gap-[7px] pl-3 max-lg:px-3 max-sm:h-9 max-sm:text-[13px]`}
       >
         <Play size={16} aria-hidden="true" className="flex-none" />
-        Start session
+        <span className="max-lg:sr-only">Start session</span>
       </button>
       {start.isError ? <SaveFailed /> : null}
     </>

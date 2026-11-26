@@ -189,7 +189,7 @@ test('the stat grid matches day-log', async () => {
   expect(value('Gross P&L')).toBe('+$75.00');
   expect(value('Won / lost')).toBe('1 / 1');
   expect(value('Commissions')).toBe('$15.00');
-  expect(value('Win rate')).toBe('50.0%');
+  expect(value('Win rate')).toBe('50%');
   // Both sides: two closed trades of one contract (2 each) and one open (1).
   expect(value('Volume')).toBe('5');
   expect(value('Profit factor')).toBe('2.50');

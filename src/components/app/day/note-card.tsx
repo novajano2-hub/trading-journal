@@ -171,7 +171,7 @@ export function NoteCard({
         </p>
       ) : null}
       {plan && !locked ? <FirstVisitTip /> : null}
-      <div className="mt-3 max-w-[72ch] min-w-0">
+      <div className="note-day mt-3 min-w-0">
         <DayNoteBinding
           date={date}
           readOnly={readOnly}

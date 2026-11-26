@@ -226,3 +226,8 @@ export const price = (n: number, tick: number) => {
     maximumFractionDigits: digits,
   });
 };
+
+/** A ratio as a percent with up to two decimals, trailing zeros dropped: 0.5 is "50%", 0.4848 is "48.48%", 4/7 is "57.14%" (the Day and Week views' win rate). */
+export function trimmedPercent(ratio: number): string {
+  return `${Number((ratio * 100).toFixed(2))}%`;
+}

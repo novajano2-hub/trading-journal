@@ -59,7 +59,7 @@ function DayDialog({
       origin={opener}
       returnFocus={opener}
       title={label}
-      size="sheet"
+      size="wide"
       description={
         net ? (
           <>

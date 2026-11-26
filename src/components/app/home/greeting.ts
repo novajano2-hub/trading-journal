@@ -27,3 +27,18 @@ export function greeting(
   const name = firstName?.trim();
   return name ? `${word}, ${name}` : word;
 }
+
+/** "Wednesday 25 November": the date under the greeting, in the profile zone (comp 14). */
+export function dateLine(now: Date, timeZone: string): string {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      timeZone,
+    })
+      .formatToParts(now)
+      .map((part) => [part.type, part.value]),
+  );
+  return `${p.weekday} ${p.day} ${p.month}`;
+}

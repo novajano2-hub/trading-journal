@@ -459,7 +459,7 @@ test('the summary row reads the date, the net and the count with the win rate, a
   const summary = within(dialog).getByRole('button', { name: /Show trades/ });
   expect(summary.textContent).toContain('Tue 24 Nov');
   expect(summary.textContent).toContain('+$60.00');
-  expect(summary.textContent).toContain('3 trades, 50.0% win rate');
+  expect(summary.textContent).toContain('3 trades, 50% win rate');
   expect(summary.getAttribute('aria-expanded')).toBe('false');
   expect(within(dialog).queryByRole('table')).toBeNull();
   fireEvent.click(summary);
@@ -486,7 +486,7 @@ test('under Privacy the summary hides the amount, keeps the sign, count and win 
   const summary = within(dialog).getByRole('button', { name: /Show trades/ });
   expect(summary.textContent).toContain('+$•••');
   expect(summary.textContent).not.toMatch(/\$\d/);
-  expect(summary.textContent).toContain('3 trades, 50.0% win rate');
+  expect(summary.textContent).toContain('3 trades, 50% win rate');
 });
 
 test('the note action on a phone is a glyph that names the day', async () => {
@@ -543,7 +543,7 @@ test('a day with base and other-currency trades names the other ones, as the wee
   const dialog = await open(MON, 'Add note');
   const summary = within(dialog).getByRole('button', { name: /Show trades/ });
   expect(summary.textContent).toContain(
-    '1 trade, 100.0% win rate, 1 in other currencies, listed apart',
+    '1 trade, 100% win rate, 1 in other currencies, listed apart',
   );
   cleanup();
   // A day of other currencies only keeps its own line.

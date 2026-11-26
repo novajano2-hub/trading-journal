@@ -5,7 +5,7 @@ import { useEffect } from 'react';
 import { isRealDate } from '@/components/app/notebook/notebook-model';
 import { useRoutineToday } from '@/data/query/derived';
 import { dayHref, dayPlanHref, dayQuery, type DayMode } from '@/lib/day-routes';
-import { usePhone } from '@/lib/use-phone';
+import { useBelowLg } from '@/lib/use-phone';
 import { BadDate } from './bad-date';
 import { useImportPicker } from './import-picker';
 import { useDaySession } from './session-button';
@@ -36,7 +36,7 @@ export function DayRedirect({
 
 /**
  * One day's page in a mode. The header (date and stages) lives in the top
- * bar; on a phone the stage bar sits at the top of the page. A future date
+ * bar; below `lg` the stage bar sits at the top of the page. A future date
  * has no review, so its review replaces itself with its plan.
  */
 export function DayView({
@@ -49,7 +49,7 @@ export function DayView({
   const { today, session } = useDaySession(date);
   const router = useRouter();
   const query = dayQuery(useSearchParams());
-  const phone = usePhone();
+  const stacked = useBelowLg();
   const imports = useImportPicker();
   const real = isRealDate(date);
   const future = real && today !== undefined && date > today;
@@ -64,7 +64,7 @@ export function DayView({
       className="flex flex-col gap-3.5 px-5 pt-3 pb-8 sm:pt-0"
       data-mode={mode}
     >
-      {phone ? (
+      {stacked ? (
         <>
           <StageBar
             full

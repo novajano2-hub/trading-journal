@@ -24,7 +24,7 @@ import { LockedDayError } from '@/data/repository';
 import { isClosed } from '@/domain/trade-status';
 import { useDisplay } from '@/lib/display';
 import { clock, dayLabel } from '@/lib/time-format';
-import { plural } from '@/lib/format';
+import { plural, trimmedPercent } from '@/lib/format';
 import { usePhone } from '@/lib/use-phone';
 import { signTone } from '../../dashboard/shared';
 import { LockLine, useDayFinished } from '../../day/day-lock';
@@ -58,9 +58,6 @@ const MENU =
   'z-[60] min-w-[200px] origin-(--radix-dropdown-menu-content-transform-origin) rounded-[12px] border border-line bg-surface-1 p-1.5 text-text shadow-[var(--shadow)] outline-none motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in';
 const ITEM =
   'flex min-h-9 cursor-pointer items-center gap-2 rounded-[8px] px-2.5 text-[13.5px] outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-sunken pointer-coarse:min-h-11';
-
-/** One decimal, as the card's figures: 57.1%. */
-const percent = (ratio: number): string => `${(ratio * 100).toFixed(1)}%`;
 
 /**
  * The day note for `date`, in a dialog that grows from its opener. Render
@@ -202,7 +199,7 @@ export function DayNoteDialog({
           `${trades} ${plural(trades, 'trade')}`,
           rate === null || rate === undefined
             ? 'win rate None'
-            : `${percent(rate)} win rate`,
+            : `${trimmedPercent(rate)} win rate`,
           apart,
         ]
           .filter((part) => part !== undefined)
@@ -381,7 +378,7 @@ export function DayNoteDialog({
         ) : null}
       </div>
       {finished && !trashed ? <LockLine className="mt-3" /> : null}
-      <div className="mt-3 min-w-0">
+      <div className="note-day mt-3 min-w-0">
         <DayNoteBinding
           date={date}
           readOnly={finished}
