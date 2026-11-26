@@ -113,3 +113,28 @@ test('a closed day refuses edits from the trade page and the Notebook', async ({
     page.getByRole('textbox', { name: 'Note', exact: true }),
   ).toHaveAttribute('contenteditable', 'false');
 });
+
+test('a day page never scrolls sideways from phone to wide desktop (D3)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop');
+  for (const width of [390, 768, 1024, 1280, 1680]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const path of [`${TODAY}/plan`, `${TODAY}/review`, `${PAST}/review`]) {
+      await page.goto(`/app/day/${path}`);
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      // Measure only once the header is whole: the stage bar and, on today's
+      // plan page, the session button (a review page and a closed day have none).
+      await expect(stages(page)).toBeVisible();
+      if (path === `${TODAY}/plan`)
+        await expect(
+          page.getByRole('button', { name: /(start|end) session/i }),
+        ).toBeVisible();
+      const [scroll, inner] = await page.evaluate(() => [
+        document.documentElement.scrollWidth,
+        window.innerWidth,
+      ]);
+      expect(scroll, `${path} at ${width}`).toBeLessThanOrEqual(inner);
+    }
+  }
+});

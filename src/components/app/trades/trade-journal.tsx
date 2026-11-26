@@ -252,7 +252,9 @@ export interface NoteControl {
    * other. `update` reads the note as stored just before. Rejects when the
    * write fails.
    */
-  patch(update: (current: JournalEntry) => Partial<JournalEntry>): Promise<void>;
+  patch(
+    update: (current: JournalEntry) => Partial<JournalEntry>,
+  ): Promise<void>;
 }
 
 /** The editor and its autosave; mounts once the trade's note (if it has one) has loaded. */
@@ -281,7 +283,7 @@ function NoteBody({
   stamp?: { current: Partial<JournalEntry> | undefined };
   /** Receives the editor's `NoteControl`. */
   controlRef?: { current: NoteControl | null };
-  onStatus(s: NoteStatus): void;
+  onStatus(s: NoteStatus, error?: unknown): void;
 }): React.JSX.Element {
   const save = useSaveJournalEntry();
   // The editor owns the text from here on: the stored body seeds it once.
@@ -336,9 +338,9 @@ function NoteBody({
         note.current = Promise.resolve(saved);
         failed.current = false;
         onStatus('saved');
-      } catch {
+      } catch (e) {
         failed.current = true;
-        onStatus('failed');
+        onStatus('failed', e);
       } finally {
         waiting.current -= 1;
       }
@@ -369,7 +371,10 @@ function NoteBody({
     const job = queue.current.then(async () => {
       try {
         const current = await (note.current ??= ensureRef.current());
-        const saved = await save.mutateAsync({ ...current, ...update(current) });
+        const saved = await save.mutateAsync({
+          ...current,
+          ...update(current),
+        });
         note.current = Promise.resolve(saved);
       } finally {
         waiting.current -= 1;
@@ -433,7 +438,7 @@ export function TradeNote({
   trade: Trade;
   readOnly: boolean;
   handleRef?: { current: NoteEditorHandle | null };
-  onStatus(s: NoteStatus): void;
+  onStatus(s: NoteStatus, error?: unknown): void;
 }): React.JSX.Element {
   const ensureNote = useEnsureTradeNote();
   const entryQuery = useJournalEntry(trade.noteId ?? '');
@@ -490,7 +495,7 @@ export function DayNoteBinding({
   stamp?: { current: Partial<JournalEntry> | undefined };
   /** Receives the editor's `NoteControl`: settle what is waiting, or change the note's fields in its queue. */
   controlRef?: { current: NoteControl | null };
-  onStatus(s: NoteStatus): void;
+  onStatus(s: NoteStatus, error?: unknown): void;
 }): React.JSX.Element {
   const journal = useJournal();
   const templates = useTemplates();
@@ -583,7 +588,7 @@ export function DayNote({
   date: string;
   readOnly: boolean;
   handleRef?: { current: NoteEditorHandle | null };
-  onStatus(s: NoteStatus): void;
+  onStatus(s: NoteStatus, error?: unknown): void;
 }): React.JSX.Element {
   const journal = useJournal();
   const entry = findDailyEntry(journal.data, date);

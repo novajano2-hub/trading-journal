@@ -7,8 +7,8 @@ import { isClosed } from '@/domain/trade-status';
 import { useDisplay } from '@/lib/display';
 import { plural } from '@/lib/format';
 import { usePhone } from '@/lib/use-phone';
-import { onTradingDate, weekdayOf } from '@/lib/time-format';
-import { tileLabel, weekLabel } from '@/lib/day-label';
+import { dayLabel, onTradingDate, weekdayOf } from '@/lib/time-format';
+import { weekLabel } from '@/lib/day-label';
 
 export type Trend = 'up' | 'down' | 'flat' | 'open' | 'other';
 
@@ -126,7 +126,7 @@ export function WeekTiles({
           f.count === 0
             ? `${other} ${plural(other, 'trade')} in other currencies`
             : `${f.count} ${plural(f.count, 'trade')}`;
-        const name = `${tileLabel(date)}, ${
+        const name = `${dayLabel(date)}, ${
           f.trend === 'other'
             ? nameCount
             : f.full

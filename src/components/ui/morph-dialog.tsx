@@ -56,16 +56,16 @@ export function MorphDialog({
   icon?: ReactNode;
   /** Controls in the header between the title and the close button (a menu, a star). */
   actions?: ReactNode;
-  /** `full` fills the screen inside a small gutter, for a chart or a table that wants the room. `sheet` is the default size on a wide screen and a full-height sheet on a phone. `medium` is the comps' 600px dialog: the same full-height sheet on a phone. `compact` is a narrow choice list (480px) that stays a small dialog on a phone. */
-  size?: 'default' | 'full' | 'sheet' | 'medium' | 'compact';
+  /** `full` fills the screen inside a small gutter, for a chart or a table that wants the room. `wide` is a `sheet` that grows to 960px for a table. `medium` is the comps' 600px dialog: the same full-height sheet on a phone. `sheet` is the default size on a wide screen and a full-height sheet on a phone. `compact` is a narrow choice list (480px) that stays a small dialog on a phone. */
+  size?: 'default' | 'full' | 'sheet' | 'wide' | 'medium' | 'compact';
   /** Pinned under the scrolling body, never inside it. */
   footer?: ReactNode;
   children: ReactNode;
 }): React.JSX.Element | null {
   const reduced = useReducedMotion();
   // The sheet breathes a little more on a wide screen (comp 02).
-  const sheet = size === 'sheet' || size === 'medium';
-  const gutter = sheet ? 'px-5 sm:px-6' : 'px-5';
+  const sheetLike = size === 'sheet' || size === 'wide' || size === 'medium';
+  const gutter = sheetLike ? 'px-5 sm:px-6' : 'px-5';
   // Stays mounted while the exit plays, after `open` has already gone false.
   const [present, setPresent] = useState(open);
   const veil = useRef<HTMLDivElement>(null);
@@ -184,8 +184,8 @@ export function MorphDialog({
           className={`fixed z-50 flex flex-col overflow-hidden rounded-card border border-line bg-surface-1 shadow-[var(--shadow)] outline-none ${
             size === 'full'
               ? 'inset-3 sm:inset-6'
-              : sheet
-                ? `inset-x-0 top-3 bottom-0 max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 sm:inset-0 sm:m-auto sm:h-fit sm:max-h-[80dvh] sm:w-[calc(100%-32px)] ${size === 'medium' ? 'sm:max-w-[600px]' : 'sm:max-w-[760px]'}`
+              : sheetLike
+                ? `inset-x-0 top-3 bottom-0 max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 sm:inset-0 sm:m-auto sm:h-fit sm:max-h-[80dvh] sm:w-[calc(100%-32px)] ${size === 'wide' ? 'sm:max-w-[960px]' : size === 'medium' ? 'sm:max-w-[600px]' : 'sm:max-w-[760px]'}`
                 : size === 'compact'
                   ? 'inset-0 m-auto h-fit max-h-[80dvh] w-[calc(100%-32px)] max-w-[480px]'
                   : 'inset-0 m-auto h-fit max-h-[80dvh] w-[calc(100%-32px)] max-w-[760px]'
@@ -193,7 +193,7 @@ export function MorphDialog({
         >
           <div
             ref={body}
-            className={`flex min-h-0 flex-col ${size === 'full' ? 'h-full' : sheet ? 'h-full sm:h-auto sm:max-h-[80dvh]' : 'max-h-[80dvh]'}`}
+            className={`flex min-h-0 flex-col ${size === 'full' ? 'h-full' : sheetLike ? 'h-full sm:h-auto sm:max-h-[80dvh]' : 'max-h-[80dvh]'}`}
           >
             <div
               className={`flex items-start gap-3 border-b border-line ${gutter} pt-[18px] pb-4`}

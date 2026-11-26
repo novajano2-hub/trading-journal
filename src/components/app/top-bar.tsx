@@ -350,7 +350,12 @@ export function TopBar({
           </div>
           {label || basis ? (
             <div ref={controls} className="flex flex-none items-center gap-2">
-              {label}
+              {/* A day page's bar is short of room below lg: no "Sample data" there. */}
+              {dayDate !== undefined ? (
+                <div className="flex max-lg:hidden empty:hidden">{label}</div>
+              ) : (
+                label
+              )}
               {/* The tracker has no unit menu: money there is net, in its currency. */}
               {hidesDisplayMenu(pathname) ? null : (
                 <div className="flex">{basis}</div>
@@ -363,7 +368,10 @@ export function TopBar({
           pathname === '/app/trades/day' ||
           pathname === '/app/trades/week' ? (
             <div className="flex flex-none max-sm:hidden">
-              <PlanTheDay />
+              {/* The shell prerenders, and the picker reads the URL's filters. */}
+              <Suspense fallback={null}>
+                <PlanTheDay />
+              </Suspense>
             </div>
           ) : null}
           {/* The day's one session, on today's plan page (K30); review has none. */}

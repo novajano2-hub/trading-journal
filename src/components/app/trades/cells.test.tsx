@@ -9,6 +9,8 @@ import {
   TagsCell,
   TradeLink,
 } from './cells';
+import { cellOf, type CellEnv } from './columns';
+import { makeTrade } from '@/domain/__fixtures__/trades';
 
 vi.mock('next/navigation', () => import('../__fixtures__/navigation'));
 
@@ -93,4 +95,17 @@ test('the tag count chip takes the marigold mistake treatment when any tag is a 
 test('the tag count chip is a faint None when the trade has no tags', () => {
   render(<TagCountCell tags={[]} mistakes={[]} />);
   expect(screen.getByText('None').className).toContain('text-faint');
+});
+
+test('the Day column carries the year, and only the Week view shortens it', () => {
+  const t = makeTrade({
+    net: 0,
+    openedAt: '2026-11-19T15:00:00Z',
+    closedAt: '2026-11-19T15:30:00Z',
+  });
+  const base = { timeZone: 'America/New_York' } as unknown as CellEnv;
+  const { container, rerender } = render(<>{cellOf('day', t, base)}</>);
+  expect(container.textContent).toBe('Thu 19 Nov 2026');
+  rerender(<>{cellOf('day', t, { ...base, shortDay: true })}</>);
+  expect(container.textContent).toBe('Thu 19 Nov');
 });

@@ -363,3 +363,34 @@ test('the header chip says Closed with no time; the time shows once, on the rule
   expect(chip.textContent).toBe('Closed');
   expect(await screen.findAllByText(/Closed at \d\d:\d\d/)).toHaveLength(1);
 });
+
+test('the stage links, the bare route and the bad-date link keep ?account=', async () => {
+  renderApp(<Day date="2026-11-03" mode="review" />, {
+    url: '/app/day/2026-11-03/review?account=acc-a',
+  });
+  const bar = within(stages());
+  expect(bar.getByRole('link', { name: 'Plan' }).getAttribute('href')).toBe(
+    '/app/day/2026-11-03/plan?account=acc-a',
+  );
+  expect(bar.getByRole('link', { name: 'Review' }).getAttribute('href')).toBe(
+    '/app/day/2026-11-03/review?account=acc-a',
+  );
+  cleanup();
+
+  renderApp(<DayRedirect date="2026-11-03" />, {
+    url: '/app/day/2026-11-03?account=acc-a',
+  });
+  await vi.waitFor(() =>
+    expect(window.location.pathname).toBe('/app/day/2026-11-03/review'),
+  );
+  expect(window.location.search).toBe('?account=acc-a');
+  cleanup();
+
+  renderApp(<DayView date="not-a-date" mode="plan" />, {
+    url: '/app/day/not-a-date/plan?account=acc-a',
+  });
+  const home = await screen.findByRole('link', { name: 'Go to today' });
+  expect(home.getAttribute('href')).toBe(
+    `/app/day/${TODAY}/plan?account=acc-a`,
+  );
+});

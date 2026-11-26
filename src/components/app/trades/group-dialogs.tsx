@@ -24,7 +24,8 @@ import { formatInstrument, plural, price } from '@/lib/format';
 import { usePhone } from '@/lib/use-phone';
 import { qty } from './columns';
 import { SelectBox } from './select-box';
-import { clock, dayLabel } from './trade-time';
+import { clock } from '@/lib/time-format';
+import { dayLabel } from './trade-time';
 
 /** What every grouping dialog is given: where it grew from and where focus returns. */
 export interface GroupDialogProps {

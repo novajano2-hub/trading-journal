@@ -2,7 +2,7 @@
 
 import { LockSimple } from '@phosphor-icons/react/dist/ssr';
 import { useDays, usePrefs } from '@/data/query/hooks';
-import { clock } from '../trades/trade-time';
+import { clock } from '@/lib/time-format';
 
 /**
  * Whether a date is finished (K3), and when: its record is stamped or

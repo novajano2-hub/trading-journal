@@ -189,7 +189,7 @@ test('the stat grid matches day-log', async () => {
   expect(value('Gross P&L')).toBe('+$75.00');
   expect(value('Won / lost')).toBe('1 / 1');
   expect(value('Commissions')).toBe('$15.00');
-  expect(value('Win rate')).toBe('50.0%');
+  expect(value('Win rate')).toBe('50%');
   // Both sides: two closed trades of one contract (2 each) and one open (1).
   expect(value('Volume')).toBe('5');
   expect(value('Profit factor')).toBe('2.50');
@@ -873,4 +873,39 @@ test('the enlarged chart has a group focus stop, and the card chart readout sits
       name: 'Points of the running net on Tue 24 Nov 2026',
     }),
   ).toBeTruthy();
+});
+
+test('the Review action keeps the account selection', async () => {
+  await renderApp(<TradesDayView />, {
+    sample: sample(),
+    url: '/app/trades/day?account=acc-a',
+  });
+  const first = (await cards())[0]!;
+  expect(
+    within(first)
+      .getByRole('link', { name: /Review/ })
+      .getAttribute('href'),
+  ).toBe('/app/day/2026-11-24/review?account=acc-a');
+});
+
+test('a failed mood write says so', async () => {
+  await renderApp(<TradesDayView />, {
+    sample: sample(),
+    url: '/app/trades/day',
+    patch: (repo) => ({
+      days: {
+        ...repo.days,
+        setMood: async () => {
+          throw new Error('storage full');
+        },
+      },
+    }),
+  });
+  const first = (await cards())[0]!;
+  fireEvent.click(within(first).getByRole('button', { name: 'Mood, Good' }));
+  fireEvent.click(await screen.findByRole('radio', { name: 'Great' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  expect((await within(first).findByRole('alert')).textContent).toContain(
+    'mood',
+  );
 });

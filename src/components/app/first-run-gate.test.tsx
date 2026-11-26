@@ -34,8 +34,9 @@ test('the gate sends a new browser to welcome from any app route, the sample lin
   }
 });
 
-test('the gate shows nothing, and goes nowhere, until the prefs load', () => {
+test('until the prefs load the gate shows a loading page, not a blank app, and goes nowhere', () => {
   renderApp(<FirstRunGate>{child}</FirstRunGate>, { url: '/app/dashboard' });
+  expect(screen.getByRole('status', { name: 'Loading Keel' })).toBeTruthy();
   expect(screen.queryByText('The page')).toBeNull();
   expect(window.location.pathname).toBe('/app/dashboard');
 });

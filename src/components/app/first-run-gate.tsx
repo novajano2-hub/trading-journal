@@ -34,6 +34,26 @@ function decide(
   return pathname === HOME ? 'pass' : { replace: HOME };
 }
 
+/**
+ * What the app shows while the prefs load (M2): a quiet page, in place of a
+ * blank app. The layout puts it inside the shell, so the chrome is there.
+ */
+export function GateLoading(): React.JSX.Element {
+  return (
+    <div
+      role="status"
+      aria-label="Loading Keel"
+      className="flex flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0"
+    >
+      <div aria-hidden="true" className="flex flex-col gap-4">
+        <span className="block h-7 w-48 rounded-chip bg-sunken" />
+        <span className="block h-[220px] rounded-[14px] bg-sunken/70" />
+        <span className="block h-[160px] rounded-[14px] bg-sunken/70" />
+      </div>
+    </div>
+  );
+}
+
 function useDecision(pathname: string, onWelcomePages: boolean): Where {
   const router = useRouter();
   const where = decide(usePrefs(), pathname, onWelcomePages);
@@ -46,17 +66,21 @@ function useDecision(pathname: string, onWelcomePages: boolean): Where {
 
 /**
  * The first-run gate over every /app route, the sample workspace link
- * included (U1, K56). It renders nothing until the prefs load, so nothing
- * flashes. Both states return the same element so the page under it keeps
- * its place when the first run is saved.
+ * included (U1, K56). While the prefs load it shows `fallback` (the shell
+ * around a skeleton), never a blank app; a visitor being sent elsewhere sees
+ * nothing. The fallback and the page are the same element type at the same
+ * place, so the shell keeps its place when the prefs arrive.
  */
 export function FirstRunGate({
   children,
+  fallback = <GateLoading />,
 }: {
   children: React.ReactNode;
+  fallback?: React.ReactNode;
 }): React.JSX.Element | null {
   const where = useDecision(usePathname(), false);
-  return where === 'pass' ? <>{children}</> : null;
+  if (where === 'pass') return <>{children}</>;
+  return where === 'wait' ? <>{fallback}</> : null;
 }
 
 /**

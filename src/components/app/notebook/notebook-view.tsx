@@ -411,7 +411,7 @@ export function NotebookView(): React.JSX.Element {
       <StateBlock
         visual={<StateGlyph icon={NotePencil} />}
         title="Pick a note to read it."
-        body="Or start one from New: a daily note, a pre-market plan, a weekly recap or a plain note."
+        body="Or start one from New: a daily note, a weekly recap or a plain note."
       />
     );
   else if (selection.type === 'daily')

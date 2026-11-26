@@ -14,10 +14,8 @@ import {
   tradeFigure,
   useDisplay,
 } from '@/lib/display';
+import { trimmedPercent } from '@/lib/format';
 import { signTone } from '../../dashboard/shared';
-
-/** One decimal, as comp 06 shows it: 57.1%, 66.7%, 25.0%. */
-const percent = (ratio: number): string => `${(ratio * 100).toFixed(1)}%`;
 
 const NONE = <span className="font-medium text-faint">None</span>;
 
@@ -102,7 +100,7 @@ export function StatGrid({
     {
       id: 'day-win-rate',
       label: 'Win rate',
-      value: stats.winRate === null ? NONE : percent(stats.winRate),
+      value: stats.winRate === null ? NONE : trimmedPercent(stats.winRate),
     },
     { id: 'day-volume', label: 'Volume', value: quantity(stats.volume) },
     {

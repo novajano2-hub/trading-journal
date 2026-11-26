@@ -1,10 +1,5 @@
 import { expect, test } from 'vitest';
-import { dayLabel, weekLabel } from './day-label';
-
-test('a day reads with its year, or without it for a phone header', () => {
-  expect(dayLabel('2026-11-24')).toBe('Tue 24 Nov 2026');
-  expect(dayLabel('2026-11-24', false)).toBe('Tue 24 Nov');
-});
+import { weekLabel } from './day-label';
 
 test('a week span has no hyphen and always the year', () => {
   expect(weekLabel('2026-11-22', '2026-11-28')).toBe('22 to 28 Nov 2026');

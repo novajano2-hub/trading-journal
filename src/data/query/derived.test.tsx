@@ -630,3 +630,18 @@ test('useRoutineToday and useDayScores roll over at local midnight (M5, M6)', as
   expect(result.current.today).toBe('2026-11-20');
   expect(result.current.scores.data!.today).toBe('2026-11-20');
 });
+
+test("the sample workspace's money rules count its own USD trades under a EUR base currency (R23)", async () => {
+  const { repository, Wrapper } = setup();
+  await repository.prefs.update({
+    timeZone: 'America/New_York',
+    baseCurrency: 'EUR',
+  });
+  const { result } = renderHook(() => useDayScores(), { wrapper: Wrapper });
+  await waitFor(() => expect(result.current.status).toBe('success'));
+  const cap = result.current
+    .data!.scoreOn('2026-11-17')
+    .rules.find((r) => r.key === 'lossPerDay')!;
+  // The day's USD loss of 129.50 reads against the cap, not as zero.
+  expect(cap.value).toMatchObject({ kind: 'money', cents: 12_950 });
+});

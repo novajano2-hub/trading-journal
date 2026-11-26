@@ -20,10 +20,11 @@ import {
   useTemplates,
   useTrashJournalEntry,
 } from '@/data/query/hooks';
+import { LockedDayError } from '@/data/repository';
 import { isClosed } from '@/domain/trade-status';
 import { useDisplay } from '@/lib/display';
-import { dayLabel } from '@/lib/day-label';
-import { plural } from '@/lib/format';
+import { clock, dayLabel } from '@/lib/time-format';
+import { plural, trimmedPercent } from '@/lib/format';
 import { usePhone } from '@/lib/use-phone';
 import { signTone } from '../../dashboard/shared';
 import { LockLine, useDayFinished } from '../../day/day-lock';
@@ -35,7 +36,6 @@ import {
   type NoteControl,
   type NoteStatus,
 } from '../trade-journal';
-import { clock } from '../trade-time';
 import { DayTables, QUICK } from './day-card';
 import { useLogEnv } from './log-env';
 
@@ -58,9 +58,6 @@ const MENU =
   'z-[60] min-w-[200px] origin-(--radix-dropdown-menu-content-transform-origin) rounded-[12px] border border-line bg-surface-1 p-1.5 text-text shadow-[var(--shadow)] outline-none motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in';
 const ITEM =
   'flex min-h-9 cursor-pointer items-center gap-2 rounded-[8px] px-2.5 text-[13.5px] outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-sunken pointer-coarse:min-h-11';
-
-/** One decimal, as the card's figures: 57.1%. */
-const percent = (ratio: number): string => `${(ratio * 100).toFixed(1)}%`;
 
 /**
  * The day note for `date`, in a dialog that grows from its opener. Render
@@ -96,6 +93,11 @@ export function DayNoteDialog({
   const [status, setStatus] = useState<NoteStatus>('idle');
   const [expanded, setExpanded] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  // The last write failed because the day was closed meanwhile: nothing can save.
+  const lockedOut = useRef(false);
+  const [lockedNotice, setLockedNotice] = useState(false);
+  // A close left text the store still refuses: offer to let it go.
+  const [stuck, setStuck] = useState(false);
 
   const entry = findDailyEntry(journal.data, date);
   const trashed = entry?.deletedAt !== undefined;
@@ -103,24 +105,37 @@ export function DayNoteDialog({
   const readOnly = finished || trashed;
   const group = groups?.get(date);
 
-  const onStatus = (s: NoteStatus) => {
+  const onStatus = (s: NoteStatus, error?: unknown) => {
     lastStatus.current = s;
+    lockedOut.current = s === 'failed' && error instanceof LockedDayError;
+    setLockedNotice(lockedOut.current);
     setStatus(s);
-    if (s === 'saved') setProblem(null);
+    if (s === 'saved') {
+      setProblem(null);
+      setStuck(false);
+    }
   };
 
   // Keel's call (TradeZella unknown): the record says Save stores the note and is
   // silent on unsaved edits (K43, spec 5.3); Keel's editors autosave. So closing
   // with unsaved edits (record line 706) neither warns nor discards: closing any
   // way, Save, the X or Escape, writes what is waiting first, and a write that
-  // still fails keeps the dialog open with the alert, so no text is lost.
+  // still fails keeps the dialog open with the alert, so no text is lost. Two
+  // ways out, so the modal is never a trap: a closed day (the write can never
+  // land) closes at once, and after a failed close "Close without saving" lets
+  // the waiting text go.
   const close = async (next: boolean) => {
     if (next) {
       onOpenChange(true);
       return;
     }
-    await control.current?.settle();
-    if (lastStatus.current === 'failed') return;
+    if (!finished) {
+      await control.current?.settle();
+      if (lastStatus.current === 'failed' && !lockedOut.current) {
+        setStuck(true);
+        return;
+      }
+    }
     onOpenChange(false);
   };
 
@@ -184,7 +199,7 @@ export function DayNoteDialog({
           `${trades} ${plural(trades, 'trade')}`,
           rate === null || rate === undefined
             ? 'win rate None'
-            : `${percent(rate)} win rate`,
+            : `${trimmedPercent(rate)} win rate`,
           apart,
         ]
           .filter((part) => part !== undefined)
@@ -287,7 +302,7 @@ export function DayNoteDialog({
       origin={origin}
       returnFocus={origin}
       title="Day note"
-      description={`${dayLabel(date)}${source ? `, from the ${source.name} template` : ''}`}
+      description={`${dayLabel(date, { year: true })}${source ? `, from the ${source.name} template` : ''}`}
       size="sheet"
       actions={actions}
       footer={
@@ -300,10 +315,24 @@ export function DayNoteDialog({
           </span>
           {status === 'failed' || problem ? (
             <span role="alert" className="min-w-0 text-[12.5px] text-loss">
-              {problem ?? "Couldn't save. Press Save to try again."}
+              {problem ??
+                (lockedNotice
+                  ? 'That day was closed, so this note can no longer change.'
+                  : "Couldn't save. Press Save to try again.")}
             </span>
           ) : null}
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            {stuck && status === 'failed' ? (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setStuck(false);
+                  onOpenChange(false);
+                }}
+              >
+                Close without saving
+              </Button>
+            ) : null}
             {/* Keel's call (TradeZella unknown): with nothing to save (a finished day, a note in Trash) the button reads Done and only closes. */}
             <Button onClick={() => void close(false)}>
               {readOnly ? 'Done' : 'Save'}
@@ -319,7 +348,7 @@ export function DayNoteDialog({
         onClick={() => setExpanded((e) => !e)}
         className="mt-1 flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-control bg-sunken px-3.5 py-3 text-left text-[13.5px] outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
       >
-        <b className="font-semibold text-text">{dayLabel(date, false)}</b>
+        <b className="font-semibold text-text">{dayLabel(date)}</b>
         <span
           className={`font-semibold tabular-nums ${net && group ? signTone(group.stats.net!) : 'text-faint'}`}
         >
@@ -341,11 +370,15 @@ export function DayNoteDialog({
       <div id={panel} hidden={!expanded}>
         {/* Keel's call (TradeZella unknown, record line 701): the expanded summary lists the day as its card does. */}
         {expanded && group ? (
-          <DayTables group={group} date={dayLabel(date)} columns={columns} />
+          <DayTables
+            group={group}
+            date={dayLabel(date, { year: true })}
+            columns={columns}
+          />
         ) : null}
       </div>
       {finished && !trashed ? <LockLine className="mt-3" /> : null}
-      <div className="mt-3 min-w-0">
+      <div className="note-day mt-3 min-w-0">
         <DayNoteBinding
           date={date}
           readOnly={finished}
@@ -378,7 +411,9 @@ export function DayNoteAction({ date }: { date: string }): React.JSX.Element {
         ref={opener}
         type="button"
         aria-haspopup="dialog"
-        aria-label={phone ? `${label} ${dayLabel(date)}` : undefined}
+        aria-label={
+          phone ? `${label} ${dayLabel(date, { year: true })}` : undefined
+        }
         onClick={() => {
           setBuilt(true);
           setOpen(true);

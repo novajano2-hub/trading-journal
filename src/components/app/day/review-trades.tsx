@@ -222,7 +222,8 @@ export function ReviewTrades({
         </>
       ) : (
         <div
-          className="-mx-2 mt-1.5 h-[268px] overflow-auto px-2 [mask-image:linear-gradient(to_bottom,#000_calc(100%-30px),transparent)]"
+          className="-mx-2 mt-1.5 h-[268px] overflow-auto px-2"
+          role="region"
           tabIndex={0}
           aria-label="Trades, scrolling"
         >

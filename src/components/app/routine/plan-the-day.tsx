@@ -1,13 +1,13 @@
 'use client';
 
 import { CalendarCheck } from '@phosphor-icons/react/dist/ssr';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { Popover } from 'radix-ui';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { usePrefs } from '@/data/query/hooks';
 import { useRoutineToday } from '@/data/query/derived';
-import { dayHref } from '@/lib/day-routes';
+import { dayHref, dayQuery } from '@/lib/day-routes';
 import { MonthPicker } from './month-picker';
 
 const PANEL =
@@ -25,6 +25,7 @@ export function PlanTheDay({
   const today = useRoutineToday();
   const weekStart = usePrefs().data?.weekStart;
   const router = useRouter();
+  const query = dayQuery(useSearchParams());
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState<string | undefined>(undefined);
 
@@ -81,7 +82,7 @@ export function PlanTheDay({
             label="Pick a day"
             onPick={(date) => {
               setOpen(false);
-              router.push(dayHref(date, today));
+              router.push(dayHref(date, today, query));
             }}
           />
         </Popover.Content>

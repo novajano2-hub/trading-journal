@@ -24,7 +24,7 @@ import {
   usePrefs,
   useTrades,
 } from '@/data/query/hooks';
-import { greeting } from './greeting';
+import { dateLine, greeting } from './greeting';
 import { GettingStartedCard } from './getting-started';
 
 /**
@@ -224,12 +224,17 @@ function HomeLayout({
     <div className="flex flex-col gap-4 px-5 pt-0.5 pb-7">
       <header className="pt-1.5 pb-0.5">
         {prefs ? (
-          <h2 className="text-2xl leading-[1.15] font-semibold tracking-[-0.03em] sm:text-[26px]">
-            {greeting(now, prefs.timeZone, name)}
-          </h2>
+          <>
+            <h2 className="text-2xl leading-[1.15] font-semibold tracking-[-0.03em] sm:text-[26px]">
+              {greeting(now, prefs.timeZone, name)}
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              {dateLine(now, prefs.timeZone)}
+            </p>
+          </>
         ) : (
           // Prefs are still being read: the greeting's place, held empty.
-          <div aria-hidden="true" className="h-[31px]" />
+          <div aria-hidden="true" className="h-[56px]" />
         )}
       </header>
       {progress ? (

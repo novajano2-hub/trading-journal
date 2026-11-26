@@ -18,6 +18,7 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import { MODULES, type ModuleInfo } from '@/content/modules';
 import { parseFilters, serializeFilters } from '@/data/filters';
+import { decodedSegment } from '@/lib/route-param';
 
 export type AppModuleId =
   | 'home'
@@ -277,31 +278,19 @@ export function tradePageId(pathname: string): string | undefined {
   const m = /^\/app\/trades\/([^/]+)$/.exec(pathname);
   if (!m || m[1] === 'new' || m[1] === 'day' || m[1] === 'week')
     return undefined;
-  try {
-    return decodeURIComponent(m[1]!);
-  } catch {
-    return m[1];
-  }
+  return decodedSegment(m[1]!);
 }
-
-const decoded = (raw: string): string => {
-  try {
-    return decodeURIComponent(raw);
-  } catch {
-    return raw;
-  }
-};
 
 /** The strategy id when `pathname` is one strategy's page (not the list, the new form or the editor), decoded. */
 export function strategyPageId(pathname: string): string | undefined {
   const m = /^\/app\/strategies\/([^/]+)$/.exec(pathname);
-  return !m || m[1] === 'new' ? undefined : decoded(m[1]!);
+  return !m || m[1] === 'new' ? undefined : decodedSegment(m[1]!);
 }
 
 /** The strategy id when `pathname` is one strategy's editor, decoded. */
 export function strategyEditId(pathname: string): string | undefined {
   const m = /^\/app\/strategies\/([^/]+)\/edit$/.exec(pathname);
-  return m ? decoded(m[1]!) : undefined;
+  return m ? decodedSegment(m[1]!) : undefined;
 }
 
 /**

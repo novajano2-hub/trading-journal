@@ -1,10 +1,16 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useStartSession } from '@/data/query/hooks';
 import type { DayRecord } from '@/domain/types';
-import { dayPlanHref, dayReviewHref, type DayMode } from '@/lib/day-routes';
+import {
+  dayPlanHref,
+  dayQuery,
+  dayReviewHref,
+  type DayMode,
+} from '@/lib/day-routes';
 import { useDayFinished } from './day-lock';
 import { formatClock, useElapsed } from './session-button';
 
@@ -48,7 +54,8 @@ export function StageBar({
   const future = today !== undefined && date > today;
   const item = full ? 'min-w-0 flex-1 px-1.5' : '';
   const stage = (on: boolean) => `${STAGE} ${item} ${on ? ON : ''}`;
-  const planHref = dayPlanHref(date);
+  const query = dayQuery(useSearchParams());
+  const planHref = dayPlanHref(date, query);
 
   const disabled = (label: string, reason: string): ReactNode => (
     <span
@@ -111,7 +118,7 @@ export function StageBar({
         disabled('Review', 'Review opens once the day has begun.')
       ) : (
         <Link
-          href={dayReviewHref(date)}
+          href={dayReviewHref(date, query)}
           aria-current={mode === 'review' ? 'step' : undefined}
           className={stage(mode === 'review')}
         >

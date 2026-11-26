@@ -15,6 +15,17 @@ import type {
   Tracker,
 } from '@/domain/types';
 
+/** The sample workspace's own account currency: its money rules count USD whatever the user's base currency is (R23). */
+export const SAMPLE_CURRENCY = 'USD';
+
+/** The currency a workspace's money rules (K24) are counted in. */
+export function routineCurrency(
+  workspaceId: string | undefined,
+  baseCurrency: string,
+): string {
+  return workspaceId === 'sample' ? SAMPLE_CURRENCY : baseCurrency;
+}
+
 export interface RoutineEnv {
   timeZone: string;
   baseCurrency: string;
