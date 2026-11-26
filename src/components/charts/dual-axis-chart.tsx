@@ -367,6 +367,8 @@ export function DualAxisChart({
   series,
   height = 200,
   alignZero = false,
+  legend = true,
+  dollars = false,
   note,
 }: {
   label: string;
@@ -383,17 +385,21 @@ export function DualAxisChart({
   /** The plot's height, without the x labels. */
   height?: number;
   alignZero?: boolean;
-  /** An extra legend line, such as the time zone. */
+  /** The swatch and name of each series under the plot; a card whose title already names its one series turns it off. */
+  legend?: boolean;
+  /** Money here is always dollars, whatever the display unit (the prop pages, C72): the axis keeps its short labels. */
+  dollars?: boolean;
+  /** An extra line under the plot, such as the time zone. */
   note?: string;
 }): React.JSX.Element {
   const display = useDisplay();
   const base = usePrefs().data?.baseCurrency ?? 'USD';
   const cur = currency ?? base;
   const fmt = useMemo(
-    () => formatterOf(display, cur),
+    () => formatterOf(display, cur, dollars),
     // `display` is rebuilt on every render; what it reads is the unit and the currency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [display.unit, cur],
+    [display.unit, cur, dollars],
   );
   const box = useRef<HTMLDivElement>(null);
   const n = xs.length;
@@ -593,18 +599,22 @@ export function DualAxisChart({
           ) : null}
         </div>
       </div>
-      <ul
-        data-legend=""
-        className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-faint"
-      >
-        {series.map((s) => (
-          <li key={s.key} className="inline-flex items-center gap-1.5">
-            <Swatch s={s} />
-            {s.label}
-          </li>
-        ))}
-        {note ? <li>{note}</li> : null}
-      </ul>
+      {legend || note ? (
+        <ul
+          data-legend=""
+          className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-faint"
+        >
+          {legend
+            ? series.map((s) => (
+                <li key={s.key} className="inline-flex items-center gap-1.5">
+                  <Swatch s={s} />
+                  {s.label}
+                </li>
+              ))
+            : null}
+          {note ? <li>{note}</li> : null}
+        </ul>
+      ) : null}
       <div className="sr-only">
         <table aria-label={label}>
           <thead>

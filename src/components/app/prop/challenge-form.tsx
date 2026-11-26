@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Info } from '@phosphor-icons/react/dist/ssr';
+import { Info } from '@phosphor-icons/react/dist/ssr';
 import { useId, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { ConfirmDialog } from '@/components/app/confirm-dialog';
 import { SelectField } from '@/components/app/import/select-field';
@@ -41,6 +41,7 @@ import {
   type RuleErrors,
   type Unit,
 } from './rule-draft';
+import { StrategyChips } from './strategy-chips';
 
 interface PhaseDraft {
   /** 'none', 'new', or the id of the account linked. */
@@ -834,34 +835,15 @@ export function ChallengeForm({
                 here.
               </p>
             ) : (
-              <div className="flex flex-wrap gap-2">
-                {strategies.map((st) => (
-                  <label
-                    key={st.id}
-                    className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-control border border-line px-3 text-[13px] font-medium transition-colors duration-200 has-[:checked]:border-accent/45 has-[:checked]:bg-accent-soft/60 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent pointer-coarse:min-h-11"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={strategyIds.includes(st.id)}
-                      onChange={(ev) =>
-                        setStrategyIds((all) =>
-                          ev.target.checked
-                            ? [...all, st.id]
-                            : all.filter((x) => x !== st.id),
-                        )
-                      }
-                      className="peer sr-only"
-                    />
-                    <Check
-                      size={14}
-                      weight="bold"
-                      aria-hidden="true"
-                      className="hidden text-accent-ink peer-checked:block"
-                    />
-                    {st.name}
-                  </label>
-                ))}
-              </div>
+              <StrategyChips
+                strategies={strategies}
+                selected={strategyIds}
+                onToggle={(id, on) =>
+                  setStrategyIds((all) =>
+                    on ? [...all, id] : all.filter((x) => x !== id),
+                  )
+                }
+              />
             )}
           </fieldset>
           <div className="flex flex-wrap gap-x-6 gap-y-3">

@@ -1,5 +1,6 @@
 'use client';
 
+import { format, parseISO } from 'date-fns';
 import { useLayoutEffect, useState, type RefObject } from 'react';
 
 /** The width a chart draws at before it has been measured (and where nothing is laid out). */
@@ -70,4 +71,31 @@ export function endRoom(
       .filter((t) => t.at >= near)
       .map((t) => Math.ceil(t.text.length * 3.3) + 2),
   );
+}
+
+/**
+ * Where a chart of days is labelled on its x axis: every day when there are
+ * few, else the first trading day of each month (the chart drops any that
+ * would touch). `keys` are YYYY-MM-DD, one per point.
+ */
+export function dateTicks(
+  keys: readonly string[],
+): { at: number; text: string }[] {
+  if (keys.length <= 40)
+    return keys.map((k, i) => ({ at: i, text: format(parseISO(k), 'd MMM') }));
+  const out: { at: number; text: string }[] = [];
+  let last = '';
+  keys.forEach((k, i) => {
+    const month = k.slice(0, 7);
+    if (month === last) return;
+    last = month;
+    out.push({
+      at: i,
+      text: format(
+        parseISO(`${month}-01`),
+        month.endsWith('-01') ? 'MMM yyyy' : 'MMM',
+      ),
+    });
+  });
+  return out;
 }

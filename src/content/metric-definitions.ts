@@ -121,6 +121,8 @@ export const METRIC_IDS = [
   'prop-daily-loss',
   'prop-trading-days',
   'prop-consistency',
+  'phase-balance',
+  'challenge-strategies',
   'day-ticks',
   'day-pips',
   'day-points',
@@ -752,6 +754,16 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Consistency',
     definition:
       "The best day's net P&L as a share of the phase's profit. The rule is kept while it stays at or under the limit. It reads only once the phase is in profit.",
+  },
+  'phase-balance': {
+    label: 'Phase balance',
+    definition:
+      "What the phase's trading account holds at each point: its balance the day before the phase starts, the deposits and withdrawals after it, and the net P&L booked through the point. By day it is the balance at each trading day's close, by hour at the end of each hour with an exit, and by trade after each closed trade. It has no value in R, ticks, pips or points.",
+  },
+  'challenge-strategies': {
+    label: 'Strategies',
+    definition:
+      "The strategies this challenge is traded with. They feed the Prop firms dashboard's pass rate by strategy and its strategy filter.",
   },
   'tracker-streak': {
     label: 'Current streak',

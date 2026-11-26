@@ -199,6 +199,27 @@ test('a legend names each series with its key, and the note', async () => {
   expect(legend.querySelectorAll('[data-swatch="line"]')).toHaveLength(1);
 });
 
+test('a card that names its one series can turn the legend off, and the note stays', async () => {
+  const { container } = draw([line], {
+    legend: false,
+    note: 'Hours in New York',
+  });
+  await chart();
+  expect(
+    [...container.querySelectorAll('ul[data-legend] li')].map(
+      (li) => li.textContent,
+    ),
+  ).toEqual(['Hours in New York']);
+  cleanup();
+  const bare = draw([line], { legend: false });
+  await chart();
+  expect(bare.container.querySelector('ul[data-legend]')).toBeNull();
+  // The series is still in the table and the readout.
+  expect(
+    screen.getByRole('table', { name: 'Daily and cumulative net P&L' }),
+  ).toBeTruthy();
+});
+
 test('a long run keeps its table to a sample that holds the first and the last point', async () => {
   const n = 500;
   const many: DualSeries = {

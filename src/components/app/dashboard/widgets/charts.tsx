@@ -2,6 +2,7 @@
 
 import { addDays, format, parseISO } from 'date-fns';
 import { useContext, useMemo, type ReactNode } from 'react';
+import { dateTicks } from '@/components/charts/chart-kit';
 import {
   DualAxisChart,
   type DualSeries,
@@ -142,31 +143,6 @@ function fromZero(
   if (!first) return [];
   const before = format(addDays(parseISO(from ?? first.key), -1), 'yyyy-MM-dd');
   return [{ key: before, value: 0 }, ...running];
-}
-
-/**
- * Where a chart of days is labelled on its x axis: every day when there are
- * few, else the first trading day of each month (the chart drops any that
- * would touch).
- */
-function dateTicks(keys: readonly string[]): { at: number; text: string }[] {
-  if (keys.length <= 40)
-    return keys.map((k, i) => ({ at: i, text: format(parseISO(k), 'd MMM') }));
-  const out: { at: number; text: string }[] = [];
-  let last = '';
-  keys.forEach((k, i) => {
-    const month = k.slice(0, 7);
-    if (month === last) return;
-    last = month;
-    out.push({
-      at: i,
-      text: format(
-        parseISO(`${month}-01`),
-        month.endsWith('-01') ? 'MMM yyyy' : 'MMM',
-      ),
-    });
-  });
-  return out;
 }
 
 /** What every chart widget reads besides its own series. */

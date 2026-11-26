@@ -39,13 +39,13 @@ import {
   usePrefs,
   useRemoveChallenge,
   useTrades,
-  useUpdateChallenge,
   useUpdatePrefs,
 } from '@/data/query/hooks';
 import { checkChallenge, urgencyOf } from '@/domain/prop/challenge';
 import {
   accountsGroup,
-  firstStart,
+  firstTradeDays,
+  startedOn,
   type AccountsGroup,
 } from '@/domain/prop/finance';
 import { localDate } from '@/domain/time';
@@ -63,9 +63,9 @@ import {
   detailsHref,
   type AccountRow,
 } from './accounts-list';
-import { phaseName, shownPhase } from './challenge-card';
 import { ChallengeForm } from './challenge-form';
 import { MarkBreached } from './mark-breached';
+import { MoveToFunded } from './move-to-funded';
 import { PropView } from './prop-view';
 
 const NO_TRADES: ReadonlyMap<string, Trade> = new Map();
@@ -112,7 +112,6 @@ export function AccountsTab(): React.JSX.Element {
   const flows = useCashFlows();
   const prefs = usePrefs();
   const updatePrefs = useUpdatePrefs();
-  const update = useUpdateChallenge();
   const remove = useRemoveChallenge();
   const params = useSearchParams();
   const phone = usePhone();
@@ -160,12 +159,7 @@ export function AccountsTab(): React.JSX.Element {
       return undefined;
     const ctx = metricContextOf(prefs.data);
     // The day each account first traded, for a challenge with no start date.
-    const firstTrade = new Map<string, string>();
-    for (const t of trades.data) {
-      const day = localDate(t.openedAt, prefs.data.timeZone);
-      const seen = firstTrade.get(t.accountId);
-      if (seen === undefined || day < seen) firstTrade.set(t.accountId, day);
-    }
+    const firstTrade = firstTradeDays(trades.data, prefs.data.timeZone);
     const rows: AccountRow[] = challenges.data
       .map((c) => ({
         c,
@@ -177,13 +171,7 @@ export function AccountsTab(): React.JSX.Element {
           today,
           flows.data,
         ),
-        started:
-          firstStart(c) ??
-          c.phases
-            .map((p) => firstTrade.get(p.accountId ?? ''))
-            .filter((d): d is string => d !== undefined)
-            .sort()[0] ??
-          null,
+        started: startedOn(c, firstTrade),
       }))
       .sort((a, b) => urgencyOf(a.c, a.check) - urgencyOf(b.c, b.check));
     return { rows, ctx };
@@ -382,26 +370,9 @@ export function AccountsTab(): React.JSX.Element {
           onClose={() => setBreaching(null)}
         />
       ) : null}
-      <ConfirmDialog
-        open={movingRow !== undefined}
-        title={`Move ${movingRow?.c.name ?? 'this challenge'} to funded?`}
-        body={`${
-          movingRow
-            ? phaseName(
-                movingRow.c,
-                shownPhase(movingRow.c, movingRow.check)?.step ?? 'step-1',
-              )
-            : 'The evaluation'
-        } passes and its results stay viewable. The challenge moves to its funded phase.`}
-        confirmLabel="Move to funded"
+      <MoveToFunded
+        row={movingRow}
         returnFocus={returnFocus}
-        onConfirm={async () => {
-          if (movingRow)
-            await update.mutateAsync({
-              id: movingRow.c.id,
-              patch: { status: 'active', phase: 'funded' },
-            });
-        }}
         onClose={() => setMoving(null)}
       />
       <ConfirmDialog

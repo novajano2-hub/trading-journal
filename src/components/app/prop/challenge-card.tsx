@@ -40,7 +40,7 @@ const MONTHS = [
 ] as const;
 
 /** "19 Nov" from YYYY-MM-DD. */
-function dayMonth(date: string): string {
+export function dayMonth(date: string): string {
   const [, m, d] = date.split('-');
   return `${Number(d)} ${MONTHS[Number(m) - 1]}`;
 }
@@ -100,6 +100,8 @@ const BAR: Record<BarTone, string> = {
 
 const STATUS = {
   active: { tone: 'accent', label: 'Active' },
+  /** A challenge in its funded phase, on the details page head (comp 06). */
+  funded: { tone: 'gain', label: 'Funded' },
   near: { tone: 'loss', label: 'Near a limit' },
   breached: { tone: 'loss', label: 'Breached' },
   passed: { tone: 'gain', label: 'Passed' },
@@ -153,7 +155,7 @@ export function maskedReason(text: string, privacy: boolean): string {
  * list kept only its words). Money in the words reads "hidden amount" under
  * Privacy.
  */
-function BreachLine({
+export function BreachLine({
   c,
   privacy,
 }: {
@@ -428,9 +430,12 @@ function RuleLine({
 export function RuleLines({
   phase,
   className = '',
+  omitFundedProfit = false,
 }: {
   phase: ChallengePhaseCheck;
   className?: string;
+  /** The details page leaves the funded phase's profit line out: it has no target (comp 06). */
+  omitFundedProfit?: boolean;
 }): React.JSX.Element | null {
   const display = useDisplay();
   const account = phase.account;
@@ -444,35 +449,37 @@ export function RuleLines({
   const used = rules.maxDrawdown - s.drawdown.remaining;
   return (
     <div className={`flex flex-col ${className}`}>
-      <RuleLine
-        rule="profit"
-        name={
-          <MetricTip
-            id={funded ? 'prop-profit-funded' : 'prop-profit'}
-            basis="net"
-          >
-            {funded ? 'Profit' : 'Profit target'}
-          </MetricTip>
-        }
-        value={
-          funded ? (
-            <>{money(s.profit.current, true)}, no target once funded</>
-          ) : (
-            <>
-              {money(s.profit.current, true)} of {money(s.profit.target)}
-              {s.overall === 'target-reached' ? ', reached' : ''}
-            </>
-          )
-        }
-        bar={
-          funded
-            ? undefined
-            : {
-                fraction: s.profit.progress,
-                tone: s.overall === 'target-reached' ? 'gain' : 'accent',
-              }
-        }
-      />
+      {funded && omitFundedProfit ? null : (
+        <RuleLine
+          rule="profit"
+          name={
+            <MetricTip
+              id={funded ? 'prop-profit-funded' : 'prop-profit'}
+              basis="net"
+            >
+              {funded ? 'Profit' : 'Profit target'}
+            </MetricTip>
+          }
+          value={
+            funded ? (
+              <>{money(s.profit.current, true)}, no target once funded</>
+            ) : (
+              <>
+                {money(s.profit.current, true)} of {money(s.profit.target)}
+                {s.overall === 'target-reached' ? ', reached' : ''}
+              </>
+            )
+          }
+          bar={
+            funded
+              ? undefined
+              : {
+                  fraction: s.profit.progress,
+                  tone: s.overall === 'target-reached' ? 'gain' : 'accent',
+                }
+          }
+        />
+      )}
       <RuleLine
         rule="daily-loss"
         name={

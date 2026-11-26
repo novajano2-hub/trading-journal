@@ -241,8 +241,18 @@ const multiple = (v: number, digits: number): string =>
  * through the display formatter, so Privacy and the unit apply to the axis,
  * the readout, the table and the label alike; shares, ratios, counts,
  * quantities and durations are not amounts and read as they are.
+ *
+ * `dollars` is for a page whose money is always dollars, whatever the unit
+ * (the prop pages, C72): the axis keeps its short dollar labels under a
+ * percentage or R unit too, and Privacy still hides them.
  */
-export function formatterOf(display: Display, currency: string): Formatter {
+export function formatterOf(
+  display: Display,
+  currency: string,
+  dollars = false,
+): Formatter {
+  const short =
+    display.unit === 'dollar' || (dollars && display.unit !== 'privacy');
   const unitText = (v: number, compact: boolean, signed: boolean) =>
     formatUnitValue(display.unit, v, { currency, signed, compact });
   const text = (unit: SeriesUnit, v: number): string => {
@@ -283,11 +293,11 @@ export function formatterOf(display: Display, currency: string): Formatter {
     tick(unit, v) {
       switch (unit) {
         case 'money':
-          return display.unit === 'dollar'
+          return short
             ? compactMoney(v, currency)
             : display.cash(v, v !== 0, currency).text;
         case 'balance':
-          return display.unit === 'dollar'
+          return short
             ? compactMoney(v, currency, false)
             : display.cash(v, false, currency).text;
         case 'tradeunit':
