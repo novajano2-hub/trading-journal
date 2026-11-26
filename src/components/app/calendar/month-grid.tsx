@@ -434,6 +434,7 @@ export function MonthGrid({
   selected,
   onSelect,
   weekStart = 'sunday',
+  weekTotals = true,
 }: {
   label: string;
   weeks: readonly CalendarWeek[];
@@ -444,6 +445,8 @@ export function MonthGrid({
   selected: string | undefined;
   onSelect(date: string): void;
   weekStart?: WeekStart;
+  /** The week column beside the days, and the weeks listed under a narrow grid; the dashboard's plain calendar leaves both out. */
+  weekTotals?: boolean;
 }): React.JSX.Element {
   const gridRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState<string>();
@@ -506,7 +509,7 @@ export function MonthGrid({
         role="grid"
         aria-label={label}
         onKeyDown={onKeyDown}
-        className="mt-3 grid grid-cols-7 gap-1 @[600px]/cal:grid-cols-[repeat(7,minmax(0,1fr))_minmax(76px,112px)] @[700px]/cal:gap-1.5"
+        className={`mt-3 grid grid-cols-7 gap-1 @[700px]/cal:gap-1.5 ${weekTotals ? '@[600px]/cal:grid-cols-[repeat(7,minmax(0,1fr))_minmax(76px,112px)]' : ''}`}
       >
         <div role="row" className="contents">
           {weekdayHeaders(weekStart).map((w) => (
@@ -518,12 +521,14 @@ export function MonthGrid({
               {w}
             </span>
           ))}
-          <span
-            role="columnheader"
-            className="hidden py-1 pl-3 text-[12px] text-faint @[600px]/cal:block"
-          >
-            Week
-          </span>
+          {weekTotals ? (
+            <span
+              role="columnheader"
+              className="hidden py-1 pl-3 text-[12px] text-faint @[600px]/cal:block"
+            >
+              Week
+            </span>
+          ) : null}
         </div>
         {weeks.map((week, i) => (
           <div
@@ -554,35 +559,37 @@ export function MonthGrid({
                 />
               ),
             )}
-            <WeekTotal week={week} index={i} fmt={fmt} />
+            {weekTotals ? <WeekTotal week={week} index={i} fmt={fmt} /> : null}
           </div>
         ))}
       </div>
-      <ul
-        aria-label="Weeks"
-        className="mt-3 divide-y divide-line rounded-[10px] bg-sunken @[600px]/cal:hidden"
-      >
-        {weeks.map((week, i) => (
-          <li
-            key={week.start}
-            className="flex items-baseline justify-between gap-3 px-3 py-2 text-[13px]"
-          >
-            <span className="text-muted">
-              Week {i + 1}
-              <span className="ml-2 text-faint">
-                {week.tradingDays === 0
-                  ? 'No trades'
-                  : `${week.tradingDays} ${plural(week.tradingDays, 'day')}`}
-              </span>
-            </span>
-            <b
-              className={`font-semibold tabular-nums ${week.net < 0 ? 'text-loss' : week.net > 0 ? 'text-gain' : 'text-faint'}`}
+      {weekTotals ? (
+        <ul
+          aria-label="Weeks"
+          className="mt-3 divide-y divide-line rounded-[10px] bg-sunken @[600px]/cal:hidden"
+        >
+          {weeks.map((week, i) => (
+            <li
+              key={week.start}
+              className="flex items-baseline justify-between gap-3 px-3 py-2 text-[13px]"
             >
-              <FigureText f={fmt(week.net, week.r, false, week)} />
-            </b>
-          </li>
-        ))}
-      </ul>
+              <span className="text-muted">
+                Week {i + 1}
+                <span className="ml-2 text-faint">
+                  {week.tradingDays === 0
+                    ? 'No trades'
+                    : `${week.tradingDays} ${plural(week.tradingDays, 'day')}`}
+                </span>
+              </span>
+              <b
+                className={`font-semibold tabular-nums ${week.net < 0 ? 'text-loss' : week.net > 0 ? 'text-gain' : 'text-faint'}`}
+              >
+                <FigureText f={fmt(week.net, week.r, false, week)} />
+              </b>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </>
   );
 }

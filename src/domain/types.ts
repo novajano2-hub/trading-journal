@@ -375,7 +375,11 @@ export type WidgetKey =
   | 'year';
 export interface WidgetSettings {
   time?: 'entry' | 'exit';
-  /** At most 3 Performance series ids. */
+  /**
+   * At most 3 Performance picks, one entry each in Performance's `?m=` form:
+   * a series id, then optionally `:bar` or `:line` and `:running`
+   * (`net:line:running`, `wins:bar`). Absent is the widget's default three.
+   */
   metrics?: string[];
   challengeId?: string;
 }

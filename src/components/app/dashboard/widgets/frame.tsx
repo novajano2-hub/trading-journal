@@ -3,11 +3,10 @@
 import { Info } from '@phosphor-icons/react/dist/ssr';
 import { useId, type ReactNode } from 'react';
 import { MetricTip } from '@/components/ui/metric-tip';
-import { WIDGET_TITLES } from '@/content/dashboard-widgets';
 import type { MetricId } from '@/content/metric-definitions';
 import { usePrefs } from '@/data/query/hooks';
 import { WIDGETS } from '@/domain/dashboard/widgets';
-import type { WidgetKey } from '@/domain/types';
+import type { PnlBasis, WidgetKey } from '@/domain/types';
 import { CARD, CARD_PAD, Caption, CardHeader } from '../shared';
 import { SkeletonBody } from './layout';
 
@@ -27,6 +26,7 @@ import { SkeletonBody } from './layout';
 export function WidgetFrame({
   widgetKey,
   title,
+  about,
   caption,
   tip,
   end,
@@ -36,6 +36,8 @@ export function WidgetFrame({
 }: {
   widgetKey: WidgetKey;
   title: string;
+  /** What the info tip is about, for a card titled by something else (a month, a challenge's name); the title by default. */
+  about?: string;
   /** Beside the title of a lower widget: the range, or what the chart is by. */
   caption?: ReactNode;
   /** The definition its info tip shows. */
@@ -104,14 +106,7 @@ export function WidgetFrame({
         title={title}
         after={
           <>
-            <MetricTip
-              id={tip}
-              basis={basis}
-              className="-ml-1.5 size-[22px] justify-center text-faint hover:text-muted"
-            >
-              <Info size={15} aria-hidden="true" />
-              <span className="sr-only">About {title}</span>
-            </MetricTip>
+            <TipGlyph id={tip} basis={basis} name={about ?? title} />
             {caption !== undefined ? <Caption>{caption}</Caption> : null}
           </>
         }
@@ -123,22 +118,29 @@ export function WidgetFrame({
 }
 
 /**
- * A widget with nothing behind it yet: its title and tip, and a skeleton body.
- * The registry holds one for each widget until the widget itself is built.
+ * The info glyph of a lower widget's header: the metric's definition on hover,
+ * focus and tap, and "About {name}" to a screen reader.
  */
-export function WidgetPlaceholder({
-  widgetKey,
+export function TipGlyph({
+  id,
+  basis,
+  name,
+  className = '-ml-1.5',
 }: {
-  widgetKey: WidgetKey;
+  id: MetricId;
+  basis: PnlBasis;
+  name: string;
+  /** Where it sits: pulled toward its title by default. */
+  className?: string;
 }): React.JSX.Element {
-  const { section, size, metric } = WIDGETS[widgetKey];
   return (
-    <WidgetFrame
-      widgetKey={widgetKey}
-      title={WIDGET_TITLES[widgetKey]}
-      tip={metric}
+    <MetricTip
+      id={id}
+      basis={basis}
+      className={`${className} size-[22px] justify-center text-faint hover:text-muted`}
     >
-      <SkeletonBody section={section} wide={size === 'wide'} />
-    </WidgetFrame>
+      <Info size={15} aria-hidden="true" />
+      <span className="sr-only">About {name}</span>
+    </MetricTip>
   );
 }

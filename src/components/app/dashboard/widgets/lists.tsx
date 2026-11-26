@@ -187,6 +187,7 @@ export function Challenge({
     <WidgetFrame
       widgetKey="challenge"
       title={c.name}
+      about={WIDGET_TITLES.challenge}
       tip={WIDGETS.challenge.metric}
       caption={`${c.firm}, ${phase ? phaseLabel(c, phase.step) : 'Evaluation'}`}
       end={

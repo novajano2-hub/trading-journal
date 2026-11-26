@@ -27,11 +27,18 @@ export function YearGrid({
   months,
   fmt,
   hrefFor = (month) => `/app/calendar?month=${month}`,
+  dense = false,
 }: {
   year: number;
   months: ReturnType<typeof calendarYear>;
   fmt?: FormatMoney;
   hrefFor?: (month: string) => string;
+  /**
+   * For a card of its own (the dashboard's year widget): the months answer to
+   * the width of their card, three across below 40rem and four from there,
+   * tightly packed on a phone, rather than to the screen's.
+   */
+  dense?: boolean;
 }): React.JSX.Element {
   const display = useDisplay();
   const weekStart = usePrefs().data?.weekStart;
@@ -50,10 +57,14 @@ export function YearGrid({
         undefined,
         compact,
       ));
-  return (
+  const list = (
     <ol
       aria-label={`${year} by month`}
-      className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+      className={
+        dense
+          ? 'grid grid-cols-3 gap-2 @[40rem]:grid-cols-4 @[40rem]:gap-3'
+          : 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+      }
     >
       {months.map((m) => {
         const traded = m.days.filter((d) => d.trades > 0).length;
@@ -62,9 +73,9 @@ export function YearGrid({
           <li key={m.month} data-testid="year-month">
             <Link
               href={hrefFor(m.month)}
-              className="block rounded-card border border-line bg-surface-1 p-3.5 shadow-[var(--shadow-card)] outline-offset-2 transition-colors duration-200 ease-(--ease-glide) hover:border-accent/35 focus-visible:outline-2 focus-visible:outline-accent"
+              className={`block rounded-card border border-line bg-surface-1 shadow-[var(--shadow-card)] outline-offset-2 transition-colors duration-200 ease-(--ease-glide) hover:border-accent/35 focus-visible:outline-2 focus-visible:outline-accent ${dense ? 'p-2 @[40rem]:p-3' : 'p-3.5'}`}
             >
-              <span className="flex items-baseline justify-between gap-2">
+              <span className="flex flex-wrap items-baseline justify-between gap-x-1.5">
                 <span className="text-[14px] font-semibold text-text">
                   {onTradingDate(`${m.month}-01`, { month: 'long' }, 'en-US')}
                 </span>
@@ -99,4 +110,5 @@ export function YearGrid({
       })}
     </ol>
   );
+  return dense ? <div className="@container">{list}</div> : list;
 }

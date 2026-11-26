@@ -97,3 +97,25 @@ test('with no data it says so in its own words, in place of the body', async () 
   expect(within(card).queryByText('the body')).toBeNull();
   expect(card.getAttribute('aria-busy')).toBeNull();
 });
+
+test('a card titled by something other than the widget says what its info tip is about', async () => {
+  renderApp(
+    <WidgetFrame
+      widgetKey="calendar"
+      title="November 2026"
+      about="Calendar"
+      tip="month-calendar"
+    >
+      <p>the month</p>
+    </WidgetFrame>,
+  );
+  const card = await screen.findByRole('region', { name: 'November 2026' });
+  expect(
+    within(card).getByRole('heading', { level: 2, name: 'November 2026' }),
+  ).toBeTruthy();
+  const tip = within(card).getByRole('button', { name: 'About Calendar' });
+  expect(tip.dataset.metricTip).toBe('month-calendar');
+  expect(
+    within(card).queryByRole('button', { name: 'About November 2026' }),
+  ).toBeNull();
+});
