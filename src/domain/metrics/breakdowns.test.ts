@@ -766,3 +766,116 @@ describe('bucket labels', () => {
     ]);
   });
 });
+
+describe('the pattern breakdown', () => {
+  // `byTrade` by trade id, `byDay` by the local date of the day's trades.
+  const hits = (...ids: string[]) => ids.map((id) => ({ id }));
+  const index = (
+    byTrade: Record<string, string[]> = {},
+    byDay: Record<string, string[]> = {},
+  ) => ({
+    byTrade: new Map(Object.entries(byTrade).map(([k, v]) => [k, hits(...v)])),
+    byDay: new Map(Object.entries(byDay).map(([k, v]) => [k, hits(...v)])),
+  });
+  const rowsOf = (
+    trades: ReturnType<typeof makeTrade>[],
+    patterns: ReturnType<typeof index> | undefined,
+  ) =>
+    breakdown(trades, 'pattern', { ...ctx, patterns }).map((r) => [
+      r.key,
+      r.label,
+      r.summary.closedCount,
+      r.summary.netPnl,
+    ]);
+
+  test('a trade with two patterns counts in both rows', () => {
+    const t = [
+      makeTrade({ id: 'a', net: 3000 }),
+      makeTrade({ id: 'b', net: -1000 }),
+    ];
+    expect(
+      rowsOf(
+        t,
+        index({ a: ['large-size', 'added-to-position'], b: ['large-size'] }),
+      ),
+    ).toEqual([
+      ['added-to-position', 'Added to the position', 1, 3000],
+      ['large-size', 'Large size', 2, 2000],
+    ]);
+  });
+
+  test("a day pattern counts that day's trades, read on the day each closed (the log's rule)", () => {
+    // 2026-03-02 in New York: a close at 22:00 is that day, one at 01:00 UTC-5 the next morning is not.
+    const t = [
+      makeTrade({
+        id: 'a',
+        net: 500,
+        openedAt: '2026-03-02T15:00:00Z',
+        closedAt: '2026-03-02T15:30:00Z',
+      }),
+      makeTrade({
+        id: 'b',
+        net: -200,
+        openedAt: '2026-03-03T02:50:00Z',
+        closedAt: '2026-03-03T03:00:00Z',
+      }),
+      makeTrade({
+        id: 'c',
+        net: 900,
+        openedAt: '2026-03-03T06:00:00Z',
+        closedAt: '2026-03-03T06:10:00Z',
+      }),
+    ];
+    // a and b closed on Mon 2 Mar (New York), c on Tue 3 Mar.
+    expect(rowsOf(t, index({}, { '2026-03-02': ['more-trades'] }))).toEqual([
+      ['more-trades', 'More trades than usual', 2, 300],
+    ]);
+  });
+
+  test('a trade that a trade pattern and a day pattern both reach counts once in each row', () => {
+    const t = [
+      makeTrade({
+        id: 'a',
+        net: 100,
+        openedAt: '2026-03-02T15:00:00Z',
+        closedAt: '2026-03-02T15:30:00Z',
+      }),
+    ];
+    expect(
+      rowsOf(
+        t,
+        index({ a: ['large-size'] }, { '2026-03-02': ['more-trades'] }),
+      ),
+    ).toEqual([
+      ['large-size', 'Large size', 1, 100],
+      ['more-trades', 'More trades than usual', 1, 100],
+    ]);
+  });
+
+  test('a trade with no pattern files under no row, and no index gives no rows', () => {
+    const t = [
+      makeTrade({ id: 'a', net: 100 }),
+      makeTrade({ id: 'b', net: 1 }),
+    ];
+    expect(rowsOf(t, index({ a: ['large-size'] }))).toEqual([
+      ['large-size', 'Large size', 1, 100],
+    ]);
+    expect(rowsOf(t, undefined)).toEqual([]);
+    expect(rowsOf(t, index())).toEqual([]);
+  });
+
+  test('an open trade is not counted, even where a pattern fired on it', () => {
+    const t = [
+      makeTrade({
+        id: 'o',
+        status: 'open',
+        net: 0,
+        openedAt: '2026-03-02T15:00:00Z',
+      }),
+      makeTrade({ id: 'a', net: 100 }),
+    ];
+    expect(
+      rowsOf(t, index({ o: ['added-to-position'], a: ['added-to-position'] })),
+    ).toEqual([['added-to-position', 'Added to the position', 1, 100]]);
+  });
+});

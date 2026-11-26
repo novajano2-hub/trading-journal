@@ -251,6 +251,7 @@ const APP_ROUTES = [
     'risk',
     'strategies',
     'tags',
+    'patterns',
     'options',
     'wins-losses',
     'compare',

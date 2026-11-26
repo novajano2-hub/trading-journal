@@ -119,3 +119,10 @@ test('every pattern has a definition headed by its name, and the Patterns column
     metricDefinition('pattern-loss-after-loss', 'net').definition,
   ).toContain('30 seconds');
 });
+
+test("the patterns report's Trades column says a day pattern counts that day's trades", () => {
+  const d = metricDefinition('pattern-trades', 'net');
+  expect(d.label).toBe('Trades');
+  expect(d.definition).toContain('both rows');
+  expect(d.definition).toContain("day pattern counts that day's trades");
+});

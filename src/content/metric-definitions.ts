@@ -142,6 +142,7 @@ export const METRIC_IDS = [
   'pattern-quick-reentries',
   'pattern-rushed-red-day',
   'pattern-busier-than-green',
+  'pattern-trades',
 ] as const;
 
 export type MetricId = (typeof METRIC_IDS)[number];
@@ -201,6 +202,11 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Trades',
     definition:
       "Closed trades in your filters. Open positions are counted apart, and aren't in the figures beside it.",
+  },
+  'pattern-trades': {
+    label: 'Trades',
+    definition:
+      "Closed trades in your filters that the pattern fired on. A trade with two patterns is in both rows. A day pattern counts that day's trades, whichever of them it was read from.",
   },
   pnl: {
     label: '{Basis} P&L',

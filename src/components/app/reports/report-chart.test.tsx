@@ -323,6 +323,63 @@ test('every named bar is labelled: the labels tilt when they would collide flat'
   expect(labels[0]!.getAttribute('transform')).toContain('rotate(-45');
 });
 
+const LONG = [
+  'Switched sides, green',
+  'Switched sides, red',
+  'Quick re-entries after a loss',
+  'Held longer than usual',
+  'Low return for the effort',
+  'Losses outweighed wins',
+  'Added to the position',
+  'More trades than usual',
+  'Busier than a green day',
+  'Sized up after wins',
+  'Exited in parts',
+  'Large size',
+];
+const LONG_SERIES = [
+  {
+    label: 'Net P&L',
+    kind: 'bar' as const,
+    unit: 'money' as const,
+    points: LONG.map((key, i) => ({ key, value: (i % 2 ? -1 : 1) * 1000 })),
+  },
+];
+
+test('long names are cut to fourteen characters on the tilted axis, so two that share a start look alike', async () => {
+  const { container } = renderApp(
+    <ReportChart
+      label="By pattern"
+      xLabel={(k) => k}
+      tiltLabels
+      series={LONG_SERIES}
+    />,
+  );
+  await screen.findByRole('img', { name: 'By pattern' });
+  const labels = [...container.querySelectorAll('[data-axis-label]')].map(
+    (l) => l.textContent,
+  );
+  expect(labels.slice(0, 2)).toEqual(['Switched side…', 'Switched side…']);
+});
+
+test('tiltMaxChars lets a name run longer, so every bar keeps a label of its own', async () => {
+  const { container } = renderApp(
+    <ReportChart
+      label="By pattern"
+      xLabel={(k) => k}
+      tiltLabels
+      tiltMaxChars={30}
+      series={LONG_SERIES}
+    />,
+  );
+  await screen.findByRole('img', { name: 'By pattern' });
+  const labels = [...container.querySelectorAll('[data-axis-label]')].map(
+    (l) => l.textContent,
+  );
+  expect(labels).toEqual(LONG);
+  expect(new Set(labels).size).toBe(LONG.length);
+});
+
 test('few bars keep flat labels', async () => {
   const { container } = renderApp(
     <ReportChart

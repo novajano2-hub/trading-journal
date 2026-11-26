@@ -384,6 +384,8 @@ test('every metric carries its definition', async () => {
     'pattern-quick-reentries',
     'pattern-rushed-red-day',
     'pattern-busier-than-green',
+    // On the Patterns report's Trades column (Plan 6B, Task 18).
+    'pattern-trades',
     'sharpe',
     'sortino',
     'longest-day',

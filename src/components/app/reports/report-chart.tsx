@@ -131,6 +131,7 @@ function xTicks(
   plotW: number,
   xLabel?: (key: string) => string,
   tiltLabels = false,
+  tiltMax = TILT_MAX_CHARS,
 ): { ticks: { i: number; text: string }[]; tilt: boolean; hang: number } {
   const step = plotW / Math.max(1, keys.length);
   let candidates: { i: number; text: string }[];
@@ -176,9 +177,7 @@ function xTicks(
     const shown = candidates.map((c) => ({
       ...c,
       text:
-        c.text.length > TILT_MAX_CHARS
-          ? `${c.text.slice(0, TILT_MAX_CHARS - 1)}…`
-          : c.text,
+        c.text.length > tiltMax ? `${c.text.slice(0, tiltMax - 1)}…` : c.text,
     }));
     const longest = Math.max(...shown.map((c) => c.text.length));
     return {
@@ -340,6 +339,8 @@ interface Layout {
   /** The x axis' height under the last band, more when its labels are tilted. */
   axisH: number;
   tilt: boolean;
+  /** The longest a tilted label runs before it is cut. */
+  tiltMax: number;
   padL: number;
   plotW: number;
   step: number;
@@ -429,7 +430,7 @@ const Plot = memo(function Plot({
   // Gain and loss colours when net is the only money series of the chart.
   const moneyCount = series.filter((s) => s.unit === 'money').length;
   const barW = Math.max(1, Math.min(step * 0.72, 30));
-  const { ticks } = xTicks(keys, plotW, xLabel, layout.tilt);
+  const { ticks } = xTicks(keys, plotW, xLabel, layout.tilt, layout.tiltMax);
   const shaded = shade ? spanOf(keys, shade) : undefined;
   // A label that would run off the plot's right edge hangs from the band's end instead.
   const nearRight =
@@ -795,6 +796,7 @@ function ChartBody({
   extra,
   rowRatio = 1,
   tiltLabels = false,
+  tiltMaxChars = TILT_MAX_CHARS,
   hrefOf,
   expand,
 }: {
@@ -823,6 +825,8 @@ function ChartBody({
   rowRatio?: number;
   /** Named bars with no order (symbols, strategies) tilt their labels rather than skip some, so every bar is named. */
   tiltLabels?: boolean;
+  /** How long a tilted label may run before it is cut with an ellipsis; default 14. Names that begin alike (Switched sides, green and red) need more. */
+  tiltMaxChars?: number;
   /**
    * Where a period's bar leads (its trades in the log), or undefined when it leads nowhere.
    * A pointer user clicks the bar; the keyboard and assistive technology use the
@@ -894,6 +898,7 @@ function ChartBody({
       plotW,
       xLabel,
       tiltLabels,
+      tiltMaxChars,
     );
     const axisH = axis.hang;
     return {
@@ -901,6 +906,7 @@ function ChartBody({
       bandHs,
       axisH,
       tilt: axis.tilt,
+      tiltMax: tiltMaxChars,
       padL,
       plotW,
       step: plotW / n,
@@ -922,6 +928,7 @@ function ChartBody({
     rowRatio,
     xLabel,
     tiltLabels,
+    tiltMaxChars,
   ]);
   const bands = useMemo(() => {
     if (!layout) return [];

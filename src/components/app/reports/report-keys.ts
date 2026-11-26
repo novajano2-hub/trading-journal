@@ -8,6 +8,7 @@ export type ReportKey =
   | 'risk'
   | 'strategies'
   | 'tags'
+  | 'patterns'
   | 'options'
   | 'wins-losses'
   | 'compare'
@@ -20,6 +21,7 @@ export const REPORT_KEYS: readonly ReportKey[] = [
   'risk',
   'strategies',
   'tags',
+  'patterns',
   'options',
   'wins-losses',
   'compare',
@@ -37,6 +39,7 @@ export const REPORT_MENU: readonly { key: ReportKey; label: string }[] = [
   { key: 'risk', label: 'Risk' },
   { key: 'strategies', label: 'Strategies' },
   { key: 'tags', label: 'Tags' },
+  { key: 'patterns', label: 'Patterns' },
   { key: 'options', label: 'Options' },
   { key: 'wins-losses', label: 'Wins vs losses' },
 ];
@@ -49,6 +52,7 @@ export const REPORT_LABELS: Record<ReportKey | 'overview', string> = {
   risk: 'Risk',
   strategies: 'Strategies',
   tags: 'Tags',
+  patterns: 'Patterns',
   options: 'Options',
   'wins-losses': 'Wins vs losses',
   compare: 'Compare',
