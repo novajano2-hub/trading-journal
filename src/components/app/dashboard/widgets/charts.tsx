@@ -1,6 +1,6 @@
 'use client';
 
-import { format, parseISO } from 'date-fns';
+import { addDays, format, parseISO } from 'date-fns';
 import { useContext, useMemo, type ReactNode } from 'react';
 import {
   DualAxisChart,
@@ -130,6 +130,21 @@ function dayPoints(
 }
 
 /**
+ * The running total with its zero in front, on the day before the range starts
+ * (before the first trading day, when the range has no start). A single trading
+ * day then draws two points, as TradeZella's chart does (record 1.5).
+ */
+function fromZero(
+  running: readonly SeriesPoint[],
+  from: string | undefined,
+): SeriesPoint[] {
+  const first = running[0];
+  if (!first) return [];
+  const before = format(addDays(parseISO(from ?? first.key), -1), 'yyyy-MM-dd');
+  return [{ key: before, value: 0 }, ...running];
+}
+
+/**
  * Where a chart of days is labelled on its x axis: every day when there are
  * few, else the first trading day of each month (the chart drops any that
  * would touch).
@@ -174,7 +189,10 @@ export function CumPnl(): React.JSX.Element {
   const days = useWidgetValue('cum-pnl');
   const { page, ctx, basis, fmt } = useChartEnv();
   const points = useMemo(
-    () => (days && ctx ? dayPoints(days, ctx).running : undefined),
+    () =>
+      days && ctx
+        ? fromZero(dayPoints(days, ctx).running, ctx.range?.from)
+        : undefined,
     [days, ctx],
   );
   if (!days || !page || !ctx || !fmt || !points) return <Loading k="cum-pnl" />;
@@ -252,6 +270,16 @@ export function Drawdown(): React.JSX.Element {
   const caption = sentenceCase('by trading day');
   if (points.length === 0)
     return <Card k="drawdown" state="empty" empty={NONE} caption={caption} />;
+  // One trading day has no fall to draw (record 1.5).
+  if (points.length < 2)
+    return (
+      <Card
+        k="drawdown"
+        state="empty"
+        empty="Not enough days to draw a drawdown."
+        caption={caption}
+      />
+    );
   // The curve starts at its high, so its lowest point is the max drawdown.
   const deepest = Math.min(0, ...points.map((p) => p.value));
   return (

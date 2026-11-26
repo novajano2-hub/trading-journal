@@ -288,6 +288,70 @@ describe('the line and bar charts', () => {
     ).not.toBeNull();
   });
 
+  describe('one trading day (record 1.5)', () => {
+    // Three days, one trade each: +$100.00, -$50.00, +$200.00.
+    const three = byDay([
+      ['2026-11-02', 10_000],
+      ['2026-11-03', -5_000],
+      ['2026-11-04', 20_000],
+    ]);
+    const one = '/app/dashboard?from=2026-11-03&to=2026-11-03';
+    /** The chart's table, a row a point: the day and the figure. */
+    const tableOf = (key: Parameters<typeof widget>[0]) =>
+      within(within(widget(key)).getByRole('table'))
+        .getAllByRole('row')
+        .slice(1)
+        .map((r) => r.textContent);
+
+    test('the cumulative chart starts at zero the day before, so a single day draws two points', async () => {
+      await renderWidgets(['cum-pnl'], { sample: three, url: one });
+      chartOf('cum-pnl', /^Cumulative net P&L by day, .*Ends at −\$50\.00\.$/);
+      const rows = tableOf('cum-pnl');
+      expect(rows).toHaveLength(2);
+      expect(rows[0]).toContain('Mon 2 Nov');
+      expect(rows[0]).toContain('$0.00');
+      expect(rows[1]).toContain('Tue 3 Nov');
+      expect(rows[1]).toContain('−$50.00');
+    });
+
+    test('a range with a start puts the zero on the day before that start, even when the first trade comes later', async () => {
+      await renderWidgets(['cum-pnl'], {
+        sample: three,
+        url: '/app/dashboard?from=2026-11-01&to=2026-11-04',
+      });
+      const rows = tableOf('cum-pnl');
+      expect(rows).toHaveLength(4);
+      expect(rows[0]).toContain('Sat 31 Oct');
+      expect(rows[0]).toContain('$0.00');
+      expect(rows[1]).toContain('Mon 2 Nov');
+      expect(rows[1]).toContain('+$100.00');
+    });
+
+    test('with no start (all time) the zero is the day before the first trading day', async () => {
+      await renderWidgets(['cum-pnl'], { sample: three });
+      const rows = tableOf('cum-pnl');
+      expect(rows).toHaveLength(4);
+      expect(rows[0]).toContain('Sun 1 Nov');
+      expect(rows[0]).toContain('$0.00');
+      expect(rows[3]).toContain('+$250.00');
+    });
+
+    test('the drawdown widget shows its empty state with fewer than two trading days', async () => {
+      await renderWidgets(['drawdown'], { sample: three, url: one });
+      expect(said('drawdown')).toContain('Not enough days to draw a drawdown');
+      expect(within(widget('drawdown')).queryAllByRole('img')).toHaveLength(0);
+    });
+
+    test('the drawdown widget draws from two trading days', async () => {
+      await renderWidgets(['drawdown'], {
+        sample: three,
+        url: '/app/dashboard?from=2026-11-02&to=2026-11-03',
+      });
+      expect(said('drawdown')).not.toContain('Not enough days');
+      chartOf('drawdown', /^Drawdown from the daily P&L peak, /);
+    });
+  });
+
   test('net daily P&L: a bar a day, gain above the line and loss below, with the best and the worst day named', async () => {
     await renderWidgets(['daily-pnl']);
     expect(said('daily-pnl')).toContain('Net daily P&L');
