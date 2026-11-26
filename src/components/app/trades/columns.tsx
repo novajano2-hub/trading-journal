@@ -23,9 +23,8 @@ import { type MetricContext } from '@/domain/metrics/context';
 import type { Trade } from '@/domain/types';
 import { formatDuration, formatQty, price } from '@/lib/format';
 import { formatUnitValue, tradeFigure, type Display } from '@/lib/display';
-import { shortTime } from '@/lib/time-format';
+import { dayLabel, shortTime } from '@/lib/time-format';
 import { dayOfTrade } from '@/data/day-log';
-import { dayLabel } from '@/lib/day-label';
 import { InstrumentName, TradeTime, signTone } from '../dashboard/shared';
 import {
   MistakesCell,
@@ -322,7 +321,7 @@ export function cellOf(id: ColumnId, t: Trade, env: CellEnv): React.ReactNode {
     case 'day':
       return (
         <span className="tabular-nums">
-          {dayLabel(dayOfTrade(t, timeZone))}
+          {dayLabel(dayOfTrade(t, timeZone), { year: true })}
         </span>
       );
   }

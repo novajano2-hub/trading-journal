@@ -1,5 +1,6 @@
 // How the trade page prints a moment, in the zone its account is read in.
 import { localDate } from '@/domain/time';
+import { clock } from '@/lib/time-format';
 
 function parts(iso: string, timeZone: string, o: Intl.DateTimeFormatOptions) {
   return Object.fromEntries(
@@ -7,18 +8,6 @@ function parts(iso: string, timeZone: string, o: Intl.DateTimeFormatOptions) {
       .formatToParts(new Date(iso))
       .map((p) => [p.type, p.value]),
   ) as Record<string, string>;
-}
-
-/** "19:21:08", or "19:21" without seconds. */
-export function clock(iso: string, timeZone: string, seconds = true): string {
-  const p = parts(iso, timeZone, {
-    hour: '2-digit',
-    minute: '2-digit',
-    ...(seconds ? { second: '2-digit' } : {}),
-  });
-  return seconds
-    ? `${p.hour}:${p.minute}:${p.second}`
-    : `${p.hour}:${p.minute}`;
 }
 
 /** "Mon 9 Nov". */

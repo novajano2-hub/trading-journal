@@ -43,9 +43,23 @@ export function onTradingDate(
 export const weekdayOf = (date: string, style: 'short' | 'long' = 'long') =>
   onTradingDate(date, { weekday: style }, 'en-US');
 
-/** "Thu 19 Nov". */
-export const dayLabel = (date: string): string =>
-  `${weekdayOf(date, 'short')} ${onTradingDate(date, { day: 'numeric', month: 'short' })}`;
+/** "Thu 19 Nov", or "Thu 19 Nov 2026" with `year`. */
+export const dayLabel = (
+  date: string,
+  { year = false }: { year?: boolean } = {},
+): string =>
+  `${weekdayOf(date, 'short')} ${onTradingDate(date, { day: 'numeric', month: 'short', ...(year ? { year: 'numeric' } : {}) })}`;
+
+/** An instant as HH:MM:SS, or HH:MM without `seconds`, in the zone. */
+export function clock(iso: string, timeZone: string, seconds = true): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    ...(seconds ? { second: '2-digit' } : {}),
+    hourCycle: 'h23',
+  }).format(new Date(iso));
+}
 
 /** The compact row clock, '20 Nov 10:15', in the given timezone. */
 export function shortTime(iso: string, timeZone = 'America/New_York'): string {

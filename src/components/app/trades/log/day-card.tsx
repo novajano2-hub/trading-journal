@@ -18,7 +18,7 @@ import { formatInstrument, plural } from '@/lib/format';
 import { CARD, CARD_PAD, signTone } from '../../dashboard/shared';
 import { MoodControl } from '../../routine/mood-control';
 import { usePhone } from '@/lib/use-phone';
-import { dayLabel } from '@/lib/day-label';
+import { dayLabel } from '@/lib/time-format';
 import { dayQuery, dayReviewHref } from '@/lib/day-routes';
 import { IntradayChart } from './intraday-chart';
 import { useLogEnv } from './log-env';
@@ -164,9 +164,9 @@ export function DayCard({
   const query = dayQuery(useSearchParams());
   const heading = useId();
   const panel = useId();
-  const date = dayLabel(group.date);
+  const date = dayLabel(group.date, { year: true });
   // Below sm the header drops the year ("Tue 24 Nov", as comp 06 at 390 shows).
-  const headerDate = phone ? dayLabel(group.date, false) : date;
+  const headerDate = phone ? dayLabel(group.date) : date;
   const record = records.get(group.date);
 
   const noteOnly =

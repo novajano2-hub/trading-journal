@@ -23,7 +23,7 @@ import {
 import { LockedDayError } from '@/data/repository';
 import { isClosed } from '@/domain/trade-status';
 import { useDisplay } from '@/lib/display';
-import { dayLabel } from '@/lib/day-label';
+import { clock, dayLabel } from '@/lib/time-format';
 import { plural } from '@/lib/format';
 import { usePhone } from '@/lib/use-phone';
 import { signTone } from '../../dashboard/shared';
@@ -36,7 +36,6 @@ import {
   type NoteControl,
   type NoteStatus,
 } from '../trade-journal';
-import { clock } from '../trade-time';
 import { DayTables, QUICK } from './day-card';
 import { useLogEnv } from './log-env';
 
@@ -99,6 +98,7 @@ export function DayNoteDialog({
   const [problem, setProblem] = useState<string | null>(null);
   // The last write failed because the day was closed meanwhile: nothing can save.
   const lockedOut = useRef(false);
+  const [lockedNotice, setLockedNotice] = useState(false);
   // A close left text the store still refuses: offer to let it go.
   const [stuck, setStuck] = useState(false);
 
@@ -111,6 +111,7 @@ export function DayNoteDialog({
   const onStatus = (s: NoteStatus, error?: unknown) => {
     lastStatus.current = s;
     lockedOut.current = s === 'failed' && error instanceof LockedDayError;
+    setLockedNotice(lockedOut.current);
     setStatus(s);
     if (s === 'saved') {
       setProblem(null);
@@ -304,7 +305,7 @@ export function DayNoteDialog({
       origin={origin}
       returnFocus={origin}
       title="Day note"
-      description={`${dayLabel(date)}${source ? `, from the ${source.name} template` : ''}`}
+      description={`${dayLabel(date, { year: true })}${source ? `, from the ${source.name} template` : ''}`}
       size="sheet"
       actions={actions}
       footer={
@@ -318,7 +319,7 @@ export function DayNoteDialog({
           {status === 'failed' || problem ? (
             <span role="alert" className="min-w-0 text-[12.5px] text-loss">
               {problem ??
-                (lockedOut.current
+                (lockedNotice
                   ? 'That day was closed, so this note can no longer change.'
                   : "Couldn't save. Press Save to try again.")}
             </span>
@@ -350,7 +351,7 @@ export function DayNoteDialog({
         onClick={() => setExpanded((e) => !e)}
         className="mt-1 flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-control bg-sunken px-3.5 py-3 text-left text-[13.5px] outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
       >
-        <b className="font-semibold text-text">{dayLabel(date, false)}</b>
+        <b className="font-semibold text-text">{dayLabel(date)}</b>
         <span
           className={`font-semibold tabular-nums ${net && group ? signTone(group.stats.net!) : 'text-faint'}`}
         >
@@ -372,7 +373,11 @@ export function DayNoteDialog({
       <div id={panel} hidden={!expanded}>
         {/* Keel's call (TradeZella unknown, record line 701): the expanded summary lists the day as its card does. */}
         {expanded && group ? (
-          <DayTables group={group} date={dayLabel(date)} columns={columns} />
+          <DayTables
+            group={group}
+            date={dayLabel(date, { year: true })}
+            columns={columns}
+          />
         ) : null}
       </div>
       {finished && !trashed ? <LockLine className="mt-3" /> : null}
@@ -409,7 +414,9 @@ export function DayNoteAction({ date }: { date: string }): React.JSX.Element {
         ref={opener}
         type="button"
         aria-haspopup="dialog"
-        aria-label={phone ? `${label} ${dayLabel(date)}` : undefined}
+        aria-label={
+          phone ? `${label} ${dayLabel(date, { year: true })}` : undefined
+        }
         onClick={() => {
           setBuilt(true);
           setOpen(true);

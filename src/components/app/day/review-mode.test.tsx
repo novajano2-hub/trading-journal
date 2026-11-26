@@ -343,9 +343,10 @@ test("a closed day's trashed note offers no Restore on the day page, the trade p
     url: '/app/notebook/daily/2026-11-18',
   });
   expect((await screen.findAllByText(/in Trash/)).length).toBeGreaterThan(0);
-  expect(await screen.findByText(/This day is closed/)).toBeTruthy();
-  expect(screen.queryByRole('button', { name: 'Restore' })).toBeNull();
-  expect(screen.queryByRole('button', { name: 'Delete forever' })).toBeNull();
+  // The pane and the Trash list's row each carry the lock line (M3).
+  expect(await screen.findAllByText(/This day is closed/)).toHaveLength(2);
+  expect(screen.queryByRole('button', { name: /Restore/ })).toBeNull();
+  expect(screen.queryByRole('button', { name: /Delete .*forever/ })).toBeNull();
 });
 
 test('an open day with a trashed note still offers Restore', async () => {

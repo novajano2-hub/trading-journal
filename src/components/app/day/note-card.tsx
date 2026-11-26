@@ -14,7 +14,7 @@ import type { DayMode } from '@/lib/day-routes';
 import { CARD, CARD_PAD, Caption, CardHeader } from '../dashboard/shared';
 import { ConfirmDialog } from '../confirm-dialog';
 import { findDailyEntry } from '../notebook/notebook-model';
-import { clock } from '../trades/trade-time';
+import { clock } from '@/lib/time-format';
 import { TemplatesDialog } from '../notebook/templates-dialog';
 import type { NoteEditorHandle } from '../notes/note-editor';
 import { DayNoteBinding, type NoteStatus } from '../trades/trade-journal';

@@ -10,7 +10,8 @@ import { useDisplay } from '@/lib/display';
 import { plural } from '@/lib/format';
 import { CARD, CARD_PAD, signTone } from '../../dashboard/shared';
 import { DayFigures, DayTables } from './day-card';
-import { dayLabel, weekLabel } from '@/lib/day-label';
+import { weekLabel } from '@/lib/day-label';
+import { dayLabel } from '@/lib/time-format';
 import { useLogEnv } from './log-env';
 import { LogTable } from './log-table';
 import { StatGrid } from './stat-grid';
@@ -31,7 +32,7 @@ function DayDialog({
 }): React.JSX.Element {
   const { columns, dayColumns } = useLogEnv();
   const display = useDisplay();
-  const label = date ? dayLabel(date) : '';
+  const label = date ? dayLabel(date, { year: true }) : '';
   // The tile's count: base-currency trades, with other currencies listed apart.
   const total = day ? day.trades.length : 0;
   const other = day ? day.otherCurrency.length : 0;

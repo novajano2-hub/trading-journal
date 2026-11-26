@@ -24,7 +24,7 @@ import {
 } from '../columns';
 import { TagsCell } from '../cells';
 import { PhoneRows } from '../phone-rows';
-import { clockOf, dayLabel } from '@/lib/day-label';
+import { clock, dayLabel } from '@/lib/time-format';
 
 /** The widths the day table wants over the trade log's: HH:MM:SS, a ticker pill, a contract with its expiry. */
 const WIDTHS: Record<ColumnId, number> = {
@@ -56,7 +56,7 @@ function TagsWithPicker({
 }): React.JSX.Element {
   const update = useUpdateTrades();
   const title = useId();
-  const date = dayLabel(dayOfTrade(trade, env.timeZone));
+  const date = dayLabel(dayOfTrade(trade, env.timeZone), { year: true });
   return (
     <span className="flex min-w-0 items-center gap-1.5">
       <span className="min-w-0 flex-1">
@@ -67,7 +67,7 @@ function TagsWithPicker({
       </span>
       <Popover.Root>
         <Popover.Trigger
-          aria-label={`Add tags to ${trade.instrument.root}, ${dayLabel(dayOfTrade(trade, env.timeZone))}`}
+          aria-label={`Add tags to ${trade.instrument.root}, ${dayLabel(dayOfTrade(trade, env.timeZone), { year: true })}`}
           className="grid size-[22px] flex-none place-items-center rounded-full border border-line text-muted outline-offset-1 hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent data-[state=open]:bg-sunken pointer-coarse:size-11"
         >
           <Plus size={12} weight="bold" aria-hidden="true" />
@@ -120,7 +120,7 @@ function Cell({
     case 'open':
       return (
         <TradeTime
-          text={`${clockOf(t.openedAt, env.timeZone, true)}`}
+          text={`${clock(t.openedAt, env.timeZone)}`}
           className="text-[13px]"
         />
       );

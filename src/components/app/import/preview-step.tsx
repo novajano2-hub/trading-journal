@@ -10,7 +10,7 @@ import {
   TradeTime,
 } from '@/components/app/dashboard/shared';
 import { price } from '@/lib/format';
-import { clock } from '@/components/app/trades/trade-time';
+import { clock } from '@/lib/time-format';
 import { FigureText } from '@/components/product/figure-text';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { Chip } from '@/components/ui/chip';
