@@ -40,7 +40,6 @@ import type {
   ManualTradeInput,
   NewAccount,
   NewCashFlow,
-  NewChallenge,
   NewChallengeAccount,
   NewChallengeEntry,
   NewPropTxn,
@@ -858,16 +857,6 @@ export function useUndoImport(): UseMutationResult<UndoResult, Error, string> {
       return result;
     },
   });
-}
-
-export function useCreateChallenge(): UseMutationResult<
-  Challenge,
-  Error,
-  NewChallenge
-> {
-  return useWorkspaceWrite('challenges.create', (r, ws, v: NewChallenge) =>
-    r.challenges.create(ws, v),
-  );
 }
 
 /**

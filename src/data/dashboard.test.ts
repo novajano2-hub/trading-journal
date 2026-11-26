@@ -1,17 +1,11 @@
-import { beforeAll, describe, expect, test } from 'vitest';
+import { beforeAll, expect, test } from 'vitest';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import {
   defaultMetricContext,
   type MetricContext,
 } from '@/domain/metrics/context';
+import { type RuleCheck, type Strategy, type Trade } from '@/domain/types';
 import {
-  strategyRules,
-  type RuleCheck,
-  type Strategy,
-  type Trade,
-} from '@/domain/types';
-import {
-  buildDashboard,
   pickPartition,
   RECENT_TRADE_COUNT,
   recentAndOpen,
@@ -43,38 +37,16 @@ const env = (ctx: MetricContext): DashboardEnv => ({
   ctx,
 });
 
-test('the dashboard is the engine, sorted by cost', () => {
+test('the recent trades are the newest closed ones, newest first', () => {
   const ctx = defaultMetricContext(NY),
     m = usd(ctx),
-    d = buildDashboard(m, env(ctx));
-  const kept = d.plan.rules.reduce((n, r) => n + r.kept, 0);
-  expect(d.plan.adherence).toBe(kept / d.plan.checks);
-  const broken = d.plan.rules.filter((r) => r.broken > 0);
-  expect(broken.map((r) => r.brokenPnl)).toEqual(
-    broken.map((r) => r.brokenPnl).sort((a, b) => a - b),
-  );
-  expect(d.plan.rules.slice(broken.length).every((r) => r.broken === 0)).toBe(
-    true,
-  );
+    d = recentAndOpen(m.trades, env(ctx));
   expect(d.recent).toHaveLength(RECENT_TRADE_COUNT);
   expect(d.recent.every((r) => r.trade.status === 'closed')).toBe(true);
   expect(d.recent[0]!.trade.closedAt! >= d.recent[1]!.trade.closedAt!).toBe(
     true,
   );
-  expect(d.performance.equity[0]).toBe(37_500_000);
-  expect(d.performance.equity).toHaveLength(m.summary.closedCount + 1);
-  expect(d.tradesById.size).toBe(m.trades.length);
-  expect(d.closedCount).toBe(m.summary.closedCount);
-});
-
-test('the recent and open trades come without the rest of the dashboard, the same as it builds them', () => {
-  const ctx = defaultMetricContext(NY),
-    m = usd(ctx);
-  const whole = buildDashboard(m, env(ctx));
-  const lean = recentAndOpen(m.trades, env(ctx));
-  expect(lean.recent).toEqual(whole.recent);
-  expect(lean.open).toEqual(whole.open);
-  expect(lean.recent).toHaveLength(RECENT_TRADE_COUNT);
+  expect(d.open.every((o) => o.trade.status === 'open')).toBe(true);
 });
 
 test('a recent trade in two strategies names both', () => {
@@ -90,42 +62,10 @@ test('a recent trade in two strategies names both', () => {
     ],
     { accounts: s.accounts, ctx, baseCurrency: 'USD' },
   );
-  expect(buildDashboard(m!, env(ctx)).recent[0]!.strategyNames).toEqual([
+  expect(recentAndOpen(m!.trades, env(ctx)).recent[0]!.strategyNames).toEqual([
     a!.name,
     b!.name,
   ]);
-});
-
-test('Gross/Net moves costs and performance', () => {
-  const net = defaultMetricContext(NY),
-    gross = { ...net, pnlBasis: 'gross' as const };
-  const a = buildDashboard(usd(net), env(net)),
-    b = buildDashboard(usd(gross), env(gross));
-  expect(b.basis).toBe('gross');
-  expect(b.performance.pnl).toBe(usd(gross).summary.grossPnl);
-  expect(a.performance.pnl).toBe(usd(net).summary.netPnl);
-  expect(b.performance.pnl).toBeGreaterThan(a.performance.pnl);
-  expect(b.plan.cost.pnl).toBeGreaterThan(a.plan.cost.pnl);
-  expect(b.mistakes.reduce((n, x) => n + x.pnl, 0)).toBeGreaterThan(
-    a.mistakes.reduce((n, x) => n + x.pnl, 0),
-  );
-  expect(b.performance.equity.at(-1)).toBeGreaterThan(
-    a.performance.equity.at(-1)!,
-  );
-});
-
-test('dashboard metrics for the sample compute well inside the 50 ms budget (spec §10, bound 150)', () => {
-  const ctx = defaultMetricContext(NY);
-  const run = () => buildDashboard(usd(ctx), env(ctx));
-  run();
-  const ms = Array.from({ length: 5 }, () => {
-    const t = performance.now();
-    run();
-    return performance.now() - t;
-  }).sort((x, y) => x - y);
-  // 3x the spec's 50 ms so a loaded suite cannot flake it; an O(n^2)
-  // regression is still far over.
-  expect(ms[2]!).toBeLessThan(150);
 });
 
 test('one currency at a time', () => {
@@ -274,97 +214,16 @@ test('imported trades with no strategy and no rule checks (Review Focus 1)', () 
       closedAt: '2026-11-19T15:00:00Z',
     }),
   ];
-  const [m] = metricsByCurrency(trades, {
-    accounts: s.accounts,
-    ctx,
-    baseCurrency: 'USD',
-  });
-  const d = buildDashboard(m!, {
+  const d = recentAndOpen(trades, {
     ...env(ctx),
     strategies: [],
     tags: [],
     tagCategories: [],
   });
-  expect(d.plan.adherence).toBeNull();
-  expect(d.plan.checks).toBe(0);
-  expect(d.plan.rules).toEqual([]);
-  expect(d.plan.cost).toEqual({ pnl: 0, tradeCount: 0 });
-  expect(d.mistakes).toEqual([]);
+  expect(d.recent).toHaveLength(2);
   expect(
     d.recent.every(
       (r) => r.rules.kind === 'ungraded' && r.strategyNames.length === 0,
     ),
   ).toBe(true);
-  const p = d.performance;
-  for (const n of [p.pnl, ...p.equity]) expect(Number.isFinite(n)).toBe(true);
-  for (const n of [p.winRate, p.profitFactor, p.expectancy])
-    if (n !== null) expect(Number.isFinite(n)).toBe(true);
-  expect(p.equity).toHaveLength(3);
-});
-
-describe('the headline adherence is the rule rows added up', () => {
-  const ctx = defaultMetricContext(NY);
-  const build = (ruleChecks: RuleCheck[][]) => {
-    const strategy = s.strategies[0]!;
-    const trades = ruleChecks.map((checks, i) =>
-      makeTrade({
-        id: `h-${i}`,
-        net: 1000,
-        closedAt: `2026-11-1${i}T15:00:00Z`,
-        strategyIds: [strategy.id],
-        ruleChecks: checks,
-      }),
-    );
-    const [m] = metricsByCurrency(trades, {
-      accounts: s.accounts,
-      ctx,
-      baseCurrency: 'USD',
-    });
-    return { m: m!, d: buildDashboard(m!, env(ctx)) };
-  };
-  const ruleId = (i: number) => strategyRules(s.strategies[0]!)[i]!.id;
-
-  test('a check on an unknown rule id counts in no row, so not in the headline', () => {
-    const { m, d } = build([
-      [
-        { ruleId: ruleId(0), followed: true },
-        { ruleId: 'deleted-rule', followed: false },
-      ],
-      [
-        { ruleId: ruleId(1), followed: true },
-        { ruleId: 'deleted-rule', followed: false },
-      ],
-    ]);
-    expect(m.summary.ruleAdherence).toBe(2 / 4); // the engine counts every check
-    expect(d.plan.checks).toBe(2);
-    expect(d.plan.adherence).toBe(1);
-  });
-
-  test("a trade's repeat check on a rule counts once, as in its row", () => {
-    const { m, d } = build([
-      [
-        { ruleId: ruleId(0), followed: true },
-        { ruleId: ruleId(0), followed: false },
-        { ruleId: ruleId(0), followed: false },
-      ],
-      [{ ruleId: ruleId(1), followed: true }],
-    ]);
-    expect(m.summary.ruleAdherence).toBe(2 / 4);
-    const row = d.plan.rules.find((r) => r.ruleId === ruleId(0))!;
-    expect([row.kept, row.broken]).toEqual([1, 0]);
-    expect(d.plan.checks).toBe(2);
-    expect(d.plan.adherence).toBe(1);
-  });
-
-  test('no decisive check on a known rule reads as no adherence', () => {
-    const { m, d } = build([
-      [
-        { ruleId: 'deleted-rule', followed: true },
-        { ruleId: ruleId(0), followed: null },
-      ],
-    ]);
-    expect(m.summary.ruleAdherence).toBe(1);
-    expect(d.plan.checks).toBe(0);
-    expect(d.plan.adherence).toBeNull();
-  });
 });
