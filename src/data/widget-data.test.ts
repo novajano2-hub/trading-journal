@@ -217,6 +217,7 @@ describe('widgetData', () => {
         env.ctx,
       ).netPnl,
       startingBalance: accounts.reduce((n, a) => n + a.startingBalance, 0),
+      unfunded: false,
     });
     // With no range the balance is today's.
     const open = widgetData(['balance-pnl'], envOf(s)).values['balance-pnl']!;
@@ -229,6 +230,88 @@ describe('widgetData', () => {
         CTX,
       ),
     );
+  });
+
+  describe('unfunded: the balance widgets ask for a starting balance only when there is none and no cash flow by the range end', () => {
+    const flowOn = (accountId: string, date: string, amount: number) => ({
+      id: `f-${date}`,
+      workspaceId: 'w',
+      accountId,
+      date,
+      amount,
+    });
+    /** The sample's accounts with no starting balance. */
+    const bare = () => {
+      const accounts = selectedAccounts(s.accounts, EMPTY_FILTERS).map((a) => ({
+        ...a,
+        startingBalance: 0,
+      }));
+      return { accounts, usd: accounts.find((a) => a.currency === 'USD')! };
+    };
+    const both = (env: WidgetEnv) => {
+      const { values } = widgetData(['balance-pnl', 'balance'], env);
+      return [values['balance-pnl']!.unfunded, values.balance!.unfunded];
+    };
+
+    test('with a starting balance it is funded, flows or not', () => {
+      expect(both(envOf(s))).toEqual([false, false]);
+    });
+
+    test('with none and no deposit or withdrawal it is not', () => {
+      const { accounts } = bare();
+      expect(both(envOf(s, { accounts }))).toEqual([true, true]);
+    });
+
+    test('a deposit dated by the range end funds the account (a withdrawal counts as a cash flow too)', () => {
+      const { accounts, usd } = bare();
+      const range = { from: '2026-10-01', to: '2026-11-10' };
+      for (const amount of [1_000_00, -400_00])
+        expect(
+          both(
+            envOf(s, {
+              accounts,
+              flows: [flowOn(usd.id, '2026-11-10', amount)],
+              ctx: { ...CTX, range },
+            }),
+          ),
+        ).toEqual([false, false]);
+    });
+
+    test('a flow dated after the range end, or on another currency, does not', () => {
+      const { accounts, usd } = bare();
+      const other = accounts.find((a) => a.currency !== 'USD');
+      const range = { from: '2026-10-01', to: '2026-11-10' };
+      expect(
+        both(
+          envOf(s, {
+            accounts,
+            flows: [flowOn(usd.id, '2026-11-11', 1_000_00)],
+            ctx: { ...CTX, range },
+          }),
+        ),
+      ).toEqual([true, true]);
+      if (other)
+        expect(
+          both(
+            envOf(s, {
+              accounts,
+              flows: [flowOn(other.id, '2026-10-05', 1_000_00)],
+            }),
+          ),
+        ).toEqual([true, true]);
+    });
+
+    test('with no range end the flows count up to today', () => {
+      const { accounts, usd } = bare();
+      expect(
+        both(envOf(s, { accounts, flows: [flowOn(usd.id, TODAY, 5_00)] })),
+      ).toEqual([false, false]);
+      expect(
+        both(
+          envOf(s, { accounts, flows: [flowOn(usd.id, '2026-11-21', 5_00)] }),
+        ),
+      ).toEqual([true, true]);
+    });
   });
 
   test('the daily widgets read the day figures', () => {

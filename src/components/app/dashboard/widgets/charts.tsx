@@ -485,7 +485,7 @@ export function Balance(): React.JSX.Element {
   // A balance is an amount of money: it has no value in R, ticks, pips or points.
   if (isTradeUnit(display.unit))
     return <Card k="balance" state="empty" empty={noBalanceIn(display.unit)} />;
-  if (data.startingBalance === 0)
+  if (data.unfunded)
     return <Card k="balance" state="empty" empty={STARTING_BALANCE_PROMPT} />;
   if (!points || points.length === 0)
     return <Card k="balance" state="empty" empty={NONE} />;

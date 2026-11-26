@@ -668,6 +668,40 @@ describe('the account balance chart (C75)', () => {
     expect(within(widget('balance')).queryAllByRole('img')).toHaveLength(0);
   });
 
+  test('a deposit funds the account: the chart draws from it, with no prompt', async () => {
+    await renderWidgets(['balance'], {
+      sample: tradesSample(
+        () => [esTrade(0, '2026-11-02', 10000)],
+        (s) => {
+          for (const a of s.accounts) a.startingBalance = 0;
+        },
+      ),
+      flows: [{ accountId: 'acc-a', date: '2026-11-01', amount: 100_000 }],
+    });
+    expect(said('balance')).not.toContain('Add a starting balance');
+    // $1,000.00 deposited and $100.00 made.
+    chartOf(
+      'balance',
+      /^Account balance by day, all time\. Ends at \$1,100\.00\./,
+    );
+  });
+
+  test('a deposit dated after the range end does not: the prompt stays', async () => {
+    await renderWidgets(['balance'], {
+      sample: tradesSample(
+        () => [esTrade(0, '2026-11-02', 10000)],
+        (s) => {
+          for (const a of s.accounts) a.startingBalance = 0;
+        },
+      ),
+      flows: [{ accountId: 'acc-a', date: '2026-11-10', amount: 100_000 }],
+      url: '/app/dashboard?from=2026-11-01&to=2026-11-05',
+    });
+    expect(said('balance')).toContain(
+      'Add a starting balance to see your balance.',
+    );
+  });
+
   test.each(['ticks', 'r'] as const)(
     'under %s it says a balance has no value there',
     async (unit) => {

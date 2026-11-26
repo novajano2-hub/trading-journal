@@ -204,7 +204,7 @@ export function BalanceAndPnl(): React.JSX.Element {
     return (
       <Card k="balance-pnl" state="empty" empty={noBalanceIn(display.unit)} />
     );
-  if (s.startingBalance === 0)
+  if (s.unfunded)
     return (
       <Card k="balance-pnl" state="empty" empty={STARTING_BALANCE_PROMPT} />
     );

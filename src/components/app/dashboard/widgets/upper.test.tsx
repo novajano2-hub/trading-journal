@@ -7,6 +7,7 @@ import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
+import type { NewCashFlow } from '@/data/repository';
 import {
   generateSampleWorkspace,
   SAMPLE_SEED,
@@ -70,6 +71,8 @@ async function renderUpper(
     sample?: () => SampleWorkspace;
     prefs?: Partial<UserPrefs>;
     url?: string;
+    /** Deposits and withdrawals to book before the page opens. */
+    flows?: NewCashFlow[];
   } = {},
 ) {
   const sample = opts.sample ?? theSample;
@@ -93,6 +96,8 @@ async function renderUpper(
     },
     ...opts.prefs,
   });
+  for (const flow of opts.flows ?? [])
+    await repository.cashFlows.create(SAMPLE_WORKSPACE.id, flow);
   renderApp(<DashboardView />, { repository, url: opts.url });
   await screen.findByTestId('dashboard-ready');
 }
@@ -546,6 +551,39 @@ describe('no starting balance', () => {
       '/app/settings/accounts',
     );
     expect(card.textContent).not.toMatch(/\$/);
+  });
+
+  test('a deposit funds the account: the balance shows, not the prompt', async () => {
+    await renderUpper({
+      keys: ['balance-pnl'],
+      sample: tradesSample(
+        () => [esTrade(0, '2026-11-02', 10000)],
+        (s) => {
+          for (const a of s.accounts) a.startingBalance = 0;
+        },
+      ),
+      flows: [{ accountId: 'acc-a', date: '2026-11-01', amount: 100_000 }],
+    });
+    const card = widget('balance-pnl');
+    expect(card.textContent).not.toMatch(/starting balance/i);
+    // $1,000.00 deposited and $100.00 made.
+    expect(said('balance-pnl')).toContain('$1,100.00');
+    expect(said('balance-pnl')).toContain('+$100.00 net P&L');
+  });
+
+  test('a deposit dated after the range end does not: the prompt stays', async () => {
+    await renderUpper({
+      keys: ['balance-pnl'],
+      sample: tradesSample(
+        () => [esTrade(0, '2026-11-02', 10000)],
+        (s) => {
+          for (const a of s.accounts) a.startingBalance = 0;
+        },
+      ),
+      flows: [{ accountId: 'acc-a', date: '2026-11-10', amount: 100_000 }],
+      url: '/app/dashboard?from=2026-11-01&to=2026-11-05',
+    });
+    expect(widget('balance-pnl').textContent).toMatch(/starting balance/i);
   });
 });
 

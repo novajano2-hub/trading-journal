@@ -70,8 +70,10 @@ export interface BalanceAndPnl {
   balance: Cents;
   /** The closed net P&L of the matched trades. */
   net: Cents;
-  /** The accounts' starting balances: 0 asks the trader for one. */
+  /** The accounts' starting balances. */
   startingBalance: Cents;
+  /** No starting balance and no deposit or withdrawal by the range's end: the widget asks the trader for one. */
+  unfunded: boolean;
 }
 
 export interface WidgetValues {
@@ -100,6 +102,8 @@ export interface WidgetValues {
   'daily-cum': DayStat[];
   balance: {
     startingBalance: Cents;
+    /** As for `balance-pnl`: the chart asks for a starting balance instead of drawing. */
+    unfunded: boolean;
     equity: EquityPoint[];
     flows: readonly CashFlow[];
     /** The balance and the net deposits and withdrawals a day at a time, inside the range (C75). Empty under a narrowing unit: a balance has no value in one. */
@@ -142,6 +146,8 @@ interface Calc {
   flows: readonly CashFlow[];
   balanceTrades: readonly Trade[];
   startingBalance: Cents;
+  /** See `BalanceAndPnl.unfunded`. */
+  unfunded: boolean;
   matched: readonly Trade[];
   summary(): Summary;
   days(): DayStat[];
@@ -181,6 +187,7 @@ const READ: { [K in keyof WidgetValues]: (c: Calc) => WidgetValues[K] } = {
     ),
     net: c.summary().netPnl,
     startingBalance: c.startingBalance,
+    unfunded: c.unfunded,
   }),
   'day-streak': (c) =>
     streakOf(
@@ -232,6 +239,7 @@ const READ: { [K in keyof WidgetValues]: (c: Calc) => WidgetValues[K] } = {
   'trade-duration': (c) => scatterPoints(c.trades, c.ctx, 'duration'),
   balance: (c) => ({
     startingBalance: c.startingBalance,
+    unfunded: c.unfunded,
     equity: equityCurve(c.trades, c.startingBalance, c.ctx),
     flows: c.flows,
     points: c.ctx.unit
@@ -308,6 +316,11 @@ export function widgetData(
     flows,
     balanceTrades,
     startingBalance,
+    // Deposits fund an account as a starting balance does, so a balance is asked for only when
+    // there is neither by the date the balance is read at (the range's end, else today).
+    unfunded:
+      startingBalance === 0 &&
+      !flows.some((f) => f.date <= (env.ctx.range?.to ?? env.today)),
     matched: ofCurrency(env.matched),
     summary: lazy(() => summarize(trades, env.ctx)),
     days,
