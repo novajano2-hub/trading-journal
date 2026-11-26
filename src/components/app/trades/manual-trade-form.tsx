@@ -149,7 +149,7 @@ function initialFor(
   const inst = trade.instrument;
   const type = assetTypeOf(inst);
   const option = inst.assetClass === 'option';
-  // The form shows a stop or target that is one Price level, however it was saved.
+  // The form shows a stop or target that is one Price level on the whole position, however it was saved.
   const sides = sidesOf(trade);
   const shown = (price: number | undefined) =>
     price === undefined ? '' : plain(price);
@@ -171,8 +171,8 @@ function initialFor(
       commission: e.commission ? plain(e.commission / 100) : '',
       fees: e.fees ? plain(e.fees / 100) : '',
     })),
-    stop: shown(formPriceOf(sides.stops)),
-    target: shown(formPriceOf(sides.targets)),
+    stop: shown(formPriceOf(sides.stops, trade.maxPosition)),
+    target: shown(formPriceOf(sides.targets, trade.maxPosition)),
   };
 }
 

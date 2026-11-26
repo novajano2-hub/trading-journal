@@ -309,14 +309,25 @@ function onePriceLevel(value: number, qty: number): LevelSide {
   return { unit: 'price', levels: [{ value, qty }] };
 }
 
+/** How far a level's quantity may sit from the trade's size and still be all of it (0.1 + 0.2 lots). */
+const SIZE_EPS = 1e-9;
+
 /**
- * The price the manual form shows for a side: a side that is one Price level.
- * Any other side (several levels, or another unit) is not one the form can
- * show or edit; the trade page owns those.
+ * The price the manual form shows for a side: a side that is one Price level
+ * on the whole position (`size`). Saving the form writes one level on the
+ * whole position, so a level on part of it, or on more than it, would be
+ * rewritten to the full size; like several levels or another unit, it is
+ * not one the form can show or edit, and the trade page owns it.
  */
-export function formPriceOf(side: LevelSide | undefined): number | undefined {
+export function formPriceOf(
+  side: LevelSide | undefined,
+  size: number,
+): number | undefined {
   const [only, ...rest] = side?.levels ?? [];
-  return side?.unit === 'price' && only !== undefined && rest.length === 0
+  return side?.unit === 'price' &&
+    only !== undefined &&
+    rest.length === 0 &&
+    Math.abs(only.qty - size) <= SIZE_EPS
     ? only.value
     : undefined;
 }
@@ -335,7 +346,9 @@ export function keepHiddenSides(
 ): Trade {
   const before = sidesOf(old);
   const hidden = (side: LevelSide | undefined, typed: number | undefined) =>
-    side !== undefined && formPriceOf(side) === undefined && typed === undefined
+    side !== undefined &&
+    formPriceOf(side, old.maxPosition) === undefined &&
+    typed === undefined
       ? side
       : undefined;
   const stops = hidden(before.stops, input.plannedStop);

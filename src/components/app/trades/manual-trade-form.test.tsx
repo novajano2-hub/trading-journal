@@ -291,6 +291,34 @@ test('editing the fills of a trade whose stops are several levels keeps them', a
   expect(t.executions[1]!.price).toBe(5020);
 });
 
+test('a stop on part of the position is not shown in the form, and a save keeps it as it was', async () => {
+  // One of the two contracts, saved on the trade page: $500 at risk.
+  const stops = {
+    unit: 'price' as const,
+    levels: [{ value: 4990, qty: 1 }],
+  };
+  const { repo } = renderApp(<ManualTradeForm tradeId="man-1" />, {
+    sample: sample(
+      true,
+      { plannedTarget: 5030 },
+      { stops, initialRisk: 50000 },
+    ),
+    url: '/app/trades/man-1/edit',
+  });
+  await screen.findByText(/^Times in New York, UTC-0[45]:00$/);
+  expect(
+    (screen.getByLabelText('Planned stop') as HTMLInputElement).value,
+  ).toBe('');
+  set('Fill 1 fees', '1.25');
+  fireEvent.click(screen.getByRole('button', { name: 'Save trade' }));
+  await waitFor(() =>
+    expect(window.location.pathname).toBe('/app/trades/man-1'),
+  );
+  const t = (await repo.trades.get(WS, 'man-1'))!;
+  expect(t.stops).toEqual(stops);
+  expect(t.initialRisk).toBe(50000);
+});
+
 test('an imported trade cannot be edited here', async () => {
   renderApp(<ManualTradeForm tradeId="f-1" />, {
     sample: sample(),

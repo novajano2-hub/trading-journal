@@ -53,7 +53,7 @@ export function SizeHelper({
           type="button"
           aria-label={label}
           disabled={disabled}
-          className="grid size-7 flex-none place-items-center rounded-[7px] text-muted outline-offset-2 hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-40 pointer-coarse:size-9"
+          className="grid size-7 flex-none place-items-center rounded-[7px] text-muted outline-offset-2 hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-40 pointer-coarse:size-11"
         >
           <Percent size={15} aria-hidden="true" />
         </button>

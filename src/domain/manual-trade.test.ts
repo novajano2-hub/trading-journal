@@ -223,12 +223,20 @@ describe('the form and levels saved elsewhere', () => {
     levels: levels.map(([value, qty]) => ({ value, qty })),
   });
 
-  test('the form shows a side that is one Price level, and no other', () => {
-    expect(formPriceOf(side('price', [4990, 2]))).toBe(4990);
-    expect(formPriceOf(side('price', [4990, 1], [4980, 1]))).toBeUndefined();
-    expect(formPriceOf(side('ticks', [12, 2]))).toBeUndefined();
-    expect(formPriceOf(side('price'))).toBeUndefined();
-    expect(formPriceOf(undefined)).toBeUndefined();
+  test('the form shows a side that is one Price level at the full size, and no other', () => {
+    expect(formPriceOf(side('price', [4990, 2]), 2)).toBe(4990);
+    expect(formPriceOf(side('price', [4990, 1], [4980, 1]), 2)).toBeUndefined();
+    expect(formPriceOf(side('ticks', [12, 2]), 2)).toBeUndefined();
+    expect(formPriceOf(side('price'), 2)).toBeUndefined();
+    expect(formPriceOf(undefined, 2)).toBeUndefined();
+  });
+
+  test('a level that covers part of the position, or more than it, is not one the form can show', () => {
+    // Saving it from the form would widen it to the whole position.
+    expect(formPriceOf(side('price', [4990, 3]), 6)).toBeUndefined();
+    expect(formPriceOf(side('price', [4990, 7]), 6)).toBeUndefined();
+    // Float noise in a size is still the full size: 0.1 + 0.2 lots against 0.3.
+    expect(formPriceOf(side('price', [4990, 0.1 + 0.2]), 0.3)).toBe(4990);
   });
 
   const made = (p: Partial<ManualTradeInput> = {}) => {
@@ -249,6 +257,26 @@ describe('the form and levels saved elsewhere', () => {
     const next = keepHiddenSides(made(), old, input());
     expect(next.stops).toEqual(old.stops);
     expect(next.stops).not.toBe(old.stops);
+    expect(next.initialRisk).toBe(150000);
+  });
+
+  test('a stop on part of the position is kept, not widened to all of it', () => {
+    const six = (p: Partial<ManualTradeInput> = {}) =>
+      input({
+        fills: [fillOf('buy', 6, 5000, 0), fillOf('sell', 6, 5010, 5)],
+        ...p,
+      });
+    const built = buildManualTrade(six(), ctx);
+    if (!built.ok) throw new Error(built.error);
+    // Saved on the trade page: 3 of the 6 contracts, so $1,500 at risk.
+    const old = {
+      ...built.trade,
+      stops: side('price', [4990, 3]),
+      initialRisk: 150000,
+    };
+    // The form shows no stop for it, so a fee edit sends none.
+    const next = keepHiddenSides(built.trade, old, six());
+    expect(next.stops).toEqual(side('price', [4990, 3]));
     expect(next.initialRisk).toBe(150000);
   });
 

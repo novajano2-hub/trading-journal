@@ -114,3 +114,30 @@ test('rebuilding a manual trade keeps levels the form cannot show, and the risk 
   expect(rebuilt.initialRisk).toBe(150000);
   expect(await repo.trades.get(S, made.id)).toEqual(rebuilt);
 });
+
+test('rebuilding a manual trade keeps a stop on part of the position at its own size', async () => {
+  const repo = setup();
+  const six = (over: Partial<ManualTradeInput> = {}) => {
+    const base = input();
+    return input({
+      fills: base.fills.map((f) => ({ ...f, qty: 6 })),
+      ...over,
+    });
+  };
+  const made = await repo.trades.createManual(S, six({ plannedStop: 4990 }));
+  expect(made.initialRisk).toBe(300000); // 10 points on 6 contracts at $50
+  // Saved on the trade page: a stop on 3 of the 6 contracts.
+  const part = {
+    unit: 'price' as const,
+    levels: [{ value: 4990, qty: 3 }],
+  };
+  const stopped = await repo.trades.update(S, made.id, { stops: part });
+  expect(stopped.initialRisk).toBe(150000);
+  // A fee edit in the form: it shows no stop for a level on part of the
+  // position, so it sends none, and the stop must not grow to all 6.
+  const fills = six().fills.map((f) => ({ ...f, fees: 125 }));
+  const rebuilt = await repo.trades.replaceManual(S, made.id, six({ fills }));
+  expect(rebuilt.stops).toEqual(part);
+  expect(rebuilt.initialRisk).toBe(150000);
+  expect(rebuilt.fees).toBeGreaterThan(0);
+});
