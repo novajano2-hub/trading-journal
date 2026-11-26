@@ -33,3 +33,10 @@ test('the blurbs of the picker comp read as it writes them', () => {
     'The year, month by month; a month opens Calendar.',
   );
 });
+
+test('the streak blurbs count winning runs only, as the figures do (C16)', () => {
+  expect(WIDGET_BLURBS['day-streak']).toMatch(/winning days in a row/i);
+  expect(WIDGET_BLURBS['trade-streak']).toMatch(/winning trades in a row/i);
+  for (const key of ['day-streak', 'trade-streak'] as const)
+    expect(WIDGET_BLURBS[key], key).not.toMatch(/losing/i);
+});

@@ -56,8 +56,8 @@ export const WIDGET_BLURBS: Record<WidgetKey, string> = {
   'win-loss-ratio':
     'The average win against the average loss, with both amounts.',
   expectancy: 'What an average closed trade has made.',
-  'day-streak': 'The current run of winning or losing days.',
-  'trade-streak': 'The current run of winning or losing trades.',
+  'day-streak': 'Winning days in a row, up to your last trading day.',
+  'trade-streak': 'Winning trades in a row, up to your last closed trade.',
   streaks: 'Both current runs, in days and in trades.',
   'max-drawdown':
     'The deepest fall from a peak, in money and percent, with its date.',
