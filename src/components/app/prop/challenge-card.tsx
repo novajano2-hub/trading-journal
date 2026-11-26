@@ -29,13 +29,6 @@ function dayLabel(date: string): string {
   }).format(new Date(`${date}T00:00:00Z`));
 }
 
-/** A plain-text amount for what is saved: dollars as the account holds them, never the display unit. */
-export function plainMoney(c: Cents, currency: string): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(
-    c / 100,
-  );
-}
-
 /** The phase the card reads: the funded one once the trader says so, else the current evaluation step. */
 export function shownPhase(
   c: Challenge,
@@ -50,6 +43,13 @@ export function shownPhase(
     [...check.phases].reverse().find((p) => p.step !== 'funded' && p.state) ??
     check.phases[0]
   );
+}
+
+/** "Evaluation" (a one-step challenge), "Step 1", "Step 2" or "Funded". */
+export function phaseName(c: Challenge, step: ChallengeStep): string {
+  if (step === 'funded') return 'Funded';
+  if (c.steps === 1) return 'Evaluation';
+  return step === 'step-1' ? 'Step 1' : 'Step 2';
 }
 
 /** "Evaluation", "Step 1 of 2" or "Funded". */
@@ -215,6 +215,7 @@ export function ChallengeCard({
   saveFailed,
   onEdit,
   onSave,
+  onMarkBreached,
 }: {
   challenge: Challenge;
   check: ChallengeCheck;
@@ -223,6 +224,8 @@ export function ChallengeCard({
   saveFailed: boolean;
   onEdit(): void;
   onSave(patch: ChallengePatch): void;
+  /** Opens the Mark as breached dialog, which asks why. */
+  onMarkBreached(): void;
 }): React.JSX.Element {
   const display = useDisplay();
   const headingId = `challenge-${c.id}`;
@@ -502,14 +505,7 @@ export function ChallengeCard({
                 size="sm"
                 variant="secondary"
                 disabled={saving}
-                onClick={() =>
-                  onSave({
-                    status: 'breached',
-                    failureReason: findingText(finding, (v) =>
-                      plainMoney(v, currency),
-                    ),
-                  })
-                }
+                onClick={onMarkBreached}
               >
                 Mark as breached
               </Button>

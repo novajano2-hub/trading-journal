@@ -27,6 +27,21 @@ export const CHALLENGE_TYPE_LABELS: Record<ChallengeType, string> = {
 };
 const TYPE_ORDER: ChallengeType[] = ['1-step', '2-step', 's2f'];
 
+/**
+ * The five reasons a breach can give, in the order the Mark as breached dialog
+ * asks them, worded as the dialog and the breach insights show them (C33).
+ */
+export const BREACH_REASON_LABELS: Record<BreachReason, string> = {
+  'max-drawdown': 'Broke the max drawdown',
+  overtrading: 'Overtrading or forcing trades',
+  'time-pressure': 'Time pressure',
+  'risk-management': 'Lack of risk management',
+  other: 'Other',
+};
+export const BREACH_REASONS = Object.keys(
+  BREACH_REASON_LABELS,
+) as BreachReason[];
+
 export interface PropFilters {
   firm?: string[];
   phase?: 'evaluation' | 'funded';

@@ -118,13 +118,13 @@ test('the Forex card reads Step 1 of 2 and labels its drawdown from its type', a
   ).toBeNull();
 });
 
-test('a broken rule on an active challenge offers Mark as breached, and saves the status and reason (through markBreached)', async () => {
+test('a broken rule on an active challenge offers Mark as breached, which asks why before it writes anything', async () => {
   const r = repo({
     accounts: [prop('p-forex', 'Forex evaluation')],
     challenges: [challenge({})],
     loss: true,
   });
-  renderApp(<PropView />, { repository: r, url: '/app/prop-firms' });
+  renderApp(<PropView />, { repository: r, url: '/app/prop-firms/accounts' });
   const card = await screen.findByRole('article', { name: 'Forex 100K' });
   const sentence =
     'Daily loss limit broken on 10 Nov (−$1,500.00 of −$1,000.00).';
@@ -134,30 +134,35 @@ test('a broken rule on an active challenge offers Mark as breached, and saves th
   fireEvent.click(
     within(card).getByRole('button', { name: 'Mark as breached' }),
   );
-  await waitFor(async () => {
-    const [saved] = await r.challenges.list(WS);
-    expect(saved).toMatchObject({
-      status: 'breached',
-      breachReason: 'other',
-      failureReason: sentence,
-    });
+  const dialog = await screen.findByRole('dialog', {
+    name: 'Mark Forex 100K as breached',
   });
-  expect(await within(card).findByText('Breached')).toBeTruthy();
+  // No reason is chosen for the trader, and nothing is stored yet.
   expect(
-    within(card).queryByRole('button', { name: 'Mark as breached' }),
-  ).toBeNull();
+    (
+      within(dialog).getByRole('button', {
+        name: 'Mark as breached',
+      }) as HTMLButtonElement
+    ).disabled,
+  ).toBe(true);
+  expect((await r.challenges.list(WS))[0]!.status).toBe('active');
 });
 
-test('Mark as breached dates the breach on the day the rule broke, not today (C34)', async () => {
+test('Mark as breached dates the breach on the day the rule broke, not today (C34), and the card moves to Breached', async () => {
   const r = repo({
     accounts: [prop('p-forex', 'Forex evaluation')],
     challenges: [challenge({})],
     loss: true,
   });
-  renderApp(<PropView />, { repository: r, url: '/app/prop-firms' });
+  renderApp(<PropView />, { repository: r, url: '/app/prop-firms/accounts' });
   const card = await screen.findByRole('article', { name: 'Forex 100K' });
   fireEvent.click(
     await within(card).findByRole('button', { name: 'Mark as breached' }),
+  );
+  const dialog = await screen.findByRole('dialog');
+  fireEvent.click(within(dialog).getByRole('radio', { name: /max drawdown/ }));
+  fireEvent.click(
+    within(dialog).getByRole('button', { name: 'Mark as breached' }),
   );
   // The finding is dated 10 Nov, the loss's day: a breach is permanent, so
   // the date it keeps is that one, whenever the trader confirms it.
@@ -165,6 +170,7 @@ test('Mark as breached dates the breach on the day the rule broke, not today (C3
     const [saved] = await r.challenges.list(WS);
     expect(saved).toMatchObject({
       status: 'breached',
+      breachReason: 'max-drawdown',
       breachedOn: '2026-11-10',
     });
   });
@@ -172,6 +178,10 @@ test('Mark as breached dates the breach on the day the rule broke, not today (C3
     timeZone: 'America/New_York',
   });
   expect(todayNy > '2026-11-10').toBe(true);
+  expect(await within(card).findByText('Breached')).toBeTruthy();
+  expect(
+    within(card).queryByRole('button', { name: 'Mark as breached' }),
+  ).toBeNull();
 });
 
 test('a target met on the last evaluation step offers Mark step passed, which moves the challenge to funded and active', async () => {
@@ -386,15 +396,23 @@ test('"Near a limit" shows for a funded challenge, as the loss-outlined chip', a
 
 test('a failed save shows one live region on the card, with no nested alert', async () => {
   const r = repo({
-    accounts: [prop('p-forex', 'Forex evaluation')],
-    challenges: [challenge({})],
-    loss: true,
+    accounts: [
+      prop('p-one', 'Futures 50K evaluation', { propRules: { ...easy } }),
+    ],
+    challenges: [
+      challenge({
+        name: 'Futures 50K',
+        steps: 1,
+        phases: [{ step: 'step-1', accountId: 'p-one' }, { step: 'funded' }],
+      }),
+    ],
+    trades: stepOneMet('p-one'),
   });
-  r.challenges.markBreached = vi.fn().mockRejectedValue(new Error('no'));
-  renderApp(<PropView />, { repository: r, url: '/app/prop-firms' });
-  const card = await screen.findByRole('article', { name: 'Forex 100K' });
+  r.challenges.update = vi.fn().mockRejectedValue(new Error('no'));
+  renderApp(<PropView />, { repository: r, url: '/app/prop-firms/accounts' });
+  const card = await screen.findByRole('article', { name: 'Futures 50K' });
   fireEvent.click(
-    await within(card).findByRole('button', { name: 'Mark as breached' }),
+    await within(card).findByRole('button', { name: 'Mark step passed' }),
   );
   expect(await within(card).findByText(/Couldn.t save that/)).toBeTruthy();
   expect(

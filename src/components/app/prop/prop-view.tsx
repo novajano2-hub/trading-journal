@@ -12,7 +12,6 @@ import {
   useAccounts,
   useCashFlows,
   useChallenges,
-  useMarkBreached,
   usePrefs,
   useTrades,
   useUpdateChallenge,
@@ -29,6 +28,7 @@ import {
 } from '../strategies/strategy-states';
 import { ChallengeCard, shownPhase } from './challenge-card';
 import { ChallengeForm } from './challenge-form';
+import { MarkBreached } from './mark-breached';
 
 type Filter = 'all' | Challenge['phase'];
 const NO_TRADES: ReadonlyMap<string, Trade> = new Map();
@@ -49,11 +49,11 @@ export function PropView(): React.JSX.Element {
   const flows = useCashFlows();
   const prefs = usePrefs();
   const update = useUpdateChallenge();
-  const markBreached = useMarkBreached();
   const [filter, setFilter] = useState<Filter>('all');
   // The tabs' New challenge button opens its own form; this one is for Edit
   // and for the empty state's button.
   const [editing, setEditing] = useState<Challenge | 'new' | null>(null);
+  const [breaching, setBreaching] = useState<Challenge | null>(null);
   const error =
     challenges.error ??
     accounts.error ??
@@ -121,6 +121,9 @@ export function PropView(): React.JSX.Element {
       </>
     );
 
+  const breachingRow = breaching
+    ? rows.find((r) => r.c.id === breaching.id)
+    : undefined;
   const count = (f: Filter) =>
     f === 'all' ? rows.length : rows.filter((r) => r.c.phase === f).length;
   const shown = rows.filter((r) => filter === 'all' || r.c.phase === filter);
@@ -172,39 +175,28 @@ export function PropView(): React.JSX.Element {
                 challenge={c}
                 check={check}
                 today={today}
-                saving={
-                  (update.isPending && update.variables?.id === c.id) ||
-                  (markBreached.isPending &&
-                    markBreached.variables?.id === c.id)
-                }
-                saveFailed={
-                  (update.isError && update.variables?.id === c.id) ||
-                  (markBreached.isError && markBreached.variables?.id === c.id)
-                }
+                saving={update.isPending && update.variables?.id === c.id}
+                saveFailed={update.isError && update.variables?.id === c.id}
                 onEdit={() => setEditing(c)}
                 onSave={(patch: ChallengePatch) =>
-                  // A breach is recorded through markBreached (update refuses
-                  // it). Until the Mark as breached dialog (Task 11) asks for
-                  // a reason, the rule's finding is kept as 'other' with its
-                  // text, dated the day the rule broke (the breach is
-                  // permanent and drives the insights), else today.
-                  patch.status === 'breached'
-                    ? markBreached.mutate({
-                        id: c.id,
-                        reason: 'other',
-                        ...(patch.failureReason !== undefined && {
-                          note: patch.failureReason,
-                        }),
-                        on: check.finding?.date ?? today,
-                      })
-                    : update.mutate({ id: c.id, patch })
+                  update.mutate({ id: c.id, patch })
                 }
+                onMarkBreached={() => setBreaching(c)}
               />
             </FigureSourceContext.Provider>
           );
         })
       )}
 
+      {breachingRow ? (
+        <MarkBreached
+          key={breachingRow.c.id}
+          challenge={breachingRow.c}
+          check={breachingRow.check}
+          today={today}
+          onClose={() => setBreaching(null)}
+        />
+      ) : null}
       {editing ? (
         <ChallengeForm
           key={editing === 'new' ? 'new' : editing.id}
