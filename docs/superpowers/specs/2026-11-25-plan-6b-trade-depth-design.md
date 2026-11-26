@@ -282,8 +282,8 @@ The next Dexie version adds six workspace tables. All join `DATA_TABLES`, so a w
 | T15 | Exited in parts | Two or more exits | neutral |
 | T16 | Large size | Volume above 75% of your trades of the past 60 days | neutral |
 | D1 | Losses outweighed wins | Keel threshold (U2): a red day with a win rate of 50% or more and an average loss at least twice the average win (B21) | negative |
-| D3 | Switched sides, red | Keel threshold (U2): a red day with three or more changes of side (B21) | negative |
-| D4 | Switched sides, green | Keel threshold (U2): a green day with three or more changes of side (B21) | negative |
+| D3 | Switched sides, red | Keel threshold (U2): a red day with three or more changes of side within one symbol (B21) | negative |
+| D4 | Switched sides, green | Keel threshold (U2): a green day with three or more changes of side within one symbol (B21) | negative |
 | D5 | One strong trade | Keel threshold (U2): one trade on the day, a win, realized R of 3 or more (B21) | positive |
 | D7 | Low return for the effort | Keel threshold (U2): three or more trades, green, net below half your average green day of the past 60 days (B21) | negative |
 | D9 | Sized up after wins | Keel threshold (U2): a size above the previous trade's after three or more wins in a row, then a loss larger than your average loss (B21) | negative |
