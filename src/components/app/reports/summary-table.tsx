@@ -159,10 +159,10 @@ export function SummaryTable<Row extends object>({
 
   return (
     <div className="min-w-0">
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto print:overflow-visible">
         <table
           aria-label={label}
-          className="w-full min-w-max border-collapse text-[13px] whitespace-nowrap"
+          className="w-full min-w-max border-collapse text-[13px] whitespace-nowrap print:min-w-0"
         >
           <thead>
             {table.getHeaderGroups().map((group) => (
@@ -243,7 +243,10 @@ export function SummaryTable<Row extends object>({
           {from}-{to} of {total} {plural(total, 'row')}
         </p>
         {pages > 1 ? (
-          <nav aria-label={`${label} pages`} className="ml-auto flex gap-2">
+          <nav
+            aria-label={`${label} pages`}
+            className="ml-auto flex gap-2 print:hidden"
+          >
             <button
               type="button"
               disabled={pagination.pageIndex === 0}

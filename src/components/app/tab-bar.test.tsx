@@ -34,6 +34,11 @@ test('the bar holds Dashboard, Trades, Calendar, Reports and More, phone only', 
   ).toEqual(['Dashboard', 'Trades', 'Calendar', 'Reports', 'More']);
 });
 
+test('the bar is chrome: the print sheet leaves it off the paper', () => {
+  renderApp(<TabBar />, { url: '/app/reports/performance' });
+  expect(tabs().getAttribute('data-print')).toBe('hide');
+});
+
 test('the current tab is marked in accent ink, its glyph filled; the rest carry the filters', () => {
   renderApp(<TabBar />, { url: '/app/trades?side=short&by=pnl' });
   const bar = tabs();

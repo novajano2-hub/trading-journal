@@ -1,0 +1,101 @@
+/*
+ * Print.
+ *
+ * What the browser's print dialog makes of a page (Save as PDF writes the
+ * file; no library). This is the ONE print sheet for everything Keel prints:
+ * Plan 6C's Export PDF on Reports > Performance uses it now, and Plan 6B's
+ * note PDF shares it and adds its own section below (the note's `#print-note`
+ * rules), so nothing in the first section is specific to Performance.
+ *
+ * How a page takes part:
+ *   data-pinned         a pinned row (the sidebar, the rail, the top bar, the
+ *                       trade views' switch row, the edit bar): never prints
+ *   data-print='hide'   any other chrome (the tab bar, a skip link): never prints
+ *   data-print='keep'   a block that stays on one page (a chart card, a header)
+ *   print:hidden        (Tailwind) a control that is on screen and not on paper
+ *   hidden print:block  (Tailwind) a block that is on paper and not on screen
+ *
+ * Always light: theme.css declares the graphite tokens inside `@media not
+ * print`, so paper gets the light set whatever the Appearance setting, and
+ * the rules below only set the ground to white (the app's own is periwinkle).
+ */
+
+/*
+ * The paper stays the user's (A4 or Letter): no `size`. The footer is the
+ * brand and the page count, in the page's margin boxes (Chrome and Edge from
+ * 131; elsewhere the margin boxes are ignored and the browser's own footer,
+ * if the user keeps it on, stands).
+ */
+@page {
+  margin: 14mm;
+
+  @bottom-left {
+    content: 'Keel';
+    font:
+      500 9pt system-ui,
+      sans-serif;
+    color: #636889;
+  }
+
+  @bottom-right {
+    content: 'Page ' counter(page) ' of ' counter(pages);
+    font:
+      500 9pt system-ui,
+      sans-serif;
+    color: #636889;
+  }
+}
+
+@media print {
+  html {
+    /* The swatches, the tones and the tints print as drawn, not as the browser's "background graphics" setting decides. */
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    /* Important: globals.css sets the app's own ground on these two, later in the cascade. */
+    background: #fff !important;
+    height: auto;
+  }
+
+  body {
+    background: #fff !important;
+    min-height: 0;
+  }
+
+  /* Paper has no depth, no hover and nothing that moves. */
+  *,
+  *::before,
+  *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* The app's chrome. */
+  [data-pinned],
+  [data-print='hide'] {
+    display: none !important;
+  }
+
+  /* What stays on one page: a table row, and what is marked to keep together. */
+  tr,
+  [data-print='keep'] {
+    break-inside: avoid;
+  }
+
+  /*
+   * A table header's sort button prints as its label. Chrome repeats a header
+   * on each page a table runs over, and leaves a button out of the repeat, so
+   * a labelled button would print its label on the first page only.
+   */
+  th button {
+    display: contents;
+  }
+
+  /* A heading is never the last line on a page. */
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+}

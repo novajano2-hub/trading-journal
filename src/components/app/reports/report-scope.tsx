@@ -73,7 +73,7 @@ export function State({
         </p>
       ) : null}
       {actions ? (
-        <div className="mt-5 flex flex-wrap gap-2">{actions}</div>
+        <div className="mt-5 flex flex-wrap gap-2 print:hidden">{actions}</div>
       ) : null}
     </div>
   );
@@ -166,7 +166,7 @@ export function ReportScope({
         <FigureSourceContext.Provider value={data.source}>
           <div data-testid={testId} className="flex min-w-0 flex-col gap-4">
             {data.currencies.length > 1 ? (
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3 print:hidden">
                 <Segmented
                   label="Currency"
                   options={data.currencies.map((c) => ({ value: c, label: c }))}

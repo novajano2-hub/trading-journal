@@ -3,11 +3,13 @@ import { EMPTY_FILTERS, type GlobalFilters } from '@/data/filters';
 import type { Account } from '@/domain/types';
 import {
   accountSummary,
+  accountsInWords,
   activeFilterCount,
   chipLabel,
   customRange,
   datesOf,
   detailChips,
+  filterWords,
   rangeText,
   hasActiveFilters,
   switchWorkspaceFilters,
@@ -294,4 +296,108 @@ test('the filters the bucket links write each have a chip that clears only them'
   let rest = f;
   for (const c of chips) rest = c.clear(rest);
   expect(rest).toEqual(EMPTY_FILTERS);
+});
+
+test('accounts in words: all, each name, or a count once there are many', () => {
+  const accts = [
+    { id: 'a', name: 'Futures live' },
+    { id: 'b', name: 'Forex evaluation' },
+    { id: 'c', name: 'Options' },
+    { id: 'd', name: 'Demo' },
+  ] as Account[];
+  const words = (accountIds: string[]) =>
+    accountsInWords(accts, { ...EMPTY_FILTERS, accountIds });
+  expect(words([])).toBe('all accounts');
+  expect(words(['b'])).toBe('Forex evaluation');
+  expect(words(['a', 'b'])).toBe('Futures live and Forex evaluation');
+  expect(words(['a', 'b', 'c'])).toBe(
+    'Futures live, Forex evaluation and Options',
+  );
+  expect(words(['a', 'b', 'c', 'd'])).toBe('4 accounts');
+});
+
+test('the filters in words leave the range and the accounts to the header', () => {
+  expect(filterWords(EMPTY_FILTERS, names)).toEqual([]);
+  expect(
+    filterWords(
+      { ...EMPTY_FILTERS, range: { preset: 'ytd' }, accountIds: ['a'] },
+      names,
+    ),
+  ).toEqual([]);
+});
+
+test('the filters in words: symbols, side, strategies and tags by name', () => {
+  expect(
+    filterWords(
+      {
+        ...EMPTY_FILTERS,
+        symbols: ['ES', 'NQ'],
+        side: 'long',
+        strategyIds: ['s1'],
+        tagIds: ['t1'],
+      },
+      names,
+    ),
+  ).toEqual([
+    'Symbols: ES, NQ',
+    'Side: Long',
+    'Strategy: Range break',
+    'Tag: Moved stop',
+  ]);
+  expect(
+    filterWords(
+      {
+        ...EMPTY_FILTERS,
+        symbols: ['ES'],
+        side: 'short',
+        strategyIds: ['s1', 's2'],
+        strategyMatch: 'all',
+      },
+      names,
+    ),
+  ).toEqual([
+    'Symbol: ES',
+    'Side: Short',
+    'Strategies, all of: Range break, Pullback',
+  ]);
+});
+
+test('the filters in words: the outcome, status, holding, review and rating', () => {
+  expect(
+    filterWords(
+      {
+        ...EMPTY_FILTERS,
+        outcomes: ['loss', 'win'],
+        status: 'closed',
+        holding: 'multiday',
+        reviewed: false,
+        ratings: [5, 4],
+      },
+      names,
+    ),
+  ).toEqual([
+    'Outcome: Wins, Losses',
+    'Status: Closed',
+    'Holding: Multiday',
+    'Reviewed: No',
+    'Rating: 4, 5',
+  ]);
+});
+
+test('the filters in words end with what More filters holds, as its chips say it', () => {
+  const f = {
+    ...EMPTY_FILTERS,
+    excludeStrategyIds: ['s2'],
+    excludeTagIds: ['t1'],
+    noTags: true,
+    weekdays: [1, 2],
+    size: { min: 2 },
+  };
+  expect(filterWords(f, names, 'monday')).toEqual([
+    'Excluded strategy: Pullback',
+    'Excluded tag: Moved stop',
+    ...detailChips(f, 'monday').map((c) => c.label),
+  ]);
+  expect(filterWords(f, names, 'monday')).toContain('Entry weekday: Mon, Tue');
+  expect(filterWords(f, names, 'monday')).toContain('No tags');
 });

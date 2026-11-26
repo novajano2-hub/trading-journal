@@ -42,6 +42,8 @@ import {
   useExpandSlot,
   type ChartSeries,
 } from './report-chart';
+import { PerformanceActions } from './performance-actions';
+import { PrintHeader } from './print-header';
 import { ReportScope } from './report-scope';
 import { SummaryTable, type SummaryColumn } from './summary-table';
 import { writeParam, type ReportData } from './use-report-data';
@@ -203,6 +205,7 @@ function ChartSlot({
     setPicks(picks.map((x) => (x === pick ? { ...x, ...to } : x)));
 
   const period = periodOf(bucket);
+  const named = series.map((s) => s.label).join(', ');
   const gapNote = (x: ChartSeries, pick: Pick) =>
     `${x.label} ${GAP_REASONS[pick.metric] ?? 'has no value in some periods.'}`;
   const gaps = series.flatMap((x, i) =>
@@ -229,15 +232,26 @@ function ChartSlot({
   return (
     <section
       aria-labelledby={chartId}
+      data-print="keep"
       className={`${CARD} ${CARD_PAD} min-w-0`}
     >
       <CardHeader
         headingId={chartId}
         title={`Chart ${slot.n}`}
         after={
-          <span className="text-[12.5px] text-faint">
-            By {bucket}, {data.caption}
-          </span>
+          <>
+            <span
+              className={`text-[12.5px] text-faint ${named ? 'print:hidden' : ''}`}
+            >
+              By {bucket}, {data.caption}
+            </span>
+            {/* On paper the metric rows are gone: the caption names what is plotted. */}
+            {named ? (
+              <span className="hidden text-[12.5px] text-faint print:inline">
+                {named}, by {bucket}
+              </span>
+            ) : null}
+          </>
         }
         end={
           <>
@@ -247,7 +261,7 @@ function ChartSlot({
                 type="button"
                 aria-label={`Remove chart ${slot.n}`}
                 onClick={onRemove}
-                className={GHOST}
+                className={`${GHOST} print:hidden`}
               >
                 Remove
               </button>
@@ -263,7 +277,7 @@ function ChartSlot({
           onRemove={(metric) => toggle(metric, false)}
         />
       ) : null}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 print:hidden">
         <div className="flex items-center gap-2.5">
           <Popover.Root>
             <Popover.Trigger
@@ -346,7 +360,7 @@ function ChartSlot({
 /** Where a removed chart was: one press brings it back. */
 function AddChart({ onAdd }: { onAdd(): void }): React.JSX.Element {
   return (
-    <div className="flex min-h-40 min-w-0 items-center justify-center rounded-card border border-dashed border-line-2 p-4">
+    <div className="flex min-h-40 min-w-0 items-center justify-center rounded-card border border-dashed border-line-2 p-4 print:hidden">
       <button
         type="button"
         onClick={onAdd}
@@ -421,6 +435,8 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
 
   return (
     <>
+      <PrintHeader title="Performance report" data={data} />
+      <PerformanceActions basis={basis} />
       <div className="grid gap-4 lg:grid-cols-2">
         {([1, 2] as const).map((n) =>
           off.includes(n) ? (
@@ -467,7 +483,11 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
  * first chart. Each slot's choice is in the address bar
  * (`?m=net:bar,win-rate:line&bucket=week` for chart 1, `m2` and `bucket2` for
  * chart 2, `off=2` for a removed chart) so it can be linked. Day-level and
- * trade-level figures follow `timeSeries`'s rules. Render inside `<Suspense>`.
+ * trade-level figures follow `timeSeries`'s rules. Above them, the P&L basis
+ * and Export PDF, which opens the print dialog: under `@media print` (the
+ * shared sheet, `styles/print.css`) the page loses its chrome and controls and
+ * gains a header that names the workspace, accounts, range, filters, unit and
+ * basis. Render inside `<Suspense>`.
  */
 export function PerformanceView(): React.JSX.Element {
   return (

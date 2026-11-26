@@ -81,43 +81,49 @@
  * surfaces lifted a step at a time, hairline borders, grey text. Every neutral
  * has equal red, green and blue, so nothing reads blue. Depth is the lift and
  * the hairline; shadows are plain black.
+ *
+ * For screens only: paper is always light, whatever the Appearance setting
+ * (the print sheet, print.css), so on a printer this block does not apply.
  */
-:root[data-theme='dark'] {
-  color-scheme: dark;
-  --bg: #0b0b0b;
-  --surface-1: #141414;
-  --sunken: #1b1b1b;
-  --line: #252525;
-  --line-2: #313131;
-  --text: #ededed;
-  --muted: #a3a3a3;
-  --faint: #878787;
-  --accent: #4c57dc;
-  --accent-hover: #5c66e6;
-  --accent-soft: #1c1d2e;
-  --accent-ink: #aeb4ff;
-  --accent-fg: #ffffff;
-  --accent-deep: #1f278c;
-  --accent-tint: #2a2f5e;
-  --gain: #3fc08e;
-  --gain-fill: #2fb27f;
-  --gain-soft: #10261c;
-  --loss: #f06a78;
-  --loss-fill: #e5484d;
-  --loss-soft: #2b1517;
-  --warn: #f0b44a;
-  --warn-fill: #e9a21a;
-  --warn-soft: #2a2010;
-  --info: #4db8e0;
-  --info-fill: #1693be;
-  --info-soft: #0d2330;
-  --track: rgb(255 255 255 / 0.05);
-  --hg0: color-mix(in srgb, var(--accent) 14%, var(--surface-1));
-  --hg1: color-mix(in srgb, var(--accent) 32%, var(--surface-1));
-  --hg2: color-mix(in srgb, var(--accent) 52%, var(--surface-1));
-  --hg3: color-mix(in srgb, var(--accent) 76%, var(--surface-1));
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 24px 48px -20px rgba(0, 0, 0, 0.75);
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-chip: 0 1px 2px rgba(0, 0, 0, 0.45);
-  --veil: rgba(0, 0, 0, 0.62);
+@media not print {
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    --bg: #0b0b0b;
+    --surface-1: #141414;
+    --sunken: #1b1b1b;
+    --line: #252525;
+    --line-2: #313131;
+    --text: #ededed;
+    --muted: #a3a3a3;
+    --faint: #878787;
+    --accent: #4c57dc;
+    --accent-hover: #5c66e6;
+    --accent-soft: #1c1d2e;
+    --accent-ink: #aeb4ff;
+    --accent-fg: #ffffff;
+    --accent-deep: #1f278c;
+    --accent-tint: #2a2f5e;
+    --gain: #3fc08e;
+    --gain-fill: #2fb27f;
+    --gain-soft: #10261c;
+    --loss: #f06a78;
+    --loss-fill: #e5484d;
+    --loss-soft: #2b1517;
+    --warn: #f0b44a;
+    --warn-fill: #e9a21a;
+    --warn-soft: #2a2010;
+    --info: #4db8e0;
+    --info-fill: #1693be;
+    --info-soft: #0d2330;
+    --track: rgb(255 255 255 / 0.05);
+    --hg0: color-mix(in srgb, var(--accent) 14%, var(--surface-1));
+    --hg1: color-mix(in srgb, var(--accent) 32%, var(--surface-1));
+    --hg2: color-mix(in srgb, var(--accent) 52%, var(--surface-1));
+    --hg3: color-mix(in srgb, var(--accent) 76%, var(--surface-1));
+    --shadow:
+      0 1px 2px rgba(0, 0, 0, 0.5), 0 24px 48px -20px rgba(0, 0, 0, 0.75);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-chip: 0 1px 2px rgba(0, 0, 0, 0.45);
+    --veil: rgba(0, 0, 0, 0.62);
+  }
 }

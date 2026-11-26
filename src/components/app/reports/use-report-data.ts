@@ -47,6 +47,8 @@ export interface ReportData {
   filters: GlobalFilters;
   /** What the display units read: the trades behind the figures, the context and the percentage's base. */
   source: FigureSource;
+  /** The matched trades the display unit leaves out (R, ticks, pips, points keep only some); 0 in the other units. */
+  unitLeftOut: number;
 }
 
 export type ReportState =
@@ -176,6 +178,7 @@ export function useReportData(): ReportState {
       caption: view.caption,
       filters: shown,
       source: view.source,
+      unitLeftOut: set.data?.unitLeftOut ?? 0,
     },
   };
 }

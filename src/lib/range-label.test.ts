@@ -1,5 +1,10 @@
 import { expect, test } from 'vitest';
-import { rangeCaption, rangeChipLabel, PRESET_LABELS } from './range-label';
+import {
+  rangeCaption,
+  rangeChipLabel,
+  rangeInWords,
+  PRESET_LABELS,
+} from './range-label';
 
 test.each([
   [{}, 'all time'],
@@ -44,3 +49,60 @@ test('preset labels', () => {
     'Year to date',
   ]);
 });
+
+// A printed page names its range in full, with the dates the figures cover.
+const SPAN = { from: '2026-06-12', to: '2026-11-24' };
+
+test.each([
+  // All time says the days the trades fall on.
+  [{}, {}, SPAN, 'All time (12 Jun to 24 Nov 2026)'],
+  [
+    {},
+    {},
+    { from: '2025-12-12', to: '2026-11-24' },
+    'All time (12 Dec 2025 to 24 Nov 2026)',
+  ],
+  // With no trade to read a span from, the name stands alone.
+  [{}, {}, {}, 'All time'],
+  // A preset keeps its name and gives the days it resolved to.
+  [
+    { preset: 'last-30-days' as const },
+    { from: '2026-10-26', to: '2026-11-24' },
+    SPAN,
+    'Last 30 days (26 Oct to 24 Nov 2026)',
+  ],
+  // A custom range is its dates.
+  [
+    { from: '2026-11-03', to: '2026-11-05' },
+    { from: '2026-11-03', to: '2026-11-05' },
+    SPAN,
+    '3 Nov to 5 Nov 2026',
+  ],
+  [
+    { from: '2025-12-28', to: '2026-01-05' },
+    { from: '2025-12-28', to: '2026-01-05' },
+    SPAN,
+    '28 Dec 2025 to 5 Jan 2026',
+  ],
+  [
+    { from: '2026-11-03', to: '2026-11-03' },
+    { from: '2026-11-03', to: '2026-11-03' },
+    SPAN,
+    '3 Nov 2026',
+  ],
+  // An open end reads from the trades.
+  [
+    { from: '2026-11-01' },
+    { from: '2026-11-01' },
+    SPAN,
+    'Since 1 Nov 2026 (1 Nov to 24 Nov 2026)',
+  ],
+  [
+    { to: '2026-11-05' },
+    { to: '2026-11-05' },
+    SPAN,
+    'Up to 5 Nov 2026 (12 Jun to 5 Nov 2026)',
+  ],
+])('range in words %o', (range, resolved, span, out) =>
+  expect(rangeInWords(range, resolved, span)).toBe(out),
+);

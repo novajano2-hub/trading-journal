@@ -240,7 +240,7 @@ export function PlottedMetrics({
   return (
     <ul
       aria-label="Plotted metrics"
-      className="mt-3 divide-y divide-line/60 rounded-control border border-line"
+      className="mt-3 divide-y divide-line/60 rounded-control border border-line print:hidden"
     >
       {picks.map((pick) => {
         const label = labelOf(pick.metric, basis);

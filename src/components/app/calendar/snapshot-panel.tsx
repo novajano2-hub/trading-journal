@@ -10,10 +10,11 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Dialog } from 'radix-ui';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { Button } from '@/components/ui/button';
+import { UNIT_WORDS } from '@/content/display-units';
 import type { calendarMonth } from '@/data/calendar';
 import { useGlobalFilters } from '@/data/query/derived';
 import { useAccounts, useActiveWorkspace, usePrefs } from '@/data/query/hooks';
-import type { CalendarStat, DisplayUnit } from '@/domain/types';
+import type { CalendarStat } from '@/domain/types';
 import { resolveTheme } from '@/lib/appearance';
 import {
   calendarFileName,
@@ -278,17 +279,6 @@ export function SnapshotPanel({
     </Dialog.Root>
   );
 }
-
-/** What each display unit says in the caption. */
-const UNIT_WORDS: Record<DisplayUnit, string> = {
-  dollar: 'in dollars',
-  percent: 'in percent',
-  r: 'in R',
-  ticks: 'in ticks',
-  pips: 'in pips',
-  points: 'in points',
-  privacy: 'with amounts hidden',
-};
 
 /** The Snapshot button: a camera, with its word from `sm`; a phone gets the camera and the label. */
 export function SnapshotButton({
