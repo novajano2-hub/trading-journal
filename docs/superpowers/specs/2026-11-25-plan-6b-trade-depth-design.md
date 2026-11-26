@@ -11,7 +11,7 @@
 3. `DESIGN.md` and `PRODUCT.md`.
 4. The Plan 5 rulings, and the approved Plan 6A spec (`2026-11-25-plan-6a-daily-routine-design.md`), whose seams this plan picks up.
 
-Where TZ is unknown this doc decides, as a **Keel's call (TradeZella unknown)** with an id (B1 to B59, all listed in §6.1; "B" for 6B, so they never clash with 6A's K ids). The owner's decisions are in §6.2 (U1 to U4).
+Where TZ is unknown this doc decides, as a **Keel's call (TradeZella unknown)** with an id (B1 to B60, all listed in §6.1; "B" for 6B, so they never clash with 6A's K ids). The owner's decisions are in §6.2 (U1 to U4).
 
 ## 1. Intent and why
 
@@ -521,6 +521,7 @@ Every row below is Keel's call (TradeZella unknown). "Basis" names the evidence 
 | B57 | Editing or deleting a default rule | Values already applied stay; only Apply to existing trades rewrites them | Fee rule delete [help 6954370]; target rule UNKNOWN (record §2.2) |
 | B58 | Costs by hand: when it saves | When the row is confirmed; recomputes the trade; logged | The row's confirm tick [help 6387098] |
 | B59 | Picking a template in the chooser | Opens the create form filled from it, unsaved | "Presumably pre-fills" (record §6.2, INFERRED) |
+| B60 | Swap and the places that derive costs | Swap is a cost of its own, never part of "commissions" or "fees": wherever a view derives a cost as gross minus net, it uses the trades' fees instead; the Overview's Gross to net shows a Swap line (only when some trade has a swap) so gross, fees, swap and net add up | TZ lists Total swap beside commissions and fees [help 5829394]; net includes swap (B49) |
 
 ### 6.2 Decided by the owner (2026-11-25)
 
