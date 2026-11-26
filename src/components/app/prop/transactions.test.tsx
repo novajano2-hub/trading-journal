@@ -744,3 +744,39 @@ test('on a phone Add transaction opens a sheet with the same fields, and saves',
     ),
   ).toBeTruthy();
 });
+
+test('?add=1 opens the add row at once, as the dashboard’s Add transaction asks, and leaves the address clean', async () => {
+  const r = repo();
+  await inNewYork(r);
+  renderApp(<Transactions />, { repository: r, url: `${URL}?add=1&x=keep` });
+  expect(
+    await screen.findByRole('button', { name: 'Save transaction' }),
+  ).toBeTruthy();
+  // The row is the fresh one the button would open: today, uncategorized.
+  expect((screen.getByLabelText('Date') as HTMLInputElement).value).toBe(
+    '2026-11-25',
+  );
+  expect(document.activeElement).toBe(
+    screen.getByRole('textbox', { name: 'Description' }),
+  );
+  await waitFor(() => expect(window.location.search).toBe('?x=keep'));
+  // Closing it does not bring it back.
+  fireEvent.keyDown(screen.getByRole('textbox', { name: 'Description' }), {
+    key: 'Escape',
+  });
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('button', { name: 'Save transaction' }),
+    ).toBeNull(),
+  );
+});
+
+test('?add=1 on a phone opens the sheet', async () => {
+  viewport({ phone: true });
+  const r = repo();
+  await inNewYork(r);
+  renderApp(<Transactions />, { repository: r, url: `${URL}?add=1` });
+  expect(
+    await screen.findByRole('dialog', { name: 'Add transaction' }),
+  ).toBeTruthy();
+});

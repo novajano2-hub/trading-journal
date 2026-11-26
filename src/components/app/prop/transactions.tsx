@@ -10,6 +10,7 @@ import {
   Trash,
 } from '@phosphor-icons/react/dist/ssr';
 import { useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
 import { DropdownMenu } from 'radix-ui';
 import {
   useEffect,
@@ -22,6 +23,7 @@ import {
 } from 'react';
 import { CARD } from '@/components/app/dashboard/shared';
 import { ConfirmDialog } from '@/components/app/confirm-dialog';
+import { writeParam } from '@/components/app/reports/use-report-data';
 import { SelectField } from '@/components/app/import/select-field';
 import { LABEL } from '@/components/app/import/styles';
 import {
@@ -387,6 +389,7 @@ export function Transactions(): React.JSX.Element {
   const update = useUpdatePropTxn();
   const remove = useRemovePropTxn();
   const phone = usePhone();
+  const wantsAdd = useSearchParams().get('add') === '1';
   const [view, setView] = useState<TxnView>('all');
   const [adding, setAdding] = useState(false);
   const [linking, setLinking] = useState<string | null>(null);
@@ -437,6 +440,19 @@ export function Transactions(): React.JSX.Element {
     refocusAdd.current = false;
     addOrigin.current?.focus();
   }, [adding]);
+
+  // The dashboard's Add transaction arrives with `?add=1`: the row opens once
+  // the profile is known (the row's date is today), and the address is cleaned
+  // so a reload or Back does not open it again.
+  const [openedByAddress, setOpenedByAddress] = useState(false);
+  if (wantsAdd && !openedByAddress && today !== '') {
+    setOpenedByAddress(true);
+    draft.reset();
+    setAdding(true);
+  }
+  useEffect(() => {
+    if (openedByAddress) writeParam('add', null);
+  }, [openedByAddress]);
 
   const error = txns.error ?? challenges.error ?? prefs.error;
   if (error)

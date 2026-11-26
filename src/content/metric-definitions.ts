@@ -123,6 +123,19 @@ export const METRIC_IDS = [
   'prop-consistency',
   'phase-balance',
   'challenge-strategies',
+  'prop-funded',
+  'prop-evaluation',
+  'prop-spent',
+  'prop-earned',
+  'prop-net',
+  'prop-return',
+  'prop-money',
+  'prop-pass-rate',
+  'prop-breach-reasons',
+  'prop-breach-days',
+  'prop-breach-pnl',
+  'prop-breach-size',
+  'prop-breach-firm',
   'day-ticks',
   'day-pips',
   'day-points',
@@ -764,6 +777,70 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Strategies',
     definition:
       "The strategies this challenge is traded with. They feed the Prop firms dashboard's pass rate by strategy and its strategy filter.",
+  },
+  'prop-funded': {
+    label: 'Funded',
+    definition:
+      'The balance of your active funded accounts: challenges in their funded phase that have not breached. Closed trades, net, in your base currency. An account in another currency is left out.',
+  },
+  'prop-evaluation': {
+    label: 'Evaluation',
+    definition:
+      'The balance of your active evaluation accounts: open challenges still in an evaluation phase. Closed trades, net, in your base currency. An account in another currency is left out.',
+  },
+  'prop-spent': {
+    label: 'Total spent',
+    definition:
+      'Every cost in your transactions, not ignored, plus challenge fees with no transaction of their own. The sign decides: a negative amount is spent, whatever its category.',
+  },
+  'prop-earned': {
+    label: 'Total earned',
+    definition:
+      'Every income in your transactions, not ignored: payouts, refunds and affiliate income. The sign decides: a positive amount is earned, whatever its category.',
+  },
+  'prop-net': {
+    label: 'Net',
+    definition:
+      'Earned minus spent. Return on spend is the net over what you spent; it has no value until you have spent something.',
+  },
+  'prop-return': {
+    label: 'Return over time',
+    definition:
+      "Cumulative income, cumulative costs and the running net, from the first day of the period chosen to its last. A transaction counts on its own date; a challenge fee on the challenge's first start date.",
+  },
+  'prop-money': {
+    label: 'Where the money went',
+    definition:
+      'Spent, earned and net by firm, account type, account size, or costs by fee type. A transaction with no challenge reads None by type and size.',
+  },
+  'prop-pass-rate': {
+    label: 'Pass rate',
+    definition:
+      'Evaluations passed over evaluations that passed or were breached. Active ones are not counted yet, and neither are accounts that went straight to funded, which never took an evaluation. A challenge counts under each of its strategies.',
+  },
+  'prop-breach-reasons': {
+    label: 'Why accounts broke',
+    definition:
+      'The reasons you gave when marking a challenge breached, most common first, as a share of the breaches in the phase chosen.',
+  },
+  'prop-breach-days': {
+    label: 'Average days before a breach',
+    definition:
+      'From the start of the phase that broke to the day it breached, averaged over the breaches that have both dates.',
+  },
+  'prop-breach-pnl': {
+    label: 'Average P&L before a breach',
+    definition:
+      "The breached phase account's net P&L from its start to the breach, averaged. Always net, in your base currency.",
+  },
+  'prop-breach-size': {
+    label: 'Most common size',
+    definition: 'The account size breached most often.',
+  },
+  'prop-breach-firm': {
+    label: 'Most common firm',
+    definition:
+      'The firm with the most breaches; a tie goes to the latest breach.',
   },
   'tracker-streak': {
     label: 'Current streak',

@@ -241,3 +241,32 @@ test('a long run keeps its table to a sample that holds the first and the last p
     within(rows[rows.length - 1]!).getByRole('rowheader').textContent,
   ).toBe(`P${n - 1}`);
 });
+
+test('a gain or loss series is drawn whole in that colour, line and legend key alike', async () => {
+  const kept: DualSeries = {
+    ...line,
+    key: 'in',
+    label: 'Income',
+    axis: 'left',
+    tone: 'gain',
+  };
+  const lost: DualSeries = {
+    ...line,
+    key: 'out',
+    label: 'Costs',
+    axis: 'left',
+    tone: 'loss',
+  };
+  const { container } = draw([kept, lost]);
+  await chart();
+  const stroke = (key: string) =>
+    container
+      .querySelector(`[data-series="${key}"] path`)
+      ?.getAttribute('stroke');
+  expect(stroke('in')).toBe('var(--gain-fill)');
+  expect(stroke('out')).toBe('var(--loss-fill)');
+  const keys = [...container.querySelectorAll('[data-swatch="line"]')].map(
+    (k) => (k as HTMLElement).style.borderColor,
+  );
+  expect(keys).toEqual(['var(--gain-fill)', 'var(--loss-fill)']);
+});

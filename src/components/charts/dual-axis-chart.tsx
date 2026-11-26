@@ -29,8 +29,12 @@ export interface DualSeries {
   unit: SeriesUnit;
   /** One value per x; null is a gap. */
   values: readonly (number | null)[];
-  /** Bars `signed` wear the gain and loss colours by sign; the default is the accent. */
-  tone?: 'accent' | 'muted' | 'signed';
+  /**
+   * Bars `signed` wear the gain and loss colours by sign; the default is the
+   * accent. `gain` and `loss` draw the whole series in one of the two, for a
+   * running figure that is always money kept or money lost.
+   */
+  tone?: 'accent' | 'muted' | 'signed' | 'gain' | 'loss';
   dashed?: boolean;
 }
 
@@ -50,6 +54,8 @@ const TONE = {
   accent: 'var(--accent)',
   muted: 'var(--muted)',
   signed: 'var(--accent)',
+  gain: 'var(--gain-fill)',
+  loss: 'var(--loss-fill)',
 } as const;
 
 interface Scale {
