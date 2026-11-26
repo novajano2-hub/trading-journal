@@ -275,6 +275,43 @@ describe('the currency the page shows', () => {
       within(widget('year')).getAllByRole('link')[10]!.getAttribute('href'),
     ).toBe('/app/calendar?month=2026-11&cur=EUR');
   });
+
+  test('a currency whose trades all fall outside the date range can still be chosen: the calendars read every date', async () => {
+    await renderWidgets([PLAIN], {
+      sample: twoCurrencies,
+      url: '/app/dashboard?from=2026-11-02&to=2026-11-02',
+    });
+    await ready(PLAIN);
+    const group = screen.getByRole('radiogroup', { name: 'Currency' });
+    expect(
+      within(group)
+        .getAllByRole('radio')
+        .map((r) => (r as HTMLInputElement).value),
+    ).toEqual(['USD', 'EUR']);
+    fireEvent.click(within(group).getByRole('radio', { name: 'EUR' }));
+    await waitFor(() =>
+      expect(day(PLAIN, '2026-11-04').getAttribute('aria-label')).toBe(
+        'Wed 4 Nov, +€200.00, 1 trade',
+      ),
+    );
+  });
+
+  test('a currency with no closed trade in the range or outside it is not offered', async () => {
+    await renderWidgets([PLAIN], {
+      sample: tradesSample(
+        () => [esTrade(0, '2026-11-02', 10_000)],
+        (s) => {
+          s.accounts.push({
+            ...s.accounts[0]!,
+            id: 'acc-eur',
+            currency: 'EUR',
+          });
+        },
+      ),
+    });
+    await ready(PLAIN);
+    expect(screen.queryByRole('radiogroup', { name: 'Currency' })).toBeNull();
+  });
 });
 
 describe('the mini calendar (C12): 6A’s month, a day opens its Day view', () => {

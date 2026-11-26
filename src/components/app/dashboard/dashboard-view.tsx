@@ -149,13 +149,18 @@ export function DashboardView(): React.JSX.Element {
   );
 
   // One currency at a time (C58): the one chosen if it has closed trades, else the base currency
-  // if it has, else the first that has.
+  // if it has, else the first that has. The calendars read every date, so a currency whose trades
+  // all fall outside the date range is offered too (the day trades hold them).
   const [chosen, setChosen] = useState<string>();
   const closedCurrencies = useMemo(() => {
     if (!set.data || !prefs) return undefined;
     const base = prefs.baseCurrency;
     return [
-      ...new Set(set.data.trades.filter(isClosed).map((t) => t.pnlCurrency)),
+      ...new Set(
+        [...set.data.trades, ...set.data.dayTrades]
+          .filter(isClosed)
+          .map((t) => t.pnlCurrency),
+      ),
     ].sort((a, b) =>
       a === b ? 0 : a === base ? -1 : b === base ? 1 : a < b ? -1 : 1,
     );
