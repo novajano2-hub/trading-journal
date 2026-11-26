@@ -187,3 +187,16 @@ test('trimmedPercent keeps up to two decimals and drops trailing zeros', async (
   expect(trimmedPercent(1)).toBe('100%');
   expect(trimmedPercent(0)).toBe('0%');
 });
+
+test('formatBytes reads a file size in B, KB or MB, to a whole KB and one decimal of MB', async () => {
+  const { formatBytes } = await import('./format');
+  expect(formatBytes(0)).toBe('0 B');
+  expect(formatBytes(832)).toBe('832 B');
+  expect(formatBytes(1024)).toBe('1 KB');
+  expect(formatBytes(412 * 1024)).toBe('412 KB');
+  // Never "1,024 KB": past 1023.5 KB it is a megabyte.
+  expect(formatBytes(1024 * 1024 - 1)).toBe('1 MB');
+  expect(formatBytes(1.5 * 1024 * 1024)).toBe('1.5 MB');
+  expect(formatBytes(10 * 1024 * 1024)).toBe('10 MB');
+  expect(formatBytes(2.04 * 1024 * 1024)).toBe('2 MB');
+});

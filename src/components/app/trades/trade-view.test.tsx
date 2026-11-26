@@ -1179,3 +1179,54 @@ test('Privacy masks swap in the row and in the header', async () => {
   expect(document.body.textContent).not.toContain('4.86');
   expect(everyString(document.body).filter((s) => /\$\d/.test(s))).toEqual([]);
 });
+
+test('the Attachments card sits between Tags and rating and Notes, and takes a file on the trade', async () => {
+  const { repo } = renderApp(<TradeView id="t-c" />, {
+    sample: sample(),
+    url: URL_C,
+  });
+  const tags = await screen.findByRole('region', { name: 'Tags and rating' });
+  const files = screen.getByRole('region', { name: 'Attachments' });
+  const notes = screen.getByRole('region', { name: 'Notes' });
+  const follows = (a: Element, b: Element) =>
+    Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+  expect(follows(tags, files)).toBe(true);
+  expect(follows(files, notes)).toBe(true);
+  const input = files.querySelector('input[type="file"]') as HTMLInputElement;
+  fireEvent.change(input, {
+    target: {
+      files: [
+        new File([new Uint8Array(4)], 'plan.pdf', { type: 'application/pdf' }),
+      ],
+    },
+  });
+  await waitFor(async () =>
+    expect((await repo.files.list(WS, 'trade:t-c')).map((f) => f.name)).toEqual(
+      ['plan.pdf'],
+    ),
+  );
+  expect(await within(files).findByText('plan.pdf')).toBeTruthy();
+});
+
+test("an archived account lists its trade's files without a way to add one", async () => {
+  const { repo } = renderApp(<TradeView id="t-c" />, {
+    sample: sample({}, 'acc-b'),
+    url: URL_C,
+  });
+  await repo.files.add(
+    WS,
+    'trade:t-c',
+    {
+      bytes: new Uint8Array(4).buffer,
+      type: 'application/pdf',
+      name: 'kept.pdf',
+    },
+    { images: false },
+  );
+  const files = await screen.findByRole('region', { name: 'Attachments' });
+  await waitFor(async () =>
+    expect(await repo.files.list(WS, 'trade:t-c')).toHaveLength(1),
+  );
+  expect(files.querySelector('input[type="file"]')).toBeNull();
+  expect(within(files).queryByText('Drop files here')).toBeNull();
+});
