@@ -504,10 +504,12 @@ test('the filters narrow the dashboard from the address, stay over a reload, and
 
   // The date chip is the global range and leaves the filter alone.
   await page.getByRole('button', { name: 'All time' }).click();
-  await page
+  const last30 = page
     .getByRole('dialog', { name: 'Date' })
-    .getByRole('radio', { name: 'Last 30 days' })
-    .check({ force: true });
+    .getByRole('radio', { name: 'Last 30 days' });
+  // The popover is placed a frame after it opens; a forced check does not retry.
+  await expect(last30).toBeInViewport();
+  await last30.check({ force: true });
   await page.keyboard.press('Escape');
   await expect(page).toHaveURL(/range=last-30-days/);
   await expect(page).toHaveURL(/pfirm=Sample\+data\+feed/);
@@ -563,4 +565,110 @@ test('the Dashboard does not overflow sideways from 390 to 1680, filtered or not
         .toBeLessThanOrEqual(0);
     }
   }
+});
+
+test('the first run shows once in an empty My workspace: two rows, the totals, the end, the rows in Transactions, and no run after a reload (C71)', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  // The sample has data: the dashboard, never the run.
+  await page.goto('/app/prop-firms');
+  await expect(card(page, 'Total spent')).toBeVisible();
+  await expect(page.getByText('How do you trade?')).toHaveCount(0);
+
+  await page.getByRole('button', { name: /Sample workspace/ }).click();
+  await page.getByRole('menuitemradio', { name: 'My workspace' }).click();
+  await expect(page.getByText('Step 1 of 4')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'How do you trade?' }),
+  ).toBeVisible();
+  // The run stands in for the dashboard: no tabs, no buttons of its own.
+  await expect(
+    page.getByRole('navigation', { name: 'Prop firms' }),
+  ).toHaveCount(0);
+
+  // Step 1: how you trade. Nothing is chosen for you.
+  await expect(page.getByRole('button', { name: 'Continue' })).toBeDisabled();
+  await page
+    .getByRole('radiogroup')
+    .locator('label', { hasText: 'Both' })
+    .click();
+  await expect(page.getByRole('radio', { name: /Both/ })).toBeChecked();
+  await page.getByRole('button', { name: 'Continue' }).click();
+
+  // Step 2: two rows, the second added with Enter.
+  await expect(page.getByText('Step 2 of 4')).toBeVisible();
+  await expect(page.getByLabel('Date', { exact: true })).toHaveValue(
+    '2026-11-20',
+  );
+  await page.getByLabel('Firm', { exact: true }).fill('E2E firm');
+  await page.getByLabel('Amount', { exact: true }).fill('-165');
+  await page
+    .getByLabel('Category', { exact: true })
+    .selectOption({ label: 'Evaluation fee' });
+  await page.getByRole('button', { name: 'Add transaction' }).click();
+  const added = page.getByRole('list', { name: 'Added' });
+  await expect(added.getByRole('listitem')).toHaveCount(1);
+  await expect(added).toContainText('−$165.00');
+  await expect(page.getByLabel('Firm', { exact: true })).toBeFocused();
+  await page.getByLabel('Firm', { exact: true }).fill('E2E firm');
+  await page.getByLabel('Amount', { exact: true }).fill('1800');
+  await page
+    .getByLabel('Category', { exact: true })
+    .selectOption({ label: 'Payout' });
+  await page.getByLabel('Amount', { exact: true }).press('Enter');
+  await expect(added.getByRole('listitem')).toHaveCount(2);
+  await expect(added.getByRole('listitem').first()).toContainText('+$1,800.00');
+
+  // The card does not overflow the page, from a phone to a wide screen.
+  for (const width of [390, 640, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () => document.documentElement.scrollWidth - innerWidth,
+          ),
+        { message: `step 2 at ${width}` },
+      )
+      .toBeLessThanOrEqual(0);
+  }
+
+  // Step 3: the totals of the two rows.
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByText('Step 3 of 4')).toBeVisible();
+  const total = (label: string) =>
+    page.getByText(label, { exact: true }).locator('xpath=ancestor::div[1]');
+  await expect(total('Spent')).toContainText('−$165.00');
+  await expect(total('Earned')).toContainText('+$1,800.00');
+  await expect(total('Net')).toContainText('+$1,635.00');
+
+  // Step 4, then the dashboard: its figures read the same rows.
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Track your active accounts' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Go to the dashboard' }).click();
+  await expect(card(page, 'Total spent')).toContainText('−$165.00');
+  await expect(card(page, 'Total earned')).toContainText('+$1,800.00');
+  await expect(card(page, 'Net')).toContainText('+$1,635.00');
+  await expect(page.getByText('How do you trade?')).toHaveCount(0);
+
+  // The rows are in Transactions.
+  await page
+    .getByRole('navigation', { name: 'Prop firms' })
+    .getByRole('link', { name: 'Transactions' })
+    .click();
+  const table = page.getByRole('table', { name: 'Transactions' });
+  await expect(table.getByRole('row')).toHaveCount(3);
+  await expect(table).toContainText('E2E firm');
+  await expect(table).toContainText('Evaluation fee');
+  await expect(table).toContainText('−$165.00');
+  await expect(table).toContainText('+$1,800.00');
+
+  // A reload: the dashboard, not the run.
+  await page.goto('/app/prop-firms');
+  await expect(card(page, 'Net')).toContainText('+$1,635.00');
+  await expect(page.getByText('How do you trade?')).toHaveCount(0);
+  await expect(page.getByText('Step 1 of 4')).toHaveCount(0);
 });
