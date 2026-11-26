@@ -410,22 +410,24 @@ export function breakdown(
 // ---- Pass rate ---------------------------------------------------------
 
 /**
- * How a challenge's evaluation ended, null while it has no outcome. Passed is
- * `passed`, or the funded phase and not breached; a breach in the evaluation
- * is a failure; a breach in the funded phase is the funded insight's, not an
- * evaluation's (C32).
+ * How a challenge's evaluation ended, null while it has no outcome. A straight
+ * to funded challenge never took an evaluation, so it has none (Ruling 12).
+ * Passed is `passed` or moved to funded, whether or not the funded account
+ * broke since (C32); a breach in an evaluation phase is a failure.
  */
 function evaluationResult(c: Challenge): 'passed' | 'failed' | null {
+  if (challengeType(c) === 's2f') return null;
   if (c.status === 'passed') return 'passed';
   if (c.status === 'breached')
-    return c.phase === 'evaluation' ? 'failed' : null;
+    return c.phase === 'evaluation' ? 'failed' : 'passed';
   return c.phase === 'funded' ? 'passed' : null;
 }
 
 /**
  * Passed over attempted, overall and by firm, type, size or strategy. An
- * attempt is an evaluation that passed or was breached; active ones are not
- * counted (C32), and a group with none has no row. A challenge counts under
+ * attempt is an evaluation that passed (or moved to funded) or was breached;
+ * active ones and straight-to-funded ones are not counted (C32), and a group
+ * with none has no row. A challenge counts under
  * each of its strategies and once overall. A strategy row's label is its id.
  */
 export function passRates(

@@ -919,6 +919,12 @@ describe('breakdown', () => {
 });
 
 describe('passRates', () => {
+  /** An evaluation step with an account linked: not straight to funded. */
+  const EVALUATED: Challenge['phases'] = [
+    { step: 'step-1', accountId: 'f50e', startDate: '2026-09-14' },
+    { step: 'funded', accountId: 'f50f' },
+  ];
+
   test('by firm: passed over attempted, an active challenge not counted', () => {
     const r = passRates(CHALLENGES, ACCOUNTS, 'firm');
     expect(r.overall).toEqual({ passed: 1, attempted: 3 });
@@ -965,28 +971,89 @@ describe('passRates', () => {
     ]);
   });
 
-  test("passed means status 'passed', or the funded phase and not breached", () => {
+  test("passed means status 'passed', or moved to funded (breached there or not)", () => {
     const rate = (c: Challenge) => passRates([c], [], 'firm').overall;
     expect(rate(challenge('a', { status: 'passed' }))).toEqual({
       passed: 1,
       attempted: 1,
     });
-    expect(rate(challenge('b', { phase: 'funded' }))).toEqual({
-      passed: 1,
-      attempted: 1,
-    });
+    expect(
+      rate(challenge('b', { phase: 'funded', phases: EVALUATED })),
+    ).toEqual({ passed: 1, attempted: 1 });
+    // Breached in an evaluation phase: attempted, not passed.
     expect(rate(challenge('c', { status: 'breached' }))).toEqual({
       passed: 0,
       attempted: 1,
     });
     expect(rate(challenge('d', {}))).toEqual({ passed: 0, attempted: 0 });
-    // A breach in the funded phase is the funded insight's, not an evaluation's.
+  });
+
+  test('a challenge breached in its funded phase moved to funded: it counts as passed (C32)', () => {
+    const rate = (cs: Challenge[]) => passRates(cs, [], 'firm').overall;
     expect(
-      rate(challenge('e', { phase: 'funded', status: 'breached' })),
-    ).toEqual({
-      passed: 0,
-      attempted: 0,
-    });
+      rate([
+        challenge('e', {
+          phase: 'funded',
+          status: 'breached',
+          phases: EVALUATED,
+        }),
+      ]),
+    ).toEqual({ passed: 1, attempted: 1 });
+    // Three evaluations passed, then the funded accounts breached: 3 of 3.
+    expect(
+      rate(
+        ['p1', 'p2', 'p3'].map((id) =>
+          challenge(id, {
+            phase: 'funded',
+            status: 'breached',
+            phases: EVALUATED,
+            breachedOn: '2026-10-20',
+          }),
+        ),
+      ),
+    ).toEqual({ passed: 3, attempted: 3 });
+    // An evaluation breach beside them still fails.
+    expect(
+      rate([
+        challenge('p', {
+          phase: 'funded',
+          status: 'breached',
+          phases: EVALUATED,
+        }),
+        challenge('q', { status: 'breached', phases: EVALUATED }),
+      ]),
+    ).toEqual({ passed: 1, attempted: 2 });
+  });
+
+  test('a straight-to-funded challenge is in neither passed nor attempted, in every view (Ruling 12)', () => {
+    const base = passRates(CHALLENGES, ACCOUNTS, 'firm').overall;
+    const s2f = (id: string, over: Partial<Challenge>) =>
+      challenge(id, {
+        phase: 'funded',
+        phases: [
+          { step: 'funded', accountId: 'f50f', startDate: '2026-11-01' },
+        ],
+        strategyIds: ['s-orb'],
+        ...over,
+      });
+    const extras = [
+      s2f('s-active', {}),
+      s2f('s-passed', { status: 'passed' }),
+      s2f('s-breached', { status: 'breached', breachedOn: '2026-11-10' }),
+    ];
+    for (const e of extras) expect(challengeType(e)).toBe('s2f');
+    for (const by of ['firm', 'type', 'size', 'strategy'] as const) {
+      expect(passRates(extras, ACCOUNTS, by)).toEqual({
+        overall: { passed: 0, attempted: 0 },
+        rows: [],
+      });
+      expect(passRates([...CHALLENGES, ...extras], ACCOUNTS, by)).toEqual(
+        passRates(CHALLENGES, ACCOUNTS, by),
+      );
+    }
+    expect(
+      passRates([...CHALLENGES, ...extras], ACCOUNTS, 'firm').overall,
+    ).toEqual(base);
   });
 
   test('no challenge gives zero over zero', () => {
