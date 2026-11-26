@@ -9,8 +9,10 @@ import {
   useEndSession,
   usePrefs,
   useStartSession,
+  useTracker,
 } from '@/data/query/hooks';
 import { sessionLength } from '@/data/routine';
+import { routineNow } from '@/domain/tracker/defaults';
 import type { DayRecord } from '@/domain/types';
 import { useDayFinished } from './day-lock';
 
@@ -53,6 +55,7 @@ export function useElapsed(
   session: DayRecord['session'],
 ): number | null {
   const timeZone = usePrefs().data?.timeZone;
+  const tracker = useTracker().data;
   const [now, setNow] = useState(() => new Date().toISOString());
   const running =
     date === today && session !== undefined && session.end === undefined;
@@ -61,8 +64,16 @@ export function useElapsed(
     const id = setInterval(() => setNow(new Date().toISOString()), 1000);
     return () => clearInterval(id);
   }, [running]);
-  if (today === undefined || timeZone === undefined) return null;
-  return sessionLength(session, date, today, now, timeZone);
+  if (today === undefined || timeZone === undefined || tracker === undefined)
+    return null;
+  // On the sample the routine's today is its `asOf` day, where the session started (M1).
+  return sessionLength(
+    session,
+    date,
+    today,
+    routineNow(tracker, now, timeZone),
+    timeZone,
+  );
 }
 
 /** What a refused or failed session write says, beside the control. */

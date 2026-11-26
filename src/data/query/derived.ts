@@ -24,7 +24,7 @@ import {
   metricsByCurrency,
   type CurrencyMetrics,
 } from '../metrics';
-import { routineToday } from '@/domain/tracker/defaults';
+import { routineNow, routineToday } from '@/domain/tracker/defaults';
 import { msToLocalMidnight, scoreHistory, type ScoreHistory } from '../routine';
 import {
   useAccounts,
@@ -433,7 +433,7 @@ export function useDayScores(): Derived<ScoreHistory> {
       {
         timeZone,
         baseCurrency,
-        now,
+        now: routineNow(tracker.data, now, timeZone),
         today: routineToday(tracker.data, now, timeZone),
         ...(selection ? { accountIds: selection.split(',') } : {}),
       },

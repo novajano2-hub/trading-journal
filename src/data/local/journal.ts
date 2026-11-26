@@ -10,7 +10,7 @@ import {
 import { dayLabel, parseYmd, ymd } from '../seed/calendar';
 import type { LocalContext } from './context';
 import { readPrefs } from './prefs';
-import { isLocked, todayIn } from './routine-today';
+import { isLocked, routineNowIn, todayIn } from './routine-today';
 import { rwTx } from './tx';
 import type { KeelDb } from './db';
 
@@ -210,7 +210,10 @@ export function localJournal(ctx: LocalContext): JournalRepo {
             day.noteStartedAt === undefined &&
             entry.date === (await todayIn(db, ws, ctx.now()))
           )
-            await db.days.put({ ...day, noteStartedAt: entry.updatedAt });
+            await db.days.put({
+              ...day,
+              noteStartedAt: await routineNowIn(db, ws, ctx.now()),
+            });
         }
         return entry;
       });
