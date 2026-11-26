@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useId } from 'react';
 import { CheckCircle, XCircle } from '@phosphor-icons/react/dist/ssr';
 import { Chip, SideChip } from '@/components/ui/chip';
 import { Segmented } from '@/components/ui/segmented';
@@ -17,20 +16,8 @@ import { useDisplay } from '@/lib/display';
 import { FigureText } from '@/components/product/figure-text';
 import { formatQty, keepHyphens, plural, price } from '@/lib/format';
 import { shortTime } from '@/lib/time-format';
-import { navHref, navItem } from '../nav';
 import { TradeLink } from '../trades/cells';
-import {
-  CARD,
-  Caption,
-  CardHeader,
-  HEADER_LINK,
-  InstrumentName,
-  signTone,
-  TradeTime,
-} from './shared';
-
-// "All trades" is a drill-down: it lands on the All view, not Trades' own Day view (spec 5.3).
-const TRADES = { ...navItem('trades'), href: '/app/trades' as const };
+import { InstrumentName, signTone, TradeTime } from './shared';
 
 const FIGURE = 'font-[550] tabular-nums';
 const TH =
@@ -342,6 +329,12 @@ function ClosedTrades({
   timeZone: string;
 }): React.JSX.Element {
   const display = useDisplay();
+  if (recent.length === 0)
+    return (
+      <p className="mt-3 pb-4 text-[13.5px] text-muted">
+        No closed trades in this range.
+      </p>
+    );
   return (
     <table
       aria-label="Recent trades"
@@ -437,8 +430,10 @@ function ClosedTrades({
 }
 
 /**
- * Row 3: the newest closed trades in the filters, each with how it went
- * against its strategy's rules. Rules takes the width the fixed columns
+ * The recent trades widget's body: the newest closed trades in the filters,
+ * each with how it went against its strategy's rules, and the open positions
+ * on a tab beside them; a row opens its trade. The widget's frame draws the
+ * card, its title and its info tip. Rules takes the width the fixed columns
  * leave, at least 280px from `xl`, where every row is one 34px line. Below
  * `md` the time folds under the symbol; below `sm` Side and Strategy hide.
  */
@@ -447,39 +442,20 @@ export function RecentTrades({
   open,
   basis,
   timeZone,
-  caption,
   tab,
   onTab,
 }: {
   recent: readonly RecentTrade[];
   /** The open trades in the filters, newest first. */
   open: readonly OpenPosition[];
-  /** Kept by the Dashboard, so a filter change doesn't reset it. */
+  /** Kept by the widget, so a filter change doesn't reset it. */
   tab: 'closed' | 'open';
   onTab: (tab: 'closed' | 'open') => void;
   basis: PnlBasis;
   timeZone: string;
-  /** The range, e.g. "1-20 Nov". */
-  caption: string;
 }): React.JSX.Element {
-  const headingId = useId();
-  // The Trades page opens on the same filters.
-  const allTrades = navHref(TRADES, useSearchParams());
   return (
-    <section
-      aria-labelledby={headingId}
-      className={`${CARD} px-5 pt-[18px] pb-1`}
-    >
-      <CardHeader
-        headingId={headingId}
-        title="Recent trades"
-        after={<Caption>{caption}</Caption>}
-        end={
-          <Link href={allTrades} className={HEADER_LINK}>
-            All trades
-          </Link>
-        }
-      />
+    <>
       <Segmented
         label="Recent trades view"
         options={[
@@ -496,6 +472,6 @@ export function RecentTrades({
       ) : (
         <ClosedTrades recent={recent} basis={basis} timeZone={timeZone} />
       )}
-    </section>
+    </>
   );
 }

@@ -77,6 +77,13 @@ export const METRIC_IDS = [
   'balance-chart',
   'trade-time-scatter',
   'trade-duration-scatter',
+  'recent-trades',
+  'challenge-card',
+  'report-chart',
+  'month-calendar',
+  'mini-calendar',
+  'advanced-calendar',
+  'year-calendar',
   'long-winners',
   'long-losers',
   'long-breakevens',
@@ -530,6 +537,41 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Trade duration performance',
     definition:
       'Each closed trade by how long it was held, from open to close, on a log scale, and its {basis} P&L. A filled dot is a gain, a hollow one a loss. A trade held under a minute sits at one minute. Both scales fit the trades in your filters.',
+  },
+  'recent-trades': {
+    label: 'Recent trades',
+    definition:
+      "The newest closed trades in your filters, each with its strategy, its first mistake, its {basis} P&L and how it went against its strategy's rules. The Open positions tab lists the trades still open, with what each holds and has booked so far. A row opens the trade.",
+  },
+  'challenge-card': {
+    label: 'Challenge',
+    definition:
+      "One prop firm challenge, as its card on the Prop firms page reads it: where it stands against the firm's profit target, drawdown, daily loss, trading days and consistency rules. It shows the challenge you pick in the widget's settings, or the most urgent active one.",
+  },
+  'report-chart': {
+    label: 'Report',
+    definition:
+      "A chart of up to three metrics from the Performance report, by trading day. Each metric is bars or a line, and is either its value for each day or running from the start of the date range. Pick them in the widget's Metrics menu. It follows your filters, date range and display unit.",
+  },
+  'month-calendar': {
+    label: 'Calendar',
+    definition:
+      'A month at a glance: each trading day shows its {basis} P&L and is tinted green for a gain, red for a loss and neutral inside your breakeven range. Days are booked on the date a trade exits. It shows the whole month whatever the date range, and follows your other filters.',
+  },
+  'mini-calendar': {
+    label: 'Mini calendar',
+    definition:
+      'A small month. A day with trades is underlined green for a net gain, red for a net loss and grey when flat. Pick a day to open it in the Trades Day view. It shows the whole month whatever the date range, and follows your other filters.',
+  },
+  'advanced-calendar': {
+    label: 'Calendar with stats',
+    definition:
+      "A month with the figures you choose in each day (Stats shown, the same as on the Calendar page), a total for each week and the month's own net and trading days. A pencil marks a day with a note. Pick a day to see its trades. It shows the whole month whatever the date range, and follows your other filters.",
+  },
+  'year-calendar': {
+    label: 'Year calendar',
+    definition:
+      "The twelve months of a year: a square for each day, tinted by how it ended, and each month's net. Pick a month and Keel opens it in the Calendar. It shows the whole year whatever the date range, and follows your other filters.",
   },
   'long-winners': {
     label: 'Long winners',

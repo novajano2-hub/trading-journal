@@ -106,6 +106,26 @@ export interface WidgetValues {
     points: BalancePoint[];
   };
   drawdown: { key: string; value: number }[];
+  /** The trades the filters match, in this currency and the display unit: the list of recent and open trades is cut from them. */
+  recent: readonly Trade[];
+  /**
+   * Every filter but the date, in this currency and the display unit: a
+   * calendar books each exit on its own day and shows the whole month or year,
+   * whatever the date range.
+   */
+  calendar: readonly Trade[];
+  'calendar-mini': readonly Trade[];
+  'calendar-adv': readonly Trade[];
+  year: readonly Trade[];
+  /**
+   * What the report's metrics are plotted from, as Performance plots them: the
+   * day trades, the balance the day before the range and the flows after it.
+   */
+  report: {
+    dayTrades: readonly Trade[];
+    riskStart: Cents;
+    riskFlows: readonly CashFlow[];
+  };
 }
 
 /** The widgets asked for, as far as they are built. Absent: not asked for, or not built yet. */
@@ -115,6 +135,7 @@ export type WidgetData = Partial<Record<WidgetKey, unknown>> &
 /** What every widget of one currency reads, each series built on first use. */
 interface Calc {
   trades: readonly Trade[];
+  dayTrades: readonly Trade[];
   ctx: MetricContext;
   today: string;
   accounts: readonly Account[];
@@ -228,6 +249,12 @@ const READ: { [K in keyof WidgetValues]: (c: Calc) => WidgetValues[K] } = {
         ),
   }),
   drawdown: (c) => drawdownSeries(c.days()),
+  recent: (c) => c.trades,
+  calendar: (c) => c.dayTrades,
+  'calendar-mini': (c) => c.dayTrades,
+  'calendar-adv': (c) => c.dayTrades,
+  year: (c) => c.dayTrades,
+  report: (c) => ({ dayTrades: c.dayTrades, ...c.risk() }),
 };
 
 function isBuilt(key: string): key is keyof WidgetValues {
@@ -274,6 +301,7 @@ export function widgetData(
   const days = lazy(() => dailyPnl(dayTrades, env.ctx));
   const calc: Calc = {
     trades,
+    dayTrades,
     ctx: env.ctx,
     today: env.today,
     accounts,

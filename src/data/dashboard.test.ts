@@ -14,6 +14,7 @@ import {
   buildDashboard,
   pickPartition,
   RECENT_TRADE_COUNT,
+  recentAndOpen,
   tradeRulesSummary,
   type DashboardEnv,
 } from './dashboard';
@@ -64,6 +65,16 @@ test('the dashboard is the engine, sorted by cost', () => {
   expect(d.performance.equity).toHaveLength(m.summary.closedCount + 1);
   expect(d.tradesById.size).toBe(m.trades.length);
   expect(d.closedCount).toBe(m.summary.closedCount);
+});
+
+test('the recent and open trades come without the rest of the dashboard, the same as it builds them', () => {
+  const ctx = defaultMetricContext(NY),
+    m = usd(ctx);
+  const whole = buildDashboard(m, env(ctx));
+  const lean = recentAndOpen(m.trades, env(ctx));
+  expect(lean.recent).toEqual(whole.recent);
+  expect(lean.open).toEqual(whole.open);
+  expect(lean.recent).toHaveLength(RECENT_TRADE_COUNT);
 });
 
 test('a recent trade in two strategies names both', () => {

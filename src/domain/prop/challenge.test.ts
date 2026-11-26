@@ -6,6 +6,8 @@ import {
   checkChallenge,
   drawdownLabel,
   findingText,
+  shownChallenge,
+  urgencyOf,
   type BreachFinding,
 } from './challenge';
 
@@ -348,5 +350,62 @@ describe('findingText', () => {
     expect(findingText(f('consistency'), money)).toBe(
       'Best-day consistency broken: the best day, 5 Nov, made $2,100.00 against $2,000.00 allowed.',
     );
+  });
+});
+
+describe('urgencyOf and shownChallenge', () => {
+  const clean = (id: string, over: Partial<Challenge> = {}) =>
+    challenge({
+      id,
+      name: id,
+      phases: [{ step: 'step-1', accountId: `acc-${id}` }, { step: 'funded' }],
+      steps: 1,
+      ...over,
+    });
+  const accounts = ['c-clean', 'c-broken', 'c-passed', 'c-breached'].map((id) =>
+    account(`acc-${id}`),
+  );
+  const trades = [
+    trade('acc-c-clean', 50_000, '2026-11-09', 1),
+    // A loss of $1,500 on a $1,000 daily limit.
+    trade('acc-c-broken', -150_000, '2026-11-10', 2),
+  ];
+  const rows = (cs: Challenge[]) =>
+    cs.map((c) => ({
+      c,
+      check: checkChallenge(c, accounts, trades, ctx, '2026-11-20'),
+    }));
+
+  test('a breach to confirm first, then the rest by status', () => {
+    const r = rows([
+      clean('c-breached', { status: 'breached' }),
+      clean('c-passed', { status: 'passed' }),
+      clean('c-clean'),
+      clean('c-broken'),
+    ]);
+    const order = [...r].sort(
+      (a, b) => urgencyOf(a.c, a.check) - urgencyOf(b.c, b.check),
+    );
+    expect(order.map((x) => x.c.id)).toEqual([
+      'c-broken',
+      'c-clean',
+      'c-passed',
+      'c-breached',
+    ]);
+  });
+
+  test('shows the challenge asked for, else the most urgent active one, else the first by the same order', () => {
+    const r = rows([clean('c-clean'), clean('c-broken')]);
+    expect(shownChallenge(r, 'c-clean')?.c.id).toBe('c-clean');
+    expect(shownChallenge(r, undefined)?.c.id).toBe('c-broken');
+    // An id that is gone reads as none was asked for.
+    expect(shownChallenge(r, 'c-deleted')?.c.id).toBe('c-broken');
+    // With none active, the best of the rest.
+    const done = rows([
+      clean('c-breached', { status: 'breached' }),
+      clean('c-passed', { status: 'passed' }),
+    ]);
+    expect(shownChallenge(done, undefined)?.c.id).toBe('c-passed');
+    expect(shownChallenge([], undefined)).toBeUndefined();
   });
 });

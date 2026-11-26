@@ -64,26 +64,70 @@ describe('widgetData', () => {
   });
 
   test('a widget whose series is not built yet reads undefined', () => {
-    const { values } = widgetData(['calendar', 'recent'], envOf(s));
-    expect(values.calendar).toBeUndefined();
-    expect(values.recent).toBeUndefined();
+    // The challenge reads its own challenges, and the progress tracker is 6A's card.
+    const { values } = widgetData(['challenge', 'progress'], envOf(s));
+    expect(values.challenge).toBeUndefined();
+    expect(values.progress).toBeUndefined();
   });
 
   test('every key of the catalogue is accepted, and the built ones are read', () => {
     const keys = Object.keys(WIDGETS) as WidgetKey[];
     const { values } = widgetData(keys, envOf(s));
-    const unbuilt = [
-      'recent',
-      'calendar',
-      'challenge',
-      'calendar-mini',
-      'calendar-adv',
-      'progress',
-      'report',
-      'year',
-    ];
+    const unbuilt = ['challenge', 'progress'];
     for (const k of keys)
       expect(Object.hasOwn(values, k), k).toBe(!unbuilt.includes(k));
+  });
+
+  describe('the list, calendar and report widgets (#46, 9B)', () => {
+    const usd = (trades: readonly { pnlCurrency: string }[]) =>
+      trades.filter((t) => t.pnlCurrency === 'USD');
+
+    test('recent reads the trades the filters match, in the one currency', () => {
+      const env = envOf(s, {
+        trades: envOf(s).trades.slice(0, 40),
+      });
+      const { values } = widgetData(['recent'], env);
+      expect(values.recent).toEqual(usd(env.trades));
+    });
+
+    test('the four calendars read every filter but the date: the day trades, whatever the range', () => {
+      const env = envOf(s, {
+        trades: envOf(s).trades.slice(0, 10),
+        ctx: { ...CTX, range: { from: '2026-11-19', to: '2026-11-19' } },
+      });
+      const { values } = widgetData(
+        ['calendar', 'calendar-mini', 'calendar-adv', 'year'],
+        env,
+      );
+      for (const k of [
+        'calendar',
+        'calendar-mini',
+        'calendar-adv',
+        'year',
+      ] as const) {
+        expect(values[k], k).toEqual(usd(env.dayTrades));
+        expect(values[k], k).not.toEqual(usd(env.trades));
+      }
+    });
+
+    test('the report reads the day trades and the balance before the range, as Performance does', () => {
+      const env = envOf(s, {
+        ctx: { ...CTX, range: { from: '2026-10-01', to: '2026-11-19' } },
+      });
+      const { values } = widgetData(['report'], env);
+      const accounts = env.accounts.filter((a) => a.currency === 'USD');
+      expect(values.report).toEqual({
+        dayTrades: usd(env.dayTrades),
+        riskStart: balanceAt(
+          accounts,
+          [],
+          env.balanceTrades,
+          '2026-09-30',
+          env.ctx,
+        ),
+        riskFlows: [],
+      });
+    });
   });
 
   test('the figure widgets read the summary and the day figures of the base currency', () => {

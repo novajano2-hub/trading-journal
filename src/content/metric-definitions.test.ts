@@ -159,3 +159,42 @@ test("the chart widgets have a tip of their own, in Keel's words", () => {
     /log scale/,
   );
 });
+
+test("the list, calendar and report widgets have a tip of their own, in Keel's words", () => {
+  const recent = metricDefinition('recent-trades', 'gross');
+  expect(recent.definition).toMatch(/newest closed trades/);
+  expect(recent.definition).toMatch(/gross P&L/);
+  expect(recent.definition).toMatch(/Open positions/);
+
+  const challenge = metricDefinition('challenge-card', 'net');
+  expect(challenge.definition).toMatch(/most urgent active one/);
+  expect(challenge.definition).toMatch(/widget's settings/);
+
+  const report = metricDefinition('report-chart', 'net');
+  expect(report.definition).toMatch(/up to three metrics/);
+  expect(report.definition).toMatch(/Performance/);
+  expect(report.definition).toMatch(/running/);
+
+  // The calendars all say they show the whole month or year, whatever the date range.
+  for (const id of [
+    'month-calendar',
+    'mini-calendar',
+    'advanced-calendar',
+    'year-calendar',
+  ] as const)
+    expect(metricDefinition(id, 'net').definition, id).toMatch(
+      /whatever the date range/,
+    );
+  expect(metricDefinition('month-calendar', 'net').definition).toMatch(
+    /breakeven/,
+  );
+  expect(metricDefinition('mini-calendar', 'net').definition).toMatch(
+    /Day view/,
+  );
+  expect(metricDefinition('advanced-calendar', 'net').definition).toMatch(
+    /Stats shown/,
+  );
+  expect(metricDefinition('year-calendar', 'net').definition).toMatch(
+    /opens it in the Calendar/,
+  );
+});

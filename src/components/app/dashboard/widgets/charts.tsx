@@ -155,7 +155,7 @@ function dateTicks(keys: readonly string[]): { at: number; text: string }[] {
 }
 
 /** What every chart widget reads besides its own series. */
-function useChartEnv() {
+export function useChartEnv() {
   const page = useWidgetPage();
   const ctx = useWidgetCtx();
   const display = useDisplay();

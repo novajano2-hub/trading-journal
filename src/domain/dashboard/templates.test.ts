@@ -437,6 +437,34 @@ describe("setWidgetSettings (the scatter's Entry or Exit, saved on the template 
     });
   });
 
+  test('a setting patched to undefined is cleared, and a widget left with none has no settings at all', () => {
+    const withChoice = {
+      inUse: 't1',
+      templates: [
+        tpl({
+          lower: [
+            {
+              key: 'challenge',
+              settings: { challengeId: 'c1', time: 'exit' as const },
+            },
+            { key: 'report', settings: { challengeId: 'c2' } },
+          ],
+        }),
+      ],
+    };
+    const next = setWidgetSettings({ dashboards: withChoice }, 'challenge', {
+      challengeId: undefined,
+    });
+    const settings = next.templates[0]!.lower[0]!.settings!;
+    expect(settings).toEqual({ time: 'exit' });
+    expect('challengeId' in settings).toBe(false);
+    const bare = setWidgetSettings({ dashboards: withChoice }, 'report', {
+      challengeId: undefined,
+    });
+    expect('settings' in bare.templates[0]!.lower[1]!).toBe(false);
+    expect(bare.templates[0]!.lower[1]).toEqual({ key: 'report' });
+  });
+
   test('a widget not on the template in use changes nothing', () => {
     const next = setWidgetSettings({ dashboards: stored }, 'year', {
       time: 'exit',

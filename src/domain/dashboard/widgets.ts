@@ -62,16 +62,20 @@ export const WIDGETS: Record<
     size: 'third',
     metric: 'daily-and-cumulative',
   },
-  recent: { section: 'lower', size: 'third', metric: 'trades' },
-  calendar: { section: 'lower', size: 'third', metric: 'pnl' },
+  recent: { section: 'lower', size: 'third', metric: 'recent-trades' },
+  calendar: { section: 'lower', size: 'third', metric: 'month-calendar' },
   balance: { section: 'lower', size: 'third', metric: 'balance-chart' },
   drawdown: { section: 'lower', size: 'third', metric: 'daily-drawdown' },
-  challenge: { section: 'lower', size: 'third', metric: 'prop-profit' },
-  'calendar-mini': { section: 'lower', size: 'third', metric: 'trading-days' },
-  'calendar-adv': { section: 'lower', size: 'wide', metric: 'pnl' },
+  challenge: { section: 'lower', size: 'third', metric: 'challenge-card' },
+  'calendar-mini': { section: 'lower', size: 'third', metric: 'mini-calendar' },
+  'calendar-adv': {
+    section: 'lower',
+    size: 'wide',
+    metric: 'advanced-calendar',
+  },
   progress: { section: 'lower', size: 'third', metric: 'tracker-card' },
-  report: { section: 'lower', size: 'third', metric: 'pnl' },
-  year: { section: 'lower', size: 'wide', metric: 'pnl' },
+  report: { section: 'lower', size: 'third', metric: 'report-chart' },
+  year: { section: 'lower', size: 'wide', metric: 'year-calendar' },
 };
 
 /** A key the catalogue knows; a template read from storage may hold others. */

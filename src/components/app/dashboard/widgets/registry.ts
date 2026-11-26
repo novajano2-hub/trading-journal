@@ -3,6 +3,7 @@ import type { WidgetKey, WidgetSettings } from '@/domain/types';
 import { ProgressCard } from '../progress-card';
 import { WidgetPlaceholder } from './frame';
 import { CHART_RENDER } from './charts';
+import { LIST_RENDER } from './lists';
 import { SCORE_RENDER } from './score';
 import { UPPER_RENDER } from './upper';
 
@@ -33,12 +34,10 @@ export const WIDGET_RENDER: Record<WidgetKey, WidgetRender> = {
   // Lower
   ...SCORE_RENDER,
   ...CHART_RENDER,
-  recent: placeholder('recent'),
+  ...LIST_RENDER,
   calendar: placeholder('calendar'),
-  challenge: placeholder('challenge'),
   'calendar-mini': placeholder('calendar-mini'),
   'calendar-adv': placeholder('calendar-adv'),
   progress: () => createElement(ProgressCard),
-  report: placeholder('report'),
   year: placeholder('year'),
 };

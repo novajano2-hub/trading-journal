@@ -240,3 +240,35 @@ export function checkChallenge(
     phases,
   };
 }
+
+/**
+ * How urgent a challenge is, the least first: a breach to confirm, a limit
+ * near, a target met, then the rest of the active ones, then those passed and
+ * those breached. The Prop firms page sorts its cards by it.
+ */
+export function urgencyOf(c: Challenge, check: ChallengeCheck): number {
+  if (c.status === 'active') {
+    if (check.health === 'breached') return 0;
+    if (check.health === 'near') return 1;
+    if (check.health === 'target-met') return 2;
+    return 3;
+  }
+  return c.status === 'passed' ? 4 : 5;
+}
+
+/**
+ * The challenge a dashboard widget shows: the one asked for, when it is still
+ * there, else the most urgent (as the Prop firms page sorts, so an active one
+ * comes before any passed or breached one). Undefined with no challenge.
+ */
+export function shownChallenge<
+  T extends { c: Challenge; check: ChallengeCheck },
+>(rows: readonly T[], asked: string | undefined): T | undefined {
+  const named =
+    asked === undefined ? undefined : rows.find((r) => r.c.id === asked);
+  if (named) return named;
+  // The sort is stable, so equally urgent challenges stay in their stored order.
+  return [...rows].sort(
+    (a, b) => urgencyOf(a.c, a.check) - urgencyOf(b.c, b.check),
+  )[0];
+}

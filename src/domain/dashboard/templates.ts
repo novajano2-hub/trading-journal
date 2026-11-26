@@ -57,6 +57,19 @@ function withSection(
 }
 
 /**
+ * The widget with `patch` merged into its settings. A setting patched to
+ * undefined is cleared, and a widget left with none carries no `settings`.
+ */
+function withSettings(ref: WidgetRef, patch: WidgetSettings): WidgetRef {
+  const settings: WidgetSettings = { ...copyRef(ref).settings, ...patch };
+  for (const k of Object.keys(settings) as (keyof WidgetSettings)[])
+    if (settings[k] === undefined) delete settings[k];
+  return Object.keys(settings).length === 0
+    ? { key: ref.key }
+    : { key: ref.key, settings };
+}
+
+/**
  * The templates the user has and the one in use. No pref, or no templates in
  * it, reads the default; a pref naming a template that is gone reads the first.
  * Nothing is skipped: a key this build does not know stays on its template.
@@ -186,11 +199,7 @@ export function setWidgetSettings(
   // A section without the widget is the same list, so it is not rewritten.
   const merged = (refs: WidgetRef[]): WidgetRef[] =>
     refs.some((r) => r.key === key)
-      ? refs.map((r) =>
-          r.key === key
-            ? { key: r.key, settings: { ...copyRef(r).settings, ...patch } }
-            : r,
-        )
+      ? refs.map((r) => (r.key === key ? withSettings(r, patch) : r))
       : refs;
   const next: DashTemplate = {
     ...inUse,

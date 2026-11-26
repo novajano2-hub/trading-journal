@@ -132,6 +132,34 @@ export interface DashboardEnv {
   ctx: MetricContext;
 }
 
+/**
+ * The newest closed trades, each with its strategy names, its mistakes and how
+ * it went against its rules, and the open trades: what the recent trades list
+ * reads, without the rest of the dashboard model.
+ */
+export function recentAndOpen(
+  trades: readonly Trade[],
+  env: DashboardEnv,
+): { recent: RecentTrade[]; open: OpenPosition[] } {
+  const strategyName = new Map(env.strategies.map((s) => [s.id, s.name]));
+  const mistakeTag = new Map(
+    mistakeTags(env.tags, env.tagCategories).map((t) => [t.id, t.name]),
+  );
+  const recent = closedInOrder(trades)
+    .slice()
+    .reverse()
+    .slice(0, RECENT_TRADE_COUNT)
+    .map((trade) => ({
+      trade,
+      strategyNames: trade.strategyIds.flatMap(
+        (id) => strategyName.get(id) ?? [],
+      ),
+      mistakes: trade.tagIds.flatMap((id) => mistakeTag.get(id) ?? []),
+      rules: tradeRulesSummary(trade, env.strategies, env.ctx),
+    }));
+  return { recent, open: openPositions(trades, env.ctx) };
+}
+
 export interface DashboardModel {
   currency: string;
   basis: PnlBasis;
@@ -177,12 +205,6 @@ export function buildDashboard(
   env: DashboardEnv,
 ): DashboardModel {
   const { summary } = m;
-  const closed = closedInOrder(m.trades);
-
-  const strategyName = new Map(env.strategies.map((s) => [s.id, s.name]));
-  const mistakeTag = new Map(
-    mistakeTags(env.tags, env.tagCategories).map((t) => [t.id, t.name]),
-  );
 
   const rules = ruleScorecard(m.trades, env.strategies, env.ctx);
   // The headline adds up the rows, so it skips what they skip: checks on
@@ -191,18 +213,7 @@ export function buildDashboard(
   const checks = rules.reduce((n, r) => n + r.kept + r.broken, 0);
 
   const outcomes = winsVsLosses(m.trades, env.ctx);
-  const recent = closed
-    .slice()
-    .reverse()
-    .slice(0, RECENT_TRADE_COUNT)
-    .map((trade) => ({
-      trade,
-      strategyNames: trade.strategyIds.flatMap(
-        (id) => strategyName.get(id) ?? [],
-      ),
-      mistakes: trade.tagIds.flatMap((id) => mistakeTag.get(id) ?? []),
-      rules: tradeRulesSummary(trade, env.strategies, env.ctx),
-    }));
+  const { recent, open } = recentAndOpen(m.trades, env);
 
   return {
     currency: m.currency,
@@ -234,7 +245,7 @@ export function buildDashboard(
       lossIds: outcomes.losses.tradeIds,
     },
     recent,
-    open: openPositions(m.trades, env.ctx),
+    open,
     tradesById: new Map(m.trades.map((t) => [t.id, t])),
   };
 }

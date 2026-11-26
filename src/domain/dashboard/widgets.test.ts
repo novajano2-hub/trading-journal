@@ -88,6 +88,16 @@ describe('the widget catalogue', () => {
     expect(WIDGETS.drawdown.metric).toBe('daily-drawdown');
   });
 
+  test('the list, calendar and report widgets read tips that describe what they draw', () => {
+    expect(WIDGETS.recent.metric).toBe('recent-trades');
+    expect(WIDGETS.challenge.metric).toBe('challenge-card');
+    expect(WIDGETS.report.metric).toBe('report-chart');
+    expect(WIDGETS.calendar.metric).toBe('month-calendar');
+    expect(WIDGETS['calendar-mini'].metric).toBe('mini-calendar');
+    expect(WIDGETS['calendar-adv'].metric).toBe('advanced-calendar');
+    expect(WIDGETS.year.metric).toBe('year-calendar');
+  });
+
   test('isWidgetKey tells known keys from unknown ones', () => {
     expect(isWidgetKey('score')).toBe(true);
     expect(isWidgetKey('year')).toBe(true);

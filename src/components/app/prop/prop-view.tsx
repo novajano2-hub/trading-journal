@@ -20,7 +20,7 @@ import {
   useUpdateChallenge,
 } from '@/data/query/hooks';
 import type { ChallengePatch } from '@/data/repository';
-import { checkChallenge, type ChallengeCheck } from '@/domain/prop/challenge';
+import { checkChallenge, urgencyOf } from '@/domain/prop/challenge';
 import { localDate } from '@/domain/time';
 import type { Challenge, Trade } from '@/domain/types';
 import { FigureSourceContext } from '@/lib/display';
@@ -34,17 +34,6 @@ import { ChallengeForm } from './challenge-form';
 
 type Filter = 'all' | Challenge['phase'];
 const NO_TRADES: ReadonlyMap<string, Trade> = new Map();
-
-/** Most urgent first: a breach to confirm, a limit near, a target met, then the rest. */
-function urgency(c: Challenge, check: ChallengeCheck): number {
-  if (c.status === 'active') {
-    if (check.health === 'breached') return 0;
-    if (check.health === 'near') return 1;
-    if (check.health === 'target-met') return 2;
-    return 3;
-  }
-  return c.status === 'passed' ? 4 : 5;
-}
 
 const NewButton = ({ onClick }: { onClick(): void }) => (
   <Button onClick={onClick}>
@@ -109,7 +98,7 @@ export function PropView(): React.JSX.Element {
         ),
         ctx,
       }))
-      .sort((a, b) => urgency(a.c, a.check) - urgency(b.c, b.check));
+      .sort((a, b) => urgencyOf(a.c, a.check) - urgencyOf(b.c, b.check));
   }, [
     challenges.data,
     accounts.data,
