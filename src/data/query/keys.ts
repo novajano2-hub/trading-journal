@@ -91,6 +91,7 @@ export type WriteKind =
   | 'propTxns.update'
   | 'propTxns.remove'
   | 'challenges.markBreached'
+  | 'challenges.createMany'
   | 'accounts.setCostMethod';
 
 /** The query keys a successful write makes stale, in workspace `ws`. */
@@ -148,9 +149,12 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
         keys.challenges(ws),
       ];
     case 'challenges.create':
-    case 'challenges.update':
     case 'challenges.markBreached':
       return [keys.challenges(ws)];
+    // An update can make an account for a phase, and a quantity makes its accounts too.
+    case 'challenges.update':
+    case 'challenges.createMany':
+      return [keys.challenges(ws), keys.accounts(ws)];
     // Its prop transactions are unlinked.
     case 'challenges.remove':
       return [keys.challenges(ws), keys.propTxns(ws)];

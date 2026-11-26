@@ -24,6 +24,7 @@ import {
   useAccounts,
   useAddPropTxn,
   useChallenges,
+  useCreateChallenges,
   useFinishPropStart,
   useLogPayout,
   useMarkBreached,
@@ -200,6 +201,80 @@ describe('prop transactions', () => {
         }),
       ).rejects.toBeInstanceOf(NotFoundError);
     });
+  });
+});
+
+describe('useCreateChallenges (C-02, C-04)', () => {
+  const entry = (name: string, breach?: boolean) => ({
+    challenge: {
+      name,
+      firm: 'Apex',
+      steps: 1 as const,
+      phases: [{ step: 'step-1' as const }, { step: 'funded' as const }],
+      phase: 'evaluation' as const,
+      status: 'active' as const,
+    },
+    newAccounts: [
+      {
+        step: 'step-1' as const,
+        account: {
+          name: `${name} eval`,
+          broker: 'Apex',
+          type: 'prop-evaluation' as const,
+          currency: 'USD',
+          startingBalance: 5_000_000,
+          status: 'active' as const,
+        },
+      },
+    ],
+    ...(breach && {
+      breach: { reason: 'overtrading' as const, on: '2026-11-18' },
+    }),
+  });
+
+  test('writes the challenges and their accounts at once, and both lists refresh', async () => {
+    const { Wrapper } = setup();
+    const { result } = renderHook(
+      () => ({
+        challenges: useChallenges(),
+        accounts: useAccounts(),
+        create: useCreateChallenges(),
+      }),
+      { wrapper: Wrapper },
+    );
+    await waitFor(() => expect(result.current.accounts.data).toBeDefined());
+    const accountsBefore = result.current.accounts.data!.length;
+    await act(async () => {
+      await result.current.create.mutateAsync([
+        entry('Apex A'),
+        entry('Apex B', true),
+      ]);
+    });
+    await waitFor(() =>
+      expect(result.current.challenges.data!.map((c) => c.name)).toEqual(
+        expect.arrayContaining(['Apex A', 'Apex B']),
+      ),
+    );
+    expect(result.current.accounts.data).toHaveLength(accountsBefore + 2);
+    expect(
+      result.current.challenges.data!.find((c) => c.name === 'Apex B'),
+    ).toMatchObject({ status: 'breached', breachReason: 'overtrading' });
+  });
+
+  test('a refused batch writes nothing', async () => {
+    const { repository, Wrapper } = setup();
+    const { result } = renderHook(() => useCreateChallenges(), {
+      wrapper: Wrapper,
+    });
+    const before = await repository.challenges.list('sample');
+    const accountsBefore = await repository.accounts.list('sample');
+    await act(async () => {
+      await expect(
+        result.current.mutateAsync([entry('Fine'), entry(' ')]),
+      ).rejects.toBeInstanceOf(RangeError);
+    });
+    expect(await repository.challenges.list('sample')).toEqual(before);
+    expect(await repository.accounts.list('sample')).toEqual(accountsBefore);
   });
 });
 

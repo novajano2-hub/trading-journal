@@ -11,6 +11,7 @@ import type {
   CashFlow,
   Cents,
   Challenge,
+  ChallengeStep,
   CostMethod,
   DayRecord,
   DayShot,
@@ -413,6 +414,23 @@ export interface CashFlowsRepo {
 
 export type NewChallenge = Omit<Challenge, 'id' | 'workspaceId'>;
 export type ChallengePatch = Partial<NewChallenge>;
+/** An account to create and link to the phase `step` of a challenge, which must have none yet. */
+export interface NewChallengeAccount {
+  step: ChallengeStep;
+  account: NewAccount;
+}
+/** One challenge for `createMany`, with the accounts it makes and, optionally, the breach it is born with. */
+export interface NewChallengeEntry {
+  /** A phase with an `accountId` links that existing account. */
+  challenge: NewChallenge;
+  newAccounts: NewChallengeAccount[];
+  /**
+   * Creates the challenge already breached (TradeZella's create form offers
+   * active or breached): `status`, `breachReason`, `breachedOn` and, for
+   * 'other', the trimmed `note` as the failure reason, as `markBreached` writes them.
+   */
+  breach?: { reason: BreachReason; note?: string; on: string };
+}
 export interface ChallengesRepo {
   /** By name. */
   list(ws: string): Promise<Challenge[]>;
@@ -427,14 +445,33 @@ export interface ChallengesRepo {
    */
   create(ws: string, input: NewChallenge): Promise<Challenge>;
   /**
+   * Creates every challenge, with the new accounts each asks for linked to its
+   * phases, in ONE transaction: all of them or none, so a failure part way
+   * leaves no orphan account and no part of a quantity. Each is checked as
+   * `create` checks it (a bare `status: 'breached'` is refused), RangeError
+   * for no entries, a new account for a phase the challenge lacks or one
+   * already linked, and a bad `breach` date or reason (the form makes
+   * "Create breached" through it). Returns them in order.
+   */
+  createMany(ws: string, items: NewChallengeEntry[]): Promise<Challenge[]>;
+  /**
    * As `create` for what it sets; a key set to undefined is left unchanged,
    * except `failureReason` and the fees, which it clears. Throws NotFoundError
    * for an unknown id, ChallengeBreachedError (writing nothing) for a breached
-   * challenge's `status` or `phase` set to a different value, and RangeError
-   * for `status: 'breached'` on one that is not (that goes through
-   * `markBreached`, which records the reason and the date).
+   * challenge's `status`, `phase` or `steps` set to a different value or its
+   * `phases` set to a different list of steps (an account link or a start date
+   * still edits), and RangeError for `status: 'breached'` on one that is not
+   * (that goes through `markBreached`, which records the reason and the date).
+   * `newAccounts` are created and linked to their phases in the same
+   * transaction, so a refused update leaves no account behind (RangeError for
+   * a phase the challenge lacks or one already linked).
    */
-  update(ws: string, id: string, patch: ChallengePatch): Promise<Challenge>;
+  update(
+    ws: string,
+    id: string,
+    patch: ChallengePatch,
+    newAccounts?: NewChallengeAccount[],
+  ): Promise<Challenge>;
   /**
    * Marks the challenge breached, for good: `status`, `breachReason` and
    * `breachedOn` (a real YYYY-MM-DD) are written, and for 'other' a non-blank

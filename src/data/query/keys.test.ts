@@ -52,7 +52,8 @@ test('Plan 5 writes invalidate what they change', () => {
     ['cashFlows.update', k('cashFlows')],
     ['cashFlows.remove', k('cashFlows')],
     ['challenges.create', k('challenges')],
-    ['challenges.update', k('challenges')],
+    // An update can make the account of a phase (C-02).
+    ['challenges.update', k('challenges', 'accounts')],
     // Its transactions are unlinked.
     ['challenges.remove', k('challenges', 'propTxns')],
     ['journal.save', k('journal', 'days')],
@@ -125,6 +126,8 @@ test('Plan 6C writes invalidate what they change', () => {
     ['propTxns.update', k('propTxns')],
     ['propTxns.remove', k('propTxns')],
     ['challenges.markBreached', k('challenges')],
+    // A quantity and its new accounts are written together.
+    ['challenges.createMany', k('challenges', 'accounts')],
     // The rebuild rewrites the account's trades, and the import context carries the method.
     ['accounts.setCostMethod', k('accounts', 'trades', 'imports')],
     // A strategy leaves the challenges that list it.
@@ -159,6 +162,8 @@ test('every write behind a figure of the widgets or the prop dashboard refreshes
     ['cashFlows.update', 'cash flows'],
     ['cashFlows.remove', 'cash flows'],
     ['challenges.create', 'challenges'],
+    ['challenges.createMany', 'challenges'],
+    ['challenges.createMany', 'accounts'],
     ['challenges.update', 'challenges'],
     ['challenges.markBreached', 'challenges'],
     ['challenges.remove', 'challenges'],

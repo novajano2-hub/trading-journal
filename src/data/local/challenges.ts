@@ -5,6 +5,8 @@ import {
   NotFoundError,
   type ChallengesRepo,
   type NewChallenge,
+  type NewChallengeAccount,
+  type NewChallengeEntry,
 } from '../repository';
 import type { LocalContext } from './context';
 import type { KeelDb } from './db';
@@ -88,6 +90,43 @@ function tidy(c: Challenge): Challenge {
   };
 }
 
+const BREACH_THROUGH_MARK =
+  'A challenge is breached through markBreached, which records the reason and the date';
+
+/** Throws RangeError for a breach date or reason that can't be, as markBreached does. */
+function assertBreach(breach: { reason: BreachReason; on: string }): void {
+  if (!isDate(breach.on))
+    throw new RangeError(
+      `A breach date must be YYYY-MM-DD, got "${breach.on}"`,
+    );
+  if (!REASONS.includes(breach.reason))
+    throw new RangeError(`Unknown breach reason "${breach.reason}"`);
+}
+
+/** `phases` with each new account created and linked to its phase; RangeError for a phase that isn't there or has an account. */
+async function linkNewAccounts(
+  ctx: LocalContext,
+  db: KeelDb,
+  ws: string,
+  base: Challenge['phases'],
+  list: readonly NewChallengeAccount[],
+): Promise<Challenge['phases']> {
+  const phases = base.map((p) => ({ ...p }));
+  for (const { step, account } of list) {
+    const phase = phases.find((p) => p.step === step);
+    if (!phase)
+      throw new RangeError(`The challenge has no ${step} phase to link to`);
+    if (phase.accountId !== undefined)
+      throw new RangeError(`The ${step} phase is linked to an account`);
+    const row = { ...account, id: ctx.newId(), workspaceId: ws };
+    // FIFO is the unset method.
+    if (row.costMethod === 'fifo') delete row.costMethod;
+    await db.accounts.put(row);
+    phase.accountId = row.id;
+  }
+  return phases;
+}
+
 export function localChallenges(ctx: LocalContext): ChallengesRepo {
   return {
     async list(ws) {
@@ -104,9 +143,7 @@ export function localChallenges(ctx: LocalContext): ChallengesRepo {
     async create(ws, input: NewChallenge) {
       // A breach is recorded with its reason and date, by markBreached only.
       if (input.status === 'breached')
-        throw new RangeError(
-          'A challenge is breached through markBreached, which records the reason and the date',
-        );
+        throw new RangeError(BREACH_THROUGH_MARK);
       const db = await ctx.db();
       const challenge = tidy({ ...input, id: ctx.newId(), workspaceId: ws });
       return rwTx(db, [db.challenges, db.accounts, db.strategies], async () => {
@@ -116,26 +153,85 @@ export function localChallenges(ctx: LocalContext): ChallengesRepo {
       });
     },
 
-    async update(ws, id, patch) {
+    async createMany(ws, items: NewChallengeEntry[]) {
+      if (items.length === 0) throw new RangeError('Nothing to create');
+      for (const { challenge, breach } of items) {
+        // Only the entry's own `breach` records one, with its reason and date.
+        if (challenge.status === 'breached')
+          throw new RangeError(BREACH_THROUGH_MARK);
+        if (breach) assertBreach(breach);
+      }
+      const db = await ctx.db();
+      // One transaction: a failure on any item aborts the accounts and
+      // challenges written before it.
+      return rwTx(db, [db.challenges, db.accounts, db.strategies], async () => {
+        const made: Challenge[] = [];
+        for (const { challenge: input, newAccounts, breach } of items) {
+          const phases = await linkNewAccounts(
+            ctx,
+            db,
+            ws,
+            input.phases,
+            newAccounts,
+          );
+          // Only the trader's own words are kept, and only for 'other'.
+          const note =
+            breach?.reason === 'other' ? breach.note?.trim() : undefined;
+          const challenge = tidy({
+            ...input,
+            phases,
+            id: ctx.newId(),
+            workspaceId: ws,
+            ...(breach && {
+              status: 'breached' as const,
+              breachReason: breach.reason,
+              breachedOn: breach.on,
+              ...(note && { failureReason: note }),
+            }),
+          });
+          await assertValid(db, challenge);
+          await db.challenges.put(challenge);
+          made.push(challenge);
+        }
+        return made;
+      });
+    },
+
+    async update(ws, id, patch, newAccounts = []) {
       const db = await ctx.db();
       return rwTx(db, [db.challenges, db.accounts, db.strategies], async () => {
         const current = await db.challenges.get([ws, id]);
         if (!current) throw new NotFoundError('challenge', id);
         // A breach is permanent: the status never moves off it, and it locks
-        // the phase (rec 3.4). The status or phase it already has is no change.
+        // the phase (rec 3.4) and the steps (C-05: fewer steps would drop the
+        // phase it broke in). The value it already has is no change.
         if (
           current.status === 'breached' &&
           ((patch.status !== undefined && patch.status !== 'breached') ||
-            (patch.phase !== undefined && patch.phase !== current.phase))
+            (patch.phase !== undefined && patch.phase !== current.phase) ||
+            (patch.steps !== undefined && patch.steps !== current.steps) ||
+            (patch.phases !== undefined &&
+              patch.phases.map((p) => p.step).join() !==
+                current.phases.map((p) => p.step).join()))
         )
           throw new ChallengeBreachedError(id);
         // A breach is recorded with its reason and date, by markBreached only.
         if (patch.status === 'breached' && current.status !== 'breached')
-          throw new RangeError(
-            'A challenge is breached through markBreached, which records the reason and the date',
-          );
+          throw new RangeError(BREACH_THROUGH_MARK);
+        const linked =
+          newAccounts.length > 0
+            ? {
+                phases: await linkNewAccounts(
+                  ctx,
+                  db,
+                  ws,
+                  patch.phases ?? current.phases,
+                  newAccounts,
+                ),
+              }
+            : {};
         const next = tidy({
-          ...mergePatch(current, patch, [
+          ...mergePatch(current, { ...patch, ...linked }, [
             'failureReason',
             'evaluationFee',
             'activationFee',
@@ -150,12 +246,7 @@ export function localChallenges(ctx: LocalContext): ChallengesRepo {
     },
 
     async markBreached(ws, id, input) {
-      if (!isDate(input.on))
-        throw new RangeError(
-          `A breach date must be YYYY-MM-DD, got "${input.on}"`,
-        );
-      if (!REASONS.includes(input.reason))
-        throw new RangeError(`Unknown breach reason "${input.reason}"`);
+      assertBreach(input);
       const db = await ctx.db();
       return rwTx(db, [db.challenges, db.accounts, db.strategies], async () => {
         const current = await db.challenges.get([ws, id]);

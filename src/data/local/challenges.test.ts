@@ -1,7 +1,11 @@
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { describe, expect, test } from 'vitest';
 import { fixtureSample } from '../__fixtures__/sample';
-import { ChallengeBreachedError, NotFoundError } from '../repository';
+import {
+  ChallengeBreachedError,
+  NotFoundError,
+  type NewChallengeEntry,
+} from '../repository';
 import { KeelDb } from './db';
 import { createLocalRepository } from './local-repository';
 
@@ -402,4 +406,328 @@ test('deleting a strategy takes it off the challenges that use it', async () => 
   const [after] = await repo.challenges.list(S);
   expect(after!.id).toBe(c.id);
   expect(after!.strategyIds).toEqual([]);
+});
+
+describe('createMany (C-02, C-04)', () => {
+  const account = (name: string) => ({
+    name,
+    broker: 'Apex',
+    type: 'prop-evaluation' as const,
+    currency: 'USD',
+    startingBalance: 10_000_000,
+    status: 'active' as const,
+  });
+  /** A challenge named `name` whose step 1 gets a new account. */
+  const entry = (name: string): NewChallengeEntry => ({
+    challenge: {
+      name,
+      firm: 'Apex',
+      steps: 1 as const,
+      phases: [{ step: 'step-1' as const }, { step: 'funded' as const }],
+      phase: 'evaluation' as const,
+      status: 'active' as const,
+      evaluationFee: 54_900,
+    },
+    newAccounts: [
+      { step: 'step-1' as const, account: account(`${name} eval`) },
+    ],
+  });
+
+  test('writes every challenge with its new accounts linked to the phase asked', async () => {
+    const repo = setup();
+    const made = await repo.challenges.createMany(S, [
+      entry('Apex 100K'),
+      entry('Apex 100K 2'),
+      entry('Apex 100K 3'),
+    ]);
+    expect(made.map((c) => c.name)).toEqual([
+      'Apex 100K',
+      'Apex 100K 2',
+      'Apex 100K 3',
+    ]);
+    const accounts = (await repo.accounts.list(S)).filter(
+      (a) => a.type === 'prop-evaluation' && a.name.endsWith(' eval'),
+    );
+    expect(accounts.map((a) => a.name).sort()).toEqual([
+      'Apex 100K 2 eval',
+      'Apex 100K 3 eval',
+      'Apex 100K eval',
+    ]);
+    for (const c of made) {
+      const linked = accounts.find((a) => a.id === c.phases[0]!.accountId)!;
+      expect(linked.name).toBe(`${c.name} eval`);
+      expect(c).toMatchObject({ status: 'active', evaluationFee: 54_900 });
+    }
+    expect(await repo.challenges.list(S)).toHaveLength(3);
+  });
+
+  test('keeps a link to an existing account, and a phase with no account', async () => {
+    const repo = setup();
+    const [c] = await repo.challenges.createMany(S, [
+      {
+        challenge: {
+          ...entry('Mixed').challenge,
+          phases: [{ step: 'step-1', accountId: 'acc-a' }, { step: 'funded' }],
+        },
+        newAccounts: [],
+      },
+    ]);
+    expect(c!.phases).toEqual([
+      { step: 'step-1', accountId: 'acc-a' },
+      { step: 'funded' },
+    ]);
+  });
+
+  test('is all or nothing: item 3 failing writes no challenge and no account', async () => {
+    const repo = setup();
+    const accountsBefore = await repo.accounts.list(S);
+    const bad = entry('Third');
+    bad.challenge.name = '  ';
+    const attempt = repo.challenges.createMany(S, [
+      entry('First'),
+      entry('Second'),
+      bad,
+    ]);
+    await expect(attempt).rejects.toBeInstanceOf(RangeError);
+    expect(await repo.challenges.list(S)).toEqual([]);
+    expect(await repo.accounts.list(S)).toEqual(accountsBefore);
+  });
+
+  test('is all or nothing for a link to an account that is not there', async () => {
+    const repo = setup();
+    const accountsBefore = await repo.accounts.list(S);
+    const ghost = entry('Ghost');
+    ghost.challenge.phases = [
+      { step: 'step-1', accountId: 'nope' },
+      { step: 'funded' },
+    ];
+    ghost.newAccounts = [];
+    await expect(
+      repo.challenges.createMany(S, [entry('First'), ghost]),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    expect(await repo.challenges.list(S)).toEqual([]);
+    expect(await repo.accounts.list(S)).toEqual(accountsBefore);
+  });
+
+  test('refuses no items, a bare breached status, and a new account for a phase that is not there or is already linked', async () => {
+    const repo = setup();
+    await expect(repo.challenges.createMany(S, [])).rejects.toBeInstanceOf(
+      RangeError,
+    );
+    const bare = entry('Bare');
+    bare.challenge.status = 'breached';
+    await expect(repo.challenges.createMany(S, [bare])).rejects.toThrow(
+      /breach/,
+    );
+    const stray = entry('Stray');
+    stray.newAccounts = [{ step: 'step-2', account: account('x') }];
+    await expect(repo.challenges.createMany(S, [stray])).rejects.toBeInstanceOf(
+      RangeError,
+    );
+    const both = entry('Both');
+    both.challenge.phases = [
+      { step: 'step-1', accountId: 'acc-a' },
+      { step: 'funded' },
+    ];
+    await expect(repo.challenges.createMany(S, [both])).rejects.toBeInstanceOf(
+      RangeError,
+    );
+    expect(await repo.challenges.list(S)).toEqual([]);
+  });
+
+  test('a breach is written with the challenge: status, reason, date and, for other, the words; and it is permanent', async () => {
+    const repo = setup();
+    const [a, b] = await repo.challenges.createMany(S, [
+      {
+        ...entry('Listed'),
+        breach: { reason: 'overtrading', note: 'ignored', on: '2026-11-12' },
+      },
+      {
+        ...entry('Own words'),
+        breach: {
+          reason: 'other',
+          note: '  Firm closed it  ',
+          on: '2026-11-13',
+        },
+      },
+    ]);
+    expect(a).toMatchObject({
+      status: 'breached',
+      breachReason: 'overtrading',
+      breachedOn: '2026-11-12',
+      phase: 'evaluation',
+    });
+    expect('failureReason' in a!).toBe(false);
+    expect(b).toMatchObject({
+      status: 'breached',
+      breachReason: 'other',
+      breachedOn: '2026-11-13',
+      failureReason: 'Firm closed it',
+    });
+    expect(await repo.challenges.list(S)).toEqual([a, b]);
+    await expect(
+      repo.challenges.update(S, a!.id, { status: 'active' }),
+    ).rejects.toBeInstanceOf(ChallengeBreachedError);
+    await expect(
+      repo.challenges.markBreached(S, a!.id, {
+        reason: 'other',
+        on: '2026-11-14',
+      }),
+    ).rejects.toBeInstanceOf(ChallengeBreachedError);
+  });
+
+  test('a bad breach date or reason refuses the whole batch', async () => {
+    const repo = setup();
+    for (const breach of [
+      { reason: 'overtrading' as const, on: '12 Nov' },
+      { reason: 'luck' as never, on: '2026-11-12' },
+    ])
+      await expect(
+        repo.challenges.createMany(S, [
+          entry('Fine'),
+          { ...entry('Broken'), breach },
+        ]),
+      ).rejects.toBeInstanceOf(RangeError);
+    expect(await repo.challenges.list(S)).toEqual([]);
+  });
+
+  test('create itself still refuses a bare breached status', async () => {
+    const repo = setup();
+    await expect(
+      repo.challenges.create(S, { ...input, status: 'breached' }),
+    ).rejects.toThrow(/markBreached/);
+  });
+});
+
+describe('a breach locks the steps (C-05)', () => {
+  const two = {
+    ...input,
+    steps: 2 as const,
+    phases: [
+      { step: 'step-1' as const, accountId: 'acc-a' },
+      { step: 'step-2' as const },
+      { step: 'funded' as const },
+    ],
+  };
+
+  test('update refuses a steps change or a different set of phases on a breached challenge, and writes nothing', async () => {
+    const repo = setup();
+    const c = await repo.challenges.create(S, two);
+    const done = await repo.challenges.markBreached(S, c.id, {
+      reason: 'overtrading',
+      on: '2026-11-12',
+    });
+    const one = repo.challenges.update(S, c.id, {
+      steps: 1,
+      phases: [{ step: 'step-1', accountId: 'acc-a' }, { step: 'funded' }],
+      name: 'Renamed',
+    });
+    await expect(one).rejects.toBeInstanceOf(ChallengeBreachedError);
+    await expect(one).rejects.toMatchObject({ challengeId: c.id });
+    await expect(
+      repo.challenges.update(S, c.id, { steps: 1 }),
+    ).rejects.toBeInstanceOf(ChallengeBreachedError);
+    await expect(
+      repo.challenges.update(S, c.id, {
+        phases: [{ step: 'step-1', accountId: 'acc-a' }, { step: 'funded' }],
+      }),
+    ).rejects.toBeInstanceOf(ChallengeBreachedError);
+    expect(await repo.challenges.list(S)).toEqual([done]);
+  });
+
+  test('the same steps and phases are no change, and a start date or an account link still edits', async () => {
+    const repo = setup();
+    const c = await repo.challenges.create(S, two);
+    await repo.challenges.markBreached(S, c.id, {
+      reason: 'overtrading',
+      on: '2026-11-12',
+    });
+    await expect(
+      repo.challenges.update(S, c.id, {
+        steps: 2,
+        phases: [
+          { step: 'step-1', accountId: 'acc-a' },
+          { step: 'step-2' },
+          { step: 'funded' },
+        ],
+        name: 'Renamed',
+      }),
+    ).resolves.toMatchObject({ name: 'Renamed', steps: 2, status: 'breached' });
+    await expect(
+      repo.challenges.update(S, c.id, {
+        phases: [
+          { step: 'step-1', accountId: 'acc-a', startDate: '2026-10-01' },
+          { step: 'step-2' },
+          { step: 'funded' },
+        ],
+      }),
+    ).resolves.toMatchObject({
+      phases: [
+        { step: 'step-1', accountId: 'acc-a', startDate: '2026-10-01' },
+        { step: 'step-2' },
+        { step: 'funded' },
+      ],
+    });
+  });
+
+  test('a challenge that is not breached still changes its steps', async () => {
+    const repo = setup();
+    const c = await repo.challenges.create(S, two);
+    await expect(
+      repo.challenges.update(S, c.id, {
+        steps: 1,
+        phases: [{ step: 'step-1', accountId: 'acc-a' }, { step: 'funded' }],
+      }),
+    ).resolves.toMatchObject({ steps: 1 });
+  });
+});
+
+describe('update with new accounts (C-02)', () => {
+  const account = {
+    name: 'Funded account',
+    broker: 'Apex',
+    type: 'prop-funded' as const,
+    currency: 'USD',
+    startingBalance: 5_000_000,
+    status: 'active' as const,
+  };
+
+  test('creates the account and links it to the phase in the same write', async () => {
+    const repo = setup();
+    const c = await repo.challenges.create(S, input);
+    const next = await repo.challenges.update(
+      S,
+      c.id,
+      { name: 'Renamed', phases: c.phases },
+      [{ step: 'funded', account }],
+    );
+    const made = (await repo.accounts.list(S)).find(
+      (a) => a.name === 'Funded account',
+    )!;
+    expect(next.phases).toEqual([
+      { step: 'step-1', accountId: 'acc-a' },
+      { step: 'funded', accountId: made.id },
+    ]);
+    expect(await repo.challenges.list(S)).toEqual([next]);
+  });
+
+  test('a refused update leaves no account behind', async () => {
+    const repo = setup();
+    const c = await repo.challenges.create(S, input);
+    const before = await repo.accounts.list(S);
+    await expect(
+      repo.challenges.update(S, c.id, { name: ' ' }, [
+        { step: 'funded', account },
+      ]),
+    ).rejects.toBeInstanceOf(RangeError);
+    // A phase that is not there, or already linked.
+    await expect(
+      repo.challenges.update(S, c.id, {}, [{ step: 'step-2', account }]),
+    ).rejects.toBeInstanceOf(RangeError);
+    await expect(
+      repo.challenges.update(S, c.id, {}, [{ step: 'step-1', account }]),
+    ).rejects.toBeInstanceOf(RangeError);
+    expect(await repo.accounts.list(S)).toEqual(before);
+    expect(await repo.challenges.list(S)).toEqual([c]);
+  });
 });

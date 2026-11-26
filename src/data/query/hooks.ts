@@ -41,6 +41,8 @@ import type {
   NewAccount,
   NewCashFlow,
   NewChallenge,
+  NewChallengeAccount,
+  NewChallengeEntry,
   NewPropTxn,
   ChallengePatch,
   PropTxnPatch,
@@ -835,15 +837,38 @@ export function useCreateChallenge(): UseMutationResult<
   );
 }
 
+/**
+ * Creates the challenges and the new accounts they ask for in one write, all or
+ * none (C-02); an entry's `breach` creates it already breached (C-04).
+ */
+export function useCreateChallenges(): UseMutationResult<
+  Challenge[],
+  Error,
+  NewChallengeEntry[]
+> {
+  return useWorkspaceWrite(
+    'challenges.createMany',
+    (r, ws, v: NewChallengeEntry[]) => r.challenges.createMany(ws, v),
+  );
+}
+
+/** `newAccounts` are created and linked in the same write, all or none. */
 export function useUpdateChallenge(): UseMutationResult<
   Challenge,
   Error,
-  { id: string; patch: ChallengePatch }
+  { id: string; patch: ChallengePatch; newAccounts?: NewChallengeAccount[] }
 > {
   return useWorkspaceWrite(
     'challenges.update',
-    (r, ws, v: { id: string; patch: ChallengePatch }) =>
-      r.challenges.update(ws, v.id, v.patch),
+    (
+      r,
+      ws,
+      v: {
+        id: string;
+        patch: ChallengePatch;
+        newAccounts?: NewChallengeAccount[];
+      },
+    ) => r.challenges.update(ws, v.id, v.patch, v.newAccounts),
   );
 }
 
