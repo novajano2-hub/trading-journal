@@ -58,30 +58,39 @@ export function withFillCosts(
   );
 }
 
-/** A message for costs that cannot be kept (a negative, a fraction, a number too large), or null when they are fine. */
+/**
+ * A message for costs that cannot be kept (not whole cents, or too large to
+ * be), or null when they are fine. A negative cost is kept: it is a credit,
+ * which is how TradeZella takes a swap credit, in the fees. Swap is a cost of
+ * its own (B60), so a credit here lowers the trade's `fees`, and the net goes
+ * up by the same.
+ */
 export function fillCostsError(costs: {
   commission: Cents;
   fees: Cents;
 }): string | null {
   for (const cents of [costs.commission, costs.fees])
-    if (!Number.isSafeInteger(cents) || cents < 0)
-      return 'A commission and a fee are whole, non-negative cents';
+    if (!Number.isSafeInteger(cents))
+      return 'A commission and a fee are whole cents';
   return null;
 }
 
-/** Thousands grouped by commas, or no commas at all. */
-const AMOUNT = /^(?:\d{1,3}(?:,\d{3})+|\d+)?(?:\.\d*)?$/;
+/** An optional minus, then thousands grouped by commas or no commas at all. */
+const AMOUNT = /^-?(?:\d{1,3}(?:,\d{3})+|\d+)?(?:\.\d*)?$/;
 
 /**
  * The cents a typed amount comes to. An empty field is 0 (nothing was
- * charged). Null when it is not an amount of zero or more: a negative, letters,
- * a second point, an exponent. A comma is a thousands mark only, so a decimal
- * comma is refused instead of read as dollars. A fraction of a cent rounds.
+ * charged). A leading minus is a credit: TradeZella takes a swap credit as a
+ * negative amount in the fees. Null when it is not an amount: letters, a
+ * second point, an exponent, a currency sign. A comma is a thousands mark
+ * only, so a decimal comma is refused instead of read as dollars. A fraction
+ * of a cent rounds.
  */
 export function centsFromText(text: string): Cents | null {
   const raw = text.replace(/\s/g, '');
   if (raw === '') return 0;
   if (!AMOUNT.test(raw) || !/\d/.test(raw)) return null;
   const cents = toCents(Number(raw.replace(/,/g, '')));
-  return Number.isSafeInteger(cents) ? cents : null;
+  // Minus zero is zero.
+  return Number.isSafeInteger(cents) ? cents + 0 : null;
 }

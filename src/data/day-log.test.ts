@@ -139,6 +139,22 @@ describe('day grouping', () => {
     });
   });
 
+  test('a fee credit is a negative commission: it lowers the day’s commissions and raises its net over its gross', () => {
+    const [day] = groupDays(
+      [
+        // A $5.00 credit in the fees: gross 95.00, net 100.00.
+        makeTrade({ gross: 9500, fees: -500, net: 10000 }),
+        makeTrade({ gross: 1000, fees: 100, net: 900 }),
+      ],
+      env(),
+    );
+    expect(day!.stats).toMatchObject({
+      gross: 10500,
+      net: 10900,
+      commissions: -400,
+    });
+  });
+
   test('a day without a loss has profit factor null', () => {
     const [day] = groupDays([makeTrade({ net: 100 })], env());
     expect(day!.stats.profitFactor).toBeNull();

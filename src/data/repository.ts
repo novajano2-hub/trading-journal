@@ -250,10 +250,11 @@ export interface TradesRepo {
    * rebuild would change a closed-trades file's currency and drop its MAE and
    * MFE). One `edited` history row, source you, for `fees` in raw cents; none
    * when the fees do not change. Allowed on a finished day (B55): its frozen
-   * score stays. Moves the import state when anything changed. Throws
-   * RangeError for costs that are not whole, non-negative cents, NotFoundError
-   * for a missing trade or execution, ArchivedAccountError for a trade in an
-   * archived account. One transaction.
+   * score stays. Moves the import state when anything changed. A negative
+   * cost is a credit (TradeZella takes a swap credit that way): it lowers the
+   * trade's `fees` and raises its `net`. Throws RangeError for costs that are
+   * not whole cents, NotFoundError for a missing trade or execution,
+   * ArchivedAccountError for a trade in an archived account. One transaction.
    */
   setFillCosts(
     ws: string,

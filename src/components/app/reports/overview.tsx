@@ -259,7 +259,8 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
   const widest = Math.max(
     1,
     Math.abs(s.grossPnl),
-    s.fees,
+    // Fees below zero (credits outweigh charges) draw as long a bar as charges do.
+    Math.abs(s.fees),
     Math.abs(swap ?? 0),
     Math.abs(s.netPnl),
   );
@@ -451,11 +452,13 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
           />
           <div className="mt-2">{inner}</div>
           <p className="mt-2 text-[13px] leading-[1.5] text-muted">
-            {feeShare !== null && s.fees > 0
-              ? `Fees took ${formatPct(feeShare, 1)} of gross.`
-              : s.fees === 0
-                ? 'No fees on these trades.'
-                : 'Fees came on top of a gross loss.'}
+            {s.fees < 0
+              ? 'Fee credits outweighed the fees.'
+              : feeShare !== null && s.fees > 0
+                ? `Fees took ${formatPct(feeShare, 1)} of gross.`
+                : s.fees === 0
+                  ? 'No fees on these trades.'
+                  : 'Fees came on top of a gross loss.'}
           </p>
         </section>
       )}
@@ -463,7 +466,12 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
       {(
         [
           ['gross-pnl', s.grossPnl, 'bg-gain-fill'],
-          ['fees', -s.fees, 'bg-loss-fill'],
+          [
+            'fees',
+            -s.fees,
+            // A credit (fees below zero) is a gain, as a swap credit is.
+            s.fees < 0 ? 'bg-gain-fill' : 'bg-loss-fill',
+          ],
           [
             'swap',
             swap ?? 0,

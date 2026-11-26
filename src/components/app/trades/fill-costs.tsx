@@ -89,6 +89,8 @@ export function useFillCosts(
     /** Whether a row can be opened at all: an archived account's trades are read-only. */
     editable: !readOnly,
     masked,
+    /** Whether the import already gave the trade a swap: then the note does not tell how to enter one. */
+    hasSwap: trade.swap !== undefined,
     openId: row?.id ?? null,
     /** The sign the fields lead with: the trade's own currency, the one its fills' figures are in. */
     symbol: currencySymbol(trade.pnlCurrency),
@@ -278,7 +280,7 @@ export function FillCostsNote({
 }): React.JSX.Element | null {
   if (edit.openId === null) return null;
   const problem = edit.invalid
-    ? 'Enter an amount of zero or more.'
+    ? 'Enter an amount.'
     : edit.failed
       ? "Couldn't save the costs. Try again."
       : null;
@@ -287,7 +289,10 @@ export function FillCostsNote({
       <p className="mt-2 flex items-start gap-1.5 text-[12.5px] text-faint">
         <Info size={15} aria-hidden="true" className="mt-px flex-none" />
         Confirm the row to save. The trade&apos;s fees and net update, and the
-        change is logged. A swap your broker charged goes in the fee.
+        change is logged.
+        {edit.hasSwap
+          ? null
+          : ' A swap your broker charged goes in the fee as a positive amount, a credit as a negative one.'}
       </p>
       {edit.masked ? (
         <p className="mt-1 text-[12.5px] text-faint">

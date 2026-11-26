@@ -176,14 +176,55 @@ describe('setFillCosts', () => {
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  test('costs that are not whole non-negative cents are refused, writing nothing', async () => {
+  test('a negative fee, a credit, lowers the fees and raises the net, in one row of raw negative cents', async () => {
+    const { repo, trade, rows, rowCount } = await setup();
+    const before = await rowCount();
+    // The exit's $3.50 becomes a $5.00 credit: $8.50 less.
+    const out = await repo.trades.setFillCosts(
+      M,
+      trade.id,
+      trade.executions[1]!.id,
+      { commission: 0, fees: -500 },
+    );
+    expect(costs(out)[1]).toEqual([0, -500]);
+    expect(out.fees).toBe(trade.fees - 850);
+    expect(out.net).toBe(trade.net + 850);
+    expect(out.gross).toBe(trade.gross);
+    expect(out.fees).toBe(-30);
+    expect(await repo.trades.get(M, trade.id)).toEqual(out);
+    expect(await rowCount()).toBe(before + 1);
+    expect((await rows('trade')).at(-1)).toMatchObject({
+      field: 'fees',
+      source: 'you',
+      oldValue: 820,
+      newValue: -30,
+    });
+    // A negative commission is as good, and a credit can be taken back.
+    const second = await repo.trades.setFillCosts(
+      M,
+      trade.id,
+      trade.executions[0]!.id,
+      { commission: -200, fees: 0 },
+    );
+    expect(second.fees).toBe(-30 - 470 - 200);
+    const back = await repo.trades.setFillCosts(
+      M,
+      trade.id,
+      trade.executions[1]!.id,
+      { commission: 350, fees: 0 },
+    );
+    expect(back.fees).toBe(second.fees + 850);
+  });
+
+  test('costs that are not whole cents are refused, writing nothing', async () => {
     const { repo, trade, rowCount } = await setup();
     const before = await rowCount();
     for (const bad of [
-      { commission: -1, fees: 0 },
-      { commission: 0, fees: -5 },
       { commission: 1.5, fees: 0 },
+      { commission: 0, fees: -0.5 },
       { commission: Number.NaN, fees: 0 },
+      { commission: 0, fees: Number.POSITIVE_INFINITY },
+      { commission: 2 ** 60, fees: 0 },
     ])
       await expect(
         repo.trades.setFillCosts(M, trade.id, trade.executions[0]!.id, bad),

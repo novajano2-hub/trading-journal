@@ -14,7 +14,14 @@ interface StoredTrade {
   accountId: string;
   pnlCurrency: string;
   grouping?: string;
-  executions: { id: string; accountId: string }[];
+  fees: number;
+  net: number;
+  executions: {
+    id: string;
+    accountId: string;
+    fees: number;
+    commission: number;
+  }[];
 }
 interface StoredHistory {
   type: string;
@@ -318,4 +325,107 @@ test('choose stats saves per user and survives a reload; attachments keep, show,
     .click();
   await expect(files.getByText('Drop files here')).toBeVisible();
   expect(page.url()).toBe(here);
+});
+
+test('costs by hand: a fill’s fee saved with Enter moves the trade’s fees and net, and a credit moves them back past where they began', async ({
+  page,
+}) => {
+  await page.goto('/app/trades?symbol=ES&account=sample-futures');
+  const list = page.getByRole('table', { name: 'Trades' });
+  await expect(list).toBeVisible({ timeout: 30_000 });
+  await list.locator('tbody tr').first().getByRole('link').first().click();
+  const exec = page.getByRole('region', { name: 'Execution' });
+  await expect(exec.getByText('Gross P&L')).toBeVisible({ timeout: 30_000 });
+  const id = decodeURIComponent(new URL(page.url()).pathname.split('/').pop()!);
+  const stored = async () =>
+    (await readStore<StoredTrade>(page, 'trades')).find((t) => t.id === id)!;
+  const fees = async () =>
+    (await readStore<StoredHistory>(page, 'history')).filter(
+      (r) => r.entityId === id && r.field === 'fees',
+    );
+  const head = page.getByRole('region', { name: /^Trade \d+/ });
+  const fills = page.getByRole('table', { name: 'Executions' });
+  const row = fills.locator('tbody tr').first();
+  const before = await stored();
+  const was = before.executions[0]!;
+  const netBefore = await head.textContent();
+  expect(await fees()).toEqual([]);
+
+  // Open the first fill's exchange fee, type one, and confirm with Enter.
+  await row.getByRole('button', { name: /^Edit exchange fee/ }).click();
+  const fee = row.getByRole('textbox', { name: 'Exchange fee' });
+  await expect(fee).toBeFocused();
+  await expect(
+    row.getByRole('button', { name: "Save this row's costs" }),
+  ).toBeVisible();
+  await fee.fill('2.43');
+  await fee.press('Enter');
+  await expect(row.getByRole('textbox')).toHaveCount(0);
+
+  // The fill, the trade's fees and net moved by the change; gross stayed.
+  const delta = 243 - was.fees;
+  await expect
+    .poll(async () => (await stored()).fees)
+    .toBe(before.fees + delta);
+  const first = await stored();
+  expect(first.executions[0]).toMatchObject({
+    fees: 243,
+    commission: was.commission,
+  });
+  expect(first.net).toBe(before.net - delta);
+  await expect(row).toContainText('$2.43');
+  expect(await head.textContent()).not.toBe(netBefore);
+  // One history row, the person's own, in raw cents.
+  expect(await fees()).toEqual([
+    expect.objectContaining({
+      type: 'trade',
+      action: 'edited',
+      source: 'you',
+      oldValue: before.fees,
+      newValue: before.fees + delta,
+    }),
+  ]);
+
+  // A credit: a negative fee is taken, lowers the fees below where they began, and raises the net.
+  await row.getByRole('button', { name: /^Edit exchange fee/ }).click();
+  await row.getByRole('textbox', { name: 'Exchange fee' }).fill('-5');
+  await row.getByRole('textbox', { name: 'Exchange fee' }).press('Enter');
+  await expect(row.getByRole('textbox')).toHaveCount(0);
+  const credit = -500 - was.fees;
+  await expect
+    .poll(async () => (await stored()).fees)
+    .toBe(before.fees + credit);
+  expect((await stored()).net).toBe(before.net - credit);
+  await expect(row).toContainText('−$5.00');
+  // Two rows, both the person's own (the page's clock is fixed, so they are told apart by their values).
+  expect(await fees()).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        source: 'you',
+        oldValue: before.fees,
+        newValue: before.fees + delta,
+      }),
+      expect.objectContaining({
+        source: 'you',
+        oldValue: before.fees + delta,
+        newValue: before.fees + credit,
+      }),
+    ]),
+  );
+  expect(await fees()).toHaveLength(2);
+
+  // Something that is not an amount is refused in the row, and nothing is written.
+  await row.getByRole('button', { name: /^Edit exchange fee/ }).click();
+  await row.getByRole('textbox', { name: 'Exchange fee' }).fill('abc');
+  await row.getByRole('button', { name: "Save this row's costs" }).click();
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'Enter an amount.' }),
+  ).toBeVisible();
+  await row.getByRole('button', { name: 'Cancel the edit' }).click();
+  expect((await stored()).fees).toBe(before.fees + credit);
+
+  // It is all still there after a reload.
+  await page.reload();
+  await expect(fills).toBeVisible({ timeout: 30_000 });
+  await expect(fills.locator('tbody tr').first()).toContainText('−$5.00');
 });

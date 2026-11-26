@@ -203,17 +203,17 @@ test('cancelling leaves the fill, the trade and the log as they were', async () 
   expect(field('Exchange fee').value).toBe('1.05');
 });
 
-test('a negative or non-numeric amount is refused in the row, and an empty field means 0', async () => {
+test('a non-numeric amount is refused in the row, and an empty field means 0', async () => {
   const { repo } = renderApp(<TradeView id="t-c" />, {
     sample: sample(),
     url: URL,
   });
   fireEvent.click(opener(await rowOf(3), 'commission'));
-  for (const bad of ['-3', 'abc', '1e3', '2,43']) {
+  for (const bad of ['abc', '1e3', '2,43', '--', '-', '$4']) {
     fireEvent.change(field('Commission'), { target: { value: bad } });
     fireEvent.click(save());
     const alert = await screen.findByRole('alert');
-    expect(alert.textContent).toBe('Enter an amount of zero or more.');
+    expect(alert.textContent).toBe('Enter an amount.');
     expect(field('Commission').getAttribute('aria-invalid')).toBe('true');
     expect(field('Commission').getAttribute('aria-describedby')).toBe(alert.id);
     expect(field('Exchange fee').getAttribute('aria-invalid')).toBeNull();
@@ -237,6 +237,91 @@ test('a negative or non-numeric amount is refused in the row, and an empty field
     expect(t.executions[3]).toMatchObject({ fees: 0, commission: 0 });
     expect(t.fees).toBe(3120 - 780);
   });
+});
+
+test('a negative fee is a credit: the trade’s fees go down and its net goes up, as a swap credit gets in', async () => {
+  const { repo } = renderApp(<TradeView id="t-c" />, {
+    sample: sample(),
+    url: URL,
+  });
+  fireEvent.click(opener(await rowOf(2), 'exchange fee'));
+  fireEvent.change(field('Exchange fee'), { target: { value: '-4.86' } });
+  fireEvent.keyDown(field('Exchange fee'), { key: 'Enter' });
+  await waitFor(async () => {
+    const t = (await repo.trades.get(WS, 't-c'))!;
+    // The fee went from $1.05 to a $4.86 credit: $5.91 less.
+    expect(t.executions[2]).toMatchObject({ fees: -486, commission: 675 });
+    expect(t.fees).toBe(3120 - 591);
+    expect(t.net).toBe(8130 + 591);
+  });
+  await waitFor(() =>
+    expect(screen.queryByRole('textbox', { name: 'Commission' })).toBeNull(),
+  );
+  // The row reads the credit with its sign, and opening it again offers it back as typed.
+  const row = await rowOf(2);
+  expect(row.textContent).toContain('−$4.86');
+  fireEvent.click(opener(row, 'exchange fee'));
+  expect(field('Exchange fee').value).toBe('-4.86');
+  expect(screen.queryByRole('alert')).toBeNull();
+  // The log holds the raw negative change.
+  const rows = await repo.history.list(WS);
+  expect(rows[0]).toMatchObject({
+    field: 'fees',
+    oldValue: 3120,
+    newValue: 2529,
+  });
+});
+
+test('the note tells how a swap goes in the fees, unless the import already gave the trade its swap', async () => {
+  renderApp(<TradeView id="t-c" />, { sample: sample(), url: URL });
+  fireEvent.click(opener(await rowOf(0), 'commission'));
+  expect(
+    screen.getByText(
+      /A swap your broker charged goes in the fee as a positive amount, a credit as a negative one\./,
+    ),
+  ).toBeTruthy();
+  cleanup();
+
+  renderApp(<TradeView id="t-c" />, {
+    sample: sample({ swap: -486, net: 8130 - 486 }),
+    url: URL,
+  });
+  fireEvent.click(opener(await rowOf(0), 'commission'));
+  const note = screen.getByText(/Confirm the row to save\./);
+  expect(note.textContent).toContain("The trade's fees and net update");
+  expect(note.textContent).not.toMatch(/swap/i);
+});
+
+test('Privacy masks a credit as well: no digit reaches a reader', async () => {
+  const credited = sample();
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => {
+      const w = await credited();
+      const t = w.trades[0]!;
+      return {
+        ...w,
+        trades: [
+          {
+            ...t,
+            executions: t.executions.map((e) =>
+              e.id === 'e3' ? { ...e, fees: -486 } : e,
+            ),
+          },
+        ],
+      };
+    },
+  });
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<TradeView id="t-c" />, { repository, url: URL });
+  fireEvent.click(opener(await rowOf(2), 'exchange fee'));
+  expect(field('Exchange fee').value).toBe('−$•••');
+  expect(field('Exchange fee').readOnly).toBe(true);
+  expect(everyString(document.body).filter((t) => /\$\d/.test(t))).toEqual([]);
+  expect(
+    screen.getByRole('table', { name: 'Executions' }).textContent,
+  ).not.toContain('4.86');
 });
 
 test('a save that fails says so and keeps the row open', async () => {

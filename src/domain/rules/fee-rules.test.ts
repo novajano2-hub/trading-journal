@@ -84,6 +84,27 @@ describe('hasCosts', () => {
       ),
     ).toBe(true);
   });
+
+  test('a negative cost, a credit, is a cost: the fill counts as costed', () => {
+    const credited = trade('ESZ5', [
+      ['buy', 1, 5000],
+      ['sell', 1, 5001, { fees: -486 }],
+    ]);
+    expect(hasCosts(credited)).toBe(true);
+    // So a rule without override leaves it alone, and with override replaces the credit.
+    expect(
+      withFeeRule(credited, rule(), {
+        override: false,
+        accountCurrency: 'USD',
+      }),
+    ).toBeUndefined();
+    const out = withFeeRule(credited, rule({ applyOn: 'exit' }), {
+      override: true,
+      accountCurrency: 'USD',
+    })!;
+    expect(costs(out.executions)[1]).toEqual([150, 20]);
+    expect(out.fees).toBe(credited.fees + 150 + 20 + 486);
+  });
 });
 
 describe('applyFeeRule', () => {

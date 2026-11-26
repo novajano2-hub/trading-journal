@@ -128,6 +128,51 @@ describe('withFillCosts', () => {
     expect(out.mfe).toBe(900);
   });
 
+  test('a negative fee lowers the trade’s fees and raises its net: a credit', () => {
+    const t = costed();
+    // The exit fill went from 3.50 to a credit of 5.00: 8.50 less.
+    const out = withFillCosts(t, t.executions[1]!.id, {
+      commission: 0,
+      fees: -500,
+    })!;
+    expect(costsOf(out)[1]).toEqual([0, -500]);
+    expect(out.fees).toBe(t.fees - 850);
+    expect(out.net).toBe(t.net + 850);
+    expect(out.gross).toBe(t.gross);
+    // The credits outweigh the charges: the trade's fees are below zero, and net is above gross.
+    expect(out.fees).toBe(-30);
+    expect(out.net).toBeGreaterThan(out.gross);
+    // The same as rebuilding it from its fills, swap included.
+    const rebuilt = buildGroupedTrade(
+      out.executions,
+      { ...out, swap: -100 },
+      opts,
+    );
+    const withSwap = withFillCosts(
+      { ...t, swap: -100, net: t.net - 100 },
+      t.executions[1]!.id,
+      {
+        commission: 0,
+        fees: -500,
+      },
+    )!;
+    expect(withSwap.net).toBe(rebuilt.net);
+    expect(withSwap.fees).toBe(rebuilt.fees);
+  });
+
+  test('a credit taken back to nothing gives the trade its charge again', () => {
+    const base = costed();
+    const t = withFillCosts(base, base.executions[1]!.id, {
+      commission: 0,
+      fees: -500,
+    })!;
+    const back = withFillCosts(t, t.executions[1]!.id, {
+      commission: 350,
+      fees: 0,
+    })!;
+    expect(back.fees).toBe(820);
+  });
+
   test('moving cost from the commission to the fee changes the fill and not the trade figures', () => {
     const t = costed();
     const out = withFillCosts(t, t.executions[1]!.id, {
@@ -168,13 +213,21 @@ describe('withFillCosts', () => {
 });
 
 describe('fillCostsError', () => {
-  test('whole, non-negative cents are fine', () => {
+  test('whole cents are fine, a negative one too: a credit', () => {
     expect(fillCostsError({ commission: 0, fees: 0 })).toBeNull();
     expect(fillCostsError({ commission: 350, fees: 120 })).toBeNull();
+    expect(fillCostsError({ commission: 0, fees: -486 })).toBeNull();
+    expect(fillCostsError({ commission: -25, fees: 0 })).toBeNull();
   });
 
-  test('a negative, a fraction or a non-number is refused', () => {
-    for (const bad of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 60])
+  test('a fraction or a non-number is refused', () => {
+    for (const bad of [
+      1.5,
+      -0.5,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      2 ** 60,
+    ])
       for (const field of ['commission', 'fees'] as const)
         expect(
           fillCostsError({ commission: 0, fees: 0, [field]: bad }),
@@ -212,10 +265,26 @@ describe('centsFromText', () => {
     expect(centsFromText('2.436')).toBe(244);
   });
 
-  test('a negative or a non-number is refused', () => {
+  test('a leading minus is a credit, as in TradeZella, where a swap credit goes in the fees', () => {
+    expect(centsFromText('-1')).toBe(-100);
+    expect(centsFromText('-4.86')).toBe(-486);
+    expect(centsFromText('-0.01')).toBe(-1);
+    expect(centsFromText('-.5')).toBe(-50);
+    expect(centsFromText(' -1,234.50 ')).toBe(-123450);
+    // Minus zero is zero, not a negative zero that would reach the store.
+    expect(Object.is(centsFromText('-0'), 0)).toBe(true);
+    expect(Object.is(centsFromText('-0.00'), 0)).toBe(true);
+    // A decimal comma stays refused when it is negative too.
+    expect(centsFromText('-2,43')).toBeNull();
+  });
+
+  test('a non-number is refused', () => {
     for (const bad of [
-      '-1',
-      '-0.01',
+      '-',
+      '--1',
+      '1-',
+      '-$2.43',
+      '-1e3',
       '+2',
       'abc',
       '2.4.3',
