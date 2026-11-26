@@ -450,6 +450,14 @@ test('every metric carries its definition', async () => {
     'tracker-streak',
     'tracker-score',
     'tracker-today',
+    // On the trade log by day (Plan 6A Task 15).
+    'day-trades',
+    'day-gross',
+    'day-won-lost',
+    'day-commissions',
+    'day-win-rate',
+    'day-volume',
+    'day-profit-factor',
     'rule-streak',
     'rule-average',
     'tracker-follow-rate',
@@ -537,6 +545,18 @@ test('recent trades opens on the closed trades, with an Open positions tab besid
       .getAllByRole('radio')
       .map((r) => (r as HTMLInputElement).labels?.[0]?.textContent),
   ).toEqual(['Closed', 'Open positions']);
+});
+
+test('All trades is a drill-down to the All view, keeping the filters', async () => {
+  await renderDashboard({
+    url: '/app/dashboard?from=2026-11-02&to=2026-11-19&account=acc-b',
+  });
+  const region = await screen.findByRole('region', { name: 'Recent trades' });
+  expect(
+    within(region)
+      .getByRole('link', { name: 'All trades' })
+      .getAttribute('href'),
+  ).toBe('/app/trades?from=2026-11-02&to=2026-11-19&account=acc-b');
 });
 
 test('open positions: each open trade with its quantity, entry and realized P&L from a partial exit', async () => {

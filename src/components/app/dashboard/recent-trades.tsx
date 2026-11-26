@@ -29,7 +29,8 @@ import {
   TradeTime,
 } from './shared';
 
-const TRADES = navItem('trades');
+// "All trades" is a drill-down: it lands on the All view, not Trades' own Day view (spec 5.3).
+const TRADES = { ...navItem('trades'), href: '/app/trades' as const };
 
 const FIGURE = 'font-[550] tabular-nums';
 const TH =

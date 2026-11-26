@@ -165,7 +165,9 @@ async function addTrade(
     await page.getByLabel(`Fill ${n} price`).fill(f.price);
   }
   await page.getByRole('button', { name: 'Save trade' }).click();
-  await expect(page).toHaveURL(/\/app\/trades\/(?!new)[^/?]+(\?.*)?$/);
+  await expect(page).toHaveURL(
+    /\/app\/trades\/(?!(?:new|day|week)(?:[/?]|$))[^/?]+(\?.*)?$/,
+  );
   await expect(page.getByRole('heading', { name: 'Add a trade' })).toHaveCount(
     0,
   );

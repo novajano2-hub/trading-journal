@@ -18,6 +18,7 @@ import { SessionButton } from './day/session-button';
 import { isRealDate } from './notebook/notebook-model';
 import { PlanTheDay } from './routine/plan-the-day';
 import { useStrategy, useTrade } from '@/data/query/hooks';
+import { LOG_VIEW_HREF, useLastLogView } from '@/lib/log-view';
 import {
   dayPageDate,
   filtersApply,
@@ -91,6 +92,12 @@ function useChipsFit({
   useLayoutEffect(() => {
     const sm = matchMedia('(min-width: 640px)');
     const measure = () => {
+      // The bar's measured height, for what pins itself under it (the trade views' switch row).
+      if (bar.current)
+        document.documentElement.style.setProperty(
+          '--top-bar',
+          `${bar.current.getBoundingClientRect().height}px`,
+        );
       const t = title.current;
       const r = tail.current;
       const c = chips.current;
@@ -106,22 +113,28 @@ function useChipsFit({
       setFit((f) => (f === next ? f : next));
     };
     measure();
-    if (typeof ResizeObserver === 'undefined') return;
+    const unpublish = () =>
+      document.documentElement.style.removeProperty('--top-bar');
+    if (typeof ResizeObserver === 'undefined') return unpublish;
     // The bar resizes with the window; the rest with their words.
     const observer = new ResizeObserver(measure);
     for (const el of [bar, title, controls, chips])
       if (el.current) observer.observe(el.current);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      unpublish();
+    };
   }, [bar, title, tail, controls, chips]);
   return fit;
 }
 
-/** "Trades" as the way back to the log, with the filters it was left with. */
+/** "Trades" as the way back to the log view last used in this tab, with the filters it was left with. */
 function BackToTrades(): React.JSX.Element {
   const search = useSearchParams().toString();
+  const view = useLastLogView();
   return (
     <Link
-      href={`/app/trades${search ? `?${search}` : ''}`}
+      href={`${LOG_VIEW_HREF[view]}${search ? `?${search}` : ''}`}
       className="rounded-chip text-faint no-underline outline-offset-2 hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
     >
       Trades
@@ -344,8 +357,11 @@ export function TopBar({
               )}
             </div>
           ) : null}
-          {/* The start-my-day popover, before Import, on the Dashboard and Trades only. */}
-          {pathname === '/app/dashboard' || pathname === '/app/trades' ? (
+          {/* The start-my-day popover, before Import, on the Dashboard and the Trades views only. */}
+          {pathname === '/app/dashboard' ||
+          pathname === '/app/trades' ||
+          pathname === '/app/trades/day' ||
+          pathname === '/app/trades/week' ? (
             <div className="flex flex-none max-sm:hidden">
               <PlanTheDay />
             </div>
