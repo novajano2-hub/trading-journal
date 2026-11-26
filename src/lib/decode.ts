@@ -67,7 +67,7 @@ export async function readImportFile(file: File): Promise<ImportFile> {
   // Refused on its size alone, before a byte is read.
   if (file.size > MAX_IMPORT_BYTES)
     throw new ImportFileError(
-      `This file is larger than ${MAX_IMPORT_BYTES / (1024 * 1024)} MB`,
+      `This file is larger than ${MAX_IMPORT_BYTES / (1024 * 1024)} MB.`,
     );
   const xlsx = /\.xlsx$/i.test(file.name);
   let text: string;

@@ -209,7 +209,7 @@ test('a file over 20 MB is refused with a sentence, and a file just under it is 
     mimeType: 'text/csv',
     buffer: Buffer.from(head + row.repeat(size(21))),
   });
-  await expect(page.getByText('This file is larger than 20 MB')).toBeVisible({
+  await expect(page.getByText('This file is larger than 20 MB.')).toBeVisible({
     timeout: 60_000,
   });
   await expect(
@@ -224,5 +224,5 @@ test('a file over 20 MB is refused with a sentence, and a file just under it is 
   await expect(page.getByRole('button', { name: /^Map columns/ })).toBeEnabled({
     timeout: 60_000,
   });
-  await expect(page.getByText('This file is larger than 20 MB')).toBeHidden();
+  await expect(page.getByText('This file is larger than 20 MB.')).toBeHidden();
 });

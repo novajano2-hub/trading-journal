@@ -58,7 +58,7 @@ test('a 21 MB file is refused with the sentence, before any byte is read', async
   const { file, read } = sized('big.csv', 21 * MB);
   const err = await readImportFile(file).catch((e: unknown) => e);
   expect(err).toBeInstanceOf(ImportFileError);
-  expect((err as Error).message).toBe('This file is larger than 20 MB');
+  expect((err as Error).message).toBe('This file is larger than 20 MB.');
   expect(read).not.toHaveBeenCalled();
 });
 
