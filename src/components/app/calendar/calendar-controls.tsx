@@ -40,13 +40,16 @@ export function StatsMenu({
 }): React.JSX.Element {
   return (
     <Popover.Root>
-      <Popover.Trigger className={TEXT_BUTTON}>
+      {/* Below sm only the icon is drawn (the word stays as the name), so a narrow card's controls keep one row. */}
+      <Popover.Trigger
+        className={`${TEXT_BUTTON} max-sm:w-[30px] max-sm:justify-center max-sm:px-0 max-sm:pointer-coarse:w-11`}
+      >
         <SlidersHorizontal
           size={15}
           aria-hidden="true"
           className="text-faint"
         />
-        Stats shown
+        <span className="max-sm:sr-only">Stats shown</span>
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content

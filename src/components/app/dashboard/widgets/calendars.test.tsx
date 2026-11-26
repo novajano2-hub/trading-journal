@@ -417,6 +417,22 @@ describe('the calendar with stats: Calendar page’s month, its Stats shown and 
     expect(within(card).getByRole('button', { name: 'Snapshot' })).toBeTruthy();
   });
 
+  test('below sm Stats shown is its icon alone, so the card’s controls keep one row; its name stays for assistive tech (D-04)', async () => {
+    await renderWidgets([ADV], { sample: november });
+    await ready(ADV);
+    const button = within(widget(ADV)).getByRole('button', {
+      name: 'Stats shown',
+    });
+    // The word folds into the accessible name; only the icon (and its box) is drawn below sm.
+    const word = [...button.querySelectorAll('span')].find(
+      (el) => el.textContent === 'Stats shown',
+    )!;
+    expect(word.className).toContain('max-sm:sr-only');
+    expect(button.className).toContain('max-sm:w-[30px]');
+    expect(button.className).toContain('max-sm:px-0');
+    expect(button.querySelector('svg[aria-hidden="true"]')).toBeTruthy();
+  });
+
   /** The SVG the open panel previews. */
   const previewSvg = async () => {
     const img = await screen.findByRole('img', {
