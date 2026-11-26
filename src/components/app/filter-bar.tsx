@@ -36,8 +36,9 @@ import {
   TagBody,
 } from './filter-popovers';
 import { FilterSheet } from './filter-sheet';
-import { datesOnly } from './nav';
+import { datesOnly, hasPropChips } from './nav';
 import { MoreFilters } from './more-filters';
+import { PropFilterBar } from './prop/prop-filters';
 import { usePhone } from '@/lib/use-phone';
 import { symbolOptions } from './search';
 import { useShownFilters } from './use-shown-filters';
@@ -309,11 +310,19 @@ function FilterRow({
 
 /**
  * The chips on the URL's filters. Render inside `<Suspense>`: it reads the
- * search params. The chips show the cleaned filters, so a stale link's
+ * search params. On the prop Dashboard and Accounts they are the date range
+ * and the six prop filters instead (C37).
+ */
+export function FilterBar(): React.JSX.Element {
+  return hasPropChips(usePathname()) ? <PropFilterBar /> : <TradeFilterBar />;
+}
+
+/**
+ * The trade filters' chips. They show the cleaned filters, so a stale link's
  * unknown ids never appear; until the workspace loads they are inert and show
  * only the parts that hold no ids.
  */
-export function FilterBar(): React.JSX.Element {
+function TradeFilterBar(): React.JSX.Element {
   const { filters, shown, setFilters } = useShownFilters();
   const dateOnly = datesOnly(usePathname());
   const trades = useTrades().data;

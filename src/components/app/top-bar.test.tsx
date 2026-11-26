@@ -74,6 +74,24 @@ test('the chips show only on the routes the filters drive', () => {
   expect(screen.getByTestId('chips')).toBeTruthy();
 });
 
+test('the chips show on the prop Dashboard and Accounts, and not on Transactions or a challenge (C37)', () => {
+  layOut({ titleWidth: 115, chipsWidth: 100 });
+  for (const path of ['/app/prop-firms', '/app/prop-firms/accounts']) {
+    renderBar(path);
+    expect(screen.getByTestId('chips'), path).toBeTruthy();
+    cleanup();
+  }
+  for (const path of [
+    '/app/prop-firms/transactions',
+    '/app/prop-firms/accounts/c-1',
+  ]) {
+    const bar = renderBar(path);
+    expect(screen.queryByTestId('chips'), path).toBeNull();
+    expect(bar.dataset.chips, path).toBeUndefined();
+    cleanup();
+  }
+});
+
 test('the prop pages carry no Display menu (C72); the trade log keeps it', () => {
   layOut({ titleWidth: 115, chipsWidth: 100 });
   const render = (path: string) =>

@@ -114,6 +114,10 @@ test('filtersApply is true only on the routes the global filters drive', () => {
     '/app/strategies',
     '/app/strategies/str-1',
     '/app/progress',
+    // The prop Dashboard and Accounts: the date range and the six prop filters (C37).
+    '/app/prop-firms',
+    '/app/prop-firms/',
+    '/app/prop-firms/accounts',
   ])
     expect(filtersApply(p), p).toBe(true);
   for (const p of [
@@ -127,6 +131,9 @@ test('filtersApply is true only on the routes the global filters drive', () => {
     '/app/strategies/new',
     '/app/strategies/str-1/edit',
     '/app/settings',
+    // Transactions and a challenge's details read neither (Ruling 27).
+    '/app/prop-firms/transactions',
+    '/app/prop-firms/accounts/c-1',
   ])
     expect(filtersApply(p), p).toBe(false);
 });

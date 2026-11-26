@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   EMPTY_FILTERS,
   parseFilters,
@@ -58,24 +58,42 @@ export interface PropFilterState {
   clear(): void;
 }
 
+/** What the caller has just written and the address has not yet shown. */
+interface Pending {
+  /** The address React was rendering when it wrote. */
+  over: string;
+  selection?: PropSelection;
+  range?: DateRange;
+}
+
 /**
  * The prop pages' filters, kept in the address (C37): the six filters under
  * their own names and the global date range under the trade filters' (`range`,
  * or `from` and `to`), which the date chip writes. Render inside
  * `<Suspense>`: it reads the search params.
+ *
+ * A write shows in what this returns at once. Next applies
+ * `history.replaceState` in a transition, and until that lands a controlled
+ * checkbox would flick back; the write stands only while React still renders
+ * the address it replaced, so the address landing, a back or forward, or
+ * another write ends it.
  */
 export function usePropFilters(): PropFilterState {
   const params = useSearchParams();
   const prefs = usePrefs().data;
   const search = params.toString();
-  const selection = useMemo(
+  const [pending, setPending] = useState<Pending | null>(null);
+  if (pending !== null && pending.over !== search) setPending(null);
+  const urlSelection = useMemo(
     () => parseSelection(new URLSearchParams(search)),
     [search],
   );
-  const range = useMemo(
+  const urlRange = useMemo(
     () => parseFilters(new URLSearchParams(search)).range,
     [search],
   );
+  const selection = pending?.selection ?? urlSelection;
+  const range = pending?.range ?? urlRange;
   const timeZone = prefs?.timeZone;
   const weekStart = prefs?.weekStart;
   const today =
@@ -92,28 +110,40 @@ export function usePropFilters(): PropFilterState {
     'preset' in range || range.from !== undefined || range.to !== undefined;
   const selected = selectionCount(selection);
 
+  const remember = useCallback(
+    (change: Partial<Pending>) =>
+      setPending((p) => ({
+        ...(p?.over === search ? p : { over: search }),
+        ...change,
+      })),
+    [search],
+  );
   const setRange = useCallback(
-    (next: DateRange) =>
+    (next: DateRange) => {
+      remember({ range: next });
       write((p) => {
         for (const key of RANGE_PARAMS) p.delete(key);
         serializeFilters({ ...EMPTY_FILTERS, range: next }).forEach(
           (value, key) => p.set(key, value),
         );
-      }),
-    [],
+      });
+    },
+    [remember],
   );
   const set = useCallback(
-    (next: PropSelection) => write((p) => setSelection(p, next)),
-    [],
+    (next: PropSelection) => {
+      remember({ selection: next });
+      write((p) => setSelection(p, next));
+    },
+    [remember],
   );
-  const clear = useCallback(
-    () =>
-      write((p) => {
-        for (const key of RANGE_PARAMS) p.delete(key);
-        setSelection(p, NO_SELECTION);
-      }),
-    [],
-  );
+  const clear = useCallback(() => {
+    remember({ selection: NO_SELECTION, range: {} });
+    write((p) => {
+      for (const key of RANGE_PARAMS) p.delete(key);
+      setSelection(p, NO_SELECTION);
+    });
+  }, [remember]);
 
   return {
     selection,

@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { Suspense, type ReactNode } from 'react';
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/ssr';
 import { EMPTY_FILTERS } from '@/data/filters';
@@ -10,6 +11,8 @@ import { DashboardEditProvider } from './dashboard/edit-session';
 import { DisplayMenu } from './display-menu';
 import { FilterBar, FilterBarView } from './filter-bar';
 import { MobileNav } from './mobile-nav';
+import { hasPropChips } from './nav';
+import { PropChipsInert } from './prop/prop-filters';
 import { SampleLabel } from './sample-label';
 import { Sidebar } from './sidebar';
 import { AppearanceSync } from './appearance';
@@ -17,16 +20,20 @@ import { TabBar } from './tab-bar';
 import { TopBar } from './top-bar';
 import { UnitNotice } from './unit-notice';
 
-/** The chips as prerendered, before the URL is read: all unset and inert. */
-const FILTERS_FALLBACK = (
-  <FilterBarView
-    filters={EMPTY_FILTERS}
-    options={{ symbols: [], strategies: [], tags: [], categories: [] }}
-    today=""
-    onChange={() => {}}
-    disabled
-  />
-);
+/** The chips as prerendered, before the URL is read: all unset and inert; the prop pages' two chips on theirs. */
+function FiltersFallback(): React.JSX.Element {
+  return hasPropChips(usePathname()) ? (
+    <PropChipsInert />
+  ) : (
+    <FilterBarView
+      filters={EMPTY_FILTERS}
+      options={{ symbols: [], strategies: [], tags: [], categories: [] }}
+      today=""
+      onChange={() => {}}
+      disabled
+    />
+  );
+}
 
 /** The search before the URL is read: its resting icon (34px; a plain 44px glyph on a phone), inert, holding the bar's place. */
 function SearchFallback(): React.JSX.Element {
@@ -68,7 +75,7 @@ export function AppShell({
           <TopBar
             menu={<MobileNav switcher={<AccountSwitcher />} />}
             filters={
-              <Suspense fallback={FILTERS_FALLBACK}>
+              <Suspense fallback={<FiltersFallback />}>
                 <FilterBar />
               </Suspense>
             }

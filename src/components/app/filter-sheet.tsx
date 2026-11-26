@@ -1,5 +1,6 @@
 'use client';
 
+import type { Icon } from '@phosphor-icons/react';
 import {
   CalendarBlank,
   CaretDown,
@@ -31,19 +32,20 @@ import {
 import { MoreFilters } from './more-filters';
 
 /** A plain 44px glyph in the phone's top bar, the count of filters in use on its shoulder. */
-const BUTTON =
+export const SHEET_BUTTON =
   'relative inline-flex size-11 flex-none cursor-pointer items-center justify-center rounded-control text-muted transition-colors duration-200 ease-(--ease-glide) data-[state=open]:bg-sunken disabled:cursor-default';
 
 type Key = 'date' | 'symbol' | 'side' | 'strategy' | 'tags';
 
 /** One row of the sheet: its name, what it is set to, and, opened, its choices. */
-function Row({
+export function Row({
   title,
   value,
   set,
   open,
   onToggle,
   onClear,
+  wideTitle = false,
   children,
 }: {
   title: string;
@@ -51,6 +53,8 @@ function Row({
   set: boolean;
   open: boolean;
   onToggle(): void;
+  /** Room for a longer name than a symbol or a tag ("Account size"). */
+  wideTitle?: boolean;
   /** Absent for a row whose own choices include the way back (the date's All time, the side's Both). */
   onClear?: () => void;
   children: ReactNode;
@@ -65,7 +69,9 @@ function Row({
         onClick={onToggle}
         className="flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-[10px] px-3 text-left hover:bg-sunken"
       >
-        <span className="w-[72px] flex-none text-[14px] font-semibold text-text">
+        <span
+          className={`${wideTitle ? 'w-[108px]' : 'w-[72px]'} flex-none text-[14px] font-semibold text-text`}
+        >
           {title}
         </span>
         <span
@@ -99,44 +105,15 @@ function Row({
   );
 }
 
-/**
- * Below `sm` the chips are one "Filters (n)" button. It opens a sheet from the
- * bottom edge holding the same controls as the chips' popovers, one row each
- * showing what it is set to, and the More filters entry. A choice applies at
- * once, as in a popover. Focus returns to the button when the sheet closes.
- * With `dateOnly` (the progress tracker) it is a calendar glyph and a sheet of
- * the date range alone.
- */
-export function FilterSheet({
-  filters: f,
-  options,
-  today,
-  onChange,
-  disabled = false,
-  noTrades = false,
-  dateOnly = false,
+/** The glyph of a sheet's button, the count of what is set on its shoulder. */
+export function SheetFace({
+  Glyph,
+  count,
 }: {
-  filters: GlobalFilters;
-  options: FilterOptions;
-  today: string;
-  onChange(next: GlobalFilters): void;
-  disabled?: boolean;
-  noTrades?: boolean;
-  dateOnly?: boolean;
+  Glyph: Icon;
+  count: number;
 }): React.JSX.Element {
-  const [open, setOpen] = useState(false);
-  const [row, setRow] = useState<Key | null>(null);
-  const reduced = useReducedMotion();
-  const noteId = useId();
-  const heading = useRef<HTMLHeadingElement>(null);
-  const count = dateOnly ? 0 : activeFilterCount(f);
-  const name = dateOnly
-    ? `Date, ${rangeChipLabel(f.range, datesOf(f.range, today))}`
-    : count > 0
-      ? `Filters, ${count} active`
-      : 'Filters';
-  const Glyph = dateOnly ? CalendarBlank : Funnel;
-  const face = (
+  return (
     <>
       <Glyph
         size={20}
@@ -154,42 +131,36 @@ export function FilterSheet({
       ) : null}
     </>
   );
+}
 
-  if (disabled || (noTrades && !dateOnly)) {
-    return (
-      <>
-        <button
-          type="button"
-          disabled={disabled}
-          aria-disabled={noTrades ? 'true' : undefined}
-          aria-describedby={noTrades ? noteId : undefined}
-          aria-label={name}
-          className={`${BUTTON} ${noTrades ? 'text-faint' : ''}`}
-        >
-          {face}
-        </button>
-        {noTrades ? (
-          <span id={noteId} hidden>
-            No trades to filter yet.
-          </span>
-        ) : null}
-      </>
-    );
-  }
-
-  const names = {
-    strategies: new Map(options.strategies.map((s) => [s.id, s.name])),
-    tags: new Map(options.tags.map((t) => [t.id, t.name])),
-  };
-  const symbol = chipLabel('symbol', f, names);
-  const side = chipLabel('side', f, names);
-  const strategy = chipLabel('strategy', f, names);
-  const tag = chipLabel('tag', f, names);
-  const range = f.range;
-  const dateSet =
-    'preset' in range || range.from !== undefined || range.to !== undefined;
-  const toggle = (key: Key) => setRow((r) => (r === key ? null : key));
-
+/**
+ * The phone's filter sheet: a glyph button in the top bar (`name` is its
+ * accessible name, `count` what is set) that opens a sheet from the bottom
+ * edge. Its heading is where focus starts; it has a Close, a scrolling body
+ * of `children`, and a footer with Done and, when `onClear` is given, "Clear
+ * filters". Focus returns to the button when it closes (`onClosed` tells the
+ * rows to fold).
+ */
+export function FilterSheetShell({
+  name,
+  Glyph,
+  count,
+  title,
+  onClear,
+  onClosed,
+  children,
+}: {
+  name: string;
+  Glyph: Icon;
+  count: number;
+  title: string;
+  onClear?: () => void;
+  onClosed?: () => void;
+  children: ReactNode;
+}): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  const reduced = useReducedMotion();
+  const heading = useRef<HTMLHeadingElement>(null);
   const rise = reduced
     ? { initial: { opacity: 0 }, shown: { opacity: 1 }, gone: { opacity: 0 } }
     : { initial: { y: '100%' }, shown: { y: 0 }, gone: { y: '100%' } };
@@ -199,15 +170,15 @@ export function FilterSheet({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) setRow(null);
+        if (!next) onClosed?.();
       }}
     >
       <Dialog.Trigger
         aria-label={name}
         aria-haspopup="dialog"
-        className={BUTTON}
+        className={SHEET_BUTTON}
       >
-        {face}
+        <SheetFace Glyph={Glyph} count={count} />
       </Dialog.Trigger>
       <AnimatePresence>
         {open ? (
@@ -242,7 +213,7 @@ export function FilterSheet({
                     tabIndex={-1}
                     className="text-[15px] font-semibold outline-none!"
                   >
-                    {dateOnly ? 'Date' : 'Filters'}
+                    {title}
                   </Dialog.Title>
                   <Dialog.Close
                     aria-label="Close"
@@ -252,102 +223,13 @@ export function FilterSheet({
                   </Dialog.Close>
                 </div>
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
-                  <Row
-                    title="Date"
-                    value={rangeChipLabel(f.range, datesOf(f.range, today))}
-                    set={dateSet}
-                    open={row === 'date'}
-                    onToggle={() => toggle('date')}
-                  >
-                    <DateBody
-                      range={f.range}
-                      today={today}
-                      onChange={(r) => onChange({ ...f, range: r })}
-                      close={() => setRow(null)}
-                    />
-                  </Row>
-                  {dateOnly ? null : (
-                    <>
-                      <Row
-                        title="Symbol"
-                        value={symbol.active ? symbol.text : 'Any'}
-                        set={symbol.active}
-                        open={row === 'symbol'}
-                        onToggle={() => toggle('symbol')}
-                        onClear={() => onChange({ ...f, symbols: [] })}
-                      >
-                        <SymbolBody
-                          symbols={options.symbols}
-                          selected={f.symbols}
-                          onChange={(symbols) => onChange({ ...f, symbols })}
-                        />
-                      </Row>
-                      <Row
-                        title="Side"
-                        value={side.active ? side.text : 'Both'}
-                        set={side.active}
-                        open={row === 'side'}
-                        onToggle={() => toggle('side')}
-                      >
-                        <RadioRows
-                          legend="Side"
-                          options={SIDE_OPTIONS}
-                          value={f.side ?? 'both'}
-                          onChange={(v) =>
-                            onChange({
-                              ...f,
-                              side: v === 'both' ? undefined : v,
-                            })
-                          }
-                        />
-                      </Row>
-                      <Row
-                        title="Strategy"
-                        value={strategy.active ? strategy.text : 'Any'}
-                        set={strategy.active}
-                        open={row === 'strategy'}
-                        onToggle={() => toggle('strategy')}
-                        onClear={() => onChange({ ...f, strategyIds: [] })}
-                      >
-                        <StrategyBody
-                          strategies={options.strategies}
-                          selected={f.strategyIds}
-                          onChange={(strategyIds) =>
-                            onChange({ ...f, strategyIds })
-                          }
-                        />
-                      </Row>
-                      <Row
-                        title="Tags"
-                        value={tag.active ? tag.text : 'Any'}
-                        set={tag.active}
-                        open={row === 'tags'}
-                        onToggle={() => toggle('tags')}
-                        onClear={() => onChange({ ...f, tagIds: [] })}
-                      >
-                        <TagBody
-                          tags={options.tags}
-                          categories={options.categories}
-                          selected={f.tagIds}
-                          onChange={(tagIds) => onChange({ ...f, tagIds })}
-                        />
-                      </Row>
-                      <div className="pt-1">
-                        <MoreFilters
-                          row
-                          filters={f}
-                          options={options}
-                          onChange={onChange}
-                        />
-                      </div>
-                    </>
-                  )}
+                  {children}
                 </div>
                 <div className="flex flex-none items-center gap-2 border-t border-line px-4 py-3">
-                  {!dateOnly && hasActiveFilters(f) ? (
+                  {onClear ? (
                     <button
                       type="button"
-                      onClick={() => onChange(EMPTY_FILTERS)}
+                      onClick={onClear}
                       className="-ml-2 mr-auto inline-flex h-11 cursor-pointer items-center rounded-[8px] px-2.5 text-[13.5px] font-semibold text-accent-ink hover:bg-accent-soft"
                     >
                       Clear filters
@@ -365,5 +247,181 @@ export function FilterSheet({
         ) : null}
       </AnimatePresence>
     </Dialog.Root>
+  );
+}
+
+/**
+ * Below `sm` the chips are one "Filters (n)" button. It opens a sheet from the
+ * bottom edge holding the same controls as the chips' popovers, one row each
+ * showing what it is set to, and the More filters entry. A choice applies at
+ * once, as in a popover. Focus returns to the button when the sheet closes.
+ * With `dateOnly` (the progress tracker) it is a calendar glyph and a sheet of
+ * the date range alone.
+ */
+export function FilterSheet({
+  filters: f,
+  options,
+  today,
+  onChange,
+  disabled = false,
+  noTrades = false,
+  dateOnly = false,
+}: {
+  filters: GlobalFilters;
+  options: FilterOptions;
+  today: string;
+  onChange(next: GlobalFilters): void;
+  disabled?: boolean;
+  noTrades?: boolean;
+  dateOnly?: boolean;
+}): React.JSX.Element {
+  const [row, setRow] = useState<Key | null>(null);
+  const noteId = useId();
+  const count = dateOnly ? 0 : activeFilterCount(f);
+  const name = dateOnly
+    ? `Date, ${rangeChipLabel(f.range, datesOf(f.range, today))}`
+    : count > 0
+      ? `Filters, ${count} active`
+      : 'Filters';
+  const Glyph = dateOnly ? CalendarBlank : Funnel;
+  const face = <SheetFace Glyph={Glyph} count={count} />;
+
+  if (disabled || (noTrades && !dateOnly)) {
+    return (
+      <>
+        <button
+          type="button"
+          disabled={disabled}
+          aria-disabled={noTrades ? 'true' : undefined}
+          aria-describedby={noTrades ? noteId : undefined}
+          aria-label={name}
+          className={`${SHEET_BUTTON} ${noTrades ? 'text-faint' : ''}`}
+        >
+          {face}
+        </button>
+        {noTrades ? (
+          <span id={noteId} hidden>
+            No trades to filter yet.
+          </span>
+        ) : null}
+      </>
+    );
+  }
+
+  const names = {
+    strategies: new Map(options.strategies.map((s) => [s.id, s.name])),
+    tags: new Map(options.tags.map((t) => [t.id, t.name])),
+  };
+  const symbol = chipLabel('symbol', f, names);
+  const side = chipLabel('side', f, names);
+  const strategy = chipLabel('strategy', f, names);
+  const tag = chipLabel('tag', f, names);
+  const range = f.range;
+  const dateSet =
+    'preset' in range || range.from !== undefined || range.to !== undefined;
+  const toggle = (key: Key) => setRow((r) => (r === key ? null : key));
+
+  return (
+    <FilterSheetShell
+      name={name}
+      Glyph={Glyph}
+      count={count}
+      title={dateOnly ? 'Date' : 'Filters'}
+      onClosed={() => setRow(null)}
+      onClear={
+        !dateOnly && hasActiveFilters(f)
+          ? () => onChange(EMPTY_FILTERS)
+          : undefined
+      }
+    >
+      <Row
+        title="Date"
+        value={rangeChipLabel(f.range, datesOf(f.range, today))}
+        set={dateSet}
+        open={row === 'date'}
+        onToggle={() => toggle('date')}
+      >
+        <DateBody
+          range={f.range}
+          today={today}
+          onChange={(r) => onChange({ ...f, range: r })}
+          close={() => setRow(null)}
+        />
+      </Row>
+      {dateOnly ? null : (
+        <>
+          <Row
+            title="Symbol"
+            value={symbol.active ? symbol.text : 'Any'}
+            set={symbol.active}
+            open={row === 'symbol'}
+            onToggle={() => toggle('symbol')}
+            onClear={() => onChange({ ...f, symbols: [] })}
+          >
+            <SymbolBody
+              symbols={options.symbols}
+              selected={f.symbols}
+              onChange={(symbols) => onChange({ ...f, symbols })}
+            />
+          </Row>
+          <Row
+            title="Side"
+            value={side.active ? side.text : 'Both'}
+            set={side.active}
+            open={row === 'side'}
+            onToggle={() => toggle('side')}
+          >
+            <RadioRows
+              legend="Side"
+              options={SIDE_OPTIONS}
+              value={f.side ?? 'both'}
+              onChange={(v) =>
+                onChange({
+                  ...f,
+                  side: v === 'both' ? undefined : v,
+                })
+              }
+            />
+          </Row>
+          <Row
+            title="Strategy"
+            value={strategy.active ? strategy.text : 'Any'}
+            set={strategy.active}
+            open={row === 'strategy'}
+            onToggle={() => toggle('strategy')}
+            onClear={() => onChange({ ...f, strategyIds: [] })}
+          >
+            <StrategyBody
+              strategies={options.strategies}
+              selected={f.strategyIds}
+              onChange={(strategyIds) => onChange({ ...f, strategyIds })}
+            />
+          </Row>
+          <Row
+            title="Tags"
+            value={tag.active ? tag.text : 'Any'}
+            set={tag.active}
+            open={row === 'tags'}
+            onToggle={() => toggle('tags')}
+            onClear={() => onChange({ ...f, tagIds: [] })}
+          >
+            <TagBody
+              tags={options.tags}
+              categories={options.categories}
+              selected={f.tagIds}
+              onChange={(tagIds) => onChange({ ...f, tagIds })}
+            />
+          </Row>
+          <div className="pt-1">
+            <MoreFilters
+              row
+              filters={f}
+              options={options}
+              onChange={onChange}
+            />
+          </div>
+        </>
+      )}
+    </FilterSheetShell>
   );
 }

@@ -3,6 +3,7 @@
 import {
   ArrowSquareOut,
   ArrowUpRight,
+  Funnel,
   ListBullets,
   PencilSimple,
   Prohibit,
@@ -44,6 +45,7 @@ import {
 import { checkChallenge, urgencyOf } from '@/domain/prop/challenge';
 import {
   accountsGroup,
+  filterChallenges,
   firstTradeDays,
   startedOn,
   type AccountsGroup,
@@ -67,6 +69,7 @@ import { ChallengeForm } from './challenge-form';
 import { MarkBreached } from './mark-breached';
 import { MoveToFunded } from './move-to-funded';
 import { PropView } from './prop-view';
+import { usePropFilters } from './use-prop-filters';
 
 const NO_TRADES: ReadonlyMap<string, Trade> = new Map();
 
@@ -114,6 +117,7 @@ export function AccountsTab(): React.JSX.Element {
   const updatePrefs = useUpdatePrefs();
   const remove = useRemoveChallenge();
   const params = useSearchParams();
+  const filters = usePropFilters();
   const phone = usePhone();
   const [editing, setEditing] = useState<Challenge | 'new' | null>(null);
   const [breaching, setBreaching] = useState<string | null>(null);
@@ -160,7 +164,16 @@ export function AccountsTab(): React.JSX.Element {
     const ctx = metricContextOf(prefs.data);
     // The day each account first traded, for a challenge with no start date.
     const firstTrade = firstTradeDays(trades.data, prefs.data.timeZone);
+    // The date range and the six filters narrow the challenges (C37); a size
+    // is read on the base currency's accounts, as the dashboard reads it.
+    const own = accounts.data.filter(
+      (a) => a.currency === prefs.data!.baseCurrency,
+    );
+    const kept = new Set(
+      filterChallenges(challenges.data, own, filters.filters).map((c) => c.id),
+    );
     const rows: AccountRow[] = challenges.data
+      .filter((c) => kept.has(c.id))
       .map((c) => ({
         c,
         check: checkChallenge(
@@ -174,7 +187,7 @@ export function AccountsTab(): React.JSX.Element {
         started: startedOn(c, firstTrade),
       }))
       .sort((a, b) => urgencyOf(a.c, a.check) - urgencyOf(b.c, b.check));
-    return { rows, ctx };
+    return { rows, ctx, total: challenges.data.length };
   }, [
     challenges.data,
     accounts.data,
@@ -182,6 +195,7 @@ export function AccountsTab(): React.JSX.Element {
     flows.data,
     prefs.data,
     today,
+    filters.filters,
   ]);
 
   if (error)
@@ -193,9 +207,21 @@ export function AccountsTab(): React.JSX.Element {
     );
   if (!loaded || !today || !accounts.data)
     return <StrategySkeleton label="Loading your challenges" />;
-  const { rows, ctx } = loaded;
+  const { rows, ctx, total } = loaded;
 
-  if (rows.length === 0)
+  if (total > 0 && rows.length === 0)
+    return (
+      <StateBlock
+        visual={<StateGlyph icon={Funnel} />}
+        title="No challenges match these filters."
+        actions={
+          <Button variant="secondary" onClick={filters.clear}>
+            Clear filters
+          </Button>
+        }
+      />
+    );
+  if (total === 0)
     return (
       <>
         <StateBlock

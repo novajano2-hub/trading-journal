@@ -595,3 +595,80 @@ test('under Privacy no amount shows in the list or the grid', async () => {
   expect(card.textContent).not.toMatch(/\p{Sc}\s?\d/u);
   expect(card.textContent).not.toMatch(/\d,\d{3}/);
 });
+
+test('the prop filters narrow the challenges, and the sub-tab counts follow them (C37, C62)', async () => {
+  renderApp(<AccountsTab />, {
+    repository: repo(),
+    url: `${URL}?pfirm=${encodeURIComponent('Sample firm B')}`,
+  });
+  // Forex 100K is the firm's evaluation, Forex 50K its breach; nothing of it is funded.
+  expect(await tab('Evaluations 1')).toBeTruthy();
+  expect(
+    within(tabs())
+      .getAllByRole('tab')
+      .map((t) => t.textContent),
+  ).toEqual(['Evaluations 1', 'Funded 0', 'Breached 1']);
+  expect(
+    within(screen.getByRole('table', { name: 'Challenges' }))
+      .getAllByRole('link')
+      .map((l) => l.textContent),
+  ).toEqual(['Forex 100K']);
+  fireEvent.click(screen.getByRole('tab', { name: 'Funded 0' }));
+  expect(await screen.findByText('No challenge is funded yet.')).toBeTruthy();
+});
+
+test('status, phase and type read the challenge as the dashboard does', async () => {
+  renderApp(<AccountsTab />, {
+    repository: repo(),
+    url: `${URL}?pstatus=breached`,
+  });
+  expect(await tab('Breached 2')).toBeTruthy();
+  expect(
+    within(tabs())
+      .getAllByRole('tab')
+      .map((t) => t.textContent),
+  ).toEqual(['Evaluations 0', 'Funded 0', 'Breached 2']);
+  cleanup();
+
+  renderApp(<AccountsTab />, {
+    repository: repo(),
+    url: `${URL}?pphase=funded&ptype=1-step`,
+  });
+  expect(await tab('Funded 1')).toBeTruthy();
+  expect(
+    within(tabs())
+      .getAllByRole('tab')
+      .map((t) => t.textContent),
+  ).toEqual(['Evaluations 0', 'Funded 1', 'Breached 0']);
+});
+
+test('the date range tests the challenge’s first start date (C37)', async () => {
+  renderApp(<AccountsTab />, {
+    repository: repo(),
+    url: `${URL}?from=2026-10-01&to=2026-11-30`,
+  });
+  // Futures 100K (1 Oct), Forex 100K (3 Nov) and Forex 50K (5 Oct) start inside it; the two September ones do not.
+  expect(await tab('Evaluations 2')).toBeTruthy();
+  expect(
+    within(tabs())
+      .getAllByRole('tab')
+      .map((t) => t.textContent),
+  ).toEqual(['Evaluations 2', 'Funded 0', 'Breached 1']);
+});
+
+test('a filter that matches no challenge says so, and Clear filters brings them back', async () => {
+  renderApp(<AccountsTab />, {
+    repository: repo(),
+    url: `${URL}?pfirm=Nobody&tab=funded&from=2026-10-01`,
+  });
+  expect(
+    await screen.findByText('No challenges match these filters.'),
+  ).toBeTruthy();
+  // No sub-tabs over nothing, and not the "no challenges yet" words.
+  expect(screen.queryByRole('tablist')).toBeNull();
+  expect(screen.queryByText('No challenges yet.')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+  expect(await tab('Funded 1')).toBeTruthy();
+  // The sub-tab the address held stays.
+  expect(window.location.search).toBe('?tab=funded');
+});

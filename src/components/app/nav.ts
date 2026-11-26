@@ -296,6 +296,8 @@ export function strategyEditId(pathname: string): string | undefined {
 /**
  * Whether the global filters drive this page: Dashboard, the trade log, Calendar,
  * Strategies (the list and one strategy), the progress tracker (its date range only) and Reports, except Compare, whose two groups each own their filters.
+ * The prop Dashboard and Accounts take the date range and their own six
+ * filters (C37); their Transactions and a challenge's details read neither.
  * Elsewhere the bar shows no chips.
  */
 export function filtersApply(pathname: string): boolean {
@@ -306,7 +308,8 @@ export function filtersApply(pathname: string): boolean {
       pathname !== '/app/strategies/new') ||
     (/^\/app\/reports(\/|$)/.test(pathname) &&
       !/^\/app\/reports\/compare\/?$/.test(pathname)) ||
-    pathname === '/app/progress'
+    pathname === '/app/progress' ||
+    hasPropChips(pathname)
   );
 }
 
@@ -316,6 +319,10 @@ export function filtersApply(pathname: string): boolean {
  */
 export const datesOnly = (pathname: string): boolean =>
   pathname === '/app/progress';
+
+/** The prop pages that take the date range and the six prop filters: the Dashboard and Accounts tabs. */
+export const hasPropChips = (pathname: string): boolean =>
+  /^\/app\/prop-firms(\/accounts)?\/?$/.test(pathname);
 
 /** The Prop firms pages: its three tabs and a challenge's details. */
 export const isPropPage = (pathname: string): boolean =>
