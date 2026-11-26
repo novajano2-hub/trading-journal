@@ -40,6 +40,9 @@ test('the welcome surface uses the app’s tokens but has no shell, so no pinned
   expect(container.querySelector('[data-shell]')).toBeNull();
 });
 
+/** The app surface's attribute selector, as CSS may write it: single-quoted, double-quoted or bare. */
+const APP_SURFACE = /\[data-surface\s*=\s*(['"]?)app\1\s*\]/;
+
 test('the top scroll padding applies to the shell only, never to the bare app surface', () => {
   const css = readFileSync('src/app/globals.css', 'utf8').replace(
     /\/\*[\s\S]*?\*\//g,
@@ -52,6 +55,18 @@ test('the top scroll padding applies to the shell only, never to the bare app su
   expect(rules.length).toBeGreaterThanOrEqual(2);
   for (const [, selector = ''] of rules) {
     expect(selector, selector.trim()).toContain('[data-shell]');
-    expect(selector, selector.trim()).not.toContain("[data-surface='app']");
+    expect(selector, selector.trim()).not.toMatch(APP_SURFACE);
   }
+});
+
+test('the guard sees the app surface selector in every way CSS can write it', () => {
+  for (const written of [
+    "[data-surface='app']",
+    '[data-surface="app"]',
+    '[data-surface=app]',
+    "[data-surface = 'app' ]",
+  ])
+    expect(written).toMatch(APP_SURFACE);
+  expect("[data-surface='marketing']").not.toMatch(APP_SURFACE);
+  expect('[data-shell]').not.toMatch(APP_SURFACE);
 });
