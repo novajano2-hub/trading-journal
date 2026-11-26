@@ -7,8 +7,8 @@ import { MorphDialog } from '@/components/ui/morph-dialog';
 import { useMarkBreached } from '@/data/query/hooks';
 import { ChallengeBreachedError } from '@/data/repository';
 import type { ChallengeCheck } from '@/domain/prop/challenge';
-import { BREACH_REASON_LABELS, BREACH_REASONS } from '@/domain/prop/finance';
 import type { BreachReason, Challenge } from '@/domain/types';
+import { BreachReasons } from './breach-reasons';
 import { phaseName, shownPhase } from './challenge-card';
 
 const NO_REF: RefObject<HTMLElement | null> = { current: null };
@@ -91,51 +91,13 @@ export function MarkBreached({
         </div>
       }
     >
-      <p id={`${ids}-why`} className="mt-2 mb-2 text-[13.5px] font-medium">
-        Why did it break?
-      </p>
-      <div
-        role="radiogroup"
-        aria-labelledby={`${ids}-why`}
-        className="flex flex-col gap-1.5"
-      >
-        {BREACH_REASONS.map((r) => (
-          <label
-            key={r}
-            className="flex cursor-pointer items-start gap-2.5 rounded-[10px] border border-line px-3 py-2.5 text-[13.5px] font-medium transition-colors duration-200 has-[:checked]:border-accent/45 has-[:checked]:bg-accent-soft/60 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent pointer-coarse:min-h-11"
-          >
-            <input
-              type="radio"
-              name={`${ids}-reason`}
-              value={r}
-              checked={reason === r}
-              onChange={() => setReason(r)}
-              className="peer sr-only"
-            />
-            <span
-              aria-hidden="true"
-              className="mt-px size-[18px] flex-none rounded-full border-[1.5px] border-line-2 bg-surface-1 peer-checked:border-[5px] peer-checked:border-accent"
-            />
-            <span>
-              {BREACH_REASON_LABELS[r]}
-              {r === 'other' ? (
-                <small className="mt-0.5 block text-[12.5px] font-normal text-muted">
-                  In your own words.
-                </small>
-              ) : null}
-            </span>
-          </label>
-        ))}
-      </div>
-      {reason === 'other' ? (
-        <textarea
-          rows={3}
-          value={words}
-          aria-label="In your own words"
-          onChange={(e) => setWords(e.target.value)}
-          className="mt-2 w-full rounded-control border border-line bg-surface-1 px-3 py-2 text-[14px] text-text focus-visible:outline-2 focus-visible:outline-accent"
-        />
-      ) : null}
+      <BreachReasons
+        idp={ids}
+        reason={reason}
+        words={words}
+        onReason={setReason}
+        onWords={setWords}
+      />
       <p className="mt-3.5 flex items-start gap-2.5 rounded-[10px] bg-sunken px-3 py-2.5 text-[13px] leading-[1.5] text-muted">
         <Info
           size={16}

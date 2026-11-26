@@ -1,7 +1,7 @@
 'use client';
 
 import { Info } from '@phosphor-icons/react/dist/ssr';
-import { useId, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useId, useState, type ReactNode, type RefObject } from 'react';
 import { ConfirmDialog } from '@/components/app/confirm-dialog';
 import { SelectField } from '@/components/app/import/select-field';
 import { HELP, INPUT, LABEL } from '@/components/app/import/styles';
@@ -15,8 +15,7 @@ import { Segmented } from '@/components/ui/segmented';
 import {
   useAccounts,
   useChallenges,
-  useCreateAccount,
-  useCreateChallenge,
+  useCreateChallenges,
   usePrefs,
   useRemoveChallenge,
   useStrategies,
@@ -26,8 +25,10 @@ import {
 import { toCents } from '@/domain/money';
 import { drawdownLabel } from '@/domain/prop/challenge';
 import { localDate } from '@/domain/time';
+import type { NewChallengeAccount, NewChallengeEntry } from '@/data/repository';
 import type {
   Account,
+  BreachReason,
   Cents,
   Challenge,
   ChallengeStep,
@@ -43,6 +44,7 @@ import {
   type Unit,
 } from './rule-draft';
 import { StrategyChips } from './strategy-chips';
+import { BreachReasons, breachReasonIds } from './breach-reasons';
 
 interface PhaseDraft {
   /** 'none', 'new', or the id of the account linked. */
@@ -541,10 +543,9 @@ export function ChallengeForm({
   const accounts = useAccounts().data ?? [];
   const challenges = useChallenges().data ?? [];
   const prefs = usePrefs().data;
-  const createChallenge = useCreateChallenge();
+  const createChallenges = useCreateChallenges();
   const updateChallenge = useUpdateChallenge();
   const removeChallenge = useRemoveChallenge();
-  const createAccount = useCreateAccount();
   const updateAccount = useUpdateAccount();
   const [name, setName] = useState(challenge?.name ?? '');
   const [firm, setFirm] = useState(challenge?.firm ?? '');
@@ -554,12 +555,15 @@ export function ChallengeForm({
   const [phase, setPhase] = useState<Challenge['phase']>(
     challenge?.phase ?? 'evaluation',
   );
-  // A breach is final: the form never offers it, and a breached challenge has
-  // no status or phase to change.
+  // A breach is final: a breached challenge has no status, phase or steps to
+  // change, and the form offers Breached only when creating one (C-04).
   const breached = challenge?.status === 'breached';
-  const [status, setStatus] = useState<'active' | 'passed'>(
+  const [status, setStatus] = useState<'active' | 'passed' | 'breached'>(
     challenge?.status === 'passed' ? 'passed' : 'active',
   );
+  const [reason, setReason] = useState<BreachReason | null>(null);
+  const [words, setWords] = useState('');
+  const [breachOn, setBreachOn] = useState('');
   const [strategyIds, setStrategyIds] = useState<string[]>(
     challenge?.strategyIds ?? [],
   );
@@ -572,13 +576,6 @@ export function ChallengeForm({
   const [failed, setFailed] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [busy, setBusy] = useState(false);
-  // What a save has made so far, so a retry after a failure part way links it
-  // instead of making it twice: each created account by quantity index and
-  // step, and each challenge written.
-  const made = useRef({
-    accounts: new Map<string, string>(),
-    challenges: new Set<number>(),
-  });
   const strategies = (useStrategies().data ?? []).filter(
     (st) => st.status === 'active' || strategyIds.includes(st.id),
   );
@@ -589,6 +586,9 @@ export function ChallengeForm({
   // The broker fills the accounts this form creates. Quantity makes the same
   // challenge again, each with its own new accounts, so it is offered only on
   // a new challenge whose phases make new accounts and link no existing one.
+  // The trader's local date: the breach's default and its latest.
+  const today = localDate(new Date().toISOString(), prefs?.timeZone ?? 'UTC');
+  const breaching = !challenge && status === 'breached';
   const makesAccounts = shown.some((st) => draft[st].link === 'new');
   const quantityShown =
     !challenge &&
@@ -612,6 +612,17 @@ export function ChallengeForm({
       if (text.trim() !== '' && cents(text) === null)
         next.push([id(field), 'Enter an amount of zero or more.']);
     };
+    if (breaching) {
+      const at = breachReasonIds(ids);
+      if (reason === null) next.push([at.first, 'Choose why it broke.']);
+      else if (reason === 'other' && !words.trim())
+        next.push([at.words, 'Say what happened, in your own words.']);
+      const on = breachOn || today;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(on))
+        next.push([id('breach-on'), 'Enter the date it broke.']);
+      else if (on > today)
+        next.push([id('breach-on'), "The breach date can't be in the future."]);
+    }
     feeError(evalFee, 'eval-fee');
     feeError(actFee, 'act-fee');
 
@@ -658,11 +669,23 @@ export function ChallengeForm({
 
     setBusy(true);
     try {
-      for (let i = 0; i < count; i++) {
-        if (made.current.challenges.has(i)) continue;
-        // The first keeps the names typed; the rest are "name 2", "name 3".
+      // The accounts already linked take the rules typed: a write apart, and
+      // the same again on a retry. What makes an account is one transaction
+      // with its challenge, so a failure leaves none behind (C-02).
+      for (const step of shown) {
+        const d = draft[step];
+        const b = built.get(step);
+        if (b && 'rules' in b.rules && d.link !== 'new')
+          await updateAccount.mutateAsync({
+            id: d.link,
+            patch: { propRules: b.rules.rules },
+          });
+      }
+      // The challenge number i (0 is the one typed; the rest are "name 2", ...).
+      const make = (i: number) => {
         const suffix = i === 0 ? '' : ` ${i + 1}`;
         const phases: Challenge['phases'] = [];
+        const newAccounts: NewChallengeAccount[] = [];
         for (const step of shown) {
           const d = draft[step];
           const entry = {
@@ -672,13 +695,11 @@ export function ChallengeForm({
           const b = built.get(step);
           if (!b || !('rules' in b.rules)) {
             phases.push(entry);
-            continue;
-          }
-          if (d.link === 'new') {
-            const key = `${i}:${step}`;
-            let accountId = made.current.accounts.get(key);
-            if (accountId === undefined) {
-              const created = await createAccount.mutateAsync({
+          } else if (d.link === 'new') {
+            phases.push(entry);
+            newAccounts.push({
+              step,
+              account: {
                 name: `${d.newName.trim()}${suffix}`,
                 broker: broker.trim() || firm.trim(),
                 type: step === 'funded' ? 'prop-funded' : 'prop-evaluation',
@@ -686,56 +707,67 @@ export function ChallengeForm({
                 startingBalance: b.start,
                 status: 'active',
                 propRules: b.rules.rules,
-              });
-              accountId = created.id;
-              made.current.accounts.set(key, accountId);
-            }
-            phases.push({ ...entry, accountId });
-          } else {
-            await updateAccount.mutateAsync({
-              id: d.link,
-              patch: { propRules: b.rules.rules },
+              },
             });
+          } else {
             phases.push({ ...entry, accountId: d.link });
           }
         }
-        const fields = {
-          name: `${name.trim()}${suffix}`,
-          firm: firm.trim(),
-          steps: Number(steps) as 1 | 2,
+        return {
           phases,
-          evaluationFee: cents(evalFee) ?? undefined,
-          activationFee: cents(actFee) ?? undefined,
-          strategyIds,
+          newAccounts,
+          fields: {
+            name: `${name.trim()}${suffix}`,
+            firm: firm.trim(),
+            steps: Number(steps) as 1 | 2,
+            evaluationFee: cents(evalFee) ?? undefined,
+            activationFee: cents(actFee) ?? undefined,
+            strategyIds,
+          },
         };
-        if (!challenge)
-          await createChallenge.mutateAsync({ ...fields, phase, status });
-        else if (breached)
-          // A breach locks its phase and status: only the rest is saved, and
-          // the reason it was given stays.
-          await updateChallenge.mutateAsync({
-            id: challenge.id,
-            patch: fields,
+      };
+      // Editing keeps Active or Passed; a challenge created breached is born so
+      // through its entry's `breach`, with its reason and date.
+      const kept: 'active' | 'passed' =
+        status === 'passed' ? 'passed' : 'active';
+      if (!challenge) {
+        const entries: NewChallengeEntry[] = [];
+        for (let i = 0; i < count; i++) {
+          const { phases, newAccounts, fields } = make(i);
+          entries.push({
+            challenge: { ...fields, phases, phase, status: 'active' },
+            newAccounts,
+            ...(breaching &&
+              reason !== null && {
+                breach: {
+                  reason,
+                  ...(reason === 'other' && { note: words.trim() }),
+                  on: breachOn || today,
+                },
+              }),
           });
-        else
-          await updateChallenge.mutateAsync({
-            id: challenge.id,
-            patch: {
-              ...fields,
-              phase,
-              status,
-              failureReason: undefined,
-              // Moving it to funded here is the same move as Move to funded.
-              ...(challenge.phase === 'evaluation' &&
-                phase === 'funded' && {
-                  movedToFundedOn: localDate(
-                    new Date().toISOString(),
-                    prefs?.timeZone ?? 'UTC',
-                  ),
-                }),
-            },
-          });
-        made.current.challenges.add(i);
+        }
+        await createChallenges.mutateAsync(entries);
+      } else {
+        const { phases, newAccounts, fields } = make(0);
+        await updateChallenge.mutateAsync({
+          id: challenge.id,
+          newAccounts,
+          patch: breached
+            ? // A breach locks its phase and status: only the rest is saved,
+              // and the reason it was given stays.
+              { ...fields, phases }
+            : {
+                ...fields,
+                phases,
+                phase,
+                status: kept,
+                failureReason: undefined,
+                // Moving it to funded here is the same move as Move to funded.
+                ...(challenge.phase === 'evaluation' &&
+                  phase === 'funded' && { movedToFundedOn: today }),
+              },
+        });
       }
       onClose();
     } catch {
@@ -860,59 +892,111 @@ export function ChallengeForm({
               />
             )}
           </fieldset>
-          <div className="flex flex-wrap gap-x-6 gap-y-3">
-            <div>
-              <span className={LABEL}>Steps</span>
-              <Segmented<'1' | '2'>
-                label="Steps"
-                value={steps}
-                coarseTargets
-                onChange={setSteps}
-                options={[
-                  { value: '1', label: '1 step' },
-                  { value: '2', label: '2 steps' },
-                ]}
-              />
+          {breached ? null : (
+            <div className="flex flex-wrap gap-x-6 gap-y-3">
+              <div>
+                <span className={LABEL}>Steps</span>
+                <Segmented<'1' | '2'>
+                  label="Steps"
+                  value={steps}
+                  coarseTargets
+                  onChange={setSteps}
+                  options={[
+                    { value: '1', label: '1 step' },
+                    { value: '2', label: '2 steps' },
+                  ]}
+                />
+              </div>
+              <div>
+                <span className={LABEL}>Phase</span>
+                <Segmented<Challenge['phase']>
+                  label="Phase"
+                  value={phase}
+                  coarseTargets
+                  onChange={setPhase}
+                  options={[
+                    { value: 'evaluation', label: 'Evaluation' },
+                    { value: 'funded', label: 'Funded' },
+                  ]}
+                />
+              </div>
+              <div>
+                <span className={LABEL}>Status</span>
+                <Segmented<'active' | 'passed' | 'breached'>
+                  label="Status"
+                  value={status}
+                  coarseTargets
+                  onChange={setStatus}
+                  // Passed is set by Move to funded (C78); creating offers
+                  // Active or Breached, and a breach on an existing
+                  // challenge goes through Mark as breached.
+                  options={
+                    challenge
+                      ? [
+                          { value: 'active', label: 'Active' },
+                          { value: 'passed', label: 'Passed' },
+                        ]
+                      : [
+                          { value: 'active', label: 'Active' },
+                          { value: 'breached', label: 'Breached' },
+                        ]
+                  }
+                />
+              </div>
             </div>
-            {breached ? null : (
-              <>
-                <div>
-                  <span className={LABEL}>Phase</span>
-                  <Segmented<Challenge['phase']>
-                    label="Phase"
-                    value={phase}
-                    coarseTargets
-                    onChange={setPhase}
-                    options={[
-                      { value: 'evaluation', label: 'Evaluation' },
-                      { value: 'funded', label: 'Funded' },
-                    ]}
-                  />
-                </div>
-                <div>
-                  <span className={LABEL}>Status</span>
-                  <Segmented<'active' | 'passed'>
-                    label="Status"
-                    value={status}
-                    coarseTargets
-                    onChange={setStatus}
-                    options={[
-                      { value: 'active', label: 'Active' },
-                      { value: 'passed', label: 'Passed' },
-                    ]}
-                  />
-                </div>
-              </>
-            )}
-          </div>
+          )}
           {breached ? (
             <p className="flex items-start gap-2.5 rounded-[10px] bg-sunken px-3 py-2.5 text-[13px] leading-[1.5] text-muted">
               <Info size={16} aria-hidden="true" className="mt-px flex-none" />
               <span>
                 A breach is final. This challenge stays in Breached, so its
-                phase and status can&apos;t change.
+                steps, phase and status can&apos;t change.
               </span>
             </p>
+          ) : null}
+          {breaching ? (
+            <div className="grid gap-3.5 rounded-control border border-line bg-sunken/50 p-3.5">
+              <div>
+                <BreachReasons
+                  idp={ids}
+                  reason={reason}
+                  words={words}
+                  onReason={setReason}
+                  onWords={setWords}
+                  reasonError={errors[breachReasonIds(ids).first]}
+                  wordsError={errors[breachReasonIds(ids).words]}
+                />
+              </div>
+              <div className="sm:max-w-64">
+                <Field
+                  id={id('breach-on')}
+                  label="Breach date"
+                  error={errors[id('breach-on')]}
+                >
+                  {(p) => (
+                    <input
+                      {...p}
+                      type="date"
+                      max={today}
+                      value={breachOn || today}
+                      onChange={(ev) => setBreachOn(ev.target.value)}
+                      className={INPUT}
+                    />
+                  )}
+                </Field>
+              </div>
+              <p className="flex items-start gap-2.5 text-[13px] leading-[1.5] text-muted">
+                <Info
+                  size={16}
+                  aria-hidden="true"
+                  className="mt-px flex-none"
+                />
+                <span>
+                  A breach is final. The challenge is created in Breached and
+                  can&apos;t return to evaluation or funded.
+                </span>
+              </p>
+            </div>
           ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
             <Field
