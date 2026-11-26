@@ -53,7 +53,12 @@ export function StarRadios({
   );
 }
 
-/** Five stars as a radio group: "Rating: 4 of 5". Choosing a star saves it; Clear takes it back. */
+/**
+ * Five stars as a radio group: "Rating: 4 of 5". Choosing a star saves it; Clear
+ * takes it back. The row wraps rather than hang past its card: on a phone with a
+ * coarse pointer the stars are 44px targets (228px for five), too wide to share
+ * a line with the label and "5 of 5", so they take a line of their own under them.
+ */
 export function RatingRow({
   rating,
   disabled,
@@ -64,17 +69,19 @@ export function RatingRow({
   onChange(next: Stars | undefined): void;
 }): React.JSX.Element {
   return (
-    <div className="mt-1.5 flex items-center gap-3 border-t border-line pt-3">
-      <span className="w-[84px] flex-none text-[12.5px] text-faint max-sm:w-[72px]">
+    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 border-t border-line pt-3">
+      <span className="w-[84px] flex-none text-[12.5px] text-faint max-sm:w-[72px] pointer-coarse:max-sm:w-auto pointer-coarse:max-sm:flex-1">
         Rating
       </span>
-      <StarRadios
-        rating={rating}
-        disabled={disabled}
-        onChange={onChange}
-        name="trade-rating"
-        label={`Rating: ${rating === undefined ? 'none' : `${rating} of 5`}`}
-      />
+      <div className="pointer-coarse:max-sm:order-last pointer-coarse:max-sm:basis-full">
+        <StarRadios
+          rating={rating}
+          disabled={disabled}
+          onChange={onChange}
+          name="trade-rating"
+          label={`Rating: ${rating === undefined ? 'none' : `${rating} of 5`}`}
+        />
+      </div>
       <span
         aria-hidden="true"
         className="text-[12.5px] whitespace-nowrap text-muted"
