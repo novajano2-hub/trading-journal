@@ -59,6 +59,8 @@ export interface CellEnv {
   ctx: MetricContext;
   display: Display;
   facts: RowFacts;
+  /** The Day column as "Thu 19 Nov", for the Week view's table; elsewhere it carries the year. */
+  shortDay?: boolean;
 }
 
 /** How a column's text sits. */
@@ -321,7 +323,7 @@ export function cellOf(id: ColumnId, t: Trade, env: CellEnv): React.ReactNode {
     case 'day':
       return (
         <span className="tabular-nums">
-          {dayLabel(dayOfTrade(t, timeZone))}
+          {dayLabel(dayOfTrade(t, timeZone), { year: !env.shortDay })}
         </span>
       );
   }
