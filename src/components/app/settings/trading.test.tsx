@@ -65,6 +65,12 @@ test('the breakeven range saves in dollars, or in percent as a fraction', async 
   await waitFor(async () =>
     expect((await r.prefs.get()).breakevenRange.unit).toBe('percent'),
   );
+  // The page follows the store a moment later; typing before it has would be over the dollar range.
+  await waitFor(() =>
+    expect(
+      (screen.getByRole('radio', { name: '%' }) as HTMLInputElement).checked,
+    ).toBe(true),
+  );
   const pctTo = screen.getByLabelText('To');
   fireEvent.change(pctTo, { target: { value: '0.1' } });
   fireEvent.blur(pctTo);
