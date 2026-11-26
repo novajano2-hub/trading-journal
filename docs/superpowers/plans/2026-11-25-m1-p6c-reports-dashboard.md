@@ -50,7 +50,7 @@
 ## Global Constraints
 
 - **Toolchain:** Node ≥ 22, npm, Next.js 16.4.6, React 19.3.0, TypeScript `strict` + `noUncheckedIndexedAccess`, Tailwind 4, Vitest 5, Playwright with `channel: 'chrome'`.
-- **Branch and commits:** work on `claude/m1-p6c-6dcad9`, after merging `m1-p6a` into it. End every commit message with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- **Branch and commits:** work on `claude/m1-p6c-6dcad9`, after merging `m1-p6a` into it. New BACKLOG E-ids start at E300 (6A uses E150 to E181), so the merges don't collide. End every commit message with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - **Next.js docs first.** Before route, layout or worker code, read in `node_modules/next/dist/docs/01-app/`: `03-api-reference/03-file-conventions/dynamic-routes.md`, `page.md`, `layout.md`; `03-api-reference/04-functions/use-search-params.md`; and search the docs for "Web Worker" and `new URL(` before Task 19. `params` and `searchParams` are Promises. If `next dev` rewrites AGENTS.md, commit that change with the task.
 - **Boundaries:** components use only the hooks in `src/data/query/*`; nothing under `src/components` or `src/app` imports `src/data/local/*` or Dexie (tests excepted). `src/domain/**` stays pure.
 - **Storage safety** (spec §3, §4.3): no existing row is rewritten on upgrade; `propTxns` starts empty; every new field is optional and defaults when unset; the sample reseeds by version, and My workspace never does. The one user-started rewrite is a cost-method change (C40).
@@ -557,7 +557,9 @@ Delivers spec §5.6, C47 to C49, E52, E55 (comps 10, 11).
 - [ ] **Step 4:** `npm test && npm run typecheck && npm run lint && npm run build && npx playwright test -c playwright.p6c.config.ts e2e/shell.spec.ts`. Expected: PASS.
 - [ ] **Step 5:** Commit: `feat(app): collapse the sidebar and the Settings menu to icons (#50, E52, E55)`.
 
-**Parity check, Module E** (record §6): the toggle, the rail's parts, the tooltips, persistence, Settings' groups and collapse.
+- [ ] **Step 6 (6A's gap audit, E154): Home.** TradeZella's Home has its own wide sidebar shell with the same collapse button; collapsed, the rail is hidden entirely and the content centres [rec S01 0:20; rec S63]. Make Home (`/app/home`, 6A) honour the toggle the same way: collapsed, no rail on Home and the content centred. Test first: `'Home collapses its sidebar and centres its content'`.
+
+**Parity check, Module E** (record §6): the toggle, the rail's parts, the tooltips, persistence, Settings' groups and collapse, and Home's collapsed shell.
 
 ---
 
