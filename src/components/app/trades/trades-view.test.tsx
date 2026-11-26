@@ -195,6 +195,9 @@ test('hiding Rating removes the column and saves the columns', async () => {
   expect(within(t).getByRole('columnheader', { name: 'Rating' })).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Columns' }));
   fireEvent.click(await screen.findByRole('checkbox', { name: 'Rating' }));
+  // Nothing saves until Update.
+  expect(within(t).getByRole('columnheader', { name: 'Rating' })).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Update' }));
   await waitFor(() =>
     expect(
       within(t).queryByRole('columnheader', { name: 'Rating' }),
@@ -205,8 +208,12 @@ test('hiding Rating removes the column and saves the columns', async () => {
       DEFAULT_COLUMNS.filter((c) => c !== 'rating'),
     ),
   );
-  // Reset to default brings it back.
-  fireEvent.click(screen.getByRole('button', { name: 'Reset to default' }));
+  // Reset to default, then Update, brings it back.
+  fireEvent.click(screen.getByRole('button', { name: 'Columns' }));
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Reset to default' }),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Update' }));
   await within(t).findByRole('columnheader', { name: 'Rating' });
 });
 
@@ -218,6 +225,7 @@ test('a column moves up and down in the Columns menu', async () => {
   const t = await table();
   fireEvent.click(screen.getByRole('button', { name: 'Columns' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Move Side up' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Update' }));
   await waitFor(() => {
     const names = within(t)
       .getAllByRole('columnheader')

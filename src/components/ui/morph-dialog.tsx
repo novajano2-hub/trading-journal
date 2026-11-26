@@ -41,6 +41,7 @@ export function MorphDialog({
   title,
   description,
   icon,
+  actions,
   size = 'default',
   footer,
   children,
@@ -53,6 +54,8 @@ export function MorphDialog({
   description?: ReactNode;
   /** A decorative tile beside the title, as the card it grew from has. */
   icon?: ReactNode;
+  /** Controls in the header between the title and the close button (a menu, a star). */
+  actions?: ReactNode;
   /** `full` fills the screen inside a small gutter, for a chart or a table that wants the room. `sheet` is the default size on a wide screen and a full-height sheet on a phone. `compact` is a narrow choice list (480px) that stays a small dialog on a phone. */
   size?: 'default' | 'full' | 'sheet' | 'compact';
   /** Pinned under the scrolling body, never inside it. */
@@ -207,6 +210,11 @@ export function MorphDialog({
                   </Dialog.Description>
                 ) : null}
               </div>
+              {actions ? (
+                <div className="flex flex-none items-center gap-0.5">
+                  {actions}
+                </div>
+              ) : null}
               <Dialog.Close
                 aria-label="Close"
                 className="-m-1.5 inline-flex size-11 flex-none items-center justify-center rounded-control text-muted transition-colors duration-200 ease-[var(--ease-glide)] hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent"

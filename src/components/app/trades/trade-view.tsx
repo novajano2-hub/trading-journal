@@ -34,6 +34,7 @@ import {
   useUpdateTrades,
 } from '@/data/query/hooks';
 import { StorageUnavailableError } from '@/data/repository';
+import { LOG_VIEW_HREF, useLastLogView } from '@/lib/log-view';
 import { heldMs, netRoiOf, statusOf } from '@/data/trade-rows';
 import {
   withRuleCheck,
@@ -775,7 +776,10 @@ function TradePage({
 
   const href = (id: string, path = '') =>
     `/app/trades/${encodeURIComponent(id)}${path}${queryString ? `?${queryString}` : ''}`;
-  const backHref = `/app/trades${queryString ? `?${queryString}` : ''}`;
+  // Back goes to the log view last used in this tab, with the filters it was
+  // left with, as the top bar's crumb does (Keel's call: TradeZella opens a drawer).
+  const logView = useLastLogView();
+  const backHref = `${LOG_VIEW_HREF[logView]}${queryString ? `?${queryString}` : ''}`;
 
   // The neighbours: by open time within the filtered set (the trade itself is
   // in it even when an archived account would have left it out).
@@ -1196,6 +1200,7 @@ export function TradeView({
   const categories = useTagCategories();
   const queryClient = useQueryClient();
   const search = useSearchParams().toString();
+  const logView = useLastLogView();
 
   const error = [trade, prefs, accounts, strategies, tags, categories].find(
     (q) => q.error,
@@ -1236,7 +1241,7 @@ export function TradeView({
     return (
       <Message icon={Warning} title="This trade isn't in this workspace.">
         <Link
-          href={`/app/trades${search ? `?${search}` : ''}`}
+          href={`${LOG_VIEW_HREF[logView]}${search ? `?${search}` : ''}`}
           className={buttonClasses('secondary')}
         >
           Back to trades

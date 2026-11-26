@@ -86,7 +86,8 @@ export const APP_NAV: readonly NavItem[] = [
   {
     id: 'trades',
     label: 'Trades',
-    href: '/app/trades',
+    // Trades opens the Day view (K36); /app/trades stays the All view.
+    href: '/app/trades/day',
     icon: ListBullets,
     group: 'modules',
     filterScoped: true,
@@ -249,6 +250,9 @@ export function navHref(
 export function activeItem(pathname: string): NavItem | undefined {
   // A day page sits under Trades (comps 04 and 05).
   if (dayPageDate(pathname) !== undefined) return navItem('trades');
+  // Every Trades page: All, Day, Week and one trade (Trades' own href is the Day view).
+  if (pathname === '/app/trades' || pathname.startsWith('/app/trades/'))
+    return navItem('trades');
   let best: NavItem | undefined;
   for (const item of APP_NAV) {
     const inside =
@@ -268,10 +272,11 @@ export function pageTitle(pathname: string): string {
   return activeItem(pathname)?.label ?? 'Keel';
 }
 
-/** The trade id when `pathname` is one trade's page (not the log, the new-trade form or an edit), decoded. */
+/** The trade id when `pathname` is one trade's page (not a log view, the new-trade form or an edit), decoded. */
 export function tradePageId(pathname: string): string | undefined {
   const m = /^\/app\/trades\/([^/]+)$/.exec(pathname);
-  if (!m || m[1] === 'new') return undefined;
+  if (!m || m[1] === 'new' || m[1] === 'day' || m[1] === 'week')
+    return undefined;
   try {
     return decodeURIComponent(m[1]!);
   } catch {
@@ -307,6 +312,7 @@ export function strategyEditId(pathname: string): string | undefined {
 export function filtersApply(pathname: string): boolean {
   return (
     /^\/app\/(dashboard|trades|calendar|strategies)$/.test(pathname) ||
+    /^\/app\/trades\/(day|week)$/.test(pathname) ||
     (/^\/app\/strategies\/[^/]+$/.test(pathname) &&
       pathname !== '/app/strategies/new') ||
     (/^\/app\/reports(\/|$)/.test(pathname) &&

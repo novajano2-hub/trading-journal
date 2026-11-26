@@ -87,3 +87,9 @@ test('the progress tracker has a definition for every figure it labels', () => {
     /days that kept this rule/,
   );
 });
+
+test("the day's volume says it counts both sides", () => {
+  expect(metricDefinition('day-volume', 'net').definition).toMatch(
+    /both sides/,
+  );
+});

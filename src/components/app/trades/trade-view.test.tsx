@@ -28,6 +28,7 @@ MotionGlobalConfig.skipAnimations = true;
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  window.sessionStorage.clear();
 });
 
 const WS = fixtureSample().trades[0]!.workspaceId;
@@ -122,6 +123,39 @@ test('Previous and Next stay within ?symbol=ES, by open time, and keep the param
   expect(
     screen.getByRole('link', { name: /Back to trades/ }).getAttribute('href'),
   ).toBe('/app/trades?symbol=ES');
+});
+
+test('Back to trades, the delete redirect and the not-found link return to the log view last used, with the filters', async () => {
+  window.sessionStorage.setItem('keel.tradeLogView', 'week');
+  const manual = renderApp(<TradeView id="t-c" />, {
+    sample: sample({ source: 'manual' }),
+    url: URL_C,
+  });
+  expect(
+    (await screen.findByRole('link', { name: /Back to trades/ })).getAttribute(
+      'href',
+    ),
+  ).toBe('/app/trades/week?symbol=ES');
+  fireEvent.click(screen.getByRole('button', { name: 'Delete trade' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+  await waitFor(async () =>
+    expect(await manual.repo.trades.get(WS, 't-c')).toBeUndefined(),
+  );
+  await waitFor(() =>
+    expect(window.location.pathname).toBe('/app/trades/week'),
+  );
+  expect(window.location.search).toBe('?symbol=ES');
+  cleanup();
+
+  window.sessionStorage.setItem('keel.tradeLogView', 'day');
+  renderApp(<TradeView id="nope" />, {
+    sample: sample(),
+    url: '/app/trades/nope?symbol=ES',
+  });
+  await screen.findByText("This trade isn't in this workspace.");
+  expect(
+    screen.getByRole('link', { name: 'Back to trades' }).getAttribute('href'),
+  ).toBe('/app/trades/day?symbol=ES');
 });
 
 test('trade ids with a slash are encoded in every link', async () => {
