@@ -20,6 +20,7 @@ import {
   type RowFacts,
 } from '@/data/trade-rows';
 import { type MetricContext } from '@/domain/metrics/context';
+import type { PatternHit } from '@/domain/patterns';
 import type { Trade } from '@/domain/types';
 import { formatDuration, formatQty, price } from '@/lib/format';
 import { formatUnitValue, tradeFigure, type Display } from '@/lib/display';
@@ -61,6 +62,12 @@ export interface CellEnv {
   facts: RowFacts;
   /** The Day column as "Thu 19 Nov", for the Week view's table; elsewhere it carries the year. */
   shortDay?: boolean;
+  /**
+   * The patterns that fired, by trade id (`usePatterns().byTrade`). The log's
+   * Patterns column and a phone row's count read it; the Day and Week views
+   * pass none and have no such column. `undefined` while they are computed.
+   */
+  patterns?: ReadonlyMap<string, readonly PatternHit[]>;
 }
 
 /** How a column's text sits. */
@@ -75,6 +82,7 @@ export const ALIGN: Partial<Record<ColumnId, 'right' | 'center'>> = {
   realizedR: 'right',
   plannedR: 'right',
   duration: 'right',
+  patterns: 'right',
   reviewed: 'center',
 };
 
@@ -102,6 +110,7 @@ export const COLUMN_WIDTHS: Record<ColumnId, number> = {
   strategies: 172,
   tags: 130,
   mistakes: 110,
+  patterns: 74,
   rules: 76,
   rating: 54,
   reviewed: 58,
@@ -127,6 +136,7 @@ const DESC_FIRST = new Set<ColumnId>([
   'realizedR',
   'plannedR',
   'duration',
+  'patterns',
   'rules',
   'rating',
   'reviewed',
@@ -180,6 +190,10 @@ function sortValue(
       return env.facts.tagsOf(t)[0]?.name.toLowerCase();
     case 'mistakes':
       return env.facts.mistakesOf(t)[0]?.toLowerCase();
+    case 'patterns':
+      return env.patterns === undefined
+        ? undefined
+        : (env.patterns.get(t.id)?.length ?? 0);
     case 'rules': {
       const r = env.facts.rules(t);
       return r.checked === 0 ? undefined : r.kept / r.checked;
@@ -218,6 +232,19 @@ function Ratio({
       {formatUnitValue(unit, value, { currency, signed: true })}
     </span>
   );
+}
+
+/** How many patterns fired on a trade: a plain count, in the faint ink when none did; empty while they are computed. */
+export function PatternCount({
+  env,
+  trade,
+}: {
+  env: CellEnv;
+  trade: Trade;
+}): React.JSX.Element | null {
+  if (env.patterns === undefined) return null;
+  const n = env.patterns.get(trade.id)?.length ?? 0;
+  return <span className={n === 0 ? 'text-faint' : undefined}>{n}</span>;
 }
 
 export function cellOf(id: ColumnId, t: Trade, env: CellEnv): React.ReactNode {
@@ -310,6 +337,8 @@ export function cellOf(id: ColumnId, t: Trade, env: CellEnv): React.ReactNode {
       return <TagsCell tags={facts.tagsOf(t)} mistakes={facts.mistakesOf(t)} />;
     case 'mistakes':
       return <MistakesCell names={facts.mistakesOf(t)} />;
+    case 'patterns':
+      return <PatternCount env={env} trade={t} />;
     case 'rules':
       return <RulesCell rules={facts.rules(t)} />;
     case 'rating':

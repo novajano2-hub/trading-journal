@@ -20,7 +20,9 @@ import {
 } from '../domain/metrics/breakdowns';
 import { classify } from '../domain/metrics/context';
 import { rOf, unitKeeps } from '../domain/metrics/units';
+import { PATTERNS, type PatternId } from '../domain/patterns/defs';
 import { localDate, localParts } from '../domain/time';
+import { dayOfTrade } from './day-log';
 import type {
   Account,
   AssetClass,
@@ -114,6 +116,11 @@ export interface GlobalFilters {
   currency?: string;
   /** The instrument: the asset classes to keep. Empty keeps every class. */
   assetClasses: AssetClass[];
+  /**
+   * Patterns (spec §5.5, B24): keep the trades a picked pattern fired on, and
+   * every trade of a day it fired on. Any pick keeps a trade; empty keeps all.
+   */
+  patterns: PatternId[];
 }
 
 export const EMPTY_FILTERS: GlobalFilters = {
@@ -141,6 +148,7 @@ export const EMPTY_FILTERS: GlobalFilters = {
   sessions: [],
   exitSessions: [],
   assetClasses: [],
+  patterns: [],
 };
 
 export const FILTER_PARAMS = [
@@ -181,7 +189,11 @@ export const FILTER_PARAMS = [
   'dte',
   'sess',
   'xsess',
+  'pat',
 ] as const;
+
+/** Every pattern id, in the order the patterns are listed in; what `pat` may hold. */
+const PATTERN_IDS: readonly PatternId[] = PATTERNS.map((p) => p.id);
 
 const OUTCOMES: readonly Outcome[] = ['win', 'loss', 'breakeven'];
 
@@ -215,6 +227,7 @@ export function advancedFilterCount(f: GlobalFilters): number {
     f.exitSessions.length > 0,
     f.currency !== undefined,
     f.assetClasses.length > 0,
+    f.patterns.length > 0,
   ];
   return used.filter(Boolean).length;
 }
@@ -360,6 +373,7 @@ export function parseFilters(
   const sessionSet = new Set(listOf(params, 'sess'));
   const exitSessionSet = new Set(listOf(params, 'xsess'));
   const classSet = new Set(listOf(params, 'inst'));
+  const patternSet = new Set(listOf(params, 'pat'));
   const ccy = params.get('ccy')?.trim().toUpperCase();
   const currency = ccy && /^[A-Z0-9]{2,10}$/.test(ccy) ? ccy : undefined;
   return {
@@ -401,6 +415,7 @@ export function parseFilters(
     exitSessions: SESSION_KEYS.filter((k) => exitSessionSet.has(k)),
     ...optional('currency', currency),
     assetClasses: ASSET_CLASSES.filter((c) => classSet.has(c)),
+    patterns: PATTERN_IDS.filter((id) => patternSet.has(id)),
   };
 }
 
@@ -491,6 +506,10 @@ export function serializeFilters(f: GlobalFilters): URLSearchParams {
     'inst',
     ASSET_CLASSES.filter((c) => f.assetClasses.includes(c)),
   );
+  list(
+    'pat',
+    PATTERN_IDS.filter((id) => f.patterns.includes(id)),
+  );
   return p;
 }
 
@@ -577,6 +596,15 @@ export function selectedAccounts(
   return accounts.filter((a) => ids.has(a.id));
 }
 
+/**
+ * Where the patterns fired (`computePatterns`): the trade-level ones by trade
+ * id, the day-level ones by the day's local date.
+ */
+export interface PatternIndex {
+  byTrade: ReadonlyMap<string, readonly { id: PatternId }[]>;
+  byDay: ReadonlyMap<string, readonly { id: PatternId }[]>;
+}
+
 export interface FilterEnv {
   timeZone: string;
   today: string;
@@ -587,6 +615,8 @@ export interface FilterEnv {
   pnlBasis?: PnlBasis;
   /** The day the week presets start on; default Sunday. */
   weekStart?: WeekStart;
+  /** Where the patterns fired, over every trade of the workspace. A Patterns pick with none given keeps nothing. */
+  patterns?: PatternIndex;
 }
 
 const NO_RANGE: BreakevenRange = { unit: 'amount', from: 0, to: 0 };
@@ -639,6 +669,7 @@ export function applyFilters(
   const exitWeekdays = new Set(f.exitWeekdays);
   const exitMonths = new Set(f.exitMonths);
   const assetClasses = new Set<AssetClass>(f.assetClasses);
+  const patterns = new Set<PatternId>(f.patterns);
   const breakeven = env.breakevenRange ?? NO_RANGE;
   const tz = env.timeZone;
 
@@ -749,6 +780,20 @@ export function applyFilters(
     if (f.daysToExpiry !== undefined) {
       const days = daysToExpiry(t, tz);
       if (days === null || !within(days, f.daysToExpiry)) return false;
+    }
+    if (patterns.size > 0) {
+      // A trade pattern keeps its trade; a day pattern keeps the day's trades (K37's day).
+      const index = env.patterns;
+      const fired = (hits: readonly { id: PatternId }[] | undefined) =>
+        hits?.some((h) => patterns.has(h.id)) ?? false;
+      if (
+        !index ||
+        !(
+          fired(index.byTrade.get(t.id)) ||
+          fired(index.byDay.get(dayOfTrade(t, tz)))
+        )
+      )
+        return false;
     }
     return true;
   });

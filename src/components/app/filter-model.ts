@@ -10,6 +10,7 @@ import {
 } from '@/data/filters';
 import { ASSET_CLASSES, ASSET_CLASS_LABELS } from '@/domain/asset-class';
 import { SESSION_KEYS, SESSION_LABELS } from '@/domain/metrics/breakdowns';
+import { PATTERNS } from '@/domain/patterns/defs';
 import type {
   Account,
   Strategy,
@@ -196,6 +197,7 @@ export function unshownFilters(f: GlobalFilters): string[] {
     [f.exitSessions.length > 0, 'Exit sessions'],
     [f.currency !== undefined, 'Currency'],
     [f.assetClasses.length > 0, 'Instrument'],
+    [f.patterns.length > 0, 'Patterns'],
     [f.strategyMatch === 'all', 'Strategies, all'],
     [f.tagMatch === 'all', 'Tags, all'],
   ];
@@ -324,6 +326,18 @@ export function detailChips(
         .map((c) => ASSET_CLASS_LABELS[c])
         .join(', ')}`,
     { assetClasses: [] },
+  );
+  // Two names read as they are, joined by "or" (the picks are any-of, and a name may hold a comma); more count against the list, as Select all does.
+  add(
+    f.patterns.length > 0,
+    'patterns',
+    () =>
+      f.patterns.length <= 2
+        ? `Patterns: ${PATTERNS.filter((p) => f.patterns.includes(p.id))
+            .map((p) => p.name)
+            .join(' or ')}`
+        : `Patterns: ${f.patterns.length} of ${PATTERNS.length}`,
+    { patterns: [] },
   );
   add(
     f.weekdays.length > 0,

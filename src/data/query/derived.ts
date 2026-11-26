@@ -37,6 +37,7 @@ import {
   useCashFlows,
   useDays,
   useImportContext,
+  usePatterns,
   usePrefs,
   useStrategies,
   useTags,
@@ -179,6 +180,9 @@ export interface TradeSet {
  * - The display unit narrows both sets (Part 2, U1): Ticks and Points keep the
  *   futures trades, Pips the forex trades, R those with an initial risk.
  *   `unitLeftOut` counts the matched trades it drops.
+ * - A Patterns pick reads where the patterns fired over all the workspace's
+ *   trades (`usePatterns`), and only then waits for them; without a pick
+ *   nothing computes them.
  */
 export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
   const trades = useTrades();
@@ -186,7 +190,16 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
   const strategies = useStrategies();
   const tags = useTags();
   const prefs = usePrefs();
-  const state = combine([trades, accounts, strategies, tags, prefs]);
+  const wantsPatterns = filters.patterns.length > 0;
+  const patterns = usePatterns(wantsPatterns);
+  const state = combine([
+    trades,
+    accounts,
+    strategies,
+    tags,
+    prefs,
+    ...(wantsPatterns ? [patterns] : []),
+  ]);
 
   const filterKey = serializeFilters(filters).toString();
   const timeZone = prefs.data?.timeZone;
@@ -219,6 +232,7 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
       breakevenRange: prefs.data?.breakevenRange,
       pnlBasis: prefs.data?.pnlBasis,
       weekStart: prefs.data?.weekStart,
+      patterns: patterns.data,
     };
     const matched = applyFilters(trades.data, clean, env);
     const kept = narrowToUnit(matched, unit);
@@ -241,6 +255,7 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
     prefs.data?.breakevenRange,
     prefs.data?.pnlBasis,
     prefs.data?.weekStart,
+    patterns.data,
     unit,
   ]);
 

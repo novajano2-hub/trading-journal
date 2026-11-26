@@ -35,6 +35,7 @@ import {
   useAccounts,
   useCashFlows,
   useJournal,
+  usePatterns,
   usePrefs,
   useStrategies,
   useTagCategories,
@@ -294,6 +295,7 @@ function SortButton({
 const HEADER_TIPS: Partial<Record<ColumnId, MetricId>> = {
   roi: 'net-roi',
   realizedR: 'realized-r',
+  patterns: 'patterns',
 };
 
 function SortMark({
@@ -350,6 +352,8 @@ export function TradesView(): React.JSX.Element {
   const tags = useTags().data;
   const journal = useJournal().data;
   const categories = useTagCategories().data;
+  // Every pattern of the workspace's trades, not of the filtered set (B20).
+  const patterns = usePatterns().data;
   const noteText = useMemo(() => noteIndex(journal ?? []), [journal]);
   const updatePrefs = useUpdatePrefs();
   const queryClient = useQueryClient();
@@ -457,8 +461,10 @@ export function TradesView(): React.JSX.Element {
   const rows = model?.rows ?? NO_ROWS;
   const cellEnv: CellEnv | undefined = useMemo(
     () =>
-      ctx && timeZone && facts ? { timeZone, ctx, display, facts } : undefined,
-    [ctx, timeZone, facts, display],
+      ctx && timeZone && facts
+        ? { timeZone, ctx, display, facts, patterns: patterns?.byTrade }
+        : undefined,
+    [ctx, timeZone, facts, display, patterns],
   );
   const columns = useMemo(
     () => (cellEnv ? buildColumns(columnIds, cellEnv) : []),
@@ -698,6 +704,7 @@ export function TradesView(): React.JSX.Element {
         tags: tags ?? [],
         categories: categories ?? [],
         ctx: ctx!,
+        patterns: patterns?.byTrade,
       }),
       today,
     );

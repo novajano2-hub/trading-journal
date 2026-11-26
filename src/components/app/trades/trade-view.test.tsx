@@ -1230,3 +1230,42 @@ test("an archived account lists its trade's files without a way to add one", asy
   expect(files.querySelector('input[type="file"]')).toBeNull();
   expect(within(files).queryByText('Drop files here')).toBeNull();
 });
+
+test("the Patterns button counts the trade's patterns and opens them in the Execution card", async () => {
+  renderApp(<TradeView id="t-c" />, { sample: sample(), url: URL_C });
+  const card = await screen.findByRole('region', { name: 'Execution' });
+  // Four fills, two in and two out, and a size above the trades before it: three patterns.
+  const button = await waitFor(() => {
+    const b = within(card).getByRole('button', { name: /^Patterns/ });
+    expect(b.textContent).toBe('Patterns3');
+    return b;
+  });
+  // It sits beside Choose stats, ahead of it.
+  const chooser = within(card).getByRole('button', { name: 'Choose stats' });
+  expect(
+    button.compareDocumentPosition(chooser) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  fireEvent.click(button);
+  const pop = await screen.findByRole('dialog', {
+    name: 'Patterns on this trade',
+  });
+  expect(
+    within(pop)
+      .getAllByRole('listitem')
+      .map((li) => li.querySelector('[data-metric-tip]')!.textContent),
+  ).toEqual(['Added to the position', 'Exited in parts', 'Large size']);
+  expect(pop.textContent).toContain('Opened in 2 entries, 6 units in all.');
+  expect(pop.textContent).toContain('Closed in 2 exits.');
+});
+
+test('a trade with no pattern has the button disabled, reading 0', async () => {
+  renderApp(<TradeView id="t-a" />, {
+    sample: sample(),
+    url: '/app/trades/t-a',
+  });
+  const card = await screen.findByRole('region', { name: 'Execution' });
+  const button = within(card).getByRole('button', { name: /^Patterns/ });
+  await waitFor(() => expect(button.textContent).toBe('Patterns0'));
+  expect(button.getAttribute('aria-disabled')).toBe('true');
+  expect(button.getAttribute('title')).toBe('No patterns on this trade.');
+});

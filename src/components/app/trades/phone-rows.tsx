@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import type { Trade } from '@/domain/types';
+import { plural } from '@/lib/format';
 import { shortTime } from '@/lib/time-format';
 import { InstrumentName, TradeTime } from '../dashboard/shared';
 import { TagCountCell } from './cells';
@@ -80,7 +81,7 @@ export function PhoneRows({
               </span>
               <span
                 data-line="2"
-                className="flex min-h-5 min-w-0 items-center gap-3 text-[12.5px] text-muted"
+                className="flex min-h-5 min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-muted"
               >
                 <span className="flex-none">
                   {t.direction === 'long' ? 'Long' : 'Short'}
@@ -100,11 +101,25 @@ export function PhoneRows({
                     />
                   </span>
                 ) : null}
+                {env.patterns ? (
+                  <PatternsCount n={env.patterns.get(t.id)?.length ?? 0} />
+                ) : null}
               </span>
             </Link>
           </li>
         );
       })}
     </ul>
+  );
+}
+
+/** "3 patterns", "1 pattern", "0 patterns": ink for a count, faint for none. */
+function PatternsCount({ n }: { n: number }): React.JSX.Element {
+  return (
+    <span
+      className={`flex-none tabular-nums ${n === 0 ? 'text-faint' : 'font-[550] text-text'}`}
+    >
+      {n} {plural(n, 'pattern')}
+    </span>
   );
 }

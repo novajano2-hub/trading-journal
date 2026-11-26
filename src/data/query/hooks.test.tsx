@@ -7,6 +7,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import type { Execution, ImportJob } from '@/domain/types';
 import type { ImportPlan } from '@/domain/import/plan';
 import { StalePlanError, type Repository } from '../repository';
+import { patternSample } from '../__fixtures__/patterns-sample';
 import { fixtureSample } from '../__fixtures__/sample';
 import type { SampleWorkspace } from '../seed/generate';
 import { createLocalRepository } from '../local/local-repository';
@@ -28,9 +29,11 @@ import {
   useMergeTrades,
   useMoveAccountTrades,
   useMoveTrades,
+  usePatterns,
   useRemoveAccount,
   useRemoveFeeRule,
   useRemoveFile,
+  useRemoveTrades,
   useRemoveTagCategory,
   useRemoveTargetRule,
   useSaveFeeRule,
@@ -738,4 +741,47 @@ test("a fill's costs refresh the trade and the history, and resolve to the trade
       ]),
     ).toEqual([['f-1', 'fees', 'you', was.fees, was.fees + 470]]),
   );
+});
+
+test('usePatterns reads every trade of the workspace, archived accounts too, and follows the trades', async () => {
+  const { result } = renderHook(
+    () => ({
+      patterns: usePatterns(),
+      again: usePatterns(),
+      remove: useRemoveTrades(),
+    }),
+    { wrapper: wrapper(patternSample) },
+  );
+  expect(result.current.patterns.status).toBe('pending');
+  await waitFor(() => expect(result.current.patterns.data).toBeDefined());
+  const hits = result.current.patterns.data!.byTrade.get('p-1');
+  expect(hits?.map((h) => h.id)).toEqual(['added-to-position']);
+  expect(hits?.[0]?.figures).toMatchObject({ entries: 2 });
+  // The archived account's trade counts too, and a plain trade has none.
+  expect(
+    result.current.patterns.data!.byTrade.get('p-old')?.map((h) => h.id),
+  ).toEqual(['added-to-position']);
+  expect(result.current.patterns.data!.byTrade.has('p-plain')).toBe(false);
+  expect(result.current.patterns.isSuccess).toBe(true);
+  // One computation per change of the inputs, shared by every reader.
+  expect(result.current.again.data).toBe(result.current.patterns.data);
+
+  const before = result.current.patterns.data;
+  await act(async () => {
+    await result.current.remove.mutateAsync(['p-1']);
+  });
+  await waitFor(() =>
+    expect(result.current.patterns.data?.byTrade.has('p-1')).toBe(false),
+  );
+  expect(result.current.patterns.data).not.toBe(before);
+});
+
+test('usePatterns(false) computes nothing and waits', async () => {
+  const { result } = renderHook(
+    () => ({ off: usePatterns(false), trades: useTrades() }),
+    { wrapper: wrapper(patternSample) },
+  );
+  await waitFor(() => expect(result.current.trades.data).toHaveLength(3));
+  expect(result.current.off.data).toBeUndefined();
+  expect(result.current.off.status).toBe('pending');
 });

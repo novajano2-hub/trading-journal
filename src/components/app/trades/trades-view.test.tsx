@@ -432,7 +432,7 @@ test('the summary strip shows its fees in the chosen unit, as it does the P&L', 
   });
 });
 
-test("the default columns are comp 01's, Net ROI in and Mistake off", async () => {
+test("the default columns are comp 01's with Patterns after Tags (6B comp 02), Net ROI in and Mistake off", async () => {
   renderApp(<TradesView />, { sample: sample(), url: '/app/trades' });
   const t = await table();
   const heads = within(t)
@@ -451,6 +451,7 @@ test("the default columns are comp 01's, Net ROI in and Mistake off", async () =
     'Duration',
     'Strategy',
     'Tags',
+    'Patterns',
     'Rules',
     'Rating',
     'Reviewed',
@@ -573,12 +574,193 @@ test('a failed cashFlows read shows the failure, not a loader or a false empty s
   expect(container.textContent).not.toContain('Loading');
 });
 
+/**
+ * Three trades on two days (New York): A and B on Mon 2 Nov, C alone on Tue 3 Nov.
+ * A has two entries and one exit (one pattern), B two entries, two exits and a
+ * size above A's (three), C no fills (none), but it is the day's one trade, a
+ * win of 3R: a pattern of its day.
+ */
+function patternLog() {
+  return async (): Promise<SampleWorkspace> => {
+    const fx = fixtureSample();
+    const fill = (
+      id: string,
+      side: 'buy' | 'sell',
+      qty: number,
+      time: string,
+    ) => ({
+      id,
+      accountId: 'acc-a',
+      symbol: 'ESZ5',
+      side,
+      qty,
+      price: 4500,
+      time,
+      fees: 0,
+      commission: 0,
+    });
+    const a = makeTrade({
+      id: 'pa',
+      serial: 1,
+      workspaceId: WS,
+      accountId: 'acc-a',
+      net: 1_000,
+      openedAt: '2026-11-02T14:00:00Z',
+      closedAt: '2026-11-02T14:30:00Z',
+      maxPosition: 2,
+      executions: [
+        fill('a1', 'buy', 1, '2026-11-02T14:00:00Z'),
+        fill('a2', 'buy', 1, '2026-11-02T14:05:00Z'),
+        fill('a3', 'sell', 2, '2026-11-02T14:30:00Z'),
+      ],
+    });
+    const b = makeTrade({
+      id: 'pb',
+      serial: 2,
+      workspaceId: WS,
+      accountId: 'acc-a',
+      net: 2_000,
+      openedAt: '2026-11-02T15:00:00Z',
+      closedAt: '2026-11-02T15:30:00Z',
+      maxPosition: 4,
+      executions: [
+        fill('b1', 'buy', 2, '2026-11-02T15:00:00Z'),
+        fill('b2', 'buy', 2, '2026-11-02T15:05:00Z'),
+        fill('b3', 'sell', 2, '2026-11-02T15:20:00Z'),
+        fill('b4', 'sell', 2, '2026-11-02T15:30:00Z'),
+      ],
+    });
+    const c = makeTrade({
+      id: 'pc',
+      serial: 3,
+      workspaceId: WS,
+      accountId: 'acc-a',
+      net: 30_000,
+      initialRisk: 10_000,
+      openedAt: '2026-11-03T15:00:00Z',
+      closedAt: '2026-11-03T15:30:00Z',
+    });
+    return { ...fx, trades: [a, b, c] };
+  };
+}
+
+/** A body row's cell under the named column. */
+const cellOf = (t: HTMLElement, row: HTMLElement, name: string) => {
+  const at = within(t)
+    .getAllByRole('columnheader')
+    .findIndex((h) => h.textContent?.startsWith(name));
+  return within(row).getAllByRole('cell')[at]!;
+};
+
+test("the column counts each trade's patterns", async () => {
+  renderApp(<TradesView />, { sample: patternLog(), url: '/app/trades' });
+  const t = await table();
+  // The column is a default, between Tags and Rules, and its header carries its definition.
+  const heads = within(t)
+    .getAllByRole('columnheader')
+    .map((h) => h.textContent);
+  expect(heads.indexOf('Patterns')).toBe(heads.indexOf('Tags') + 1);
+  expect(heads.indexOf('Rules')).toBe(heads.indexOf('Patterns') + 1);
+  const head = within(t).getByRole('columnheader', { name: /Patterns/ });
+  expect(head.querySelector('[data-metric-tip="patterns"]')).not.toBeNull();
+  await waitFor(() => {
+    const counts = Object.fromEntries(
+      bodyRows(t).map((r) => [idOf(r), cellOf(t, r, 'Patterns').textContent]),
+    );
+    // A: Added to the position; B: that, Exited in parts and Large size; C: none of its own.
+    expect(counts).toEqual({ pa: '1', pb: '3', pc: '0' });
+  });
+  // A zero reads in the faint ink, a count in the text's.
+  const rows = Object.fromEntries(bodyRows(t).map((r) => [idOf(r), r]));
+  expect(
+    cellOf(t, rows['pc']!, 'Patterns').querySelector('.text-faint'),
+  ).not.toBeNull();
+  expect(
+    cellOf(t, rows['pb']!, 'Patterns').querySelector('.text-faint'),
+  ).toBeNull();
+  // It sorts by the count, the largest first.
+  fireEvent.click(
+    within(head).getByRole('button', { name: 'Sort by Patterns' }),
+  );
+  expect(head.getAttribute('aria-sort')).toBe('descending');
+  expect(bodyRows(t).map(idOf)).toEqual(['pb', 'pa', 'pc']);
+});
+
+test('the log, Columns menu and CSV all know the Patterns column', async () => {
+  renderApp(<TradesView />, { sample: patternLog(), url: '/app/trades' });
+  await table();
+  fireEvent.click(screen.getByRole('button', { name: 'Columns' }));
+  expect(
+    (await screen.findByRole('checkbox', {
+      name: 'Patterns',
+    })) as HTMLInputElement,
+  ).toHaveProperty('checked', true);
+  let blob: Blob | undefined;
+  Object.assign(URL, {
+    createObjectURL: vi.fn((b: Blob) => {
+      blob = b;
+      return 'blob:keel';
+    }),
+    revokeObjectURL: vi.fn(),
+  });
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+  await waitFor(() =>
+    expect(screen.queryByRole('checkbox', { name: 'Patterns' })).toBeNull(),
+  );
+  await waitFor(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
+    expect(blob).toBeDefined();
+    const [head, ...lines] = (await blob!.text()).split('\r\n');
+    const at = head!.split(',').indexOf('Patterns');
+    expect(at).toBeGreaterThan(0);
+    expect(lines.join('\n')).toContain(
+      'Added to the position; Exited in parts; Large size',
+    );
+  });
+});
+
+test('a Patterns pick in the address keeps the trades, and the trades of the days, where it fired', async () => {
+  renderApp(<TradesView />, {
+    sample: patternLog(),
+    url: '/app/trades?pat=exited-in-parts',
+  });
+  const t = await table();
+  // A trade pattern: only the trade it fired on.
+  await waitFor(() => expect(bodyRows(t).map(idOf)).toEqual(['pb']));
+  // The pick shows as a chip with a way to take it off.
+  expect(screen.getByText('Patterns: Exited in parts')).toBeTruthy();
+  cleanup();
+  renderApp(<TradesView />, {
+    sample: patternLog(),
+    url: '/app/trades?pat=one-strong-trade',
+  });
+  const day = await table();
+  // A day pattern: the trade of that day, which has no pattern of its own.
+  await waitFor(() => expect(bodyRows(day).map(idOf)).toEqual(['pc']));
+  expect(cellOf(day, bodyRows(day)[0]!, 'Patterns').textContent).toBe('0');
+});
+
 describe('at 390px', () => {
   beforeEach(() => {
     window.innerWidth = 390;
   });
   afterEach(() => {
     window.innerWidth = 1024;
+  });
+
+  test('a row ends its second line with a count of patterns', async () => {
+    renderApp(<TradesView />, { sample: patternLog(), url: '/app/trades' });
+    const list = await screen.findByRole('list', { name: 'Trades' });
+    await waitFor(() => {
+      const lines = within(list)
+        .getAllByRole('listitem')
+        .map((li) => li.querySelector('[data-line="2"]')!.textContent);
+      // Newest first: C, B, A.
+      expect(lines[0]).toMatch(/0 patterns$/);
+      expect(lines[1]).toMatch(/3 patterns$/);
+      expect(lines[2]).toMatch(/1 pattern$/);
+    });
   });
 
   test('the summary is a 2 by 2 grid: net, win rate, profit factor, trades', async () => {

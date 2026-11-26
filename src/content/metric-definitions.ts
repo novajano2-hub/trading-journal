@@ -124,6 +124,24 @@ export const METRIC_IDS = [
   'tracker-history',
   'tracker-card',
   'tracker-follow-rate',
+  'patterns',
+  'pattern-held-longer',
+  'pattern-long-loss-hold',
+  'pattern-loss-after-loss',
+  'pattern-added-to-position',
+  'pattern-exited-in-parts',
+  'pattern-large-size',
+  'pattern-losses-outweighed',
+  'pattern-switched-sides-red',
+  'pattern-switched-sides-green',
+  'pattern-one-strong-trade',
+  'pattern-low-return',
+  'pattern-sized-up-after-wins',
+  'pattern-more-trades',
+  'pattern-waited-then-won',
+  'pattern-quick-reentries',
+  'pattern-rushed-red-day',
+  'pattern-busier-than-green',
 ] as const;
 
 export type MetricId = (typeof METRIC_IDS)[number];
@@ -731,6 +749,96 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Follow rate',
     definition:
       "The days that kept this rule, divided by the days it was decided, in the date range. A day still pending doesn't count, and a rule with no decided day reads 0%.",
+  },
+  patterns: {
+    label: 'Patterns',
+    definition:
+      "How many behaviour patterns fired on a trade. Each one is read from the trade's fills and from your other trades in the 60 days before it, in every account. Patterns of a whole day are counted on the day, not on its trades. 0 when none fired.",
+  },
+  'pattern-held-longer': {
+    label: 'Held longer than usual',
+    definition:
+      'A closed trade held longer than 75% of your closed trades with the same outcome (wins against wins, losses against losses) in the 60 days before it was opened. Breakevens and open trades are left out. With less history it uses the trades there are.',
+  },
+  'pattern-long-loss-hold': {
+    label: 'Long hold on a loss',
+    definition:
+      'A loss held longer than half of your losses in the 60 days before it was opened, and larger than the average of those losses.',
+  },
+  'pattern-loss-after-loss': {
+    label: 'Loss after a loss',
+    definition:
+      'A losing trade opened within 30 seconds of the exit of another losing trade, in any account or instrument.',
+  },
+  'pattern-added-to-position': {
+    label: 'Added to the position',
+    definition:
+      "A trade opened in two or more entries. It needs the trade's fills, so a trade typed in without them never has it.",
+  },
+  'pattern-exited-in-parts': {
+    label: 'Exited in parts',
+    definition:
+      "A closed trade that was closed in two or more exits. It needs the trade's fills.",
+  },
+  'pattern-large-size': {
+    label: 'Large size',
+    definition:
+      'A trade whose size is above 75% of the trades you opened in the 60 days before it. Open trades count.',
+  },
+  'pattern-losses-outweighed': {
+    label: 'Losses outweighed wins',
+    definition:
+      'A red day on which you won half of your decided trades or more, but the average loss was at least twice the average win.',
+  },
+  'pattern-switched-sides-red': {
+    label: 'Switched sides, red',
+    definition:
+      'A red day with three or more changes of side, long to short or back, within one symbol. The symbol with the most changes counts; changes in different symbols are not added.',
+  },
+  'pattern-switched-sides-green': {
+    label: 'Switched sides, green',
+    definition:
+      'A green day with three or more changes of side, long to short or back, within one symbol. The symbol with the most changes counts; changes in different symbols are not added.',
+  },
+  'pattern-one-strong-trade': {
+    label: 'One strong trade',
+    definition:
+      'A day with a single trade, a win, with a realized R of 3 or more. It needs a stop on the trade, because R is measured against it.',
+  },
+  'pattern-low-return': {
+    label: 'Low return for the effort',
+    definition:
+      'A green day of three or more trades whose net P&L is below half of your average green day in the 60 days before it.',
+  },
+  'pattern-sized-up-after-wins': {
+    label: 'Sized up after wins',
+    definition:
+      'A trade larger than the one before it, after three or more wins in a row, that lost more than your average loss in the 60 days before the day.',
+  },
+  'pattern-more-trades': {
+    label: 'More trades than usual',
+    definition:
+      'A day with at least a third more trades than your daily average over the 60 days before it. Days without trades are not in the average.',
+  },
+  'pattern-waited-then-won': {
+    label: 'Waited, then won',
+    definition:
+      "A green day whose first entry came 90 minutes or more after the day's session started. It needs a session started with the day's timer.",
+  },
+  'pattern-quick-reentries': {
+    label: 'Quick re-entries after a loss',
+    definition:
+      'Two or more losing trades, each opened within one minute of the exit of an earlier losing trade.',
+  },
+  'pattern-rushed-red-day': {
+    label: 'Rushed red day',
+    definition:
+      'A red day of five or more trades with a median hold under 5 minutes and a median gap between trades under 2 minutes.',
+  },
+  'pattern-busier-than-green': {
+    label: 'Busier than a green day',
+    definition:
+      'A day with at least twice your average number of trades on green days in the 60 days before it.',
   },
 };
 

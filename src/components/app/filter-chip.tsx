@@ -19,10 +19,10 @@ const CHIP_UNAVAILABLE =
 const PANEL =
   'z-50 flex max-h-[min(600px,var(--radix-popover-content-available-height))] max-w-[calc(100vw-24px)] origin-(--radix-popover-content-transform-origin) flex-col overflow-hidden rounded-[12px] border border-line bg-surface-1 text-text shadow-[var(--shadow)] outline-none motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in';
 
-const ROW =
+export const ROW =
   'flex min-h-9 cursor-pointer items-center gap-2.5 rounded-[8px] px-2 py-1 text-[13.5px] text-text hover:bg-sunken pointer-coarse:min-h-11';
-const BOX = 'size-4 flex-none cursor-pointer accent-accent';
-const GROUP_LABEL = 'px-2 pt-2 pb-1 text-[12px] font-medium text-faint';
+export const BOX = 'size-4 flex-none cursor-pointer accent-accent';
+export const GROUP_LABEL = 'px-2 pt-2 pb-1 text-[12px] font-medium text-faint';
 
 /**
  * A text or date field inside a filter popover. Its focus ring hugs the

@@ -7,7 +7,9 @@ import {
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import type { ImportContext, ImportPlan } from '@/domain/import/plan';
+import { computePatterns, type PatternEnv } from '@/domain/patterns';
 import { useHydrated } from '@/lib/use-hydrated';
 import type {
   Account,
@@ -226,6 +228,77 @@ export function useFeeRules(): UseQueryResult<FeeRule[]> {
 
 export function useTrades(): UseQueryResult<Trade[]> {
   return useWorkspaceQuery(keys.trades, (r, ws) => r.trades.list(ws));
+}
+
+/** Every pattern of the workspace's trades: by trade id and by day (Plan 6B §5.5). */
+export type PatternResult = ReturnType<typeof computePatterns>;
+
+/** The last result per trades array: every reader of the same trades, prefs and sessions shares one computation. */
+const patternMemo = new WeakMap<
+  readonly Trade[],
+  { key: string; value: PatternResult }
+>();
+
+function patternsFor(trades: readonly Trade[], env: PatternEnv): PatternResult {
+  const key = JSON.stringify([
+    env.timeZone,
+    env.breakevenRange,
+    env.pnlBasis,
+    [...env.sessions],
+  ]);
+  const memo = patternMemo.get(trades);
+  if (memo?.key === key) return memo.value;
+  const value = computePatterns(trades, env);
+  patternMemo.set(trades, { key, value });
+  return value;
+}
+
+/**
+ * The patterns of every trade in the active workspace, all accounts, never
+ * stored (B20): `byTrade` by trade id, `byDay` by the day's local date. It
+ * reads all of the workspace's trades, not a filtered set, so a trade's
+ * result is the same wherever it is shown. Computed again only when the
+ * trades, the profile's zone, breakeven range or P&L basis, or the days'
+ * session starts change. `enabled: false` computes nothing and stays pending
+ * (the filters read it only while a pattern is picked).
+ */
+export function usePatterns(enabled = true): UseQueryResult<PatternResult> {
+  const trades = useTrades();
+  const prefs = usePrefs();
+  // The same query `useDays` holds, left idle while nobody needs the patterns.
+  const days = useWorkspaceQuery(
+    keys.days,
+    (r, ws) => r.days.list(ws),
+    enabled,
+  );
+  const tradeList = trades.data;
+  const prefsData = prefs.data;
+  const dayList = days.data;
+  const data = useMemo(() => {
+    if (!enabled || !tradeList || !prefsData || !dayList) return undefined;
+    return patternsFor(tradeList, {
+      timeZone: prefsData.timeZone,
+      breakevenRange: prefsData.breakevenRange,
+      pnlBasis: prefsData.pnlBasis,
+      sessions: new Map(
+        dayList.flatMap((d) => (d.session ? [[d.id, d.session] as const] : [])),
+      ),
+    });
+  }, [enabled, tradeList, prefsData, dayList]);
+  const failed = [trades, prefs, days].find((q) => q.isError);
+  const status = failed ? 'error' : data === undefined ? 'pending' : 'success';
+  // The trades' result with the computed data and one status for the three reads.
+  return {
+    ...trades,
+    data,
+    error: failed?.error ?? null,
+    status,
+    isPending: status === 'pending',
+    isSuccess: status === 'success',
+    isError: status === 'error',
+    isLoadingError: status === 'error',
+    isRefetchError: false,
+  } as unknown as UseQueryResult<PatternResult>;
 }
 
 export function useTrade(id: string): UseQueryResult<Trade | null> {

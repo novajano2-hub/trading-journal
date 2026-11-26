@@ -18,6 +18,7 @@ import { guessMapping } from '@/domain/import/mapping';
 import { EMPTY_FILTERS } from '../filters';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import { resolveInstrument } from '@/domain/instruments';
+import { patternSample } from '../__fixtures__/patterns-sample';
 import { fixtureSample } from '../__fixtures__/sample';
 import { createLocalRepository } from '../local/local-repository';
 import type { Repository } from '../repository';
@@ -126,6 +127,48 @@ test('useTradeSet keeps its result while the inputs are unchanged', async () => 
   const first = result.current.data;
   rerender();
   expect(result.current.data).toBe(first);
+});
+
+test('a Patterns pick keeps the trades the pattern fired on, and only then waits for the days', async () => {
+  const { repository, Wrapper } = setup(patternSample);
+  const days = vi.spyOn(repository.days, 'list');
+  const none = renderHook(() => useTradeSet(EMPTY_FILTERS), {
+    wrapper: Wrapper,
+  });
+  await waitFor(() => expect(none.result.current.status).toBe('success'));
+  // Nothing needs the patterns, so nothing computes them or reads the days.
+  expect(days).not.toHaveBeenCalled();
+  expect(none.result.current.data!.trades.map((t) => t.id).sort()).toEqual([
+    'p-1',
+    'p-plain',
+  ]);
+  none.unmount();
+
+  const picked = renderHook(
+    () => useTradeSet({ ...EMPTY_FILTERS, patterns: ['added-to-position'] }),
+    { wrapper: Wrapper },
+  );
+  await waitFor(() => expect(picked.result.current.status).toBe('success'));
+  expect(days).toHaveBeenCalled();
+  // The active account's trade; the archived account's counts only when it is selected.
+  expect(picked.result.current.data!.trades.map((t) => t.id)).toEqual(['p-1']);
+  expect(picked.result.current.data!.filters.patterns).toEqual([
+    'added-to-position',
+  ]);
+
+  const archived = renderHook(
+    () =>
+      useTradeSet({
+        ...EMPTY_FILTERS,
+        accountIds: ['acc-b'],
+        patterns: ['added-to-position'],
+      }),
+    { wrapper: Wrapper },
+  );
+  await waitFor(() => expect(archived.result.current.status).toBe('success'));
+  expect(archived.result.current.data!.trades.map((t) => t.id)).toEqual([
+    'p-old',
+  ]);
 });
 
 test('useMetrics partitions by currency', async () => {

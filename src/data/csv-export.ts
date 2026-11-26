@@ -1,5 +1,6 @@
 import { localParts } from '@/domain/time';
 import { csvField, decimalOf } from '@/lib/csv';
+import { PATTERNS, type PatternId } from '@/domain/patterns/defs';
 import type { Trade } from '@/domain/types';
 import { dayOfTrade } from './day-log';
 import { COLUMN_LABELS, type ColumnId } from './trade-columns';
@@ -14,7 +15,12 @@ import {
 } from './trade-rows';
 
 /** What the export needs to name things; its time zone is the trader's. */
-export type CsvEnv = RowEnv;
+export interface CsvEnv extends RowEnv {
+  /** The patterns that fired, by trade id (`computePatterns().byTrade`), for the Patterns column. */
+  patterns?: ReadonlyMap<string, readonly { id: PatternId }[]>;
+}
+
+const PATTERN_NAMES = new Map(PATTERNS.map((p) => [p.id, p.name]));
 
 const two = (n: number) => String(n).padStart(2, '0');
 
@@ -84,6 +90,10 @@ export function tradesCsv(
           .join('; ');
       case 'mistakes':
         return facts.mistakesOf(t).join('; ');
+      case 'patterns':
+        return (env.patterns?.get(t.id) ?? [])
+          .map((h) => PATTERN_NAMES.get(h.id) ?? h.id)
+          .join('; ');
       case 'rules': {
         const r = facts.rules(t);
         return r.checked === 0 ? '' : `${r.kept} of ${r.checked}`;

@@ -25,6 +25,7 @@ import { metricContextOf } from '@/data/metrics';
 import { useGlobalFilters, useTradeSet } from '@/data/query/derived';
 import {
   useAccounts,
+  usePatterns,
   usePrefs,
   useRemoveTrades,
   useStrategies,
@@ -78,6 +79,7 @@ import { FillsTimeline, positions, sortedFills } from './fills-timeline';
 import { LevelsBlock, noun } from './levels-block';
 import { RatingRow } from '../routine/rating-row';
 import { RuleChecklist } from './rule-checklist';
+import { PatternsButton } from './patterns-button';
 import { StatsChooser, type StatChoice } from './stats-chooser';
 import { TradeFiles } from './trade-files';
 import { clock } from '@/lib/time-format';
@@ -621,6 +623,8 @@ function ExecutionCard({
   const prefs = usePrefs().data!;
   const update = useUpdatePrefs();
   const unset = useUnsetPrefs();
+  // Every pattern of the workspace's trades; this trade's own are the button's.
+  const patterns = usePatterns().data;
   const defs = statDefs(trade, display, basis, ctx);
   const shown: readonly string[] = prefs.tradeStats ?? STAT_IDS;
   const rows: StatChoice[] = STAT_IDS.map((id) => {
@@ -655,14 +659,21 @@ function ExecutionCard({
           </span>
         }
         end={
-          <StatsChooser
-            rows={rows}
-            shown={shown}
-            onSave={async (next) => {
-              if (next === undefined) await unset.mutateAsync(['tradeStats']);
-              else await update.mutateAsync({ tradeStats: next });
-            }}
-          />
+          <span className="flex flex-wrap items-center justify-end gap-2">
+            <PatternsButton
+              hits={
+                patterns ? (patterns.byTrade.get(trade.id) ?? []) : undefined
+              }
+            />
+            <StatsChooser
+              rows={rows}
+              shown={shown}
+              onSave={async (next) => {
+                if (next === undefined) await unset.mutateAsync(['tradeStats']);
+                else await update.mutateAsync({ tradeStats: next });
+              }}
+            />
+          </span>
         }
       />
       <Stats

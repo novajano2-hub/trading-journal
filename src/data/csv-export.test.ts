@@ -108,6 +108,35 @@ describe('tradesCsv', () => {
     ]);
   });
 
+  test("the Patterns column lists the trade's pattern names, none for a trade without", () => {
+    const csv = tradesCsv(
+      ['a', 'b'].map((id) => (id === 'a' ? loss : win)),
+      ['instrument', 'patterns'],
+      {
+        ...env,
+        patterns: new Map([
+          [
+            'a',
+            [
+              { id: 'held-longer' as const },
+              { id: 'exited-in-parts' as const },
+            ],
+          ],
+        ]),
+      },
+    );
+    expect(csv.split('\r\n')).toEqual([
+      'Instrument,Patterns',
+      'ESZ5,Held longer than usual; Exited in parts',
+      'ESZ5,',
+    ]);
+    // Before the patterns are computed the cell is empty, as for a trade with none.
+    expect(tradesCsv([loss], ['patterns'], env).split('\r\n')).toEqual([
+      'Patterns',
+      '',
+    ]);
+  });
+
   test('a field with a comma, quote or line break is quoted', () => {
     const t = makeTrade({ net: 0, strategyIds: ['s'] });
     const csv = tradesCsv([t], ['strategies'], {
