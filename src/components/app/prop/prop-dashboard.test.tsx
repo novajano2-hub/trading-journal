@@ -453,8 +453,8 @@ test('Where the money went: firms by what they took and paid, net at the right, 
   expect(await checked('Break down by')).toEqual(['Firm']);
   await waitFor(() => expect(rowsOf('money').length).toBe(2));
   expect(rowsOf('money')).toEqual([
-    'Sample prop firm3 challenges+$3,010.00',
-    'Sample data feedNo challenge−$29.00',
+    'Sample prop firm3 challengesSpent −$1,490.00, earned +$4,500.00+$3,010.00',
+    'Sample data feedNo challengeSpent −$29.00−$29.00',
   ]);
   // Net wears its sign's colour.
   const nets = [
@@ -489,27 +489,27 @@ test('by Type, Size and Fee the rows regroup, and a row with no challenge reads 
   await choose('Break down by', 'Type');
   await waitFor(() =>
     expect(rowsOf('money')).toEqual([
-      '1-step2 challenges+$3,708.00',
-      '2-step1 challenge−$698.00',
-      'NoneNo challenge−$29.00',
+      '1-step2 challengesSpent −$792.00, earned +$4,500.00+$3,708.00',
+      '2-step1 challengeSpent −$698.00−$698.00',
+      'NoneNo challengeSpent −$29.00−$29.00',
     ]),
   );
   await choose('Break down by', 'Size');
   await waitFor(() =>
     expect(rowsOf('money')).toEqual([
-      '$50,000.001 challenge+$4,205.00',
-      '$100,000.002 challenges−$1,195.00',
-      'NoneNo challenge−$29.00',
+      '$50,000.001 challengeSpent −$295.00, earned +$4,500.00+$4,205.00',
+      '$100,000.002 challengesSpent −$1,195.00−$1,195.00',
+      'NoneNo challengeSpent −$29.00−$29.00',
     ]),
   );
   // By fee type it groups the costs, in the fees' order, with their transactions.
   await choose('Break down by', 'Fee');
   await waitFor(() =>
     expect(rowsOf('money')).toEqual([
-      'Evaluation fee3 transactions−$1,013.00',
-      'Activation fee2 transactions−$279.00',
-      'Reset fee2 transactions−$198.00',
-      'Uncategorized1 transaction−$29.00',
+      'Evaluation fee3 transactionsSpent −$1,013.00−$1,013.00',
+      'Activation fee2 transactionsSpent −$279.00−$279.00',
+      'Reset fee2 transactionsSpent −$198.00−$198.00',
+      'Uncategorized1 transactionSpent −$29.00−$29.00',
     ]),
   );
   expect(await checked('Break down by')).toEqual(['Fee']);
@@ -561,8 +561,48 @@ test('the breakdown follows the filters: one firm leaves one row', async () => {
     url: `${URL}?pfirm=${encodeURIComponent('Sample data feed')}`,
   });
   await waitFor(() =>
-    expect(rowsOf('money')).toEqual(['Sample data feedNo challenge−$29.00']),
+    expect(rowsOf('money')).toEqual([
+      'Sample data feedNo challengeSpent −$29.00−$29.00',
+    ]),
   );
+});
+
+test('each row prints what was spent and earned under its name, not only in a hover title (C-03)', async () => {
+  const r = repo();
+  await inNewYork(r);
+  renderApp(<PropDashboard />, { repository: r, url: URL });
+  await waitFor(() => expect(rowsOf('money').length).toBe(2));
+  const lines = () =>
+    [...document.querySelectorAll<HTMLElement>('[data-list="money"] > li')].map(
+      (li) => li.querySelector('[data-figures]')?.textContent,
+    );
+  // Both when both moved; only what moved otherwise.
+  expect(lines()).toEqual([
+    'Spent −$1,490.00, earned +$4,500.00',
+    'Spent −$29.00',
+  ]);
+  await choose('Break down by', 'Fee');
+  await waitFor(() => expect(lines()[0]).toBe('Spent −$1,013.00'));
+  expect(lines().every((t) => t?.startsWith('Spent '))).toBe(true);
+});
+
+test('under Privacy the printed spent and earned are masked, and no digit of them shows (C-03)', async () => {
+  const r = repo();
+  await inNewYork(r);
+  await r.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<PropDashboard />, { repository: r, url: URL });
+  await waitFor(() => expect(rowsOf('money').length).toBe(2));
+  const lines = [
+    ...document.querySelectorAll<HTMLElement>(
+      '[data-list="money"] [data-figures]',
+    ),
+  ];
+  expect(lines).toHaveLength(2);
+  for (const line of lines) {
+    expect(line.textContent).toMatch(/^Spent /);
+    expect(line.textContent).not.toMatch(/\d/);
+  }
+  expect(lines[0]!.textContent).toContain('earned');
 });
 
 test('under Privacy the breakdown names and counts stay and no amount shows, bars and table included', async () => {

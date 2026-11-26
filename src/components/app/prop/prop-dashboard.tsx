@@ -64,7 +64,6 @@ function KeyCard({
   sub: string;
 }): React.JSX.Element {
   const id = useId();
-  const basis = usePrefs().data?.pnlBasis ?? 'net';
   return (
     <section
       aria-labelledby={id}
@@ -73,7 +72,7 @@ function KeyCard({
       <div className="flex min-h-[22px] items-center">
         <MetricTip
           id={tip}
-          basis={basis}
+          basis="net"
           className="text-left text-[12.5px] text-faint"
         >
           <span id={id}>{label}</span>
@@ -169,7 +168,6 @@ function ReturnCard({
 }): React.JSX.Element {
   const id = useId();
   const display = useDisplay();
-  const basis = usePrefs().data?.pnlBasis ?? 'net';
   const points = d.roi;
   const last = points[points.length - 1];
   const keys = useMemo(() => points.map((p) => p.date), [points]);
@@ -217,7 +215,7 @@ function ReturnCard({
         headingId={id}
         title="Return over time"
         after={
-          <TipGlyph id="prop-return" basis={basis} name="Return over time" />
+          <TipGlyph id="prop-return" basis="net" name="Return over time" />
         }
         end={
           <Segmented

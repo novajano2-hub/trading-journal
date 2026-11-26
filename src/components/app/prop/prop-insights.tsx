@@ -6,7 +6,6 @@ import { MetricTip } from '@/components/ui/metric-tip';
 import { Segmented } from '@/components/ui/segmented';
 import type { MetricId } from '@/content/metric-definitions';
 import type { PropFinance, PropFinanceView } from '@/data/prop-finance';
-import { usePrefs } from '@/data/query/hooks';
 import { BREACH_REASON_LABELS } from '@/domain/prop/finance';
 import { useDisplay } from '@/lib/display';
 import { formatPct, plural } from '@/lib/format';
@@ -42,14 +41,13 @@ export function PassRateCard({
 }): React.JSX.Element {
   const id = useId();
   const display = useDisplay();
-  const basis = usePrefs().data?.pnlBasis ?? 'net';
   const { passed, attempted } = d.passRate.overall;
   return (
     <section aria-labelledby={id} className={PANEL}>
       <CardHeader
         headingId={id}
         title="Pass rate"
-        after={<TipGlyph id="prop-pass-rate" basis={basis} name="Pass rate" />}
+        after={<TipGlyph id="prop-pass-rate" basis="net" name="Pass rate" />}
         end={
           <Segmented
             label="Pass rate by"
@@ -110,13 +108,12 @@ function Fact({
   className?: string;
   children: React.ReactNode;
 }): React.JSX.Element {
-  const basis = usePrefs().data?.pnlBasis ?? 'net';
   return (
     <div className="min-w-0">
       <dt>
         <MetricTip
           id={tip}
-          basis={basis}
+          basis="net"
           className="text-left text-[12.5px] text-faint"
         >
           {label}
@@ -148,7 +145,6 @@ export function BreachCard({
   onWhich(next: PropFinanceView['breaches']): void;
 }): React.JSX.Element {
   const id = useId();
-  const basis = usePrefs().data?.pnlBasis ?? 'net';
   const b = d.breaches;
   const days = b.avgDays === null ? null : Math.round(b.avgDays);
   return (
@@ -159,7 +155,7 @@ export function BreachCard({
         after={
           <TipGlyph
             id="prop-breach-reasons"
-            basis={basis}
+            basis="net"
             name="Why accounts broke"
           />
         }

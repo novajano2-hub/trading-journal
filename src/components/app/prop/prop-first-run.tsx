@@ -180,13 +180,7 @@ function Added({
 }
 
 /** Step 3: what was spent, earned and kept, Task 4's totals of the transactions (C60). */
-function Totals({
-  txns,
-  basis,
-}: {
-  txns: readonly PropTxn[];
-  basis: UserPrefs['pnlBasis'];
-}): React.JSX.Element {
+function Totals({ txns }: { txns: readonly PropTxn[] }): React.JSX.Element {
   const { spent, earned, net } = totals(txns);
   const figures: {
     tip: MetricId;
@@ -209,7 +203,7 @@ function Totals({
           <dt>
             <MetricTip
               id={f.tip}
-              basis={basis}
+              basis="net"
               className="text-left text-[12.5px] text-faint"
             >
               {f.label}
@@ -421,7 +415,7 @@ export function PropFirstRun({
               </>
             ) : null}
 
-            {step === 3 ? <Totals txns={txns} basis={prefs.pnlBasis} /> : null}
+            {step === 3 ? <Totals txns={txns} /> : null}
 
             {problem ? (
               <p

@@ -3,7 +3,6 @@
 import { useId } from 'react';
 import { FigureText } from '@/components/product/figure-text';
 import { Segmented } from '@/components/ui/segmented';
-import { usePrefs } from '@/data/query/hooks';
 import type { PropFinance, PropFinanceView } from '@/data/prop-finance';
 import type { BreakdownRow } from '@/domain/prop/finance';
 import { useDisplay } from '@/lib/display';
@@ -80,7 +79,6 @@ export function MoneyCard({
 }): React.JSX.Element {
   const id = useId();
   const display = useDisplay();
-  const basis = usePrefs().data?.pnlBasis ?? 'net';
   const rows = d.breakdown;
   const scale = Math.max(0, ...rows.flatMap((r) => [r.spent, r.earned]));
   // A size is an amount: it reads through the display, and so hides under Privacy.
@@ -98,7 +96,7 @@ export function MoneyCard({
         headingId={id}
         title="Where the money went"
         after={
-          <TipGlyph id="prop-money" basis={basis} name="Where the money went" />
+          <TipGlyph id="prop-money" basis="net" name="Where the money went" />
         }
         end={
           <Segmented
@@ -128,6 +126,24 @@ export function MoneyCard({
                   {name(r)}
                   <small className="block truncate text-[12px] font-normal text-faint">
                     {countText(by, r.count)}
+                  </small>
+                  {/* The two bars' figures in words: touch and keyboard users have no hover. */}
+                  <small
+                    data-figures
+                    className="block text-[12px] font-normal whitespace-normal text-muted tabular-nums"
+                  >
+                    {r.spent > 0 ? (
+                      <>
+                        Spent <FigureText f={money(out(r.spent))} />
+                      </>
+                    ) : null}
+                    {r.spent > 0 && r.earned > 0 ? ', ' : null}
+                    {r.earned > 0 ? (
+                      <>
+                        {r.spent > 0 ? 'earned' : 'Earned'}{' '}
+                        <FigureText f={money(r.earned)} />
+                      </>
+                    ) : null}
                   </small>
                 </span>
                 <span className="flex flex-col gap-[3px]">
