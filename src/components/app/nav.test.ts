@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import {
+  challengePageId,
   APP_NAV,
   activeItem,
   dayPageDate,
@@ -211,4 +212,14 @@ test('only Home itself is Home: a collapsed sidebar is hidden there and nowhere 
     '/app/day/2026-11-24',
   ])
     expect(isHomePage(path), path).toBe(false);
+});
+
+test("challengePageId reads the id of a challenge's details page, decoded, and nothing else under Prop firms", () => {
+  expect(challengePageId('/app/prop-firms/accounts/c-1')).toBe('c-1');
+  expect(challengePageId('/app/prop-firms/accounts/c-1/')).toBe('c-1');
+  expect(challengePageId('/app/prop-firms/accounts/a%20b%2Fc')).toBe('a b/c');
+  expect(challengePageId('/app/prop-firms')).toBeUndefined();
+  expect(challengePageId('/app/prop-firms/accounts')).toBeUndefined();
+  expect(challengePageId('/app/prop-firms/transactions')).toBeUndefined();
+  expect(challengePageId('/app/prop-firms/accounts/c-1/extra')).toBeUndefined();
 });

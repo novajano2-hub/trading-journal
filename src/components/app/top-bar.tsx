@@ -20,12 +20,13 @@ import { useImportPicker } from './day/import-picker';
 import { SessionButton } from './day/session-button';
 import { isRealDate } from './notebook/notebook-model';
 import { PlanTheDay } from './routine/plan-the-day';
-import { useStrategy, useTrade } from '@/data/query/hooks';
+import { useChallenges, useStrategy, useTrade } from '@/data/query/hooks';
 import { LOG_VIEW_HREF, useLastLogView } from '@/lib/log-view';
 import { usePhone } from '@/lib/use-phone';
 import { HomeSidebarToggle } from './sidebar-toggle';
 import { useBarHeight } from './use-bar-height';
 import {
+  challengePageId,
   dayPageDate,
   filtersApply,
   hidesDisplayMenu,
@@ -162,6 +163,28 @@ function TradeNumber({ id }: { id: string }): React.JSX.Element | null {
   );
 }
 
+/**
+ * A challenge's name, on a phone: the bar there has a title and nothing else
+ * (comp 06), and "Prop firms" would say nothing of which challenge is open.
+ * From `sm` the bar keeps the module's name, and so does it until the
+ * challenge loads or where it isn't found.
+ */
+function ChallengeTitle({
+  id,
+  phone,
+  fallback,
+}: {
+  id: string;
+  phone: boolean;
+  fallback: string;
+}): React.JSX.Element {
+  const challenges = useChallenges();
+  const name = phone
+    ? challenges.data?.find((c) => c.id === id)?.name
+    : undefined;
+  return <>{name ?? fallback}</>;
+}
+
 const CRUMB_LINK =
   'rounded-chip text-faint no-underline outline-offset-2 hover:text-text focus-visible:outline-2 focus-visible:outline-accent';
 
@@ -232,8 +255,8 @@ function StrategyCrumb({
  * - Below `sm` it is one 56px row pinned to the top: the title (with a quiet
  *   "Sample" badge in the sample workspace, which gives its room to the title
  *   below 375px) on the left, plain icon buttons for Filters (where the page
- *   has them), search and Display on the right. The tab bar at the foot does
- *   the navigating.
+ *   has them), search and Display on the right. A challenge's page reads the
+ *   challenge's name there. The tab bar at the foot does the navigating.
  */
 export function TopBar({
   menu,
@@ -266,6 +289,7 @@ export function TopBar({
   const tradeId = tradePageId(pathname);
   const strategyId = strategyPageId(pathname);
   const editingId = strategyEditId(pathname);
+  const challengeId = challengePageId(pathname);
   const crumbed =
     tradeId !== undefined ||
     strategyId !== undefined ||
@@ -335,6 +359,12 @@ export function TopBar({
                     <StrategyCrumb
                       id={(strategyId ?? editingId)!}
                       edit={editingId !== undefined}
+                    />
+                  ) : challengeId !== undefined ? (
+                    <ChallengeTitle
+                      id={challengeId}
+                      phone={phone}
+                      fallback={pageTitle(pathname)}
                     />
                   ) : (
                     pageTitle(pathname)

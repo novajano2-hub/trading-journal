@@ -10,8 +10,10 @@ import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { afterEach, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
-import type { UserPrefs } from '@/domain/types';
+import { SAMPLE_WORKSPACE } from '@/data/workspaces';
+import type { Challenge, UserPrefs } from '@/domain/types';
 import { renderApp } from './__fixtures__/render-app';
+import { viewport } from './__fixtures__/viewport';
 import { TopBar } from './top-bar';
 
 vi.mock('next/navigation', () => import('./__fixtures__/navigation'));
@@ -493,4 +495,87 @@ test('a page without the chips has no breakers', () => {
 test('the bar is a pinned row: focus inside it never sends the page scrolling', () => {
   layOut({ titleWidth: 115, chipsWidth: 100 });
   expect(renderBar().hasAttribute('data-pinned')).toBe(true);
+});
+
+// ---- The prop challenge's phone title --------------------------------------
+
+const CHALLENGE: Challenge = {
+  id: 'c-t1',
+  workspaceId: SAMPLE_WORKSPACE.id,
+  name: 'Futures 50K',
+  firm: 'Sample firm A',
+  steps: 1,
+  phases: [],
+  phase: 'evaluation',
+  status: 'active',
+};
+
+async function repoWithChallenge() {
+  const sample = fixtureSample();
+  sample.challenges.push(CHALLENGE);
+  return createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => sample,
+  });
+}
+
+const title = () => screen.getByRole('heading', { level: 1 });
+
+test("a challenge's details page titles a phone's bar with the challenge's name; wider screens keep the module's", async () => {
+  viewport({ phone: true });
+  renderApp(<TopBar />, {
+    url: '/app/prop-firms/accounts/c-t1',
+    repository: await repoWithChallenge(),
+  });
+  // The module's name until the challenge loads, so the bar never reads empty.
+  expect(title().textContent).toBe('Prop firms');
+  await waitFor(() => expect(title().textContent).toBe('Futures 50K'));
+  cleanup();
+  vi.restoreAllMocks();
+
+  viewport();
+  renderApp(<TopBar />, {
+    url: '/app/prop-firms/accounts/c-t1',
+    repository: await repoWithChallenge(),
+  });
+  await new Promise((r) => setTimeout(r, 50));
+  expect(title().textContent).toBe('Prop firms');
+});
+
+test('the title stays "Prop firms" for a challenge that is not there, and on the other prop pages', async () => {
+  viewport({ phone: true });
+  const repository = await repoWithChallenge();
+  renderApp(<TopBar />, {
+    url: '/app/prop-firms/accounts/nope',
+    repository,
+  });
+  await new Promise((r) => setTimeout(r, 50));
+  expect(title().textContent).toBe('Prop firms');
+  cleanup();
+  for (const path of [
+    '/app/prop-firms',
+    '/app/prop-firms/accounts',
+    '/app/prop-firms/transactions',
+  ]) {
+    renderApp(<TopBar />, { url: path, repository });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(title().textContent, path).toBe('Prop firms');
+    cleanup();
+  }
+});
+
+test("a challenge's name is read from its address, decoded", async () => {
+  viewport({ phone: true });
+  const sample = fixtureSample();
+  sample.challenges.push({ ...CHALLENGE, id: 'c a/b', name: 'Slash & space' });
+  renderApp(<TopBar />, {
+    url: '/app/prop-firms/accounts/c%20a%2Fb',
+    repository: createLocalRepository({
+      indexedDB: new IDBFactory(),
+      IDBKeyRange,
+      sample: async () => sample,
+    }),
+  });
+  await waitFor(() => expect(title().textContent).toBe('Slash & space'));
 });

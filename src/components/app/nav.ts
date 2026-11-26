@@ -298,6 +298,12 @@ export function strategyEditId(pathname: string): string | undefined {
   return m ? decodedSegment(m[1]!) : undefined;
 }
 
+/** The challenge id when `pathname` is one challenge's details page (not the Accounts list), decoded. */
+export function challengePageId(pathname: string): string | undefined {
+  const m = /^\/app\/prop-firms\/accounts\/([^/]+)\/?$/.exec(pathname);
+  return m ? decodedSegment(m[1]!) : undefined;
+}
+
 /**
  * Whether the global filters drive this page: Dashboard, the trade log, Calendar,
  * Strategies (the list and one strategy), the progress tracker (its date range only) and Reports, except Compare, whose two groups each own their filters.

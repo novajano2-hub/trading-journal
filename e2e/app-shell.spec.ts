@@ -544,6 +544,20 @@ test('wrapped chips keep a full row of their own, with the controls on the row a
   }
 });
 
+test("a challenge's page titles a phone's bar with the challenge's name, and a wider screen's with Prop firms", async ({
+  page,
+}, info) => {
+  const mobile = info.project.name === 'mobile';
+  await page.goto('/app/prop-firms/accounts/sample-challenge-futures-50k');
+  const title = page.getByRole('banner').getByRole('heading', { level: 1 });
+  await expect(title).toHaveText(mobile ? 'Futures 50K' : 'Prop firms');
+  // The other prop pages keep the module's name on a phone.
+  for (const path of ['/app/prop-firms', '/app/prop-firms/accounts']) {
+    await page.goto(path);
+    await expect(title, path).toHaveText('Prop firms');
+  }
+});
+
 test('below 375px the phone bar keeps its title and stays inside the screen (mobile)', async ({
   page,
 }, info) => {
