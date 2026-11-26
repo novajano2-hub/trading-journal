@@ -74,6 +74,29 @@ test('the chips show only on the routes the filters drive', () => {
   expect(screen.getByTestId('chips')).toBeTruthy();
 });
 
+test('the prop pages carry no Display menu (C72); the trade log keeps it', () => {
+  layOut({ titleWidth: 115, chipsWidth: 100 });
+  const render = (path: string) =>
+    renderApp(
+      <TopBar
+        search={<button data-testid="search">Search</button>}
+        basis={<button>Display</button>}
+      />,
+      { url: path },
+    );
+  for (const path of [
+    '/app/prop-firms',
+    '/app/prop-firms/accounts',
+    '/app/prop-firms/transactions',
+  ]) {
+    render(path);
+    expect(screen.queryByRole('button', { name: 'Display' }), path).toBeNull();
+    cleanup();
+  }
+  render('/app/trades');
+  expect(screen.getByRole('button', { name: 'Display' })).toBeTruthy();
+});
+
 test('Compare shows no chips, and says the groups own their filters', () => {
   layOut({ titleWidth: 115, chipsWidth: 100 });
   const bar = renderBar('/app/reports/compare');

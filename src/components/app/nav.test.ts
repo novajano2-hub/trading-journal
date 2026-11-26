@@ -4,6 +4,7 @@ import {
   activeItem,
   dayPageDate,
   navHref,
+  navItem,
   pageTitle,
   strategyEditId,
   strategyPageId,
@@ -146,6 +147,21 @@ test('the tracker shows the date range alone and no Display menu', () => {
     expect(datesOnly(p), p).toBe(false);
     expect(hidesDisplayMenu(p), p).toBe(false);
   }
+});
+
+test('the prop pages sit under Prop firms, with no Display menu (C72)', () => {
+  for (const path of [
+    '/app/prop-firms',
+    '/app/prop-firms/accounts',
+    '/app/prop-firms/transactions',
+    '/app/prop-firms/accounts/c-1',
+  ]) {
+    expect(activeItem(path)?.id, path).toBe('prop-firms');
+    expect(pageTitle(path), path).toBe('Prop firms');
+    expect(hidesDisplayMenu(path), path).toBe(true);
+  }
+  // The sidebar entry and the More sheet's both open the Dashboard.
+  expect(navItem('prop-firms').href).toBe('/app/prop-firms');
 });
 
 test('a day page sits under Trades, with no Display menu and no filters', () => {

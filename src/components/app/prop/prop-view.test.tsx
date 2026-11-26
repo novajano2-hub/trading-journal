@@ -479,23 +479,3 @@ test.each([
   expect(maskedReason(text, true)).toBe(out);
   expect(maskedReason(text, false)).toBe(text);
 });
-
-test('?new=challenge opens the new-challenge form once and leaves the address clean', async () => {
-  const r = repo({
-    accounts: [prop('p-forex', 'Forex evaluation')],
-    challenges: [challenge({})],
-  });
-  renderApp(<PropView />, {
-    repository: r,
-    url: '/app/prop-firms?new=challenge&phase=funded',
-  });
-  expect(
-    await screen.findByRole('dialog', { name: 'New challenge' }),
-  ).toBeTruthy();
-  // The param goes with a replace; the rest of the address stays.
-  expect(window.location.search).toBe('?phase=funded');
-  fireEvent.keyDown(document.activeElement ?? document.body, {
-    key: 'Escape',
-  });
-  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-});

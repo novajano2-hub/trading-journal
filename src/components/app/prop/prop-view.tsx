@@ -3,9 +3,7 @@
 import { Bank, Plus, ShieldCheck } from '@phosphor-icons/react/dist/ssr';
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
-import { writeParam } from '@/components/app/reports/use-report-data';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { StateGlyph } from '@/components/ui/state-glyph';
 import { Segmented } from '@/components/ui/segmented';
@@ -53,17 +51,9 @@ export function PropView(): React.JSX.Element {
   const update = useUpdateChallenge();
   const markBreached = useMarkBreached();
   const [filter, setFilter] = useState<Filter>('all');
-  // Home's second step links here with ?new=challenge: the form opens, and the
-  // param leaves the address (below) so a reload or Back doesn't reopen it.
-  // Read from the router's params, not window.location: on a client navigation
-  // the address is written after this page renders.
-  const params = useSearchParams();
-  const [editing, setEditing] = useState<Challenge | 'new' | null>(() =>
-    params.get('new') === 'challenge' ? 'new' : null,
-  );
-  useEffect(() => {
-    if (params.get('new') === 'challenge') writeParam('new', null);
-  }, [params]);
+  // The tabs' New challenge button opens its own form; this one is for Edit
+  // and for the empty state's button.
+  const [editing, setEditing] = useState<Challenge | 'new' | null>(null);
   const error =
     challenges.error ??
     accounts.error ??
@@ -161,7 +151,6 @@ export function PropView(): React.JSX.Element {
             <Bank size={16} aria-hidden="true" />
             Manage accounts
           </Link>
-          <NewButton onClick={() => setEditing('new')} />
         </span>
       </div>
 

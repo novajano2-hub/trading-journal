@@ -317,9 +317,19 @@ export function filtersApply(pathname: string): boolean {
 export const datesOnly = (pathname: string): boolean =>
   pathname === '/app/progress';
 
-/** Pages with no Display menu: money there is always net, in its own currency (P6A-03). */
+/** The Prop firms pages: its three tabs and a challenge's details. */
+export const isPropPage = (pathname: string): boolean =>
+  /^\/app\/prop-firms(\/|$)/.test(pathname);
+
+/**
+ * Pages with no Display menu: money there is always net, in its own currency
+ * (P6A-03). The prop pages read net money in the base currency, whatever the
+ * menu says (C72).
+ */
 export const hidesDisplayMenu = (pathname: string): boolean =>
-  pathname === '/app/progress' || dayPageDate(pathname) !== undefined;
+  pathname === '/app/progress' ||
+  dayPageDate(pathname) !== undefined ||
+  isPropPage(pathname);
 
 /** The page where each group of trades has its own filters rather than the global ones. */
 export const isComparePage = (pathname: string): boolean =>
