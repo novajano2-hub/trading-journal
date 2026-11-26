@@ -9,6 +9,7 @@ vi.mock('next/navigation', () => import('./__fixtures__/navigation'));
 
 afterEach(() => {
   cleanup();
+  window.sessionStorage.clear();
   vi.restoreAllMocks();
 });
 
@@ -195,6 +196,22 @@ test('a trade page titles the bar "Trades" then the trade number, and shows no f
   expect(screen.getByRole('banner').dataset.chips).toBeUndefined();
 });
 
+test('the Trades crumb returns to the log view last used in this tab', () => {
+  window.sessionStorage.setItem('keel.tradeLogView', 'day');
+  const id = fixtureSample().trades[0]!;
+  renderApp(
+    <TopBar
+      filters={<div data-testid="chips" />}
+      search={<button data-testid="search">Search</button>}
+    />,
+    { url: `/app/trades/${encodeURIComponent(id.id)}?symbol=ES` },
+  );
+  const title = screen.getByRole('heading', { level: 1 });
+  expect(
+    within(title).getByRole('link', { name: 'Trades' }).getAttribute('href'),
+  ).toBe('/app/trades/day?symbol=ES');
+});
+
 test('the trade log keeps its plain title and its chips', () => {
   renderApp(
     <TopBar
@@ -263,4 +280,27 @@ test('Plan the day sits before Import on the Dashboard and Trades only', () => {
     ).toBeNull();
     cleanup();
   }
+});
+
+test('the bar publishes its measured height for what pins under it, and Plan the day shows on the day and week views', () => {
+  layOut({ titleWidth: 115, chipsWidth: 100 });
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+    function (this: HTMLElement) {
+      return {
+        left: 0,
+        width: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        height: this.tagName === 'HEADER' ? 104 : 0,
+      } as DOMRect;
+    },
+  );
+  renderBar('/app/trades/day');
+  expect(document.documentElement.style.getPropertyValue('--top-bar')).toBe(
+    '104px',
+  );
+  expect(screen.getByRole('button', { name: 'Plan the day' })).toBeTruthy();
+  cleanup();
+  expect(document.documentElement.style.getPropertyValue('--top-bar')).toBe('');
 });

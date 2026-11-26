@@ -288,3 +288,12 @@ export function StatusChip({
 }): React.JSX.Element {
   return <Chip tone={status === 'Open' ? 'accent' : 'neutral'}>{status}</Chip>;
 }
+
+/** The instrument's root symbol as a pill. */
+export function TickerPill({ root }: { root: string }): React.JSX.Element {
+  return (
+    <Chip className="max-w-full min-w-0 font-semibold">
+      <span className="truncate">{root}</span>
+    </Chip>
+  );
+}

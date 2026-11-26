@@ -131,6 +131,7 @@ export function DayPanel({
 }): React.JSX.Element {
   const decided = day.wins + day.losses;
   const other = basis === 'net' ? day.gross : day.gross - day.fees;
+  // The Day view's address: this date as the range (equal from and to) and the page's filters.
   const query = serializeFilters({
     ...filters,
     range: { from: date, to: date },
@@ -362,7 +363,8 @@ export function DayPanel({
           Open daily note
         </Link>
         <Link
-          href={`/app/trades${query ? `?${query}` : ''}`}
+          // The record: View details opens the Trades Day view filtered to the date.
+          href={`/app/trades/day${query ? `?${query}` : ''}`}
           className={`${buttonClasses('secondary', 'sm')} min-w-fit flex-1 px-2.5! whitespace-nowrap`}
         >
           <ListBullets aria-hidden="true" size={16} className="shrink-0" />

@@ -239,6 +239,22 @@ export function TagRows({
 
 export type NoteStatus = 'idle' | 'saving' | 'saved' | 'failed';
 
+/** What a bound note editor offers the page around it. */
+export interface NoteControl {
+  /**
+   * Writes what is waiting (or tries again after a failed write), then waits
+   * for everything already on its way; `onStatus` says whether it landed.
+   */
+  settle(): Promise<void>;
+  /**
+   * Changes the stored note's fields (the star), in the editor's own queue and
+   * after what is waiting, so the text and the change never write over each
+   * other. `update` reads the note as stored just before. Rejects when the
+   * write fails.
+   */
+  patch(update: (current: JournalEntry) => Partial<JournalEntry>): Promise<void>;
+}
+
 /** The editor and its autosave; mounts once the trade's note (if it has one) has loaded. */
 function NoteBody({
   label,
@@ -249,6 +265,7 @@ function NoteBody({
   readOnly,
   handleRef,
   stamp,
+  controlRef,
   onStatus,
 }: {
   label: string;
@@ -262,6 +279,8 @@ function NoteBody({
   handleRef?: { current: NoteEditorHandle | null };
   /** Fields the next save writes with the body (the template a body came from). */
   stamp?: { current: Partial<JournalEntry> | undefined };
+  /** Receives the editor's `NoteControl`. */
+  controlRef?: { current: NoteControl | null };
   onStatus(s: NoteStatus): void;
 }): React.JSX.Element {
   const save = useSaveJournalEntry();
@@ -281,6 +300,8 @@ function NoteBody({
   // is let go: the next change makes a new one rather than bring it back. (A
   // daily note in Trash is not let go: its date keeps it, read-only, E109.)
   const waiting = useRef(0);
+  // The last write failed: the text on screen is not the stored one.
+  const failed = useRef(false);
   useEffect(() => {
     if (waiting.current === 0)
       note.current = entry ? Promise.resolve(entry) : null;
@@ -313,8 +334,10 @@ function NoteBody({
           body,
         });
         note.current = Promise.resolve(saved);
+        failed.current = false;
         onStatus('saved');
       } catch {
+        failed.current = true;
         onStatus('failed');
       } finally {
         waiting.current -= 1;
@@ -324,6 +347,47 @@ function NoteBody({
   const flushRef = useRef(flush);
   useEffect(() => {
     flushRef.current = flush;
+  });
+
+  // Writes what is waiting now (or tries again after a failed write), then
+  // waits for everything already on its way.
+  const settle = async () => {
+    if (timer.current !== undefined || failed.current) {
+      if (timer.current !== undefined) clearTimeout(timer.current);
+      flush();
+    }
+    await queue.current;
+  };
+  // A change to the note's fields joins the same queue, behind what is waiting,
+  // and builds on the note the last save returned.
+  const patch: NoteControl['patch'] = async (update) => {
+    if (timer.current !== undefined) {
+      clearTimeout(timer.current);
+      flush();
+    }
+    waiting.current += 1;
+    const job = queue.current.then(async () => {
+      try {
+        const current = await (note.current ??= ensureRef.current());
+        const saved = await save.mutateAsync({ ...current, ...update(current) });
+        note.current = Promise.resolve(saved);
+      } finally {
+        waiting.current -= 1;
+      }
+    });
+    // The queue goes on whatever this write does; the caller hears of a failure.
+    queue.current = job.then(
+      () => {},
+      () => {},
+    );
+    await job;
+  };
+  useEffect(() => {
+    if (!controlRef) return;
+    controlRef.current = { settle, patch };
+    return () => {
+      controlRef.current = null;
+    };
   });
 
   // Leaving the trade (or the page) saves what is still waiting.
@@ -417,12 +481,15 @@ export function DayNoteBinding({
   readOnly,
   handleRef,
   stamp,
+  controlRef,
   onStatus,
 }: {
   date: string;
   readOnly: boolean;
   handleRef?: { current: NoteEditorHandle | null };
   stamp?: { current: Partial<JournalEntry> | undefined };
+  /** Receives the editor's `NoteControl`: settle what is waiting, or change the note's fields in its queue. */
+  controlRef?: { current: NoteControl | null };
   onStatus(s: NoteStatus): void;
 }): React.JSX.Element {
   const journal = useJournal();
@@ -496,6 +563,7 @@ export function DayNoteBinding({
         readOnly={readOnly || trashed}
         handleRef={handleRef}
         stamp={stamp}
+        controlRef={controlRef}
         onStatus={onStatus}
       />
     </>

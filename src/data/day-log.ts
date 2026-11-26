@@ -1,6 +1,7 @@
 import { classify, type MetricContext } from '@/domain/metrics/context';
 import { closedInOrder, isClosed } from '@/domain/trade-status';
 import { localDate } from '@/domain/time';
+import { TZDate } from '@date-fns/tz';
 import type { Cents, Trade, WeekStart } from '@/domain/types';
 import { weekFirstDay } from '@/domain/week';
 
@@ -60,6 +61,35 @@ export function dayOfTrade(t: Trade, timeZone: string): string {
   return localDate(isClosed(t) ? t.closedAt : t.openedAt, timeZone);
 }
 
+/** The instant a local date begins (00:00 in the zone), as ISO. */
+export function startOfLocalDay(date: string, timeZone: string): string {
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
+  return new Date(new TZDate(y, m - 1, d, timeZone).getTime()).toISOString();
+}
+
+/**
+ * The span a day's chart covers. Keel's call (TradeZella unknown): the first
+ * open to the last close of the day's closed trades (the record: "the start,
+ * the middle and the end of the day's trading"), except that it never starts
+ * before 00:00 of the card's date, so a swing trade opened days earlier does
+ * not stretch the axis over days (ruling R19). None without a closed trade.
+ */
+export function daySpan(
+  trades: readonly Trade[],
+  date: string,
+  timeZone: string,
+): { from: string; to: string } | undefined {
+  const closed = trades.filter(isClosed);
+  if (closed.length === 0) return undefined;
+  const first = Math.min(...closed.map((t) => Date.parse(t.openedAt)));
+  const last = Math.max(...closed.map((t) => Date.parse(t.closedAt)));
+  const midnight = Date.parse(startOfLocalDay(date, timeZone));
+  return {
+    from: new Date(Math.max(first, midnight)).toISOString(),
+    to: new Date(last).toISOString(),
+  };
+}
+
 const newestOpenFirst = (a: Trade, b: Trade) =>
   Date.parse(b.openedAt) - Date.parse(a.openedAt) || b.serial - a.serial;
 
@@ -88,6 +118,8 @@ function statsOf(trades: readonly Trade[], ctx: MetricContext): DayStats {
     gross += t.gross;
     if (t.net > 0) positive += t.net;
     else if (t.net < 0) negative += t.net;
+    // Keel's call (TradeZella unknown): winners and losers follow the user's P&L basis and
+    // breakeven band (R1); the record is silent on the basis.
     const { outcome } = classify(t, ctx);
     if (outcome === 'win') wins += 1;
     else if (outcome === 'loss') losses += 1;
@@ -187,4 +219,37 @@ export function groupWeeks(
   return weeks.sort((a, b) =>
     a.start < b.start ? 1 : a.start > b.start ? -1 : 0,
   );
+}
+
+export interface WeekRows {
+  trades: Trade[];
+  otherCurrency: Trade[];
+}
+
+/**
+ * R5: the trades a week's table lists, bucketed by week start: given the trades
+ * under every filter except the date range, base currency apart from the
+ * rest, newest open first. R20: it also applies to a multi-day range, not only
+ * one day, as the record's source reads (recording/inventory-2.md:63, "the
+ * table ignoring the day filter").
+ */
+export function weekRows(
+  trades: readonly Trade[],
+  env: Pick<DayLogEnv, 'timeZone' | 'baseCurrency' | 'weekStart'>,
+): Map<string, WeekRows> {
+  const out = new Map<string, WeekRows>();
+  for (const t of trades) {
+    const start = weekFirstDay(dayOfTrade(t, env.timeZone), env.weekStart);
+    let bucket = out.get(start);
+    if (!bucket) out.set(start, (bucket = { trades: [], otherCurrency: [] }));
+    (t.pnlCurrency === env.baseCurrency
+      ? bucket.trades
+      : bucket.otherCurrency
+    ).push(t);
+  }
+  for (const b of out.values()) {
+    b.trades.sort(newestOpenFirst);
+    b.otherCurrency.sort(newestOpenFirst);
+  }
+  return out;
 }
