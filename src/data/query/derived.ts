@@ -402,29 +402,43 @@ export function useImportPlan(input: ImportInput | null): Derived<ImportPlan> {
   useEffect(() => {
     if (!planInput || !read) return;
     let live = true;
+    // Gone, or moved on to another input: the request is dropped, and its worker stopped.
+    const gone = new AbortController();
+    let askedAgain = false;
     const ask = () => {
       lastAsked.current = planInput;
-      planInWorker({
-        parsed: planInput.parsed,
-        mapping: planInput.mapping,
-        ctx: read,
-        meta: {
-          importId: identity.importId,
-          fileName: planInput.fileName,
-          now: identity.now,
+      planInWorker(
+        {
+          parsed: planInput.parsed,
+          mapping: planInput.mapping,
+          ctx: read,
+          meta: {
+            importId: identity.importId,
+            fileName: planInput.fileName,
+            now: identity.now,
+          },
         },
-      }).then(
+        gone.signal,
+      ).then(
         (plan) => {
           if (live) setMade({ identity, context: read, plan });
         },
         (error: unknown) => {
-          // A request a later one replaced is not a failure: the later one is awaited.
-          if (live && !(error instanceof StalePlanError))
-            setMade({
-              identity,
-              context: read,
-              error: error instanceof Error ? error : new Error(String(error)),
-            });
+          if (!live) return;
+          if (error instanceof StalePlanError) {
+            // Not this hook's doing (its own requests are dropped as it moves on):
+            // another consumer took the client. Ask again, once, so the plan comes.
+            if (!askedAgain) {
+              askedAgain = true;
+              ask();
+            }
+            return;
+          }
+          setMade({
+            identity,
+            context: read,
+            error: error instanceof Error ? error : new Error(String(error)),
+          });
         },
       );
     };
@@ -434,11 +448,13 @@ export function useImportPlan(input: ImportInput | null): Derived<ImportPlan> {
       return () => {
         live = false;
         clearTimeout(timer);
+        gone.abort();
       };
     }
     ask();
     return () => {
       live = false;
+      gone.abort();
     };
   }, [identity, planInput, read]);
 

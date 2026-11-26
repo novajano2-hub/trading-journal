@@ -6,6 +6,8 @@ import type { PlanInput } from '../plan-protocol';
 /** A plan that was asked for, and waits for the test to let it go or fail it. */
 export interface HeldPlan {
   input: PlanInput;
+  /** The signal the request was made with: aborted when its consumer went. */
+  signal: AbortSignal | undefined;
   resolve: () => void;
   reject: (reason: Error) => void;
 }
@@ -20,10 +22,11 @@ export interface HeldPlan {
 export function holdPlans(): HeldPlan[] {
   const held: HeldPlan[] = [];
   vi.mocked(planInWorker).mockImplementation(
-    (input) =>
+    (input, signal) =>
       new Promise((resolve, reject) => {
         held.push({
           input,
+          signal,
           resolve: () =>
             resolve(
               planImport(input.parsed, input.mapping, input.ctx, input.meta),

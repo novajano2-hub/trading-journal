@@ -229,6 +229,66 @@ describe('planInWorker', () => {
     await expect(b).resolves.toStrictEqual(main(second));
   });
 
+  describe('cancelling a request', () => {
+    const one = () => input(H + '2026-11-16 09:41:00,ESZ5,Buy,1,6010\n');
+    const two = () =>
+      input(H + '2026-11-16 09:41:00,ESZ5,Buy,2,6010\n', ctx(), 'second');
+
+    test('the request the worker is on is dropped and the worker ended, so a page that left stops it at once', async () => {
+      const { plan, workers } = harness(true);
+      const controller = new AbortController();
+      const a = plan(one(), controller.signal).catch((e: unknown) => e);
+      expect(workers[0]!.posted).toHaveLength(1);
+      controller.abort();
+      expect(await a).toBe(controller.signal.reason);
+      expect(workers[0]!.terminated).toBe(true);
+      // A late answer to it has no one to go to, and the next request has a worker of its own.
+      const b = plan(two());
+      expect(workers).toHaveLength(2);
+      workers[1]!.release(workers[1]!.posted[0]!.id);
+      await expect(b).resolves.toStrictEqual(main(two()));
+    });
+
+    test('a request on the main thread is dropped before it is planned', async () => {
+      const plan = withWorker(null);
+      const controller = new AbortController();
+      const a = plan(one(), controller.signal).catch((e: unknown) => e);
+      controller.abort();
+      expect(await a).toBe(controller.signal.reason);
+      // The client is not left stuck: the next request is planned.
+      await expect(plan(two())).resolves.toStrictEqual(main(two()));
+    });
+
+    test('a request already cancelled is refused without waking a worker', async () => {
+      const { plan, workers } = harness();
+      const controller = new AbortController();
+      controller.abort();
+      await expect(plan(one(), controller.signal)).rejects.toBe(
+        controller.signal.reason,
+      );
+      expect(workers).toHaveLength(0);
+    });
+
+    test('cancelling a request that was replaced, or that has its plan, touches nothing else', async () => {
+      const { plan, workers } = harness(true);
+      const first = new AbortController();
+      const a = plan(one(), first.signal).catch((e: unknown) => e);
+      const b = plan(two());
+      expect(await a).toBeInstanceOf(StalePlanError);
+      // The earlier one is gone already: the worker the later one is on stays.
+      first.abort();
+      expect(workers[1]!.terminated).toBe(false);
+      workers[1]!.release(workers[1]!.posted[0]!.id);
+      await expect(b).resolves.toStrictEqual(main(two()));
+
+      const done = new AbortController();
+      const { plan: again, workers: others } = harness();
+      await again(one(), done.signal);
+      done.abort();
+      expect(others[0]!.terminated).toBe(false);
+    });
+  });
+
   test('a worker with nothing in flight is kept for the next request', async () => {
     const { plan, workers } = harness();
     await plan(input(H + '2026-11-16 09:41:00,ESZ5,Buy,1,6010\n'));

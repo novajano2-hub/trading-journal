@@ -437,14 +437,65 @@ test("useImportPlan: a plan that fails is the import's error; a plan that went s
     { wrapper: Wrapper, initialProps: { i: a } },
   );
   await waitFor(() => expect(calls).toHaveLength(1));
-  act(() => calls[0]!.reject(new StalePlanError()));
-  expect(result.current.status).toBe('pending');
+  // The input moves on; a's request is replaced, and its late "stale" is no one's failure.
   rerender({ i: b });
   await waitFor(() => expect(calls).toHaveLength(2));
+  act(() => calls[0]!.reject(new StalePlanError()));
+  expect(result.current.status).toBe('pending');
+  expect(calls).toHaveLength(2);
   act(() => calls[1]!.reject(new Error('the plan failed')));
   await waitFor(() => expect(result.current.status).toBe('error'));
   expect(result.current.error?.message).toBe('the plan failed');
   expect(result.current.data).toBeUndefined();
+});
+
+test('useImportPlan: a request another consumer superseded is asked again while the hook is live, so it is not pending for good', async () => {
+  const { repository, Wrapper } = setup();
+  const a = await importFixture(repository, 'a', TWO_FILLS);
+  const calls = holdPlans();
+  const { result } = renderHook(() => useImportPlan(a), { wrapper: Wrapper });
+  await waitFor(() => expect(calls).toHaveLength(1));
+  // Another consumer's request replaced it: no failure, and the plan is asked for again.
+  act(() => calls[0]!.reject(new StalePlanError()));
+  await waitFor(() => expect(calls).toHaveLength(2));
+  expect(result.current.status).toBe('pending');
+  expect(calls[1]!.input.meta).toEqual(calls[0]!.input.meta);
+  act(() => calls[1]!.resolve());
+  await waitFor(() => expect(result.current.status).toBe('success'));
+  expect(result.current.data!.fileName).toBe('a.csv');
+});
+
+test('useImportPlan: it asks again once when superseded, not for as long as another consumer keeps taking turns', async () => {
+  const { repository, Wrapper } = setup();
+  const a = await importFixture(repository, 'a', TWO_FILLS);
+  const calls = holdPlans();
+  const { result } = renderHook(() => useImportPlan(a), { wrapper: Wrapper });
+  await waitFor(() => expect(calls).toHaveLength(1));
+  act(() => calls[0]!.reject(new StalePlanError()));
+  await waitFor(() => expect(calls).toHaveLength(2));
+  act(() => calls[1]!.reject(new StalePlanError()));
+  await new Promise((r) => setTimeout(r, 30));
+  expect(calls).toHaveLength(2);
+  expect(result.current.status).toBe('pending');
+});
+
+test('useImportPlan: the request is cancelled when the hook goes or its input moves on', async () => {
+  const { repository, Wrapper } = setup();
+  const a = await importFixture(repository, 'a', TWO_FILLS);
+  const b = await importFixture(repository, 'b', TWO_FILLS);
+  const calls = holdPlans();
+  const { rerender, unmount } = renderHook(
+    ({ i }: { i: ImportInput }) => useImportPlan(i),
+    { wrapper: Wrapper, initialProps: { i: a } },
+  );
+  await waitFor(() => expect(calls).toHaveLength(1));
+  expect(calls[0]!.signal!.aborted).toBe(false);
+  rerender({ i: b });
+  await waitFor(() => expect(calls).toHaveLength(2));
+  expect(calls[0]!.signal!.aborted).toBe(true);
+  expect(calls[1]!.signal!.aborted).toBe(false);
+  unmount();
+  expect(calls[1]!.signal!.aborted).toBe(true);
 });
 
 test('useImportPlan: a point value edited again and again is planned once, 150 ms after the last edit', async () => {
