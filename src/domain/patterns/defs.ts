@@ -174,7 +174,7 @@ export const THRESHOLDS = {
   outweighedWinRate: 0.5,
   /** D1: ...and an average loss at least this many times the average win. */
   outweighedRatio: 2,
-  /** D3, D4: this many changes of side on a red or a green day. */
+  /** D3, D4: this many changes of side within one symbol (the symbol with the most) on a red or a green day. */
   flipChanges: 3,
   /** D5: one winning trade with a realized R of at least this. */
   strongR: 3,

@@ -1,4 +1,5 @@
 import { makeTrade } from '@/domain/__fixtures__/trades';
+import { resolveInstrument } from '@/domain/instruments';
 import type { Cents, Execution, Trade } from '@/domain/types';
 import type { PatternEnv, PatternHit, PatternId } from '../defs';
 import { computePatterns } from '../index';
@@ -35,6 +36,8 @@ export interface Spec {
   /** The size: `maxPosition`, and the entry fills' total when fills are asked for. */
   volume?: number;
   direction?: 'long' | 'short';
+  /** The instrument's symbol; omitted: ESZ5. */
+  symbol?: string;
   /** Entry fills to build; with `exits`, the trade carries fills. */
   entries?: number;
   /** Exit fills to build. */
@@ -81,6 +84,7 @@ export function mk(s: Spec): Trade {
     status: closed ? 'closed' : 'open',
     openedAt: iso(s.open),
     ...(closed ? { closedAt: iso(s.open + (s.hold ?? 5 * MIN)) } : {}),
+    ...(s.symbol ? { instrument: resolveInstrument(s.symbol)! } : {}),
     maxPosition: s.volume ?? 1,
     ...(s.risk !== undefined ? { initialRisk: s.risk } : {}),
     ...s.extra,

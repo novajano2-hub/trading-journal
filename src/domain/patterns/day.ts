@@ -58,12 +58,34 @@ const dayIndex = (date: string): number => {
   return Date.UTC(y, m - 1, d) / DAY_MS;
 };
 
-/** Side changes through the day's trades in entry order. */
-function sideChanges(facts: readonly Fact[]): number {
-  let n = 0;
-  for (let i = 1; i < facts.length; i++)
-    if (facts[i]!.trade.direction !== facts[i - 1]!.trade.direction) n += 1;
-  return n;
+/**
+ * The most changes of side in one symbol: each symbol's trades, in entry
+ * order, change side when a trade's direction differs from the symbol's
+ * trade before it. Other symbols traded in between do not break a run, and
+ * changes in different symbols do not add up. `trades` is that symbol's count.
+ */
+function sideChanges(facts: readonly Fact[]): {
+  changes: number;
+  trades: number;
+} {
+  const bySymbol = new Map<
+    string,
+    { last: string; changes: number; trades: number }
+  >();
+  for (const f of facts) {
+    const symbol = f.trade.instrument.symbol;
+    const s = bySymbol.get(symbol);
+    if (!s) {
+      bySymbol.set(symbol, { last: f.trade.direction, changes: 0, trades: 1 });
+      continue;
+    }
+    if (f.trade.direction !== s.last) s.changes += 1;
+    s.last = f.trade.direction;
+    s.trades += 1;
+  }
+  let best = { changes: 0, trades: 0 };
+  for (const s of bySymbol.values()) if (s.changes > best.changes) best = s;
+  return { changes: best.changes, trades: best.trades };
 }
 
 const absValue = (x: Fact) => Math.abs(x.value);
@@ -89,17 +111,17 @@ const CHECKS: readonly (readonly [PatternId, Check])[] = [
   [
     'switched-sides-red',
     (d) => {
-      const changes = sideChanges(d.facts);
+      const { changes, trades } = sideChanges(d.facts);
       if (d.outcome !== 'loss' || changes < T.flipChanges) return;
-      return { changes, trades: d.facts.length, net: d.net };
+      return { changes, trades, net: d.net };
     },
   ],
   [
     'switched-sides-green',
     (d) => {
-      const changes = sideChanges(d.facts);
+      const { changes, trades } = sideChanges(d.facts);
       if (d.outcome !== 'win' || changes < T.flipChanges) return;
-      return { changes, trades: d.facts.length, net: d.net };
+      return { changes, trades, net: d.net };
     },
   ],
   [

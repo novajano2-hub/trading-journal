@@ -57,6 +57,13 @@ describe('losses-outweighed', () => {
   });
 });
 
+/** One trade per `symbol:side` item, each losing or winning `net`, in the order given. */
+const flips = (net: number, ...items: string[]) =>
+  items.map((item) => {
+    const [symbol, side] = item.split(':') as [string, 'long' | 'short'];
+    return { symbol, direction: side, net };
+  });
+
 describe('switched-sides-red', () => {
   const sides = (...d: ('long' | 'short')[]) =>
     d.map((direction) => ({ direction, net: -100 }));
@@ -74,6 +81,97 @@ describe('switched-sides-red', () => {
   test('two changes are not enough', () => {
     const r = run(onDay(D, sides('long', 'short', 'long')));
     expect(dayHit(r, D, 'switched-sides-red')).toBeUndefined();
+  });
+
+  test('counts the changes within one symbol, whatever else is traded between them', () => {
+    // ES flips three times with other symbols' trades in between.
+    const r = run(
+      onDay(
+        D,
+        flips(
+          -100,
+          'ESZ5:long',
+          'NQZ5:long',
+          'ESZ5:short',
+          'NQZ5:short',
+          'ESZ5:long',
+          'CLZ5:long',
+          'ESZ5:short',
+        ),
+      ),
+    );
+    expect(dayHit(r, D, 'switched-sides-red')).toMatchObject({
+      figures: { changes: 3, trades: 4, net: -700 },
+    });
+  });
+
+  test('says how many trades the symbol had, those after its last change included', () => {
+    const r = run(
+      onDay(
+        D,
+        flips(
+          -100,
+          'ESZ5:long',
+          'ESZ5:short',
+          'ESZ5:long',
+          'ESZ5:short',
+          'ESZ5:short',
+          'NQZ5:long',
+        ),
+      ),
+    );
+    expect(dayHit(r, D, 'switched-sides-red')).toMatchObject({
+      figures: { changes: 3, trades: 5 },
+    });
+  });
+
+  test('the same flips spread over three symbols are not a switch', () => {
+    // Long, short, long, short is three changes across the day, but no symbol changes twice.
+    const r = run(
+      onDay(
+        D,
+        flips(-100, 'ESZ5:long', 'NQZ5:short', 'CLZ5:long', 'ESZ5:short'),
+      ),
+    );
+    expect(dayHit(r, D, 'switched-sides-red')).toBeUndefined();
+  });
+
+  test('two symbols each flipping twice are not a switch: the symbol with the most counts', () => {
+    const r = run(
+      onDay(
+        D,
+        flips(
+          -100,
+          'ESZ5:long',
+          'NQZ5:short',
+          'ESZ5:short',
+          'NQZ5:long',
+          'ESZ5:long',
+          'NQZ5:short',
+        ),
+      ),
+    );
+    expect(dayHit(r, D, 'switched-sides-red')).toBeUndefined();
+  });
+
+  test('one symbol with three changes and another with one is a switch of three', () => {
+    const r = run(
+      onDay(
+        D,
+        flips(
+          -100,
+          'ESZ5:long',
+          'NQZ5:long',
+          'ESZ5:short',
+          'NQZ5:short',
+          'ESZ5:long',
+          'ESZ5:short',
+        ),
+      ),
+    );
+    expect(dayHit(r, D, 'switched-sides-red')).toMatchObject({
+      figures: { changes: 3, trades: 4 },
+    });
   });
 
   test('trades in a row on one side are not changes', () => {
@@ -117,6 +215,55 @@ describe('switched-sides-green', () => {
 
   test('two changes are not enough', () => {
     const r = run(onDay(D, sides('short', 'long', 'short')));
+    expect(dayHit(r, D, 'switched-sides-green')).toBeUndefined();
+  });
+
+  test('counts the changes within one symbol, whatever else is traded between them', () => {
+    const r = run(
+      onDay(
+        D,
+        flips(
+          100,
+          'NQZ5:short',
+          'ESZ5:long',
+          'NQZ5:long',
+          'ESZ5:short',
+          'NQZ5:short',
+          'NQZ5:long',
+        ),
+      ),
+    );
+    expect(dayHit(r, D, 'switched-sides-green')).toMatchObject({
+      figures: { changes: 3, trades: 4, net: 600 },
+    });
+    expect(dayHit(r, D, 'switched-sides-red')).toBeUndefined();
+  });
+
+  test('the same flips spread over three symbols are not a switch', () => {
+    const r = run(
+      onDay(
+        D,
+        flips(100, 'ESZ5:short', 'NQZ5:long', 'CLZ5:short', 'ESZ5:long'),
+      ),
+    );
+    expect(dayHit(r, D, 'switched-sides-green')).toBeUndefined();
+  });
+
+  test('two symbols each flipping twice are not a switch', () => {
+    const r = run(
+      onDay(
+        D,
+        flips(
+          100,
+          'ESZ5:long',
+          'NQZ5:short',
+          'ESZ5:short',
+          'NQZ5:long',
+          'ESZ5:long',
+          'NQZ5:short',
+        ),
+      ),
+    );
     expect(dayHit(r, D, 'switched-sides-green')).toBeUndefined();
   });
 
