@@ -68,6 +68,8 @@ test('Plan 5 writes invalidate what they change', () => {
         'challenges',
         'history',
         'filesAll',
+        'targetRules',
+        'feeRules',
       ),
     ],
     // Merging moves files and unlinks notes; a day's figures read the trades.
@@ -103,6 +105,16 @@ test('Plan 5 writes invalidate what they change', () => {
     ['dayShots.remove', k('dayShotsAll')],
     ['files.add', k('filesAll')],
     ['files.remove', k('filesAll')],
+    // The default rules: a rule's own write touches its list and the history;
+    // applying one rewrites trades, so it also makes the import context stale.
+    ['targetRules.save', k('targetRules', 'history')],
+    ['targetRules.remove', k('targetRules', 'history')],
+    ['feeRules.save', k('feeRules', 'history')],
+    ['feeRules.remove', k('feeRules', 'history')],
+    [
+      'rules.apply',
+      k('targetRules', 'feeRules', 'trades', 'imports', 'history'),
+    ],
   ];
   for (const [write, expected] of table)
     expect(invalidationsFor(write, ws), write).toEqual(expected);
@@ -164,6 +176,11 @@ test('every write of a logged record makes the edit history stale', () => {
     'tagCategories.remove',
     'imports.commit',
     'imports.undo',
+    'targetRules.save',
+    'targetRules.remove',
+    'feeRules.save',
+    'feeRules.remove',
+    'rules.apply',
   ] as const)
     expect(invalidationsFor(write, 'mine'), write).toContainEqual(
       keys.history('mine'),
@@ -178,6 +195,11 @@ test('every write of a logged record makes the edit history stale', () => {
     expect(invalidationsFor(write, 'mine'), write).not.toContainEqual(
       keys.history('mine'),
     );
+});
+
+test('the rule lists are per workspace and per kind', () => {
+  expect(keys.targetRules('mine')).not.toEqual(keys.feeRules('mine'));
+  expect(keys.targetRules('mine')).not.toEqual(keys.targetRules('sample'));
 });
 
 test('a day key covers a date, and the shots of one date sit under all shots', () => {
@@ -216,6 +238,7 @@ test('every write that changes what an import context holds makes it stale', () 
     'trades.split',
     'trades.move',
     'journal.ensureTradeNote',
+    'rules.apply',
   ] as const)
     expect(invalidationsFor(write, 'mine'), write).toContainEqual(
       keys.imports('mine'),

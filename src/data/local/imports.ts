@@ -26,6 +26,7 @@ import {
 import { META, type ImportJobRecord } from './schema';
 import { pruneJournalLinks } from './journal';
 import { readPrefs } from './prefs';
+import { withDefaultRules } from './rule-shared';
 import { rwTx } from './tx';
 
 /** The job as the history shows it, without what dedupe and undo work from. */
@@ -409,10 +410,12 @@ export function localImports(ctx: LocalContext): ImportRepo {
           db.meta,
           db.files,
           db.history,
+          db.targetRules,
+          db.feeRules,
         ],
         async () => {
-          if (!(await db.accounts.get([ws, plan.accountId])))
-            throw new StalePlanError('account-removed');
+          const account = await db.accounts.get([ws, plan.accountId]);
+          if (!account) throw new StalePlanError('account-removed');
           // A commit or undo since then moved the open trades, fingerprints
           // and serials the plan was made from.
           if ((await importRevision(db, ws)) !== plan.importRevision)
@@ -436,10 +439,17 @@ export function localImports(ctx: LocalContext): ImportRepo {
               .map((t) => t.id)
               .filter((id) => !written.has(id)),
           );
-          // The plan carries journaling read with its context.
-          await db.trades.bulkPut(
-            await withLiveReferences(db, ws, plan.trades),
+          // The account's default rules give each new trade its levels and
+          // costs (B15 to B18); a trade the import carries on keeps its own.
+          const ruled = await withDefaultRules(
+            db,
+            ws,
+            account,
+            plan.trades,
+            new Set(plan.replacedTrades.map((t) => t.id)),
           );
+          // The plan carries journaling read with its context.
+          await db.trades.bulkPut(await withLiveReferences(db, ws, ruled));
           await db.imports.put({
             ...job,
             fingerprints: plan.fingerprints,

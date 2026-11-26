@@ -6,6 +6,7 @@ import { localCashFlows } from './cashflows';
 import { localChallenges } from './challenges';
 import { localDays } from './days';
 import { localDayShots } from './day-shots';
+import { localFeeRules } from './fee-rules';
 import { localFiles } from './files';
 import { localFolders } from './folders';
 import { localHistory } from './history';
@@ -15,6 +16,7 @@ import { localOnboarding } from './onboarding';
 import { localPrefs } from './prefs';
 import { localStrategies } from './strategies';
 import { localTagCategories } from './tag-categories';
+import { localTargetRules } from './target-rules';
 import { localTags } from './tags';
 import { localTemplates } from './templates';
 import { localTracker } from './tracker';
@@ -57,6 +59,8 @@ export function createLocalRepository(
     dayShots: localDayShots(ctx),
     files: localFiles(ctx),
     history: localHistory(ctx),
+    targetRules: localTargetRules(ctx),
+    feeRules: localFeeRules(ctx),
     onboarding: localOnboarding(ctx),
   };
 }

@@ -18,7 +18,9 @@ import {
   useCreateAccount,
   useCreateTagCategory,
   useDailyNote,
+  useApplyRule,
   useEnsureTradeNote,
+  useFeeRules,
   useFile,
   useFiles,
   useHistory,
@@ -27,12 +29,17 @@ import {
   useMoveAccountTrades,
   useMoveTrades,
   useRemoveAccount,
+  useRemoveFeeRule,
   useRemoveFile,
   useRemoveTagCategory,
+  useRemoveTargetRule,
+  useSaveFeeRule,
+  useSaveTargetRule,
   useSetActiveWorkspace,
   useSplitTrade,
   useTagCategories,
   useTags,
+  useTargetRules,
   useTemplates,
   useTrade,
   useTrades,
@@ -551,4 +558,137 @@ test('a remove that lands but whose cache refresh fails still resolves: it was d
   expect(
     (await repository.accounts.list('sample')).map((a) => a.id),
   ).not.toContain(made.id);
+});
+
+test('rule writes refresh the rule lists, the trades and the history', async () => {
+  // f-1 and f-2 are ES trades in the active account; give them fills to cost.
+  const sample = () => {
+    const s = fixtureSample();
+    s.trades.find((t) => t.id === 'f-1')!.executions = [
+      fillOf('e1', 'buy', 6000, '2026-11-16T14:45:00.000Z'),
+      fillOf('e2', 'sell', 6005, '2026-11-16T15:10:00.000Z'),
+    ];
+    s.trades.find((t) => t.id === 'f-2')!.executions = [
+      fillOf('e3', 'sell', 6010, '2026-11-17T15:00:00.000Z'),
+      fillOf('e4', 'buy', 6012.5, '2026-11-17T15:30:00.000Z'),
+    ];
+    return s;
+  };
+  const { result } = renderHook(
+    () => ({
+      trades: useTrades(),
+      history: useHistory(),
+      targets: useTargetRules(),
+      fees: useFeeRules(),
+      saveTarget: useSaveTargetRule(),
+      saveFee: useSaveFeeRule(),
+      removeTarget: useRemoveTargetRule(),
+      removeFee: useRemoveFeeRule(),
+      apply: useApplyRule(),
+    }),
+    { wrapper: wrapper(sample) },
+  );
+  await waitFor(() => expect(result.current.targets.data).toEqual([]));
+  await waitFor(() => expect(result.current.fees.data).toEqual([]));
+  await waitFor(() => expect(result.current.history.data).toEqual([]));
+
+  // Saving a rule shows in its list and in the history.
+  let targetId = '';
+  await act(async () => {
+    targetId = (
+      await result.current.saveTarget.mutateAsync({
+        rule: {
+          accountId: 'acc-a',
+          assetClass: 'future',
+          symbols: [],
+          target: { unit: 'movement', levels: [{ value: 10, pct: 100 }] },
+          stop: { unit: 'movement', levels: [{ value: 5, pct: 100 }] },
+        },
+      })
+    ).id;
+  });
+  await waitFor(() => expect(result.current.targets.data).toHaveLength(1));
+  await waitFor(() => expect(result.current.history.data).toHaveLength(1));
+  let feeId = '';
+  await act(async () => {
+    feeId = (
+      await result.current.saveFee.mutateAsync({
+        rule: {
+          accountId: 'acc-a',
+          assetClass: 'future',
+          symbols: [],
+          mode: 'per-execution',
+          applyOn: 'all',
+          commission: 150,
+          fee: 20,
+        },
+      })
+    ).id;
+  });
+  await waitFor(() => expect(result.current.fees.data).toHaveLength(1));
+
+  // Applying a rule rewrites the trades and logs each one.
+  await act(async () => {
+    expect(
+      await result.current.apply.mutateAsync({
+        kind: 'target',
+        id: targetId,
+        override: false,
+      }),
+    ).toBe(2);
+  });
+  await waitFor(() =>
+    expect(
+      result.current.trades.data!.find((t) => t.id === 'f-1')!.stops,
+    ).toBeDefined(),
+  );
+  // The fixture trade carries fees its fills do not; the rule adds its own on top.
+  const was = result.current.trades.data!.find((t) => t.id === 'f-1')!.fees;
+  await act(async () => {
+    expect(
+      await result.current.apply.mutateAsync({
+        kind: 'fee',
+        id: feeId,
+        override: false,
+      }),
+    ).toBe(2);
+  });
+  await waitFor(() =>
+    expect(result.current.trades.data!.find((t) => t.id === 'f-1')!.fees).toBe(
+      was + 340,
+    ),
+  );
+  const rows = () =>
+    (result.current.history.data ?? []).filter((r) => r.source === 'rule');
+  // Two trades, targets and stops for each, then fees for each.
+  await waitFor(() => expect(rows()).toHaveLength(6));
+
+  // An edit (a save with the id) and a removal show in the lists, and leave the trades.
+  await act(async () => {
+    await result.current.saveTarget.mutateAsync({
+      id: targetId,
+      rule: {
+        accountId: 'acc-a',
+        assetClass: 'future',
+        symbols: ['ES'],
+        target: { unit: 'movement', levels: [{ value: 10, pct: 100 }] },
+      },
+    });
+  });
+  await waitFor(() =>
+    expect(result.current.targets.data![0]).toMatchObject({
+      symbols: ['ES'],
+    }),
+  );
+  // A save without a stop clears it from the rule.
+  expect(result.current.targets.data![0]).not.toHaveProperty('stop');
+  await act(async () => {
+    await result.current.removeTarget.mutateAsync(targetId);
+    await result.current.removeFee.mutateAsync(feeId);
+  });
+  await waitFor(() => expect(result.current.targets.data).toEqual([]));
+  await waitFor(() => expect(result.current.fees.data).toEqual([]));
+  expect(result.current.trades.data!.find((t) => t.id === 'f-1')!.fees).toBe(
+    was + 340,
+  );
 });

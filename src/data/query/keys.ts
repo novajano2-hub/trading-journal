@@ -35,6 +35,8 @@ export const keys = {
     [...W(ws), 'files', 'owner', owner] as const,
   file: (ws: string, id: string) => [...W(ws), 'files', 'id', id] as const,
   history: (ws: string) => [...W(ws), 'history'] as const,
+  targetRules: (ws: string) => [...W(ws), 'target-rules'] as const,
+  feeRules: (ws: string) => [...W(ws), 'fee-rules'] as const,
   imports: (ws: string) => [...W(ws), 'imports'] as const,
   importContext: (ws: string, accountId: string) =>
     [...W(ws), 'imports', 'context', accountId] as const,
@@ -94,7 +96,12 @@ export type WriteKind =
   | 'files.add'
   | 'files.remove'
   | 'imports.commit'
-  | 'imports.undo';
+  | 'imports.undo'
+  | 'targetRules.save'
+  | 'targetRules.remove'
+  | 'feeRules.save'
+  | 'feeRules.remove'
+  | 'rules.apply';
 
 /** The query keys a successful write makes stale, in workspace `ws`. */
 export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
@@ -177,6 +184,8 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
         keys.challenges(ws),
         keys.history(ws),
         keys.filesAll(ws),
+        keys.targetRules(ws),
+        keys.feeRules(ws),
       ];
     case 'challenges.create':
     case 'challenges.update':
@@ -256,5 +265,22 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
       return [keys.filesAll(ws)];
     case 'imports.commit':
       return [keys.imports(ws), keys.trades(ws), keys.history(ws)];
+    // A rule's own write changes its list and leaves a row; what it has
+    // already written on trades stays (B57).
+    case 'targetRules.save':
+    case 'targetRules.remove':
+      return [keys.targetRules(ws), keys.history(ws)];
+    case 'feeRules.save':
+    case 'feeRules.remove':
+      return [keys.feeRules(ws), keys.history(ws)];
+    // Applying a rule rewrites open trades the next import plan carries.
+    case 'rules.apply':
+      return [
+        keys.targetRules(ws),
+        keys.feeRules(ws),
+        keys.trades(ws),
+        keys.imports(ws),
+        keys.history(ws),
+      ];
   }
 }

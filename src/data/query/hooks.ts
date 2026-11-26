@@ -15,6 +15,7 @@ import type {
   Challenge,
   DayRecord,
   DayShot,
+  FeeRule,
   FrozenDay,
   HistoryRow,
   ImportJob,
@@ -25,6 +26,7 @@ import type {
   Strategy,
   Tag,
   TagCategory,
+  TargetRule,
   Tracker,
   TrackerVersion,
   Trade,
@@ -39,7 +41,9 @@ import type {
   NewAccount,
   NewCashFlow,
   NewChallenge,
+  NewFeeRule,
   NewFile,
+  NewTargetRule,
   ChallengePatch,
   FirstRunInput,
   NewStrategy,
@@ -207,6 +211,16 @@ export function useFile(
 /** The last 30 days of edits in the active workspace, newest first. */
 export function useHistory(): UseQueryResult<HistoryRow[]> {
   return useWorkspaceQuery(keys.history, (r, ws) => r.history.list(ws));
+}
+
+/** The default target and stop rules of the active workspace, newest first. */
+export function useTargetRules(): UseQueryResult<TargetRule[]> {
+  return useWorkspaceQuery(keys.targetRules, (r, ws) => r.targetRules.list(ws));
+}
+
+/** The default commission and fee rules of the active workspace, newest first. */
+export function useFeeRules(): UseQueryResult<FeeRule[]> {
+  return useWorkspaceQuery(keys.feeRules, (r, ws) => r.feeRules.list(ws));
 }
 
 export function useTrades(): UseQueryResult<Trade[]> {
@@ -1011,6 +1025,71 @@ export function useRemoveFile(): UseMutationResult<
 > {
   return useWorkspaceWrite('files.remove', (r, ws, v: { id: string }) =>
     r.files.remove(ws, v.id),
+  );
+}
+
+/**
+ * Creates a target and stop rule, or, with `id`, edits it to be `rule`: a side
+ * `rule` leaves out is cleared. Resolves to the rule as stored.
+ */
+export function useSaveTargetRule(): UseMutationResult<
+  TargetRule,
+  Error,
+  { id?: string; rule: NewTargetRule }
+> {
+  return useWorkspaceWrite(
+    'targetRules.save',
+    (r, ws, v: { id?: string; rule: NewTargetRule }) =>
+      v.id === undefined
+        ? r.targetRules.create(ws, v.rule)
+        : r.targetRules.update(ws, v.id, {
+            target: undefined,
+            stop: undefined,
+            ...v.rule,
+          }),
+  );
+}
+
+/** Creates a commission and fee rule, or, with `id`, edits it to be `rule`. Resolves to the rule as stored. */
+export function useSaveFeeRule(): UseMutationResult<
+  FeeRule,
+  Error,
+  { id?: string; rule: NewFeeRule }
+> {
+  return useWorkspaceWrite(
+    'feeRules.save',
+    (r, ws, v: { id?: string; rule: NewFeeRule }) =>
+      v.id === undefined
+        ? r.feeRules.create(ws, v.rule)
+        : r.feeRules.update(ws, v.id, v.rule),
+  );
+}
+
+/** What the rule has already written on trades stays (B57). */
+export function useRemoveTargetRule(): UseMutationResult<void, Error, string> {
+  return useWorkspaceWrite('targetRules.remove', (r, ws, id: string) =>
+    r.targetRules.remove(ws, id),
+  );
+}
+
+export function useRemoveFeeRule(): UseMutationResult<void, Error, string> {
+  return useWorkspaceWrite('feeRules.remove', (r, ws, id: string) =>
+    r.feeRules.remove(ws, id),
+  );
+}
+
+/** Apply to existing trades, for either kind of rule; resolves to how many trades changed. */
+export function useApplyRule(): UseMutationResult<
+  number,
+  Error,
+  { kind: 'target' | 'fee'; id: string; override: boolean }
+> {
+  return useWorkspaceWrite(
+    'rules.apply',
+    (r, ws, v: { kind: 'target' | 'fee'; id: string; override: boolean }) =>
+      v.kind === 'target'
+        ? r.targetRules.applyExisting(ws, v.id, v.override)
+        : r.feeRules.applyExisting(ws, v.id, v.override),
   );
 }
 

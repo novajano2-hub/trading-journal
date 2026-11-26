@@ -102,6 +102,8 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
           db.challenges,
           db.files,
           db.history,
+          db.targetRules,
+          db.feeRules,
         ],
         async () => {
           const account = await db.accounts.get([ws, id]);
@@ -111,6 +113,17 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
             .equals([ws, id])
             .count();
           if (trades > 0) throw new Error('account has trades');
+          // Its default rules go with it, as its cash flows do.
+          await db.targetRules
+            .where('workspaceId')
+            .equals(ws)
+            .filter((r) => r.accountId === id)
+            .delete();
+          await db.feeRules
+            .where('workspaceId')
+            .equals(ws)
+            .filter((r) => r.accountId === id)
+            .delete();
           await deleteDroppedFiles(db, ws, id);
           // Undone imports keep their history rows; they go with the account.
           await db.imports
@@ -136,7 +149,7 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
             })),
           );
           await db.accounts.delete([ws, id]);
-          // Its cash flows and import jobs go with it, under this one row.
+          // Its cash flows, import jobs and default rules go with it, under this one row.
           await logHistory(
             db,
             ws,

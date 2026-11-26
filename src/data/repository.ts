@@ -12,6 +12,7 @@ import type {
   Challenge,
   DayRecord,
   DayShot,
+  FeeRule,
   FrozenDay,
   HistoryRow,
   ImportJob,
@@ -27,6 +28,7 @@ import type {
   SurveyAnswers,
   Tag,
   TagCategory,
+  TargetRule,
   Tracker,
   TrackerVersion,
   Trade,
@@ -599,6 +601,72 @@ export interface HistoryRepo {
   list(ws: string): Promise<HistoryRow[]>;
 }
 
+/**
+ * The default target and stop rules (spec §5.3, B15 to B19, B57). A rule is
+ * for one account and one kind of instrument, with symbols or without (every
+ * symbol). New imports get the picked rule for each new trade; Apply to
+ * existing trades does it on demand. Creating, editing and deleting a rule
+ * leaves what it has already written on trades (B57), and each logs a row.
+ */
+export type NewTargetRule = Omit<
+  TargetRule,
+  'id' | 'workspaceId' | 'createdAt'
+>;
+/** A key set to undefined is left unchanged, except `target` and `stop`, which it clears. */
+export type TargetRulePatch = Partial<NewTargetRule>;
+export interface TargetRulesRepo {
+  /** Newest first. */
+  list(ws: string): Promise<TargetRule[]>;
+  /**
+   * Symbols are trimmed, upper-cased and listed once. Throws NotFoundError
+   * for an unknown account and RangeError for a rule that has neither a
+   * target nor a stop, a level that is not a number or takes a share of the
+   * position outside 0 to 100, or a unit the instrument does not have.
+   */
+  create(ws: string, input: NewTargetRule): Promise<TargetRule>;
+  /** As `create` for what the rule is then; it keeps its id and its creation time. Throws NotFoundError for an unknown rule or account. */
+  update(ws: string, id: string, patch: TargetRulePatch): Promise<TargetRule>;
+  /** What the rule has already written stays. Throws NotFoundError for an unknown rule. */
+  remove(ws: string, id: string): Promise<void>;
+  /**
+   * Writes the rule's levels on every trade of its account it matches, manual
+   * trades included (B16), in one transaction. Without `override` only a trade
+   * with neither a target nor a stop is filled; with it each side the rule
+   * gives replaces that side. Levels go through `applyTradePatch`, so the risk
+   * follows the stop. Each trade it changes gets one `edited` row with source
+   * `rule` per changed side. Returns how many trades changed. Throws
+   * NotFoundError for an unknown rule or account and ArchivedAccountError,
+   * writing nothing, for an archived account.
+   */
+  applyExisting(ws: string, id: string, override: boolean): Promise<number>;
+}
+
+/** The default commission and fee rules; see `TargetRulesRepo` for what they share. */
+export type NewFeeRule = Omit<FeeRule, 'id' | 'workspaceId' | 'createdAt'>;
+export type FeeRulePatch = Partial<NewFeeRule>;
+export interface FeeRulesRepo {
+  /** Newest first. */
+  list(ws: string): Promise<FeeRule[]>;
+  /**
+   * Throws NotFoundError for an unknown account and RangeError for a mode or
+   * an apply-on that is not one of the three, or a commission or fee that is
+   * not whole, non-negative cents.
+   */
+  create(ws: string, input: NewFeeRule): Promise<FeeRule>;
+  update(ws: string, id: string, patch: FeeRulePatch): Promise<FeeRule>;
+  /** Fees already applied stay. Throws NotFoundError for an unknown rule. */
+  remove(ws: string, id: string): Promise<void>;
+  /**
+   * Writes the rule's commission and fee on the executions of every matching
+   * trade of its account in the account's currency, in one transaction.
+   * Without `override` a trade with any costed fill is skipped; with it every
+   * fill the rule covers is replaced. The trade's fees and net follow. Each
+   * trade it changes gets one `edited` row, field `fees`, source `rule`.
+   * Returns how many trades changed; refusals as `TargetRulesRepo.applyExisting`.
+   */
+  applyExisting(ws: string, id: string, override: boolean): Promise<number>;
+}
+
 export interface FirstRunInput {
   firstName: string;
   lastName: string;
@@ -633,6 +701,8 @@ export interface Repository {
   dayShots: DayShotsRepo;
   files: FilesRepo;
   history: HistoryRepo;
+  targetRules: TargetRulesRepo;
+  feeRules: FeeRulesRepo;
   imports: ImportRepo;
   onboarding: OnboardingRepo;
 }
