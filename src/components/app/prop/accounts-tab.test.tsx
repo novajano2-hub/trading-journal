@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import {
+  act,
   cleanup,
   fireEvent,
   screen,
@@ -15,7 +16,7 @@ import type { Repository } from '@/data/repository';
 import { SAMPLE_WORKSPACE } from '@/data/workspaces';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import { challengeType, passRates } from '@/domain/prop/finance';
-import type { Account, Challenge, PropRuleSet } from '@/domain/types';
+import type { Account, Challenge, PropRuleSet, Trade } from '@/domain/types';
 import { renderApp } from '../__fixtures__/render-app';
 import { viewport } from '../__fixtures__/viewport';
 import { AccountsTab } from './accounts-tab';
@@ -129,11 +130,16 @@ const X50 = challenge('c-x50', {
 });
 
 function repo(
-  extra: { accounts?: Account[]; challenges?: Challenge[] } = {},
+  extra: {
+    accounts?: Account[];
+    challenges?: Challenge[];
+    trades?: Trade[];
+  } = {},
 ): Repository {
   const sample = fixtureSample();
   sample.accounts.push(...(extra.accounts ?? ACCOUNTS));
   sample.challenges.push(...(extra.challenges ?? [F100, X100, F50, F50S, X50]));
+  sample.trades.push(...(extra.trades ?? []));
   // Futures 100K is down $1,236.75, so its balance reads $98,763.25.
   sample.trades.push(
     makeTrade({
@@ -703,4 +709,58 @@ test('a filter that matches no challenge says so, and Clear filters brings them 
   expect(await tab('Funded 1')).toBeTruthy();
   // The sub-tab the address held stays.
   expect(window.location.search).toBe('?tab=funded');
+});
+
+// Run by `npm run test:perf`: the name carries "budget".
+test('prop accounts budget: AccountsTab filters 200 challenges in under 50 ms', async () => {
+  const firms = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8'];
+  const accounts: Account[] = [];
+  const challenges: Challenge[] = [];
+  const trades: Trade[] = [];
+  for (let i = 0; i < 200; i++) {
+    accounts.push(prop(`bud-a${i}`, `Budget ${i}`, { currency: 'USD' }));
+    challenges.push(
+      challenge(`bud-c${i}`, {
+        name: `Budget ${i}`,
+        firm: firms[i % firms.length]!,
+        phases: [
+          {
+            step: 'step-1',
+            accountId: `bud-a${i}`,
+            startDate: `2026-10-${String((i % 27) + 1).padStart(2, '0')}`,
+          },
+          { step: 'funded' },
+        ],
+      }),
+    );
+    for (let k = 0; k < 5; k++)
+      trades.push(
+        makeTrade({
+          id: `bud-t${i}-${k}`,
+          workspaceId: WS,
+          accountId: `bud-a${i}`,
+          net: k % 2 === 0 ? 12_000 : -9_000,
+          serial: i * 5 + k,
+          openedAt: `2026-11-${String(k + 3).padStart(2, '0')}T15:00:00Z`,
+          closedAt: `2026-11-${String(k + 3).padStart(2, '0')}T15:30:00Z`,
+        }),
+      );
+  }
+  renderApp(<AccountsTab />, {
+    repository: repo({ accounts, challenges, trades }),
+    url: URL,
+  });
+  expect(await tab('Evaluations 200')).toBeTruthy();
+  // Narrowing the 200 by firm, then by another, five times: the median change.
+  const took: number[] = [];
+  for (const firm of ['F1', 'F2', 'F3', 'F4', 'F5']) {
+    const start = performance.now();
+    act(() => {
+      window.history.replaceState(null, '', `${URL}?pfirm=${firm}`);
+    });
+    took.push(performance.now() - start);
+    expect(screen.getByRole('tab', { name: 'Evaluations 25' })).toBeTruthy();
+  }
+  took.sort((a, b) => a - b);
+  expect(took[2]!).toBeLessThan(50);
 });

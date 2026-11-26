@@ -776,6 +776,57 @@ test('switching workspace swaps the run for the sample dashboard, and back bring
   expect((await savedPrefs(r)).propStart).toBeUndefined();
 });
 
+test('after a switch from the sample to an empty My workspace the run is decided on My workspace, never on the sample’s challenges or transactions', async () => {
+  // The sample is the active workspace, with three challenges and nine transactions.
+  const r = repo();
+  await r.prefs.update({ timeZone: NY });
+  renderApp(
+    <>
+      <Switcher to="mine" />
+      <PropHome />
+    </>,
+    { repository: r, url: URL },
+  );
+  expect(
+    await screen.findByRole('region', { name: 'Total spent' }),
+  ).toBeTruthy();
+  expect(screen.queryByText('Step 1 of 4')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Switch to mine' }));
+  // The run, not the sample's dashboard held over, and not a blank in between.
+  await step(1);
+  expect(screen.queryByRole('region', { name: 'Total spent' })).toBeNull();
+  expect(await r.challenges.list('mine')).toEqual([]);
+  expect(await r.propTxns.list('mine')).toEqual([]);
+  expect((await savedPrefs(r)).propStart).toBeUndefined();
+});
+
+test('a switch to a My workspace that has a transaction and no challenge shows its dashboard, whatever the sample held', async () => {
+  const r = repo();
+  await r.prefs.update({ timeZone: NY });
+  await r.propTxns.add('mine', {
+    date: '2026-11-20',
+    firm: 'Apex',
+    category: 'evaluation-fee',
+    amount: -16_500,
+    status: 'reviewed',
+  });
+  renderApp(
+    <>
+      <Switcher to="mine" />
+      <PropHome />
+    </>,
+    { repository: r, url: URL },
+  );
+  await screen.findByRole('region', { name: 'Total spent' });
+  fireEvent.click(screen.getByRole('button', { name: 'Switch to mine' }));
+  await waitFor(() =>
+    expect(
+      screen.getByRole('region', { name: 'Total spent' }).textContent,
+    ).toBe('Total spent−$165.00fees and resets'),
+  );
+  expect(screen.queryByText('Step 1 of 4')).toBeNull();
+});
+
 test('the form is one column on a phone and two from sm, and the card is the full width up to 640px', async () => {
   const r = await emptyMine();
   await openRun(r);
