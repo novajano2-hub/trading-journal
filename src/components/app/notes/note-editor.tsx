@@ -3,14 +3,17 @@
 // The rich-text note editor, shared by the trade note, the notebook and the
 // templates. A note is stored as Tiptap JSON. The parent debounces its saves
 // (600 ms); this component reports every change.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/core';
 import { EditorContent, useEditor, type Content } from '@tiptap/react';
+import { ClockCounterClockwise, X } from '@phosphor-icons/react/dist/ssr';
 import 'katex/dist/katex.min.css';
+import { useHasData } from '@/data/query/provider';
 import { usePhone } from '@/lib/use-phone';
 import { FileViewer, type ViewerFile } from '../trades/file-viewer';
 import { BlockHandle } from './block-handle';
-import { EditorToolbar } from './editor-toolbar';
+import { speechSupported, startDictation } from './dictation';
+import { EditorToolbar, type TemplateSlot } from './editor-toolbar';
 import {
   EMOJI_LISTBOX_ID,
   EmojiMenu,
@@ -23,6 +26,8 @@ import { noteExtensions } from './extensions';
 import { createImageLink, fileIdOf } from './extensions/image-model';
 import { ImageIntake } from './image-intake';
 import { NoteBlocks, createBlockLink } from './note-blocks';
+import { VersionHistory } from './version-history';
+import { VersionKeeper } from './version-keeper';
 import {
   SLASH_ITEMS,
   SLASH_LISTBOX_ID,
@@ -66,6 +71,54 @@ export interface NoteEditorProps {
    * embed plays or shows while the note is open and the browser is online.
    */
   embeds?: EmbedPolicy;
+  /**
+   * The host's own template menu, drawn in the toolbar beside Insert: it is
+   * given the toolbar's button to use as the menu's trigger. Without it the
+   * toolbar has no Template control.
+   */
+  templateSlot?: TemplateSlot;
+  /**
+   * Whether the toolbar offers full screen (default). A host that sits inside
+   * a box that is moved with a transform (a centred dialog) says no: a fixed
+   * layer inside it would fill that box and not the window.
+   */
+  canFullScreen?: boolean;
+}
+
+/** Marks everything on the page but the ancestors of `el` as out of reach (`inert`); returns the way to undo exactly that. */
+function inertAround(el: HTMLElement): () => void {
+  const changed: Element[] = [];
+  for (let node: HTMLElement | null = el; node; node = node.parentElement) {
+    const parent: HTMLElement | null = node.parentElement;
+    if (!parent) break;
+    for (const sibling of Array.from(parent.children)) {
+      if (sibling !== node && !sibling.hasAttribute('inert')) {
+        sibling.setAttribute('inert', '');
+        changed.push(sibling);
+      }
+    }
+  }
+  return () => {
+    for (const sibling of changed) sibling.removeAttribute('inert');
+  };
+}
+
+/** Why dictation stopped, for a person; the browser's own reasons are not words. */
+function dictationProblem(reason: string): string | null {
+  switch (reason) {
+    case 'not-allowed':
+    case 'service-not-allowed':
+      return "Keel can't use the microphone. Allow it in your browser's site settings to dictate.";
+    case 'network':
+      return "The browser's speech service can't be reached right now.";
+    case 'start-failed':
+      return "Dictation couldn't start. Try again.";
+    case 'no-speech':
+    case 'aborted':
+      return null;
+    default:
+      return 'Dictation stopped.';
+  }
 }
 
 /** The images in the body that are stored files, in reading order. */
@@ -78,6 +131,25 @@ function imagesOf(editor: Editor): (ViewerFile & { pos: number })[] {
       out.push({ id, pos, name: String(node.attrs.alt ?? '') || 'Image' });
   });
   return out;
+}
+
+/** A body drawn read-only, as a print layout or a version's preview shows it: no toolbar, embeds as links. */
+export function NotePreview({
+  body,
+  label,
+}: {
+  body: unknown;
+  label: string;
+}): React.JSX.Element {
+  return (
+    <NoteEditor
+      value={body}
+      onChange={() => {}}
+      label={label}
+      readOnly
+      embeds="links"
+    />
+  );
 }
 
 const EMPTY_DOC = { type: 'doc', content: [{ type: 'paragraph' }] };
@@ -97,7 +169,10 @@ export function NoteEditor({
   noteId,
   ensureNoteId,
   embeds = 'live',
+  templateSlot,
+  canFullScreen = true,
 }: NoteEditorProps): React.JSX.Element {
+  const hasData = useHasData();
   const [slash, setSlash] = useState<SlashState | null>(null);
   const slashRef = useRef<SlashState | null>(null);
   const [bridge] = useState<SlashBridge>(() => ({
@@ -120,6 +195,14 @@ export function NoteEditor({
   useEffect(() => {
     onChangeRef.current = onChange;
   });
+  // The version keeper hears each edit from here, so the body is read once.
+  const edits = useRef(new Set<(body: unknown) => void>());
+  const subscribe = useCallback((onEdit: (body: unknown) => void) => {
+    edits.current.add(onEdit);
+    return () => {
+      edits.current.delete(onEdit);
+    };
+  }, []);
 
   // What paste, drop and the picker call to store an image, and what an image
   // calls to open larger; the pieces that do the work fill it in.
@@ -153,7 +236,11 @@ export function NoteEditor({
         class: 'note-prose',
       },
     },
-    onUpdate: ({ editor: e }) => onChangeRef.current(e.getJSON()),
+    onUpdate: ({ editor: e }) => {
+      const body = e.getJSON();
+      onChangeRef.current(body);
+      for (const onEdit of edits.current) onEdit(body);
+    },
   });
 
   // Follow an outside change (another note opened, a template applied), but
@@ -251,14 +338,202 @@ export function NoteEditor({
 
   // The handles need a pointer that hovers: not on a phone.
   const phone = usePhone();
+  // Images are stored files: without the app's data there is nowhere to put one.
   const takesImages =
-    !readOnly && (noteId !== undefined || ensureNoteId !== undefined);
+    hasData &&
+    !readOnly &&
+    (noteId !== undefined || ensureNoteId !== undefined);
   const handles = !readOnly && !phone;
+
+  // ---- version history (B39) ------------------------------------------------
+  // A note that is stored, or that the host stores on its first change, keeps
+  // versions; the dialog is built the first time it opens, so a note nobody
+  // opens the history of reads no versions.
+  const keepsVersions =
+    hasData && (noteId !== undefined || ensureNoteId !== undefined);
+  const [historyBuilt, setHistoryBuilt] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [now, setNow] = useState<unknown>(null);
+  const historyFrom = useRef<HTMLElement | null>(null);
+  const [restored, setRestored] = useState('');
+  const openHistory = (from: HTMLElement | null) => {
+    if (!editor) return;
+    historyFrom.current =
+      from ?? (document.activeElement as HTMLElement | null);
+    setNow(editor.getJSON());
+    setHistoryBuilt(true);
+    setHistoryOpen(true);
+  };
+  useEffect(() => {
+    if (restored === '') return;
+    const id = setTimeout(() => setRestored(''), 8000);
+    return () => clearTimeout(id);
+  }, [restored]);
+
+  // ---- full screen (B37) ----------------------------------------------------
+  // The same editor, not another: the box is fixed over the window, the page
+  // behind is out of reach, Escape or the control leaves.
+  const [full, setFull] = useState(false);
+  const isFull = full && !readOnly;
+  const root = useRef<HTMLDivElement>(null);
+  const fullFrom = useRef<HTMLElement | null>(null);
+  const toggleFull = () => {
+    if (!full) fullFrom.current = document.activeElement as HTMLElement | null;
+    setFull(!full);
+  };
+  useEffect(() => {
+    if (!isFull || !editor || !root.current) return;
+    const release = inertAround(root.current);
+    editor.commands.focus();
+    // Escape leaves, unless something on top of the note is open (a menu, a
+    // dialog, the slash or emoji list, an offer to embed a link) or the
+    // focus is in a field that uses Escape itself (a caption, a time, the
+    // link address). Asked before anything handles the key: ProseMirror takes
+    // every Escape pressed in the text, so "taken already" cannot say which.
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      const top = root.current;
+      if (!top) return;
+      const target = event.target as Element | null;
+      if (slashRef.current?.items.length || emojiRef.current?.items.length)
+        return;
+      if (top.querySelector('[role="group"][aria-label="Embed this link"]'))
+        return;
+      if (
+        target &&
+        top.contains(target) &&
+        target.closest('input, textarea, select')
+      )
+        return;
+      for (const layer of document.querySelectorAll(
+        '[role="menu"], [role="dialog"], [role="alertdialog"]',
+      ))
+        if (layer !== top) return;
+      event.preventDefault();
+      setFull(false);
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('keydown', onKey, true);
+      release();
+      const back = fullFrom.current;
+      if (back?.isConnected && back !== document.body) back.focus();
+      else editor.commands.focus();
+    };
+  }, [isFull, editor]);
+
+  // ---- dictation (B38, U4) --------------------------------------------------
+  const [dictating, setDictating] = useState(false);
+  const [dictationError, setDictationError] = useState<string | null>(null);
+  const stopDictation = useRef<(() => void) | null>(null);
+  const toggleDictation = () => {
+    if (!editor) return;
+    setDictationError(null);
+    if (stopDictation.current) {
+      stopDictation.current();
+      return;
+    }
+    setDictating(true);
+    stopDictation.current = startDictation(
+      (text) => {
+        const { from } = editor.state.selection;
+        const before =
+          from > 1 ? editor.state.doc.textBetween(from - 1, from) : '';
+        const lead = before !== '' && !/\s/.test(before) ? ' ' : '';
+        editor.chain().focus().insertContent(`${lead}${text}`).run();
+      },
+      {
+        onEnd: () => {
+          stopDictation.current = null;
+          setDictating(false);
+        },
+        onError: (reason) => {
+          setDictationError(dictationProblem(reason));
+          stopDictation.current = null;
+          setDictating(false);
+        },
+      },
+    );
+  };
+  // Leaving the note, or locking it, stops the listening.
+  useEffect(
+    () => () => {
+      stopDictation.current?.();
+    },
+    [],
+  );
+  useEffect(() => {
+    if (readOnly) stopDictation.current?.();
+  }, [readOnly]);
+
   return (
-    <div className={`flex flex-col${handles ? ' note-with-handles' : ''}`}>
+    <div
+      ref={root}
+      {...(isFull
+        ? {
+            role: 'dialog',
+            'aria-modal': true,
+            'aria-label': `${label}, full screen`,
+          }
+        : {})}
+      className={
+        isFull
+          ? 'fixed inset-0 z-[45] flex flex-col overflow-y-auto overscroll-contain bg-surface-1 px-4 pb-24 sm:px-[max(2rem,calc((100%-900px)/2))]' +
+            (handles ? ' note-with-handles' : '')
+          : `flex flex-col${handles ? ' note-with-handles' : ''}`
+      }
+    >
       {editor && !readOnly ? (
-        <EditorToolbar editor={editor} images={takesImages} blocks />
+        <EditorToolbar
+          editor={editor}
+          images={takesImages}
+          blocks
+          sticky={isFull}
+          templateSlot={templateSlot}
+          onHistory={keepsVersions ? openHistory : undefined}
+          onFullScreen={canFullScreen ? toggleFull : undefined}
+          fullScreen={isFull}
+          onDictate={speechSupported() ? toggleDictation : undefined}
+          dictating={dictating}
+        />
       ) : null}
+      {editor && readOnly && hasData && noteId !== undefined ? (
+        <button
+          type="button"
+          onClick={(e) => openHistory(e.currentTarget)}
+          className="mb-1 inline-flex h-8 items-center gap-1.5 self-end rounded-[8px] px-2.5 text-[13px] font-medium text-muted outline-offset-0 hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11"
+        >
+          <ClockCounterClockwise size={15} aria-hidden="true" />
+          Version history
+        </button>
+      ) : null}
+      {dictationError ? (
+        <p role="alert" className="mt-2 text-[13px] text-loss">
+          {dictationError}
+        </p>
+      ) : null}
+      <div role="status" aria-label="Dictation" className="sr-only">
+        {dictating ? 'Listening' : ''}
+      </div>
+      <div
+        role="status"
+        aria-label="Version history"
+        className={restored ? 'mt-2' : 'sr-only'}
+      >
+        {restored ? (
+          <div className="flex items-center gap-2 rounded-control bg-sunken py-1.5 pr-1.5 pl-3 text-[13px] text-text">
+            <span className="min-w-0 flex-1">{restored}</span>
+            <button
+              type="button"
+              aria-label="Dismiss"
+              onClick={() => setRestored('')}
+              className="grid size-7 place-items-center rounded-[7px] text-faint hover:bg-surface-1 hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:size-11"
+            >
+              <X size={13} aria-hidden="true" />
+            </button>
+          </div>
+        ) : null}
+      </div>
       {editor && !readOnly ? (
         <NoteBlocks editor={editor} link={blocks} />
       ) : null}
@@ -269,6 +544,9 @@ export function NoteEditor({
           noteId={noteId}
           ensureNoteId={ensureNoteId}
         />
+      ) : null}
+      {editor && !readOnly && keepsVersions ? (
+        <VersionKeeper noteId={noteId} subscribe={subscribe} />
       ) : null}
       <EmbedPolicyContext.Provider value={embeds}>
         <EditorContent editor={editor} />
@@ -283,6 +561,26 @@ export function NoteEditor({
           origin={origin}
           onIndex={(index) => setViewing((v) => v && { ...v, index })}
           onClose={() => setViewing((v) => v && { ...v, index: null })}
+        />
+      ) : null}
+      {editor && historyBuilt ? (
+        <VersionHistory
+          noteId={noteId}
+          readOnly={readOnly}
+          open={historyOpen}
+          onOpenChange={setHistoryOpen}
+          origin={historyFrom}
+          returnFocus={historyFrom}
+          current={now}
+          preview={(body) => (
+            <NotePreview body={body} label="Version preview" />
+          )}
+          onRestored={(entry, _version, when) => {
+            editor.commands.setContent(asDoc(entry.body), {
+              emitUpdate: false,
+            });
+            setRestored(`Restored the version from ${when}.`);
+          }}
         />
       ) : null}
     </div>

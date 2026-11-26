@@ -10,7 +10,8 @@ import {
   within,
 } from '@testing-library/react';
 import { Editor } from '@tiptap/core';
-import { EditorToolbar } from './editor-toolbar';
+import { DropdownMenu } from 'radix-ui';
+import { EditorToolbar, type TemplateSlot } from './editor-toolbar';
 import { noteExtensions } from './extensions';
 import { NoteEditor } from './note-editor';
 import {
@@ -770,4 +771,127 @@ test('Insert has no Image or Inline image for a note that cannot take images', a
   expect(items).not.toContain('Image');
   expect(items).not.toContain('Inline image');
   expect(items[0]).toBe('Table');
+});
+
+/** A host's template menu, as its slot draws it: its own items on the toolbar's trigger. */
+const hostMenu: TemplateSlot = ({ trigger, open, onOpenChange }) => (
+  <DropdownMenu.Root open={open} onOpenChange={onOpenChange}>
+    <DropdownMenu.Trigger asChild>{trigger}</DropdownMenu.Trigger>
+    <DropdownMenu.Portal>
+      <DropdownMenu.Content>
+        <DropdownMenu.Item>Daily game plan</DropdownMenu.Item>
+      </DropdownMenu.Content>
+    </DropdownMenu.Portal>
+  </DropdownMenu.Root>
+);
+
+test("the template slot draws the host's menu in the insert group", async () => {
+  const { editor } = setup();
+  cleanup();
+  render(<EditorToolbar editor={editor} templateSlot={hostMenu} />);
+  const insert = screen.getByRole('button', { name: 'Insert' });
+  const template = screen.getByRole('button', { name: 'Insert a template' });
+  // Beside Insert, after it, on the toolbar's own roving tab stop.
+  expect(template.textContent).toContain('Template');
+  expect(
+    insert.compareDocumentPosition(template) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(screen.getByRole('toolbar').contains(template)).toBe(true);
+  // It is the host's menu that opens, with the host's items.
+  fireEvent.keyDown(template, { key: 'Enter' });
+  expect(
+    await screen.findByRole('menuitem', { name: 'Daily game plan' }),
+  ).toBeTruthy();
+});
+
+test('without a template slot there is no Template control', () => {
+  setup();
+  expect(
+    screen.queryByRole('button', { name: 'Insert a template' }),
+  ).toBeNull();
+});
+
+test("on a phone the template is a choice in More that opens the host's menu", async () => {
+  window.innerWidth = 390;
+  const { editor } = setup();
+  cleanup();
+  render(<EditorToolbar editor={editor} templateSlot={hostMenu} />);
+  // Not in the bar (it has no room), and not the host's trigger either.
+  expect(
+    screen.queryByRole('button', { name: 'Insert a template' }),
+  ).toBeNull();
+  await openMenu('More tools');
+  const pick = await screen.findByRole('menuitem', { name: 'Template' });
+  await new Promise((r) => setTimeout(r, 400));
+  fireEvent.click(pick);
+  expect(
+    await screen.findByRole('menuitem', { name: 'Daily game plan' }),
+  ).toBeTruthy();
+});
+
+test('full screen reads as leaving it while it is on, and dictation shows that it is listening', () => {
+  const { editor } = setup();
+  cleanup();
+  const { rerender } = render(
+    <EditorToolbar
+      editor={editor}
+      onFullScreen={() => {}}
+      onDictate={() => {}}
+    />,
+  );
+  expect(screen.getByRole('button', { name: 'Full screen' })).toBeTruthy();
+  expect(
+    screen
+      .getByRole('button', { name: /^Dictate/ })
+      .getAttribute('aria-pressed'),
+  ).toBeNull();
+  rerender(
+    <EditorToolbar
+      editor={editor}
+      onFullScreen={() => {}}
+      fullScreen
+      onDictate={() => {}}
+      dictating
+    />,
+  );
+  expect(screen.getByRole('button', { name: 'Exit full screen' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Full screen' })).toBeNull();
+  expect(
+    screen
+      .getByRole('button', { name: /^Dictate/ })
+      .getAttribute('aria-pressed'),
+  ).toBe('true');
+});
+
+test('the dictation control says the browser does the listening, in its name and its tooltip', () => {
+  const { editor } = setup();
+  cleanup();
+  render(<EditorToolbar editor={editor} onDictate={() => {}} />);
+  const mic = screen.getByRole('button', { name: /^Dictate/ });
+  expect(mic.getAttribute('aria-label')).toBe(
+    "Dictate. Your browser's speech service turns speech into text.",
+  );
+  expect(mic.getAttribute('title')).toBe(mic.getAttribute('aria-label'));
+});
+
+test('the history control tells the host which button opened it', async () => {
+  const { editor } = setup();
+  cleanup();
+  const onHistory = vi.fn();
+  render(<EditorToolbar editor={editor} onHistory={onHistory} />);
+  const clock = screen.getByRole('button', { name: 'Version history' });
+  fireEvent.click(clock);
+  expect(onHistory).toHaveBeenLastCalledWith(clock);
+
+  // On a phone the choice is in More, and the host gets More to come back to.
+  cleanup();
+  window.innerWidth = 390;
+  render(<EditorToolbar editor={editor} onHistory={onHistory} />);
+  const more = await openMenu('More tools');
+  const item = await screen.findByRole('menuitem', { name: 'Version history' });
+  await new Promise((r) => setTimeout(r, 400));
+  fireEvent.click(item);
+  expect(onHistory).toHaveBeenLastCalledWith(more);
+  // The menu has gone before the editor does.
+  await waitFor(() => expect(screen.queryAllByRole('menu')).toHaveLength(0));
 });

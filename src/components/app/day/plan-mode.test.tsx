@@ -101,7 +101,7 @@ test('Templates inserts at the cursor, mid-document, and keeps the rest', async 
     ],
   });
   tiptap.commands.setTextSelection(1 + 'First line'.length);
-  await pick('Templates', 'Daily game plan');
+  await pick('Insert a template', 'Daily game plan');
   await within(box).findByText('What I will trade');
   const text = box.textContent ?? '';
   // Not appended: the template sits between the two lines.
@@ -131,9 +131,12 @@ test('the Templates menu lists yours, then the built-in templates, then See more
     isDefault: false,
   });
   await open(TODAY, { repo });
-  fireEvent.keyDown(await screen.findByRole('button', { name: 'Templates' }), {
-    key: 'Enter',
-  });
+  fireEvent.keyDown(
+    await screen.findByRole('button', { name: 'Insert a template' }),
+    {
+      key: 'Enter',
+    },
+  );
   await screen.findByRole('menuitem', { name: 'Daily game plan' });
   // Built-in templates sit with Keel's three, not under "Your templates".
   const menu = screen.getByRole('menu');
@@ -159,9 +162,12 @@ test('the Templates menu lists yours, then the built-in templates, then See more
 
 test('See more templates opens Manage templates', async () => {
   await open();
-  fireEvent.keyDown(await screen.findByRole('button', { name: 'Templates' }), {
-    key: 'Enter',
-  });
+  fireEvent.keyDown(
+    await screen.findByRole('button', { name: 'Insert a template' }),
+    {
+      key: 'Enter',
+    },
+  );
   fireEvent.click(
     await screen.findByRole('menuitem', { name: 'See more templates' }),
   );
@@ -263,7 +269,7 @@ test('the tip shows once, in the flow above the note, and Got it closes it', asy
   );
   cleanup();
   await open(TODAY, { repo });
-  await screen.findByRole('button', { name: 'Templates' });
+  await screen.findByRole('button', { name: 'Insert a template' });
   expect(screen.queryByRole('note', { name: 'Tip' })).toBeNull();
 });
 

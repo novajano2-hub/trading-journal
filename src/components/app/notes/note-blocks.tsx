@@ -622,7 +622,11 @@ function EmbedOfferBar({
         onDone();
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onDone();
+      if (event.key === 'Escape') {
+        // Taken: it ends the offer and nothing around it (full screen).
+        event.preventDefault();
+        onDone();
+      }
     };
     editor.on('transaction', onTransaction);
     editor.view.dom.addEventListener('keydown', onKey);

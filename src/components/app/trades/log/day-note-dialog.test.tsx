@@ -246,7 +246,22 @@ async function closeBothWays(heading: string, name: 'Add note' | 'View note') {
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 }
 
-test('it is read-only with the lock line on a finished day (no Templates, star or menu), and refuses every write', async () => {
+/** The "..." menu of a note that cannot change: export and import stay, Move to Trash is not there. */
+async function menuKeeps(dialog: HTMLElement) {
+  fireEvent.keyDown(within(dialog).getByRole('button', { name: 'More' }), {
+    key: 'Enter',
+  });
+  const menu = await screen.findByRole('menu');
+  expect(
+    within(menu)
+      .getAllByRole('menuitem')
+      .map((i) => i.textContent),
+  ).toEqual(['Export as PDF', 'Export as Keel note', 'Import a Keel note']);
+  fireEvent.keyDown(menu, { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+}
+
+test('it is read-only with the lock line on a finished day (no Template, star or Move to Trash), and refuses every write', async () => {
   const { repo } = await renderApp({
     journal: [dailyNote('2026-11-23')],
     days: [FINISHED_MON],
@@ -261,12 +276,13 @@ test('it is read-only with the lock line on a finished day (no Templates, star o
     'This day is closed. Its note is locked.',
   );
   expect(
-    within(dialog).queryByRole('button', { name: 'Templates' }),
+    within(dialog).queryByRole('button', { name: 'Insert a template' }),
   ).toBeNull();
   expect(
     within(dialog).queryByRole('button', { name: 'Favourite' }),
   ).toBeNull();
-  expect(within(dialog).queryByRole('button', { name: 'More' })).toBeNull();
+  // The menu keeps the note's export and import, and has no Move to Trash.
+  await menuKeeps(dialog);
   // Nothing to save: the footer button closes.
   expect(within(dialog).queryByRole('button', { name: 'Save' })).toBeNull();
   fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
@@ -371,7 +387,7 @@ test('a note in Trash opens with Restore, read-only', async () => {
     await within(dialog).findByText("This day's note is in Trash."),
   ).toBeTruthy();
   expect(within(dialog).getByRole('button', { name: 'Restore' })).toBeTruthy();
-  expect(within(dialog).queryByRole('button', { name: 'More' })).toBeNull();
+  await menuKeeps(dialog);
 });
 
 test('the star and Open in Notebook wait for the note, then the star favourites it and the link opens it', async () => {
@@ -431,15 +447,18 @@ test('the star and Open in Notebook wait for the note, then the star favourites 
   );
 });
 
-test('Templates inserts a template at the cursor', async () => {
+test('Template, in the editor toolbar, inserts a template at the cursor', async () => {
   const { repo } = await renderApp();
   const dialog = await open(TUE, 'Add note');
   const box = await within(dialog).findByRole('textbox', {
     name: 'Daily note',
   });
-  fireEvent.keyDown(within(dialog).getByRole('button', { name: 'Templates' }), {
-    key: 'Enter',
-  });
+  fireEvent.keyDown(
+    await within(dialog).findByRole('button', { name: 'Insert a template' }),
+    {
+      key: 'Enter',
+    },
+  );
   fireEvent.click(
     await screen.findByRole('menuitem', { name: 'Daily game plan' }),
   );

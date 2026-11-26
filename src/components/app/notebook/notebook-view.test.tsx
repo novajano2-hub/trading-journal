@@ -1001,3 +1001,161 @@ test('a malformed note row in storage never breaks the Notebook: it lists as an 
   fireEvent.click(within(folders).getByRole('button', { name: /My notes/ }));
   await listed();
 });
+
+// ---- Task 21: export and import, templates in the toolbar ----------------------
+
+test('a note has Template in its toolbar, its own kind’s templates for a daily note or a recap, any for a plain note, none for a trade note', async () => {
+  await openWith('/app/notebook/daily-2026-11-19');
+  await screen.findByRole('toolbar', { name: 'Formatting' });
+  // A daily note takes the daily templates.
+  const trigger = await screen.findByRole('button', {
+    name: 'Insert a template',
+  });
+  fireEvent.keyDown(trigger, { key: 'Enter' });
+  expect(
+    await screen.findByRole('menuitem', { name: 'Daily game plan' }),
+  ).toBeTruthy();
+  fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+  cleanup();
+
+  // A weekly recap takes the weekly one, and no daily template.
+  await openWith('/app/notebook/n-wk');
+  fireEvent.keyDown(
+    await screen.findByRole('button', { name: 'Insert a template' }),
+    { key: 'Enter' },
+  );
+  expect(
+    await screen.findByRole('menuitem', { name: 'Weekly recap' }),
+  ).toBeTruthy();
+  expect(
+    screen.queryByRole('menuitem', { name: 'Daily game plan' }),
+  ).toBeNull();
+  fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+  cleanup();
+
+  // A plain note takes any template.
+  await openWith('/app/notebook/n-plan');
+  fireEvent.keyDown(
+    await screen.findByRole('button', { name: 'Insert a template' }),
+    { key: 'Enter' },
+  );
+  expect(
+    await screen.findByRole('menuitem', { name: 'Daily game plan' }),
+  ).toBeTruthy();
+  expect(screen.getByRole('menuitem', { name: 'Weekly recap' })).toBeTruthy();
+  fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+  cleanup();
+
+  // A trade note has none.
+  await openWith('/app/notebook/trade-note-0', {
+    edit: (fx) => {
+      fx.journal[0]!.id = 'trade-note-0';
+    },
+  });
+  await screen.findByRole('toolbar', { name: 'Formatting' });
+  expect(
+    screen.queryByRole('button', { name: 'Insert a template' }),
+  ).toBeNull();
+});
+
+test('every note has Export or import in its header, a note in Trash and a version history too', async () => {
+  await openWith('/app/notebook/n-plan', {
+    prepare: async (r) => {
+      await r.journal.trash(WS, 'n-idea');
+    },
+  });
+  expect(
+    await screen.findByRole('button', { name: 'Export or import' }),
+  ).toBeTruthy();
+  // The history is in the toolbar of a note that can change.
+  expect(screen.getByRole('button', { name: 'Version history' })).toBeTruthy();
+  cleanup();
+
+  // A note in Trash reads only: no toolbar, but the header's menu and the history stay.
+  await openWith('/app/notebook/n-idea', {
+    prepare: async (r) => {
+      await r.journal.trash(WS, 'n-idea');
+    },
+  });
+  expect(
+    await screen.findByRole('button', { name: 'Export or import' }),
+  ).toBeTruthy();
+  expect(screen.queryByRole('toolbar')).toBeNull();
+  expect(
+    await screen.findByRole('button', { name: 'Version history' }),
+  ).toBeTruthy();
+});
+
+test('exporting reads the title and tags on screen, and importing brings the file in as a new note in the open folder and opens it', async () => {
+  const blobs: Blob[] = [];
+  URL.createObjectURL = vi.fn((b: Blob) => {
+    blobs.push(b);
+    return 'blob:note';
+  });
+  URL.revokeObjectURL = vi.fn();
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  // The note is in the Ideas folder; the folder is picked, as a person does.
+  const { repo } = await openWith('/app/notebook/n-idea', {
+    prepare: async (r, ideasId) => {
+      await r.journal.save(WS, {
+        ...(await r.journal.get(WS, 'n-idea'))!,
+        folderId: ideasId,
+      });
+    },
+  });
+
+  await screen.findByRole('navigation', { name: 'Folders' });
+  fireEvent.click(
+    await within(rail()).findByRole('button', { name: /^Ideas/ }),
+  );
+  // The title is edited and not yet saved: the file still has what is on screen.
+  const title = await screen.findByRole('textbox', { name: 'Note title' });
+  fireEvent.change(title, { target: { value: 'Idea, reworded' } });
+  fireEvent.keyDown(screen.getByRole('button', { name: 'Export or import' }), {
+    key: 'Enter',
+  });
+  fireEvent.click(
+    await screen.findByRole('menuitem', { name: 'Export as Keel note' }),
+  );
+  await waitFor(() => expect(blobs).toHaveLength(1));
+  const file = JSON.parse(await blobs[0]!.text()) as { title: string };
+  expect(file.title).toBe('Idea, reworded');
+
+  // Import it back: a new note in the Ideas folder, open on screen.
+  fireEvent.keyDown(screen.getByRole('button', { name: 'Export or import' }), {
+    key: 'Enter',
+  });
+  fireEvent.click(
+    await screen.findByRole('menuitem', { name: 'Import a Keel note' }),
+  );
+  const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+  fireEvent.change(input, {
+    target: {
+      files: [
+        new File(
+          [JSON.stringify({ ...file, kind: 'keel-note', version: 1 })],
+          'idea.json',
+        ),
+      ],
+    },
+  });
+  await waitFor(async () =>
+    expect(
+      (await repo.journal.list(WS)).filter((e) => e.title === 'Idea, reworded'),
+    ).toHaveLength(1),
+  );
+  const [made] = (await repo.journal.list(WS)).filter(
+    (e) => e.title === 'Idea, reworded',
+  );
+  expect(made).toMatchObject({ kind: 'note' });
+  expect(made!.folderId).toBeDefined();
+  expect(
+    (await repo.folders.list(WS)).find((f) => f.id === made!.folderId)?.name,
+  ).toBe('Ideas');
+  await waitFor(() =>
+    expect(window.location.pathname).toBe(`/app/notebook/${made!.id}`),
+  );
+});

@@ -108,6 +108,10 @@ test('Plan 5 writes invalidate what they change', () => {
     ['dayShots.remove', k('dayShotsAll')],
     ['files.add', k('filesAll')],
     ['files.remove', k('filesAll')],
+    // A kept version changes the versions list; a restore also writes the
+    // note, which the journal and the day cards read.
+    ['noteVersions.keep', k('noteVersionsAll')],
+    ['noteVersions.restore', k('journal', 'days', 'noteVersionsAll')],
     // The default rules: a rule's own write touches its list and the history;
     // applying one rewrites trades, so it also makes the import context stale.
     ['targetRules.save', k('targetRules', 'history')],
@@ -195,6 +199,8 @@ test('every write of a logged record makes the edit history stale', () => {
     'journal.save',
     'journal.ensureTradeNote',
     'tracker.save',
+    'noteVersions.keep',
+    'noteVersions.restore',
   ] as const)
     expect(invalidationsFor(write, 'mine'), write).not.toContainEqual(
       keys.history('mine'),
@@ -264,4 +270,16 @@ test('a list key covers its details and nothing in another workspace or entity',
   );
   expect(qc.getQueryState(keys.trades('mine'))!.isInvalidated).toBe(false);
   expect(qc.getQueryState(keys.journal('sample'))!.isInvalidated).toBe(false);
+});
+
+test('the versions of one note sit under all versions, and workspaces never overlap', () => {
+  expect(keys.noteVersions('mine', 'n-1').slice(0, 4)).toEqual(
+    keys.noteVersionsAll('mine'),
+  );
+  expect(keys.noteVersions('mine', 'n-1')).not.toEqual(
+    keys.noteVersions('sample', 'n-1'),
+  );
+  expect(keys.noteVersions('mine', 'n-1')).not.toEqual(
+    keys.noteVersions('mine', 'n-2'),
+  );
 });

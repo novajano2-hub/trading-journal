@@ -3,7 +3,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   CaretLeft,
   CaretRight,
@@ -25,6 +25,8 @@ import { metricContextOf } from '@/data/metrics';
 import { useGlobalFilters, useTradeSet } from '@/data/query/derived';
 import {
   useAccounts,
+  useJournal,
+  useJournalEntry,
   usePatterns,
   usePrefs,
   useRemoveTrades,
@@ -64,7 +66,9 @@ import { formatDuration, formatInstrument, plural } from '@/lib/format';
 import { CARD, CardHeader, InstrumentName } from '../dashboard/shared';
 import { ConfirmDialog } from '../confirm-dialog';
 import { ManageTagsLink } from '../tag-picker';
+import { findDailyEntry } from '../notebook/notebook-model';
 import type { NoteEditorHandle } from '../notes/note-editor';
+import { NoteMenu } from '../notes/note-menu';
 import { price } from '@/lib/format';
 import { StatusChip } from './cells';
 import { qty } from './columns';
@@ -82,7 +86,7 @@ import { RuleChecklist } from './rule-checklist';
 import { PatternsButton } from './patterns-button';
 import { StatsChooser, type StatChoice } from './stats-chooser';
 import { TradeFiles } from './trade-files';
-import { clock } from '@/lib/time-format';
+import { clock, dayLabel as dayName } from '@/lib/time-format';
 import { clockOnDay, dayLabel } from './trade-time';
 import {
   DayNote,
@@ -93,6 +97,8 @@ import {
 } from './trade-journal';
 
 const PAD = 'px-5 pt-[18px] pb-4';
+
+const EMPTY_DOC = { type: 'doc', content: [{ type: 'paragraph' }] };
 
 type Save = (patch: TradePatch | ((t: Trade) => TradePatch)) => void;
 
@@ -913,6 +919,15 @@ function NoteCard({
   );
   const [which, setWhich] = useState<'trade' | 'day'>('trade');
   const date = dayNoteDate(trade, timeZone);
+  // Export and import act on the note in view, as the editor holds it.
+  const ownHandle = useRef<NoteEditorHandle | null>(null);
+  const note = handleRef ?? ownHandle;
+  const tradeEntry = useJournalEntry(trade.noteId ?? '').data ?? undefined;
+  const dayEntry = findDailyEntry(
+    useJournal({ enabled: which === 'day' }).data,
+    date,
+  );
+  const entry = which === 'trade' ? tradeEntry : dayEntry;
   const switchTo = (next: 'trade' | 'day') => {
     setWhich(next);
     setStatus('idle');
@@ -948,13 +963,24 @@ function NoteCard({
           ]}
           onChange={switchTo}
         />
+        <NoteMenu
+          read={() => ({
+            title:
+              entry?.title ??
+              (which === 'trade'
+                ? `${trade.instrument.symbol} trade note`
+                : `Daily review, ${dayName(date)}`),
+            tags: entry?.tags ?? [],
+            body: note.current?.getJSON() ?? entry?.body ?? EMPTY_DOC,
+          })}
+        />
       </div>
       {which === 'trade' ? (
         <TradeNote
           key={trade.id}
           trade={trade}
           readOnly={readOnly}
-          handleRef={handleRef}
+          handleRef={note}
           onStatus={setStatus}
         />
       ) : (
@@ -962,7 +988,7 @@ function NoteCard({
           key={date}
           date={date}
           readOnly={readOnly}
-          handleRef={handleRef}
+          handleRef={note}
           onStatus={setStatus}
         />
       )}

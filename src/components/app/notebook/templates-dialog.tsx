@@ -87,6 +87,8 @@ function TemplateForm({
       <div className="max-h-[42dvh] min-h-[160px] overflow-y-auto rounded-control border border-line px-3 py-2">
         <NoteEditor
           label="Template body"
+          // The dialog is a centred box moved by a transform: a full-screen layer inside it would fill the box.
+          canFullScreen={false}
           value={seed}
           onChange={(doc) => {
             body.current = doc;

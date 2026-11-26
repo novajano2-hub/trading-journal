@@ -34,6 +34,9 @@ export const keys = {
   files: (ws: string, owner: string) =>
     [...W(ws), 'files', 'owner', owner] as const,
   file: (ws: string, id: string) => [...W(ws), 'files', 'id', id] as const,
+  noteVersionsAll: (ws: string) => [...W(ws), 'note-versions'] as const,
+  noteVersions: (ws: string, noteId: string) =>
+    [...W(ws), 'note-versions', noteId] as const,
   history: (ws: string) => [...W(ws), 'history'] as const,
   targetRules: (ws: string) => [...W(ws), 'target-rules'] as const,
   feeRules: (ws: string) => [...W(ws), 'fee-rules'] as const,
@@ -96,6 +99,8 @@ export type WriteKind =
   | 'dayShots.remove'
   | 'files.add'
   | 'files.remove'
+  | 'noteVersions.keep'
+  | 'noteVersions.restore'
   | 'imports.commit'
   | 'imports.undo'
   | 'targetRules.save'
@@ -274,6 +279,11 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
     case 'files.add':
     case 'files.remove':
       return [keys.filesAll(ws)];
+    case 'noteVersions.keep':
+      return [keys.noteVersionsAll(ws)];
+    // A restore writes the note's body: the journal and the day cards read it.
+    case 'noteVersions.restore':
+      return [keys.journal(ws), keys.days(ws), keys.noteVersionsAll(ws)];
     case 'imports.commit':
       return [keys.imports(ws), keys.trades(ws), keys.history(ws)];
     // A rule's own write changes its list and leaves a row; what it has

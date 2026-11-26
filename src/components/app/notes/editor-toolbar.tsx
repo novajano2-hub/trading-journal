@@ -2,9 +2,10 @@
 
 // The note editor's toolbar, in Keel's own groups: history; text (style, font,
 // size); marks (bold, italic, underline, link and a Format menu); colour and
-// highlight; a paragraph menu; insert. Version history, full screen and
-// dictation take a place at the end only where a host passes their handler:
-// the toolbar draws no control that does nothing.
+// highlight; a paragraph menu; insert, with the host's template menu beside
+// it. Template, version history, full screen and dictation take a place only
+// where a host passes what they need: the toolbar draws no control that does
+// nothing.
 //
 // Every menu is built from one list of entries (`Entry`), so the desktop menu,
 // the phone's More menu and the tests all read the same thing. Each item names
@@ -17,12 +18,14 @@ import { useEditorState, type Editor } from '@tiptap/react';
 import {
   ArrowUUpLeft,
   ArrowUUpRight,
+  ArrowsIn,
   ArrowsOut,
   CaretDown,
   CaretRight,
   Check,
   ClockCounterClockwise,
   DotsThree,
+  FileText,
   Highlighter,
   LinkSimple,
   Microphone,
@@ -803,7 +806,7 @@ function Tool({
   keys?: string;
   pressed?: boolean;
   disabled?: boolean;
-  onClick(): void;
+  onClick(event: React.MouseEvent<HTMLButtonElement>): void;
   children: React.ReactNode;
 } & Omit<React.ComponentProps<'button'>, 'onClick'>) {
   return (
@@ -838,14 +841,33 @@ const call =
       return true;
     });
 
+/** What a host's template menu is given: the toolbar's button for it, and, where the menu is opened from elsewhere (a phone's More sheet), its open state. */
+export interface TemplateSlotProps {
+  /** The button that opens the menu: use it as the menu's trigger. */
+  trigger: React.ReactElement;
+  open?: boolean;
+  onOpenChange?(open: boolean): void;
+}
+
+/** Draws the host's own template menu on the toolbar's trigger (Insert's group). */
+export type TemplateSlot = (props: TemplateSlotProps) => React.ReactNode;
+
 export interface EditorToolbarProps {
   editor: Editor;
-  /** Opens the note's version history. Without it the control is not drawn. */
-  onHistory?: () => void;
-  /** Takes the editor full screen. Without it the control is not drawn. */
+  /** Opens the note's version history; `from` is the button that was used. Without it the control is not drawn. */
+  onHistory?: (from: HTMLElement | null) => void;
+  /** Takes the editor full screen, or out of it. Without it the control is not drawn. */
   onFullScreen?: () => void;
-  /** Starts dictation, for a host whose browser has speech recognition. */
+  /** The editor is full screen now: the control says it leaves it. */
+  fullScreen?: boolean;
+  /** Starts or stops dictation, for a host whose browser has speech recognition. */
   onDictate?: () => void;
+  /** Dictation is listening now. */
+  dictating?: boolean;
+  /** The host's template menu, drawn beside Insert. Without it there is no Template control. */
+  templateSlot?: TemplateSlot;
+  /** The bar stays at the top of the window while the note scrolls under it (full screen). */
+  sticky?: boolean;
   /** The note can take images: Insert offers Image and Inline image. */
   images?: boolean;
   /** The note has the dialogs the blocks ask for: Insert offers Equation. */
@@ -856,11 +878,18 @@ export function EditorToolbar({
   editor,
   onHistory,
   onFullScreen,
+  fullScreen = false,
   onDictate,
+  dictating = false,
+  templateSlot,
+  sticky = false,
   images = false,
   blocks = false,
 }: EditorToolbarProps): React.JSX.Element {
   const phone = usePhone();
+  // A phone's More button is where the host's dialogs open from and return to.
+  const [moreButton, setMoreButton] = useState<HTMLButtonElement | null>(null);
+  const [templateOpen, setTemplateOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [href, setHref] = useState('');
   const s = useEditorState({
@@ -999,22 +1028,54 @@ export function EditorToolbar({
     { title: 'Insert' },
   );
 
+  const template = templateSlot
+    ? templateSlot(
+        phone
+          ? {
+              // The bar has no room for it: More opens the menu, anchored here.
+              trigger: (
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  className="pointer-events-none ml-auto size-0 overflow-hidden opacity-0"
+                />
+              ),
+              open: templateOpen,
+              onOpenChange: (next) => {
+                setTemplateOpen(next);
+                // Closed without a choice: back to the text, not to a button that is not there.
+                if (!next) setTimeout(() => editor.commands.focus(), 0);
+              },
+            }
+          : {
+              trigger: (
+                <Trigger label="Insert a template" className={TEXT_BTN}>
+                  <FileText {...ICON} />
+                  Template
+                </Trigger>
+              ),
+            },
+      )
+    : null;
   const dictate = onDictate ? (
     <Tool
       label="Dictate. Your browser's speech service turns speech into text."
+      pressed={dictating ? true : undefined}
       onClick={onDictate}
     >
       <Microphone {...ICON} />
     </Tool>
   ) : null;
   const versions = onHistory ? (
-    <Tool label="Version history" onClick={onHistory}>
+    <Tool label="Version history" onClick={(e) => onHistory(e.currentTarget)}>
       <ClockCounterClockwise {...ICON} />
     </Tool>
   ) : null;
-  const fullScreen = onFullScreen ? (
-    <Tool label="Full screen" onClick={onFullScreen}>
-      <ArrowsOut {...ICON} />
+  const fullScreenLabel = fullScreen ? 'Exit full screen' : 'Full screen';
+  const fullScreenButton = onFullScreen ? (
+    <Tool label={fullScreenLabel} onClick={onFullScreen}>
+      {fullScreen ? <ArrowsIn {...ICON} /> : <ArrowsOut {...ICON} />}
     </Tool>
   ) : null;
 
@@ -1057,12 +1118,20 @@ export function EditorToolbar({
       entries: paragraphEntries(s),
     },
   ];
-  if (onDictate || onHistory || onFullScreen) more.push({ kind: 'sep' });
+  if (templateSlot || onDictate || onHistory || onFullScreen)
+    more.push({ kind: 'sep' });
+  if (templateSlot)
+    more.push({
+      kind: 'action',
+      id: 'template',
+      label: 'Template',
+      run: call(() => setTemplateOpen(true)),
+    });
   if (onDictate)
     more.push({
       kind: 'action',
       id: 'dictate',
-      label: 'Dictate',
+      label: dictating ? 'Stop dictating' : 'Dictate',
       run: call(onDictate),
     });
   if (onHistory)
@@ -1070,13 +1139,13 @@ export function EditorToolbar({
       kind: 'action',
       id: 'history',
       label: 'Version history',
-      run: call(onHistory),
+      run: call(() => onHistory(moreButton)),
     });
   if (onFullScreen)
     more.push({
       kind: 'action',
       id: 'full',
-      label: 'Full screen',
+      label: fullScreenLabel,
       run: call(onFullScreen),
     });
 
@@ -1084,7 +1153,9 @@ export function EditorToolbar({
     'flex flex-[1_1_auto] flex-wrap items-center gap-0.5 max-sm:basis-full';
 
   return (
-    <div className="flex flex-col items-start gap-2">
+    <div
+      className={`flex flex-col items-start gap-2${sticky ? ' sticky top-0 z-10 bg-surface-1 pt-3 pb-1' : ''}`}
+    >
       <Toolbar.Root
         aria-label="Formatting"
         className="flex w-full max-w-full flex-wrap items-center gap-y-1 self-stretch rounded-[10px] bg-sunken p-1"
@@ -1098,12 +1169,17 @@ export function EditorToolbar({
               {menu(
                 'More tools',
                 more,
-                <Trigger label="More tools" className={`${TEXT_BTN} ml-auto`}>
+                <Trigger
+                  ref={setMoreButton}
+                  label="More tools"
+                  className={`${TEXT_BTN} ml-auto`}
+                >
                   <DotsThree size={16} weight="bold" aria-hidden="true" />
                   More
                 </Trigger>,
                 { title: 'More tools', align: 'end' },
               )}
+              {template}
             </div>
             <div className={ROW}>
               {marks}
@@ -1189,11 +1265,12 @@ export function EditorToolbar({
               )}
               <Sep />
               {insert}
+              {template}
               {dictate}
-              {versions || fullScreen ? (
+              {versions || fullScreenButton ? (
                 <span className="ml-auto flex items-center gap-0.5">
                   {versions}
-                  {fullScreen}
+                  {fullScreenButton}
                 </span>
               ) : null}
             </div>
@@ -1205,6 +1282,8 @@ export function EditorToolbar({
           onSubmit={applyLink}
           onKeyDown={(e) => {
             if (e.key === 'Escape') {
+              // Taken: it closes this form and nothing around it (full screen).
+              e.preventDefault();
               setLinkOpen(false);
               editor.commands.focus();
             }

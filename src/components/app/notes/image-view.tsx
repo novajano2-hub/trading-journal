@@ -13,8 +13,8 @@ import {
   useEditorState,
   type NodeViewProps,
 } from '@tiptap/react';
-import { useLayoutEffect, useRef, useState } from 'react';
-import { useLazyFileUrl } from '../use-file-url';
+import { useContext, useLayoutEffect, useRef, useState } from 'react';
+import { EagerFilesContext, useLazyFileUrl } from '../use-file-url';
 import {
   fileIdOf,
   MAX_WIDTH,
@@ -144,6 +144,8 @@ function ImageFrame({
   const id = fileIdOf(node.attrs.src);
   const alt = String(node.attrs.alt ?? '') || 'Image';
   const { url, status, ref } = useLazyFileUrl<HTMLDivElement>(id);
+  // A print layout draws every image now; the browser's own waiting is off too.
+  const eager = useContext(EagerFilesContext);
   const bridge = (
     extension.options as { bridge?: () => ImageBridge }
   ).bridge?.();
@@ -172,7 +174,7 @@ function ImageFrame({
         <img
           src={url}
           alt={alt}
-          loading="lazy"
+          loading={eager ? 'eager' : 'lazy'}
           decoding="async"
           draggable={false}
         />

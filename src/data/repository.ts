@@ -20,6 +20,7 @@ import type {
   JournalEntry,
   NoteFolder,
   NoteTemplate,
+  NoteVersion,
   Rule,
   RuleGroup,
   Side,
@@ -616,6 +617,40 @@ export interface FilesRepo {
   reassign(ws: string, from: string, to: string): Promise<void>;
 }
 
+/** How long a kept version of a note stays (B39). */
+export const NOTE_VERSION_DAYS = 30;
+
+/**
+ * Kept versions of a note's body (B39). A version is the body as it stood;
+ * the title, tags and folder are not part of one.
+ */
+export interface NoteVersionsRepo {
+  /**
+   * The note's versions, newest first. Removes the note's versions older than
+   * `NOTE_VERSION_DAYS` first. Reads on a finished day's note too.
+   */
+  list(ws: string, noteId: string): Promise<NoteVersion[]>;
+  /**
+   * Keeps `body` as a version of the note. Leaves it out when the note's newest
+   * version already holds that body. Throws NotFoundError for a note that is
+   * not stored (no version outlives its note).
+   */
+  keep(
+    ws: string,
+    noteId: string,
+    body: unknown,
+    kind: NoteVersion['kind'],
+  ): Promise<void>;
+  /**
+   * Keeps the note's current body as a `before-restore` version, then writes
+   * the version's body, and only that, through the journal's save (so the title,
+   * tags, folder and star stay). One transaction. Throws NotFoundError for a
+   * note or a version of another note that is not there, LockedDayError for a
+   * finished day's daily note (nothing is written then).
+   */
+  restore(ws: string, noteId: string, versionId: string): Promise<JournalEntry>;
+}
+
 /**
  * The edit history (B26 to B28): one row per changed field, written by each
  * repository write in the transaction that makes the change.
@@ -724,6 +759,7 @@ export interface Repository {
   days: DaysRepo;
   dayShots: DayShotsRepo;
   files: FilesRepo;
+  noteVersions: NoteVersionsRepo;
   history: HistoryRepo;
   targetRules: TargetRulesRepo;
   feeRules: FeeRulesRepo;

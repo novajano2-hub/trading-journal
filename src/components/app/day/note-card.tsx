@@ -1,12 +1,7 @@
 'use client';
 
-import {
-  CaretDown,
-  FileText,
-  LockSimple,
-} from '@phosphor-icons/react/dist/ssr';
+import { LockSimple } from '@phosphor-icons/react/dist/ssr';
 import { useRef, useState } from 'react';
-import { buttonClasses } from '@/components/ui/button-styles';
 import { Chip } from '@/components/ui/chip';
 import { useJournal, usePrefs, useTemplates } from '@/data/query/hooks';
 import type { JournalEntry, NoteTemplate } from '@/domain/types';
@@ -14,9 +9,11 @@ import type { DayMode } from '@/lib/day-routes';
 import { CARD, CARD_PAD, Caption, CardHeader } from '../dashboard/shared';
 import { ConfirmDialog } from '../confirm-dialog';
 import { findDailyEntry } from '../notebook/notebook-model';
-import { clock } from '@/lib/time-format';
+import { clock, dayLabel } from '@/lib/time-format';
 import { TemplatesDialog } from '../notebook/templates-dialog';
+import type { TemplateSlot } from '../notes/editor-toolbar';
 import type { NoteEditorHandle } from '../notes/note-editor';
+import { NoteMenu } from '../notes/note-menu';
 import { DayNoteBinding, type NoteStatus } from '../trades/trade-journal';
 import { FirstVisitTip } from './first-visit-tip';
 import { TemplateMenu } from './template-menu';
@@ -31,16 +28,18 @@ function textOf(node: unknown): string {
     : own;
 }
 
+const EMPTY_DOC = { type: 'doc', content: [{ type: 'paragraph' }] };
+
 const LINK =
   'inline-flex items-center rounded-chip font-semibold text-accent-ink outline-offset-2 hover:text-accent-hover focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11';
 
 /**
- * The day's note: Templates inserts at the cursor, Change template replaces
+ * The day's note: Template (in the editor's toolbar) inserts at the cursor, Change template replaces
  * the body (after asking, when you have written in it) and records the
  * template. It saves as you type, and is read-only for a finished day. The
  * plan and the review pages both show it; the template line, Change template
  * and the one-time tip belong to plan mode (TradeZella's review note has
- * none), and Templates stays in both.
+ * none), and Template stays in both. Export and import sit in the header.
  */
 export function NoteCard({
   date,
@@ -100,18 +99,20 @@ export function NoteCard({
             : `Saved ${clock(entry.updatedAt, timeZone, false)}`
           : null;
 
-  const templatesButton = (
-    <button type="button" className={buttonClasses('ghost', 'sm')}>
-      <FileText size={15} aria-hidden="true" />
-      Templates
-      <CaretDown
-        size={12}
-        weight="bold"
-        aria-hidden="true"
-        className="text-faint"
-      />
-    </button>
-  );
+  // Insert's neighbour in the editor's toolbar: the daily templates, with the
+  // ways to manage them. A closed day's note takes none.
+  const templateSlot: TemplateSlot | undefined = locked
+    ? undefined
+    : (slot) => (
+        <TemplateMenu
+          {...slot}
+          onPick={(t) => handle.current?.insertContent(structuredClone(t.body))}
+          manage={{
+            onManage: () => setManage('all'),
+            onEditDefault: () => setManage('default'),
+          }}
+        />
+      );
 
   return (
     <section
@@ -136,18 +137,13 @@ export function NoteCard({
           ) : undefined
         }
         end={
-          locked ? undefined : (
-            <TemplateMenu
-              trigger={templatesButton}
-              onPick={(t) =>
-                handle.current?.insertContent(structuredClone(t.body))
-              }
-              manage={{
-                onManage: () => setManage('all'),
-                onEditDefault: () => setManage('default'),
-              }}
-            />
-          )
+          <NoteMenu
+            read={() => ({
+              title: entry?.title ?? `Daily review, ${dayLabel(date)}`,
+              tags: entry?.tags ?? [],
+              body: handle.current?.getJSON() ?? entry?.body ?? EMPTY_DOC,
+            })}
+          />
         }
       />
       {plan && (source || !locked) ? (
@@ -177,6 +173,7 @@ export function NoteCard({
           readOnly={readOnly}
           handleRef={handle}
           stamp={stamp}
+          templateSlot={templateSlot}
           onStatus={setStatus}
         />
       </div>

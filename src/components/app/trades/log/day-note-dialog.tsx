@@ -4,7 +4,6 @@ import {
   ArrowSquareOut,
   CaretDown,
   DotsThree,
-  FileText,
   NotePencil,
   Star,
   Trash,
@@ -30,7 +29,9 @@ import { signTone } from '../../dashboard/shared';
 import { LockLine, useDayFinished } from '../../day/day-lock';
 import { TemplateMenu } from '../../day/template-menu';
 import { findDailyEntry } from '../../notebook/notebook-model';
+import type { TemplateSlot } from '../../notes/editor-toolbar';
 import type { NoteEditorHandle } from '../../notes/note-editor';
+import { useNoteTransfer } from '../../notes/note-menu';
 import {
   DayNoteBinding,
   type NoteControl,
@@ -41,14 +42,17 @@ import { useLogEnv } from './log-env';
 
 /*
  * The day note dialog (the record: a modal titled for the day note, from Add
- * note or View note on a day card). Header: Templates, a link to the
- * notebook, a star, a "..." menu and close. A summary row: the date, the net
+ * note or View note on a day card). Header: a link to the notebook, a star, a
+ * "..." menu (export, import, Move to Trash) and close; Template sits in the
+ * editor's toolbar. A summary row: the date, the net
  * and "n trades, x% win rate", expanding to the day's trades. The editor, and
  * Save at the bottom right.
  *
  * The record leaves several calls UNKNOWN; Keel's calls are marked where they
  * are made.
  */
+
+const EMPTY_DOC = { type: 'doc', content: [{ type: 'paragraph' }] };
 
 const GHOST =
   'inline-flex h-8 items-center gap-1.5 rounded-control px-2 text-[13px] font-medium text-muted outline-offset-0 hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent aria-disabled:pointer-events-none aria-disabled:opacity-45 pointer-coarse:h-11 pointer-coarse:min-w-11 pointer-coarse:justify-center';
@@ -104,6 +108,14 @@ export function DayNoteDialog({
   // A finished day's note is frozen (K3), and a trashed one is read-only until restored (E109).
   const readOnly = finished || trashed;
   const group = groups?.get(date);
+  // Export and import read the note as it stands in the editor.
+  const transfer = useNoteTransfer({
+    read: () => ({
+      title: entry?.title ?? `Daily review, ${dayLabel(date)}`,
+      tags: entry?.tags ?? [],
+      body: handle.current?.getJSON() ?? entry?.body ?? EMPTY_DOC,
+    }),
+  });
 
   const onStatus = (s: NoteStatus, error?: unknown) => {
     lastStatus.current = s;
@@ -216,24 +228,6 @@ export function DayNoteDialog({
 
   const actions = (
     <>
-      {/* Keel's call (TradeZella unknown): a finished day, or a note in Trash, shows no Templates, star or menu, as the Notebook's pane does. */}
-      {readOnly ? null : (
-        <TemplateMenu
-          trigger={
-            <button type="button" className={GHOST}>
-              <FileText size={16} aria-hidden="true" />
-              <span className="max-sm:sr-only">Templates</span>
-              <CaretDown
-                size={12}
-                weight="bold"
-                aria-hidden="true"
-                className="text-faint"
-              />
-            </button>
-          }
-          onPick={(t) => handle.current?.insertContent(structuredClone(t.body))}
-        />
-      )}
       {/* Keel's call (TradeZella unknown): the link needs the note, so it waits until there is one (nothing is written by looking). */}
       {entry ? (
         <Link
@@ -254,6 +248,7 @@ export function DayNoteDialog({
           <span className="max-sm:sr-only">Open in Notebook</span>
         </button>
       )}
+      {/* Keel's call (TradeZella unknown): a finished day, or a note in Trash, shows no star, as the Notebook's pane does. */}
       {readOnly ? null : (
         <>
           {/* Keel's call (TradeZella unknown): the star needs the note, so it waits until there is one. */}
@@ -272,13 +267,19 @@ export function DayNoteDialog({
               aria-hidden="true"
             />
           </button>
-          {/* Keel's call (TradeZella unknown): the "..." menu holds Move to Trash. */}
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger aria-label="More" className={GLYPH}>
-              <DotsThree size={18} weight="bold" aria-hidden="true" />
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Portal>
-              <DropdownMenu.Content align="end" sideOffset={6} className={MENU}>
+        </>
+      )}
+      {/* Keel's call (TradeZella unknown): the "..." menu holds the note's export and import (B40, TradeZella's overflow menu) and Move to Trash; a finished day, or a note in Trash, keeps the export and the import, and has no Move to Trash. */}
+      <DropdownMenu.Root>
+        <DropdownMenu.Trigger aria-label="More" className={GLYPH}>
+          <DotsThree size={18} weight="bold" aria-hidden="true" />
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content align="end" sideOffset={6} className={MENU}>
+            {transfer.items}
+            {readOnly ? null : (
+              <>
+                <DropdownMenu.Separator className="my-1 h-px bg-line" />
                 <DropdownMenu.Item
                   className={ITEM}
                   disabled={!entry}
@@ -287,107 +288,121 @@ export function DayNoteDialog({
                   <Trash size={15} aria-hidden="true" className="text-muted" />
                   Move to Trash
                 </DropdownMenu.Item>
-              </DropdownMenu.Content>
-            </DropdownMenu.Portal>
-          </DropdownMenu.Root>
-        </>
-      )}
+              </>
+            )}
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
     </>
   );
 
-  return (
-    <MorphDialog
-      open={open}
-      onOpenChange={(next) => void close(next)}
-      origin={origin}
-      returnFocus={origin}
-      title="Day note"
-      description={`${dayLabel(date, { year: true })}${source ? `, from the ${source.name} template` : ''}`}
-      size="sheet"
-      actions={actions}
-      footer={
-        <div className="flex items-center gap-3">
-          <span
-            aria-live="polite"
-            className="min-w-0 truncate text-[12.5px] text-faint"
-          >
-            {caption}
-          </span>
-          {status === 'failed' || problem ? (
-            <span role="alert" className="min-w-0 text-[12.5px] text-loss">
-              {problem ??
-                (lockedNotice
-                  ? 'That day was closed, so this note can no longer change.'
-                  : "Couldn't save. Press Save to try again.")}
-            </span>
-          ) : null}
-          <div className="ml-auto flex items-center gap-2">
-            {stuck && status === 'failed' ? (
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setStuck(false);
-                  onOpenChange(false);
-                }}
-              >
-                Close without saving
-              </Button>
-            ) : null}
-            {/* Keel's call (TradeZella unknown): with nothing to save (a finished day, a note in Trash) the button reads Done and only closes. */}
-            <Button onClick={() => void close(false)}>
-              {readOnly ? 'Done' : 'Save'}
-            </Button>
-          </div>
-        </div>
-      }
-    >
-      <button
-        type="button"
-        aria-expanded={expanded}
-        aria-controls={panel}
-        onClick={() => setExpanded((e) => !e)}
-        className="mt-1 flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-control bg-sunken px-3.5 py-3 text-left text-[13.5px] outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
-      >
-        <b className="font-semibold text-text">{dayLabel(date)}</b>
-        <span
-          className={`font-semibold tabular-nums ${net && group ? signTone(group.stats.net!) : 'text-faint'}`}
-        >
-          {net ? net.text : noteOnly ? display.cash(0, false).text : 'None'}
-        </span>
-        <span className="text-muted">
-          {noteOnly ? 'No trades this day' : count}
-        </span>
-        <span className="ml-auto inline-flex items-center gap-1 font-semibold text-accent-ink">
-          {expanded ? 'Hide trades' : 'Show trades'}
-          <CaretDown
-            size={12}
-            weight="bold"
-            aria-hidden="true"
-            className={expanded ? 'rotate-180' : ''}
-          />
-        </span>
-      </button>
-      <div id={panel} hidden={!expanded}>
-        {/* Keel's call (TradeZella unknown, record line 701): the expanded summary lists the day as its card does. */}
-        {expanded && group ? (
-          <DayTables
-            group={group}
-            date={dayLabel(date, { year: true })}
-            columns={columns}
-          />
-        ) : null}
-      </div>
-      {finished && !trashed ? <LockLine className="mt-3" /> : null}
-      <div className="note-day mt-3 min-w-0">
-        <DayNoteBinding
-          date={date}
-          readOnly={finished}
-          handleRef={handle}
-          controlRef={control}
-          onStatus={onStatus}
+  // Insert's neighbour in the editor's toolbar. Keel's call (TradeZella unknown): a finished day, or a note in Trash, takes no template.
+  const templateSlot: TemplateSlot | undefined = readOnly
+    ? undefined
+    : (slot) => (
+        <TemplateMenu
+          {...slot}
+          onPick={(t) => handle.current?.insertContent(structuredClone(t.body))}
         />
-      </div>
-    </MorphDialog>
+      );
+
+  return (
+    <>
+      <MorphDialog
+        open={open}
+        onOpenChange={(next) => void close(next)}
+        origin={origin}
+        returnFocus={origin}
+        title="Day note"
+        description={`${dayLabel(date, { year: true })}${source ? `, from the ${source.name} template` : ''}`}
+        size="sheet"
+        actions={actions}
+        footer={
+          <div className="flex items-center gap-3">
+            <span
+              aria-live="polite"
+              className="min-w-0 truncate text-[12.5px] text-faint"
+            >
+              {caption}
+            </span>
+            {status === 'failed' || problem ? (
+              <span role="alert" className="min-w-0 text-[12.5px] text-loss">
+                {problem ??
+                  (lockedNotice
+                    ? 'That day was closed, so this note can no longer change.'
+                    : "Couldn't save. Press Save to try again.")}
+              </span>
+            ) : null}
+            <div className="ml-auto flex items-center gap-2">
+              {stuck && status === 'failed' ? (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setStuck(false);
+                    onOpenChange(false);
+                  }}
+                >
+                  Close without saving
+                </Button>
+              ) : null}
+              {/* Keel's call (TradeZella unknown): with nothing to save (a finished day, a note in Trash) the button reads Done and only closes. */}
+              <Button onClick={() => void close(false)}>
+                {readOnly ? 'Done' : 'Save'}
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-controls={panel}
+          onClick={() => setExpanded((e) => !e)}
+          className="mt-1 flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-control bg-sunken px-3.5 py-3 text-left text-[13.5px] outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
+        >
+          <b className="font-semibold text-text">{dayLabel(date)}</b>
+          <span
+            className={`font-semibold tabular-nums ${net && group ? signTone(group.stats.net!) : 'text-faint'}`}
+          >
+            {net ? net.text : noteOnly ? display.cash(0, false).text : 'None'}
+          </span>
+          <span className="text-muted">
+            {noteOnly ? 'No trades this day' : count}
+          </span>
+          <span className="ml-auto inline-flex items-center gap-1 font-semibold text-accent-ink">
+            {expanded ? 'Hide trades' : 'Show trades'}
+            <CaretDown
+              size={12}
+              weight="bold"
+              aria-hidden="true"
+              className={expanded ? 'rotate-180' : ''}
+            />
+          </span>
+        </button>
+        <div id={panel} hidden={!expanded}>
+          {/* Keel's call (TradeZella unknown, record line 701): the expanded summary lists the day as its card does. */}
+          {expanded && group ? (
+            <DayTables
+              group={group}
+              date={dayLabel(date, { year: true })}
+              columns={columns}
+            />
+          ) : null}
+        </div>
+        {finished && !trashed ? <LockLine className="mt-3" /> : null}
+        <div className="note-day mt-3 min-w-0">
+          <DayNoteBinding
+            date={date}
+            readOnly={finished}
+            handleRef={handle}
+            controlRef={control}
+            templateSlot={templateSlot}
+            onStatus={onStatus}
+          />
+        </div>
+      </MorphDialog>
+      {transfer.host}
+    </>
   );
 }
 

@@ -22,6 +22,7 @@ import type {
 } from '@/domain/types';
 import { localDate } from '@/domain/time';
 import { dayLabel } from './trade-time';
+import type { TemplateSlot } from '../notes/editor-toolbar';
 import { NoteEditor, type NoteEditorHandle } from '../notes/note-editor';
 import { TagPicker } from '../tag-picker';
 import { findDailyEntry } from '../notebook/notebook-model';
@@ -268,6 +269,7 @@ function NoteBody({
   handleRef,
   stamp,
   controlRef,
+  templateSlot,
   onStatus,
 }: {
   label: string;
@@ -283,6 +285,8 @@ function NoteBody({
   stamp?: { current: Partial<JournalEntry> | undefined };
   /** Receives the editor's `NoteControl`. */
   controlRef?: { current: NoteControl | null };
+  /** The host's template menu, drawn in the editor's toolbar. */
+  templateSlot?: TemplateSlot;
   onStatus(s: NoteStatus, error?: unknown): void;
 }): React.JSX.Element {
   const save = useSaveJournalEntry();
@@ -424,6 +428,7 @@ function NoteBody({
       placeholder={placeholder}
       noteId={entry?.id}
       ensureNoteId={ensureNoteId}
+      templateSlot={templateSlot}
       onChange={(doc) => {
         latest.current = doc;
         onStatus('saving');
@@ -498,6 +503,7 @@ export function DayNoteBinding({
   handleRef,
   stamp,
   controlRef,
+  templateSlot,
   onStatus,
 }: {
   date: string;
@@ -506,6 +512,8 @@ export function DayNoteBinding({
   stamp?: { current: Partial<JournalEntry> | undefined };
   /** Receives the editor's `NoteControl`: settle what is waiting, or change the note's fields in its queue. */
   controlRef?: { current: NoteControl | null };
+  /** The host's template menu, drawn in the editor's toolbar. */
+  templateSlot?: TemplateSlot;
   onStatus(s: NoteStatus, error?: unknown): void;
 }): React.JSX.Element {
   const journal = useJournal();
@@ -580,6 +588,7 @@ export function DayNoteBinding({
         handleRef={handleRef}
         stamp={stamp}
         controlRef={controlRef}
+        templateSlot={templateSlot}
         onStatus={onStatus}
       />
     </>

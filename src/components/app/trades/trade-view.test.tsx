@@ -1112,6 +1112,56 @@ test('the trade note tab does not read the journal', async () => {
   expect(list).not.toHaveBeenCalled();
 });
 
+test('the notes card exports the note in view, on the trade tab and on the daily tab', async () => {
+  const blobs: Blob[] = [];
+  URL.createObjectURL = vi.fn((b: Blob) => {
+    blobs.push(b);
+    return 'blob:note';
+  });
+  URL.revokeObjectURL = vi.fn();
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  renderApp(<TradeView id="t-c" />, { sample: sample(), url: URL_C });
+  await screen.findByRole('textbox', { name: 'Trade note' });
+  const exportKeel = async () => {
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: 'Export or import' }),
+      {
+        key: 'Enter',
+      },
+    );
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Export as Keel note' }),
+    );
+    await waitFor(() => expect(blobs.length).toBeGreaterThan(0));
+    return JSON.parse(await blobs.at(-1)!.text()) as {
+      kind: string;
+      title: string;
+    };
+  };
+  // A trade with no note yet exports an empty one, under a name that says whose it is.
+  const trade = await exportKeel();
+  expect(trade.kind).toBe('keel-note');
+  expect(trade.title).toMatch(/trade note$/);
+
+  fireEvent.click(screen.getByRole('radio', { name: 'Daily note' }));
+  await screen.findByRole('textbox', { name: 'Daily note' });
+  const count = blobs.length;
+  const day = await (async () => {
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: 'Export or import' }),
+      {
+        key: 'Enter',
+      },
+    );
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Export as Keel note' }),
+    );
+    await waitFor(() => expect(blobs.length).toBe(count + 1));
+    return JSON.parse(await blobs.at(-1)!.text()) as { title: string };
+  })();
+  expect(day.title).toMatch(/^Daily review, /);
+});
+
 test("the Daily note dates by the trader's zone, not the account's (K35)", async () => {
   const base = sample(
     {

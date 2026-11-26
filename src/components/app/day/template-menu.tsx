@@ -3,7 +3,7 @@
 import { DropdownMenu } from 'radix-ui';
 import { useTemplates } from '@/data/query/hooks';
 import { KEEL_DAILY_IDS } from '@/data/seed/templates';
-import type { NoteTemplate } from '@/domain/types';
+import type { JournalKind, NoteTemplate } from '@/domain/types';
 
 const MENU =
   'z-[60] min-w-[220px] origin-(--radix-dropdown-menu-content-transform-origin) rounded-[12px] border border-line bg-surface-1 p-1.5 text-text shadow-[var(--shadow)] outline-none motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in';
@@ -12,24 +12,31 @@ const ITEM =
 const GROUP = 'px-2.5 pt-1.5 pb-1 text-[12px] font-medium text-faint';
 
 /**
- * The daily templates a day note can take: yours, then the built-in ones
- * (the Daily review and Keel's three) as "Recommended". With `manage`, See
- * more templates, Manage templates and Edit default follow. `trigger` is the
- * one button that opens it.
+ * The templates a note can take (the daily ones for a day note; `kind` asks
+ * for another kind's, or `all` for every kind: a plain note can take any):
+ * yours, then the built-in ones (the Daily review and
+ * Keel's three) as "Recommended". With `manage`, See more templates, Manage
+ * templates and Edit default follow. `trigger` is the one button that opens
+ * it; `open` is for a menu that is opened from another control (a phone's More
+ * sheet), and leaves the menu uncontrolled when it is not given.
  */
 export function TemplateMenu({
   trigger,
   onPick,
   manage,
+  open,
   onOpenChange,
+  kind = 'daily-review',
 }: {
   trigger: React.ReactElement;
   onPick(template: NoteTemplate): void;
   manage?: { onManage(): void; onEditDefault(): void };
+  open?: boolean;
   onOpenChange?(open: boolean): void;
+  kind?: JournalKind | 'all';
 }): React.JSX.Element {
   const daily = (useTemplates().data ?? []).filter(
-    (t) => t.kind === 'daily-review',
+    (t) => kind === 'all' || t.kind === kind,
   );
   const own = daily.filter((t) => !t.builtIn);
   const builtIn = [
@@ -45,7 +52,7 @@ export function TemplateMenu({
       </DropdownMenu.Item>
     ));
   return (
-    <DropdownMenu.Root onOpenChange={onOpenChange}>
+    <DropdownMenu.Root open={open} onOpenChange={onOpenChange}>
       <DropdownMenu.Trigger asChild>{trigger}</DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content align="end" sideOffset={6} className={MENU}>

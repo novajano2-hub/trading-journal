@@ -10,7 +10,8 @@
  * the surface), and a highlight is that ink as a tint under the note's own
  * text colour. Hues with a job elsewhere (gain, loss, info) are left out.
  */
-:root {
+:root,
+[data-print-root] {
   --note-serif: ui-serif, Georgia, Cambria, 'Times New Roman', serif;
   --note-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --note-ink-marigold: var(--warn);
@@ -29,7 +30,8 @@
   --note-ink-plum: #c192df;
   --note-ink-olive: #b5c23c;
 }
-:root {
+:root,
+[data-print-root] {
   --note-hl-marigold: color-mix(
     in srgb,
     var(--note-ink-marigold) 26%,

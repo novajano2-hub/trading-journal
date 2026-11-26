@@ -26,9 +26,11 @@ import {
   useFiles,
   useHistory,
   useJournal,
+  useKeepVersion,
   useMergeTrades,
   useMoveAccountTrades,
   useMoveTrades,
+  useNoteVersions,
   usePatterns,
   useRemoveAccount,
   useRemoveFeeRule,
@@ -37,7 +39,9 @@ import {
   useRemoveTrades,
   useRemoveTagCategory,
   useRemoveTargetRule,
+  useRestoreVersion,
   useSaveFeeRule,
+  useSaveJournalEntry,
   useSaveTargetRule,
   useSetActiveWorkspace,
   useSetFillCosts,
@@ -819,4 +823,82 @@ test('usePatterns(false) computes nothing and waits', async () => {
   await waitFor(() => expect(result.current.trades.data).toHaveLength(3));
   expect(result.current.off.data).toBeUndefined();
   expect(result.current.off.status).toBe('pending');
+});
+
+test('kept versions list, restore and refresh the note and its list', async () => {
+  const doc = (t: string) => ({
+    type: 'doc',
+    content: [{ type: 'paragraph', content: [{ type: 'text', text: t }] }],
+  });
+  const { result } = renderHook(
+    () => {
+      const [id, setId] = useState<string | undefined>(undefined);
+      return {
+        setId,
+        save: useSaveJournalEntry(),
+        journal: useJournal(),
+        versions: useNoteVersions(id),
+        keep: useKeepVersion(),
+        restore: useRestoreVersion(),
+      };
+    },
+    { wrapper: wrapper() },
+  );
+  await waitFor(() => expect(result.current.journal.isSuccess).toBe(true));
+  // With no note id the list is idle, and nothing is read.
+  expect(result.current.versions.fetchStatus).toBe('idle');
+
+  let noteId = '';
+  await act(async () => {
+    noteId = (
+      await result.current.save.mutateAsync({
+        kind: 'note',
+        title: 'T',
+        body: doc('one'),
+        linkedTradeIds: [],
+        tags: [],
+      })
+    ).id;
+  });
+  act(() => result.current.setId(noteId));
+  await waitFor(() => expect(result.current.versions.data).toEqual([]));
+
+  // Keeping refreshes the list.
+  await act(async () => {
+    await result.current.keep.mutateAsync({
+      noteId,
+      body: doc('one'),
+      kind: 'auto',
+    });
+  });
+  await waitFor(() => expect(result.current.versions.data).toHaveLength(1));
+  const version = result.current.versions.data![0]!;
+  expect(version).toMatchObject({ noteId, kind: 'auto', body: doc('one') });
+
+  // The note moves on, then a restore brings the version back: the journal
+  // and the list both refresh, and a "before restore" version is there.
+  await act(async () => {
+    await result.current.save.mutateAsync({
+      ...result.current.journal.data!.find((e) => e.id === noteId)!,
+      body: doc('two'),
+    });
+  });
+  await act(async () => {
+    const restored = await result.current.restore.mutateAsync({
+      noteId,
+      versionId: version.id,
+    });
+    expect(restored.body).toEqual(doc('one'));
+  });
+  await waitFor(() =>
+    expect(
+      result.current.journal.data!.find((e) => e.id === noteId)!.body,
+    ).toEqual(doc('one')),
+  );
+  await waitFor(() =>
+    expect(result.current.versions.data!.map((v) => v.kind)).toEqual([
+      'before-restore',
+      'auto',
+    ]),
+  );
 });

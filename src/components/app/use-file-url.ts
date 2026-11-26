@@ -5,8 +5,17 @@
 // into an object URL when the image is wanted, and the URL is revoked when it
 // goes. An image waits until it is near the viewport (where the browser can
 // say), so a long note or a trade with many shots reads only what is in sight.
-import { useEffect, useState, type RefCallback } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type RefCallback,
+} from 'react';
 import { useReadFile } from '@/data/query/hooks';
+
+/** True under a print or export layout: nothing waits to be near the viewport, every image is read at once. */
+export const EagerFilesContext = createContext(false);
 
 export type FileUrlStatus = 'idle' | 'loading' | 'ready' | 'missing' | 'error';
 
@@ -88,6 +97,7 @@ export function useNearViewport<T extends Element>(
   const [seen, setSeen] = useState(false);
   const [el, setEl] = useState<T | null>(null);
   const supported = typeof IntersectionObserver !== 'undefined';
+  const eager = useContext(EagerFilesContext);
 
   useEffect(() => {
     if (seen || !supported || !el) return;
@@ -104,7 +114,7 @@ export function useNearViewport<T extends Element>(
     return () => io.disconnect();
   }, [el, seen, supported, margin]);
 
-  return [setEl, seen || !supported];
+  return [setEl, seen || !supported || eager];
 }
 
 /** `useFileUrl` for an image that waits until it is near the viewport; put `ref` on the image's box. */

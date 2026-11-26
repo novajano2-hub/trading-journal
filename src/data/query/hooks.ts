@@ -7,7 +7,7 @@ import {
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { ImportContext, ImportPlan } from '@/domain/import/plan';
 import { computePatterns, type PatternEnv } from '@/domain/patterns';
 import { useHydrated } from '@/lib/use-hydrated';
@@ -25,6 +25,7 @@ import type {
   JournalEntry,
   NoteFolder,
   NoteTemplate,
+  NoteVersion,
   StoredFile,
   StoredFileMeta,
   Strategy,
@@ -1145,6 +1146,118 @@ export function useRemoveFile(): UseMutationResult<
 > {
   return useWorkspaceWrite('files.remove', (r, ws, v: { id: string }) =>
     r.files.remove(ws, v.id),
+  );
+}
+
+/**
+ * A stored note's kept versions, newest first (B39). Idle while `noteId` is
+ * unknown (a note that is not stored yet has none). Reading purges those older
+ * than 30 days.
+ */
+export function useNoteVersions(
+  noteId: string | undefined,
+): UseQueryResult<NoteVersion[]> {
+  return useWorkspaceQuery(
+    (ws) => keys.noteVersions(ws, noteId ?? ''),
+    (r, ws) => r.noteVersions.list(ws, noteId!),
+    noteId !== undefined,
+  );
+}
+
+/** Keeps a body as a version of a stored note; a body the newest version already holds is left out. */
+export function useKeepVersion(): UseMutationResult<
+  void,
+  Error,
+  { noteId: string; body: unknown; kind: NoteVersion['kind'] }
+> {
+  return useWorkspaceWrite(
+    'noteVersions.keep',
+    (r, ws, v: { noteId: string; body: unknown; kind: NoteVersion['kind'] }) =>
+      r.noteVersions.keep(ws, v.noteId, v.body, v.kind),
+  );
+}
+
+/** An edited note goes this long without a version before one is kept (B39). */
+export const VERSION_IDLE_MS = 5 * 60_000;
+
+/**
+ * Keeps versions of an open note as it is edited (B39). `body` is the note's
+ * text as last edited, and `undefined` while it has not been edited, so
+ * opening a note keeps nothing.
+ * - A version is kept `VERSION_IDLE_MS` after an edit that no version has
+ *   caught up with: the newest text then, however much was typed meanwhile.
+ * - Leaving the note (or the page) keeps what is typed since the last one.
+ * - A note with no id yet (not stored) starts its five minutes when it has one.
+ * A version that could not be written is tried again on the next chance.
+ */
+export function useVersionKeeper(
+  noteId: string | undefined,
+  body: unknown,
+  idleMs = VERSION_IDLE_MS,
+): void {
+  const { mutate } = useKeepVersion();
+  const latest = useRef({ noteId, body });
+  const seen = useRef<unknown>(undefined);
+  // Text typed that no kept version holds yet.
+  const dirty = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const write = useRef(mutate);
+  const flushRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    write.current = mutate;
+    flushRef.current = () => {
+      if (timer.current !== undefined) clearTimeout(timer.current);
+      timer.current = undefined;
+      const { noteId: id, body: text } = latest.current;
+      if (!dirty.current || id === undefined || text === undefined) return;
+      dirty.current = false;
+      write.current(
+        { noteId: id, body: text, kind: 'auto' },
+        {
+          // Not kept: what is still typed stays to be kept on leaving.
+          onError: () => {
+            dirty.current = true;
+          },
+        },
+      );
+    };
+  });
+
+  useEffect(() => {
+    latest.current = { noteId, body };
+    if (body !== undefined && body !== seen.current) {
+      seen.current = body;
+      dirty.current = true;
+    }
+    if (dirty.current && noteId !== undefined && timer.current === undefined)
+      timer.current = setTimeout(() => flushRef.current(), idleMs);
+  }, [noteId, body, idleMs]);
+
+  useEffect(() => {
+    const leave = () => flushRef.current();
+    window.addEventListener('pagehide', leave);
+    return () => {
+      window.removeEventListener('pagehide', leave);
+      leave();
+    };
+  }, []);
+}
+
+/**
+ * Brings a version's body back: the current body is kept as "before restore"
+ * first, and only the body is written (not the title or tags). Resolves to the
+ * note as stored. Rejects with LockedDayError for a finished day's note.
+ */
+export function useRestoreVersion(): UseMutationResult<
+  JournalEntry,
+  Error,
+  { noteId: string; versionId: string }
+> {
+  return useWorkspaceWrite(
+    'noteVersions.restore',
+    (r, ws, v: { noteId: string; versionId: string }) =>
+      r.noteVersions.restore(ws, v.noteId, v.versionId),
   );
 }
 

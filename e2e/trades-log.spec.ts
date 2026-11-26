@@ -177,10 +177,18 @@ test("a finished day's note dialog refuses edits and says why", async ({
   await expect(
     dialog.getByRole('textbox', { name: 'Daily note' }),
   ).toHaveAttribute('contenteditable', 'false');
-  await expect(dialog.getByRole('button', { name: 'Templates' })).toHaveCount(
-    0,
-  );
-  await expect(dialog.getByRole('button', { name: 'More' })).toHaveCount(0);
+  await expect(
+    dialog.getByRole('button', { name: 'Insert a template' }),
+  ).toHaveCount(0);
+  // The "..." menu stays for the note's export and import; Move to Trash is not in it.
+  await dialog.getByRole('button', { name: 'More' }).click();
+  await expect(
+    page.getByRole('menuitem', { name: 'Export as Keel note' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('menuitem', { name: 'Move to Trash' }),
+  ).toHaveCount(0);
+  await page.keyboard.press('Escape');
   await expect(dialog.getByRole('button', { name: 'Save' })).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Done' }).click();
   await expect(dialog).toBeHidden();

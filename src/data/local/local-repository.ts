@@ -12,6 +12,7 @@ import { localFolders } from './folders';
 import { localHistory } from './history';
 import { localImports } from './imports';
 import { localJournal } from './journal';
+import { localNoteVersions } from './note-versions';
 import { localOnboarding } from './onboarding';
 import { localPrefs } from './prefs';
 import { localStrategies } from './strategies';
@@ -40,6 +41,7 @@ export function createLocalRepository(
 ): Repository {
   const sample = opts.sample ?? defaultSample;
   const ctx = createLocalContext({ ...opts, sample });
+  const journal = localJournal(ctx);
   return {
     workspaces: localWorkspaces(ctx, sample),
     prefs: localPrefs(ctx),
@@ -52,7 +54,8 @@ export function createLocalRepository(
     tagCategories: localTagCategories(ctx),
     templates: localTemplates(ctx),
     folders: localFolders(ctx),
-    journal: localJournal(ctx),
+    journal,
+    noteVersions: localNoteVersions(ctx, journal),
     imports: localImports(ctx),
     tracker: localTracker(ctx),
     days: localDays(ctx),

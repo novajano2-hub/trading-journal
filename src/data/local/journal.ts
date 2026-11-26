@@ -18,6 +18,7 @@ import {
   todayIn,
 } from './routine-today';
 import { deleteOwnerFiles } from './files';
+import { deleteNoteVersions } from './note-versions';
 import { rwTx } from './tx';
 import type { KeelDb } from './db';
 
@@ -96,7 +97,7 @@ function byRecency(a: JournalEntry, b: JournalEntry): number {
   return a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0;
 }
 
-/** Deletes the entries and their image files (B56) and clears `noteId` on trades pointing at them. Call inside an rw transaction over `db.journal`, `db.trades` and `db.files`. */
+/** Deletes the entries, their image files (B56) and their kept versions, and clears `noteId` on trades pointing at them. Call inside an rw transaction over `db.journal`, `db.trades`, `db.files` and `db.noteVersions`. */
 async function deleteEntries(
   db: KeelDb,
   ws: string,
@@ -109,6 +110,7 @@ async function deleteEntries(
     ws,
     ids.map((id) => `note:${id}`),
   );
+  await deleteNoteVersions(db, ws, ids);
   await db.trades
     .where('workspaceId')
     .equals(ws)
@@ -143,11 +145,15 @@ export function localJournal(ctx: LocalContext): JournalRepo {
       if (rows.some(expired)) {
         // A finished day's note is frozen, so the purge leaves it in Trash.
         const purged = new Set<string>();
-        await rwTx(db, [db.journal, db.trades, db.days, db.files], async () => {
-          for (const e of rows.filter(expired))
-            if (!(await isLockedNote(db, ws, e))) purged.add(e.id);
-          await deleteEntries(db, ws, [...purged]);
-        });
+        await rwTx(
+          db,
+          [db.journal, db.trades, db.days, db.files, db.noteVersions],
+          async () => {
+            for (const e of rows.filter(expired))
+              if (!(await isLockedNote(db, ws, e))) purged.add(e.id);
+            await deleteEntries(db, ws, [...purged]);
+          },
+        );
         rows = rows.filter((e) => !purged.has(e.id));
       }
       return rows.map(whole).sort(byRecency);
@@ -211,12 +217,16 @@ export function localJournal(ctx: LocalContext): JournalRepo {
 
     async remove(ws, id) {
       const db = await ctx.db();
-      await rwTx(db, [db.journal, db.trades, db.days, db.files], async () => {
-        const entry = await db.journal.get([ws, id]);
-        if (!entry) throw new NotFoundError('journal entry', id);
-        await refuseLockedNote(db, ws, entry);
-        await deleteEntries(db, ws, [id]);
-      });
+      await rwTx(
+        db,
+        [db.journal, db.trades, db.days, db.files, db.noteVersions],
+        async () => {
+          const entry = await db.journal.get([ws, id]);
+          if (!entry) throw new NotFoundError('journal entry', id);
+          await refuseLockedNote(db, ws, entry);
+          await deleteEntries(db, ws, [id]);
+        },
+      );
     },
 
     trash: (ws, id) => setTrashed(ws, id, true),

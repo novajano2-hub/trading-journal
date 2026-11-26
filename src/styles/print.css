@@ -1,0 +1,92 @@
+/*
+ * Printing. The app prints as it looks, until a print layout is mounted: a
+ * node marked `data-print-root`, a direct child of <body> (a note's PDF is
+ * one; Plan 6C's report PDF is another). Then the page is the layout alone:
+ * everything else is hidden on paper, and the layout reads in the light
+ * palette whatever the app's theme is. On a screen the layout is off to the
+ * side, drawn so that its images load and its fonts settle, and out of reach.
+ */
+@media screen {
+  [data-print-root] {
+    position: fixed;
+    top: 0;
+    left: -10000px;
+    width: 794px;
+    pointer-events: none;
+  }
+}
+
+@media print {
+  @page {
+    margin: 16mm 14mm;
+  }
+
+  body:has(> [data-print-root]) {
+    background: #fff !important;
+  }
+  body:has(> [data-print-root]) > :not([data-print-root]) {
+    display: none !important;
+  }
+
+  [data-print-root] {
+    display: block;
+    position: static;
+    width: auto;
+    margin: 0;
+    color-scheme: light;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    background: #fff;
+    /* theme.css's light tokens, so a page printed from graphite is still ink on paper. */
+    --bg: #ffffff;
+    --surface-1: #ffffff;
+    --sunken: #f0f1f8;
+    --line: #e7e9f3;
+    --line-2: #d5d8ea;
+    --text: #121633;
+    --muted: #4b5175;
+    --faint: #636889;
+    --accent: #2b35af;
+    --accent-ink: #2b35af;
+    --accent-soft: #eeeffc;
+    --accent-tint: #dcdff8;
+    --gain: #0a7a52;
+    --loss: #c22e3a;
+    --warn: #9a5700;
+    --info: #0a6f94;
+    color: var(--text);
+    font-family: var(--font-sans);
+  }
+
+  [data-print-root] .print-title {
+    margin: 0 0 4pt;
+    font-size: 22pt;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+  [data-print-root] .print-tags {
+    margin: 0 0 12pt;
+    font-size: 10pt;
+    color: var(--muted);
+  }
+  [data-print-root] .note-prose {
+    max-width: none;
+    margin-top: 0;
+  }
+  [data-print-root] a {
+    color: inherit;
+    text-decoration: underline;
+  }
+  [data-print-root] h1,
+  [data-print-root] h2,
+  [data-print-root] h3 {
+    break-after: avoid;
+  }
+  [data-print-root] figure,
+  [data-print-root] tr,
+  [data-print-root] pre,
+  [data-print-root] blockquote {
+    break-inside: avoid;
+  }
+}

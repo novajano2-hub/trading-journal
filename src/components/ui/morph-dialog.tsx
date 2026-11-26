@@ -56,15 +56,19 @@ export function MorphDialog({
   icon?: ReactNode;
   /** Controls in the header between the title and the close button (a menu, a star). */
   actions?: ReactNode;
-  /** `full` fills the screen inside a small gutter, for a chart or a table that wants the room. `wide` is a `sheet` that grows to 960px for a table. `medium` is the comps' 600px dialog: the same full-height sheet on a phone. `sheet` is the default size on a wide screen and a full-height sheet on a phone. `compact` is a narrow choice list (480px) that stays a small dialog on a phone. */
-  size?: 'default' | 'full' | 'sheet' | 'wide' | 'medium' | 'compact';
+  /** `full` fills the screen inside a small gutter, for a chart or a table that wants the room. `wide` is a `sheet` that grows to 960px for a table. `medium` is the comps' 600px dialog and `large` their 880px one (a list beside a preview): the same full-height sheet on a phone. `sheet` is the default size on a wide screen and a full-height sheet on a phone. `compact` is a narrow choice list (480px) that stays a small dialog on a phone. */
+  size?: 'default' | 'full' | 'sheet' | 'wide' | 'medium' | 'large' | 'compact';
   /** Pinned under the scrolling body, never inside it. */
   footer?: ReactNode;
   children: ReactNode;
 }): React.JSX.Element | null {
   const reduced = useReducedMotion();
   // The sheet breathes a little more on a wide screen (comp 02).
-  const sheetLike = size === 'sheet' || size === 'wide' || size === 'medium';
+  const sheetLike =
+    size === 'sheet' ||
+    size === 'wide' ||
+    size === 'medium' ||
+    size === 'large';
   const gutter = sheetLike ? 'px-5 sm:px-6' : 'px-5';
   // Stays mounted while the exit plays, after `open` has already gone false.
   const [present, setPresent] = useState(open);
@@ -185,7 +189,7 @@ export function MorphDialog({
             size === 'full'
               ? 'inset-3 sm:inset-6'
               : sheetLike
-                ? `inset-x-0 top-3 bottom-0 max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 sm:inset-0 sm:m-auto sm:h-fit sm:max-h-[80dvh] sm:w-[calc(100%-32px)] ${size === 'wide' ? 'sm:max-w-[960px]' : size === 'medium' ? 'sm:max-w-[600px]' : 'sm:max-w-[760px]'}`
+                ? `inset-x-0 top-3 bottom-0 max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 sm:inset-0 sm:m-auto sm:h-fit sm:max-h-[80dvh] sm:w-[calc(100%-32px)] ${size === 'wide' ? 'sm:max-w-[960px]' : size === 'large' ? 'sm:max-w-[880px]' : size === 'medium' ? 'sm:max-w-[600px]' : 'sm:max-w-[760px]'}`
                 : size === 'compact'
                   ? 'inset-0 m-auto h-fit max-h-[80dvh] w-[calc(100%-32px)] max-w-[480px]'
                   : 'inset-0 m-auto h-fit max-h-[80dvh] w-[calc(100%-32px)] max-w-[760px]'
