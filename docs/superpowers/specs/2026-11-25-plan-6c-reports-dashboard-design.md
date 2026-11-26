@@ -12,7 +12,7 @@
 3. `DESIGN.md` and `PRODUCT.md`.
 4. The Plan 5 rulings, and Plan 6A's spec (`2026-11-25-plan-6a-daily-routine-design.md`), whose Keel's calls K1 to K56 and decisions U1 to U4 stand.
 
-Where TZ is unknown this doc decides, as a **Keel's call (TradeZella unknown)** with an id (C1 to C77, all listed in §6.1).
+Where TZ is unknown this doc decides, as a **Keel's call (TradeZella unknown)** with an id (C1 to C81, all listed in §6.1).
 
 **TradeZella's behaviour, never its UI** (the owner, 2026-11-25). Wherever this doc says "TZ's template", "TZ's default", "TZ's widgets" or "TZ's way", it means TZ's features and behaviour: which widgets exist, which are in the default set, and what each one does and computes. The layout, look, arrangement, wording and icons are Keel's own: design G and the comps. Nothing here asks for TZ's screen. The owner's decisions are D1 to D3 (§6.2).
 
@@ -587,6 +587,10 @@ Every row below is Keel's call (TradeZella unknown).
 | C67 | The figure widgets' marks | TZ's half gauges and ring are look; Keel shows the same split (won, breakeven, lost; green, flat, red days; gross profit against loss; average win against loss) as a thin split bar with the counts in words, as its summary strip does | DESIGN.md; comps 01 and 03 |
 | C76 | Total swap | The Overview's costs group gains "Swap", the sum of 6B's per-trade `swap` over the trades in the filters, signed as stored; "None" when no trade carries one. Built only once 6B's field has landed; until then the row waits in the backlog with #55 | [rec S50; help 7189346]; 6B's P6B-10 |
 | C77 | A set with no winning trade | Profit factor and average win to loss score 0 (nothing won, so no edge is shown), `why: 'no-profit'`; "no losses scores 100" (C23) applies only when there is a profit. An all-breakeven range scores low, not 65 | TZ unknown (rec §2.3 UNKNOWN: zero denominators) |
+| C78 | Passed status | Keel's existing "passed" status (Plan 5, PF4) is kept; it is set by Move to funded, not offered when creating a challenge | Plan 5; TZ's create form offers active or breached |
+| C79 | The row menu by state | The five actions on evaluation rows; Move to funded is absent on funded rows; Move to funded and Mark as breached are absent on breached rows (a breach is permanent) | TZ's menu is the five actions [help 14502950]; the omissions follow its permanence |
+| C80 | Move to funded from step 1 of 2 | Passes the evaluation as a whole and starts the funded phase (TZ unknown whether step 2 is skipped); recorded as `movedToFundedOn` | UNKNOWN [help 14502950] |
+| C81 | Transactions and the date chips | The Transactions tab ignores the global date range and Filters chips (the record shows only its income/costs/review filter); comp 07 draws the chips and is superseded here | [help 14499729]; comp 07 |
 | C61 | 6B's order | 6C plans against `main` after 6A. If 6B lands first, Task 1 takes the next Dexie version after 6B's, the migration test opens 6B's version, and the cost method joins 6B's builder changes | No 6B spec yet |
 
 ### 6.2 Decided by the owner (2026-11-25)
