@@ -252,3 +252,28 @@ test('no overflow at any width once loaded (desktop)', async ({
     ).toBeLessThanOrEqual(0);
   }
 });
+
+test("the calendar widget's controls keep one row on a phone: Stats shown is its icon alone (mobile)", async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'mobile');
+  for (const width of [390, 375, 360, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/app/dashboard');
+    await ready(page);
+    const widget = page.locator('[data-widget="calendar-adv"]');
+    const stats = widget.getByRole('button', { name: 'Stats shown' });
+    // The word is for assistive tech here; the icon is drawn alone.
+    expect((await stats.boundingBox())!.width, `${width}`).toBeLessThan(50);
+    const tops = await Promise.all(
+      [
+        widget.getByRole('button', { name: 'Previous month' }),
+        widget.getByRole('button', { name: 'Next month' }),
+        widget.getByRole('button', { name: 'This month' }),
+        stats,
+        widget.getByRole('button', { name: 'Snapshot' }),
+      ].map(async (control) => Math.round((await control.boundingBox())!.y)),
+    );
+    expect(new Set(tops).size, `the controls' tops at ${width}`).toBe(1);
+  }
+});
