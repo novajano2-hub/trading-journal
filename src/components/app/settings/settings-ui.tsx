@@ -120,6 +120,7 @@ export function SettingsDialog({
   onClose,
   title,
   description,
+  describedBy,
   wide = false,
   returnFocus,
   children,
@@ -128,6 +129,12 @@ export function SettingsDialog({
   onClose(): void;
   title: string;
   description?: ReactNode;
+  /**
+   * The `id` of a line in the body that describes the dialog, read out instead of
+   * `description`. For a question whose own first paragraph says what it asks;
+   * the header then carries no description of its own.
+   */
+  describedBy?: string;
   wide?: boolean;
   /** Where focus goes back to on close; a dialog opened from a menu has no button of its own to return to. */
   returnFocus?: RefObject<HTMLElement | null>;
@@ -143,6 +150,7 @@ export function SettingsDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-veil" />
         <Dialog.Content
+          aria-describedby={describedBy}
           onCloseAutoFocus={(e) => {
             if (!returnFocus) return;
             e.preventDefault();
@@ -155,11 +163,13 @@ export function SettingsDialog({
               <Dialog.Title className="text-[17px] leading-snug font-semibold tracking-[-0.015em] text-balance">
                 {title}
               </Dialog.Title>
-              <Dialog.Description asChild>
-                <div className="mt-1 text-[13.5px] leading-snug text-muted">
-                  {description ?? <span className="sr-only">{title}</span>}
-                </div>
-              </Dialog.Description>
+              {describedBy === undefined ? (
+                <Dialog.Description asChild>
+                  <div className="mt-1 text-[13.5px] leading-snug text-muted">
+                    {description ?? <span className="sr-only">{title}</span>}
+                  </div>
+                </Dialog.Description>
+              ) : null}
             </div>
             <Dialog.Close
               aria-label="Close"

@@ -49,6 +49,7 @@ function AccountForm({
   initialType,
   hasTrades,
   asking,
+  askId,
   onAsking,
   onClose,
 }: {
@@ -59,6 +60,8 @@ function AccountForm({
   hasTrades: boolean;
   /** The method the question on the screen asks about; null: the form shows. */
   asking: CostMethod | null;
+  /** The `id` of the question's first paragraph: the dialog's description while it shows. */
+  askId: string;
   onAsking(method: CostMethod | null): void;
   onClose(): void;
 }): React.JSX.Element {
@@ -326,7 +329,7 @@ function AccountForm({
       </form>
       {asked ? (
         <div>
-          <p className={ASK}>
+          <p id={askId} className={ASK}>
             Every trade in this account is worked out again from its fills. What
             can change:
           </p>
@@ -389,6 +392,7 @@ export function AccountDialog({
 }): React.JSX.Element {
   // The question a changed cost method asks before it saves (C40); a closed dialog forgets it.
   const [asking, setAsking] = useState<CostMethod | null>(null);
+  const askId = useId();
   if (!open && asking !== null) setAsking(null);
   const question = open && asking !== null && account !== undefined;
   return (
@@ -402,13 +406,9 @@ export function AccountDialog({
             ? 'Edit account'
             : 'New account'
       }
-      description={
-        question
-          ? undefined
-          : account
-            ? account.name
-            : 'It starts with no trades.'
-      }
+      // The question is described by its own first paragraph, which says what changes.
+      describedBy={question ? askId : undefined}
+      description={account ? account.name : 'It starts with no trades.'}
     >
       {/* Mounted only while open, so a reopened dialog starts from the account as it is. */}
       {open ? (
@@ -418,6 +418,7 @@ export function AccountDialog({
           initialType={initialType}
           hasTrades={hasTrades}
           asking={asking}
+          askId={askId}
           onAsking={setAsking}
           onClose={onClose}
         />

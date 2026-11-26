@@ -139,6 +139,30 @@ test('choosing LIFO and saving asks first, says what can change, and writes only
   expect(own.every((t) => t.costMethod === 'lifo')).toBe(true);
 });
 
+test('the question is described by what the rebuild changes, not by a copy of its title', async () => {
+  renderApp(<AccountsSettings />, { repository: repo(), url: URL });
+  const dialog = await openEdit('Futures main');
+  fireEvent.click(radio(dialog, /^LIFO/));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+  const ask = await screen.findByRole('dialog', {
+    name: 'Switch Futures main to LIFO?',
+  });
+  const described = ask
+    .getAttribute('aria-describedby')!
+    .split(/\s+/)
+    .map((id) => document.getElementById(id)!.textContent);
+  expect(described).toEqual([
+    'Every trade in this account is worked out again from its fills. What can change:',
+  ]);
+  // The form's own description is still its account name.
+  fireEvent.click(within(ask).getByRole('button', { name: 'Cancel' }));
+  const form = await screen.findByRole('dialog', { name: 'Edit account' });
+  expect(
+    document.getElementById(form.getAttribute('aria-describedby')!)!
+      .textContent,
+  ).toBe('Futures main');
+});
+
 test('Cancel on the question keeps the old method, saves nothing and returns to the form', async () => {
   const r = repo();
   renderApp(<AccountsSettings />, { repository: r, url: URL });
