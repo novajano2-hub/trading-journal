@@ -75,6 +75,19 @@ describe('the widget catalogue', () => {
     expect(WIDGETS['avg-drawdown'].metric).toBe('avg-drawdown-card');
   });
 
+  test('the chart widgets read tips that describe the chart, not a figure it resembles', () => {
+    expect(WIDGETS.score.metric).toBe('edge-score');
+    expect(WIDGETS['win-avg'].metric).toBe('win-avg-through-day');
+    expect(WIDGETS['daily-pnl'].metric).toBe('daily-net-pnl');
+    expect(WIDGETS['daily-cum'].metric).toBe('daily-and-cumulative');
+    expect(WIDGETS.balance.metric).toBe('balance-chart');
+    expect(WIDGETS['trade-time'].metric).toBe('trade-time-scatter');
+    expect(WIDGETS['trade-duration'].metric).toBe('trade-duration-scatter');
+    // These two already had a tip for what they draw.
+    expect(WIDGETS['cum-pnl'].metric).toBe('cumulative-pnl');
+    expect(WIDGETS.drawdown.metric).toBe('daily-drawdown');
+  });
+
   test('isWidgetKey tells known keys from unknown ones', () => {
     expect(isWidgetKey('score')).toBe(true);
     expect(isWidgetKey('year')).toBe(true);

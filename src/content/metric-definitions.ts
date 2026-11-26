@@ -70,6 +70,13 @@ export const METRIC_IDS = [
   'current-trade-streak',
   'current-streaks',
   'avg-drawdown-card',
+  'edge-score',
+  'win-avg-through-day',
+  'daily-net-pnl',
+  'daily-and-cumulative',
+  'balance-chart',
+  'trade-time-scatter',
+  'trade-duration-scatter',
   'long-winners',
   'long-losers',
   'long-breakevens',
@@ -488,6 +495,41 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Average drawdown',
     definition:
       "How far the close of a trading day sat under its running peak, averaged over the days that closed under one. With no date range set, it shows today's drawdown from the high instead. It reads the day-by-day {basis} P&L, as the max drawdown does.",
+  },
+  'edge-score': {
+    label: 'Edge score',
+    definition:
+      'One score from 0 to 100 for six parts of your trading: win rate, profit factor, average win to loss, recovery, drawdown and consistency. Each part is scored from 0 to 100 and weighted into the total, which reads Weak under 40, Building from 40 and Strong from 70. It follows your filters, date range and accounts, and always reads money, whatever the display unit.',
+  },
+  'win-avg-through-day': {
+    label: 'Win rate, average win and average loss',
+    definition:
+      'Your closed trades in order of the time of day they closed, whatever the day, with the running win rate, average win and average loss after each. The win rate is on the left scale and the averages on the right scale. Breakeven trades, inside your breakeven range, are left out of all three.',
+  },
+  'daily-net-pnl': {
+    label: '{Basis} daily P&L',
+    definition:
+      "Each trading day's {basis} P&L, booked on the day each trade exited: a day that made money rises above the line, a day that lost falls below it.",
+  },
+  'daily-and-cumulative': {
+    label: 'Daily and cumulative {basis} P&L',
+    definition:
+      "Bars: each trading day's {basis} P&L, on the left scale. Line: the running total from the start of the date range, on the right scale.",
+  },
+  'balance-chart': {
+    label: 'Account balance',
+    definition:
+      'What the selected accounts held at the close of each day, on the left scale: their starting balances, the deposits and withdrawals on their dates, and the net P&L booked by then. The second line is the deposits and withdrawals, net, running from the start of the date range, on the right scale. It has no value in R, ticks, pips or points.',
+  },
+  'trade-time-scatter': {
+    label: 'Trade time performance',
+    definition:
+      'Each closed trade by the time of day it was entered or exited, in your timezone, and its {basis} P&L. A filled dot is a gain, a hollow one a loss. Both scales fit the trades in your filters. The switch picks entry or exit.',
+  },
+  'trade-duration-scatter': {
+    label: 'Trade duration performance',
+    definition:
+      'Each closed trade by how long it was held, from open to close, on a log scale, and its {basis} P&L. A filled dot is a gain, a hollow one a loss. A trade held under a minute sits at one minute. Both scales fit the trades in your filters.',
   },
   'long-winners': {
     label: 'Long winners',

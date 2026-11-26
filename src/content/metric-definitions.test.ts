@@ -116,3 +116,46 @@ test('the upper dashboard widgets have a tip each, apart from the longest-streak
   expect(avg.definition).toMatch(/no date range/);
   expect(avg.definition).toMatch(/today/i);
 });
+
+test("the chart widgets have a tip of their own, in Keel's words", () => {
+  const edge = metricDefinition('edge-score', 'net');
+  expect(edge.label).toBe('Edge score');
+  expect(edge.definition).toMatch(/0 to 100/);
+  for (const part of [
+    'win rate',
+    'profit factor',
+    'average win to loss',
+    'recovery',
+    'drawdown',
+    'consistency',
+  ])
+    expect(edge.definition).toContain(part);
+  // The bands, and the unit it never reads.
+  expect(edge.definition).toMatch(/Weak.*Building.*Strong/);
+  expect(edge.definition).toMatch(/whatever the display unit/);
+
+  const winAvg = metricDefinition('win-avg-through-day', 'net');
+  expect(winAvg.definition).toMatch(/time of day/);
+  expect(winAvg.definition).toMatch(/left scale.*right scale/);
+
+  expect(metricDefinition('daily-net-pnl', 'gross').label).toBe(
+    'Gross daily P&L',
+  );
+  expect(metricDefinition('daily-and-cumulative', 'net').definition).toMatch(
+    /Bars.*Line/,
+  );
+  const balance = metricDefinition('balance-chart', 'net');
+  expect(balance.definition).toMatch(/deposits and withdrawals/);
+  expect(balance.definition).toMatch(/right scale/);
+  expect(balance.definition).toMatch(/no value in R, ticks, pips or points/);
+  for (const id of ['trade-time-scatter', 'trade-duration-scatter'] as const) {
+    const d = metricDefinition(id, 'net');
+    expect(d.definition, id).toMatch(/filled dot.*hollow/);
+  }
+  expect(metricDefinition('trade-time-scatter', 'net').definition).toMatch(
+    /entered or exited/,
+  );
+  expect(metricDefinition('trade-duration-scatter', 'net').definition).toMatch(
+    /log scale/,
+  );
+});
