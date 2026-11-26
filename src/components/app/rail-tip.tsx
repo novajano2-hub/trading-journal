@@ -2,7 +2,7 @@
 
 import { useReducedMotion } from 'motion/react';
 import { Slot, Tooltip } from 'radix-ui';
-import type { ComponentProps, ReactElement } from 'react';
+import { useState, type ComponentProps, type ReactElement } from 'react';
 
 /**
  * Slots the trigger's props onto the control, minus the tooltip's
@@ -23,23 +23,33 @@ function Undescribed(props: ComponentProps<typeof Slot.Root>) {
  * Wrap the rail in a `Tooltip.Provider` so moving from one glyph to the next
  * skips the delay. The control keeps its own accessible name, and the tip must
  * say the same (it is not announced as a description as well).
+ *
+ * `disabled` keeps the tip from opening and the control where it is: leave the
+ * tip wrapped round a control that only sometimes needs it (a rail that folds
+ * from a width up), and the control stays mounted, with its focus, as that
+ * changes.
  */
 export function RailTip({
   label,
   side = 'right',
+  disabled = false,
   children,
 }: {
   label: string;
   side?: 'right' | 'bottom';
+  disabled?: boolean;
   /** The one control the tip names. */
   children: ReactElement;
 }): React.JSX.Element {
   const reduced = useReducedMotion();
+  const [open, setOpen] = useState(false);
+  // Disabled, the tip is shut and forgets that it was open, so it does not return with the width.
+  if (disabled && open) setOpen(false);
   const motion = reduced
     ? ''
     : 'data-[state=closed]:animate-tip-out data-[state=delayed-open]:animate-tip-in data-[state=instant-open]:animate-tip-in';
   return (
-    <Tooltip.Root>
+    <Tooltip.Root open={open && !disabled} onOpenChange={setOpen}>
       <Tooltip.Trigger asChild>
         <Undescribed>{children}</Undescribed>
       </Tooltip.Trigger>

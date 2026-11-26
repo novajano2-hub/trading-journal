@@ -224,3 +224,73 @@ test('below lg a collapsed sidebar leaves the labelled pill row as it is: names 
   await new Promise((r) => setTimeout(r, 30));
   expect(screen.queryByRole('tooltip')).toBeNull();
 });
+
+/** A viewport that can be resized: `matchMedia` tells its listeners when a query's answer changes. */
+function resizableViewport(width: number): (next: number) => void {
+  let current = width;
+  const watching = new Set<{ query: string; notify: () => void }>();
+  const answer = (query: string) =>
+    /min-width:\s*(\d+)px/.test(query)
+      ? current >= Number(/min-width:\s*(\d+)px/.exec(query)![1])
+      : false;
+  vi.spyOn(window, 'matchMedia').mockImplementation((query) => {
+    const mine = new Set<{ query: string; notify: () => void }>();
+    return {
+      get matches() {
+        return answer(query);
+      },
+      media: query,
+      addEventListener: (_: string, notify: () => void) => {
+        const watcher = { query, notify };
+        mine.add(watcher);
+        watching.add(watcher);
+      },
+      removeEventListener: (_: string, notify: () => void) => {
+        for (const w of mine) if (w.notify === notify) watching.delete(w);
+      },
+    } as unknown as MediaQueryList;
+  });
+  return (next) => {
+    const before = new Map(
+      [...watching].map((w) => [w, answer(w.query)] as const),
+    );
+    current = next;
+    for (const [w, was] of before) if (answer(w.query) !== was) w.notify();
+  };
+}
+
+test('crossing lg while a page link has focus keeps the link, so its focus is not lost', async () => {
+  const resize = resizableViewport(1280);
+  const nav = renderNav(true);
+  const link = within(nav).getByRole('link', { name: 'Trading' });
+  act(() => link.focus());
+  expect(document.activeElement).toBe(link);
+  // Below lg the tooltip wrapper used to go, and the link with it.
+  act(() => resize(800));
+  expect(within(nav).getByRole('link', { name: 'Trading' })).toBe(link);
+  expect(link.isConnected).toBe(true);
+  expect(document.activeElement).toBe(link);
+  await new Promise((r) => setTimeout(r, 30));
+  expect(screen.queryByRole('tooltip')).toBeNull();
+  // And back: the tip is there again where the name is folded into the icon.
+  act(() => resize(1280));
+  expect(within(nav).getByRole('link', { name: 'Trading' })).toBe(link);
+  expect(document.activeElement).toBe(link);
+  act(() => link.blur());
+  act(() => link.focus());
+  expect((await screen.findByRole('tooltip')).textContent).toBe('Trading');
+});
+
+test('a tip that was open when the row went below lg is gone, and does not come back with the width', async () => {
+  const resize = resizableViewport(1280);
+  const nav = renderNav(true);
+  const link = within(nav).getByRole('link', { name: 'Tags' });
+  act(() => link.focus());
+  expect((await screen.findByRole('tooltip')).textContent).toBe('Tags');
+  act(() => resize(800));
+  await waitFor(() => expect(screen.queryByRole('tooltip')).toBeNull());
+  act(() => link.blur());
+  act(() => resize(1280));
+  await new Promise((r) => setTimeout(r, 30));
+  expect(screen.queryByRole('tooltip')).toBeNull();
+});

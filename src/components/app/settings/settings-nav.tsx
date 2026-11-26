@@ -121,7 +121,10 @@ export function SettingsNav({
                   );
                   return (
                     <li key={href}>
-                      {tips ? <RailTip label={label}>{link}</RailTip> : link}
+                      {/* Always wrapped, so the link stays mounted (and focused) as the width crosses lg or the sidebar folds. */}
+                      <RailTip label={label} disabled={!tips}>
+                        {link}
+                      </RailTip>
                     </li>
                   );
                 })}
