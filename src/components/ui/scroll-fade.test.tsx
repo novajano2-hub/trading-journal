@@ -60,3 +60,23 @@ test('on the page ground the fade takes the ground colour, not the card white', 
   expect(fade(container)!.className).not.toContain('from-surface-1');
   expect(container.firstElementChild!.className).toContain('-mx-5');
 });
+
+test('the scrolling box is positioned, so a visually hidden header inside it cannot widen the page', () => {
+  const { container } = render(
+    <ScrollFade>
+      <table>
+        <thead>
+          <tr>
+            <th>
+              <span className="sr-only">Actions</span>
+            </th>
+          </tr>
+        </thead>
+      </table>
+    </ScrollFade>,
+  );
+  // An absolutely placed child belongs to the nearest positioned ancestor, and
+  // only the scroller clips: with the root as its box, the child would stick out.
+  const scroller = container.querySelector('.overflow-x-auto') as HTMLElement;
+  expect(scroller.className.split(' ')).toContain('relative');
+});
