@@ -36,6 +36,8 @@ export interface ChartSeries {
   points: readonly SeriesPoint[];
   /** `money` values are cents: they read in the chosen display unit. */
   unit: SeriesUnit;
+  /** `loss` draws the series in the loss colour: a measure of what was lost, such as the drawdown. */
+  tone?: 'loss';
   /** For `dots`: how much stands behind each point (its trades). More is larger and stronger. */
   counts?: readonly number[];
 }
@@ -48,6 +50,9 @@ const COLOURS = [
   'var(--muted)',
   'color-mix(in srgb, var(--accent) 55%, var(--surface-1))',
 ];
+const colourOf = (s: ChartSeries, i: number): string =>
+  s.tone === 'loss' ? 'var(--loss-fill)' : COLOURS[i % COLOURS.length]!;
+
 /** The third series' line is dashed, so it reads apart from the first two without colour. */
 const DASHES = [undefined, undefined, '5 4'] as const;
 
@@ -467,7 +472,7 @@ const Plot = memo(function Plot({
       ) : null}
       {series.map((s, si) => {
         const band = bands[si]!;
-        const colour = COLOURS[si % COLOURS.length]!;
+        const colour = colourOf(s, si);
         const top = layout.tops[si]!;
         const zero = band.y(0);
         const counts = s.counts ?? [];
@@ -1065,7 +1070,7 @@ function ChartBody({
                           ? v < 0
                             ? 'var(--loss-fill)'
                             : 'var(--gain-fill)'
-                          : COLOURS[si % COLOURS.length]
+                          : colourOf(s, si)
                       }
                       stroke="var(--surface-1)"
                       strokeWidth={2}
@@ -1113,7 +1118,7 @@ function ChartBody({
                     <span
                       aria-hidden="true"
                       className="size-2 rounded-full"
-                      style={{ background: COLOURS[i % COLOURS.length] }}
+                      style={{ background: colourOf(s, i) }}
                     />
                     {s.label}
                   </span>

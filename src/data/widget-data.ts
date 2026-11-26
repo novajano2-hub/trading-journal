@@ -1,5 +1,9 @@
 import { partitionByCurrency } from '@/domain/currency';
-import { balanceAt } from '@/domain/metrics/balance';
+import {
+  balanceAt,
+  balanceSeries,
+  type BalancePoint,
+} from '@/domain/metrics/balance';
 import { classify, type MetricContext } from '@/domain/metrics/context';
 import {
   dailyPnl,
@@ -19,6 +23,7 @@ import { scatterPoints, type ScatterPoint } from '@/domain/metrics/scatter';
 import { scoreOf, type ScoreResult } from '@/domain/metrics/score';
 import { winStreak } from '@/domain/metrics/streaks';
 import { summarize, type Summary } from '@/domain/metrics/summary';
+import { throughDay, type ThroughDayPoint } from '@/domain/metrics/through-day';
 import { closedInOrder } from '@/domain/trade-status';
 import type {
   Account,
@@ -87,6 +92,8 @@ export interface WidgetValues {
   'avg-drawdown': ReturnType<typeof avgDrawdown> & { current: number | null };
   score: ScoreResult | null;
   'cum-pnl': DayStat[];
+  /** The closed trades in order of the time of day they closed, with the running win rate and averages after each (C14). */
+  'win-avg': ThroughDayPoint[];
   'trade-time': { entry: ScatterPoint[]; exit: ScatterPoint[] };
   'trade-duration': ScatterPoint[];
   'daily-pnl': DayStat[];
@@ -95,6 +102,8 @@ export interface WidgetValues {
     startingBalance: Cents;
     equity: EquityPoint[];
     flows: readonly CashFlow[];
+    /** The balance and the net deposits and withdrawals a day at a time, inside the range (C75). Empty under a narrowing unit: a balance has no value in one. */
+    points: BalancePoint[];
   };
   drawdown: { key: string; value: number }[];
 }
@@ -192,6 +201,7 @@ const READ: { [K in keyof WidgetValues]: (c: Calc) => WidgetValues[K] } = {
     return scoreOf(c.matched, money);
   },
   'cum-pnl': (c) => c.days(),
+  'win-avg': (c) => throughDay(c.trades, c.ctx),
   'daily-pnl': (c) => c.days(),
   'daily-cum': (c) => c.days(),
   'trade-time': (c) => ({
@@ -203,6 +213,19 @@ const READ: { [K in keyof WidgetValues]: (c: Calc) => WidgetValues[K] } = {
     startingBalance: c.startingBalance,
     equity: equityCurve(c.trades, c.startingBalance, c.ctx),
     flows: c.flows,
+    points: c.ctx.unit
+      ? []
+      : balanceSeries(
+          // Every trade of the accounts, on net, from the beginning: the balance is the accounts', whatever the filters.
+          dailyPnl(c.balanceTrades, {
+            ...c.ctx,
+            pnlBasis: 'net',
+            range: undefined,
+          }),
+          c.startingBalance,
+          c.flows,
+          c.ctx.range,
+        ),
   }),
   drawdown: (c) => drawdownSeries(c.days()),
 };

@@ -1,13 +1,11 @@
 'use client';
 
 import { format, parseISO } from 'date-fns';
-import Link from 'next/link';
 import { useContext, useMemo, type ReactNode } from 'react';
 import { SplitBar } from '@/components/charts/split-bar';
 import { FigureText } from '@/components/product/figure-text';
 import { Chip } from '@/components/ui/chip';
 import { WIDGET_TITLES } from '@/content/dashboard-widgets';
-import { UNIT_SCOPE } from '@/content/display-units';
 import { usePrefs } from '@/data/query/hooks';
 import { WIDGETS } from '@/domain/dashboard/widgets';
 import { winsVsLosses } from '@/domain/metrics/breakdowns';
@@ -23,6 +21,7 @@ import {
   type Figure,
 } from '@/lib/display';
 import { formatCount, formatPct, plural } from '@/lib/format';
+import { noBalanceIn, STARTING_BALANCE_PROMPT } from './balance-states';
 import { useWidgetPage, useWidgetValue } from './context';
 import { WidgetFrame } from './frame';
 import type { WidgetRender } from './registry';
@@ -203,29 +202,11 @@ export function BalanceAndPnl(): React.JSX.Element {
   // A balance is an amount of money: it has no value in R, ticks, pips or points.
   if (isTradeUnit(display.unit))
     return (
-      <Card
-        k="balance-pnl"
-        state="empty"
-        empty={`A balance has no value in ${UNIT_SCOPE[display.unit].name}.`}
-      />
+      <Card k="balance-pnl" state="empty" empty={noBalanceIn(display.unit)} />
     );
   if (s.startingBalance === 0)
     return (
-      <Card
-        k="balance-pnl"
-        state="empty"
-        empty={
-          <>
-            Add a starting balance to see your balance.{' '}
-            <Link
-              href="/app/settings/accounts"
-              className="rounded-chip font-semibold text-accent-ink underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center"
-            >
-              Open Accounts
-            </Link>
-          </>
-        }
-      />
+      <Card k="balance-pnl" state="empty" empty={STARTING_BALANCE_PROMPT} />
     );
   // A balance is an amount, never a return: dollars, or hidden.
   const balance = display.figure({ money: s.balance }, false, page.currency);

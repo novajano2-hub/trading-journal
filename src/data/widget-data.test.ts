@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, test } from 'vitest';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import { DEFAULT_TEMPLATE } from '@/domain/dashboard/templates';
 import { WIDGETS } from '@/domain/dashboard/widgets';
-import { balanceAt } from '@/domain/metrics/balance';
+import { balanceAt, balanceSeries } from '@/domain/metrics/balance';
 import { dailyPnl, daySummary } from '@/domain/metrics/days';
 import {
   avgDrawdown,
@@ -14,6 +14,7 @@ import { scatterPoints } from '@/domain/metrics/scatter';
 import { scoreOf } from '@/domain/metrics/score';
 import { winStreak } from '@/domain/metrics/streaks';
 import { summarize } from '@/domain/metrics/summary';
+import { throughDay } from '@/domain/metrics/through-day';
 import type { WidgetKey } from '@/domain/types';
 import { applyFilters, EMPTY_FILTERS, selectedAccounts } from './filters';
 import { generateSampleWorkspace, SAMPLE_SEED } from './seed/generate';
@@ -63,8 +64,7 @@ describe('widgetData', () => {
   });
 
   test('a widget whose series is not built yet reads undefined', () => {
-    const { values } = widgetData(['win-avg', 'calendar', 'recent'], envOf(s));
-    expect(values['win-avg']).toBeUndefined();
+    const { values } = widgetData(['calendar', 'recent'], envOf(s));
     expect(values.calendar).toBeUndefined();
     expect(values.recent).toBeUndefined();
   });
@@ -73,7 +73,6 @@ describe('widgetData', () => {
     const keys = Object.keys(WIDGETS) as WidgetKey[];
     const { values } = widgetData(keys, envOf(s));
     const unbuilt = [
-      'win-avg',
       'recent',
       'calendar',
       'challenge',
@@ -131,7 +130,8 @@ describe('widgetData', () => {
     expect(values['avg-drawdown']).toMatchObject(avgDrawdown(days, start, []));
     expect(values.drawdown).toEqual(drawdownSeries(days));
     const startingBalance = accounts.reduce((n, a) => n + a.startingBalance, 0);
-    expect(values.balance).toEqual({
+    // `points` (the balance a day at a time) has its own test below.
+    expect(values.balance).toMatchObject({
       startingBalance,
       equity: equityCurve(
         env.trades.filter((t) => t.pnlCurrency === 'USD'),
@@ -197,6 +197,85 @@ describe('widgetData', () => {
     expect(values['daily-pnl']).toEqual(days);
     expect(values['daily-cum']).toEqual(days);
     expect(values['cum-pnl']).toEqual(days);
+  });
+
+  test('win rate, average win and average loss read the closed trades through the day (C14)', () => {
+    const env = envOf(s);
+    const { values } = widgetData(['win-avg'], env);
+    const usd = env.trades.filter((t) => t.pnlCurrency === 'USD');
+    expect(values['win-avg']).toEqual(throughDay(usd, CTX));
+    expect(values['win-avg']!.length).toBeGreaterThan(100);
+    const minutes = values['win-avg']!.map((p) => p.minute);
+    expect(minutes).toEqual([...minutes].sort((a, b) => a - b));
+  });
+
+  describe('the balance chart (C75)', () => {
+    const flow = (
+      id: string,
+      accountId: string,
+      date: string,
+      amount: number,
+    ) => ({
+      id,
+      workspaceId: 'w',
+      accountId,
+      date,
+      amount,
+    });
+
+    test('a point a day, the balance as balanceAt has it, and the net flows', () => {
+      const accounts = selectedAccounts(s.accounts, EMPTY_FILTERS);
+      const usd = accounts.filter((a) => a.currency === 'USD');
+      const flows = [
+        flow('f1', usd[0]!.id, '2026-10-05', 1_000_00),
+        flow('f2', usd[0]!.id, '2026-10-20', -400_00),
+        flow('f3', usd[0]!.id, '2026-11-30', 9_999_00),
+      ];
+      const range = { from: '2026-10-01', to: '2026-11-19' };
+      const env = envOf(s, { flows, ctx: { ...CTX, range } });
+      const { balance } = widgetData(['balance'], env).values;
+      const points = balance!.points;
+      const everyTrade = env.balanceTrades.filter(
+        (t) => t.pnlCurrency === 'USD',
+      );
+      expect(points.length).toBeGreaterThan(20);
+      // Inside the range and in date order, with the two flows' days among them.
+      expect(points[0]!.date >= range.from).toBe(true);
+      expect(points[points.length - 1]!.date <= range.to).toBe(true);
+      expect(points.map((p) => p.date)).toEqual(
+        [...new Set(points.map((p) => p.date))].sort(),
+      );
+      expect(points.some((p) => p.date === '2026-10-05')).toBe(true);
+      // Every point is the balance on its date.
+      for (const p of [points[0]!, points[7]!, points[points.length - 1]!])
+        expect(p.balance, p.date).toBe(
+          balanceAt(usd, flows, everyTrade, p.date, CTX),
+        );
+      // The flow dated after the range is not in the line; the two inside are, net.
+      expect(points[points.length - 1]!.flows).toBe(1_000_00 - 400_00);
+      expect(points[0]!.flows).toBe(0);
+      // What `balance` held before is still there.
+      expect(balance!.startingBalance).toBe(
+        usd.reduce((n, a) => n + a.startingBalance, 0),
+      );
+    });
+
+    test('is the series balanceSeries makes from every trade of the accounts', () => {
+      const env = envOf(s);
+      const { balance } = widgetData(['balance'], env).values;
+      const accounts = env.accounts.filter((a) => a.currency === 'USD');
+      const start = accounts.reduce((n, a) => n + a.startingBalance, 0);
+      const days = dailyPnl(
+        env.balanceTrades.filter((t) => t.pnlCurrency === 'USD'),
+        { ...CTX, pnlBasis: 'net' },
+      );
+      expect(balance!.points).toEqual(balanceSeries(days, start, []));
+    });
+
+    test('a narrowing unit leaves the line empty: a balance has no value in it', () => {
+      const env = envOf(s, { ctx: { ...CTX, unit: 'ticks' } });
+      expect(widgetData(['balance'], env).values.balance!.points).toEqual([]);
+    });
   });
 
   test('the scatters read both times, and the hold', () => {

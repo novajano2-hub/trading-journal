@@ -5,6 +5,7 @@ import { screen } from '@testing-library/react';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
+import type { NewCashFlow } from '@/data/repository';
 import {
   generateSampleWorkspace,
   SAMPLE_SEED,
@@ -36,6 +37,8 @@ export async function renderWidgets(
     sample?: () => SampleWorkspace;
     prefs?: Partial<UserPrefs>;
     url?: string;
+    /** Deposits and withdrawals to book before the page opens. */
+    flows?: NewCashFlow[];
   } = {},
 ) {
   const sample = opts.sample ?? theSample;
@@ -59,6 +62,8 @@ export async function renderWidgets(
     },
     ...opts.prefs,
   });
+  for (const flow of opts.flows ?? [])
+    await repository.cashFlows.create(SAMPLE_WORKSPACE.id, flow);
   const rendered = renderApp(<DashboardView />, { repository, url: opts.url });
   await screen.findByTestId('dashboard-ready');
   return rendered;

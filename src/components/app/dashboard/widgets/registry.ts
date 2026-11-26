@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import type { WidgetKey, WidgetSettings } from '@/domain/types';
 import { ProgressCard } from '../progress-card';
 import { WidgetPlaceholder } from './frame';
+import { CHART_RENDER } from './charts';
 import { SCORE_RENDER } from './score';
 import { UPPER_RENDER } from './upper';
 
@@ -31,16 +32,11 @@ export const WIDGET_RENDER: Record<WidgetKey, WidgetRender> = {
   ...UPPER_RENDER,
   // Lower
   ...SCORE_RENDER,
-  'cum-pnl': placeholder('cum-pnl'),
-  'win-avg': placeholder('win-avg'),
+  ...CHART_RENDER,
   'trade-time': placeholder('trade-time'),
   'trade-duration': placeholder('trade-duration'),
-  'daily-pnl': placeholder('daily-pnl'),
-  'daily-cum': placeholder('daily-cum'),
   recent: placeholder('recent'),
   calendar: placeholder('calendar'),
-  balance: placeholder('balance'),
-  drawdown: placeholder('drawdown'),
   challenge: placeholder('challenge'),
   'calendar-mini': placeholder('calendar-mini'),
   'calendar-adv': placeholder('calendar-adv'),

@@ -1,5 +1,7 @@
 import { createContext, useContext } from 'react';
 import type { WidgetDataResult } from '@/data/query/derived';
+import type { MetricContext } from '@/domain/metrics/context';
+import { FigureSourceContext } from '@/lib/display';
 import type { WidgetValues } from '@/data/widget-data';
 
 /**
@@ -32,4 +34,13 @@ export function useWidgetValue<K extends keyof WidgetValues>(
 ): WidgetValues[K] | undefined {
   // `values` is typed loosely (any widget key, unknown); each built key holds its `WidgetValues` entry.
   return useWidgetPage()?.values[key] as WidgetValues[K] | undefined;
+}
+
+/**
+ * The metrics context the page's figures are read in: the zone, the basis, the
+ * breakeven range, the date range resolved, and the unit when it narrows the
+ * trades. Undefined outside the page.
+ */
+export function useWidgetCtx(): MetricContext | undefined {
+  return useContext(FigureSourceContext)?.ctx;
 }

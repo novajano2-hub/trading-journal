@@ -8,9 +8,11 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { scoreOf } from '@/domain/metrics/score';
 import {
   byDay,
+  esTrade,
   renderWidgets,
   said,
   theSample,
+  tradesSample,
   widget,
 } from '../../__fixtures__/dashboard-widgets';
 import { bandOf, scoreText } from './score';
@@ -244,5 +246,373 @@ describe('the Edge score', () => {
     ).not.toBeNull();
     // Nothing waits on a tip to be read: the info glyph has its name.
     expect(screen.getAllByText('About Edge score').length).toBeGreaterThan(0);
+  });
+});
+
+/** The chart a widget draws: the image that is not the info glyph, by the start of its label. */
+const chartOf = (key: Parameters<typeof widget>[0], name: RegExp) =>
+  within(widget(key)).getByRole('img', { name });
+
+describe('the line and bar charts', () => {
+  test('cumulative net P&L: the running total by trading day, over the whole range', async () => {
+    await renderWidgets(['cum-pnl']);
+    expect(said('cum-pnl')).toContain('Cumulative net P&L');
+    expect(said('cum-pnl')).toContain('By trading day');
+    chartOf(
+      'cum-pnl',
+      /^Cumulative net P&L by day, all time\. Ends at \+\$17,486\.25\.$/,
+    );
+    // The line is the accent over a soft area, as the other pages draw it.
+    expect(
+      widget('cum-pnl').querySelectorAll('[data-mark="line"]'),
+    ).toHaveLength(1);
+    // A hidden table holds a row a trading day.
+    const rows = within(widget('cum-pnl')).getAllByRole('row');
+    expect(rows.length).toBeGreaterThan(100);
+    expect(
+      widget('cum-pnl').querySelector('[data-metric-tip="cumulative-pnl"]'),
+    ).not.toBeNull();
+  });
+
+  test('net daily P&L: a bar a day, gain above the line and loss below, with the best and the worst day named', async () => {
+    await renderWidgets(['daily-pnl']);
+    expect(said('daily-pnl')).toContain('Net daily P&L');
+    const img = chartOf(
+      'daily-pnl',
+      /^Daily net P&L bars, \d+ days, all time\. Best /,
+    );
+    expect(img.getAttribute('aria-label')).toMatch(/, worst .* −\$/);
+    const bars = widget('daily-pnl').querySelectorAll('[data-mark="bar"]');
+    expect(bars.length).toBeGreaterThan(100);
+    const fills = new Set([...bars].map((b) => b.getAttribute('fill')));
+    expect(fills).toEqual(new Set(['var(--gain-fill)', 'var(--loss-fill)']));
+  });
+
+  test('the names follow the gross or net basis', async () => {
+    await renderWidgets(['cum-pnl', 'daily-pnl', 'daily-cum'], {
+      prefs: { pnlBasis: 'gross' },
+    });
+    expect(said('cum-pnl')).toContain('Cumulative gross P&L');
+    expect(said('daily-pnl')).toContain('Gross daily P&L');
+    expect(said('daily-cum')).toContain('Daily and cumulative gross P&L');
+  });
+
+  test('daily and cumulative: day bars on the left scale, the running total on the right', async () => {
+    await renderWidgets(['daily-cum']);
+    const card = widget('daily-cum');
+    expect(said('daily-cum')).toContain('Day net, left scale');
+    expect(said('daily-cum')).toContain('Running total, right scale');
+    chartOf(
+      'daily-cum',
+      /^Daily net P&L bars and the running total, \d+ days, all time\. Ends at \+\$17,486\.25\.$/,
+    );
+    expect(card.querySelectorAll('[data-mark="bar"]').length).toBeGreaterThan(
+      100,
+    );
+    expect(card.querySelectorAll('[data-tick="left"]').length).toBeGreaterThan(
+      1,
+    );
+    expect(card.querySelectorAll('[data-tick="right"]').length).toBeGreaterThan(
+      1,
+    );
+    expect(card.querySelectorAll('[data-mark="line"]')).toHaveLength(1);
+  });
+
+  test('drawdown: the chart alone, in the loss colour, with the max drawdown in its label', async () => {
+    await renderWidgets(['drawdown']);
+    expect(said('drawdown')).toContain('Drawdown');
+    expect(said('drawdown')).toContain('By trading day');
+    chartOf(
+      'drawdown',
+      /^Drawdown from the daily P&L peak, all time\. Max drawdown −\$8,665\.36\.$/,
+    );
+    expect(
+      widget('drawdown')
+        .querySelector('[data-mark="line"] path:not([stroke="none"])')!
+        .getAttribute('stroke'),
+    ).toBe('var(--loss-fill)');
+  });
+
+  test('every chart is an image with a label, and says so when there is nothing to chart', async () => {
+    await renderWidgets(
+      ['cum-pnl', 'daily-pnl', 'daily-cum', 'drawdown', 'win-avg', 'balance'],
+      {
+        url: '/app/dashboard?symbol=ZZZ',
+      },
+    );
+    for (const key of [
+      'cum-pnl',
+      'daily-pnl',
+      'daily-cum',
+      'drawdown',
+      'win-avg',
+    ] as const) {
+      expect(said(key), key).toMatch(/No closed trades in this range\./);
+      expect(within(widget(key)).queryAllByRole('img'), key).toHaveLength(0);
+    }
+  });
+
+  test('every chart has role img and a label', async () => {
+    await renderWidgets([
+      'cum-pnl',
+      'daily-pnl',
+      'daily-cum',
+      'drawdown',
+      'win-avg',
+      'balance',
+    ]);
+    for (const key of [
+      'cum-pnl',
+      'daily-pnl',
+      'daily-cum',
+      'drawdown',
+      'win-avg',
+      'balance',
+    ] as const) {
+      const imgs = within(widget(key)).getAllByRole('img');
+      expect(imgs.length, key).toBe(1);
+      expect(imgs[0]!.getAttribute('aria-label')!.length, key).toBeGreaterThan(
+        20,
+      );
+      expect(imgs[0]!.getAttribute('tabindex'), key).toBe('0');
+    }
+  });
+
+  describe('a narrowing unit and Privacy', () => {
+    // ES +8 ticks (+$100) on one day and -4 ticks (-$50) on the next.
+    const ticks = tradesSample(() => [
+      esTrade(0, '2026-11-02', 10000, { avgExit: 4502 }),
+      esTrade(1, '2026-11-03', -5000, { avgExit: 4499 }),
+    ]);
+
+    test('in ticks the cumulative chart plots ticks, and says so in its label', async () => {
+      await renderWidgets(['cum-pnl'], {
+        sample: ticks,
+        prefs: { displayUnit: 'ticks' },
+      });
+      chartOf('cum-pnl', /Ends at \+4\.0 ticks\./);
+    });
+
+    test('Privacy hides every amount: the label, the axes and the table', async () => {
+      await renderWidgets(['cum-pnl', 'daily-pnl', 'daily-cum', 'drawdown'], {
+        sample: ticks,
+        prefs: { displayUnit: 'privacy' },
+      });
+      for (const key of [
+        'cum-pnl',
+        'daily-pnl',
+        'daily-cum',
+        'drawdown',
+      ] as const) {
+        const card = widget(key);
+        expect(card.textContent, key).not.toMatch(/\d,\d{3}|\$\d|\.\d\d/);
+        for (const img of within(card).getAllByRole('img'))
+          expect(img.getAttribute('aria-label'), key).not.toMatch(/\$\d/);
+        expect(card.textContent, key).toContain('$•••');
+      }
+    });
+  });
+});
+
+describe('win rate, average win and average loss through the day (C14)', () => {
+  // New York closes at 10:10, 10:11 and 10:12: a win, a loss and a win, on three days.
+  const three = tradesSample(() => [
+    esTrade(0, '2026-11-02', 10000),
+    esTrade(1, '2026-11-03', -5000),
+    esTrade(2, '2026-11-04', 8000),
+  ]);
+
+  test('x is the time of day; each trade adds a point, the win rate on the left and the averages on the right', async () => {
+    await renderWidgets(['win-avg'], { sample: three });
+    const card = widget('win-avg');
+    expect(said('win-avg')).toContain('Win rate, average win and average loss');
+    expect(said('win-avg')).toContain('Through the day');
+    expect(said('win-avg')).toContain('Win rate, left scale');
+    expect(said('win-avg')).toContain('Average win, right scale');
+    expect(said('win-avg')).toContain('Average loss, right scale');
+    expect(said('win-avg')).toContain('Time of day in New York');
+    // The x axis reads clock times, not dates.
+    const clock = [...card.querySelectorAll('[data-axis-label]')].map(
+      (t) => t.textContent,
+    );
+    expect(clock.length).toBeGreaterThan(0);
+    for (const t of clock) expect(t).toMatch(/^\d\d:\d\d$/);
+    // A rate on the left, money on the right.
+    for (const t of card.querySelectorAll('[data-tick="left"]'))
+      expect(t.textContent).toMatch(/%$/);
+    for (const t of card.querySelectorAll('[data-tick="right"]'))
+      expect(t.textContent).toMatch(/^[+−]?\$/);
+    // Three lines: the rate and the two averages.
+    expect(card.querySelectorAll('[data-mark="line"]')).toHaveLength(3);
+  });
+
+  test('the readout after the last trade: two of three won, +$90.00 a win and −$50.00 a loss', async () => {
+    await renderWidgets(['win-avg'], { sample: three });
+    const img = chartOf(
+      'win-avg',
+      /^Win rate, average win and average loss through the day, all time\./,
+    );
+    expect(img.getAttribute('aria-label')).toContain('After 3 trades');
+    expect(img.getAttribute('aria-label')).toContain('win rate 66.7%');
+    fireEvent.focus(img);
+    fireEvent.keyDown(img, { key: 'End' });
+    const status = within(widget('win-avg')).getByRole('status');
+    expect(status.textContent).toContain('10:12, after 3 trades');
+    expect(status.textContent).toContain('66.7%');
+    expect(status.textContent).toContain('+$90.00');
+    expect(status.textContent).toContain('−$50.00');
+    // Before a loss there is no average loss.
+    fireEvent.keyDown(img, { key: 'Home' });
+    expect(status.textContent).toContain('10:10, after 1 trade');
+    expect(status.textContent).toContain('100.0%');
+    expect(status.textContent).toContain('None');
+  });
+
+  test('a table holds a row a closed trade', async () => {
+    await renderWidgets(['win-avg'], { sample: three });
+    const rows = within(widget('win-avg')).getAllByRole('row');
+    expect(rows).toHaveLength(4);
+    expect(within(rows[3]!).getByRole('rowheader').textContent).toBe(
+      '10:12, after 3 trades',
+    );
+  });
+
+  test('over the sample it draws every closed trade of the range', async () => {
+    await renderWidgets(['win-avg']);
+    const rows = within(widget('win-avg')).getAllByRole('row');
+    // The table is a sample of at most 120 rows, with the header, and ends at the last trade.
+    expect(rows.length).toBeLessThanOrEqual(122);
+    expect(
+      within(rows[rows.length - 1]!).getByRole('rowheader').textContent,
+    ).toMatch(/, after 1,?518 trades$/);
+  });
+
+  test('in ticks the averages read in ticks', async () => {
+    await renderWidgets(['win-avg'], {
+      prefs: { displayUnit: 'ticks' },
+      sample: tradesSample(() => [
+        esTrade(0, '2026-11-02', 10000, { avgExit: 4502 }),
+        esTrade(1, '2026-11-03', -5000, { avgExit: 4499 }),
+      ]),
+    });
+    const img = chartOf('win-avg', /^Win rate, average win/);
+    fireEvent.focus(img);
+    fireEvent.keyDown(img, { key: 'End' });
+    const status = within(widget('win-avg')).getByRole('status');
+    expect(status.textContent).toContain('+8.0 ticks');
+    expect(status.textContent).toContain('−4.0 ticks');
+    expect(status.textContent).toContain('50.0%');
+  });
+
+  test('Privacy hides the averages and their axis, and leaves the rate', async () => {
+    await renderWidgets(['win-avg'], {
+      sample: three,
+      prefs: { displayUnit: 'privacy' },
+    });
+    const card = widget('win-avg');
+    expect(card.textContent).not.toMatch(/\$\d/);
+    expect(card.textContent).toContain('$•••');
+    expect(
+      chartOf('win-avg', /^Win rate/).getAttribute('aria-label'),
+    ).toContain('win rate 66.7%');
+  });
+});
+
+describe('the account balance chart (C75)', () => {
+  const three = tradesSample(() => [
+    esTrade(0, '2026-11-02', 10000),
+    esTrade(1, '2026-11-03', -5000),
+    esTrade(2, '2026-11-04', 8000),
+  ]);
+
+  test('the balance on the left scale; with no deposit or withdrawal there is no second line', async () => {
+    await renderWidgets(['balance'], { sample: three });
+    const card = widget('balance');
+    expect(said('balance')).toContain('Account balance');
+    chartOf(
+      'balance',
+      /^Account balance by day, all time\. Ends at \$50,130\.00\.$/,
+    );
+    expect(said('balance')).toContain('Balance, left scale');
+    expect(said('balance')).not.toContain('Deposits and withdrawals');
+    expect(card.querySelectorAll('[data-mark="line"]')).toHaveLength(1);
+    expect(card.querySelectorAll('[data-tick="right"]')).toHaveLength(0);
+    // A balance is unsigned.
+    for (const t of card.querySelectorAll('[data-tick="left"]'))
+      expect(t.textContent).toMatch(/^\$/);
+  });
+
+  test('deposits and withdrawals, net, run on a scale of their own on the right', async () => {
+    await renderWidgets(['balance'], {
+      sample: three,
+      flows: [
+        { accountId: 'acc-a', date: '2026-11-02', amount: 100_000 },
+        { accountId: 'acc-a', date: '2026-11-10', amount: -40_000 },
+      ],
+    });
+    const card = widget('balance');
+    expect(said('balance')).toContain('Balance, left scale');
+    expect(said('balance')).toContain(
+      'Deposits and withdrawals, net, right scale',
+    );
+    // 50,000.00 + 130.00 + 1,000.00 - 400.00, with the withdrawal on a day with no trade.
+    chartOf(
+      'balance',
+      /^Account balance by day, all time\. Ends at \$50,730\.00\./,
+    );
+    expect(card.querySelectorAll('[data-mark="line"]')).toHaveLength(2);
+    expect(card.querySelectorAll('[data-tick="right"]').length).toBeGreaterThan(
+      1,
+    );
+    const img = chartOf('balance', /^Account balance by day/);
+    fireEvent.focus(img);
+    fireEvent.keyDown(img, { key: 'End' });
+    const status = within(card).getByRole('status');
+    expect(status.textContent).toContain('+$600.00');
+  });
+
+  test('with no starting balance it asks for one and links to Settings > Accounts', async () => {
+    await renderWidgets(['balance'], {
+      sample: tradesSample(
+        () => [esTrade(0, '2026-11-02', 10000)],
+        (s) => {
+          for (const a of s.accounts) a.startingBalance = 0;
+        },
+      ),
+    });
+    expect(said('balance')).toContain(
+      'Add a starting balance to see your balance.',
+    );
+    const link = within(widget('balance')).getByRole('link', {
+      name: 'Open Accounts',
+    });
+    expect(link.getAttribute('href')).toBe('/app/settings/accounts');
+    expect(within(widget('balance')).queryAllByRole('img')).toHaveLength(0);
+  });
+
+  test.each(['ticks', 'r'] as const)(
+    'under %s it says a balance has no value there',
+    async (unit) => {
+      await renderWidgets(['balance'], {
+        sample: three,
+        prefs: { displayUnit: unit },
+      });
+      expect(said('balance')).toMatch(/A balance has no value in /);
+      expect(within(widget('balance')).queryAllByRole('img')).toHaveLength(0);
+    },
+  );
+
+  test('Privacy hides the balance and the flows on the axes, the label and the table', async () => {
+    await renderWidgets(['balance'], {
+      sample: three,
+      prefs: { displayUnit: 'privacy' },
+      flows: [{ accountId: 'acc-a', date: '2026-11-02', amount: 100_000 }],
+    });
+    const card = widget('balance');
+    expect(card.textContent).not.toMatch(/\$\d/);
+    expect(card.textContent).toContain('$•••');
+    expect(
+      chartOf('balance', /^Account balance by day/).getAttribute('aria-label'),
+    ).not.toMatch(/\$\d/);
   });
 });
