@@ -421,7 +421,9 @@ export interface ChallengesRepo {
    * then `step-2` for a two-step challenge, then `funded`, fees that aren't
    * whole non-negative cents, or a start date that isn't a real YYYY-MM-DD;
    * NotFoundError for a linked account that isn't in the workspace; and
-   * RangeError for one account linked to two phases.
+   * RangeError for one account linked to two phases, and for `status:
+   * 'breached'` (a breach goes through `markBreached`, which records the
+   * reason and the date).
    */
   create(ws: string, input: NewChallenge): Promise<Challenge>;
   /**

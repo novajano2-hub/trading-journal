@@ -12,6 +12,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import { SAMPLE_WORKSPACE } from '@/data/workspaces';
+import { challengeType } from '@/domain/prop/finance';
 import type { Account, Challenge, PropRuleSet } from '@/domain/types';
 import { renderApp } from '../__fixtures__/render-app';
 import { ChallengeForm } from './challenge-form';
@@ -295,4 +296,289 @@ test('a failed delete keeps the dialog and says so', async () => {
   fireEvent.click(within(confirm).getByRole('button', { name: 'Delete' }));
   expect(await within(confirm).findByRole('alert')).toBeTruthy();
   expect(onClose).not.toHaveBeenCalled();
+});
+
+/** The sample plus a second strategy, for the picker's several. */
+function repoWithStrategies() {
+  const sample = fixtureSample();
+  sample.strategies.push({
+    ...sample.strategies[0]!,
+    id: 'str-2',
+    name: 'Opening range fade',
+  });
+  return createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => sample,
+  });
+}
+
+/** The rules every created phase needs, typed into step 1. */
+function rules(step: HTMLElement) {
+  type('Profit target', '8000', step);
+  type('Daily loss limit', '2500', step);
+  type('Max drawdown', '6000', step);
+  type('Minimum trading days', '5', step);
+}
+
+test('the status control offers Active and Passed, and never Breached; the failure reason is gone', async () => {
+  renderApp(<ChallengeForm onClose={() => {}} />, { repository: repo() });
+  await screen.findByRole('dialog');
+  const status = screen.getByRole('radiogroup', { name: 'Status' });
+  expect(
+    within(status)
+      .getAllByRole('radio')
+      .map((r) => r.closest('label')!.textContent),
+  ).toEqual(['Active', 'Passed']);
+  expect(screen.queryByLabelText('Failure reason')).toBeNull();
+});
+
+const breached: Challenge = {
+  ...existing,
+  id: 'c-b',
+  name: 'Failed one',
+  status: 'breached',
+  failureReason: 'Held through news',
+  breachReason: 'other',
+  breachedOn: '2026-11-10',
+};
+
+test('a breached challenge has no status or phase to change, says why, and keeps its breach when saved', async () => {
+  const r = repoWithBreached();
+  const onClose = vi.fn();
+  renderApp(<ChallengeForm challenge={breached} onClose={onClose} />, {
+    repository: r,
+  });
+  const dialog = await screen.findByRole('dialog', { name: 'Edit challenge' });
+  expect(
+    within(dialog).queryByRole('radiogroup', { name: 'Status' }),
+  ).toBeNull();
+  expect(
+    within(dialog).queryByRole('radiogroup', { name: 'Phase' }),
+  ).toBeNull();
+  expect(dialog.textContent).toContain('A breach is final');
+  type('Challenge name', 'Failed one, renamed');
+  fireEvent.click(screen.getByRole('button', { name: 'Save challenge' }));
+  await waitFor(() => expect(onClose).toHaveBeenCalled());
+  const saved = (await r.challenges.list(WS)).find((c) => c.id === 'c-b')!;
+  expect(saved).toMatchObject({
+    name: 'Failed one, renamed',
+    status: 'breached',
+    breachReason: 'other',
+    breachedOn: '2026-11-10',
+    failureReason: 'Held through news',
+  });
+});
+
+function repoWithBreached() {
+  return repoWith([account('p-forex', 'Forex evaluation')], [breached]);
+}
+
+test('Strategies: several can be chosen, and are saved on the challenge', async () => {
+  const r = repoWithStrategies();
+  const onClose = vi.fn();
+  renderApp(<ChallengeForm onClose={onClose} />, { repository: r });
+  await screen.findByRole('dialog');
+  type('Challenge name', 'Apex 100K');
+  type('Firm', 'Apex');
+  const strategies = screen.getByRole('group', { name: 'Strategies' });
+  fireEvent.click(
+    await within(strategies).findByRole('checkbox', {
+      name: 'Opening range breakout',
+    }),
+  );
+  fireEvent.click(
+    within(strategies).getByRole('checkbox', { name: 'Opening range fade' }),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Create challenge' }));
+  await waitFor(() => expect(onClose).toHaveBeenCalled());
+  const [saved] = await r.challenges.list(WS);
+  expect([...saved!.strategyIds!].sort()).toEqual(['str-1', 'str-2']);
+});
+
+test('editing shows the strategies attached, and unchecking them all clears them', async () => {
+  const withStrategies: Challenge = { ...existing, strategyIds: ['str-1'] };
+  const sample = fixtureSample();
+  sample.accounts.push(account('p-forex', 'Forex evaluation'));
+  sample.challenges.push(withStrategies);
+  const r = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => sample,
+  });
+  const onClose = vi.fn();
+  renderApp(<ChallengeForm challenge={withStrategies} onClose={onClose} />, {
+    repository: r,
+  });
+  const box = (await screen.findByRole('checkbox', {
+    name: 'Opening range breakout',
+  })) as HTMLInputElement;
+  expect(box.checked).toBe(true);
+  fireEvent.click(box);
+  fireEvent.click(screen.getByRole('button', { name: 'Save challenge' }));
+  await waitFor(() => expect(onClose).toHaveBeenCalled());
+  expect((await r.challenges.list(WS))[0]!.strategyIds ?? []).toEqual([]);
+});
+
+test('Broker fills the broker of the account the form creates; blank uses the firm', async () => {
+  const r = repo();
+  const onClose = vi.fn();
+  renderApp(<ChallengeForm onClose={onClose} />, { repository: r });
+  await screen.findByRole('dialog');
+  expect(screen.queryByLabelText('Broker')).toBeNull();
+  const step1 = basics('100000');
+  rules(step1);
+  type('Broker', 'Tradovate');
+  fireEvent.click(screen.getByRole('button', { name: 'Create challenge' }));
+  await waitFor(() => expect(onClose).toHaveBeenCalled());
+  const made = (await r.accounts.list(WS)).find(
+    (a) => a.name === 'Apex 100K evaluation',
+  )!;
+  expect(made.broker).toBe('Tradovate');
+
+  cleanup();
+  const r2 = repo();
+  const close2 = vi.fn();
+  renderApp(<ChallengeForm onClose={close2} />, { repository: r2 });
+  await screen.findByRole('dialog');
+  rules(basics('100000'));
+  fireEvent.click(screen.getByRole('button', { name: 'Create challenge' }));
+  await waitFor(() => expect(close2).toHaveBeenCalled());
+  expect(
+    (await r2.accounts.list(WS)).find((a) => a.name === 'Apex 100K evaluation')!
+      .broker,
+  ).toBe('Apex');
+});
+
+test('Quantity 3 makes three challenges, each with its own new account, named name, name 2, name 3 (C64)', async () => {
+  const r = repo();
+  const onClose = vi.fn();
+  renderApp(<ChallengeForm onClose={onClose} />, { repository: r });
+  await screen.findByRole('dialog');
+  const step1 = basics('100000');
+  rules(step1);
+  type('Evaluation fee', '549');
+  type('Quantity', '3');
+  fireEvent.click(screen.getByRole('button', { name: 'Create challenge' }));
+  await waitFor(() => expect(onClose).toHaveBeenCalled());
+  const challenges = await r.challenges.list(WS);
+  expect(challenges.map((c) => c.name)).toEqual([
+    'Apex 100K',
+    'Apex 100K 2',
+    'Apex 100K 3',
+  ]);
+  const accounts = (await r.accounts.list(WS)).filter(
+    (a) => a.type === 'prop-evaluation',
+  );
+  expect(accounts.map((a) => a.name).sort()).toEqual([
+    'Apex 100K evaluation',
+    'Apex 100K evaluation 2',
+    'Apex 100K evaluation 3',
+  ]);
+  // The same rules and fees, each its own account.
+  for (const c of challenges) {
+    expect(c).toMatchObject({ evaluationFee: 54_900, steps: 1 });
+    const linked = accounts.find((a) => a.id === c.phases[0]!.accountId)!;
+    expect(linked.propRules).toMatchObject({
+      profitTarget: 800_000,
+      dailyLossLimit: 250_000,
+      maxDrawdown: 600_000,
+    });
+  }
+  expect(new Set(challenges.map((c) => c.phases[0]!.accountId)).size).toBe(3);
+});
+
+test('Quantity is offered only when every phase makes a new account, on a new challenge, and runs 1 to 20', async () => {
+  const r = repoWith([account('p-free', 'Free one')], []);
+  renderApp(<ChallengeForm onClose={() => {}} />, { repository: r });
+  await screen.findByRole('dialog');
+  expect(screen.queryByLabelText('Quantity')).toBeNull();
+  const step1 = group('Step 1');
+  type('Account', 'new', step1);
+  expect(screen.getByLabelText('Quantity')).toBeTruthy();
+  // Linking an existing account in another phase takes it away.
+  const funded = group('Funded');
+  await within(funded).findByRole('option', { name: /Free one/ });
+  type('Account', 'p-free', funded);
+  expect(screen.queryByLabelText('Quantity')).toBeNull();
+  type('Account', 'none', funded);
+  expect(screen.getByLabelText('Quantity')).toBeTruthy();
+
+  // 0 and 21 are refused, with the reason beside the field.
+  type('Challenge name', 'Apex 100K');
+  type('Firm', 'Apex');
+  type('New account name', 'Apex eval', step1);
+  type('Starting balance', '100000', step1);
+  rules(step1);
+  for (const bad of ['0', '21', '2.5', '']) {
+    type('Quantity', bad);
+    fireEvent.click(screen.getByRole('button', { name: 'Create challenge' }));
+    expect(
+      (await screen.findAllByRole('alert')).map((a) => a.textContent),
+    ).toContain('Enter a whole number from 1 to 20.');
+  }
+  expect(await r.challenges.list(WS)).toEqual([]);
+});
+
+test('editing a challenge offers no Quantity', async () => {
+  const r = repoWith([account('p-forex', 'Forex evaluation')], [existing]);
+  renderApp(<ChallengeForm challenge={existing} onClose={() => {}} />, {
+    repository: r,
+  });
+  await screen.findByRole('dialog');
+  type('Account', 'new', group('Funded'));
+  expect(screen.queryByLabelText('Quantity')).toBeNull();
+});
+
+test('a retry after a failure part way through a quantity does not duplicate what was made', async () => {
+  const r = repo();
+  const create = r.challenges.create.bind(r.challenges);
+  r.challenges.create = vi
+    .fn()
+    .mockImplementationOnce(create)
+    .mockRejectedValueOnce(new Error('disk full'))
+    .mockImplementation(create);
+  const onClose = vi.fn();
+  renderApp(<ChallengeForm onClose={onClose} />, { repository: r });
+  await screen.findByRole('dialog');
+  rules(basics('100000'));
+  type('Quantity', '3');
+  fireEvent.click(screen.getByRole('button', { name: 'Create challenge' }));
+  expect(await screen.findByText(/Couldn.t save that/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Create challenge' }));
+  await waitFor(() => expect(onClose).toHaveBeenCalled());
+  expect(await r.challenges.list(WS)).toHaveLength(3);
+  expect(
+    (await r.accounts.list(WS)).filter((a) => a.type === 'prop-evaluation'),
+  ).toHaveLength(3);
+});
+
+test('a challenge created in the funded phase reads as straight to funded, derived and never stored (C30)', async () => {
+  const r = repo();
+  const onClose = vi.fn();
+  renderApp(<ChallengeForm onClose={onClose} />, { repository: r });
+  await screen.findByRole('dialog');
+  type('Challenge name', 'Funded direct');
+  type('Firm', 'Apex');
+  fireEvent.click(
+    within(screen.getByRole('radiogroup', { name: 'Phase' })).getByRole(
+      'radio',
+      {
+        name: 'Funded',
+      },
+    ),
+  );
+  const funded = group('Funded');
+  type('Account', 'new', funded);
+  type('New account name', 'Funded account', funded);
+  type('Starting balance', '50000', funded);
+  type('Daily loss limit', '1100', funded);
+  type('Max drawdown', '2000', funded);
+  type('Minimum trading days', '5', funded);
+  fireEvent.click(screen.getByRole('button', { name: 'Create challenge' }));
+  await waitFor(() => expect(onClose).toHaveBeenCalled());
+  const [saved] = await r.challenges.list(WS);
+  expect(saved).toMatchObject({ phase: 'funded', steps: 1 });
+  expect(challengeType(saved!)).toBe('s2f');
+  expect('type' in saved!).toBe(false);
 });

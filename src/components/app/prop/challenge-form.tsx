@@ -1,6 +1,7 @@
 'use client';
 
-import { useId, useState, type ReactNode } from 'react';
+import { Check, Info } from '@phosphor-icons/react/dist/ssr';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import { ConfirmDialog } from '@/components/app/confirm-dialog';
 import { SelectField } from '@/components/app/import/select-field';
 import { HELP, INPUT, LABEL } from '@/components/app/import/styles';
@@ -18,6 +19,7 @@ import {
   useCreateChallenge,
   usePrefs,
   useRemoveChallenge,
+  useStrategies,
   useUpdateAccount,
   useUpdateChallenge,
 } from '@/data/query/hooks';
@@ -64,6 +66,9 @@ const DRAWDOWN_TYPES: readonly DrawdownType[] = [
   'eod-trailing',
   'trailing',
 ];
+
+/** How many of the same challenge one save can make (C64). */
+const MAX_QUANTITY = 20;
 
 const blankPhase = (): PhaseDraft => ({
   link: 'none',
@@ -544,10 +549,17 @@ export function ChallengeForm({
   const [phase, setPhase] = useState<Challenge['phase']>(
     challenge?.phase ?? 'evaluation',
   );
-  const [status, setStatus] = useState<Challenge['status']>(
-    challenge?.status ?? 'active',
+  // A breach is final: the form never offers it, and a breached challenge has
+  // no status or phase to change.
+  const breached = challenge?.status === 'breached';
+  const [status, setStatus] = useState<'active' | 'passed'>(
+    challenge?.status === 'passed' ? 'passed' : 'active',
   );
-  const [reason, setReason] = useState(challenge?.failureReason ?? '');
+  const [strategyIds, setStrategyIds] = useState<string[]>(
+    challenge?.strategyIds ?? [],
+  );
+  const [broker, setBroker] = useState('');
+  const [quantity, setQuantity] = useState('1');
   const [evalFee, setEvalFee] = useState(feeText(challenge?.evaluationFee));
   const [actFee, setActFee] = useState(feeText(challenge?.activationFee));
   const [draft, setDraft] = useState(() => initialPhases(challenge, accounts));
@@ -555,15 +567,42 @@ export function ChallengeForm({
   const [failed, setFailed] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [busy, setBusy] = useState(false);
+  // What a save has made so far, so a retry after a failure part way links it
+  // instead of making it twice: each created account by quantity index and
+  // step, and each challenge written.
+  const made = useRef({
+    accounts: new Map<string, string>(),
+    challenges: new Set<number>(),
+  });
+  const strategies = (useStrategies().data ?? []).filter(
+    (st) => st.status === 'active' || strategyIds.includes(st.id),
+  );
 
   const shown: ChallengeStep[] =
     steps === '1' ? ['step-1', 'funded'] : [...STEPS];
   const id = (n: string) => `${ids}-${n}`;
+  // The broker fills the accounts this form creates. Quantity makes the same
+  // challenge again, each with its own new accounts, so it is offered only on
+  // a new challenge whose phases make new accounts and link no existing one.
+  const makesAccounts = shown.some((st) => draft[st].link === 'new');
+  const quantityShown =
+    !challenge &&
+    makesAccounts &&
+    shown.every((st) => draft[st].link === 'new' || draft[st].link === 'none');
 
   async function save() {
     const next: [string, string][] = []; // in the order the fields sit
     if (!name.trim()) next.push([id('name'), 'Give the challenge a name.']);
     if (!firm.trim()) next.push([id('firm'), 'Name the firm.']);
+    const count = quantityShown ? Number(quantity.trim()) : 1;
+    if (
+      quantityShown &&
+      !(/^\d+$/.test(quantity.trim()) && count >= 1 && count <= MAX_QUANTITY)
+    )
+      next.push([
+        id('quantity'),
+        `Enter a whole number from 1 to ${MAX_QUANTITY}.`,
+      ]);
     const feeError = (text: string, field: string) => {
       if (text.trim() !== '' && cents(text) === null)
         next.push([id(field), 'Enter an amount of zero or more.']);
@@ -614,57 +653,72 @@ export function ChallengeForm({
 
     setBusy(true);
     try {
-      const phases: Challenge['phases'] = [];
-      for (const step of shown) {
-        const d = draft[step];
-        const entry = {
-          step,
-          ...(d.startDate && { startDate: d.startDate }),
+      for (let i = 0; i < count; i++) {
+        if (made.current.challenges.has(i)) continue;
+        // The first keeps the names typed; the rest are "name 2", "name 3".
+        const suffix = i === 0 ? '' : ` ${i + 1}`;
+        const phases: Challenge['phases'] = [];
+        for (const step of shown) {
+          const d = draft[step];
+          const entry = {
+            step,
+            ...(d.startDate && { startDate: d.startDate }),
+          };
+          const b = built.get(step);
+          if (!b || !('rules' in b.rules)) {
+            phases.push(entry);
+            continue;
+          }
+          if (d.link === 'new') {
+            const key = `${i}:${step}`;
+            let accountId = made.current.accounts.get(key);
+            if (accountId === undefined) {
+              const created = await createAccount.mutateAsync({
+                name: `${d.newName.trim()}${suffix}`,
+                broker: broker.trim() || firm.trim(),
+                type: step === 'funded' ? 'prop-funded' : 'prop-evaluation',
+                currency: prefs?.baseCurrency ?? 'USD',
+                startingBalance: b.start,
+                status: 'active',
+                propRules: b.rules.rules,
+              });
+              accountId = created.id;
+              made.current.accounts.set(key, accountId);
+            }
+            phases.push({ ...entry, accountId });
+          } else {
+            await updateAccount.mutateAsync({
+              id: d.link,
+              patch: { propRules: b.rules.rules },
+            });
+            phases.push({ ...entry, accountId: d.link });
+          }
+        }
+        const fields = {
+          name: `${name.trim()}${suffix}`,
+          firm: firm.trim(),
+          steps: Number(steps) as 1 | 2,
+          phases,
+          evaluationFee: cents(evalFee) ?? undefined,
+          activationFee: cents(actFee) ?? undefined,
+          strategyIds,
         };
-        const b = built.get(step);
-        if (!b || !('rules' in b.rules)) {
-          phases.push(entry);
-          continue;
-        }
-        if (d.link === 'new') {
-          const created = await createAccount.mutateAsync({
-            name: d.newName.trim(),
-            broker: firm.trim(),
-            type: step === 'funded' ? 'prop-funded' : 'prop-evaluation',
-            currency: prefs?.baseCurrency ?? 'USD',
-            startingBalance: b.start,
-            status: 'active',
-            propRules: b.rules.rules,
+        if (!challenge)
+          await createChallenge.mutateAsync({ ...fields, phase, status });
+        else if (breached)
+          // A breach locks its phase and status: only the rest is saved, and
+          // the reason it was given stays.
+          await updateChallenge.mutateAsync({
+            id: challenge.id,
+            patch: fields,
           });
-          phases.push({ ...entry, accountId: created.id });
-          // Written back, so a retry after a later failure links this account
-          // instead of creating a second one.
-          setDraft((all) => ({
-            ...all,
-            [step]: { ...all[step], link: created.id },
-          }));
-        } else {
-          await updateAccount.mutateAsync({
-            id: d.link,
-            patch: { propRules: b.rules.rules },
+        else
+          await updateChallenge.mutateAsync({
+            id: challenge.id,
+            patch: { ...fields, phase, status, failureReason: undefined },
           });
-          phases.push({ ...entry, accountId: d.link });
-        }
+        made.current.challenges.add(i);
       }
-      const fields = {
-        name: name.trim(),
-        firm: firm.trim(),
-        steps: Number(steps) as 1 | 2,
-        phases,
-        phase,
-        status,
-        failureReason: status === 'breached' ? reason : undefined,
-        evaluationFee: cents(evalFee) ?? undefined,
-        activationFee: cents(actFee) ?? undefined,
-      };
-      if (challenge)
-        await updateChallenge.mutateAsync({ id: challenge.id, patch: fields });
-      else await createChallenge.mutateAsync(fields);
       onClose();
     } catch {
       setFailed(true);
@@ -732,6 +786,80 @@ export function ChallengeForm({
               )}
             </Field>
           </div>
+          {makesAccounts ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field
+                id={id('broker')}
+                label="Broker"
+                help="Fills the broker of each account this form creates. Blank uses the firm."
+              >
+                {(p) => (
+                  <input
+                    {...p}
+                    value={broker}
+                    onChange={(ev) => setBroker(ev.target.value)}
+                    className={INPUT}
+                  />
+                )}
+              </Field>
+              {quantityShown ? (
+                <Field
+                  id={id('quantity')}
+                  label="Quantity"
+                  error={errors[id('quantity')]}
+                  help={`Makes this many of the same challenge, named "${name.trim() || 'name'}", "${name.trim() || 'name'} 2" and so on, each with its own new accounts. 1 to ${MAX_QUANTITY}.`}
+                >
+                  {(p) => (
+                    <input
+                      {...p}
+                      inputMode="numeric"
+                      value={quantity}
+                      onChange={(ev) => setQuantity(ev.target.value)}
+                      className={INPUT}
+                    />
+                  )}
+                </Field>
+              ) : null}
+            </div>
+          ) : null}
+          <fieldset>
+            <legend className={LABEL}>Strategies</legend>
+            {strategies.length === 0 ? (
+              <p className="text-[12.5px] text-muted">
+                No strategies yet. Create one in Strategies, then attach it
+                here.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {strategies.map((st) => (
+                  <label
+                    key={st.id}
+                    className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-control border border-line px-3 text-[13px] font-medium transition-colors duration-200 has-[:checked]:border-accent/45 has-[:checked]:bg-accent-soft/60 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent pointer-coarse:min-h-11"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={strategyIds.includes(st.id)}
+                      onChange={(ev) =>
+                        setStrategyIds((all) =>
+                          ev.target.checked
+                            ? [...all, st.id]
+                            : all.filter((x) => x !== st.id),
+                        )
+                      }
+                      className="peer sr-only"
+                    />
+                    <Check
+                      size={14}
+                      weight="bold"
+                      aria-hidden="true"
+                      className="hidden text-accent-ink peer-checked:block"
+                    />
+                    {st.name}
+                  </label>
+                ))}
+              </div>
+            )}
+          </fieldset>
           <div className="flex flex-wrap gap-x-6 gap-y-3">
             <div>
               <span className={LABEL}>Steps</span>
@@ -746,46 +874,45 @@ export function ChallengeForm({
                 ]}
               />
             </div>
-            <div>
-              <span className={LABEL}>Phase</span>
-              <Segmented<Challenge['phase']>
-                label="Phase"
-                value={phase}
-                coarseTargets
-                onChange={setPhase}
-                options={[
-                  { value: 'evaluation', label: 'Evaluation' },
-                  { value: 'funded', label: 'Funded' },
-                ]}
-              />
-            </div>
-            <div>
-              <span className={LABEL}>Status</span>
-              <Segmented<Challenge['status']>
-                label="Status"
-                value={status}
-                coarseTargets
-                onChange={setStatus}
-                options={[
-                  { value: 'active', label: 'Active' },
-                  { value: 'passed', label: 'Passed' },
-                  { value: 'breached', label: 'Breached' },
-                ]}
-              />
-            </div>
+            {breached ? null : (
+              <>
+                <div>
+                  <span className={LABEL}>Phase</span>
+                  <Segmented<Challenge['phase']>
+                    label="Phase"
+                    value={phase}
+                    coarseTargets
+                    onChange={setPhase}
+                    options={[
+                      { value: 'evaluation', label: 'Evaluation' },
+                      { value: 'funded', label: 'Funded' },
+                    ]}
+                  />
+                </div>
+                <div>
+                  <span className={LABEL}>Status</span>
+                  <Segmented<'active' | 'passed'>
+                    label="Status"
+                    value={status}
+                    coarseTargets
+                    onChange={setStatus}
+                    options={[
+                      { value: 'active', label: 'Active' },
+                      { value: 'passed', label: 'Passed' },
+                    ]}
+                  />
+                </div>
+              </>
+            )}
           </div>
-          {status === 'breached' ? (
-            <Field id={id('reason')} label="Failure reason">
-              {(p) => (
-                <textarea
-                  {...p}
-                  rows={2}
-                  value={reason}
-                  onChange={(ev) => setReason(ev.target.value)}
-                  className={`${INPUT} h-auto py-2`}
-                />
-              )}
-            </Field>
+          {breached ? (
+            <p className="flex items-start gap-2.5 rounded-[10px] bg-sunken px-3 py-2.5 text-[13px] leading-[1.5] text-muted">
+              <Info size={16} aria-hidden="true" className="mt-px flex-none" />
+              <span>
+                A breach is final. This challenge stays in Breached, so its
+                phase and status can&apos;t change.
+              </span>
+            </p>
           ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
             <Field

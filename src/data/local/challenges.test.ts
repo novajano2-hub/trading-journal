@@ -89,6 +89,18 @@ test('a challenge that cannot be is refused', async () => {
   expect(await repo.challenges.list(S)).toEqual([]);
 });
 
+test('a challenge cannot be created breached: that goes through markBreached, which records why and when', async () => {
+  const repo = setup();
+  const attempt = repo.challenges.create(S, { ...input, status: 'breached' });
+  await expect(attempt).rejects.toBeInstanceOf(RangeError);
+  await expect(attempt).rejects.toThrow(/markBreached/);
+  // Nothing was written, and an ordinary status still creates.
+  expect(await repo.challenges.list(S)).toEqual([]);
+  await expect(
+    repo.challenges.create(S, { ...input, status: 'passed' }),
+  ).resolves.toMatchObject({ status: 'passed' });
+});
+
 test('an account another challenge links is refused, naming that challenge', async () => {
   const repo = setup();
   const first = await repo.challenges.create(S, input);

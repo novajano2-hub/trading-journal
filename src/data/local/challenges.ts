@@ -98,6 +98,11 @@ export function localChallenges(ctx: LocalContext): ChallengesRepo {
     },
 
     async create(ws, input: NewChallenge) {
+      // A breach is recorded with its reason and date, by markBreached only.
+      if (input.status === 'breached')
+        throw new RangeError(
+          'A challenge is breached through markBreached, which records the reason and the date',
+        );
       const db = await ctx.db();
       const challenge = tidy({ ...input, id: ctx.newId(), workspaceId: ws });
       return rwTx(db, [db.challenges, db.accounts, db.strategies], async () => {
