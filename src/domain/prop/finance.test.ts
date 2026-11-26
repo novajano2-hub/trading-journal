@@ -313,6 +313,40 @@ describe('challengeType', () => {
     });
     expect(challengeType(fresh)).toBe('2-step');
   });
+
+  test('an unlinked, undated evaluation moved to funded keeps its steps and its passed evaluation (C-01)', () => {
+    const phases: Challenge['phases'] = [
+      { step: 'step-1' },
+      { step: 'funded' },
+    ];
+    const moved = challenge('m', {
+      phase: 'funded',
+      phases,
+      movedToFundedOn: '2026-11-20',
+    });
+    expect(challengeType(moved)).toBe('1-step');
+    expect(challengeType({ ...moved, steps: 2 })).toBe('2-step');
+    // The same phases without the move are a challenge created in the funded phase.
+    expect(challengeType(challenge('c', { phase: 'funded', phases }))).toBe(
+      's2f',
+    );
+    // The pass rate counts the moved one, 1 of 1, and the type filter files it under 1-step.
+    expect(passRates([moved], [], 'firm').overall).toEqual({
+      passed: 1,
+      attempted: 1,
+    });
+    expect(passRates([moved], [], 'type').rows).toEqual([
+      expect.objectContaining({ key: '1-step', passed: 1, attempted: 1 }),
+    ]);
+    // Still moved after its funded account breached: the evaluation passed.
+    expect(
+      passRates(
+        [{ ...moved, status: 'breached', breachedOn: '2026-11-25' }],
+        [],
+        'firm',
+      ).overall,
+    ).toEqual({ passed: 1, attempted: 1 });
+  });
 });
 
 describe('accountsGroup (C62)', () => {

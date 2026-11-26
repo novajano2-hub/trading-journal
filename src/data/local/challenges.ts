@@ -42,6 +42,10 @@ async function assertValid(db: KeelDb, c: Challenge): Promise<void> {
     );
   if (!isFee(c.evaluationFee) || !isFee(c.activationFee))
     throw new RangeError('A fee is a whole number of cents, 0 or more');
+  if (c.movedToFundedOn !== undefined && !isDate(c.movedToFundedOn))
+    throw new RangeError(
+      `A move-to-funded date must be YYYY-MM-DD, got "${c.movedToFundedOn}"`,
+    );
   for (const id of c.strategyIds ?? [])
     if (!(await db.strategies.get([c.workspaceId, id])))
       throw new NotFoundError('strategy', id);

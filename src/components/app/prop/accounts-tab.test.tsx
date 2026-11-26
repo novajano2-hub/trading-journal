@@ -14,6 +14,7 @@ import { createLocalRepository } from '@/data/local/local-repository';
 import type { Repository } from '@/data/repository';
 import { SAMPLE_WORKSPACE } from '@/data/workspaces';
 import { makeTrade } from '@/domain/__fixtures__/trades';
+import { challengeType, passRates } from '@/domain/prop/finance';
 import type { Account, Challenge, PropRuleSet } from '@/domain/types';
 import { renderApp } from '../__fixtures__/render-app';
 import { viewport } from '../__fixtures__/viewport';
@@ -465,6 +466,37 @@ test('confirming Move to funded passes the evaluation: funded phase, active, and
   expect(await tab('Evaluations 1')).toBeTruthy();
   expect(screen.getByRole('tab', { name: 'Funded 2' })).toBeTruthy();
   expect(screen.getByRole('tab', { name: 'Breached 2' })).toBeTruthy();
+});
+
+test('Move to funded on a 1-step with no account or date records the move, so it stays 1-step and keeps its passed evaluation (C-01)', async () => {
+  const bare = challenge('c-bare', {
+    name: 'Bare one',
+    phases: [{ step: 'step-1' }, { step: 'funded' }],
+  });
+  const r = repo({ accounts: [], challenges: [bare] });
+  renderApp(<AccountsTab />, { repository: r, url: URL });
+  await openMenu('Bare one');
+  fireEvent.click(
+    await screen.findByRole('menuitem', { name: 'Move to funded' }),
+  );
+  const dialog = await screen.findByRole('dialog');
+  fireEvent.click(
+    within(dialog).getByRole('button', { name: 'Move to funded' }),
+  );
+  await waitFor(async () =>
+    expect((await r.challenges.list(WS))[0]).toMatchObject({
+      phase: 'funded',
+      movedToFundedOn: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+    }),
+  );
+  const [saved] = await r.challenges.list(WS);
+  expect(challengeType(saved!)).toBe('1-step');
+  expect(passRates([saved!], [], 'firm').overall).toEqual({
+    passed: 1,
+    attempted: 1,
+  });
+  fireEvent.click(await tab('Funded 1'));
+  expect(within(await rowOf('Bare one')).getByText('1-step')).toBeTruthy();
 });
 
 test('Mark as breached starts with no reason, writes the reason and the date, and the challenge cannot return', async () => {

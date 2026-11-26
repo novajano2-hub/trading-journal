@@ -235,6 +235,12 @@ export interface Challenge {
   breachReason?: BreachReason;
   /** YYYY-MM-DD */
   breachedOn?: string;
+  /**
+   * YYYY-MM-DD: the day the challenge was moved from an evaluation to its
+   * funded phase (Move to funded). It tells that move from a challenge
+   * created in the funded phase (straight to funded, C30).
+   */
+  movedToFundedOn?: string;
 }
 export type BreachReason =
   | 'max-drawdown'

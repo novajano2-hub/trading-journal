@@ -183,12 +183,14 @@ export function accountsGroup(c: Challenge): AccountsGroup {
 
 /**
  * 1-step or 2-step from `steps`; straight to funded is a challenge created in
- * the funded phase, whose phases hold no evaluation step with an account or a
- * start date (C30).
+ * the funded phase (C30): in the funded phase, with no evaluation step holding
+ * an account or a start date, and never moved there (`movedToFundedOn`: a
+ * Move to funded records the evaluation it passed, even an unlinked one).
  */
 export function challengeType(c: Challenge): ChallengeType {
   if (
     c.phase === 'funded' &&
+    c.movedToFundedOn === undefined &&
     !c.phases.some(
       (p) =>
         p.step !== 'funded' &&

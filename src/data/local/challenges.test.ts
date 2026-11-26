@@ -350,6 +350,34 @@ describe('markBreached', () => {
   });
 });
 
+test('movedToFundedOn records the day a challenge moved to funded, as a real date (C-01)', async () => {
+  const repo = setup();
+  const c = await repo.challenges.create(S, input);
+  expect('movedToFundedOn' in c).toBe(false);
+  await expect(
+    repo.challenges.update(S, c.id, {
+      phase: 'funded',
+      movedToFundedOn: '20 Nov',
+    }),
+  ).rejects.toBeInstanceOf(RangeError);
+  expect((await repo.challenges.list(S))[0]).toEqual(c);
+  const moved = await repo.challenges.update(S, c.id, {
+    status: 'active',
+    phase: 'funded',
+    movedToFundedOn: '2026-11-20',
+  });
+  expect(moved).toMatchObject({
+    phase: 'funded',
+    movedToFundedOn: '2026-11-20',
+  });
+  // A later edit keeps it.
+  const renamed = await repo.challenges.update(S, c.id, { name: 'Renamed' });
+  expect(renamed.movedToFundedOn).toBe('2026-11-20');
+  await expect(
+    repo.challenges.create(S, { ...input, name: 'Bad', movedToFundedOn: 'x' }),
+  ).rejects.toBeInstanceOf(RangeError);
+});
+
 test('strategies attach to a challenge, once each, and must exist', async () => {
   const repo = setup();
   const c = await repo.challenges.create(S, {

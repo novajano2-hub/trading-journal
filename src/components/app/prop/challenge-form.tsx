@@ -25,6 +25,7 @@ import {
 } from '@/data/query/hooks';
 import { toCents } from '@/domain/money';
 import { drawdownLabel } from '@/domain/prop/challenge';
+import { localDate } from '@/domain/time';
 import type {
   Account,
   Cents,
@@ -719,7 +720,20 @@ export function ChallengeForm({
         else
           await updateChallenge.mutateAsync({
             id: challenge.id,
-            patch: { ...fields, phase, status, failureReason: undefined },
+            patch: {
+              ...fields,
+              phase,
+              status,
+              failureReason: undefined,
+              // Moving it to funded here is the same move as Move to funded.
+              ...(challenge.phase === 'evaluation' &&
+                phase === 'funded' && {
+                  movedToFundedOn: localDate(
+                    new Date().toISOString(),
+                    prefs?.timeZone ?? 'UTC',
+                  ),
+                }),
+            },
           });
         made.current.challenges.add(i);
       }

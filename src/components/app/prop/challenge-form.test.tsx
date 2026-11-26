@@ -582,3 +582,51 @@ test('a challenge created in the funded phase reads as straight to funded, deriv
   expect(challengeType(saved!)).toBe('s2f');
   expect('type' in saved!).toBe(false);
 });
+
+test('editing an unlinked evaluation to the funded phase records the move, so it does not read as straight to funded (C-01)', async () => {
+  const bare: Challenge = {
+    ...existing,
+    id: 'c-bare',
+    name: 'Bare one',
+    phases: [{ step: 'step-1' }, { step: 'funded' }],
+  };
+  const r = repoWith([], [bare]);
+  const onClose = vi.fn();
+  renderApp(<ChallengeForm challenge={bare} onClose={onClose} />, {
+    repository: r,
+  });
+  await screen.findByRole('dialog', { name: 'Edit challenge' });
+  fireEvent.click(
+    within(screen.getByRole('radiogroup', { name: 'Phase' })).getByRole(
+      'radio',
+      { name: 'Funded' },
+    ),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Save challenge' }));
+  await waitFor(() => expect(onClose).toHaveBeenCalled());
+  const saved = (await r.challenges.list(WS)).find((c) => c.id === 'c-bare')!;
+  expect(saved).toMatchObject({
+    phase: 'funded',
+    movedToFundedOn: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+  });
+  expect(challengeType(saved)).toBe('1-step');
+});
+
+test('saving a challenge that is already funded records no move', async () => {
+  const funded: Challenge = {
+    ...existing,
+    id: 'c-funded',
+    phases: [{ step: 'step-1' }, { step: 'funded' }],
+    phase: 'funded',
+  };
+  const r = repoWith([], [funded]);
+  const onClose = vi.fn();
+  renderApp(<ChallengeForm challenge={funded} onClose={onClose} />, {
+    repository: r,
+  });
+  await screen.findByRole('dialog', { name: 'Edit challenge' });
+  fireEvent.click(screen.getByRole('button', { name: 'Save challenge' }));
+  await waitFor(() => expect(onClose).toHaveBeenCalled());
+  const saved = (await r.challenges.list(WS)).find((c) => c.id === 'c-funded')!;
+  expect('movedToFundedOn' in saved).toBe(false);
+});

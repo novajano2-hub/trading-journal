@@ -431,6 +431,7 @@ function DetailsBody({
       ) : null}
       <MoveToFunded
         row={moving ? { c, check } : undefined}
+        today={today}
         returnFocus={RETURN.fund}
         // The funded phase is the current one now: show it.
         onMoved={() => writeParam('phase', null)}

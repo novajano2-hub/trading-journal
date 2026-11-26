@@ -9,17 +9,22 @@ import { phaseName, shownPhase } from './challenge-card';
 
 /**
  * Move a challenge to its funded phase, after asking: Plan 5's pass action
- * (`status: 'active'`, `phase: 'funded'`). The evaluation's results stay
- * viewable. The Accounts tab's row menu and the details page both open it;
- * `row` is the challenge asked about, and the dialog is closed without one.
+ * (`status: 'active'`, `phase: 'funded'`) and the day it moved
+ * (`movedToFundedOn`), which keeps an evaluation with no account or date from
+ * reading as straight to funded afterwards (C30). The evaluation's results
+ * stay viewable. The Accounts tab's row menu and the details page both open
+ * it; `row` is the challenge asked about, and the dialog is closed without one.
  */
 export function MoveToFunded({
   row,
+  today,
   returnFocus,
   onMoved,
   onClose,
 }: {
   row: { c: Challenge; check: ChallengeCheck } | undefined;
+  /** The trader's local date: the day of the move. */
+  today: string;
   returnFocus?: RefObject<HTMLElement | null>;
   /** Called once the challenge has moved, before the dialog closes. */
   onMoved?(): void;
@@ -41,7 +46,11 @@ export function MoveToFunded({
         if (!row) return;
         await update.mutateAsync({
           id: row.c.id,
-          patch: { status: 'active', phase: 'funded' },
+          patch: {
+            status: 'active',
+            phase: 'funded',
+            movedToFundedOn: today,
+          },
         });
         onMoved?.();
       }}

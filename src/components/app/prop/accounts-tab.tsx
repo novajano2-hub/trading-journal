@@ -398,6 +398,7 @@ export function AccountsTab(): React.JSX.Element {
       ) : null}
       <MoveToFunded
         row={movingRow}
+        today={today}
         returnFocus={returnFocus}
         onClose={() => setMoving(null)}
       />
