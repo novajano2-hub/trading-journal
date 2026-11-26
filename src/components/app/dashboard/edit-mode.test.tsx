@@ -968,3 +968,44 @@ test('on a phone the sheet has Cancel and, with several templates, Delete templa
   );
   expect((await stored(repository))!.templates[1]).toEqual(review);
 });
+
+// ---------------------------------------------------------------------------
+// The edit bar is a pinned row (E52)
+
+test("edit mode's bar is pinned and tells what pins under it how tall it is; leaving it hands the token back to the top bar", async () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+    function (this: HTMLElement) {
+      return {
+        left: 0,
+        width: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        height: this.tagName === 'HEADER' ? 92 : 0,
+      } as DOMRect;
+    },
+  );
+  await mount({ dashboards: two });
+  await edit();
+  await nameField();
+  const bar = screen.getByRole('banner');
+  expect(bar.getAttribute('aria-label')).toBe('Editing a dashboard template');
+  expect(bar.hasAttribute('data-pinned')).toBe(true);
+  await waitFor(() =>
+    expect(document.documentElement.style.getPropertyValue('--top-bar')).toBe(
+      '92px',
+    ),
+  );
+  fireEvent.click(button('Cancel'));
+  await waitFor(() =>
+    expect(screen.queryByRole('textbox', { name: 'Template name' })).toBeNull(),
+  );
+  // The top bar is back and publishes its own height.
+  await waitFor(() =>
+    expect(screen.getByRole('banner').hasAttribute('data-pinned')).toBe(true),
+  );
+  expect(screen.getByRole('banner').getAttribute('aria-label')).toBeNull();
+  expect(document.documentElement.style.getPropertyValue('--top-bar')).toBe(
+    '92px',
+  );
+});

@@ -40,6 +40,7 @@ import {
 } from '@/domain/dashboard/widgets';
 import type { DashTemplate, WidgetKey, WidgetRef } from '@/domain/types';
 import { usePhone } from '@/lib/use-phone';
+import { useBarHeight } from '../use-bar-height';
 import {
   NAME_LIMIT,
   useDashboardEdit,
@@ -513,8 +514,12 @@ export function EditBar({
   session: EditSession;
 }): React.JSX.Element {
   const fieldId = useId();
+  const bar = useRef<HTMLElement>(null);
+  useBarHeight(bar);
   return (
     <header
+      ref={bar}
+      data-pinned=""
       aria-label="Editing a dashboard template"
       className="sticky top-0 z-30 flex min-h-[68px] flex-wrap items-center gap-x-2.5 gap-y-1 bg-bg px-5 max-xl:py-2"
     >

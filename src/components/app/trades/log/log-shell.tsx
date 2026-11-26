@@ -230,31 +230,33 @@ export function LogShell({
 }): React.JSX.Element {
   const phone = usePhone();
   const wide = useWide();
-  const root = useRef<HTMLDivElement>(null);
   const row = useRef<HTMLDivElement>(null);
-  // The switch row's height, for the aside to sit under it when both are pinned.
+  // The switch row's height, on the page: the aside sits under it when both are
+  // pinned, and a focused control clears it (globals.css, with the bar's).
   useEffect(() => {
     const el = row.current;
-    const host = root.current;
-    if (!el || !host) return;
+    if (!el) return;
+    const root = document.documentElement;
     const publish = () =>
-      host.style.setProperty('--log-switch', `${el.offsetHeight}px`);
+      root.style.setProperty('--log-switch', `${el.offsetHeight}px`);
     publish();
-    if (typeof ResizeObserver === 'undefined') return;
+    const unpublish = () => root.style.removeProperty('--log-switch');
+    if (typeof ResizeObserver === 'undefined') return unpublish;
     const observer = new ResizeObserver(publish);
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      unpublish();
+    };
   }, []);
   // The column is built only where it shows (from xl): a hidden one would still
   // group every trade again at each filter change.
   const column = aside !== undefined && !phone && wide;
   return (
-    <div
-      ref={root}
-      className="flex min-w-0 flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0"
-    >
+    <div className="flex min-w-0 flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0">
       <div
         ref={row}
+        data-pinned=""
         className="sticky top-[var(--top-bar,56px)] z-20 -mx-5 bg-bg px-5 py-2 sm:top-[var(--top-bar,68px)]"
       >
         <div className="flex items-center gap-2.5">

@@ -24,6 +24,7 @@ import { useStrategy, useTrade } from '@/data/query/hooks';
 import { LOG_VIEW_HREF, useLastLogView } from '@/lib/log-view';
 import { usePhone } from '@/lib/use-phone';
 import { HomeSidebarToggle } from './sidebar-toggle';
+import { useBarHeight } from './use-bar-height';
 import {
   dayPageDate,
   filtersApply,
@@ -37,9 +38,10 @@ import {
 } from './nav';
 
 /**
- * Where the chips sit from `sm` up: beside the title, or with the controls on
- * a row under it. `unknown` is the prerendered guess, until the bar is
- * measured: beside the title from `xl`, where chips at rest fit.
+ * Where the chips sit from `sm` up: beside the title, or on a row of their
+ * own under it with the controls on the row after (the chips keep the whole
+ * width). `unknown` is the prerendered guess, until the bar is measured:
+ * beside the title from `xl`, where chips at rest fit.
  */
 type ChipsFit = 'unknown' | 'inline' | 'wrapped';
 
@@ -50,9 +52,9 @@ const FIT: Record<'bar' | 'title' | 'breaker', Record<ChipsFit, string>> = {
     wrapped: 'sm:flex-wrap sm:pb-3',
   },
   title: {
-    unknown: 'sm:h-14 xl:mr-3 xl:h-[68px] xl:flex-none',
+    unknown: 'sm:h-12 xl:mr-3 xl:h-[68px] xl:flex-none',
     inline: 'sm:mr-3 sm:flex-none',
-    wrapped: 'sm:h-14',
+    wrapped: 'sm:h-12',
   },
   breaker: {
     unknown: 'sm:block xl:hidden',
@@ -102,12 +104,6 @@ function useChipsFit({
     if (!active) return;
     const sm = matchMedia('(min-width: 640px)');
     const measure = () => {
-      // The bar's measured height, for what pins itself under it (the trade views' switch row).
-      if (bar.current)
-        document.documentElement.style.setProperty(
-          '--top-bar',
-          `${bar.current.getBoundingClientRect().height}px`,
-        );
       const t = title.current;
       const r = tail.current;
       const c = chips.current;
@@ -123,17 +119,12 @@ function useChipsFit({
       setFit((f) => (f === next ? f : next));
     };
     measure();
-    const unpublish = () =>
-      document.documentElement.style.removeProperty('--top-bar');
-    if (typeof ResizeObserver === 'undefined') return unpublish;
+    if (typeof ResizeObserver === 'undefined') return;
     // The bar resizes with the window; the rest with their words.
     const observer = new ResizeObserver(measure);
     for (const el of [bar, title, controls, chips])
       if (el.current) observer.observe(el.current);
-    return () => {
-      observer.disconnect();
-      unpublish();
-    };
+    return () => observer.disconnect();
   }, [active, bar, title, tail, controls, chips]);
   return fit;
 }
@@ -229,17 +220,20 @@ function StrategyCrumb({
 /**
  * The bar over every app page, on the canvas with no rule under it. Its
  * source order is its reading order at every width, so Tab follows what the
- * eye does: the menu (`sm` to `lg`), the page title, the filter chips, then
- * search, the sample label, the Display menu, Plan the day, the Dashboard's
- * template button and Import. Nothing is reordered by CSS.
+ * eye does: the menu (`sm` to `lg`), Home's way back to the sidebar (from
+ * `lg`, while it is collapsed), the page title, the filter chips, then search,
+ * the sample label, the Display menu, Plan the day, the Dashboard's template
+ * button and Import. Nothing is reordered by CSS.
  * - From `sm` up it is one sticky bar, 68px while the chips fit beside the
- *   title. Where they don't, measured, the title keeps the first row and the
- *   chips lead a second one, the controls after them; where even that row is
- *   too short the chips scroll sideways.
+ *   title. Where they don't, measured, it has three rows: the title, the
+ *   chips with the whole width to themselves (they scroll sideways only where
+ *   even that is too short), then the controls, at the right. It pins itself
+ *   (`data-pinned`) and tells the page its height (`--top-bar`).
  * - Below `sm` it is one 56px row pinned to the top: the title (with a quiet
- *   "Sample" badge in the sample workspace) on the left, plain icon buttons
- *   for Filters (where the page has them), search and Display on the right.
- *   The tab bar at the foot does the navigating.
+ *   "Sample" badge in the sample workspace, which gives its room to the title
+ *   below 375px) on the left, plain icon buttons for Filters (where the page
+ *   has them), search and Display on the right. The tab bar at the foot does
+ *   the navigating.
  */
 export function TopBar({
   menu,
@@ -281,6 +275,7 @@ export function TopBar({
   const dayDate =
     rawDate !== undefined && isRealDate(rawDate) ? rawDate : undefined;
   const imports = useImportPicker();
+  useBarHeight(bar, session === undefined);
   const measured = useChipsFit({
     active: session === undefined,
     bar,
@@ -302,6 +297,7 @@ export function TopBar({
       ) : (
         <header
           ref={bar}
+          data-pinned=""
           data-chips={showFilters ? fit : undefined}
           className={`sticky top-0 z-30 flex items-center bg-bg px-5 max-sm:h-14 max-sm:border-b max-sm:border-line sm:gap-x-2 ${dayDate !== undefined ? 'sm:h-[68px]' : ''} ${FIT.bar[fit]}`}
         >
@@ -362,6 +358,11 @@ export function TopBar({
               >
                 {filters}
               </div>
+              {/* Ends the chips' row when they have it to themselves: the controls take the next, a little apart. */}
+              <div
+                aria-hidden="true"
+                className={`hidden h-1.5 basis-full ${FIT.breaker[fit]}`}
+              />
             </>
           ) : null}
           {isComparePage(pathname) ? (

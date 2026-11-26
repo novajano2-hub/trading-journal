@@ -489,3 +489,114 @@ test('on a phone the Settings pills keep their words, whatever the saved choice 
     ),
   ).toBe(true);
 });
+
+// ---- Focus is never under what is pinned (E52, WCAG 2.4.11) ------------------
+
+const BUSY =
+  '?from=2026-10-05&to=2026-11-20&symbol=AUDUSD&symbol=BTCUSD&side=short&strategy=sample-strategy-1&tag=sample-tag-4';
+
+/** The lowest edge of what is pinned at the top: the bar, and the trade views' switch row under it. */
+const pinnedBottom = (page: Page) =>
+  page.evaluate(() =>
+    Math.max(
+      ...[...document.querySelectorAll('[data-pinned]')].map(
+        (el) => el.getBoundingClientRect().bottom,
+      ),
+    ),
+  );
+
+for (const route of ['/app/trades', '/app/trades/day']) {
+  test(`shift-tabbing up ${route} from its middle never leaves a control under the top bar`, async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    await page.goto(route);
+    await settled(page);
+    // The log has filled in: a page long enough to scroll through.
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollHeight))
+      .toBeGreaterThan(1800);
+    // The middle of a long page: past the end first, then focus the last control in the page.
+    await page.evaluate(() =>
+      scrollTo(0, document.documentElement.scrollHeight),
+    );
+    await page.evaluate(() => {
+      const all = [
+        ...document.querySelectorAll<HTMLElement>(
+          'main a[href], main button, main input, main [tabindex="0"]',
+        ),
+      ].filter(
+        (el) =>
+          el.getBoundingClientRect().width > 0 &&
+          !el.closest('[data-pinned]') &&
+          !(el as HTMLButtonElement).disabled,
+      );
+      all.at(-1)!.focus();
+    });
+    expect(await page.evaluate(() => scrollY)).toBeGreaterThan(300);
+    let checked = 0;
+    let closest = Infinity;
+    for (let i = 0; i < 70; i++) {
+      await page.keyboard.press('Shift+Tab');
+      const at = await page.evaluate(() => {
+        const el = document.activeElement as HTMLElement | null;
+        if (
+          !el ||
+          el === document.body ||
+          el.closest(
+            '[data-pinned], [aria-label="Sidebar"], nav[aria-label="Main"]',
+          )
+        )
+          return null;
+        return el.getBoundingClientRect().top;
+      });
+      if (at === null) continue;
+      checked += 1;
+      const floor = await pinnedBottom(page);
+      closest = Math.min(closest, at - floor);
+      expect(
+        at,
+        `stop ${i + 1}: top ${at}, pinned down to ${floor}`,
+      ).toBeGreaterThanOrEqual(floor - 0.5);
+    }
+    // The walk really crossed the page, up to the bar's edge.
+    expect(checked).toBeGreaterThan(20);
+    expect(closest).toBeLessThan(200);
+  });
+}
+
+test('a control in the bar takes focus without moving the page, chips scroller included', async ({
+  page,
+}, info) => {
+  const mobile = info.project.name === 'mobile';
+  await page.goto(`/app/dashboard${BUSY}`);
+  await settled(page);
+  await expect(page.getByTestId('dashboard-ready')).toBeVisible({
+    timeout: 20_000,
+  });
+  await page.evaluate(() => scrollTo(0, 500));
+  const y = await page.evaluate(() => scrollY);
+  expect(y).toBeGreaterThan(100);
+  const bar = page.getByRole('banner');
+  const stops = mobile
+    ? [
+        bar.getByRole('button', { name: /^Filters/ }),
+        bar.getByRole('combobox', { name: 'Search' }),
+        bar.getByRole('button', { name: /show as / }),
+      ]
+    : [
+        bar
+          .getByRole('group', { name: 'Filters' })
+          .getByRole('button', { name: 'Short', exact: true }),
+        bar
+          .getByRole('group', { name: 'Filters' })
+          .getByRole('button', { name: 'Clear filters' }),
+        bar.getByRole('combobox', { name: 'Search' }),
+        bar.getByRole('link', { name: 'Import' }),
+      ];
+  for (const stop of stops) {
+    await stop.focus();
+    await expect(stop).toBeFocused();
+    expect(await page.evaluate(() => scrollY)).toBe(y);
+  }
+});

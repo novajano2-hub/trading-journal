@@ -436,3 +436,61 @@ test('on Home a collapsed sidebar leaves the bar a way back from lg, and nowhere
   await new Promise((r) => setTimeout(r, 30));
   expect(screen.queryByRole('button', { name: /the sidebar$/ })).toBeNull();
 });
+
+// ---- Wrapped chips keep a full row (E55) -----------------------------------
+
+/** The bar's row breakers: the empty, hidden-from-assistive-tech blocks that end a row. */
+const breakers = (bar: HTMLElement) =>
+  [...bar.children].filter(
+    (el) =>
+      el.getAttribute('aria-hidden') === 'true' &&
+      el.className.includes('basis-full'),
+  ) as HTMLElement[];
+
+test('chips that need more than the room get a full row, and the controls drop to the row after it', () => {
+  layOut({ titleWidth: 115, chipsWidth: 517 });
+  const bar = renderBar();
+  expect(bar.dataset.chips).toBe('wrapped');
+  const chips = screen.getByTestId('chips').parentElement!;
+  const [afterTitle, afterChips] = breakers(bar);
+  // Title, a break, the chips, a break, then the controls: the reading order is the row order.
+  expect(afterTitle!.nextElementSibling).toBe(chips);
+  expect(chips.nextElementSibling).toBe(afterChips);
+  expect(
+    afterChips!.nextElementSibling!.contains(screen.getByTestId('search')),
+  ).toBe(true);
+  expect(afterChips!.className).toContain('sm:block');
+  expect(afterChips!.className).not.toContain('xl:');
+});
+
+test('chips that fit beside the title leave the controls on that row', () => {
+  layOut({ titleWidth: 115, chipsWidth: 516 });
+  const bar = renderBar();
+  expect(bar.dataset.chips).toBe('inline');
+  const [, afterChips] = breakers(bar);
+  expect(afterChips!.className).not.toMatch(/(^|\s)sm:block(\s|$)/);
+  expect(afterChips!.className).not.toMatch(/(^|\s)block(\s|$)/);
+});
+
+test('before the bar is measured the controls drop below xl, with the chips', () => {
+  vi.spyOn(window, 'matchMedia').mockImplementation(
+    (query: string) => ({ matches: false, media: query }) as MediaQueryList,
+  );
+  layOut({ titleWidth: 115, chipsWidth: 100 });
+  const bar = renderBar();
+  expect(bar.dataset.chips).toBe('unknown');
+  const [, afterChips] = breakers(bar);
+  expect(afterChips!.className).toContain('sm:block');
+  expect(afterChips!.className).toContain('xl:hidden');
+});
+
+test('a page without the chips has no breakers', () => {
+  layOut({ titleWidth: 115, chipsWidth: 517 });
+  const bar = renderBar('/app/import');
+  expect(breakers(bar)).toHaveLength(0);
+});
+
+test('the bar is a pinned row: focus inside it never sends the page scrolling', () => {
+  layOut({ titleWidth: 115, chipsWidth: 100 });
+  expect(renderBar().hasAttribute('data-pinned')).toBe(true);
+});

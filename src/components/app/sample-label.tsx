@@ -5,7 +5,8 @@ import { useActiveWorkspace } from '@/data/query/hooks';
 /**
  * Sample figures are always labelled while the sample workspace is active. From
  * `sm` it is quiet words beside the controls; below `sm` (`badge`) a small
- * neutral pill beside the page title.
+ * neutral pill beside the page title, which below 375px gives its room to the
+ * title and stays as words for assistive tech.
  */
 export function SampleLabel({
   badge = false,
@@ -15,7 +16,7 @@ export function SampleLabel({
   const workspace = useActiveWorkspace().data;
   if (workspace?.kind !== 'sample') return null;
   return badge ? (
-    <span className="inline-flex h-5 flex-none items-center rounded-full bg-sunken px-2 text-[11.5px] font-[550] whitespace-nowrap text-muted sm:hidden">
+    <span className="inline-flex h-5 flex-none items-center rounded-full bg-sunken px-2 text-[11.5px] font-[550] whitespace-nowrap text-muted max-[374.98px]:sr-only sm:hidden">
       <span aria-hidden="true">Sample</span>
       <span className="sr-only">Sample data. Not a real account.</span>
     </span>
