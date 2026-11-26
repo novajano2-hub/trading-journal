@@ -51,6 +51,9 @@ export type WriteKind =
   | 'trades.createManual'
   | 'trades.replaceManual'
   | 'trades.remove'
+  | 'trades.merge'
+  | 'trades.split'
+  | 'trades.move'
   | 'accounts.create'
   | 'accounts.update'
   | 'accounts.remove'
@@ -114,12 +117,27 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
     case 'trades.createManual':
     case 'trades.replaceManual':
       return [keys.trades(ws), keys.imports(ws), keys.history(ws)];
+    // Deleting trades deletes their files (B56).
     case 'trades.remove':
       return [
         keys.trades(ws),
         keys.journal(ws),
         keys.imports(ws),
         keys.history(ws),
+        keys.filesAll(ws),
+      ];
+    // Regrouping moves a merged trade's files and unlinks its notes; a day's
+    // figures read the trades (a finished day's frozen score does not move).
+    case 'trades.merge':
+    case 'trades.split':
+    case 'trades.move':
+      return [
+        keys.trades(ws),
+        keys.journal(ws),
+        keys.imports(ws),
+        keys.history(ws),
+        keys.days(ws),
+        keys.filesAll(ws),
       ];
     case 'journal.remove':
       return [
@@ -127,6 +145,7 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
         keys.journal(ws),
         keys.imports(ws),
         keys.days(ws),
+        keys.filesAll(ws),
       ];
     case 'imports.undo':
     case 'accounts.clearTrades':
@@ -135,6 +154,7 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
         keys.journal(ws),
         keys.imports(ws),
         keys.history(ws),
+        keys.filesAll(ws),
       ];
     case 'journal.ensureTradeNote':
       return [
@@ -156,6 +176,7 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
         keys.cashFlows(ws),
         keys.challenges(ws),
         keys.history(ws),
+        keys.filesAll(ws),
       ];
     case 'challenges.create':
     case 'challenges.update':
@@ -168,12 +189,20 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
     case 'strategies.create':
       return [keys.strategies(ws), keys.history(ws)];
     case 'strategies.update':
+      return [
+        keys.strategies(ws),
+        keys.trades(ws),
+        keys.imports(ws),
+        keys.history(ws),
+      ];
+    // Its photo goes with it (B56).
     case 'strategies.remove':
       return [
         keys.strategies(ws),
         keys.trades(ws),
         keys.imports(ws),
         keys.history(ws),
+        keys.filesAll(ws),
       ];
     case 'tags.create':
     case 'tags.update':

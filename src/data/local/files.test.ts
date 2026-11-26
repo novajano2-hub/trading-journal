@@ -3,6 +3,7 @@ import { expect, test, vi } from 'vitest';
 import type { FrozenDay } from '@/domain/types';
 import { fixtureSample } from '../__fixtures__/sample';
 import {
+  ArchivedAccountError,
   FileRejected,
   LockedDayError,
   NotFoundError,
@@ -241,7 +242,9 @@ test('a refused trade removal keeps the files', async () => {
   // f-3 is in an archived account, so removing it is refused.
   await repo.files.add(S, 'trade:f-1', png(), { images: true });
   await repo.files.add(S, 'trade:f-3', png(), { images: true });
-  await expect(repo.trades.remove(S, ['f-1', 'f-3'])).rejects.toThrow();
+  await expect(repo.trades.remove(S, ['f-1', 'f-3'])).rejects.toBeInstanceOf(
+    ArchivedAccountError,
+  );
   expect(await owners(db, S)).toEqual(['trade:f-1', 'trade:f-3']);
 });
 

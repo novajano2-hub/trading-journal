@@ -569,6 +569,58 @@ export function useRemoveTrades(): UseMutationResult<
   );
 }
 
+/** Joins trades by the executions picked (B1 to B3); resolves to the merged trade. */
+export function useMergeTrades(): UseMutationResult<
+  Trade,
+  Error,
+  { ids: readonly string[]; picked: readonly string[] }
+> {
+  return useWorkspaceWrite(
+    'trades.merge',
+    (r, ws, v: { ids: readonly string[]; picked: readonly string[] }) =>
+      r.trades.merge(ws, v.ids, v.picked),
+  );
+}
+
+/** Moves the executions `moved` of one trade to a new trade (B4). */
+export function useSplitTrade(): UseMutationResult<
+  { original: Trade; created: Trade },
+  Error,
+  { id: string; moved: readonly string[] }
+> {
+  return useWorkspaceWrite(
+    'trades.split',
+    (r, ws, v: { id: string; moved: readonly string[] }) =>
+      r.trades.split(ws, v.id, v.moved),
+  );
+}
+
+/** Moves trades to another account (B6); resolves to how many moved. */
+export function useMoveTrades(): UseMutationResult<
+  number,
+  Error,
+  { ids: readonly string[]; accountId: string }
+> {
+  return useWorkspaceWrite(
+    'trades.move',
+    (r, ws, v: { ids: readonly string[]; accountId: string }) =>
+      r.trades.move(ws, v.ids, v.accountId),
+  );
+}
+
+/** Moves every trade of an account to another (B7); resolves to how many moved. */
+export function useMoveAccountTrades(): UseMutationResult<
+  number,
+  Error,
+  { from: string; to: string }
+> {
+  return useWorkspaceWrite(
+    'trades.move',
+    (r, ws, v: { from: string; to: string }) =>
+      r.trades.moveAccount(ws, v.from, v.to),
+  );
+}
+
 export function useCreateStrategy(): UseMutationResult<
   Strategy,
   Error,

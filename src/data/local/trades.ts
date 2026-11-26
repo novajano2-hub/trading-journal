@@ -13,6 +13,7 @@ import type { KeelDb } from './db';
 import { rwTx } from './tx';
 import { assertEditable } from './editable';
 import { deleteOwnerFiles } from './files';
+import { localGrouping } from './grouping';
 import { logHistory, tradeChanges, tradeLabel } from './history';
 import { pruneJournalLinks } from './journal';
 import { bumpImportRevision } from './imports';
@@ -88,6 +89,8 @@ async function patched(
 
 export function localTrades(ctx: LocalContext): TradesRepo {
   return {
+    ...localGrouping(ctx),
+
     async list(ws) {
       const db = await ctx.db();
       const rows = await db.trades.where('workspaceId').equals(ws).toArray();
@@ -218,7 +221,7 @@ export function localTrades(ctx: LocalContext): TradesRepo {
             old,
             input,
           );
-          for (const k of ['rating', 'noteId', 'reviewed'] as const)
+          for (const k of ['rating', 'noteId', 'reviewed', 'grouping'] as const)
             if (old[k] !== undefined) Object.assign(next, { [k]: old[k] });
           await db.trades.put(next);
           await bumpImportRevision(db, ws);
@@ -238,9 +241,15 @@ export function localTrades(ctx: LocalContext): TradesRepo {
         async () => {
           const held = await db.trades.bulkGet(keys);
           await assertEditable(db, ws, held);
-          // Later imports' fills would have nothing to close (Plan 5 adds a tombstone flow).
+          // Later imports' fills would have nothing to close (Plan 5 adds a
+          // tombstone flow). A trade grouped by hand is never handed to an
+          // import (B8), so nothing waits on it.
           for (const t of held)
-            if (t?.status === 'open' && t.importId !== undefined)
+            if (
+              t?.status === 'open' &&
+              t.importId !== undefined &&
+              t.grouping !== 'manual'
+            )
               throw new OpenImportedTradeError(t.id, t.importId);
           await db.trades.bulkDelete(keys);
           const { timeZone } = await readPrefs(db);

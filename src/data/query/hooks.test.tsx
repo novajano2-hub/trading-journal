@@ -4,16 +4,18 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { useState, type ReactNode } from 'react';
 import { afterEach, expect, test, vi } from 'vitest';
-import type { ImportJob } from '@/domain/types';
+import type { Execution, ImportJob } from '@/domain/types';
 import type { ImportPlan } from '@/domain/import/plan';
 import { StalePlanError, type Repository } from '../repository';
 import { fixtureSample } from '../__fixtures__/sample';
+import type { SampleWorkspace } from '../seed/generate';
 import { createLocalRepository } from '../local/local-repository';
 import { USER_WORKSPACE } from '../workspaces';
 import {
   useActiveWorkspace,
   useAddFile,
   useCommitImport,
+  useCreateAccount,
   useCreateTagCategory,
   useDailyNote,
   useEnsureTradeNote,
@@ -21,10 +23,14 @@ import {
   useFiles,
   useHistory,
   useJournal,
+  useMergeTrades,
+  useMoveAccountTrades,
+  useMoveTrades,
   useRemoveAccount,
   useRemoveFile,
   useRemoveTagCategory,
   useSetActiveWorkspace,
+  useSplitTrade,
   useTagCategories,
   useTags,
   useTemplates,
@@ -37,11 +43,11 @@ import { DataProvider } from './provider';
 
 afterEach(cleanup);
 
-function wrapper() {
+function wrapper(sample: () => SampleWorkspace = fixtureSample) {
   const repository = createLocalRepository({
     indexedDB: new IDBFactory(),
     IDBKeyRange,
-    sample: async () => fixtureSample(),
+    sample: async () => sample(),
   });
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
@@ -249,6 +255,128 @@ test('a trade write shows up in the edit history', async () => {
     });
   });
   await waitFor(() => expect(result.current.history.data).toHaveLength(3));
+});
+
+const fillOf = (
+  id: string,
+  side: 'buy' | 'sell',
+  price: number,
+  time: string,
+): Execution => ({
+  id,
+  accountId: 'acc-a',
+  symbol: 'ESZ5',
+  side,
+  qty: 1,
+  price,
+  time,
+  fees: 0,
+  commission: 0,
+});
+
+test('grouping writes refresh the trades, the history and the files', async () => {
+  // f-1 and f-2 are ES trades in the active account; give them fills to regroup.
+  const sample = () => {
+    const s = fixtureSample();
+    s.trades.find((t) => t.id === 'f-1')!.executions = [
+      fillOf('e1', 'buy', 6000, '2026-11-16T14:45:00.000Z'),
+      fillOf('e2', 'sell', 6005, '2026-11-16T15:10:00.000Z'),
+    ];
+    s.trades.find((t) => t.id === 'f-2')!.executions = [
+      fillOf('e3', 'sell', 6010, '2026-11-17T15:00:00.000Z'),
+      fillOf('e4', 'buy', 6012.5, '2026-11-17T15:30:00.000Z'),
+    ];
+    return s;
+  };
+  const { result } = renderHook(
+    () => ({
+      trades: useTrades(),
+      history: useHistory(),
+      files: useFiles('trade:f-1'),
+      add: useAddFile(),
+      createAccount: useCreateAccount(),
+      merge: useMergeTrades(),
+      split: useSplitTrade(),
+      move: useMoveTrades(),
+      moveAccount: useMoveAccountTrades(),
+    }),
+    { wrapper: wrapper(sample) },
+  );
+  await waitFor(() => expect(result.current.trades.data).toHaveLength(3));
+  const actions = () =>
+    (result.current.history.data ?? []).map((r) => r.action).sort();
+  await waitFor(() => expect(result.current.history.data).toEqual([]));
+  await act(async () => {
+    await result.current.add.mutateAsync({
+      owner: 'trade:f-2',
+      file: { bytes: new ArrayBuffer(4), type: 'application/pdf', name: 'p' },
+      images: false,
+    });
+  });
+
+  // A merge leaves one trade, moves f-2's file to it and logs both trades.
+  await act(async () => {
+    const kept = await result.current.merge.mutateAsync({
+      ids: ['f-2', 'f-1'],
+      picked: ['e1', 'e2', 'e3', 'e4'],
+    });
+    expect(kept.id).toBe('f-1');
+  });
+  await waitFor(() => expect(result.current.trades.data).toHaveLength(2));
+  await waitFor(() => expect(result.current.files.data).toHaveLength(1));
+  await waitFor(() => expect(actions()).toEqual(['merged', 'merged']));
+
+  // A split makes two again.
+  await act(async () => {
+    const { created } = await result.current.split.mutateAsync({
+      id: 'f-1',
+      moved: ['e3', 'e4'],
+    });
+    expect(created.executions.map((e) => e.id)).toEqual(['e3', 'e4']);
+  });
+  await waitFor(() => expect(result.current.trades.data).toHaveLength(3));
+  await waitFor(() => expect(actions()).toHaveLength(4));
+
+  // A move, of one trade and of a whole account, to an account made now.
+  let other = '';
+  await act(async () => {
+    other = (
+      await result.current.createAccount.mutateAsync({
+        name: 'Other',
+        broker: 'b',
+        type: 'live',
+        currency: 'USD',
+        startingBalance: 0,
+        status: 'active',
+      })
+    ).id;
+  });
+  await act(async () => {
+    expect(
+      await result.current.move.mutateAsync({ ids: ['f-1'], accountId: other }),
+    ).toBe(1);
+  });
+  await waitFor(() =>
+    expect(
+      result.current.trades.data!.find((t) => t.id === 'f-1')!.accountId,
+    ).toBe(other),
+  );
+  await act(async () => {
+    expect(
+      await result.current.moveAccount.mutateAsync({
+        from: 'acc-a',
+        to: other,
+      }),
+    ).toBe(1);
+  });
+  await waitFor(() =>
+    expect(
+      result.current.trades.data!.filter((t) => t.accountId === other),
+    ).toHaveLength(2),
+  );
+  await waitFor(() =>
+    expect(actions().filter((a) => a === 'moved')).toHaveLength(2),
+  );
 });
 
 test('switching to My workspace swaps the data', async () => {

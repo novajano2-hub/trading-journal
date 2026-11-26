@@ -57,6 +57,24 @@ export async function deleteOwnerFiles(
     .delete();
 }
 
+/**
+ * Gives every file of owner `from` to owner `to`, keeping their ids and upload
+ * times. Call inside an rw transaction that includes `db.files`; a note owner
+ * is not checked against the day lock here (`FilesRepo.reassign` does).
+ */
+export async function moveOwnerFiles(
+  db: KeelDb,
+  ws: string,
+  from: string,
+  to: string,
+): Promise<void> {
+  if (from === to) return;
+  await db.files
+    .where('[workspaceId+owner]')
+    .equals([ws, from])
+    .modify({ owner: to });
+}
+
 export function localFiles(ctx: LocalContext): FilesRepo {
   return {
     async list(ws, owner) {
@@ -126,10 +144,7 @@ export function localFiles(ctx: LocalContext): FilesRepo {
       await rwTx(db, [db.files, db.journal, db.days], async () => {
         await refuseLockedOwner(db, ws, from);
         await refuseLockedOwner(db, ws, to);
-        await db.files
-          .where('[workspaceId+owner]')
-          .equals([ws, from])
-          .modify({ owner: to });
+        await moveOwnerFiles(db, ws, from, to);
       });
     },
   };

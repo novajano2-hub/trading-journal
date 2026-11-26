@@ -1061,3 +1061,107 @@ describe('import history', () => {
     });
   });
 });
+
+describe('the files of a trade an import dropped', () => {
+  const file = {
+    bytes: new ArrayBuffer(4),
+    type: 'application/pdf',
+    name: 'plan.pdf',
+  };
+
+  /**
+   * Two open ES trades, `x` and `y`, each with a file; import D closes both
+   * as one trade that continues `x` and drops `y`.
+   */
+  async function dropped() {
+    const ctx = await setup();
+    const { repo, db, commit } = ctx;
+    await commit(OPEN_ES, 'impA');
+    await commit(H + '2026-11-18 09:41:00,ESZ5,Buy,1,6020\n', 'impC', {
+      alter: (c) => ({ ...c, openTrades: [] }),
+    });
+    const [x, y] = await repo.trades.list(M);
+    await repo.files.add(M, `trade:${x!.id}`, file, { images: false });
+    await repo.files.add(M, `trade:${y!.id}`, file, { images: false });
+    const d = await commit(
+      H + '2026-11-19 10:00:00,ESZ5,Sell,3,6030\n',
+      'impD',
+    );
+    expect(await repo.trades.get(M, y!.id)).toBeUndefined();
+    const owners = async () =>
+      (await db.files.toArray()).map((f) => f.owner).sort();
+    return { ...ctx, x: x!, y: y!, d, owners };
+  }
+
+  test('stay while the import can be undone, which restores the trade with them', async () => {
+    const { repo, x, y, d, owners } = await dropped();
+    expect(await owners()).toEqual([`trade:${x.id}`, `trade:${y.id}`].sort());
+    expect(await repo.imports.undo(M, d.id)).toEqual({ ok: true });
+    expect(await repo.trades.get(M, y.id)).toBeDefined();
+    expect(await repo.files.list(M, `trade:${y.id}`)).toHaveLength(1);
+    expect(await owners()).toEqual([`trade:${x.id}`, `trade:${y.id}`].sort());
+  });
+
+  test('go when a later import depends on the import', async () => {
+    const { repo, commit, x, d, owners } = await dropped();
+    await commit(H + '2026-11-20 09:41:00,ESZ5,Buy,1,6040\n', 'impE');
+    expect(await repo.imports.undo(M, d.id)).toMatchObject({
+      ok: false,
+      reason: 'later-import-depends',
+    });
+    // The trade that was continued keeps its file; the dropped one's is gone.
+    expect(await owners()).toEqual([`trade:${x.id}`]);
+  });
+
+  test('go when its trades are regrouped', async () => {
+    const { repo, acc, x, d, owners } = await dropped();
+    const manual = await repo.trades.createManual(M, {
+      accountId: acc.id,
+      instrument: (await repo.trades.get(M, x.id))!.instrument,
+      fills: [
+        {
+          time: '2026-11-20T15:00:00.000Z',
+          side: 'buy',
+          qty: 1,
+          price: 6000,
+          commission: 0,
+          fees: 0,
+        },
+        {
+          time: '2026-11-20T15:10:00.000Z',
+          side: 'sell',
+          qty: 1,
+          price: 6001,
+          commission: 0,
+          fees: 0,
+        },
+      ],
+    });
+    const closed = (await repo.trades.get(M, x.id))!;
+    await repo.trades.merge(
+      M,
+      [closed.id, manual.id],
+      [...closed.executions, ...manual.executions].map((e) => e.id),
+    );
+    expect(await repo.imports.undo(M, d.id)).toMatchObject({
+      ok: false,
+      reason: 'regrouped',
+    });
+    expect(await owners()).toEqual([`trade:${x.id}`]);
+  });
+
+  test('go with the account when its trades are cleared', async () => {
+    const { repo, acc, owners } = await dropped();
+    expect(await owners()).toHaveLength(2);
+    await repo.accounts.clearTrades(M, acc.id);
+    expect(await owners()).toEqual([]);
+  });
+
+  test('go with the account when it is deleted', async () => {
+    const { repo, acc, x, y, owners } = await dropped();
+    await repo.trades.remove(M, [x.id]);
+    expect(await owners()).toEqual([`trade:${y.id}`]);
+    await repo.accounts.remove(M, acc.id);
+    expect(await owners()).toEqual([]);
+  });
+});

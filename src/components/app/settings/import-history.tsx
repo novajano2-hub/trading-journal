@@ -73,6 +73,12 @@ export function ImportHistory() {
       setBlocked(null);
       return;
     }
+    if (result.reason === 'regrouped') {
+      setBlocked(
+        `${job.fileName} can't be undone. Some of its trades were merged, split or moved since. Delete or regroup them first.`,
+      );
+      return;
+    }
     const later = jobs.find((j) => j.id === result.dependentJobId);
     setBlocked(
       `${job.fileName} can't be undone yet. A later import${later ? `, ${later.fileName},` : ''} built on its trades. Undo that one first.`,

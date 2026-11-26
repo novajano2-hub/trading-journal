@@ -132,11 +132,14 @@ function buildFills(
 ): Built {
   const { kept, duplicateRows } = dedupe(fills, ctx.fingerprints);
   const symbols = new Set(kept.map((f) => canonicalSymbol(f.execution.symbol)));
-  // Hand-entered trades never merge with an import, not even to settle an expiry.
+  // Hand-entered trades never merge with an import, not even to settle an
+  // expiry, and neither do trades the user grouped by hand (B8): rebuilding
+  // one from its fills would cut it at a flat point again.
   const merged = ctx.openTrades.filter(
     (t) =>
       t.status === 'open' &&
       t.source !== 'manual' &&
+      t.grouping !== 'manual' &&
       (symbols.has(canonicalSymbol(t.instrument.symbol)) || expiredBy(t, now)),
   );
   const { executions, expired } = settleExpiredOptions(

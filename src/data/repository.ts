@@ -189,9 +189,58 @@ export interface TradesRepo {
   /**
    * Also drops the ids from journal links. Missing ids are ignored. Throws
    * OpenImportedTradeError, deleting nothing, when any of them is an open
-   * trade with an `importId`; closed trades and trades without one delete.
+   * trade with an `importId`; closed trades, trades without one and trades
+   * grouped by hand (imports never touch those) delete.
    */
   remove(ws: string, ids: readonly string[]): Promise<void>;
+  /**
+   * Joins the trades `ids` by the executions `picked` (execution ids) into
+   * the earliest-opened one's trade, which is returned (B1 to B3): its id,
+   * serial, note, rating, levels and checks stay; tags and strategies are
+   * united; a source left with no execution is removed, its note unlinked
+   * (it stays in Trade notes) and its files moved to the merged trade; an
+   * execution not picked stays in its own trade. Every result is
+   * `grouping: 'manual'`, and each trade touched gets one `merged` history
+   * row. One transaction. Throws NotFoundError for a missing trade,
+   * ArchivedAccountError, nothing written, for a trade in an archived
+   * account, and `GroupRefused` (domain) for what `canMerge` refuses.
+   */
+  merge(
+    ws: string,
+    ids: readonly string[],
+    picked: readonly string[],
+  ): Promise<Trade>;
+  /**
+   * Moves the executions `moved` (ids) of one trade to a new trade with the
+   * next serial (B4). The original keeps its record, the new trade only its
+   * tags and strategies; each part is rebuilt, and both are
+   * `grouping: 'manual'`. Each gets one `split` history row. One
+   * transaction; same refusals as `merge`, with `canSplit`.
+   */
+  split(
+    ws: string,
+    id: string,
+    moved: readonly string[],
+  ): Promise<{ original: Trade; created: Trade }>;
+  /**
+   * Moves the trades to another account with everything attached to them
+   * (B6): note, tags, strategies, checks, levels, rating, files. A trade keeps
+   * its own P&L currency and figures; its fills sit in the new account. A
+   * trade already there is left alone. Returns how many moved; each has one
+   * `moved` history row (`field: 'accountId'`). Throws ArchivedAccountError
+   * when the destination or the account of any trade is archived,
+   * NotFoundError for a missing trade or account. One transaction.
+   */
+  move(ws: string, ids: readonly string[], accountId: string): Promise<number>;
+  /**
+   * `move` for every trade of an account. The account, its cash flows, its
+   * balance and its import jobs stay where they are. Returns how many moved.
+   */
+  moveAccount(
+    ws: string,
+    fromAccountId: string,
+    toAccountId: string,
+  ): Promise<number>;
 }
 
 export type NewAccount = Omit<Account, 'id' | 'workspaceId'>;
@@ -353,7 +402,13 @@ export class StalePlanError extends Error {
 export type UndoResult =
   | { ok: true }
   /** A later active import in the account rebuilt one of this import's trades, or trades the symbol of one undo would restore; undo that one first. */
-  | { ok: false; reason: 'later-import-depends'; dependentJobId: string };
+  | { ok: false; reason: 'later-import-depends'; dependentJobId: string }
+  /**
+   * Trades of this import were merged, split or moved since (B8): the trades
+   * that now hold its fills, a trade grouped by hand or one moved to another
+   * account. Delete or regroup them first.
+   */
+  | { ok: false; reason: 'regrouped'; tradeIds: string[] };
 
 export interface ImportRepo {
   /** Newest commit first (then by `id`), without what dedupe and undo work from. */
@@ -377,7 +432,9 @@ export interface ImportRepo {
    * whose same-id replacement the user deleted, minus references to tags,
    * strategies, rules and notes deleted since. Refused while a later active
    * import in the account rebuilt one of its trades or has trades in the
-   * symbol of a trade the undo would restore. Throws NotFoundError for a
+   * symbol of a trade the undo would restore, and refused as `regrouped`
+   * while a trade grouped by hand holds fills of it or one of its trades
+   * moved to another account. Throws NotFoundError for a
    * missing job, and ArchivedAccountError, changing nothing, when the job's
    * account (or an account of a trade it would delete or restore) is
    * archived; an undone job is left as it is.

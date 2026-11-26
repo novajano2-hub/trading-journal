@@ -1,8 +1,9 @@
 import { NotFoundError, type AccountsRepo } from '../repository';
 import type { LocalContext } from './context';
+import type { KeelDb } from './db';
 import { deleteOwnerFiles } from './files';
 import { changeRows, fieldChanges, lifecycleRow, logHistory } from './history';
-import { bumpImportRevision } from './imports';
+import { bumpImportRevision, droppedOwners } from './imports';
 import { rwTx } from './tx';
 import { pruneJournalLinks } from './journal';
 import { mergePatch } from '../merge';
@@ -16,6 +17,25 @@ const LOGGED_FIELDS = [
   'startingBalance',
   'status',
 ] as const;
+
+/**
+ * Deletes the files of the trades the account's active imports dropped: the
+ * imports go with the account's trades, so nothing can bring those back. Call
+ * inside an rw transaction over `db.imports`, `db.trades` and `db.files`,
+ * before the jobs are deleted.
+ */
+async function deleteDroppedFiles(
+  db: KeelDb,
+  ws: string,
+  accountId: string,
+): Promise<void> {
+  const jobs = await db.imports
+    .where('[workspaceId+accountId]')
+    .equals([ws, accountId])
+    .filter((j) => j.status === 'active')
+    .toArray();
+  await deleteOwnerFiles(db, ws, await droppedOwners(db, ws, jobs));
+}
 
 export function localAccounts(ctx: LocalContext): AccountsRepo {
   return {
@@ -80,6 +100,7 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
           db.imports,
           db.cashflows,
           db.challenges,
+          db.files,
           db.history,
         ],
         async () => {
@@ -90,6 +111,7 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
             .equals([ws, id])
             .count();
           if (trades > 0) throw new Error('account has trades');
+          await deleteDroppedFiles(db, ws, id);
           // Undone imports keep their history rows; they go with the account.
           await db.imports
             .where('[workspaceId+accountId]')
@@ -153,6 +175,7 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
             ws,
             tradeIds.map((tradeId) => `trade:${tradeId}`),
           );
+          await deleteDroppedFiles(db, ws, id);
           await db.imports
             .where('[workspaceId+accountId]')
             .equals([ws, id])

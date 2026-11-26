@@ -53,7 +53,10 @@ test('Plan 5 writes invalidate what they change', () => {
     ['trades.createManual', k('trades', 'imports', 'history')],
     ['trades.replaceManual', k('trades', 'imports', 'history')],
     ['trades.updateMany', k('trades', 'imports', 'history')],
-    ['accounts.clearTrades', k('trades', 'journal', 'imports', 'history')],
+    [
+      'accounts.clearTrades',
+      k('trades', 'journal', 'imports', 'history', 'filesAll'),
+    ],
     [
       'accounts.remove',
       k(
@@ -64,7 +67,21 @@ test('Plan 5 writes invalidate what they change', () => {
         'cashFlows',
         'challenges',
         'history',
+        'filesAll',
       ),
+    ],
+    // Merging moves files and unlinks notes; a day's figures read the trades.
+    [
+      'trades.merge',
+      k('trades', 'journal', 'imports', 'history', 'days', 'filesAll'),
+    ],
+    [
+      'trades.split',
+      k('trades', 'journal', 'imports', 'history', 'days', 'filesAll'),
+    ],
+    [
+      'trades.move',
+      k('trades', 'journal', 'imports', 'history', 'days', 'filesAll'),
     ],
     ['cashFlows.create', k('cashFlows', 'history')],
     ['cashFlows.update', k('cashFlows', 'history')],
@@ -75,7 +92,7 @@ test('Plan 5 writes invalidate what they change', () => {
     ['journal.save', k('journal', 'days')],
     ['journal.trash', k('journal', 'days')],
     ['journal.restore', k('journal', 'days')],
-    ['journal.remove', k('trades', 'journal', 'imports', 'days')],
+    ['journal.remove', k('trades', 'journal', 'imports', 'days', 'filesAll')],
     ['journal.ensureTradeNote', k('journal', 'trades', 'imports', 'days')],
     ['journal.dailyNote', k('journal', 'days')],
     ['tracker.save', k('tracker', 'days')],
@@ -98,11 +115,33 @@ test('every trade write makes the edit history stale', () => {
     'trades.createManual',
     'trades.replaceManual',
     'trades.remove',
+    'trades.merge',
+    'trades.split',
+    'trades.move',
   ] as const)
     expect(invalidationsFor(write, 'mine'), write).toContainEqual(
       keys.history('mine'),
     );
   expect(keys.history('mine')).not.toEqual(keys.history('sample'));
+});
+
+test('every write that deletes or moves files makes the file lists stale', () => {
+  for (const write of [
+    'files.add',
+    'files.remove',
+    'trades.remove',
+    'trades.merge',
+    'trades.split',
+    'trades.move',
+    'strategies.remove',
+    'journal.remove',
+    'imports.undo',
+    'accounts.clearTrades',
+    'accounts.remove',
+  ] as const)
+    expect(invalidationsFor(write, 'mine'), write).toContainEqual(
+      keys.filesAll('mine'),
+    );
 });
 
 test('every write of a logged record makes the edit history stale', () => {
@@ -173,6 +212,9 @@ test('every write that changes what an import context holds makes it stale', () 
     'trades.updateMany',
     'trades.createManual',
     'trades.replaceManual',
+    'trades.merge',
+    'trades.split',
+    'trades.move',
     'journal.ensureTradeNote',
   ] as const)
     expect(invalidationsFor(write, 'mine'), write).toContainEqual(

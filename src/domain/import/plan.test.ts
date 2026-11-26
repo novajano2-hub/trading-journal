@@ -104,6 +104,37 @@ describe('planImport', () => {
     expect(p.trades.map((t) => t.serial)).toEqual([5]);
   });
 
+  test('an open trade grouped by hand is never rebuilt by an import', () => {
+    // A closed round trip and a position left open, joined into one trade by hand:
+    // rebuilding it from its fills would cut it at the flat point again.
+    const [closed, open] = plan(
+      H +
+        '2026-11-16 09:41:00,AAPL,Buy,10,190\n2026-11-16 09:50:00,AAPL,Sell,10,191\n2026-11-16 10:41:00,AAPL,Buy,5,192\n',
+    ).trades as [Trade, Trade];
+    const grouped: Trade = {
+      ...open,
+      executions: [...closed.executions, ...open.executions],
+      grouping: 'manual',
+    };
+    const p = plan(
+      H + '2026-11-17 10:00:00,AAPL,Sell,5,195\n',
+      ctx({ nextSerial: 5, openTrades: [grouped] }),
+    );
+    expect(p.replacedTrades).toEqual([]);
+    expect(p.trades).toHaveLength(1);
+    expect(p.trades[0]).toMatchObject({ serial: 5, direction: 'short' });
+    expect(p.trades[0]!.executions).toHaveLength(1);
+    // Without the mark the same trade is taken in, as before.
+    const rebuilt = plan(
+      H + '2026-11-17 10:00:00,AAPL,Sell,5,195\n',
+      ctx({
+        nextSerial: 5,
+        openTrades: [{ ...grouped, grouping: undefined }],
+      }),
+    );
+    expect(rebuilt.replacedTrades).toHaveLength(1);
+  });
+
   test('a position closed by a later import is one trade keeping id, serial and tags (Review Focus 2)', () => {
     const open: Trade = {
       ...plan(H + '2026-11-16 09:41:00,ESZ5,Buy,2,6010\n').trades[0]!,
