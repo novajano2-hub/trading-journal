@@ -358,6 +358,9 @@ test('every metric carries its definition', async () => {
     'net-roi',
     'realized-r',
     'planned-r',
+    // On the trade page's plan (Plan 6B, Task 7).
+    'planned-reward',
+    'planned-risk',
     'mae',
     'mfe',
     'sharpe',

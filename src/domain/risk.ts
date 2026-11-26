@@ -130,6 +130,35 @@ export function levelPrice(
 }
 
 /**
+ * The value a level at `price` has in `unit`: `levelPrice` read backwards, so a
+ * side keeps its prices when its unit changes. A price on the wrong side of the
+ * entry reads as a negative value, which `levelPrice` puts back on that same
+ * side. An `amount` is rounded to the cent.
+ */
+export function levelValueAt(
+  t: Trade,
+  side: LevelRole,
+  unit: LevelUnit,
+  price: number,
+  qty: number,
+): number {
+  if (unit === 'price') return price;
+  const towardsProfit = (t.direction === 'long') === (side === 'target');
+  const distance = (price - t.avgEntry) * (towardsProfit ? 1 : -1);
+  switch (unit) {
+    case 'movement':
+    case 'points':
+      return tidy(distance);
+    case 'ticks':
+      return tidy(distance / t.instrument.tickSize);
+    case 'pips':
+      return tidy(distance / pipSize(t.instrument));
+    case 'amount':
+      return Math.round(distance * qty * moneyPerPriceUnit(t) * 100) / 100;
+  }
+}
+
+/**
  * The money, in cents of the P&L currency and never negative, the trade makes
  * (a target) or loses (a stop) if the level fills. An `amount` level is its
  * own value (B10); any other is priced as `riskFromStop` prices a stop, so a

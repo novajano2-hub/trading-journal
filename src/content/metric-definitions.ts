@@ -22,6 +22,8 @@ export const METRIC_IDS = [
   'net-roi',
   'realized-r',
   'planned-r',
+  'planned-reward',
+  'planned-risk',
   'mae',
   'mfe',
   'sharpe',
@@ -212,12 +214,22 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'realized-r': {
     label: 'Realized R',
     definition:
-      "The trade's {basis} P&L divided by the money it risked at its planned stop. +1R is a profit as large as that risk. None without a planned stop.",
+      "The trade's {basis} P&L divided by the money it risked: the loss if every stop level fills. +1R is a profit as large as that risk. It needs a stop but not a target, and a closed trade. None without them.",
   },
   'planned-r': {
     label: 'Planned R',
     definition:
-      'The distance from entry to your planned target divided by the distance from entry to your planned stop. It needs both.',
+      'Planned reward divided by planned risk: the profit if every target level fills over the loss if every stop level fills. It needs a target and a stop.',
+  },
+  'planned-reward': {
+    label: 'Planned reward',
+    definition:
+      "The profit if every target level fills: each level's quantity times its distance from the average entry, added up. None until the trade has a target and a stop.",
+  },
+  'planned-risk': {
+    label: 'Planned risk',
+    definition:
+      "The loss if every stop level fills: each level's quantity times its distance from the average entry, added up. A stop level that covers part of the position counts only that part. None until the trade has a target and a stop.",
   },
   mae: {
     label: 'MAE',

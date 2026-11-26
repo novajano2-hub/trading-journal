@@ -8,6 +8,7 @@ import {
   levelMoney,
   levelPrice,
   levelProblems,
+  levelValueAt,
   pipSize,
   plannedReward,
   plannedRisk,
@@ -15,8 +16,15 @@ import {
   sidesOf,
   tradeRisk,
   unitsFor,
+  type LevelRole,
 } from './risk';
-import type { Execution, Instrument, LevelSide, Trade } from './types';
+import type {
+  Execution,
+  Instrument,
+  LevelSide,
+  LevelUnit,
+  Trade,
+} from './types';
 
 const inst = (symbol: string): Instrument => resolveInstrument(symbol)!;
 
@@ -223,6 +231,65 @@ describe('levelPrice and levelMoney', () => {
     const t = makeTrade({ net: 0, instrument: inst('AAPL'), avgEntry: 100 });
     expect(levelMoney(t, 'stop', 'price', { value: 105, qty: 10 })).toBe(5000);
     expect(levelMoney(t, 'stop', 'price', { value: 95, qty: 10 })).toBe(5000);
+  });
+});
+
+describe('levelValueAt', () => {
+  test('is levelPrice read backwards, in every unit, on both sides', () => {
+    const es = makeTrade({ net: 0, maxPosition: 2, avgEntry: 4500 });
+    const eur = makeTrade({
+      net: 0,
+      instrument: inst('EURUSD'),
+      avgEntry: 1.075,
+      maxPosition: 1,
+    });
+    const jpy = makeTrade({
+      net: 0,
+      instrument: inst('USDJPY'),
+      avgEntry: 154.21,
+      maxPosition: 1,
+      pnlCurrency: 'USD',
+    });
+    const short = makeTrade({
+      net: 0,
+      direction: 'short',
+      maxPosition: 2,
+      avgEntry: 4500,
+    });
+    const cases: [Trade, LevelRole, LevelUnit, number, number][] = [
+      [es, 'target', 'ticks', 4502, 2],
+      [es, 'stop', 'points', 4497, 2],
+      [es, 'stop', 'movement', 4497.5, 2],
+      [es, 'target', 'amount', 4504, 2],
+      [eur, 'target', 'pips', 1.077, 1],
+      [eur, 'stop', 'pips', 1.074, 1],
+      [jpy, 'target', 'pips', 154.51, 1],
+      [short, 'target', 'ticks', 4498, 2],
+      [short, 'stop', 'points', 4503, 2],
+    ];
+    for (const [t, role, unit, price, qty] of cases) {
+      const value = levelValueAt(t, role, unit, price, qty);
+      expect(
+        levelPrice(t, role, unit, { value, qty }),
+        `${unit} ${role}`,
+      ).toBeCloseTo(price, 9);
+    }
+    // The numbers a trader would type: 8 ticks, 20 pips, a clean amount.
+    expect(levelValueAt(es, 'target', 'ticks', 4502, 2)).toBe(8);
+    expect(levelValueAt(eur, 'target', 'pips', 1.077, 1)).toBe(20);
+    expect(levelValueAt(es, 'target', 'amount', 4504, 2)).toBe(400);
+  });
+
+  test('a price already on the wrong side reads as a negative value, so it stays on the wrong side', () => {
+    const es = makeTrade({ net: 0, maxPosition: 2, avgEntry: 4500 });
+    // A long's stop above the entry.
+    expect(levelValueAt(es, 'stop', 'movement', 4501, 2)).toBe(-1);
+    expect(levelValueAt(es, 'target', 'ticks', 4499, 2)).toBe(-4);
+  });
+
+  test('Price is the price itself', () => {
+    const es = makeTrade({ net: 0, avgEntry: 4500 });
+    expect(levelValueAt(es, 'stop', 'price', 4490.25, 1)).toBe(4490.25);
   });
 });
 

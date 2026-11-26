@@ -153,22 +153,27 @@ test('trade ids with a slash are encoded in every link', async () => {
   ).toBe('/app/trades/acc%3AEUR%2FUSD%3Ac/edit?symbol=ES');
 });
 
-test('setting the planned stop saves it and the realized R follows', async () => {
+test('adding a stop level saves it and the realized R follows', async () => {
   const { repo } = renderApp(<TradeView id="t-c" />, {
     sample: sample(),
     url: URL_C,
   });
   const head = await screen.findByRole('region', { name: 'Trade 1132' });
   expect(within(head).queryByText(R_FIGURE)).toBeNull();
-  const stop = screen.getByRole('textbox', { name: 'Planned stop' });
+  const stops = screen.getByRole('group', { name: 'Stops' });
+  fireEvent.click(within(stops).getByRole('button', { name: 'Add level' }));
+  const stop = screen.getByRole('textbox', { name: 'Stop level 1' });
   fireEvent.change(stop, { target: { value: '6304.75' } });
   fireEvent.blur(stop);
   await waitFor(async () =>
-    expect((await repo.trades.get(WS, 't-c'))?.plannedStop).toBe(6304.75),
+    expect((await repo.trades.get(WS, 't-c'))?.stops?.levels).toEqual([
+      { value: 6304.75, qty: 6 },
+    ]),
   );
-  // The risk comes from riskFromStop.
+  // The stored risk is the stop side's loss: 5 points on 6 contracts at $50.
   const saved = (await repo.trades.get(WS, 't-c'))!;
-  expect(saved.initialRisk).toBeGreaterThan(0);
+  expect(saved.initialRisk).toBe(150000);
+  expect(saved.plannedStop).toBeUndefined();
   await waitFor(() =>
     expect(within(head).getAllByText(R_FIGURE).length).toBe(1),
   );
@@ -408,7 +413,12 @@ test('an archived account makes the trade read-only', async () => {
   ).toBe(true);
   expect(
     screen
-      .getByRole('textbox', { name: 'Planned stop' })
+      .getByRole('button', { name: 'Stops unit, Price' })
+      .hasAttribute('disabled'),
+  ).toBe(true);
+  expect(
+    within(screen.getByRole('group', { name: 'Targets' }))
+      .getByRole('button', { name: 'Add level' })
       .hasAttribute('disabled'),
   ).toBe(true);
   expect(
@@ -514,7 +524,7 @@ test('the Execution header gives a futures point value as a multiplier, with no 
   expect(head.textContent).not.toMatch(/\$|per point/);
 });
 
-test('the labels of realized R, planned R, MAE and MFE carry their definitions', async () => {
+test('the labels of the R figures, planned reward and risk, MAE and MFE carry their definitions', async () => {
   renderApp(<TradeView id="t-c" />, {
     sample: sample({ initialRisk: 15000 }),
     url: URL_C,
@@ -525,7 +535,14 @@ test('the labels of realized R, planned R, MAE and MFE carry their definitions',
       (e) => (e as HTMLElement).dataset.metricTip,
     );
   expect(tips(exec)).toEqual(
-    expect.arrayContaining(['realized-r', 'planned-r', 'mae', 'mfe']),
+    expect.arrayContaining([
+      'realized-r',
+      'planned-r',
+      'planned-reward',
+      'planned-risk',
+      'mae',
+      'mfe',
+    ]),
   );
   const head = screen.getByRole('region', { name: 'Trade 1132' });
   expect(tips(head)).toEqual(

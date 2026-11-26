@@ -42,13 +42,8 @@ import {
 } from '@/data/trade-patch';
 import { closedQty, moneyPerPip } from '@/domain/metrics/units';
 import { costBasis, type MetricContext } from '@/domain/metrics/context';
-import { sidesOf } from '@/domain/risk';
-import {
-  plannedR,
-  riskFromStop,
-  rOf,
-  tradeVolume,
-} from '@/domain/metrics/summary';
+import { plannedReward, plannedRisk, sidesOf } from '@/domain/risk';
+import { plannedR, rOf, tradeVolume } from '@/domain/metrics/summary';
 import {
   strategyRules,
   type Execution,
@@ -70,6 +65,7 @@ import { price } from '@/lib/format';
 import { StatusChip } from './cells';
 import { qty } from './columns';
 import { FillsTimeline, positions, sortedFills } from './fills-timeline';
+import { LevelsBlock, noun } from './levels-block';
 import { RatingRow } from '../routine/rating-row';
 import { RuleChecklist } from './rule-checklist';
 import { clock, clockOnDay, dayLabel } from './trade-time';
@@ -133,62 +129,6 @@ function Message({
   );
 }
 
-/** A price field that reads like a figure and saves when you leave it, or press Enter. */
-function PriceField({
-  label,
-  value,
-  tick,
-  disabled,
-  onCommit,
-}: {
-  label: string;
-  value: number | undefined;
-  tick: number;
-  disabled: boolean;
-  onCommit(next: number | undefined): void;
-}): React.JSX.Element {
-  const shown = value === undefined ? '' : price(value, tick);
-  const [text, setText] = useState(shown);
-  const [seen, setSeen] = useState(value);
-  // A saved value that changed elsewhere replaces what is typed.
-  if (seen !== value) {
-    setSeen(value);
-    setText(shown);
-  }
-  const commit = () => {
-    const raw = text.replace(/[,\s]/g, '');
-    if (raw === '') {
-      setText('');
-      if (value !== undefined) onCommit(undefined);
-      return;
-    }
-    const n = Number(raw);
-    if (!Number.isFinite(n) || n <= 0) {
-      setText(shown);
-      return;
-    }
-    setText(price(n, tick));
-    if (n !== value) onCommit(n);
-  };
-  return (
-    <input
-      type="text"
-      inputMode="decimal"
-      aria-label={label}
-      placeholder="Not set"
-      value={text}
-      disabled={disabled}
-      onChange={(e) => setText(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') e.currentTarget.blur();
-        if (e.key === 'Escape') setText(shown);
-      }}
-      className="-mx-1.5 mt-0.5 block h-8 w-[calc(100%+12px)] rounded-[8px] border border-transparent bg-transparent px-1.5 text-[17px] font-semibold tracking-[-0.02em] text-text tabular-nums placeholder:text-[14px] placeholder:font-normal placeholder:tracking-normal placeholder:text-faint hover:border-line-2 focus-visible:border-accent focus-visible:bg-surface-1 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-transparent pointer-coarse:h-11"
-    />
-  );
-}
-
 function Stat({
   label,
   tip,
@@ -206,7 +146,7 @@ function Stat({
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <div className="min-w-0 bg-surface-1 px-3.5 py-3 first:pl-0 sm:[&:nth-child(4n+1)]:pl-0 sm:[&:not(:nth-child(4n+1))]:pl-4">
+    <div className="min-w-0 bg-surface-1 px-3.5 py-3 first:pl-0 max-sm:[&:nth-child(2n+1)]:pl-0 sm:[&:nth-child(4n+1)]:pl-0 sm:[&:not(:nth-child(4n+1))]:pl-4">
       <span className="block text-xs text-faint">
         {tip && basis ? (
           <MetricTip id={tip} basis={basis}>
@@ -232,17 +172,6 @@ function Stat({
 
 const tone = (cents: number) =>
   cents < 0 ? 'text-loss' : cents > 0 ? 'text-gain' : '';
-
-function noun(t: Trade, n: number): string {
-  const c = t.instrument.assetClass;
-  const one =
-    c === 'future' || c === 'option'
-      ? 'contract'
-      : c === 'stock'
-        ? 'share'
-        : 'unit';
-  return plural(n, one);
-}
 
 function sum(list: readonly Execution[], pick: (e: Execution) => number) {
   return list.reduce((n, e) => n + pick(e), 0);
@@ -279,22 +208,17 @@ function Stats({
     trade.avgExit === undefined
       ? undefined
       : (trade.avgExit - trade.avgEntry) * dir;
-  const r = rOf(trade, basis);
+  // Realized R needs a closed trade (spec §5.2).
+  const r = trade.status === 'open' ? undefined : rOf(trade, basis);
   const planned = plannedR(trade);
   const rText = (n: number, signed: boolean) =>
     formatUnitValue('r', n, { currency: cur, signed });
-  const rewardMoney =
-    trade.plannedTarget === undefined
-      ? undefined
-      : riskFromStop(trade, trade.plannedTarget);
-  const stopPoints =
-    trade.plannedStop === undefined
-      ? undefined
-      : Math.abs(trade.avgEntry - trade.plannedStop);
-  const targetPoints =
-    trade.plannedTarget === undefined
-      ? undefined
-      : Math.abs(trade.plannedTarget - trade.avgEntry);
+  // The plan: the sides as the trade has them (levels, or the old single
+  // stop and target read as one level each), and the figures they make.
+  const sides = sidesOf(trade);
+  const reward = plannedReward(trade);
+  const risk = plannedRisk(trade);
+  const needsBoth = 'needs a target and a stop';
   const per = future ? 'points' : `per ${noun(trade, 1)}`;
   const held = heldMs(trade);
 
@@ -357,191 +281,220 @@ function Stats({
       </Stat>,
     );
   }
-  unitRows.push(
-    <Stat key="basis" label="Cost basis" sub="entry price x size">
-      {cash(costBasis(trade), false)}
-    </Stat>,
-  );
   // Whole rows only, so the hairlines between cells never show an empty one.
-  const fillers = (4 - (unitRows.length % 4)) % 4;
+  const fillers = (rows: number) => (4 - (rows % 4)) % 4;
+  const blanks = (rows: number, name: string) =>
+    Array.from({ length: fillers(rows) }, (_, i) => (
+      <div key={`${name}-${i}`} aria-hidden="true" className="bg-surface-1" />
+    ));
+
+  const GRID =
+    'grid grid-cols-2 gap-px bg-line sm:grid-cols-4 [&>div]:border-0';
+  // 7 cells today; Swap takes the eighth (spec §5.4).
+  const FIRST_CELLS = 7;
+  const realizedSub =
+    r !== undefined && trade.initialRisk !== undefined ? (
+      <>
+        {basis} over {cash(trade.initialRisk, false)} risk
+      </>
+    ) : sides.stops === undefined ? (
+      'needs a stop'
+    ) : trade.status === 'open' ? (
+      'after the trade closes'
+    ) : (
+      'needs a risk above 0'
+    );
+  const none = <span className="text-[14px] font-normal text-faint">None</span>;
 
   return (
-    <div className="mt-3.5 grid grid-cols-2 gap-px border-t border-line bg-line sm:grid-cols-4 [&>div]:border-0">
-      <Stat
-        label="Avg entry"
-        sub={`${entries.length} ${plural(entries.length, into)}, ${qty(sum(entries, (e) => e.qty))} ${noun(
-          trade,
-          sum(entries, (e) => e.qty),
-        )}`}
-      >
-        {price(trade.avgEntry, tick)}
-      </Stat>
-      <Stat
-        label="Avg exit"
-        sub={
-          trade.avgExit === undefined
-            ? 'Still open'
-            : `${exits.length} ${plural(exits.length, into === 'buy' ? 'sell' : 'buy')}, ${qty(sum(exits, (e) => e.qty))} ${noun(
-                trade,
-                sum(exits, (e) => e.qty),
-              )}`
-        }
-      >
-        {trade.avgExit === undefined ? (
-          <span className="text-[14px] font-normal text-faint">None</span>
-        ) : (
-          price(trade.avgExit, tick)
-        )}
-      </Stat>
-      <Stat label="Quantity" sub={`max position, ${noun(trade, 2)}`}>
-        {qty(trade.maxPosition)}
-      </Stat>
-      <Stat
-        label="Duration"
-        sub={held === undefined ? 'since entry' : 'entry to flat'}
-      >
-        {held === undefined ? (
-          <span className="text-[14px] font-normal text-faint">Open</span>
-        ) : (
-          formatDuration(held)
-        )}
-      </Stat>
-      <Stat
-        label="Gross P&L"
-        tone={tone(trade.gross)}
-        sub={
-          move === undefined
-            ? undefined
-            : `${move > 0 ? '+' : move < 0 ? '−' : ''}${price(Math.abs(move), tick)} ${per} on ${qty(trade.maxPosition)}`
-        }
-      >
-        {cash(trade.gross)}
-      </Stat>
-      <Stat
-        label="Fees"
-        sub={
-          <>
-            {cash(commission, false)} commission, {cash(exchange, false)}{' '}
-            exchange
-          </>
-        }
-      >
-        {cash(-trade.fees)}
-      </Stat>
-      <Stat
-        label="Planned stop"
-        sub={
-          trade.initialRisk !== undefined && stopPoints !== undefined ? (
-            <>
-              risk {cash(trade.initialRisk, false)}, {price(stopPoints, tick)}{' '}
-              {future ? 'points' : 'away'}
-            </>
+    <>
+      <div className={`mt-3.5 border-t border-line ${GRID}`}>
+        <Stat
+          label="Avg entry"
+          sub={`${entries.length} ${plural(entries.length, into)}, ${qty(sum(entries, (e) => e.qty))} ${noun(
+            trade,
+            sum(entries, (e) => e.qty),
+          )}`}
+        >
+          {price(trade.avgEntry, tick)}
+        </Stat>
+        <Stat
+          label="Avg exit"
+          sub={
+            trade.avgExit === undefined
+              ? 'Still open'
+              : `${exits.length} ${plural(exits.length, into === 'buy' ? 'sell' : 'buy')}, ${qty(sum(exits, (e) => e.qty))} ${noun(
+                  trade,
+                  sum(exits, (e) => e.qty),
+                )}`
+          }
+        >
+          {trade.avgExit === undefined ? (
+            <span className="text-[14px] font-normal text-faint">None</span>
           ) : (
-            'Where you would be wrong'
-          )
-        }
-      >
-        <PriceField
-          label="Planned stop"
-          value={trade.plannedStop}
-          tick={tick}
-          disabled={readOnly}
-          onCommit={(next) => save({ plannedStop: next })}
-        />
-      </Stat>
-      <Stat
-        label="Planned target"
-        sub={
-          rewardMoney !== undefined && targetPoints !== undefined ? (
-            <>
-              reward {cash(rewardMoney, false)}, {price(targetPoints, tick)}{' '}
-              {future ? 'points' : 'away'}
-            </>
+            price(trade.avgExit, tick)
+          )}
+        </Stat>
+        <Stat label="Quantity" sub={`max position, ${noun(trade, 2)}`}>
+          {qty(trade.maxPosition)}
+        </Stat>
+        <Stat
+          label="Duration"
+          sub={held === undefined ? 'since entry' : 'entry to flat'}
+        >
+          {held === undefined ? (
+            <span className="text-[14px] font-normal text-faint">Open</span>
           ) : (
-            'Where you would take profit'
-          )
-        }
-      >
-        <PriceField
-          label="Planned target"
-          value={trade.plannedTarget}
-          tick={tick}
-          disabled={readOnly}
-          onCommit={(next) => save({ plannedTarget: next })}
-        />
-      </Stat>
-      <Stat
-        label="Planned R"
-        tip="planned-r"
-        basis={basis}
-        sub={
-          planned === undefined
-            ? 'needs a stop and a target'
-            : 'target over stop'
-        }
-      >
-        {planned === undefined ? (
-          <span className="text-[14px] font-normal text-faint">None</span>
-        ) : (
-          rText(planned, false)
-        )}
-      </Stat>
-      <Stat
-        label="Realized R"
-        tip="realized-r"
-        basis={basis}
-        tone={r === undefined ? '' : tone(r)}
-        sub={
-          r === undefined || trade.initialRisk === undefined ? (
-            'needs a planned stop'
-          ) : (
+            formatDuration(held)
+          )}
+        </Stat>
+        <Stat
+          label="Gross P&L"
+          tone={tone(trade.gross)}
+          sub={
+            move === undefined
+              ? undefined
+              : `${move > 0 ? '+' : move < 0 ? '−' : ''}${price(Math.abs(move), tick)} ${per} on ${qty(trade.maxPosition)}`
+          }
+        >
+          {cash(trade.gross)}
+        </Stat>
+        <Stat
+          label="Fees"
+          sub={
             <>
-              {basis} over {cash(trade.initialRisk, false)} risk
+              {cash(commission, false)} commission, {cash(exchange, false)}{' '}
+              exchange
             </>
-          )
-        }
+          }
+        >
+          {cash(-trade.fees)}
+        </Stat>
+        <Stat label="Cost basis" sub="entry price x size">
+          {cash(costBasis(trade), false)}
+        </Stat>
+        {blanks(FIRST_CELLS, 'first')}
+      </div>
+
+      <div
+        role="group"
+        aria-labelledby="plan-h"
+        className="border-t border-line pt-3.5 pb-1.5"
       >
-        {r === undefined ? (
-          <span className="text-[14px] font-normal text-faint">None</span>
-        ) : (
-          rText(r, true)
-        )}
-      </Stat>
-      <Stat
-        label="MAE"
-        tip="mae"
-        basis={basis}
-        tone={trade.mae === undefined ? '' : tone(trade.mae)}
-        sub="worst open P&L"
-      >
-        {trade.mae === undefined ? (
-          <span className="text-[14px] font-normal text-faint">
-            Not recorded
+        <b id="plan-h" className="text-[13.5px] font-semibold">
+          Plan
+        </b>
+        <div
+          aria-hidden="true"
+          className="mt-2 grid grid-cols-[128px_minmax(0,1fr)] gap-x-[18px] max-sm:hidden"
+        >
+          <span />
+          <span className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_32px] gap-x-2 pb-1 text-xs text-faint">
+            <span>Level</span>
+            <span>Quantity</span>
           </span>
-        ) : (
-          cash(trade.mae)
-        )}
-      </Stat>
-      <Stat
-        label="MFE"
-        tip="mfe"
-        basis={basis}
-        tone={trade.mfe === undefined ? '' : tone(trade.mfe)}
-        sub="best open P&L"
-      >
-        {trade.mfe === undefined ? (
-          <span className="text-[14px] font-normal text-faint">
-            Not recorded
+        </div>
+        <LevelsBlock
+          trade={trade}
+          side="target"
+          value={sides.targets}
+          readOnly={readOnly}
+          onCommit={(next) => save({ targets: next })}
+        />
+        <p className="my-2.5 flex items-center gap-2.5 text-[12.5px] whitespace-nowrap text-faint before:h-0 before:flex-none before:basis-[128px] before:border-t before:border-dashed before:border-line-2 after:h-0 after:flex-1 after:border-t after:border-dashed after:border-line-2 max-sm:before:flex-1 max-sm:before:basis-0">
+          <span>
+            Avg entry{' '}
+            <b className="font-semibold text-text tabular-nums">
+              {price(trade.avgEntry, tick)}
+            </b>
+            , {qty(trade.maxPosition)} {noun(trade, trade.maxPosition)}
           </span>
-        ) : (
-          cash(trade.mfe)
-        )}
-      </Stat>
-      {unitRows}
-      {Array.from({ length: fillers }, (_, i) => (
-        <div key={`fill-${i}`} aria-hidden="true" className="bg-surface-1" />
-      ))}
-    </div>
+        </p>
+        <LevelsBlock
+          trade={trade}
+          side="stop"
+          value={sides.stops}
+          readOnly={readOnly}
+          onCommit={(next) => save({ stops: next })}
+        />
+        <div className={`mt-3 border-t border-line ${GRID}`}>
+          <Stat
+            label="Planned R"
+            tip="planned-r"
+            basis={basis}
+            sub={
+              planned !== undefined
+                ? 'reward over risk'
+                : reward === undefined
+                  ? needsBoth
+                  : 'needs a risk above 0'
+            }
+          >
+            {planned === undefined ? none : rText(planned, false)}
+          </Stat>
+          <Stat
+            label="Realized R"
+            tip="realized-r"
+            basis={basis}
+            tone={r === undefined ? '' : tone(r)}
+            sub={realizedSub}
+          >
+            {r === undefined ? none : rText(r, true)}
+          </Stat>
+          <Stat
+            label="Planned reward"
+            tip="planned-reward"
+            basis={basis}
+            sub={reward === undefined ? needsBoth : 'if every target fills'}
+          >
+            {reward === undefined ? none : cash(reward, false)}
+          </Stat>
+          <Stat
+            label="Planned risk"
+            tip="planned-risk"
+            basis={basis}
+            sub={risk === undefined ? needsBoth : 'if every stop fills'}
+          >
+            {risk === undefined ? none : cash(risk, false)}
+          </Stat>
+        </div>
+      </div>
+
+      <div className={`border-t border-line ${GRID}`}>
+        <Stat
+          label="MAE"
+          tip="mae"
+          basis={basis}
+          tone={trade.mae === undefined ? '' : tone(trade.mae)}
+          sub="worst open P&L"
+        >
+          {trade.mae === undefined ? (
+            <span className="text-[14px] font-normal text-faint">
+              Not recorded
+            </span>
+          ) : (
+            cash(trade.mae)
+          )}
+        </Stat>
+        <Stat
+          label="MFE"
+          tip="mfe"
+          basis={basis}
+          tone={trade.mfe === undefined ? '' : tone(trade.mfe)}
+          sub="best open P&L"
+        >
+          {trade.mfe === undefined ? (
+            <span className="text-[14px] font-normal text-faint">
+              Not recorded
+            </span>
+          ) : (
+            cash(trade.mfe)
+          )}
+        </Stat>
+        {unitRows}
+        {blanks(2 + unitRows.length, 'last')}
+      </div>
+    </>
   );
 }
 
@@ -838,7 +791,8 @@ function TradePage({
   }, [set.data?.trades, trade]);
 
   const roi = netRoiOf(trade);
-  const r = rOf(trade, basis);
+  // Realized R needs a closed trade (spec §5.2).
+  const r = trade.status === 'open' ? undefined : rOf(trade, basis);
   const planned = plannedR(trade);
   const fig = display.ofTrade(trade);
   const money = pnlTone(basis === 'gross' ? trade.gross : trade.net);
