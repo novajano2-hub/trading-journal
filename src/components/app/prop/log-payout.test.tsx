@@ -305,3 +305,54 @@ test('the amount carries the base currency’s symbol', async () => {
   const dialog = await open();
   expect(dialog.querySelector('[data-currency]')?.textContent).toBe('€');
 });
+
+test('Escape does not close it while the payout is being written; it closes once the write lands (C-10)', async () => {
+  const r = repo();
+  const real = r.propTxns.logPayout.bind(r.propTxns);
+  let release: () => void = () => {};
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  vi.spyOn(r.propTxns, 'logPayout').mockImplementation(async (ws, input) => {
+    await gate;
+    return real(ws, input);
+  });
+  renderApp(<Harness />, { repository: r });
+  const dialog = await open();
+  fireEvent.change(within(dialog).getByLabelText('Amount'), {
+    target: { value: '100' },
+  });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Add payout' }));
+  await waitFor(() =>
+    expect(
+      (
+        within(dialog).getByRole('button', {
+          name: 'Add payout',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true),
+  );
+  fireEvent.keyDown(dialog, { key: 'Escape' });
+  fireEvent.keyDown(document.body, { key: 'Escape' });
+  // Still open, still busy: the write was not abandoned half way.
+  expect(screen.getByRole('dialog', { name: 'Log a payout' })).toBeTruthy();
+  release();
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(await r.propTxns.list(WS)).toHaveLength(10);
+});
+
+test('the base currency is shown beside the amount and read with it (C58, C-10)', async () => {
+  const r = repo();
+  await r.prefs.update({ baseCurrency: 'EUR' });
+  renderApp(<Harness />, { repository: r });
+  const dialog = await open();
+  const code = dialog.querySelector('[data-currency-code]') as HTMLElement;
+  expect(code.textContent).toBe('EUR');
+  const amount = within(dialog).getByLabelText('Amount');
+  expect(amount.getAttribute('aria-describedby')).toContain(code.id);
+  // An error joins it rather than replacing it.
+  fireEvent.change(amount, { target: { value: 'abc' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Add payout' }));
+  await waitFor(() =>
+    expect(amount.getAttribute('aria-describedby')?.split(' ')).toHaveLength(2),
+  );
+  expect(amount.getAttribute('aria-describedby')).toContain(code.id);
+});

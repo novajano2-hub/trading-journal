@@ -73,6 +73,7 @@ function PayoutDialog({
   origin,
   returnFocus,
   onClose,
+  busy = false,
   description,
   footer,
   children,
@@ -80,6 +81,8 @@ function PayoutDialog({
   origin: RefObject<HTMLElement | null>;
   returnFocus: RefObject<HTMLElement | null>;
   onClose(): void;
+  /** A write is under way: Escape and a click outside leave the dialog open, as Mark as breached does. */
+  busy?: boolean;
   /** The line under the title; the states with nothing to add have none. */
   description?: string;
   /** Pinned under the body; the states with nothing to add have none, and the close button leaves. */
@@ -90,7 +93,7 @@ function PayoutDialog({
     <MorphDialog
       open
       onOpenChange={(open) => {
-        if (!open) onClose();
+        if (!open && !busy) onClose();
       }}
       origin={origin}
       returnFocus={returnFocus}
@@ -189,6 +192,7 @@ function PayoutForm({
       origin={origin}
       returnFocus={returnFocus}
       onClose={onClose}
+      busy={busy}
       description="It counts in total earned at once."
       footer={
         <div className="flex justify-end gap-2">
@@ -238,6 +242,14 @@ function PayoutForm({
             >
               {symbol}
             </span>
+            {/* The base currency, as every prop figure is in it (C58); read with the amount. */}
+            <span
+              id={`${ids}-amount-cur`}
+              data-currency-code=""
+              className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[12.5px] font-medium text-muted"
+            >
+              {currency}
+            </span>
             <input
               id={`${ids}-amount`}
               // The amount is what is asked for first. The dialog's own focus
@@ -249,8 +261,12 @@ function PayoutForm({
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               aria-invalid={errors.amount ? true : undefined}
-              aria-describedby={errors.amount ? `${ids}-amount-err` : undefined}
-              className={`${INPUT} ${symbol.length > 1 ? 'pl-11' : 'pl-7'}`}
+              aria-describedby={
+                errors.amount
+                  ? `${ids}-amount-cur ${ids}-amount-err`
+                  : `${ids}-amount-cur`
+              }
+              className={`${INPUT} pr-14 ${symbol.length > 1 ? 'pl-11' : 'pl-7'}`}
             />
           </div>
           {errors.amount ? (
