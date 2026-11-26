@@ -99,7 +99,9 @@ test('without ClipboardItem the Copy button is a line, never a dead button', asy
   await page.getByRole('button', { name: 'Snapshot' }).click();
   const panel = panelOf(page);
   await expect(
-    panel.getByText("This browser can't copy images. Download saves or shares the file."),
+    panel.getByText(
+      "This browser can't copy images. Download saves or shares the file.",
+    ),
   ).toBeVisible();
   await expect(panel.getByRole('button', { name: /copy/i })).toHaveCount(0);
   await expect(
