@@ -112,13 +112,19 @@ export function localChallenges(ctx: LocalContext): ChallengesRepo {
       return rwTx(db, [db.challenges, db.accounts, db.strategies], async () => {
         const current = await db.challenges.get([ws, id]);
         if (!current) throw new NotFoundError('challenge', id);
-        // A breach is permanent: the status never moves off it.
+        // A breach is permanent: the status never moves off it, and it locks
+        // the phase (rec 3.4). The status or phase it already has is no change.
         if (
           current.status === 'breached' &&
-          patch.status !== undefined &&
-          patch.status !== 'breached'
+          ((patch.status !== undefined && patch.status !== 'breached') ||
+            (patch.phase !== undefined && patch.phase !== current.phase))
         )
           throw new ChallengeBreachedError(id);
+        // A breach is recorded with its reason and date, by markBreached only.
+        if (patch.status === 'breached' && current.status !== 'breached')
+          throw new RangeError(
+            'A challenge is breached through markBreached, which records the reason and the date',
+          );
         const next = tidy({
           ...mergePatch(current, patch, [
             'failureReason',

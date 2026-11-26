@@ -424,7 +424,14 @@ export interface ChallengesRepo {
    * RangeError for one account linked to two phases.
    */
   create(ws: string, input: NewChallenge): Promise<Challenge>;
-  /** As `create` for what it sets; a key set to undefined is left unchanged, except `failureReason` and the fees, which it clears. Throws NotFoundError for an unknown id. */
+  /**
+   * As `create` for what it sets; a key set to undefined is left unchanged,
+   * except `failureReason` and the fees, which it clears. Throws NotFoundError
+   * for an unknown id, ChallengeBreachedError (writing nothing) for a breached
+   * challenge's `status` or `phase` set to a different value, and RangeError
+   * for `status: 'breached'` on one that is not (that goes through
+   * `markBreached`, which records the reason and the date).
+   */
   update(ws: string, id: string, patch: ChallengePatch): Promise<Challenge>;
   /**
    * Marks the challenge breached, for good: `status`, `breachReason` and
@@ -433,7 +440,7 @@ export interface ChallengesRepo {
    * Throws ChallengeBreachedError, writing nothing, for a challenge already
    * breached (one breached before reasons existed too), RangeError for a bad
    * date or reason, NotFoundError for an unknown id. `update` refuses any
-   * status change on a breached challenge the same way. Removing a challenge
+   * status or phase change on a breached challenge the same way. Removing a challenge
    * unlinks its prop transactions and keeps them.
    */
   markBreached(
@@ -444,7 +451,7 @@ export interface ChallengesRepo {
   remove(ws: string, id: string): Promise<void>;
 }
 
-/** The challenge is breached, and a breach is permanent: it can't be marked again or move to another status. */
+/** The challenge is breached, and a breach is permanent: it can't be marked again or move to another status or phase. */
 export class ChallengeBreachedError extends Error {
   override name = 'ChallengeBreachedError';
   constructor(readonly challengeId: string) {

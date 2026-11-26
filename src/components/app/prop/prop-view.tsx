@@ -14,6 +14,7 @@ import {
   useAccounts,
   useCashFlows,
   useChallenges,
+  useMarkBreached,
   usePrefs,
   useTrades,
   useUpdateChallenge,
@@ -61,6 +62,7 @@ export function PropView(): React.JSX.Element {
   const flows = useCashFlows();
   const prefs = usePrefs();
   const update = useUpdateChallenge();
+  const markBreached = useMarkBreached();
   const [filter, setFilter] = useState<Filter>('all');
   // Home's second step links here with ?new=challenge: the form opens, and the
   // param leaves the address (below) so a reload or Back doesn't reopen it.
@@ -192,11 +194,31 @@ export function PropView(): React.JSX.Element {
                 challenge={c}
                 check={check}
                 today={today}
-                saving={update.isPending && update.variables?.id === c.id}
-                saveFailed={update.isError && update.variables?.id === c.id}
+                saving={
+                  (update.isPending && update.variables?.id === c.id) ||
+                  (markBreached.isPending &&
+                    markBreached.variables?.id === c.id)
+                }
+                saveFailed={
+                  (update.isError && update.variables?.id === c.id) ||
+                  (markBreached.isError && markBreached.variables?.id === c.id)
+                }
                 onEdit={() => setEditing(c)}
                 onSave={(patch: ChallengePatch) =>
-                  update.mutate({ id: c.id, patch })
+                  // A breach is recorded through markBreached (update refuses
+                  // it). Until the Mark as breached dialog (Task 11) asks for
+                  // a reason, the rule's finding is kept as 'other' with its
+                  // text, dated today.
+                  patch.status === 'breached'
+                    ? markBreached.mutate({
+                        id: c.id,
+                        reason: 'other',
+                        ...(patch.failureReason !== undefined && {
+                          note: patch.failureReason,
+                        }),
+                        on: today,
+                      })
+                    : update.mutate({ id: c.id, patch })
                 }
               />
             </FigureSourceContext.Provider>

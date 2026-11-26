@@ -2,18 +2,26 @@ import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { describe, expect, test } from 'vitest';
 import { fixtureSample } from '../__fixtures__/sample';
 import { ChallengeBreachedError, NotFoundError } from '../repository';
+import { KeelDb } from './db';
 import { createLocalRepository } from './local-repository';
 
 const S = 'sample';
 
 function setup() {
+  return setupWithDb().repo;
+}
+
+/** The repository and a handle on its store, to seed a record the methods would refuse. */
+function setupWithDb() {
   let n = 0;
-  return createLocalRepository({
-    indexedDB: new IDBFactory(),
+  const indexedDB = new IDBFactory();
+  const repo = createLocalRepository({
+    indexedDB,
     IDBKeyRange,
     sample: async () => fixtureSample(),
     newId: () => `ch-${++n}`,
   });
+  return { repo, db: new KeelDb({ indexedDB, IDBKeyRange }) };
 }
 
 const input = {
@@ -34,12 +42,11 @@ test('create trims, lists by name, updates, clears and removes', async () => {
   const c = await repo.challenges.create(S, input);
   expect(c).toMatchObject({ id: 'ch-1', name: 'Futures 50K' });
   const edited = await repo.challenges.update(S, c.id, {
-    status: 'breached',
     failureReason: ' Daily loss limit broken. ',
     evaluationFee: undefined,
   });
   expect(edited).toMatchObject({
-    status: 'breached',
+    status: 'active',
     failureReason: 'Daily loss limit broken.',
   });
   expect('evaluationFee' in edited).toBe(false);
@@ -219,15 +226,76 @@ describe('markBreached', () => {
   });
 
   test('a challenge breached before 6C (a status and a text, no reason) is refused too', async () => {
-    const repo = setup();
+    const { repo, db } = setupWithDb();
     const c = await repo.challenges.create(S, input);
-    await repo.challenges.update(S, c.id, {
+    // Written straight to the store: update no longer sets a breach.
+    await db.challenges.update([S, c.id], {
       status: 'breached',
       failureReason: 'Daily loss limit broken.',
     });
     await expect(
       repo.challenges.markBreached(S, c.id, { reason: 'other', on }),
     ).rejects.toBeInstanceOf(ChallengeBreachedError);
+    await expect(
+      repo.challenges.update(S, c.id, { phase: 'funded' }),
+    ).rejects.toBeInstanceOf(ChallengeBreachedError);
+  });
+
+  test('update cannot set a breach: it goes through markBreached, which records why and when', async () => {
+    const repo = setup();
+    const c = await repo.challenges.create(S, input);
+    const attempt = repo.challenges.update(S, c.id, {
+      status: 'breached',
+      failureReason: 'Daily loss limit broken.',
+    });
+    await expect(attempt).rejects.toBeInstanceOf(RangeError);
+    await expect(attempt).rejects.toThrow(/markBreached/);
+    // Nothing was written: no status, no failure reason, no breach facts.
+    expect(await repo.challenges.list(S)).toEqual([c]);
+    // The ordinary statuses still move.
+    await expect(
+      repo.challenges.update(S, c.id, { status: 'passed' }),
+    ).resolves.toMatchObject({ status: 'passed' });
+    // A breach reaches a passed challenge through markBreached too.
+    await expect(
+      repo.challenges.update(S, c.id, { status: 'breached' }),
+    ).rejects.toBeInstanceOf(RangeError);
+    await expect(
+      repo.challenges.markBreached(S, c.id, { reason: 'max-drawdown', on }),
+    ).resolves.toMatchObject({
+      status: 'breached',
+      breachReason: 'max-drawdown',
+      breachedOn: on,
+    });
+  });
+
+  test('a breach locks the phase: update refuses a phase change on a breached challenge', async () => {
+    const repo = setup();
+    const c = await repo.challenges.create(S, input);
+    const done = await repo.challenges.markBreached(S, c.id, {
+      reason: 'overtrading',
+      on,
+    });
+    const move = repo.challenges.update(S, c.id, {
+      phase: 'funded',
+      name: 'Renamed',
+    });
+    await expect(move).rejects.toBeInstanceOf(ChallengeBreachedError);
+    await expect(move).rejects.toMatchObject({ challengeId: c.id });
+    // Nothing was written, not even the rename riding on the same patch.
+    expect(await repo.challenges.list(S)).toEqual([done]);
+    // The phase it already has is no change (the edit form sends every field).
+    await expect(
+      repo.challenges.update(S, c.id, { phase: 'evaluation', name: 'Renamed' }),
+    ).resolves.toMatchObject({ phase: 'evaluation', name: 'Renamed' });
+  });
+
+  test('a challenge that is not breached still changes phase', async () => {
+    const repo = setup();
+    const c = await repo.challenges.create(S, input);
+    await expect(
+      repo.challenges.update(S, c.id, { phase: 'funded' }),
+    ).resolves.toMatchObject({ phase: 'funded', status: 'active' });
   });
 
   test('update refuses any status change on a breached challenge, and allows the rest', async () => {

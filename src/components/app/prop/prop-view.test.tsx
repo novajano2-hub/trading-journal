@@ -118,7 +118,7 @@ test('the Forex card reads Step 1 of 2 and labels its drawdown from its type', a
   ).toBeNull();
 });
 
-test('a broken rule on an active challenge offers Mark as breached, and saves the status and reason', async () => {
+test('a broken rule on an active challenge offers Mark as breached, and saves the status and reason (through markBreached)', async () => {
   const r = repo({
     accounts: [prop('p-forex', 'Forex evaluation')],
     challenges: [challenge({})],
@@ -138,6 +138,7 @@ test('a broken rule on an active challenge offers Mark as breached, and saves th
     const [saved] = await r.challenges.list(WS);
     expect(saved).toMatchObject({
       status: 'breached',
+      breachReason: 'other',
       failureReason: sentence,
     });
   });
@@ -363,7 +364,7 @@ test('a failed save shows one live region on the card, with no nested alert', as
     challenges: [challenge({})],
     loss: true,
   });
-  r.challenges.update = vi.fn().mockRejectedValue(new Error('no'));
+  r.challenges.markBreached = vi.fn().mockRejectedValue(new Error('no'));
   renderApp(<PropView />, { repository: r, url: '/app/prop-firms' });
   const card = await screen.findByRole('article', { name: 'Forex 100K' });
   fireEvent.click(
