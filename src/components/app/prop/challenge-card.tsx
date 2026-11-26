@@ -592,9 +592,9 @@ function RuleLine({
       data-rule={rule}
       className="border-t border-line py-2.5 first:border-t-0 first:pt-1"
     >
-      <div className="flex items-baseline justify-between gap-3 text-[13px]">
-        <span className="min-w-0 text-text">{name}</span>
-        <span className="min-w-0 text-right tabular-nums text-muted">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-[13px]">
+        <span className="text-left text-text [&_button]:text-left">{name}</span>
+        <span className="ml-auto text-right tabular-nums text-muted">
           {value}
         </span>
       </div>

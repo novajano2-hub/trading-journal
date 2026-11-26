@@ -143,12 +143,12 @@ test('a trade that broke two rules and carries two mistakes', async () => {
   const row = within(table).getAllByRole('row')[1]!;
   // The full list rides in the title, and whole in the text a screen reader gets.
   const rules = within(row).getByTitle(`${r1}, ${r2}`);
-  // Below xl the rule wraps to two lines rather than cutting to a stub; from xl it reads on one line.
+  // In a narrow card the rule wraps to two lines rather than cutting to a stub; from a 64rem card it reads on one line.
   // "Broke:" (loss red) and the rule (ink) are two runs in one clamped line.
   const text = rules.querySelector('.line-clamp-2')!;
   expect(text.textContent).toBe(`Broke: ${keepHyphens(r1)}`);
   expect(text.className).toContain('line-clamp-2');
-  expect(text.className).toContain('xl:truncate');
+  expect(text.className).toContain('@[64rem]:truncate');
   expect(text.className).not.toMatch(/(^|\s)truncate/);
   // The rest is a small loss chip right after the rule, not stranded at the cell's edge.
   const count = text.nextElementSibling!;
@@ -243,6 +243,39 @@ test('recent trades opens on the closed trades, with an Open positions tab besid
       .getAllByRole('radio')
       .map((r) => (r as HTMLInputElement).labels?.[0]?.textContent),
   ).toEqual(['Closed', 'Open positions']);
+});
+
+test('the closed table answers to the width of its card: time, instrument and result, then side and rules, then strategy and mistake', async () => {
+  await renderRecent();
+  const table = await screen.findByRole('table', { name: 'Recent trades' });
+  // The card is the container the columns measure themselves against.
+  expect(table.closest('.\\@container')).not.toBeNull();
+  const head = (name: string) =>
+    within(table).getByRole('columnheader', { name });
+  // Always there: the instrument and the result; the time folds under the symbol in a card under 20rem.
+  expect(head('Instrument').className).not.toContain('hidden');
+  expect(head('Net P&L').className).not.toContain('hidden');
+  expect(head('Time').className).toContain('@max-[20rem]:hidden');
+  // From 36rem: the side and the rules.
+  for (const name of ['Side', 'Rules']) {
+    expect(head(name).className).toContain('hidden');
+    expect(head(name).className).toContain('@[36rem]:table-cell');
+  }
+  // From 56rem: the strategy and the mistake.
+  for (const name of ['Strategy', 'Mistake']) {
+    expect(head(name).className).toContain('hidden');
+    expect(head(name).className).toContain('@[56rem]:table-cell');
+  }
+  // The cells follow their headers, so a narrow card never clips a column.
+  const first = within(table).getAllByRole('row')[1]!;
+  const cells = within(first).getAllByRole('cell');
+  expect(cells[2]!.className).toContain('@[36rem]:table-cell');
+  expect(cells[3]!.className).toContain('@[56rem]:table-cell');
+  expect(cells[4]!.className).toContain('@[56rem]:table-cell');
+  expect(cells[5]!.className).not.toContain('hidden');
+  expect(cells[6]!.className).toContain('@[36rem]:table-cell');
+  // Under 20rem the time reads under the symbol, and only there.
+  expect(cells[1]!.querySelector('.\\@\\[20rem\\]\\:hidden')).not.toBeNull();
 });
 
 test('the card has no header link: a row is the way into a trade', async () => {
@@ -355,7 +388,7 @@ test('on a phone the open positions are two-line rows that link to the trade', a
   });
   await openTab();
   const list = screen.getByRole('list', { name: 'Open positions' });
-  expect(list.className).toContain('sm:hidden');
+  expect(list.className).toContain('@[48rem]:hidden');
   const row = within(list).getAllByRole('listitem')[0]!;
   const link = within(row).getByRole('link');
   expect(link.getAttribute('href')).toContain('/app/trades/o-1');
@@ -369,7 +402,7 @@ test('on a phone the open positions are two-line rows that link to the trade', a
   // The table keeps from 640px up.
   expect(
     screen.getByRole('table', { name: 'Open positions' }).className,
-  ).toContain('max-sm:hidden');
+  ).toContain('@max-[48rem]:hidden');
 });
 
 test('open trades with no closed one still open on their tab', async () => {
