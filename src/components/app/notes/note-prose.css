@@ -2,6 +2,51 @@
  * How a note reads. Token colours only; the type follows DESIGN.md's ramp
  * (comp 10: 15px / 1.65 body, 15px semibold prompts, larger headings above).
  */
+
+/*
+ * The toolbar's text colours, highlights and faces. A note stores these as
+ * tokens, so one note reads in light and in graphite: each ink is dark enough
+ * on white in light and light enough on graphite in dark (4.5:1 and above on
+ * the surface), and a highlight is that ink as a tint under the note's own
+ * text colour. Hues with a job elsewhere (gain, loss, info) are left out.
+ */
+:root {
+  --note-serif: ui-serif, Georgia, Cambria, 'Times New Roman', serif;
+  --note-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --note-ink-marigold: var(--warn);
+  --note-ink-clay: #a5562b;
+  --note-ink-rose: #b83a77;
+  --note-ink-orchid: #a63f99;
+  --note-ink-plum: #7e3f9e;
+  --note-ink-olive: #657015;
+  --note-ink-ultramarine: var(--accent-ink);
+  --note-ink-grey: var(--muted);
+}
+:root[data-theme='dark'] {
+  --note-ink-clay: #e0976c;
+  --note-ink-rose: #ec80b3;
+  --note-ink-orchid: #d97ccd;
+  --note-ink-plum: #c192df;
+  --note-ink-olive: #b5c23c;
+}
+:root {
+  --note-hl-marigold: color-mix(
+    in srgb,
+    var(--note-ink-marigold) 26%,
+    transparent
+  );
+  --note-hl-clay: color-mix(in srgb, var(--note-ink-clay) 24%, transparent);
+  --note-hl-rose: color-mix(in srgb, var(--note-ink-rose) 24%, transparent);
+  --note-hl-orchid: color-mix(in srgb, var(--note-ink-orchid) 24%, transparent);
+  --note-hl-plum: color-mix(in srgb, var(--note-ink-plum) 24%, transparent);
+  --note-hl-olive: color-mix(in srgb, var(--note-ink-olive) 26%, transparent);
+  --note-hl-ultramarine: color-mix(
+    in srgb,
+    var(--note-ink-ultramarine) 22%,
+    transparent
+  );
+  --note-hl-grey: color-mix(in srgb, var(--note-ink-grey) 22%, transparent);
+}
 .note-prose {
   margin-top: 6px;
   max-width: 68ch;
@@ -80,6 +125,16 @@
 .note-prose pre code {
   padding: 0;
   background: none;
+}
+/* Highlight: a tint behind the text, which keeps its own colour. */
+.note-prose mark {
+  padding: 0 1px;
+  border-radius: 3px;
+  background: var(--note-hl-marigold);
+  color: inherit;
+}
+.note-prose u {
+  text-underline-offset: 0.18em;
 }
 .note-prose ul,
 .note-prose ol {
@@ -250,6 +305,62 @@
   display: none;
 }
 
+/*
+ * Toggles: the same node as a collapsible section, set without its rule. A
+ * toggle's title reads as body text, a toggle heading's as the heading of its
+ * level, at the sizes headings take.
+ */
+.note-prose div[data-type='details'][data-toggle] {
+  margin: 4px 0;
+  padding: 0;
+  border-top: 0;
+}
+.note-prose div[data-type='details'][data-toggle] > button {
+  margin-top: 0;
+  height: 1.65em;
+}
+.note-prose
+  div[data-type='details'][data-toggle='0']
+  div[data-type='detailsSummary'] {
+  font-size: inherit;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.65;
+  padding: 0;
+}
+.note-prose
+  div[data-type='details'][data-toggle='1']
+  div[data-type='detailsSummary'] {
+  font-size: 26px;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  padding: 4px 0;
+}
+.note-prose
+  div[data-type='details'][data-toggle='2']
+  div[data-type='detailsSummary'] {
+  font-size: 20px;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  padding: 4px 0;
+}
+.note-prose
+  div[data-type='details'][data-toggle='3']
+  div[data-type='detailsSummary'] {
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+  padding: 4px 0;
+}
+.note-prose div[data-type='details'][data-toggle='1'] > button {
+  height: 1.15em;
+  margin-top: 8px;
+}
+.note-prose div[data-type='details'][data-toggle='2'] > button {
+  height: 1.25em;
+  margin-top: 6px;
+}
+
 /* Tables take the app's table style: quiet header, hairline rows. */
 .note-prose .tableWrapper {
   overflow-x: auto;
@@ -317,4 +428,17 @@
   font-size: 16px;
   font-weight: 600;
   letter-spacing: -0.01em;
+}
+
+/*
+ * A toolbar menu on a phone is a sheet from the bottom edge (comp 05). Radix
+ * places a menu with an inline transform; this pins its wrapper to the edge.
+ */
+@media (max-width: 639.98px) {
+  [data-radix-popper-content-wrapper]:has(> .note-sheet) {
+    position: fixed !important;
+    inset: auto 0 0 0 !important;
+    transform: none !important;
+    min-width: 0 !important;
+  }
 }

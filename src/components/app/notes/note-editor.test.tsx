@@ -1,6 +1,13 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, test, vi } from 'vitest';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { NoteEditor, type NoteEditorHandle } from './note-editor';
 import { DAILY_REVIEW_BODY } from '@/content/note-templates';
 
@@ -51,9 +58,27 @@ test('the toolbar is named and toggles carry aria-pressed', async () => {
   expect(bar).toBeTruthy();
   const bold = screen.getByRole('button', { name: 'Bold' });
   expect(bold.getAttribute('aria-pressed')).toBe('false');
+  // The headings and lists moved into the Style menu; the marks are buttons.
   for (const n of [
     'Italic',
+    'Underline',
     'Link',
+    'Undo',
+    'Redo',
+    'Style: Normal text',
+    'Insert',
+  ]) {
+    expect(screen.getByRole('button', { name: n })).toBeTruthy();
+  }
+});
+
+test('the Style menu keeps the headings, lists, checklist and quote the toolbar had', async () => {
+  render(<NoteEditor value={doc} onChange={() => {}} label="Trade note" />);
+  fireEvent.keyDown(
+    await screen.findByRole('button', { name: 'Style: Normal text' }),
+    { key: 'Enter' },
+  );
+  for (const n of [
     'Heading 1',
     'Heading 2',
     'Heading 3',
@@ -62,7 +87,7 @@ test('the toolbar is named and toggles carry aria-pressed', async () => {
     'Checklist',
     'Quote',
   ]) {
-    expect(screen.getByRole('button', { name: n })).toBeTruthy();
+    expect(await screen.findByRole('menuitemradio', { name: n })).toBeTruthy();
   }
 });
 
