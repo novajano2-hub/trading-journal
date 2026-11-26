@@ -353,6 +353,36 @@ describe('findingText', () => {
   });
 });
 
+describe('findingText dates', () => {
+  test('every month is its three-letter name; September is Sep, not the engine\'s "Sept"', () => {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    months.forEach((name, i) => {
+      const date = `2026-${String(i + 1).padStart(2, '0')}-07`;
+      expect(
+        findingText(
+          { rule: 'daily-loss', date, value: 150_000, limit: 100_000 },
+          money,
+        ),
+      ).toBe(
+        `Daily loss limit broken on 7 ${name} (−$1,500.00 of −$1,000.00).`,
+      );
+    });
+  });
+});
+
 describe('urgencyOf and shownChallenge', () => {
   const clean = (id: string, over: Partial<Challenge> = {}) =>
     challenge({

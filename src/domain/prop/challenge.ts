@@ -56,13 +56,27 @@ export function drawdownLabel(t: DrawdownType): string {
       : 'Trailing drawdown';
 }
 
-/** "12 Nov". */
+// Spelled out, not read from Intl: the en-GB short month for September is
+// "Sept" in current engines, and Keel writes "Sep".
+const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+
+/** "12 Nov", from YYYY-MM-DD. */
 function shortDate(date: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'UTC',
-    day: 'numeric',
-    month: 'short',
-  }).format(new Date(`${date}T00:00:00Z`));
+  const [, month, day] = date.split('-');
+  return `${Number(day)} ${MONTHS[Number(month) - 1]}`;
 }
 
 /** The sentence the card shows, and the failure reason it saves. `money` formats cents without a sign. */
