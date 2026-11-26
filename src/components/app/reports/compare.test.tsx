@@ -8,6 +8,7 @@ import {
 } from '@testing-library/react';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
+import { patternSample } from '@/data/__fixtures__/patterns-sample';
 import { breakdownSample } from '../__fixtures__/breakdown-sample';
 import { commitNavigation, deferNavigation } from '../__fixtures__/navigation';
 import { renderApp } from '../__fixtures__/render-app';
@@ -345,4 +346,28 @@ test('two quick outcome ticks in a group before the address catches up both stic
   );
   expect(group.get('symbol')).toBe('ES');
   expect(group.get('outcome')?.split(',').sort()).toEqual(['loss', 'win']);
+});
+
+test('a Patterns pick in the global filters narrows Group A, and both groups when each names it', async () => {
+  // p-1 (acc-a) and p-old (archived acc-b) opened in two entries; p-plain did not.
+  renderApp(<CompareView />, {
+    sample: async () => patternSample(),
+    url: '/app/reports/compare?pat=added-to-position',
+  });
+  const page = await screen.findByTestId('reports-compare');
+  const table = within(page).getByRole('table', { name: 'Comparison' });
+  // A is the pick: p-1 alone. B starts from the active accounts' every trade: p-1 and p-plain.
+  // Read at once: the page waits for the patterns, it never shows a group as empty meanwhile.
+  expect(row(table, /^Trades/)).toEqual(['1', '2', '−1']);
+  expect(row(table, /^Net P&L/)).toEqual(['+$50.00', '+$60.00', '−$10.00']);
+  cleanup();
+
+  // Each group that names the pick keeps what it fired on, in any account it selects.
+  renderApp(<CompareView />, {
+    sample: async () => patternSample(),
+    url: '/app/reports/compare?a=pat%3Dadded-to-position&b=pat%3Dadded-to-position%26account%3Dacc-b',
+  });
+  const both = await screen.findByTestId('reports-compare');
+  const t2 = within(both).getByRole('table', { name: 'Comparison' });
+  expect(row(t2, /^Trades/)).toEqual(['1', '1', '0']);
 });

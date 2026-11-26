@@ -34,13 +34,19 @@ function PatternsControl({
   const display = useDisplay();
   const day = useDayFigures(date);
   const currency = usePrefs().data?.baseCurrency;
-  const net = day?.stats?.net ?? 0;
+  // No net when the scoped accounts have no base-currency trade (or none closed) that day, as the day card has none:
+  // the day's patterns read every account, so a $0.00 here would sit above real patterns.
+  const net = day?.stats?.net ?? null;
   return (
     <DayPatterns
       date={date}
       label={label}
-      net={{ figure: display.cash(net, true, currency), cents: net }}
-      trades={day?.stats?.trades ?? 0}
+      net={
+        net === null
+          ? null
+          : { figure: display.cash(net, true, currency), cents: net }
+      }
+      trades={day?.stats?.trades ?? day?.trades.length ?? 0}
       align="start"
     />
   );

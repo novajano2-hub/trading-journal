@@ -44,6 +44,7 @@ async function renderDay(
   date: string,
   mode: 'plan' | 'review' = 'review',
   prefs: { displayUnit?: 'privacy' } = {},
+  query = '',
 ) {
   const repository = createLocalRepository({
     indexedDB: new IDBFactory(),
@@ -53,7 +54,7 @@ async function renderDay(
   await repository.prefs.update({ timeZone: 'UTC', ...prefs });
   renderApp(<Day date={date} mode={mode} />, {
     repository,
-    url: `/app/day/${date}/${mode}`,
+    url: `/app/day/${date}/${mode}${query}`,
   });
   return screen.findByRole('banner');
 }
@@ -118,4 +119,43 @@ test('on a phone it is a glyph with the count in the bar, opening a sheet', asyn
   const sheet = await screen.findByRole('dialog', { name: 'Patterns' });
   expect(sheet.textContent).toContain('3 trades');
   expect(sheet.textContent).toContain('−$60.00');
+});
+
+test('the desktop control is named with its count', async () => {
+  const bar = await renderDay('2026-11-02');
+  expect(
+    await within(bar).findByRole('button', { name: 'Patterns, 1' }),
+  ).toBeTruthy();
+  cleanup();
+  const quiet = await renderDay('2026-11-03');
+  expect(
+    await within(quiet).findByRole('button', { name: 'Patterns, none' }),
+  ).toBeTruthy();
+});
+
+test("a day the scoped accounts have no trade on lists the day's patterns with no net, never $0.00", async () => {
+  // The archived account has nothing on Mon 2 Nov; the patterns read every account's trades.
+  const bar = await renderDay('2026-11-02', 'review', {}, '?account=acc-b');
+  await waitFor(() => expect(trigger(bar).textContent).toBe('Patterns1'));
+  fireEvent.click(trigger(bar));
+  const pop = await screen.findByRole('dialog', {
+    name: 'Patterns on Mon 2 Nov',
+  });
+  const head = within(pop).getByText('Mon 2 Nov').parentElement!;
+  expect(head.textContent).not.toMatch(/\$/);
+  expect(head.textContent).toContain('0 trades');
+  expect(within(pop).getAllByRole('listitem')).toHaveLength(1);
+});
+
+test('a Patterns pick in the address does not narrow the day page: it is scoped by account alone', async () => {
+  // Nothing fired Large size, yet the page still lists the day's three trades and its pattern.
+  const bar = await renderDay('2026-11-02', 'review', {}, '?pat=large-size');
+  await waitFor(() => expect(trigger(bar).textContent).toBe('Patterns1'));
+  fireEvent.click(trigger(bar));
+  const pop = await screen.findByRole('dialog', {
+    name: 'Patterns on Mon 2 Nov',
+  });
+  const head = within(pop).getByText('Mon 2 Nov').parentElement!;
+  expect(head.textContent).toContain('3 trades');
+  expect(head.textContent).toContain('−$60.00');
 });

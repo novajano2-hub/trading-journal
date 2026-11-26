@@ -16,10 +16,11 @@ const BUTTON = `${buttonClasses('secondary', 'sm')} gap-1.5 outline-offset-2 foc
 const PANEL =
   'z-50 flex max-h-[min(560px,var(--radix-popover-content-available-height))] max-w-[calc(100vw-24px)] origin-(--radix-popover-content-transform-origin) flex-col overflow-hidden rounded-[12px] border border-line bg-surface-1 text-text shadow-[var(--shadow)] outline-none motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in';
 
-/** What a popover's trigger looks like: its class, its content and, for a glyph, its accessible name. */
+/** What a popover's trigger looks like: its class and its content. */
 export interface PatternsFace {
   className: string;
   children: ReactNode;
+  /** The accessible name; by default "Patterns, 3" ("Patterns, none", and "Patterns" while the count is read). */
   label?: string;
 }
 
@@ -67,9 +68,16 @@ export function PatternsPopover({
   const heading = useRef<HTMLHeadingElement>(null);
   const count = hits?.length;
   const look = face(count, phone);
+  // The count joins the name on every trigger, the desktop's as the phone's glyph: its text alone would read "Patterns3".
+  const label =
+    look.label ??
+    (count === undefined
+      ? 'Patterns'
+      : `Patterns, ${count === 0 ? 'none' : count}`);
 
   if (hits === undefined || hits.length === 0) {
     // Kept in the tab order and describing itself, like the filter chips with nothing to filter.
+    // The reason is for a trade or day known to have none: while the patterns are read there is none to give.
     return (
       <>
         <button
@@ -77,16 +85,18 @@ export function PatternsPopover({
           aria-disabled="true"
           aria-busy={hits === undefined ? 'true' : undefined}
           aria-haspopup="dialog"
-          aria-describedby={noteId}
-          aria-label={look.label}
-          title={reason}
+          aria-describedby={hits === undefined ? undefined : noteId}
+          aria-label={label}
+          title={hits === undefined ? undefined : reason}
           className={look.className}
         >
           {look.children}
         </button>
-        <span id={noteId} hidden>
-          {reason}
-        </span>
+        {hits === undefined ? null : (
+          <span id={noteId} hidden>
+            {reason}
+          </span>
+        )}
       </>
     );
   }
@@ -94,7 +104,7 @@ export function PatternsPopover({
   if (!phone) {
     return (
       <Popover.Root open={open} onOpenChange={setOpen}>
-        <Popover.Trigger aria-label={look.label} className={look.className}>
+        <Popover.Trigger aria-label={label} className={look.className}>
           {look.children}
         </Popover.Trigger>
         <Popover.Portal>
@@ -128,7 +138,7 @@ export function PatternsPopover({
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger
-        aria-label={look.label}
+        aria-label={label}
         className={look.className}
         aria-haspopup="dialog"
       >

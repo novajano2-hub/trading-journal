@@ -99,7 +99,7 @@ test("the control ends the card header's quick actions, after Review", async () 
   );
   // The toggle, then Review, then Patterns last (the note action, when given, sits between).
   expect(names[0]).toBe('Expand Tue 3 Nov 2026');
-  expect(names.slice(1)).toEqual(['Review', 'Patterns0']);
+  expect(names.slice(1)).toEqual(['Review', 'Patterns, none']);
 });
 
 test("the popover's net follows Privacy, for the eye and the ear", async () => {

@@ -131,11 +131,28 @@ test('no patterns: the count reads 0 and the button is disabled with its reason'
   expect(screen.queryByRole('dialog')).toBeNull();
 });
 
-test('while the patterns are read the button waits, with no count', () => {
+test('while the patterns are read the button waits, with no count and no reason yet', () => {
   renderApp(<PatternsButton hits={undefined} />);
   expect(trigger().textContent).toBe('Patterns');
   expect(trigger().getAttribute('aria-disabled')).toBe('true');
   expect(trigger().getAttribute('aria-busy')).toBe('true');
+  // "No patterns on this trade" is for a trade known to have none, not for one still being read.
+  expect(trigger().getAttribute('title')).toBeNull();
+  expect(trigger().getAttribute('aria-describedby')).toBeNull();
+  expect(document.body.textContent).not.toContain('No patterns');
+});
+
+test('the desktop button is named with its count, as the phone glyph is', () => {
+  const { unmount } = renderApp(<PatternsButton hits={HITS} />);
+  expect(trigger().getAttribute('aria-label')).toBe('Patterns, 3');
+  unmount();
+  renderApp(<PatternsButton hits={[]} />);
+  expect(trigger().getAttribute('aria-label')).toBe('Patterns, none');
+  cleanup();
+  renderApp(<PatternsButton hits={undefined} />);
+  expect(trigger().getAttribute('aria-label')).toBe('Patterns');
+  // The visible text still starts the name.
+  expect(screen.getByRole('button', { name: 'Patterns' })).toBeTruthy();
 });
 
 test('Escape closes it and focus returns to the button', async () => {

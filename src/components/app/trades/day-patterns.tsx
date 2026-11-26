@@ -69,10 +69,6 @@ export function DayPatterns({
     phone
       ? {
           className: GLYPH,
-          label:
-            count === undefined
-              ? 'Patterns'
-              : `Patterns, ${count === 0 ? 'none' : count}`,
           children: (
             <>
               <Pulse size={20} aria-hidden="true" />
