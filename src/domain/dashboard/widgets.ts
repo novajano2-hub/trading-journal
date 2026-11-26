@@ -14,18 +14,30 @@ export const WIDGETS: Record<
   { section: WidgetSection; size: 'third' | 'wide'; metric: MetricId }
 > = {
   // Upper
-  'net-pnl': { section: 'upper', size: 'third', metric: 'net-pnl' },
-  'balance-pnl': { section: 'upper', size: 'third', metric: 'account-balance' },
+  'net-pnl': { section: 'upper', size: 'third', metric: 'pnl' },
+  'balance-pnl': { section: 'upper', size: 'third', metric: 'balance-and-pnl' },
   'trade-win': { section: 'upper', size: 'third', metric: 'win-rate' },
   'profit-factor': { section: 'upper', size: 'third', metric: 'profit-factor' },
   'day-win': { section: 'upper', size: 'third', metric: 'daily-win-rate' },
   'win-loss-ratio': { section: 'upper', size: 'third', metric: 'avg-win-loss' },
   expectancy: { section: 'upper', size: 'third', metric: 'expectancy' },
-  'day-streak': { section: 'upper', size: 'third', metric: 'green-day-streak' },
-  'trade-streak': { section: 'upper', size: 'third', metric: 'win-streak' },
-  streaks: { section: 'upper', size: 'third', metric: 'day-streaks' },
+  'day-streak': {
+    section: 'upper',
+    size: 'third',
+    metric: 'current-day-streak',
+  },
+  'trade-streak': {
+    section: 'upper',
+    size: 'third',
+    metric: 'current-trade-streak',
+  },
+  streaks: { section: 'upper', size: 'third', metric: 'current-streaks' },
   'max-drawdown': { section: 'upper', size: 'third', metric: 'max-drawdown' },
-  'avg-drawdown': { section: 'upper', size: 'third', metric: 'avg-drawdown' },
+  'avg-drawdown': {
+    section: 'upper',
+    size: 'third',
+    metric: 'avg-drawdown-card',
+  },
   // Lower
   score: { section: 'lower', size: 'third', metric: 'sharpe' },
   'cum-pnl': { section: 'lower', size: 'third', metric: 'cumulative-pnl' },

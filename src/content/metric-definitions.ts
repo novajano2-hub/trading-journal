@@ -65,6 +65,11 @@ export const METRIC_IDS = [
   'logged-days',
   'daily-drawdown',
   'account-balance',
+  'balance-and-pnl',
+  'current-day-streak',
+  'current-trade-streak',
+  'current-streaks',
+  'avg-drawdown-card',
   'long-winners',
   'long-losers',
   'long-breakevens',
@@ -458,6 +463,31 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Net account balance',
     definition:
       'What the selected accounts hold at the end of the period: their balance the day before the date range starts, the deposits and withdrawals after it, and the net P&L of the trades in your filters booked up to then. It has no value in R, ticks, pips or points.',
+  },
+  'balance-and-pnl': {
+    label: 'Account balance and P&L',
+    definition:
+      'What the selected accounts hold at the end of the date range, with the closed net P&L of the trades in your filters under it. The balance is the starting balances, the deposits and withdrawals, and the net P&L booked up to then. It has no value in R, ticks, pips or points.',
+  },
+  'current-day-streak': {
+    label: 'Winning day streak',
+    definition:
+      'Winning days in a row, counted back from the last trading day of your date range. A losing or flat day, inside your breakeven range, ends the run, so it reads 0 after one.',
+  },
+  'current-trade-streak': {
+    label: 'Winning trade streak',
+    definition:
+      'Winning trades in a row, counted back from your last closed trade, in the order they closed. A losing or breakeven trade ends the run, so it reads 0 after one.',
+  },
+  'current-streaks': {
+    label: 'Streaks',
+    definition:
+      'Winning days in a row up to your last trading day, and winning trades in a row up to your last trade. A losing or breakeven day or trade ends a run.',
+  },
+  'avg-drawdown-card': {
+    label: 'Average drawdown',
+    definition:
+      "How far the close of a trading day sat under its running peak, averaged over the days that closed under one. With no date range set, it shows today's drawdown from the high instead. It reads the day-by-day {basis} P&L, as the max drawdown does.",
   },
   'long-winners': {
     label: 'Long winners',

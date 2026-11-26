@@ -8,7 +8,8 @@ export function Bar({ className }: { className: string }): React.JSX.Element {
 
 /**
  * The upper strip: two columns on a phone (an odd last widget takes the full
- * row), three from `md`, five from `lg`.
+ * row), three from `md`, five from `xl` (comp 01 holds three up to 1280px:
+ * five 22px figures need the room).
  */
 export function UpperStrip({
   children,
@@ -20,7 +21,7 @@ export function UpperStrip({
       role="group"
       aria-label="Figures"
       data-grid="upper"
-      className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-5 max-md:[&>:last-child:nth-child(odd)]:col-span-2"
+      className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 xl:grid-cols-5 max-md:[&>:last-child:nth-child(odd)]:col-span-2"
     >
       {children}
     </div>

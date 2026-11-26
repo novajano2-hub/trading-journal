@@ -66,6 +66,15 @@ describe('the widget catalogue', () => {
     }
   });
 
+  test('the figures the widgets show have tips that describe them, not the longest-run ones', () => {
+    expect(WIDGETS['net-pnl'].metric).toBe('pnl');
+    expect(WIDGETS['balance-pnl'].metric).toBe('balance-and-pnl');
+    expect(WIDGETS['day-streak'].metric).toBe('current-day-streak');
+    expect(WIDGETS['trade-streak'].metric).toBe('current-trade-streak');
+    expect(WIDGETS.streaks.metric).toBe('current-streaks');
+    expect(WIDGETS['avg-drawdown'].metric).toBe('avg-drawdown-card');
+  });
+
   test('isWidgetKey tells known keys from unknown ones', () => {
     expect(isWidgetKey('score')).toBe(true);
     expect(isWidgetKey('year')).toBe(true);

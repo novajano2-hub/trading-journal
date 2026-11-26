@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import type { WidgetKey, WidgetSettings } from '@/domain/types';
 import { ProgressCard } from '../progress-card';
 import { WidgetPlaceholder } from './frame';
+import { UPPER_RENDER } from './upper';
 
 /**
  * What draws a widget. It is rendered as a component (`<Render settings=…/>`),
@@ -21,23 +22,12 @@ function placeholder(widgetKey: WidgetKey): WidgetRender {
 
 /**
  * The renderer of every widget in the catalogue. The progress tracker is 6A's
- * card, which draws its own, so it is not framed again; the others hold their
- * place until the upper and the lower widgets replace them.
+ * card, which draws its own, so it is not framed again; the upper widgets are
+ * `upper.tsx`'s, and the lower ones hold their place until they are built.
  */
 export const WIDGET_RENDER: Record<WidgetKey, WidgetRender> = {
   // Upper
-  'net-pnl': placeholder('net-pnl'),
-  'balance-pnl': placeholder('balance-pnl'),
-  'trade-win': placeholder('trade-win'),
-  'profit-factor': placeholder('profit-factor'),
-  'day-win': placeholder('day-win'),
-  'win-loss-ratio': placeholder('win-loss-ratio'),
-  expectancy: placeholder('expectancy'),
-  'day-streak': placeholder('day-streak'),
-  'trade-streak': placeholder('trade-streak'),
-  streaks: placeholder('streaks'),
-  'max-drawdown': placeholder('max-drawdown'),
-  'avg-drawdown': placeholder('avg-drawdown'),
+  ...UPPER_RENDER,
   // Lower
   score: placeholder('score'),
   'cum-pnl': placeholder('cum-pnl'),

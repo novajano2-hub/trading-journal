@@ -52,6 +52,9 @@ test('an upper widget is a small card whose label is the info tip, with no headi
   expect(tip.dataset.metricTip).toBe('net-pnl');
   expect(card.textContent).toContain('1,226 trades');
   expect(card.textContent).toContain('figure');
+  // The card is the container its figure sizes itself against, and a label that wraps stays left.
+  expect(card.className).toContain('@container');
+  expect(tip.className).toContain('text-left');
 });
 
 test('while it loads the card keeps its header and shows a skeleton instead of the body', async () => {

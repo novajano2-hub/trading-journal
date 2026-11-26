@@ -167,7 +167,7 @@ test('the progress tracker widget is 6As card, drawn once, with no frame around 
   await waitFor(() => expect(card.textContent).toMatch(/\d+ of \d+ rules met/));
 });
 
-test('the upper strip is 2 columns, 3 from md and 5 from lg; the lower grid is dense, 1 column, 2 from md and 3 from xl, and a wide widget spans 2 columns and 2 rows', async () => {
+test('the upper strip is 2 columns, 3 from md and 5 from xl; the lower grid is dense, 1 column, 2 from md and 3 from xl, and a wide widget spans 2 columns and 2 rows', async () => {
   const wide: DashTemplate = {
     id: 'w',
     name: 'Wide',
@@ -179,8 +179,10 @@ test('the upper strip is 2 columns, 3 from md and 5 from lg; the lower grid is d
   });
   await screen.findByTestId('dashboard-ready');
   const upper = screen.getByRole('group', { name: 'Figures' });
-  for (const c of ['grid-cols-2', 'md:grid-cols-3', 'lg:grid-cols-5'])
+  for (const c of ['grid-cols-2', 'md:grid-cols-3', 'xl:grid-cols-5'])
     expect(upper.className).toContain(c);
+  // Comp 01 holds 3 columns up to 1280px: five 22px figures do not fit 1024.
+  expect(upper.className).not.toContain('lg:grid-cols-5');
   const calendar = document.querySelector('[data-widget="calendar-adv"]')!;
   const lower = calendar.closest('[data-grid="lower"]')!;
   for (const c of [

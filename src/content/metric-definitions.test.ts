@@ -93,3 +93,26 @@ test("the day's volume says it counts both sides", () => {
     /both sides/,
   );
 });
+
+test('the upper dashboard widgets have a tip each, apart from the longest-streak ones', () => {
+  const streaks = {
+    'current-day-streak': /winning days in a row/i,
+    'current-trade-streak': /winning trades in a row/i,
+    'current-streaks': /winning days in a row.*winning trades in a row/i,
+  } as const;
+  for (const [id, words] of Object.entries(streaks)) {
+    const d = metricDefinition(id as keyof typeof streaks, 'net');
+    expect(METRIC_IDS as readonly string[], id).toContain(id);
+    expect(d.definition, id).toMatch(words);
+    // The current run, counted back from the last day or trade; a breakeven ends it.
+    expect(d.definition, id).toMatch(/breakeven/i);
+    expect(d.definition, id).not.toMatch(/longest|most/i);
+  }
+  const balance = metricDefinition('balance-and-pnl', 'net');
+  expect(balance.label).toBe('Account balance and P&L');
+  expect(balance.definition).toMatch(/end of the date range/);
+  expect(balance.definition).toMatch(/no value in R, ticks, pips or points/);
+  const avg = metricDefinition('avg-drawdown-card', 'net');
+  expect(avg.definition).toMatch(/no date range/);
+  expect(avg.definition).toMatch(/today/i);
+});

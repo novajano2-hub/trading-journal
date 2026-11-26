@@ -90,6 +90,104 @@ test('the account switcher writes the account filter (desktop)', async ({
   ).toContainText('Futures live');
 });
 
+test('the upper strip shows its five figures, each with its info tip', async ({
+  page,
+}) => {
+  await page.goto('/app/dashboard');
+  await ready(page);
+  const strip = page.getByRole('group', { name: 'Figures' });
+  const pnl = strip.locator('[data-widget="net-pnl"]');
+  // A signed amount over a trade count; no fees line.
+  await expect(pnl).toContainText(/[+−]\$[\d,]+\.\d\d/);
+  await expect(pnl).toContainText(/[\d,]+ trades/);
+  await expect(pnl).not.toContainText(/fee/i);
+  await expect(strip.locator('[data-widget="trade-win"]')).toContainText(
+    /\d+\.\d%.*\d+ won, \d+ breakeven, \d+ lost/,
+  );
+  await expect(strip.locator('[data-widget="day-win"]')).toContainText(
+    /\d+ green, \d+ flat, \d+ red/,
+  );
+  // The profit factor is a bare ratio: no amount beside it.
+  await expect(
+    strip.locator('[data-widget="profit-factor"]'),
+  ).not.toContainText('$');
+  await expect(strip.locator('[data-widget="win-loss-ratio"]')).toContainText(
+    /\d\.\d\d.*[+−]\$[\d,.]+ \/ [+−]\$[\d,.]+/,
+  );
+  // Each split bar is a picture of the words beside it.
+  await expect(strip.locator('[data-split-bar]')).toHaveCount(4);
+  for (const bar of await strip.locator('[data-split-bar]').all())
+    await expect(bar).toHaveAttribute('aria-hidden', 'true');
+  for (const key of ['net-pnl', 'trade-win', 'profit-factor'])
+    await expect(
+      strip.locator(`[data-widget="${key}"] [data-metric-tip]`),
+    ).toBeVisible();
+});
+
+test('the upper strip is five across from 1280px, three below it', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop');
+  const columns = () =>
+    page
+      .getByRole('group', { name: 'Figures' })
+      .evaluate(
+        (el) => getComputedStyle(el).gridTemplateColumns.split(' ').length,
+      );
+  for (const [width, want] of [
+    [1440, 5],
+    [1280, 5],
+    [1279, 3],
+    [768, 3],
+    [767, 2],
+  ] as const) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/app/dashboard');
+    await ready(page);
+    expect(await columns(), `columns at ${width}`).toBe(want);
+  }
+});
+
+test('Gross/Net relabels the P&L widget', async ({ page }) => {
+  await page.goto('/app/dashboard');
+  await ready(page);
+  const pnl = page.locator('[data-widget="net-pnl"]');
+  await expect(pnl).toContainText('Net P&L');
+  const display = page.getByRole('button', { name: /show as / });
+  await display.click();
+  await page.getByRole('menuitemradio', { name: 'Gross' }).click();
+  await expect(pnl).toContainText('Gross P&L');
+  await page.getByRole('menuitemradio', { name: 'Net' }).click();
+  await expect(pnl).toContainText('Net P&L');
+  await page.keyboard.press('Escape');
+});
+
+test('the Display menu hides every amount under Privacy and brings them back', async ({
+  page,
+}) => {
+  await page.goto('/app/dashboard');
+  await ready(page);
+  await page.getByRole('button', { name: /show as / }).click();
+  await page.getByRole('menuitemradio', { name: 'Privacy' }).click();
+  await page.keyboard.press('Escape');
+  await expect(
+    page.getByRole('button', { name: 'Net, show as Privacy' }),
+  ).toBeFocused();
+  await expect(page.locator('[data-widget="net-pnl"]')).toContainText('$•••');
+  // The profit factor and the average win to loss are amounts' ratios: hidden too.
+  await expect(page.locator('[data-widget="profit-factor"]')).toContainText(
+    '•••',
+  );
+  await expect(page.locator('[data-widget="win-loss-ratio"]')).toContainText(
+    '$•••',
+  );
+  expect(await page.locator('body').innerText()).not.toMatch(/\$\d/);
+  await page.getByRole('button', { name: /show as / }).click();
+  await page.getByRole('menuitemradio', { name: 'Dollar' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-widget="net-pnl"]')).toContainText(/\$\d/);
+});
+
 test('the template button names the template in use and lists the templates', async ({
   page,
 }, info) => {

@@ -74,13 +74,13 @@ export function WidgetFrame({
         data-widget={widgetKey}
         aria-labelledby={headingId}
         aria-busy={state === 'loading' || undefined}
-        className={`${CARD} flex min-h-32 min-w-0 flex-col px-[18px] pt-4 pb-3.5 max-sm:min-h-0 max-sm:px-3.5 max-sm:pt-3.5 max-sm:pb-3`}
+        className={`${CARD} @container flex min-h-32 min-w-0 flex-col px-[18px] pt-4 pb-3.5 max-sm:min-h-0 max-sm:px-3.5 max-sm:pt-3.5 max-sm:pb-3`}
       >
         <div className="flex min-h-[22px] items-center gap-2">
           <MetricTip
             id={tip}
             basis={basis}
-            className="text-[12.5px] text-faint"
+            className="text-left text-[12.5px] text-faint"
           >
             <span id={headingId}>{title}</span>
           </MetricTip>
