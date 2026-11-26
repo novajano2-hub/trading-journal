@@ -626,3 +626,352 @@
     display: none;
   }
 }
+
+/*
+ * Block handles (comp 05, B54): a "+" and a grip beside the block the pointer
+ * is over, which takes a soft background. The body is indented 22px, and the
+ * handle (42px wide) reaches 20px into the card's padding, so it stays inside
+ * a card with that much. No hover (a phone), no handles.
+ */
+.note-with-handles .note-prose {
+  padding-left: 22px;
+}
+.note-block-handle {
+  z-index: 5;
+}
+.note-block-handle-inner {
+  display: flex;
+  gap: 2px;
+  padding-right: 4px;
+}
+.note-prose .note-block-hovered {
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--sunken) 55%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sunken) 55%, transparent);
+}
+@media (hover: none) {
+  .note-block-handle {
+    display: none;
+  }
+  .note-with-handles .note-prose {
+    padding-left: 0;
+  }
+}
+@media print {
+  .note-block-handle {
+    display: none;
+  }
+  .note-with-handles .note-prose {
+    padding-left: 0;
+  }
+  .note-prose .note-block-hovered {
+    background: none;
+    box-shadow: none;
+  }
+}
+
+/*
+ * Columns (comp 05, B36): two or three side by side in a dashed frame, as many
+ * as the node holds. Below `sm` they stack. The frame is editing chrome: the
+ * PDF has none.
+ */
+.note-prose div[data-type='columns'] {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  margin: 14px 0 6px;
+  border: 1px dashed var(--line-2);
+  border-radius: 8px;
+}
+.note-prose div[data-type='column'] {
+  min-width: 0;
+  padding: 8px 14px;
+}
+.note-prose div[data-type='column'] + div[data-type='column'] {
+  border-left: 1px dashed var(--line-2);
+}
+.note-prose div[data-type='column'] > :first-child {
+  margin-top: 0;
+}
+.note-prose div[data-type='column'] h3 {
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+@media (max-width: 639.98px) {
+  .note-prose div[data-type='columns'] {
+    grid-auto-flow: row;
+  }
+  .note-prose div[data-type='column'] + div[data-type='column'] {
+    border-left: 0;
+    border-top: 1px dashed var(--line-2);
+  }
+}
+@media print {
+  .note-prose div[data-type='columns'],
+  .note-prose div[data-type='column'] + div[data-type='column'] {
+    border: 0;
+  }
+}
+
+/*
+ * A page break (B36): a dashed rule with its name in the editor, the end of
+ * the page in the PDF. The rule is ignored on screen, where nothing is paged.
+ */
+.note-prose div[data-type='page-break'] {
+  position: relative;
+  height: 0;
+  margin: 24px 0;
+  border-top: 1px dashed var(--line-2);
+  break-after: page;
+  page-break-after: always;
+}
+.note-prose div[data-type='page-break']::after {
+  content: 'Page break';
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  padding: 0 8px;
+  transform: translateX(-50%);
+  background: var(--surface-1);
+  color: var(--faint);
+  font-size: 11.5px;
+  line-height: 18px;
+}
+.note-prose div[data-type='page-break'].ProseMirror-selectednode {
+  border-top-color: var(--accent);
+}
+@media print {
+  .note-prose div[data-type='page-break'] {
+    margin: 0;
+    border: 0;
+  }
+  .note-prose div[data-type='page-break']::after {
+    display: none;
+  }
+}
+
+/* A timed list (comp 05, B34): the time in a box, then the item. */
+.note-prose ul[data-type='timed-list'] {
+  margin: 4px 0;
+  padding: 0;
+  list-style: none;
+}
+.note-prose li[data-type='timed-item'] {
+  display: flex;
+  gap: 12px;
+  padding: 2px 0;
+}
+.note-prose .note-timed-stamp {
+  flex: none;
+  width: 46px;
+}
+.note-prose .note-timed-time {
+  display: block;
+  width: 100%;
+  font: inherit;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.note-prose input.note-timed-time {
+  margin: 0 0 0 -4px;
+  width: 50px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  outline: none;
+}
+.note-prose input.note-timed-time:hover {
+  background: var(--sunken);
+}
+.note-prose input.note-timed-time:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.note-prose .note-timed-body {
+  flex: 1;
+  min-width: 0;
+}
+.note-prose .note-timed-body p:first-child {
+  margin-top: 0;
+}
+@media (pointer: coarse) {
+  /* A 44px target around a line-high box: the padding is taken back in the margin. */
+  .note-prose input.note-timed-time {
+    padding-block: 10px;
+    margin-block: -10px;
+  }
+}
+
+/*
+ * Link chips (comp 05, B34): a trade or a day in the line, a small chip that
+ * opens its page. What it shows is read when it is drawn. On touch the hit
+ * area grows past the drawn chip.
+ */
+.note-prose .note-chip-wrap {
+  display: inline;
+}
+.note-prose .note-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 7px;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-decoration: none;
+  vertical-align: 1px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.note-prose .note-chip svg {
+  flex: none;
+  color: var(--muted);
+}
+.note-prose .note-chip em {
+  color: var(--faint);
+  font-style: normal;
+  font-weight: 500;
+}
+.note-prose a.note-chip:hover {
+  background: color-mix(in srgb, var(--sunken) 70%, var(--surface-1));
+}
+.note-prose a.note-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.note-prose .note-chip-wrap[data-selected] .note-chip {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.note-prose .note-chip-missing {
+  color: var(--muted);
+  font-weight: 500;
+  cursor: default;
+}
+@media (pointer: coarse) {
+  .note-prose .note-chip {
+    height: 32px;
+  }
+  .note-prose .note-chip::after {
+    content: '';
+    position: absolute;
+    inset: -6px -2px;
+  }
+}
+
+/*
+ * Equations (B35): KaTeX draws them. One that does not parse shows its own
+ * text, marked, and never stops the note. KaTeX's stylesheet is imported by
+ * the editor, not by the app.
+ */
+.note-prose .tiptap-mathematics-render {
+  border-radius: 6px;
+}
+.note-prose .tiptap-mathematics-render--editable {
+  cursor: pointer;
+}
+.note-prose .tiptap-mathematics-render--editable:hover {
+  background: var(--sunken);
+}
+.note-prose div[data-type='block-math'] {
+  margin: 12px 0;
+  padding: 6px 8px;
+  overflow-x: auto;
+  text-align: center;
+}
+.note-prose .katex {
+  font-size: 1.1em;
+}
+.note-prose .block-math-error,
+.note-prose .inline-math-error {
+  background: color-mix(in srgb, var(--loss) 8%, transparent);
+  color: var(--loss);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  text-decoration: underline wavy;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.note-prose .ProseMirror-selectednode.tiptap-mathematics-render {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/*
+ * Embeds (B42, U4): a video in a 16 to 9 frame, or a post in X's own widget,
+ * with the source under it. The link is what shows offline, while a post
+ * loads, if it fails, and on paper.
+ */
+.note-prose .note-embed {
+  max-width: 640px;
+  margin: 14px 0 6px;
+}
+.note-prose .note-embed-frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--sunken);
+}
+.note-prose .note-embed-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.note-prose .note-embed-widget:not([data-ready]) {
+  height: 0;
+  overflow: hidden;
+}
+.note-prose .note-embed[data-selected] .note-embed-frame,
+.note-prose .note-embed[data-selected] .note-embed-widget[data-ready],
+.note-prose .note-embed[data-selected] .note-embed-link {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.note-prose .note-embed-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.note-prose .note-embed-link svg {
+  flex: none;
+}
+.note-prose .note-embed-note {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.note-prose .note-embed-source {
+  margin: 6px 0 0;
+  color: var(--faint);
+  font-size: 12px;
+}
+@media print {
+  .note-prose .note-embed-frame,
+  .note-prose .note-embed-widget,
+  .note-prose .note-embed-note {
+    display: none;
+  }
+  .note-prose .note-embed-link[hidden] {
+    display: flex !important;
+  }
+}

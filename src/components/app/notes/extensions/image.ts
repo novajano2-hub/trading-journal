@@ -19,6 +19,9 @@ export interface ImageAttrs {
 }
 
 declare module '@tiptap/core' {
+  interface Storage {
+    image: { canPick: () => boolean };
+  }
   interface Commands<ReturnType> {
     noteImage: {
       /** Asks the host to open its file picker for a block image, or an inline one. */
@@ -61,6 +64,14 @@ export const NoteImage = Node.create<Options>({
 
   addOptions() {
     return { bridge: () => ({}) };
+  },
+
+  // What a menu asks before it offers Image: whether the note takes images.
+  addStorage() {
+    const bridge = this.options.bridge;
+    return {
+      canPick: () => bridge().canPick?.() ?? bridge().pick !== undefined,
+    };
   },
 
   addAttributes() {

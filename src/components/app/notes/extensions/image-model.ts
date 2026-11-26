@@ -41,6 +41,8 @@ export const percentOf = (px: number, container: number): number =>
 export interface ImageBridge {
   /** Opens the file picker: for a block image, or an inline one. */
   pick(inline: boolean): boolean;
+  /** Whether this note takes images at all (menus leave Image out where it does not). */
+  canPick(): boolean;
   /** Stores the files and puts each in the note: where a drop landed (`pos`), or at the caret. */
   take(files: File[], at?: { inline?: boolean; pos?: number }): boolean;
   /** Opens the viewer on the image node at `pos`, growing from `origin`. */
@@ -63,6 +65,7 @@ export function createImageLink(): ImageLink {
   return {
     bridge: {
       pick: (inline) => parts.pick?.(inline) ?? false,
+      canPick: () => parts.canPick?.() ?? parts.pick !== undefined,
       take: (files, at) => parts.take?.(files, at) ?? false,
       open: (pos, origin) => void parts.open?.(pos, origin),
     },

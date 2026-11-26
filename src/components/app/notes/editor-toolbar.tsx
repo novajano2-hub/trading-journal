@@ -37,6 +37,7 @@ import {
   TextUnderline,
 } from '@phosphor-icons/react/dist/ssr';
 import { usePhone } from '@/lib/use-phone';
+import { leaveToggle } from './extensions/toggle';
 import {
   FONT_FAMILIES,
   FONT_SIZES,
@@ -55,19 +56,29 @@ const MOD_NAMES: Record<string, { pc: string; mac: string }> = {
   Alt: { pc: 'Alt', mac: '⌥' },
 };
 
+/** Named keys as a keyboard prints them; a letter or a digit is its capital. */
+const KEY_SYMBOLS: Record<string, string> = {
+  ArrowUp: '↑',
+  ArrowDown: '↓',
+  ArrowLeft: '←',
+  ArrowRight: '→',
+};
+
 /** "Mod-Shift-7" as it reads on the keyboard: "Ctrl+Shift+7", or "⌘⇧7" on a Mac. */
 export function keyLabel(keys: string): string {
   const mac = isMacOS();
   const parts = keys.split('-');
-  const key = (parts.pop() ?? '').toUpperCase();
+  const raw = parts.pop() ?? '';
+  const key = KEY_SYMBOLS[raw] ?? raw.toUpperCase();
   const mods = parts.map((m) => MOD_NAMES[m]?.[mac ? 'mac' : 'pc'] ?? m);
   return mac ? `${mods.join('')}${key}` : [...mods, key].join('+');
 }
 
-/** The same binding for `aria-keyshortcuts` ("Control+Shift+7", "Meta+Shift+7"). */
+/** The same binding for `aria-keyshortcuts` ("Control+Shift+7", "Meta+Shift+ArrowUp"). */
 export function ariaKeys(keys: string): string {
   const parts = keys.split('-');
-  const key = (parts.pop() ?? '').toUpperCase();
+  const raw = parts.pop() ?? '';
+  const key = raw.length === 1 ? raw.toUpperCase() : raw;
   const mod = isMacOS() ? 'Meta' : 'Control';
   return [...parts.map((m) => (m === 'Mod' ? mod : m)), key].join('+');
 }
@@ -103,6 +114,10 @@ interface BarState {
   canInsertToggle: boolean;
   canTable: boolean;
   canRule: boolean;
+  canColumns: boolean;
+  canPageBreak: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
 }
 
 /** The block the caret is in, as the style menu names it. */
@@ -183,6 +198,10 @@ function readState(e: Editor): BarState {
     canInsertToggle: e.can().insertToggle(0),
     canTable: e.can().insertTable({ rows: 3, cols: 3, withHeaderRow: true }),
     canRule: e.can().setHorizontalRule(),
+    canColumns: e.can().insertColumns(2),
+    canPageBreak: e.can().setPageBreak(),
+    canMoveUp: e.can().moveBlock('up'),
+    canMoveDown: e.can().moveBlock('down'),
   };
 }
 
@@ -211,14 +230,6 @@ interface Sub {
   entries: Entry[];
 }
 type Entry = Item | Sub | { kind: 'sep' };
-
-/** A block that is not a toggle's title: out of the toggle first, so the block style can apply. */
-const leaveToggle = (c: Chain): Chain =>
-  c.command(({ commands, state }) => {
-    if (state.selection.$from.parent.type.name === 'detailsSummary')
-      commands.unsetDetails();
-    return true;
-  });
 
 const radio = (
   id: string,
@@ -399,13 +410,34 @@ const paragraphEntries = (s: BarState): Entry[] => [
     disabled: !s.canIndent,
     run: (c) => c.indent(),
   },
+  { kind: 'sep' },
+  // The keyboard's and the phone's way to move a block: the handles beside a
+  // block need a pointer that hovers.
+  {
+    kind: 'action',
+    id: 'move-up',
+    label: 'Move up',
+    keys: 'Mod-Shift-ArrowUp',
+    disabled: !s.canMoveUp,
+    run: (c) => c.moveBlock('up'),
+  },
+  {
+    kind: 'action',
+    id: 'move-down',
+    label: 'Move down',
+    keys: 'Mod-Shift-ArrowDown',
+    disabled: !s.canMoveDown,
+    run: (c) => c.moveBlock('down'),
+  },
 ];
 
 /**
- * What Insert offers. Rows are plain commands; a host or a later block adds
- * its own (image, columns, page break, equation) by adding an entry here.
+ * What Insert offers, in the comp's groups (comp 05): pictures and the table,
+ * the column layouts, then the single blocks. Rows are plain commands; a
+ * block adds its own by adding an entry here. `images` and `blocks` say what
+ * the host can do (store a picture, show a dialog).
  */
-function insertEntries(s: BarState, images: boolean): Entry[] {
+function insertEntries(s: BarState, images: boolean, blocks: boolean): Entry[] {
   const action = (
     id: string,
     label: string,
@@ -433,8 +465,30 @@ function insertEntries(s: BarState, images: boolean): Entry[] {
       !s.canTable,
     ),
     { kind: 'sep' },
-    action('divider', 'Divider', (c) => c.setHorizontalRule(), !s.canRule),
+    action(
+      'columns-2',
+      'Two columns',
+      (c) => c.insertColumns(2),
+      !s.canColumns,
+    ),
+    action(
+      'columns-3',
+      'Three columns',
+      (c) => c.insertColumns(3),
+      !s.canColumns,
+    ),
     { kind: 'sep' },
+    action('divider', 'Divider', (c) => c.setHorizontalRule(), !s.canRule),
+    action(
+      'page-break',
+      'Page break',
+      (c) => c.setPageBreak(),
+      !s.canPageBreak,
+    ),
+    // The equation box is the host's.
+    ...(blocks
+      ? [action('equation', 'Equation', (c) => c.askEquation(false), false)]
+      : []),
     action('toggle', 'Toggle', (c) => c.insertToggle(0), !s.canInsertToggle),
     ...([1, 2, 3] as const).map((n) =>
       action(
@@ -794,6 +848,8 @@ export interface EditorToolbarProps {
   onDictate?: () => void;
   /** The note can take images: Insert offers Image and Inline image. */
   images?: boolean;
+  /** The note has the dialogs the blocks ask for: Insert offers Equation. */
+  blocks?: boolean;
 }
 
 export function EditorToolbar({
@@ -802,6 +858,7 @@ export function EditorToolbar({
   onFullScreen,
   onDictate,
   images = false,
+  blocks = false,
 }: EditorToolbarProps): React.JSX.Element {
   const phone = usePhone();
   const [linkOpen, setLinkOpen] = useState(false);
@@ -933,7 +990,7 @@ export function EditorToolbar({
 
   const insert = menu(
     'Insert',
-    insertEntries(s, images),
+    insertEntries(s, images, blocks),
     <Trigger label="Insert">
       <Plus {...ICON} />
       Insert

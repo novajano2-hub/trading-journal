@@ -34,6 +34,11 @@ interface DataContextValue {
 
 const DataContext = createContext<DataContextValue | null>(null);
 
+/** Whether a `DataProvider` is above: lets a component that works with or without the app's data ask first. */
+export function useHasData(): boolean {
+  return useContext(DataContext) !== null;
+}
+
 function useDataContext(): DataContextValue {
   const value = useContext(DataContext);
   if (!value) throw new Error('DataProvider is missing above this component');

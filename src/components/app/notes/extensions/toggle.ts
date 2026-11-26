@@ -3,6 +3,7 @@
 // title in body text, 1 to 3 a title set as a heading. A collapsible section
 // has no value and keeps its own look. The toolbar's style and insert menus,
 // and the slash menu, share the two commands below.
+import type { ChainedCommands } from '@tiptap/core';
 import { Details } from '@tiptap/extension-details';
 import type { Node as ProseNode } from '@tiptap/pm/model';
 import { Fragment } from '@tiptap/pm/model';
@@ -32,6 +33,17 @@ const level = (value: unknown): ToggleLevel | null => {
     ? (n as ToggleLevel)
     : null;
 };
+
+/**
+ * A block that is not a toggle's title: out of the toggle first, so the block
+ * style the chain goes on to apply has a block to apply to.
+ */
+export const leaveToggle = (c: ChainedCommands): ChainedCommands =>
+  c.command(({ commands, state }) => {
+    if (state.selection.$from.parent.type.name === 'detailsSummary')
+      commands.unsetDetails();
+    return true;
+  });
 
 export const KeelDetails = Details.extend({
   addAttributes() {

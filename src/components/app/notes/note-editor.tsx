@@ -6,11 +6,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/core';
 import { EditorContent, useEditor, type Content } from '@tiptap/react';
+import 'katex/dist/katex.min.css';
+import { usePhone } from '@/lib/use-phone';
 import { FileViewer, type ViewerFile } from '../trades/file-viewer';
+import { BlockHandle } from './block-handle';
 import { EditorToolbar } from './editor-toolbar';
+import {
+  EMOJI_LISTBOX_ID,
+  EmojiMenu,
+  emojiOptionId,
+  type EmojiBridge,
+  type EmojiState,
+} from './emoji-menu';
+import { EmbedPolicyContext, type EmbedPolicy } from './embed-view';
 import { noteExtensions } from './extensions';
 import { createImageLink, fileIdOf } from './extensions/image-model';
 import { ImageIntake } from './image-intake';
+import { NoteBlocks, createBlockLink } from './note-blocks';
 import {
   SLASH_ITEMS,
   SLASH_LISTBOX_ID,
@@ -48,6 +60,12 @@ export interface NoteEditorProps {
   noteId?: string;
   /** For a note that is not stored yet: stores it, and says its id, when its first image comes. */
   ensureNoteId?: () => Promise<string>;
+  /**
+   * `links`: a YouTube video or a post from X is only its link, and nothing is
+   * asked of an outside server (a print or export layout). Default `live`: an
+   * embed plays or shows while the note is open and the browser is online.
+   */
+  embeds?: EmbedPolicy;
 }
 
 /** The images in the body that are stored files, in reading order. */
@@ -78,6 +96,7 @@ export function NoteEditor({
   handleRef,
   noteId,
   ensureNoteId,
+  embeds = 'live',
 }: NoteEditorProps): React.JSX.Element {
   const [slash, setSlash] = useState<SlashState | null>(null);
   const slashRef = useRef<SlashState | null>(null);
@@ -88,6 +107,15 @@ export function NoteEditor({
     },
     get: () => slashRef.current,
   }));
+  const [emoji, setEmoji] = useState<EmojiState | null>(null);
+  const emojiRef = useRef<EmojiState | null>(null);
+  const [emojiBridge] = useState<EmojiBridge>(() => ({
+    set: (s) => {
+      emojiRef.current = s;
+      setEmoji(s);
+    },
+    get: () => emojiRef.current,
+  }));
   const onChangeRef = useRef(onChange);
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -96,12 +124,19 @@ export function NoteEditor({
   // What paste, drop and the picker call to store an image, and what an image
   // calls to open larger; the pieces that do the work fill it in.
   const [images] = useState(createImageLink);
+  // What the blocks that need the app ask of it: the time, a dialog, an offer.
+  const [blocks] = useState(createBlockLink);
   const extensions = useMemo(
     () => [
-      ...noteExtensions(placeholder, images.bridge),
+      ...noteExtensions(
+        placeholder,
+        images.bridge,
+        blocks.bridge,
+        () => emojiBridge,
+      ),
       createSlashExtension(bridge),
     ],
-    [placeholder, bridge, images],
+    [placeholder, bridge, images, blocks, emojiBridge],
   );
 
   const editor = useEditor({
@@ -193,27 +228,39 @@ export function NoteEditor({
     });
   }, [editor, images]);
 
-  // The listbox is the editor's active descendant while the menu is open.
+  // The open menu's listbox is the editor's active descendant.
   useEffect(() => {
     if (!editor) return;
     const dom = editor.view.dom;
-    if (slash && slash.items.length > 0) {
-      dom.setAttribute('aria-controls', SLASH_LISTBOX_ID);
-      dom.setAttribute('aria-activedescendant', slashOptionId(slash.index));
+    const open =
+      slash && slash.items.length > 0
+        ? { list: SLASH_LISTBOX_ID, option: slashOptionId(slash.index) }
+        : emoji && emoji.items.length > 0
+          ? { list: EMOJI_LISTBOX_ID, option: emojiOptionId(emoji.index) }
+          : null;
+    if (open) {
+      dom.setAttribute('aria-controls', open.list);
+      dom.setAttribute('aria-activedescendant', open.option);
       dom.setAttribute('aria-expanded', 'true');
     } else {
       dom.removeAttribute('aria-controls');
       dom.removeAttribute('aria-activedescendant');
       dom.removeAttribute('aria-expanded');
     }
-  }, [editor, slash]);
+  }, [editor, slash, emoji]);
 
+  // The handles need a pointer that hovers: not on a phone.
+  const phone = usePhone();
   const takesImages =
     !readOnly && (noteId !== undefined || ensureNoteId !== undefined);
+  const handles = !readOnly && !phone;
   return (
-    <div className="flex flex-col">
+    <div className={`flex flex-col${handles ? ' note-with-handles' : ''}`}>
       {editor && !readOnly ? (
-        <EditorToolbar editor={editor} images={takesImages} />
+        <EditorToolbar editor={editor} images={takesImages} blocks />
+      ) : null}
+      {editor && !readOnly ? (
+        <NoteBlocks editor={editor} link={blocks} />
       ) : null}
       {editor && takesImages ? (
         <ImageIntake
@@ -223,8 +270,12 @@ export function NoteEditor({
           ensureNoteId={ensureNoteId}
         />
       ) : null}
-      <EditorContent editor={editor} />
+      <EmbedPolicyContext.Provider value={embeds}>
+        <EditorContent editor={editor} />
+      </EmbedPolicyContext.Provider>
+      {editor && handles ? <BlockHandle editor={editor} /> : null}
       {slash ? <SlashMenu state={slash} /> : null}
+      {emoji ? <EmojiMenu state={emoji} /> : null}
       {viewing ? (
         <FileViewer
           files={viewing.files}
