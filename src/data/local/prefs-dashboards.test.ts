@@ -40,9 +40,23 @@ test.each([
   ],
   ['an empty name', { inUse: 'x', templates: [tpl({ name: '' })] }],
   ['an inUse that names none', { inUse: 'nope', templates: [tpl()] }],
+  [
+    'two templates with one id',
+    { inUse: 'x', templates: [tpl(), tpl({ name: 'Another' })] },
+  ],
 ])('dashboards with %s is refused with RangeError', async (_n, dashboards) => {
   await expect(open().prefs.update({ dashboards })).rejects.toBeInstanceOf(
     RangeError,
+  );
+});
+
+test('templates with different ids and the same name pass', async () => {
+  const dashboards = {
+    inUse: 'y',
+    templates: [tpl(), tpl({ id: 'y' })],
+  };
+  expect((await open().prefs.update({ dashboards })).dashboards).toEqual(
+    dashboards,
   );
 });
 

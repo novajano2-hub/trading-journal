@@ -19,6 +19,7 @@ export function ConfirmDialog({
   title,
   body,
   confirmLabel,
+  cancelLabel = 'Cancel',
   danger = false,
   requireText,
   onConfirm,
@@ -28,6 +29,8 @@ export function ConfirmDialog({
   title: string;
   body: React.ReactNode;
   confirmLabel: string;
+  /** What the way out says, where "Cancel" would be taken for another Cancel on the page. */
+  cancelLabel?: string;
   danger?: boolean;
   requireText?: string;
   onConfirm(): Promise<void>;
@@ -111,7 +114,7 @@ export function ConfirmDialog({
           ) : null}
           <div className="mt-6 flex flex-wrap justify-end gap-2">
             <Button variant="secondary" disabled={busy} onClick={onClose}>
-              Cancel
+              {cancelLabel}
             </Button>
             <Button
               disabled={!ready || busy}

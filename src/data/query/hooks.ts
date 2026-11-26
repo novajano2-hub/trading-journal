@@ -379,6 +379,27 @@ export function useUpdatePrefs(): UseMutationResult<
   );
 }
 
+/**
+ * Rewrites the `dashboards` pref from what is stored now: `change` gets the
+ * prefs read afresh at the write, so a template saved in another tab is not
+ * overwritten by a list this tab has not refetched. `change` may throw to
+ * refuse (nothing is written, and the write rejects with its error).
+ */
+export function useChangeDashboards(): UseMutationResult<
+  UserPrefs,
+  Error,
+  (current: UserPrefs) => NonNullable<UserPrefs['dashboards']>
+> {
+  return useFixedWrite(
+    'prefs.update',
+    '',
+    async (
+      r,
+      change: (current: UserPrefs) => NonNullable<UserPrefs['dashboards']>,
+    ) => r.prefs.update({ dashboards: change(await r.prefs.get()) }),
+  );
+}
+
 /** Forgets the saved value of each key, so it follows its default again. */
 export function useUnsetPrefs(): UseMutationResult<
   UserPrefs,

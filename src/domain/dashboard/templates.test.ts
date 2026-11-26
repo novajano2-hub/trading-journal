@@ -8,8 +8,14 @@ import {
   moveWidget,
   newTemplate,
   removeWidget,
+  sameTemplate,
   setWidgetSettings,
+  TemplateChangedError,
   templatesOf,
+  withInUse,
+  withNewTemplate,
+  withSavedTemplate,
+  withoutTemplate,
 } from './templates';
 
 const keys = (refs: WidgetRef[]) => refs.map((r) => r.key);
@@ -470,5 +476,242 @@ describe("setWidgetSettings (the scatter's Entry or Exit, saved on the template 
       time: 'exit',
     });
     expect(next).toEqual(stored);
+  });
+});
+
+describe('sameTemplate', () => {
+  test('is true for equal names, widgets and settings, whatever the order of a setting', () => {
+    const a = tpl({
+      lower: [{ key: 'report', settings: { metrics: ['net'], time: 'exit' } }],
+    });
+    const b = tpl({
+      lower: [{ key: 'report', settings: { time: 'exit', metrics: ['net'] } }],
+    });
+    expect(sameTemplate(a, b)).toBe(true);
+    expect(sameTemplate(a, a)).toBe(true);
+  });
+
+  test('is false for another id, name, widget, place or setting', () => {
+    const a = tpl();
+    expect(sameTemplate(a, tpl({ id: 'x' }))).toBe(false);
+    expect(sameTemplate(a, tpl({ name: 'Other' }))).toBe(false);
+    expect(sameTemplate(a, tpl({ upper: [{ key: 'net-pnl' }] }))).toBe(false);
+    expect(
+      sameTemplate(a, tpl({ lower: [{ key: 'cum-pnl' }, { key: 'score' }] })),
+    ).toBe(false);
+    expect(
+      sameTemplate(
+        tpl({ lower: [{ key: 'trade-time' }] }),
+        tpl({ lower: [{ key: 'trade-time', settings: { time: 'exit' } }] }),
+      ),
+    ).toBe(false);
+    // An empty settings object is no setting at all.
+    expect(
+      sameTemplate(
+        tpl({ lower: [{ key: 'trade-time' }] }),
+        tpl({ lower: [{ key: 'trade-time', settings: {} }] }),
+      ),
+    ).toBe(true);
+  });
+});
+
+describe('withInUse (picking a template)', () => {
+  const stored = {
+    inUse: 'a',
+    templates: [tpl({ id: 'a' }), tpl({ id: 'b', name: 'B' })],
+  };
+
+  test('points inUse at the template and keeps the list', () => {
+    const next = withInUse({ dashboards: stored }, 'b');
+    expect(next.inUse).toBe('b');
+    expect(next.templates).toEqual(stored.templates);
+  });
+
+  test('a template nobody has leaves the one in use in use', () => {
+    expect(withInUse({ dashboards: stored }, 'zzz').inUse).toBe('a');
+  });
+
+  test('with no pref the default is saved, in use', () => {
+    expect(withInUse({}, 'main')).toEqual({
+      inUse: 'main',
+      templates: [DEFAULT_TEMPLATE],
+    });
+  });
+});
+
+describe('withSavedTemplate (Save template)', () => {
+  const a = tpl({ id: 'a', name: 'A' });
+  const b = tpl({ id: 'b', name: 'B' });
+  const stored = { inUse: 'a', templates: [a, b] };
+
+  test('replaces the template in its place, others untouched, and puts it in use', () => {
+    const draft = { ...b, name: 'B2', lower: [{ key: 'score' }] };
+    const next = withSavedTemplate({ dashboards: stored }, draft, b);
+    expect(next.inUse).toBe('b');
+    expect(next.templates).toEqual([a, draft]);
+    expect(next.templates[0]).toBe(a);
+  });
+
+  test('the template in use stays in use when it is the one saved', () => {
+    const draft = { ...a, lower: [] };
+    expect(withSavedTemplate({ dashboards: stored }, draft, a).inUse).toBe('a');
+  });
+
+  test('refuses a template saved elsewhere since the edit began', () => {
+    const changed = { ...b, lower: [{ key: 'drawdown' }] };
+    const elsewhere = { inUse: 'a', templates: [a, changed] };
+    expect(() =>
+      withSavedTemplate({ dashboards: elsewhere }, { ...b, name: 'Mine' }, b),
+    ).toThrow(TemplateChangedError);
+  });
+
+  test('refuses a template deleted elsewhere', () => {
+    const gone = { inUse: 'a', templates: [a] };
+    expect(() =>
+      withSavedTemplate({ dashboards: gone }, { ...b, name: 'Mine' }, b),
+    ).toThrow(TemplateChangedError);
+  });
+
+  test('overwrite replaces the one saved elsewhere, and puts one deleted elsewhere back', () => {
+    const changed = { ...b, lower: [{ key: 'drawdown' }] };
+    const draft = { ...b, name: 'Mine' };
+    const over = withSavedTemplate(
+      { dashboards: { inUse: 'a', templates: [a, changed] } },
+      draft,
+      b,
+      { overwrite: true },
+    );
+    expect(over.templates).toEqual([a, draft]);
+    const back = withSavedTemplate(
+      { dashboards: { inUse: 'a', templates: [a] } },
+      draft,
+      b,
+      { overwrite: true },
+    );
+    expect(back.templates).toEqual([a, draft]);
+    expect(back.inUse).toBe('b');
+  });
+
+  test('with no pref the default is edited and saved whole', () => {
+    const draft = removeWidget(DEFAULT_TEMPLATE, 'upper', 0);
+    const next = withSavedTemplate({}, draft, DEFAULT_TEMPLATE);
+    expect(next).toEqual({ inUse: 'main', templates: [draft] });
+  });
+
+  test('an unknown widget key stays on the saved template', () => {
+    const odd = tpl({
+      id: 'o',
+      lower: [{ key: 'from-the-future' }, { key: 'score' }],
+    });
+    const draft = moveWidget(odd, 'lower', 1, 0);
+    const next = withSavedTemplate(
+      { dashboards: { inUse: 'o', templates: [odd] } },
+      draft,
+      odd,
+    );
+    expect(keys(next.templates[0]!.lower)).toEqual([
+      'score',
+      'from-the-future',
+    ]);
+  });
+});
+
+describe('withoutTemplate (Delete template)', () => {
+  const a = tpl({ id: 'a', name: 'A' });
+  const b = tpl({ id: 'b', name: 'B' });
+  const c = tpl({ id: 'c', name: 'C' });
+
+  test('deleting the one in use points inUse at the first one left', () => {
+    const next = withoutTemplate(
+      { dashboards: { inUse: 'b', templates: [a, b, c] } },
+      'b',
+    );
+    expect(next).toEqual({ inUse: 'a', templates: [a, c] });
+    const first = withoutTemplate(
+      { dashboards: { inUse: 'a', templates: [a, b, c] } },
+      'a',
+    );
+    expect(first).toEqual({ inUse: 'b', templates: [b, c] });
+  });
+
+  test('deleting another template leaves the one in use in use', () => {
+    const next = withoutTemplate(
+      { dashboards: { inUse: 'b', templates: [a, b, c] } },
+      'c',
+    );
+    expect(next).toEqual({ inUse: 'b', templates: [a, b] });
+  });
+
+  test('the last template cannot go, saved or the default', () => {
+    expect(() =>
+      withoutTemplate({ dashboards: { inUse: 'a', templates: [a] } }, 'a'),
+    ).toThrow();
+    expect(() => withoutTemplate({}, 'main')).toThrow();
+  });
+
+  test('a template that is gone already changes nothing', () => {
+    const stored = { inUse: 'a', templates: [a, b] };
+    expect(withoutTemplate({ dashboards: stored }, 'zzz')).toEqual(stored);
+  });
+});
+
+describe('withNewTemplate (New template)', () => {
+  const a = tpl({
+    id: 'a',
+    name: 'A',
+    lower: [
+      { key: 'trade-time', settings: { time: 'exit' } },
+      { key: 'report', settings: { metrics: ['net:line:running'] } },
+    ],
+  });
+  const b = tpl({ id: 'b', name: 'B' });
+
+  test('copies the template in use, settings included, adds it last and puts it in use', () => {
+    const { dashboards, created } = withNewTemplate(
+      { dashboards: { inUse: 'a', templates: [a, b] } },
+      'Swing',
+      () => 'swing',
+    );
+    expect(created.id).toBe('swing');
+    expect(created.name).toBe('Swing');
+    expect(created.upper).toEqual(a.upper);
+    expect(created.lower).toEqual(a.lower);
+    expect(dashboards.inUse).toBe('swing');
+    expect(dashboards.templates).toEqual([a, b, created]);
+    expect(created.lower[1]?.settings?.metrics).not.toBe(
+      a.lower[1]?.settings?.metrics,
+    );
+  });
+
+  test('keeps the id unique among the templates, asking again when it is taken', () => {
+    const ids = ['a', 'b', 'a', 'fresh'];
+    const { created } = withNewTemplate(
+      { dashboards: { inUse: 'a', templates: [a, b] } },
+      'Copy',
+      () => ids.shift()!,
+    );
+    expect(created.id).toBe('fresh');
+  });
+
+  test('gives up on an id generator that only repeats itself', () => {
+    expect(() =>
+      withNewTemplate(
+        { dashboards: { inUse: 'a', templates: [a] } },
+        'Copy',
+        () => 'a',
+      ),
+    ).toThrow();
+  });
+
+  test('with no pref it copies the default, which is saved beside it', () => {
+    const { dashboards, created } = withNewTemplate({}, 'Second', () => 's');
+    expect(dashboards.templates).toEqual([DEFAULT_TEMPLATE, created]);
+    expect(dashboards.inUse).toBe('s');
+    expect(created.upper).toEqual(DEFAULT_TEMPLATE.upper);
+  });
+
+  test('uses a real uuid when no generator is given', () => {
+    const { created } = withNewTemplate({}, 'Second');
+    expect(created.id).toMatch(/^[0-9a-f-]{36}$/);
   });
 });

@@ -8,7 +8,7 @@ import type {
 import { WIDGETS, type WidgetSection } from './widgets';
 
 /** The upper strip holds at most five widgets (spec 5.1). */
-const UPPER_LIMIT = 5;
+export const UPPER_LIMIT = 5;
 
 /**
  * The template a browser with no `dashboards` pref reads (C5): TradeZella's
@@ -209,5 +209,124 @@ export function setWidgetSettings(
   return {
     inUse: inUse.id,
     templates: all.map((t) => (t === inUse ? next : t)),
+  };
+}
+
+type Dashboards = NonNullable<UserPrefs['dashboards']>;
+
+/** A widget's settings, empty ones left out, in a fixed key order, for comparing. */
+function settingsKey(ref: WidgetRef): string {
+  const s = ref.settings ?? {};
+  return JSON.stringify([
+    s.time ?? null,
+    s.metrics ?? null,
+    s.challengeId ?? null,
+  ]);
+}
+
+/** Whether two templates hold the same name, widgets, places and settings. */
+export function sameTemplate(a: DashTemplate, b: DashTemplate): boolean {
+  const same = (x: WidgetRef[], y: WidgetRef[]) =>
+    x.length === y.length &&
+    x.every(
+      (r, i) => r.key === y[i]?.key && settingsKey(r) === settingsKey(y[i]!),
+    );
+  return (
+    a.id === b.id &&
+    a.name === b.name &&
+    same(a.upper, b.upper) &&
+    same(a.lower, b.lower)
+  );
+}
+
+/**
+ * The `dashboards` pref when `id` is picked. A template that is gone leaves
+ * the one in use as it was; with no pref the default is saved, in use.
+ */
+export function withInUse(
+  prefs: Pick<UserPrefs, 'dashboards'>,
+  id: string,
+): Dashboards {
+  const { inUse, all } = templatesOf(prefs);
+  return {
+    inUse: all.some((t) => t.id === id) ? id : inUse.id,
+    templates: all,
+  };
+}
+
+/**
+ * Thrown by `withSavedTemplate` when the stored template is no longer the one
+ * the edit began from (C70): it was saved or deleted somewhere else.
+ */
+export class TemplateChangedError extends Error {
+  constructor() {
+    super('The template was changed somewhere else since the edit began');
+    this.name = 'TemplateChangedError';
+  }
+}
+
+/**
+ * The `dashboards` pref after saving `draft`, which began as `base`: the
+ * template takes its place in the list (at the end, if it is gone), and is
+ * put in use. If the stored template is no longer `base` that throws
+ * `TemplateChangedError`, unless `overwrite` says to replace it anyway. With no
+ * pref the default is what is edited, and is saved whole.
+ */
+export function withSavedTemplate(
+  prefs: Pick<UserPrefs, 'dashboards'>,
+  draft: DashTemplate,
+  base: DashTemplate,
+  opts: { overwrite?: boolean } = {},
+): Dashboards {
+  const { all } = templatesOf(prefs);
+  const stored = all.find((t) => t.id === draft.id);
+  if (!opts.overwrite && !(stored && sameTemplate(stored, base)))
+    throw new TemplateChangedError();
+  return {
+    inUse: draft.id,
+    templates: stored
+      ? all.map((t) => (t === stored ? draft : t))
+      : [...all, draft],
+  };
+}
+
+/**
+ * The `dashboards` pref after Delete template. When the template in use goes,
+ * the first one left takes its place; the last template cannot go (that
+ * throws). A template that is gone already changes nothing.
+ */
+export function withoutTemplate(
+  prefs: Pick<UserPrefs, 'dashboards'>,
+  id: string,
+): Dashboards {
+  const { inUse, all } = templatesOf(prefs);
+  if (!all.some((t) => t.id === id)) return { inUse: inUse.id, templates: all };
+  const rest = deleteTemplate(all, id);
+  return {
+    inUse: inUse.id === id ? rest[0]!.id : inUse.id,
+    templates: rest,
+  };
+}
+
+/**
+ * The `dashboards` pref after New template (C2): a copy of the template in
+ * use under `name`, last in the list and in use. Its id comes from `makeId`,
+ * asked again while it is one the user already has.
+ */
+export function withNewTemplate(
+  prefs: Pick<UserPrefs, 'dashboards'>,
+  name: string,
+  makeId: () => string = () => crypto.randomUUID(),
+): { dashboards: Dashboards; created: DashTemplate } {
+  const { inUse, all } = templatesOf(prefs);
+  let id = makeId();
+  for (let tries = 0; all.some((t) => t.id === id); tries++) {
+    if (tries >= 50) throw new Error('No unused template id to give');
+    id = makeId();
+  }
+  const created = newTemplate(inUse, name, id);
+  return {
+    dashboards: { inUse: id, templates: [...all, created] },
+    created,
   };
 }

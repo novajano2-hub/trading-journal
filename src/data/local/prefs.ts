@@ -175,10 +175,11 @@ function validateDashboards(d: UserPrefs['dashboards']): void {
         t.upper.length <= 5 &&
         Array.isArray(t.lower),
     ) &&
-    d.templates.some((t) => t.id === d.inUse);
+    d.templates.some((t) => t.id === d.inUse) &&
+    new Set(d.templates.map((t) => t.id)).size === d.templates.length;
   if (!ok)
     throw new RangeError(
-      'Dashboards need one or more templates, each named 1 to 40 characters with at most 5 upper widgets, and inUse naming one',
+      'Dashboards need one or more templates, each with its own id and a name of 1 to 40 characters, at most 5 upper widgets, and inUse naming one',
     );
 }
 
