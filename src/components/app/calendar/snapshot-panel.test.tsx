@@ -91,7 +91,41 @@ afterEach(() => {
   vi.restoreAllMocks();
   Reflect.deleteProperty(window, 'ClipboardItem');
   Reflect.deleteProperty(navigator, 'clipboard');
+  Reflect.deleteProperty(navigator, 'share');
+  Reflect.deleteProperty(navigator, 'canShare');
 });
+
+/** A phone or tablet (a coarse pointer), or a mouse; every other query answers as the browser does. */
+const pointer = (kind: 'coarse' | 'fine') => {
+  const real = window.matchMedia.bind(window);
+  vi.spyOn(window, 'matchMedia').mockImplementation((query) =>
+    /pointer:\s*coarse/.test(query)
+      ? ({
+          matches: kind === 'coarse',
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        } as unknown as MediaQueryList)
+      : real(query),
+  );
+};
+
+/** The device's share sheet: `canShare` says whether it takes this file, `share` what the visitor does there. */
+const sharing = (
+  share: (data: ShareData) => Promise<void> = async () => {},
+  canShare: (data: ShareData) => boolean = () => true,
+) => {
+  const spy = vi.fn(share);
+  Object.defineProperty(navigator, 'share', {
+    configurable: true,
+    value: spy,
+  });
+  Object.defineProperty(navigator, 'canShare', {
+    configurable: true,
+    value: vi.fn(canShare),
+  });
+  return spy;
+};
 
 describe('the panel', () => {
   test('opens as a dialog named Calendar image, with the preview of the SVG and what it is', async () => {
@@ -181,6 +215,75 @@ describe('Download image', () => {
   });
 });
 
+describe('Download image on a device that can share (D-05)', () => {
+  const press = async () => {
+    await screen.findByRole('img');
+    fireEvent.click(screen.getByRole('button', { name: 'Download image' }));
+  };
+
+  test('a phone hands the PNG to its share sheet, named for the month, and saves no link', async () => {
+    pointer('coarse');
+    const share = sharing();
+    renderPanel();
+    await press();
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    const { files } = share.mock.calls[0]![0] as { files: File[] };
+    expect(files).toHaveLength(1);
+    expect(files[0]!.name).toBe('keel-calendar-2026-11.png');
+    expect(files[0]!.type).toBe('image/png');
+    expect(navigator.canShare).toHaveBeenCalledWith({ files });
+    expect(clicks).toEqual([]);
+  });
+
+  test('a mouse saves the file even where the browser can share', async () => {
+    pointer('fine');
+    const share = sharing();
+    renderPanel();
+    await press();
+    await waitFor(() => expect(clicks).toHaveLength(1));
+    expect(share).not.toHaveBeenCalled();
+  });
+
+  test('a phone whose browser cannot share this file saves it', async () => {
+    pointer('coarse');
+    const share = sharing(undefined, () => false);
+    renderPanel();
+    await press();
+    await waitFor(() => expect(clicks).toHaveLength(1));
+    expect(share).not.toHaveBeenCalled();
+  });
+
+  test('a phone without the share sheet at all saves it', async () => {
+    pointer('coarse');
+    renderPanel();
+    await press();
+    await waitFor(() => expect(clicks).toHaveLength(1));
+  });
+
+  test('closing the share sheet is not a failure: nothing is saved behind its back', async () => {
+    pointer('coarse');
+    const share = sharing(async () => {
+      throw new DOMException('closed', 'AbortError');
+    });
+    renderPanel();
+    await press();
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(clicks).toEqual([]);
+  });
+
+  test('a share sheet that fails falls back to saving the file', async () => {
+    pointer('coarse');
+    sharing(async () => {
+      throw new DOMException('no', 'NotAllowedError');
+    });
+    renderPanel();
+    await press();
+    await waitFor(() => expect(clicks).toHaveLength(1));
+    expect(clicks[0]!.download).toBe('keel-calendar-2026-11.png');
+  });
+});
+
 describe('Copy image (C46)', () => {
   test('writes image/png to the clipboard and says so', async () => {
     const write = vi.fn(async () => {});
@@ -214,7 +317,7 @@ describe('Copy image (C46)', () => {
     expect(within(panel).queryByRole('button', { name: /copy/i })).toBeNull();
     expect(
       within(panel).getByText(
-        "This browser can't copy images. Download saves the file.",
+        "This browser can't copy images. Download saves or shares the file.",
       ),
     ).toBeTruthy();
     for (const b of within(panel).getAllByRole('button'))
@@ -249,7 +352,7 @@ describe('Copy image (C46)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Copy image' }));
     expect(
       await screen.findByText(
-        "Couldn't copy the image. Download saves the file.",
+        "Couldn't copy the image. Download saves or shares the file.",
       ),
     ).toBeTruthy();
   });

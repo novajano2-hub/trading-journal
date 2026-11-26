@@ -40,7 +40,7 @@ import type { FormatMoney } from './month-grid';
  * changes the picture. The style-image action is not built (C43).
  */
 
-/** Where a month's picture is saved: Download hands the file over as a link would. */
+/** Saves the file the way a link would. */
 function download(blob: Blob, name: string): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -51,6 +51,29 @@ function download(blob: Blob, name: string): void {
   link.remove();
   // The browser has the file by then; the address is not needed any longer.
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+/**
+ * Download image: on a phone or tablet (a coarse pointer) whose browser can
+ * share a PNG, the device's share sheet takes the file (save to Photos or Files,
+ * or send it on); everywhere else, and if the sheet fails, it is saved as a
+ * link would. Closing the sheet is the visitor's choice, not a failure.
+ */
+async function saveImage(blob: Blob, name: string): Promise<void> {
+  const file = new File([blob], name, { type: 'image/png' });
+  if (
+    matchMedia('(pointer: coarse)').matches &&
+    typeof navigator.share === 'function' &&
+    navigator.canShare?.({ files: [file] })
+  ) {
+    try {
+      await navigator.share({ files: [file] });
+      return;
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return;
+    }
+  }
+  download(blob, name);
 }
 
 const PANEL =
@@ -236,7 +259,7 @@ export function SnapshotPanel({
                     <Button
                       className="flex-1"
                       disabled={blob === null}
-                      onClick={() => blob && download(blob, file)}
+                      onClick={() => blob && void saveImage(blob, file)}
                     >
                       <DownloadSimple size={16} aria-hidden="true" />
                       Download image
@@ -262,13 +285,13 @@ export function SnapshotPanel({
                     {copyResult === 'copied'
                       ? 'Copied to the clipboard.'
                       : copyResult === 'failed'
-                        ? "Couldn't copy the image. Download saves the file."
+                        ? "Couldn't copy the image. Download saves or shares the file."
                         : null}
                   </p>
                 ) : (
                   <p className="mt-2.5 text-[12.5px] leading-snug text-muted">
-                    This browser can&apos;t copy images. Download saves the
-                    file.
+                    This browser can&apos;t copy images. Download saves or
+                    shares the file.
                   </p>
                 )}
               </motion.div>
