@@ -30,20 +30,24 @@ const TAB =
  * New challenge beside them on every tab; the page's own content follows in
  * `children`. Home's second step links here with `?new=challenge`: the form
  * opens, and the param leaves the address so a reload or Back doesn't reopen
- * it. Render inside `<Suspense>`: it reads the address.
+ * it. The first run's Add active accounts opens the same form (`openChallenge`).
+ * Render inside `<Suspense>`: it reads the address.
  */
 export function PropTabs({
   active,
+  openChallenge = false,
   children,
 }: {
   active: PropTab;
+  /** Opens New challenge as the page appears. */
+  openChallenge?: boolean;
   children: ReactNode;
 }): React.JSX.Element {
   // Read from the router's params, not window.location: on a client navigation
   // the address is written after this page renders.
   const params = useSearchParams();
   const [creating, setCreating] = useState(
-    () => params.get('new') === 'challenge',
+    () => openChallenge || params.get('new') === 'challenge',
   );
   const [paying, setPaying] = useState(false);
   // The payout dialog grows from its button and hands focus back to it.

@@ -60,7 +60,7 @@ export interface NewTxn {
   /** The firms already in the workspace, as suggestions for the firm field. */
   firms: readonly string[];
   challenges: readonly Challenge[];
-  errors: { date?: string; amount?: string };
+  errors: { date?: string; amount?: string; firm?: string };
   /** What a refused write says. */
   failure: string | null;
   busy: boolean;
@@ -77,20 +77,24 @@ export interface NewTxn {
 }
 
 /**
- * The state behind the add row and the add sheet: the draft with the defaults
- * the brief asks (today, uncategorized, not reviewed), the checks (a real
- * date, a nonzero amount), and the write. Invalid rows do not save: the first
- * bad field says what is wrong and takes focus.
+ * The state behind the add row, the add sheet and the first run's form: the
+ * draft with the defaults the brief asks (today, uncategorized, not reviewed),
+ * the checks (a real date, a nonzero amount, and a firm where `requireFirm`),
+ * and the write. Invalid rows do not save: the first bad field, in the order
+ * the fields appear, says what is wrong and takes focus.
  */
 export function useNewTxn({
   today,
   challenges,
   knownFirms,
+  requireFirm = false,
 }: {
   today: string;
   challenges: readonly Challenge[];
   /** Firms the transactions already carry. */
   knownFirms: readonly string[];
+  /** The first run has no challenge to name a firm, so its form asks for one. */
+  requireFirm?: boolean;
 }): NewTxn {
   const id = useId();
   const add = useAddPropTxn();
@@ -116,12 +120,19 @@ export function useNewTxn({
   async function save(): Promise<PropTxn | null> {
     const cents = parseAmount(draft.amount);
     const next: NewTxn['errors'] = {};
+    if (requireFirm && draft.firm.trim() === '')
+      next.firm = "Enter the firm's name.";
     if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.date)) next.date = 'Pick a date.';
     if (cents === null) next.amount = `Enter an amount, like ${AMOUNT_HINT}.`;
     setErrors(next);
     setFailure(null);
-    if (cents === null || next.date) {
-      focusField(`${id}-${next.date ? 'date' : 'amount'}`);
+    const bad = (
+      requireFirm
+        ? (['firm', 'amount', 'date'] as const)
+        : (['date', 'amount'] as const)
+    ).find((name) => next[name]);
+    if (cents === null || bad) {
+      focusField(`${id}-${bad ?? 'amount'}`);
       return null;
     }
     setBusy(true);
@@ -176,7 +187,7 @@ const ROW_INPUT = `${INPUT} min-w-0`;
 /** The date's own column is narrow: its native picker needs the room the padding would take. */
 const DATE_INPUT = `${INPUT} min-w-0 pl-2.5 pr-1.5`;
 
-type FieldName =
+export type FieldName =
   | 'date'
   | 'description'
   | 'firm'
@@ -187,12 +198,20 @@ type FieldName =
 
 /**
  * The seven fields of a new transaction. In the table's row each is named by
- * `aria-label` (its column heading names it for the eye); in the sheet each
- * has its own visible label, drawn by the caller, so only `id` is set.
+ * `aria-label` (its column heading names it for the eye); in the sheet and the
+ * first run each has its own visible label, drawn by the caller, so only `id`
+ * is set. `hints` words the two free-text placeholders and sets the amount's
+ * alignment for the place.
  */
-function fieldsOf(
+export function fieldsOf(
   api: NewTxn,
   named: boolean,
+  hints: {
+    firm?: string;
+    description?: string;
+    /** The amount lines up on its right in a table's column; a form field reads from the left. */
+    amountAlign?: 'left' | 'right';
+  } = {},
 ): Record<FieldName, React.JSX.Element> {
   const { draft, errors } = api;
   const props = (name: string, label: string) => ({
@@ -221,7 +240,7 @@ function fieldsOf(
       <input
         {...props('description', 'Description')}
         autoComplete="off"
-        placeholder="Description"
+        placeholder={hints.description ?? 'Description'}
         value={draft.description}
         onChange={(e) => api.set('description', e.target.value)}
         className={ROW_INPUT}
@@ -231,9 +250,10 @@ function fieldsOf(
       <>
         <input
           {...props('firm', 'Firm')}
+          {...invalid(errors.firm, 'firm')}
           list={`${api.id}-firms`}
           autoComplete="off"
-          placeholder="Firm"
+          placeholder={hints.firm ?? 'Firm'}
           value={draft.firm}
           onChange={(e) => api.setFirm(e.target.value)}
           className={ROW_INPUT}
@@ -285,7 +305,7 @@ function fieldsOf(
         placeholder={AMOUNT_HINT}
         value={draft.amount}
         onChange={(e) => api.set('amount', e.target.value)}
-        className={`${ROW_INPUT} text-right`}
+        className={`${ROW_INPUT} ${hints.amountAlign === 'left' ? '' : 'text-right'}`}
       />
     ),
     status: (

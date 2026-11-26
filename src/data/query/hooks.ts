@@ -400,6 +400,35 @@ export function useChangeDashboards(): UseMutationResult<
   );
 }
 
+/**
+ * Ends the prop first run of one workspace (C71): `propStart[workspaceId]`
+ * becomes `{ answer, done: true }` (the answer only when one was given). The
+ * prefs are read afresh at the write, so another workspace's entry, or a run
+ * finished in another tab, is kept. Nothing else is written.
+ */
+export function useFinishPropStart(): UseMutationResult<
+  UserPrefs,
+  Error,
+  { workspaceId: string; answer?: 'own' | 'prop' | 'both' }
+> {
+  return useFixedWrite(
+    'prefs.update',
+    '',
+    async (r, v: { workspaceId: string; answer?: 'own' | 'prop' | 'both' }) => {
+      const current = await r.prefs.get();
+      return r.prefs.update({
+        propStart: {
+          ...current.propStart,
+          [v.workspaceId]:
+            v.answer === undefined
+              ? { done: true }
+              : { answer: v.answer, done: true },
+        },
+      });
+    },
+  );
+}
+
 /** Forgets the saved value of each key, so it follows its default again. */
 export function useUnsetPrefs(): UseMutationResult<
   UserPrefs,

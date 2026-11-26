@@ -24,8 +24,10 @@ import {
   useAccounts,
   useAddPropTxn,
   useChallenges,
+  useFinishPropStart,
   useLogPayout,
   useMarkBreached,
+  usePrefs,
   usePropTxns,
   useRemovePropTxn,
   useSetCostMethod,
@@ -377,5 +379,81 @@ describe('useWidgetData', () => {
     expect(result.current.data!.currencies[0]).toBe('USD');
     // The sample has no JPY trades: the base is read.
     expect(result.current.data!.currency).toBe('USD');
+  });
+});
+
+describe('useFinishPropStart (C71)', () => {
+  test("writes the workspace's answer and done, and nothing else", async () => {
+    const { repository, Wrapper } = setup();
+    const before = await repository.prefs.saved();
+    const { result } = renderHook(() => useFinishPropStart(), {
+      wrapper: Wrapper,
+    });
+    await act(async () => {
+      await result.current.mutateAsync({ workspaceId: 'mine', answer: 'both' });
+    });
+    const after = await repository.prefs.saved();
+    expect(after.propStart).toEqual({ mine: { answer: 'both', done: true } });
+    // Every other saved pref is as it was.
+    expect({ ...after, propStart: undefined }).toEqual({
+      ...before,
+      propStart: undefined,
+    });
+  });
+
+  test('with no answer it stores done alone, and it keeps what other workspaces hold', async () => {
+    const { repository, Wrapper } = setup();
+    await repository.prefs.update({
+      propStart: { mine: { answer: 'own', done: true } },
+    });
+    const { result } = renderHook(() => useFinishPropStart(), {
+      wrapper: Wrapper,
+    });
+    await act(async () => {
+      await result.current.mutateAsync({ workspaceId: 'sample' });
+    });
+    expect((await repository.prefs.saved()).propStart).toEqual({
+      mine: { answer: 'own', done: true },
+      sample: { done: true },
+    });
+  });
+
+  test('it reads the prefs as stored at the write, so a run finished in another tab is not undone', async () => {
+    const { repository, Wrapper } = setup();
+    const { result } = renderHook(() => useFinishPropStart(), {
+      wrapper: Wrapper,
+    });
+    // This tab has not heard of it.
+    await repository.prefs.update({
+      propStart: { mine: { answer: 'prop', done: true } },
+    });
+    await act(async () => {
+      await result.current.mutateAsync({
+        workspaceId: 'sample',
+        answer: 'own',
+      });
+    });
+    expect((await repository.prefs.saved()).propStart).toEqual({
+      mine: { answer: 'prop', done: true },
+      sample: { answer: 'own', done: true },
+    });
+  });
+
+  test('the prefs read follows the write', async () => {
+    const { Wrapper } = setup();
+    const { result } = renderHook(
+      () => ({ prefs: usePrefs(), finish: useFinishPropStart() }),
+      { wrapper: Wrapper },
+    );
+    await waitFor(() => expect(result.current.prefs.data).toBeDefined());
+    expect(result.current.prefs.data!.propStart).toBeUndefined();
+    await act(async () => {
+      await result.current.finish.mutateAsync({ workspaceId: 'mine' });
+    });
+    await waitFor(() =>
+      expect(result.current.prefs.data!.propStart).toEqual({
+        mine: { done: true },
+      }),
+    );
   });
 });
