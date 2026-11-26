@@ -774,6 +774,39 @@ test('leaving with nothing changed, or after Cancel, does not ask', async () => 
   expect(defaultPrevented).toHaveBeenCalledWith(false);
 });
 
+/** Closing or reloading the tab: whether the browser is asked to confirm. */
+function unloadAsks(): boolean {
+  const event = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(event);
+  return event.defaultPrevented;
+}
+
+test('closing or reloading the tab with unsaved changes asks the browser to confirm; clean, saved or cancelled does not', async () => {
+  await mount();
+  // No edit, nothing to lose.
+  expect(unloadAsks()).toBe(false);
+  await edit();
+  await nameField();
+  // An edit that changed nothing yet.
+  expect(unloadAsks()).toBe(false);
+  fireEvent.click(button('Remove Net P&L'));
+  expect(unloadAsks()).toBe(true);
+  // Cancel drops the draft: the guard goes with it.
+  fireEvent.click(button('Cancel'));
+  await waitFor(() =>
+    expect(screen.queryByRole('textbox', { name: 'Template name' })).toBeNull(),
+  );
+  expect(unloadAsks()).toBe(false);
+
+  // Saved changes are no longer unsaved.
+  await edit();
+  await nameField();
+  fireEvent.click(button('Remove Net P&L'));
+  expect(unloadAsks()).toBe(true);
+  await save();
+  expect(unloadAsks()).toBe(false);
+});
+
 test('a route change drops the draft: coming back to the Dashboard finds no edit mode', async () => {
   await mount();
   await edit();

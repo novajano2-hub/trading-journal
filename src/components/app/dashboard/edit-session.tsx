@@ -102,7 +102,8 @@ function leavingLink(e: MouseEvent): string | undefined {
  * Holds the one edit of a dashboard template that can be open: the draft, and
  * what Save, Cancel and Delete do to it (C2, C8, C70). It sits above the top
  * bar and the page, which both draw from it. The draft is dropped when the
- * page is left, and a link that would leave with changes asks first.
+ * page is left, and a link that would leave with changes asks first (so does
+ * closing or reloading the tab).
  */
 export function DashboardEditProvider({
   children,
@@ -151,7 +152,9 @@ export function DashboardEditProvider({
       name: state.draft.name.trim(),
     });
 
-  // A link that leaves the page with changes in the draft asks first (C8).
+  // A link that leaves the page with changes in the draft asks first (C8), and so does closing or
+  // reloading the tab (the browser's own confirm). Browser Back and the command palette's
+  // navigation stay unguarded, and drop the draft: Keel's call, as a route change always does.
   useEffect(() => {
     if (!dirty) return;
     const onClick = (e: MouseEvent) => {
@@ -161,8 +164,17 @@ export function DashboardEditProvider({
       e.stopPropagation();
       setLeaving(href);
     };
+    const onUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // Older browsers ask only when a return value is set.
+      e.returnValue = '';
+    };
     document.addEventListener('click', onClick, true);
-    return () => document.removeEventListener('click', onClick, true);
+    window.addEventListener('beforeunload', onUnload);
+    return () => {
+      document.removeEventListener('click', onClick, true);
+      window.removeEventListener('beforeunload', onUnload);
+    };
   }, [dirty]);
 
   const begin = useCallback((template: DashTemplate) => {
