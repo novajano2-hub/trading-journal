@@ -30,7 +30,7 @@ export function noun(t: Trade, n: number): string {
   return plural(n, one);
 }
 
-const UNIT_LABEL: Record<LevelUnit, string> = {
+export const UNIT_LABEL: Record<LevelUnit, string> = {
   price: 'Price',
   movement: 'Price movement',
   ticks: 'Ticks',
@@ -38,30 +38,34 @@ const UNIT_LABEL: Record<LevelUnit, string> = {
   amount: 'Amount',
   pips: 'Pips',
 };
-const UNIT_SUFFIX: Partial<Record<LevelUnit, string>> = {
+export const UNIT_SUFFIX: Partial<Record<LevelUnit, string>> = {
   ticks: 'ticks',
   points: 'points',
   pips: 'pips',
 };
+/** The unit select's look: the comp's 30px control beside a level block's heading. */
+export const UNIT_TRIGGER =
+  'inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-[8px] border border-line-2 bg-surface-1 pr-2 pl-2.5 text-[13px] font-semibold whitespace-nowrap text-text shadow-[0_1px_1px_rgb(18_22_51/0.04)] outline-offset-2 transition-[border-color] duration-200 ease-(--ease-glide) hover:border-faint focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-default disabled:opacity-60 pointer-coarse:h-11';
+
 const WORDS = {
   target: { many: 'Targets', one: 'Target', lower: 'target' },
   stop: { many: 'Stops', one: 'Stop', lower: 'stop' },
 } as const;
 
-const FIELD =
+export const FIELD =
   'flex h-9 min-w-0 items-center rounded-[8px] border border-line-2 bg-surface-1 pr-1 pl-2.5 text-[14px] font-[550] text-text tabular-nums shadow-[0_1px_1px_rgb(18_22_51/0.04)] transition-[border-color] duration-200 ease-(--ease-glide) hover:border-faint focus-within:border-accent focus-within:outline-2 focus-within:outline-accent/25 has-[input[aria-invalid=true]]:border-loss max-sm:h-10 pointer-coarse:h-11';
-const BARE_INPUT =
-  'h-full min-w-0 flex-1 bg-transparent text-[14px] font-[550] tabular-nums outline-none placeholder:text-faint read-only:text-muted disabled:cursor-not-allowed disabled:opacity-60';
+export const BARE_INPUT =
+  'h-full min-w-0 flex-1 bg-transparent text-[14px] font-[550] tabular-nums outline-none! placeholder:text-faint read-only:text-muted disabled:cursor-not-allowed disabled:opacity-60';
 
 /** A number typed in a field, or null for nothing or for something that is not one. */
-function parseNumber(text: string): number | null {
+export function parseNumber(text: string): number | null {
   const raw = text.replace(/[,\s]/g, '');
   if (raw === '') return null;
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
 }
 
-const plain = (n: number) =>
+export const plain = (n: number) =>
   n.toLocaleString('en-US', { maximumFractionDigits: 6, useGrouping: false });
 
 const sidesOfRole = (role: LevelRole, side?: LevelSide): LevelSides =>
@@ -447,7 +451,7 @@ export function LevelsBlock({
             value: u,
             label: UNIT_LABEL[u],
           }))}
-          triggerClassName="inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-[8px] border border-line-2 bg-surface-1 pr-2 pl-2.5 text-[13px] font-semibold whitespace-nowrap text-text shadow-[0_1px_1px_rgb(18_22_51/0.04)] outline-offset-2 transition-[border-color] duration-200 ease-(--ease-glide) hover:border-faint focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-default disabled:opacity-60 pointer-coarse:h-11"
+          triggerClassName={UNIT_TRIGGER}
         />
         <button
           type="button"
