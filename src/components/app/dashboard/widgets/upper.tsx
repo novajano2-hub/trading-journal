@@ -5,9 +5,7 @@ import { useContext, useMemo, type ReactNode } from 'react';
 import { SplitBar } from '@/components/charts/split-bar';
 import { FigureText } from '@/components/product/figure-text';
 import { Chip } from '@/components/ui/chip';
-import { WIDGET_TITLES } from '@/content/dashboard-widgets';
 import { usePrefs } from '@/data/query/hooks';
-import { WIDGETS } from '@/domain/dashboard/widgets';
 import { winsVsLosses } from '@/domain/metrics/breakdowns';
 import { isTradeUnit } from '@/domain/metrics/units';
 import { localDate } from '@/domain/time';
@@ -23,7 +21,7 @@ import {
 import { formatCount, formatPct, plural } from '@/lib/format';
 import { noBalanceIn, STARTING_BALANCE_PROMPT } from './balance-states';
 import { useWidgetPage, useWidgetValue } from './context';
-import { WidgetFrame } from './frame';
+import { WidgetCard, WidgetLoading } from './frame';
 import type { WidgetRender } from './registry';
 
 /**
@@ -37,45 +35,8 @@ import type { WidgetRender } from './registry';
 
 const NONE = 'None';
 
-/** The widget's name on its card: the P&L widget follows the Gross or Net basis. */
-function titleOf(key: WidgetKey, basis: 'net' | 'gross'): string {
-  return key === 'net-pnl'
-    ? `${basis === 'gross' ? 'Gross' : 'Net'} P&L`
-    : WIDGET_TITLES[key];
-}
-
-/** The widget's frame with its name, its tip and the state it is in. */
-function Card({
-  k,
-  state = 'ready',
-  empty,
-  end,
-  children,
-}: {
-  k: WidgetKey;
-  state?: 'ready' | 'loading' | 'empty';
-  empty?: ReactNode;
-  end?: ReactNode;
-  children?: ReactNode;
-}): React.JSX.Element {
-  const basis = usePrefs().data?.pnlBasis ?? 'net';
-  return (
-    <WidgetFrame
-      widgetKey={k}
-      title={titleOf(k, basis)}
-      tip={WIDGETS[k].metric}
-      end={end}
-      state={state}
-      empty={empty}
-    >
-      {children}
-    </WidgetFrame>
-  );
-}
-
-const Loading = ({ k }: { k: WidgetKey }) => <Card k={k} state="loading" />;
 const Nothing = ({ k }: { k: WidgetKey }) => (
-  <Card k={k} state="empty" empty={NONE} />
+  <WidgetCard k={k} state="empty" empty={NONE} />
 );
 
 /**
@@ -170,12 +131,12 @@ export function NetPnl(): React.JSX.Element {
   const s = useWidgetValue('net-pnl');
   const currency = useWidgetPage()?.currency;
   const display = useDisplay();
-  if (!s || currency === undefined) return <Loading k="net-pnl" />;
+  if (!s || currency === undefined) return <WidgetLoading k="net-pnl" />;
   if (s.closedCount === 0) return <Nothing k="net-pnl" />;
   const f = display.ofAll(s.basis === 'gross' ? s.grossPnl : s.netPnl);
   const shown = display.figure(f, true, currency);
   return (
-    <Card
+    <WidgetCard
       k="net-pnl"
       end={
         // A phone has no room for it (comp 01).
@@ -189,7 +150,7 @@ export function NetPnl(): React.JSX.Element {
       <Fig chars={shown.text.length} className={toneOf(f, display.unit)}>
         <FigureText f={shown} />
       </Fig>
-    </Card>
+    </WidgetCard>
   );
 }
 
@@ -198,21 +159,29 @@ export function BalanceAndPnl(): React.JSX.Element {
   const s = useWidgetValue('balance-pnl');
   const page = useWidgetPage();
   const display = useDisplay();
-  if (!s || !page) return <Loading k="balance-pnl" />;
+  if (!s || !page) return <WidgetLoading k="balance-pnl" />;
   // A balance is an amount of money: it has no value in R, ticks, pips or points.
   if (isTradeUnit(display.unit))
     return (
-      <Card k="balance-pnl" state="empty" empty={noBalanceIn(display.unit)} />
+      <WidgetCard
+        k="balance-pnl"
+        state="empty"
+        empty={noBalanceIn(display.unit)}
+      />
     );
   if (s.unfunded)
     return (
-      <Card k="balance-pnl" state="empty" empty={STARTING_BALANCE_PROMPT} />
+      <WidgetCard
+        k="balance-pnl"
+        state="empty"
+        empty={STARTING_BALANCE_PROMPT}
+      />
     );
   // A balance is an amount, never a return: dollars, or hidden.
   const balance = display.figure({ money: s.balance }, false, page.currency);
   const net = display.ofAll(s.net);
   return (
-    <Card k="balance-pnl">
+    <WidgetCard k="balance-pnl">
       <Fig chars={balance.text.length}>
         <FigureText f={balance} />
       </Fig>
@@ -222,18 +191,18 @@ export function BalanceAndPnl(): React.JSX.Element {
         </span>{' '}
         net P&L, {page.caption}
       </Sub>
-    </Card>
+    </WidgetCard>
   );
 }
 
 /** The share of decided trades that won, over a split of won, breakeven and lost. */
 export function TradeWin(): React.JSX.Element {
   const s = useWidgetValue('trade-win');
-  if (!s) return <Loading k="trade-win" />;
+  if (!s) return <WidgetLoading k="trade-win" />;
   if (s.closedCount === 0) return <Nothing k="trade-win" />;
   const rate = s.winRate === null ? null : formatPct(s.winRate, 1);
   return (
-    <Card k="trade-win">
+    <WidgetCard k="trade-win">
       {rate === null ? <NoFig /> : <Fig chars={rate.length}>{rate}</Fig>}
       <SplitBar
         className="mt-2.5"
@@ -248,7 +217,7 @@ export function TradeWin(): React.JSX.Element {
         <Counted n={s.breakevens} word="breakeven" />,{' '}
         <Counted n={s.losses} word="lost" />
       </Sub>
-    </Card>
+    </WidgetCard>
   );
 }
 
@@ -260,12 +229,12 @@ export function TradeWin(): React.JSX.Element {
 export function ProfitFactor(): React.JSX.Element {
   const s = useWidgetValue('profit-factor');
   const display = useDisplay();
-  if (!s) return <Loading k="profit-factor" />;
+  if (!s) return <WidgetLoading k="profit-factor" />;
   if (s.closedCount === 0) return <Nothing k="profit-factor" />;
   const pf = s.profitFactor;
   const shown = pf === null ? null : display.ratio(pf);
   return (
-    <Card k="profit-factor">
+    <WidgetCard k="profit-factor">
       {shown === null ? (
         <NoFig />
       ) : (
@@ -284,18 +253,18 @@ export function ProfitFactor(): React.JSX.Element {
               ]
         }
       />
-    </Card>
+    </WidgetCard>
   );
 }
 
 /** The share of trading days that ended green, over a split of green, flat and red days. */
 export function DayWin(): React.JSX.Element {
   const s = useWidgetValue('day-win');
-  if (!s) return <Loading k="day-win" />;
+  if (!s) return <WidgetLoading k="day-win" />;
   if (s.greenPct === null) return <Nothing k="day-win" />;
   const rate = formatPct(s.greenPct, 1);
   return (
-    <Card k="day-win">
+    <WidgetCard k="day-win">
       <Fig chars={rate.length}>{rate}</Fig>
       <SplitBar
         className="mt-2.5"
@@ -310,7 +279,7 @@ export function DayWin(): React.JSX.Element {
         <Counted n={s.flatDays} word="flat" />,{' '}
         <Counted n={s.redDays} word="red" />
       </Sub>
-    </Card>
+    </WidgetCard>
   );
 }
 
@@ -326,7 +295,7 @@ export function WinLossRatio(): React.JSX.Element {
       source ? winsVsLosses([...source.tradesById.values()], source.ctx) : null,
     [source],
   );
-  if (!s || currency === undefined) return <Loading k="win-loss-ratio" />;
+  if (!s || currency === undefined) return <WidgetLoading k="win-loss-ratio" />;
   if (s.closedCount === 0) return <Nothing k="win-loss-ratio" />;
   const ratio = s.winLossRatio;
   const shown = ratio === null ? null : display.ratio(ratio);
@@ -347,7 +316,7 @@ export function WinLossRatio(): React.JSX.Element {
           currency,
         );
   return (
-    <Card k="win-loss-ratio">
+    <WidgetCard k="win-loss-ratio">
       {shown === null ? (
         <NoFig />
       ) : (
@@ -377,7 +346,7 @@ export function WinLossRatio(): React.JSX.Element {
           </span>
         </Sub>
       ) : null}
-    </Card>
+    </WidgetCard>
   );
 }
 
@@ -386,12 +355,12 @@ export function Expectancy(): React.JSX.Element {
   const s = useWidgetValue('expectancy');
   const currency = useWidgetPage()?.currency;
   const display = useDisplay();
-  if (!s || currency === undefined) return <Loading k="expectancy" />;
+  if (!s || currency === undefined) return <WidgetLoading k="expectancy" />;
   if (s.closedCount === 0) return <Nothing k="expectancy" />;
   const f = s.expectancy === null ? null : display.expectancy(s.expectancy);
   const shown = f === null ? null : display.figure(f, true, currency);
   return (
-    <Card k="expectancy">
+    <WidgetCard k="expectancy">
       {f === null || shown === null ? (
         <NoFig />
       ) : (
@@ -399,7 +368,7 @@ export function Expectancy(): React.JSX.Element {
           <FigureText f={shown} />
         </Fig>
       )}
-    </Card>
+    </WidgetCard>
   );
 }
 
@@ -428,15 +397,15 @@ const runChars = (n: number, word: 'day' | 'trade'): number =>
 export function DayStreak(): React.JSX.Element {
   const n = useWidgetValue('day-streak');
   const closed = useClosedCount();
-  if (n === undefined) return <Loading k="day-streak" />;
+  if (n === undefined) return <WidgetLoading k="day-streak" />;
   if (closed === 0) return <Nothing k="day-streak" />;
   return (
-    <Card k="day-streak">
+    <WidgetCard k="day-streak">
       <Fig chars={runChars(n, 'day')}>
         <Run n={n} word="day" />
       </Fig>
       <Sub>winning days in a row</Sub>
-    </Card>
+    </WidgetCard>
   );
 }
 
@@ -444,15 +413,15 @@ export function DayStreak(): React.JSX.Element {
 export function TradeStreak(): React.JSX.Element {
   const n = useWidgetValue('trade-streak');
   const closed = useClosedCount();
-  if (n === undefined) return <Loading k="trade-streak" />;
+  if (n === undefined) return <WidgetLoading k="trade-streak" />;
   if (closed === 0) return <Nothing k="trade-streak" />;
   return (
-    <Card k="trade-streak">
+    <WidgetCard k="trade-streak">
       <Fig chars={runChars(n, 'trade')}>
         <Run n={n} word="trade" />
       </Fig>
       <Sub>winning trades in a row</Sub>
-    </Card>
+    </WidgetCard>
   );
 }
 
@@ -460,10 +429,10 @@ export function TradeStreak(): React.JSX.Element {
 export function Streaks(): React.JSX.Element {
   const s = useWidgetValue('streaks');
   const closed = useClosedCount();
-  if (s === undefined) return <Loading k="streaks" />;
+  if (s === undefined) return <WidgetLoading k="streaks" />;
   if (closed === 0) return <Nothing k="streaks" />;
   return (
-    <Card k="streaks">
+    <WidgetCard k="streaks">
       <div className="mt-1 grid grid-cols-1 gap-x-2.5 gap-y-2 sm:grid-cols-2">
         <div className="min-w-0">
           <Fig chars={runChars(s.day, 'day')} share={0.48} flush>
@@ -482,7 +451,7 @@ export function Streaks(): React.JSX.Element {
           </span>
         </div>
       </div>
-    </Card>
+    </WidgetCard>
   );
 }
 
@@ -493,7 +462,7 @@ export function MaxDrawdown(): React.JSX.Element {
   const display = useDisplay();
   const closed = useClosedCount();
   const thisYear = useThisYear();
-  if (!s || currency === undefined) return <Loading k="max-drawdown" />;
+  if (!s || currency === undefined) return <WidgetLoading k="max-drawdown" />;
   if (closed === 0) return <Nothing k="max-drawdown" />;
   const shown = display.cash(-s.amount, true, currency);
   const where = [
@@ -506,7 +475,7 @@ export function MaxDrawdown(): React.JSX.Element {
       : null,
   ].filter((part) => part !== null);
   return (
-    <Card k="max-drawdown">
+    <WidgetCard k="max-drawdown">
       <Fig
         chars={shown.text.length}
         className={s.amount > 0 ? 'text-loss' : ''}
@@ -514,7 +483,7 @@ export function MaxDrawdown(): React.JSX.Element {
         <FigureText f={shown} />
       </Fig>
       <Sub>{where.length > 0 ? where.join(', ') : 'no fall from a high'}</Sub>
-    </Card>
+    </WidgetCard>
   );
 }
 
@@ -528,7 +497,7 @@ export function AvgDrawdown(): React.JSX.Element {
   const display = useDisplay();
   const source = useContext(FigureSourceContext);
   const closed = useClosedCount();
-  if (!s || currency === undefined) return <Loading k="avg-drawdown" />;
+  if (!s || currency === undefined) return <WidgetLoading k="avg-drawdown" />;
   if (closed === 0) return <Nothing k="avg-drawdown" />;
   const range = source?.ctx.range;
   const noRange = range?.from === undefined && range?.to === undefined;
@@ -536,21 +505,21 @@ export function AvgDrawdown(): React.JSX.Element {
   const depth = noRange ? s.current : s.amount === null ? null : -s.amount;
   if (depth === null)
     return (
-      <Card k="avg-drawdown">
+      <WidgetCard k="avg-drawdown">
         <NoFig />
         <Sub>no day closed under a high</Sub>
-      </Card>
+      </WidgetCard>
     );
   const shown = display.cash(depth, true, currency);
   return (
-    <Card k="avg-drawdown">
+    <WidgetCard k="avg-drawdown">
       <Fig chars={shown.text.length} className={depth < 0 ? 'text-loss' : ''}>
         <FigureText f={shown} />
       </Fig>
       {noRange ? (
         <Sub>{`today, ${depth < 0 ? 'from' : 'at'} the high; no date range set`}</Sub>
       ) : null}
-    </Card>
+    </WidgetCard>
   );
 }
 

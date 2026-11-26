@@ -56,7 +56,7 @@ import type { ChartSeries } from '../../reports/report-chart';
 import { RecentTrades } from '../recent-trades';
 import { useChartEnv } from './charts';
 import { useWidgetCtx, useWidgetValue } from './context';
-import { WidgetFrame } from './frame';
+import { WidgetFrame, WidgetLoading } from './frame';
 import type { WidgetRender } from './registry';
 import { useSetWidgetSetting } from './use-widget-setting';
 
@@ -67,15 +67,6 @@ import { useSetWidgetSetting } from './use-widget-setting';
  * already has, and reads money through `useDisplay()` (the bodies do), so the
  * unit and Privacy apply to every figure, label and tip.
  */
-
-const Loading = ({ k }: { k: WidgetKey }) => (
-  <WidgetFrame
-    widgetKey={k}
-    title={WIDGET_TITLES[k]}
-    tip={WIDGETS[k].metric}
-    state="loading"
-  />
-);
 
 /** The newest closed trades in the filters, and the open positions on a tab beside them. */
 export function Recent(): React.JSX.Element {
@@ -98,7 +89,7 @@ export function Recent(): React.JSX.Element {
         : undefined,
     [trades, ctx, strategies, tags, categories],
   );
-  if (!model || !ctx || !prefs) return <Loading k="recent" />;
+  if (!model || !ctx || !prefs) return <WidgetLoading k="recent" />;
   const { recent, open } = model;
   // The tab is kept here, so a filter change does not reset it; with no closed trade the open ones show first.
   const tab =
@@ -125,9 +116,11 @@ export function Recent(): React.JSX.Element {
 
 const NO_TRADES: ReadonlyMap<string, Trade> = new Map();
 
-/** The look of the settings control in a frame: quiet, as the report's Metrics button. */
-const SETTING_TRIGGER =
-  'inline-flex h-7 max-w-[10rem] min-w-0 cursor-pointer items-center gap-1.5 rounded-control px-2 text-[12.5px] font-medium text-muted transition-colors duration-200 ease-(--ease-glide) hover:bg-sunken hover:text-text data-[state=open]:bg-sunken focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 pointer-coarse:px-3';
+/** The look of a control in a widget's frame: quiet, as the report's Metrics button. */
+const QUIET_TRIGGER =
+  'inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-control px-2 text-[12.5px] font-medium text-muted transition-colors duration-200 ease-(--ease-glide) hover:bg-sunken hover:text-text data-[state=open]:bg-sunken focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 pointer-coarse:px-3';
+/** The settings control: the same, and it gives way (and ellipsizes) in a narrow header. */
+const SETTING_TRIGGER = `${QUIET_TRIGGER} max-w-[10rem] min-w-0`;
 
 /**
  * One challenge as its card reads on the Prop firms page, compactly (C11): the
@@ -156,7 +149,7 @@ export function Challenge({
       ctx,
     }));
   }, [challenges, accounts, trades, flows, prefs]);
-  if (!rows) return <Loading k="challenge" />;
+  if (!rows) return <WidgetLoading k="challenge" />;
   const shown = shownChallenge(rows, settings?.challengeId);
   if (!shown)
     return (
@@ -273,7 +266,7 @@ function MetricsMenu({
   const full = picks.length >= MAX_METRICS;
   return (
     <Popover.Root>
-      <Popover.Trigger className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-control px-2 text-[12.5px] font-medium text-muted transition-colors duration-200 ease-(--ease-glide) hover:bg-sunken hover:text-text data-[state=open]:bg-sunken focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 pointer-coarse:px-3">
+      <Popover.Trigger className={QUIET_TRIGGER}>
         <SlidersHorizontal
           size={15}
           aria-hidden="true"
@@ -376,7 +369,7 @@ export function Report({
         : { keys: [], aligned: [] },
     [data, ctx, picks, noted],
   );
-  if (!data || !page || !ctx || !fmt) return <Loading k="report" />;
+  if (!data || !page || !ctx || !fmt) return <WidgetLoading k="report" />;
 
   const series: ChartSeries[] = picks.map((x, i) => ({
     label: seriesLabel(x, basis),

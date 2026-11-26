@@ -54,7 +54,7 @@ import { YearGrid } from '../../calendar/year-grid';
 import { MiniCalendar } from '../../trades/log/mini-calendar';
 import { CARD, CARD_PAD, signTone } from '../shared';
 import { useWidgetPage, useWidgetValue } from './context';
-import { TipGlyph, WidgetFrame } from './frame';
+import { TipGlyph, WidgetFrame, WidgetLoading } from './frame';
 import type { WidgetRender } from './registry';
 
 /**
@@ -66,15 +66,6 @@ import type { WidgetRender } from './registry';
  * (cells, week totals, the month's net, names a screen reader gets), so
  * Privacy hides it everywhere.
  */
-
-const Loading = ({ k }: { k: WidgetKey }) => (
-  <WidgetFrame
-    widgetKey={k}
-    title={WIDGET_TITLES[k]}
-    tip={WIDGETS[k].metric}
-    state="loading"
-  />
-);
 
 /**
  * The date the calendars call today: the routine's (the sample workspace's own
@@ -257,7 +248,7 @@ function MonthCard({
     return { ctx, ...calendarMonth(trades, notes ?? [], month, ctx) };
   }, [trades, prefs, notes, month, advanced]);
   if (!trades || !page || !prefs || !model || !month || !today || !currency)
-    return <Loading k={widgetKey} />;
+    return <WidgetLoading k={widgetKey} />;
 
   const fmt = monthFormat(display, pctBase, currency);
   const { weeks, summary } = model;
@@ -420,7 +411,7 @@ export function CalendarMini(): React.JSX.Element {
         : undefined,
     [trades, prefs, pageSource?.pctBase],
   );
-  if (!groups || !source || !today) return <Loading k="calendar-mini" />;
+  if (!groups || !source || !today) return <WidgetLoading k="calendar-mini" />;
   return (
     <section
       data-widget="calendar-mini"
@@ -481,7 +472,7 @@ export function Year(): React.JSX.Element {
     () => (trades && ctx && year ? calendarYear(trades, year, ctx) : undefined),
     [trades, ctx, year],
   );
-  if (!months || !page || !year || !currency) return <Loading k="year" />;
+  if (!months || !page || !year || !currency) return <WidgetLoading k="year" />;
 
   const fmt = monthFormat(display, pctBase, currency);
   const net = months.reduce((n, m) => n + m.net, 0);

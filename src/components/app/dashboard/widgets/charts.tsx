@@ -1,7 +1,7 @@
 'use client';
 
 import { addDays, format, parseISO } from 'date-fns';
-import { useContext, useMemo, type ReactNode } from 'react';
+import { useContext, useMemo } from 'react';
 import { dateTicks } from '@/components/charts/chart-kit';
 import {
   DualAxisChart,
@@ -20,9 +20,7 @@ import {
   periodText,
   ReportChart,
 } from '@/components/app/reports/report-chart';
-import { WIDGET_TITLES } from '@/content/dashboard-widgets';
 import { usePrefs } from '@/data/query/hooks';
-import { WIDGETS } from '@/domain/dashboard/widgets';
 import type { MetricContext } from '@/domain/metrics/context';
 import { dayValue, type DayStat } from '@/domain/metrics/days';
 import { clockText, durationAxis, timeAxis } from '@/domain/metrics/scatter';
@@ -46,7 +44,7 @@ import { shortTime } from '@/lib/time-format';
 import { zoneLabel } from '@/lib/time-zone-label';
 import { noBalanceIn, STARTING_BALANCE_PROMPT } from './balance-states';
 import { useWidgetCtx, useWidgetPage, useWidgetValue } from './context';
-import { WidgetFrame } from './frame';
+import { WidgetCard, WidgetLoading } from './frame';
 import type { WidgetRender } from './registry';
 import { sentenceCase } from './text';
 import { useSetWidgetSetting } from './use-widget-setting';
@@ -63,55 +61,6 @@ import { useSetWidgetSetting } from './use-widget-setting';
  */
 
 const NONE = 'No closed trades in this range.';
-
-/** A widget's name, following the Gross or Net basis where it carries one. */
-function titleOf(key: WidgetKey, basis: 'net' | 'gross'): string {
-  const word = basis === 'gross' ? 'gross' : 'net';
-  switch (key) {
-    case 'cum-pnl':
-      return `Cumulative ${word} P&L`;
-    case 'daily-pnl':
-      return `${sentenceCase(word)} daily P&L`;
-    case 'daily-cum':
-      return `Daily and cumulative ${word} P&L`;
-    default:
-      return WIDGET_TITLES[key];
-  }
-}
-
-/** The frame of a chart widget: its name, its tip and the range or what it is by. */
-function Card({
-  k,
-  caption,
-  end,
-  state = 'ready',
-  empty,
-  children,
-}: {
-  k: WidgetKey;
-  caption?: ReactNode;
-  end?: ReactNode;
-  state?: 'ready' | 'loading' | 'empty';
-  empty?: ReactNode;
-  children?: ReactNode;
-}): React.JSX.Element {
-  const basis = usePrefs().data?.pnlBasis ?? 'net';
-  return (
-    <WidgetFrame
-      widgetKey={k}
-      title={titleOf(k, basis)}
-      tip={WIDGETS[k].metric}
-      caption={caption}
-      end={end}
-      state={state}
-      empty={empty}
-    >
-      {children}
-    </WidgetFrame>
-  );
-}
-
-const Loading = ({ k }: { k: WidgetKey }) => <Card k={k} state="loading" />;
 
 /** Rounds away binary noise from a running total of units. */
 const clean = (n: number) => Math.round(n * 1e6) / 1e6;
@@ -171,14 +120,17 @@ export function CumPnl(): React.JSX.Element {
         : undefined,
     [days, ctx],
   );
-  if (!days || !page || !ctx || !fmt || !points) return <Loading k="cum-pnl" />;
+  if (!days || !page || !ctx || !fmt || !points)
+    return <WidgetLoading k="cum-pnl" />;
   const caption = sentenceCase('by trading day');
   if (days.length === 0)
-    return <Card k="cum-pnl" state="empty" empty={NONE} caption={caption} />;
+    return (
+      <WidgetCard k="cum-pnl" state="empty" empty={NONE} caption={caption} />
+    );
   const unit = seriesUnit('cumulative-net', ctx);
   const ends = points[points.length - 1]!.value!;
   return (
-    <Card k="cum-pnl" caption={caption}>
+    <WidgetCard k="cum-pnl" caption={caption}>
       <div className="mt-3">
         <ReportChart
           label={`Cumulative ${basis} P&L by day, ${page.caption}. Ends at ${fmt.text(unit, ends)}.`}
@@ -195,7 +147,7 @@ export function CumPnl(): React.JSX.Element {
           ]}
         />
       </div>
-    </Card>
+    </WidgetCard>
   );
 }
 
@@ -208,15 +160,17 @@ export function DailyPnl(): React.JSX.Element {
     [days, ctx],
   );
   if (!days || !page || !ctx || !fmt || !points)
-    return <Loading k="daily-pnl" />;
+    return <WidgetLoading k="daily-pnl" />;
   const caption = sentenceCase('by trading day');
   if (days.length === 0)
-    return <Card k="daily-pnl" state="empty" empty={NONE} caption={caption} />;
+    return (
+      <WidgetCard k="daily-pnl" state="empty" empty={NONE} caption={caption} />
+    );
   const unit = seriesUnit('net', ctx);
   const best = points.reduce((a, p) => (p.value! > a.value! ? p : a));
   const worst = points.reduce((a, p) => (p.value! < a.value! ? p : a));
   return (
-    <Card k="daily-pnl" caption={caption}>
+    <WidgetCard k="daily-pnl" caption={caption}>
       <div className="mt-3">
         <ReportChart
           label={`Daily ${basis} P&L bars, ${points.length} ${plural(points.length, 'day')}, ${page.caption}. Best ${periodText(best.key)} ${fmt.text(unit, best.value!)}, worst ${periodText(worst.key)} ${fmt.text(unit, worst.value!)}.`}
@@ -233,7 +187,7 @@ export function DailyPnl(): React.JSX.Element {
           ]}
         />
       </div>
-    </Card>
+    </WidgetCard>
   );
 }
 
@@ -242,14 +196,16 @@ export function Drawdown(): React.JSX.Element {
   // The widget's series is already the distance under the high, a point a trading day.
   const points = useWidgetValue('drawdown');
   const { page, fmt } = useChartEnv();
-  if (!page || !fmt || !points) return <Loading k="drawdown" />;
+  if (!page || !fmt || !points) return <WidgetLoading k="drawdown" />;
   const caption = sentenceCase('by trading day');
   if (points.length === 0)
-    return <Card k="drawdown" state="empty" empty={NONE} caption={caption} />;
+    return (
+      <WidgetCard k="drawdown" state="empty" empty={NONE} caption={caption} />
+    );
   // One trading day has no fall to draw (record 1.5).
   if (points.length < 2)
     return (
-      <Card
+      <WidgetCard
         k="drawdown"
         state="empty"
         empty="Not enough days to draw a drawdown."
@@ -259,7 +215,7 @@ export function Drawdown(): React.JSX.Element {
   // The curve starts at its high, so its lowest point is the max drawdown.
   const deepest = Math.min(0, ...points.map((p) => p.value));
   return (
-    <Card k="drawdown" caption={caption}>
+    <WidgetCard k="drawdown" caption={caption}>
       <div className="mt-3">
         <ReportChart
           label={`Drawdown from the daily P&L peak, ${page.caption}. ${deepest === 0 ? 'No fall from a peak.' : `Max drawdown ${fmt.text('money', deepest)}.`}`}
@@ -277,7 +233,7 @@ export function Drawdown(): React.JSX.Element {
           ]}
         />
       </div>
-    </Card>
+    </WidgetCard>
   );
 }
 
@@ -321,13 +277,16 @@ export function DailyCum(): React.JSX.Element {
         : [],
     [both, unit],
   );
-  if (!days || !page || !ctx || !fmt || !both) return <Loading k="daily-cum" />;
+  if (!days || !page || !ctx || !fmt || !both)
+    return <WidgetLoading k="daily-cum" />;
   const caption = sentenceCase('by trading day');
   if (days.length === 0)
-    return <Card k="daily-cum" state="empty" empty={NONE} caption={caption} />;
+    return (
+      <WidgetCard k="daily-cum" state="empty" empty={NONE} caption={caption} />
+    );
   const ends = both.running[both.running.length - 1]!.value!;
   return (
-    <Card k="daily-cum" caption={caption}>
+    <WidgetCard k="daily-cum" caption={caption}>
       <div className="mt-3">
         <DualAxisChart
           label={`Daily ${basis} P&L bars and the running total, ${days.length} ${plural(days.length, 'day')}, ${page.caption}. Ends at ${fmt.text(unit, ends)}.`}
@@ -340,7 +299,7 @@ export function DailyCum(): React.JSX.Element {
           alignZero
         />
       </div>
-    </Card>
+    </WidgetCard>
   );
 }
 
@@ -388,15 +347,17 @@ export function WinAvg(): React.JSX.Element {
         : [],
     [points, unit],
   );
-  if (!points || !page || !ctx || !fmt) return <Loading k="win-avg" />;
+  if (!points || !page || !ctx || !fmt) return <WidgetLoading k="win-avg" />;
   const caption = sentenceCase('through the day');
   if (points.length === 0)
-    return <Card k="win-avg" state="empty" empty={NONE} caption={caption} />;
+    return (
+      <WidgetCard k="win-avg" state="empty" empty={NONE} caption={caption} />
+    );
   const last = points[points.length - 1]!;
   const say = (u: SeriesUnit, v: number | null) =>
     v === null ? 'none' : fmt.text(u, v);
   return (
-    <Card k="win-avg" caption={caption}>
+    <WidgetCard k="win-avg" caption={caption}>
       <div className="mt-3">
         <DualAxisChart
           label={`Win rate, average win and average loss through the day, ${page.caption}. After ${formatCount(last.trades)} ${plural(last.trades, 'trade')}: win rate ${say('pct', last.winRate)}, average win ${say(unit, last.avgWin)}, average loss ${say(unit, last.avgLoss)}.`}
@@ -412,7 +373,7 @@ export function WinAvg(): React.JSX.Element {
           note={`Time of day in ${zoneLabel(ctx.timeZone)}`}
         />
       </div>
-    </Card>
+    </WidgetCard>
   );
 }
 
@@ -457,17 +418,21 @@ export function Balance(): React.JSX.Element {
         : [],
     [points, moved],
   );
-  if (!data || !page || !fmt) return <Loading k="balance" />;
+  if (!data || !page || !fmt) return <WidgetLoading k="balance" />;
   // A balance is an amount of money: it has no value in R, ticks, pips or points.
   if (isTradeUnit(display.unit))
-    return <Card k="balance" state="empty" empty={noBalanceIn(display.unit)} />;
+    return (
+      <WidgetCard k="balance" state="empty" empty={noBalanceIn(display.unit)} />
+    );
   if (data.unfunded)
-    return <Card k="balance" state="empty" empty={STARTING_BALANCE_PROMPT} />;
+    return (
+      <WidgetCard k="balance" state="empty" empty={STARTING_BALANCE_PROMPT} />
+    );
   if (!points || points.length === 0)
-    return <Card k="balance" state="empty" empty={NONE} />;
+    return <WidgetCard k="balance" state="empty" empty={NONE} />;
   const last = points[points.length - 1]!;
   return (
-    <Card k="balance">
+    <WidgetCard k="balance">
       <div className="mt-3">
         <DualAxisChart
           label={`Account balance by day, ${page.caption}. Ends at ${fmt.text('balance', last.balance)}.${moved ? ` Net deposits and withdrawals ${fmt.text('money', last.flows)}.` : ''}`}
@@ -479,7 +444,7 @@ export function Balance(): React.JSX.Element {
           series={series}
         />
       </div>
-    </Card>
+    </WidgetCard>
   );
 }
 
@@ -580,7 +545,7 @@ export function TradeTime({
     [dots, oneDay],
   );
   if (!data || !page || !ctx || !fmt || !describe)
-    return <Loading k="trade-time" />;
+    return <WidgetLoading k="trade-time" />;
   // The switch stays, whatever the range holds: it is the widget's setting.
   const end = (
     <Segmented
@@ -595,9 +560,9 @@ export function TradeTime({
     />
   );
   if (dots.length === 0)
-    return <Card k="trade-time" end={end} state="empty" empty={NONE} />;
+    return <WidgetCard k="trade-time" end={end} state="empty" empty={NONE} />;
   return (
-    <Card k="trade-time" end={end}>
+    <WidgetCard k="trade-time" end={end}>
       <div className="mt-3">
         <ScatterChart
           label={`Trade time performance by ${time} time, ${formatCount(dots.length)} closed ${plural(dots.length, 'trade')}, ${page.caption}. ${describeDots(dots, fmt)}`}
@@ -608,7 +573,7 @@ export function TradeTime({
           note={`Times in ${zoneLabel(ctx.timeZone)}`}
         />
       </div>
-    </Card>
+    </WidgetCard>
   );
 }
 
@@ -623,16 +588,21 @@ export function TradeDuration(): React.JSX.Element {
   );
   const xAxis = useMemo(() => durationAxis(dots.map((d) => d.x)), [dots]);
   if (!points || !page || !ctx || !fmt || !describe)
-    return <Loading k="trade-duration" />;
+    return <WidgetLoading k="trade-duration" />;
   const caption = sentenceCase('log scale');
   if (dots.length === 0)
     return (
-      <Card k="trade-duration" caption={caption} state="empty" empty={NONE} />
+      <WidgetCard
+        k="trade-duration"
+        caption={caption}
+        state="empty"
+        empty={NONE}
+      />
     );
   const xs = dots.map((d) => d.x);
   const spread = `Held from ${formatMinutes(10 ** Math.min(...xs))} to ${formatMinutes(10 ** Math.max(...xs))}.`;
   return (
-    <Card k="trade-duration" caption={caption}>
+    <WidgetCard k="trade-duration" caption={caption}>
       <div className="mt-3">
         <ScatterChart
           label={`Trade duration performance, ${formatCount(dots.length)} closed ${plural(dots.length, 'trade')}, ${page.caption}. ${spread} ${describeDots(dots, fmt)}`}
@@ -642,7 +612,7 @@ export function TradeDuration(): React.JSX.Element {
           describe={describe}
         />
       </div>
-    </Card>
+    </WidgetCard>
   );
 }
 

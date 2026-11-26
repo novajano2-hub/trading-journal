@@ -2,7 +2,7 @@
 import { cleanup, screen, within } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import { renderApp } from '../../__fixtures__/render-app';
-import { WidgetFrame } from './frame';
+import { WidgetCard, widgetTitle, WidgetFrame, WidgetLoading } from './frame';
 
 vi.mock('next/navigation', () => import('../../__fixtures__/navigation'));
 
@@ -118,4 +118,35 @@ test('a card titled by something other than the widget says what its info tip is
   expect(
     within(card).queryByRole('button', { name: 'About November 2026' }),
   ).toBeNull();
+});
+
+test('the title of a widget that carries the P&L basis follows it; every other keeps its name', () => {
+  expect(widgetTitle('net-pnl', 'net')).toBe('Net P&L');
+  expect(widgetTitle('net-pnl', 'gross')).toBe('Gross P&L');
+  expect(widgetTitle('cum-pnl', 'gross')).toBe('Cumulative gross P&L');
+  expect(widgetTitle('daily-pnl', 'net')).toBe('Net daily P&L');
+  expect(widgetTitle('daily-cum', 'gross')).toBe(
+    'Daily and cumulative gross P&L',
+  );
+  expect(widgetTitle('drawdown', 'gross')).toBe('Drawdown');
+  expect(widgetTitle('recent', 'net')).toBe('Recent trades');
+});
+
+test('WidgetCard frames a widget by its key, with its tip and caption; WidgetLoading is its skeleton', async () => {
+  renderApp(
+    <>
+      <WidgetCard k="drawdown" caption="By trading day">
+        <p>the body</p>
+      </WidgetCard>
+      <WidgetLoading k="cum-pnl" />
+    </>,
+  );
+  const card = await screen.findByRole('region', { name: 'Drawdown' });
+  expect(card.getAttribute('data-widget')).toBe('drawdown');
+  expect(card.textContent).toContain('By trading day');
+  expect(within(card).getByText('the body')).toBeTruthy();
+  const loading = screen.getByRole('region', {
+    name: 'Cumulative net P&L',
+  });
+  expect(loading.getAttribute('aria-busy')).toBe('true');
 });

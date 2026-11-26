@@ -3,12 +3,14 @@
 import { Info } from '@phosphor-icons/react/dist/ssr';
 import { useId, type ReactNode } from 'react';
 import { MetricTip } from '@/components/ui/metric-tip';
+import { WIDGET_TITLES } from '@/content/dashboard-widgets';
 import type { MetricId } from '@/content/metric-definitions';
 import { usePrefs } from '@/data/query/hooks';
 import { WIDGETS } from '@/domain/dashboard/widgets';
 import type { PnlBasis, WidgetKey } from '@/domain/types';
 import { CARD, CARD_PAD, Caption, CardHeader } from '../shared';
 import { SkeletonBody } from './layout';
+import { sentenceCase } from './text';
 
 /**
  * The card every dashboard widget but the progress tracker (which draws its
@@ -144,3 +146,62 @@ export function TipGlyph({
     </MetricTip>
   );
 }
+
+/** A widget's name, following the Gross or Net basis where it carries one. */
+export function widgetTitle(key: WidgetKey, basis: PnlBasis): string {
+  const word = basis === 'gross' ? 'gross' : 'net';
+  switch (key) {
+    case 'net-pnl':
+      return `${sentenceCase(word)} P&L`;
+    case 'cum-pnl':
+      return `Cumulative ${word} P&L`;
+    case 'daily-pnl':
+      return `${sentenceCase(word)} daily P&L`;
+    case 'daily-cum':
+      return `Daily and cumulative ${word} P&L`;
+    default:
+      return WIDGET_TITLES[key];
+  }
+}
+
+/**
+ * The frame of a widget named by its key: the title (following the P&L basis),
+ * the metric's tip, and the state it is in. What the widgets draw their cards
+ * with; `WidgetFrame` is for one with a title of its own (a month, a challenge).
+ */
+export function WidgetCard({
+  k,
+  caption,
+  end,
+  state = 'ready',
+  empty,
+  children,
+}: {
+  k: WidgetKey;
+  /** Beside the title of a lower widget: the range, or what the chart is by. */
+  caption?: ReactNode;
+  end?: ReactNode;
+  state?: 'ready' | 'loading' | 'empty';
+  empty?: ReactNode;
+  children?: ReactNode;
+}): React.JSX.Element {
+  const basis = usePrefs().data?.pnlBasis ?? 'net';
+  return (
+    <WidgetFrame
+      widgetKey={k}
+      title={widgetTitle(k, basis)}
+      tip={WIDGETS[k].metric}
+      caption={caption}
+      end={end}
+      state={state}
+      empty={empty}
+    >
+      {children}
+    </WidgetFrame>
+  );
+}
+
+/** A widget's skeleton, until its data is in. */
+export const WidgetLoading = ({ k }: { k: WidgetKey }) => (
+  <WidgetCard k={k} state="loading" />
+);
