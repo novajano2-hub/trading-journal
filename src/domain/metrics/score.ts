@@ -26,8 +26,12 @@ export const SCORE_WEIGHTS: Record<ScorePart, number> = {
   consistency: 0.1,
 };
 
-/** Why a part scores as it does when its raw value cannot be computed or is not a figure. */
-export type ScoreWhy = 'no-losses' | 'no-drawdown' | 'net-loss';
+/**
+ * Why a part scores as it does when its raw value cannot be computed or is not
+ * a figure. 'no-profit' is the ratios' with no winning trade (C77): nothing was
+ * won, so no edge is shown and they score 0.
+ */
+export type ScoreWhy = 'no-losses' | 'no-profit' | 'no-drawdown' | 'net-loss';
 
 export interface ScorePartResult {
   /**
@@ -140,8 +144,15 @@ function part(
   };
 }
 
-/** A ratio part: no loss to divide by scores full. */
-function ratioPart(raw: number | null): ScorePartResult {
+/**
+ * A ratio part (profit factor or avg win/loss). With no winning trade nothing
+ * was won, so it scores 0, 'no-profit' (C77); the raw is the ratio when there
+ * is one (0 with losses), null when there is none (all breakeven). With a win
+ * and no loss there is nothing to divide by: it scores full, 'no-losses'
+ * (C23), which applies only when there is a profit.
+ */
+function ratioPart(raw: number | null, wins: number): ScorePartResult {
+  if (wins === 0) return part(raw, 0, { why: 'no-profit' });
   return raw === null
     ? part(null, 100, { why: 'no-losses' })
     : part(raw, ratioScore(raw));
@@ -176,6 +187,7 @@ export function scoreOf(
 
   // No wins and a loss is a ratio of 0; no loss has no ratio.
   const winLoss = s.losses === 0 ? null : s.wins === 0 ? 0 : s.winLossRatio;
+  // (ratioPart scores either as no-profit when there is no win.)
 
   let drawdown: ScorePartResult;
   if (dd.amount === 0) drawdown = part(0, 100);
@@ -204,8 +216,8 @@ export function scoreOf(
   const parts: Record<ScorePart, ScorePartResult> = {
     winRate:
       winRate === null ? part(null, 0) : part(winRate, winRateScore(winRate)),
-    profitFactor: ratioPart(s.profitFactor),
-    winLoss: ratioPart(winLoss),
+    profitFactor: ratioPart(s.profitFactor, s.wins),
+    winLoss: ratioPart(winLoss, s.wins),
     recovery,
     drawdown,
     consistency,

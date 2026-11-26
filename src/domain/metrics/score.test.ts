@@ -280,11 +280,48 @@ describe('scoreOf', () => {
     });
   });
 
-  test('losses and no win: both ratios are 0 and score the floor of 20', () => {
-    const { parts } = scoreOf(nets(-10000, -20000), ctx)!;
-    expect(parts.profitFactor).toMatchObject({ raw: 0, score: 20 });
-    expect(parts.winLoss).toMatchObject({ raw: 0, score: 20 });
+  test('losses and no win: both ratios are 0 and score 0, why no-profit (C77)', () => {
+    const r = scoreOf(nets(-10000, -20000), ctx)!;
+    const { parts } = r;
+    expect(parts.profitFactor).toMatchObject({
+      raw: 0,
+      score: 0,
+      plotted: 0,
+      why: 'no-profit',
+    });
+    expect(parts.winLoss).toMatchObject({
+      raw: 0,
+      score: 0,
+      plotted: 0,
+      why: 'no-profit',
+    });
     expect(parts.winRate).toMatchObject({ raw: 0, score: 0 });
+    expect(r.total).toBe(0);
+  });
+
+  test('all breakeven: no profit, so both ratios score 0, not 100 for no losses (C77)', () => {
+    const r = scoreOf(nets(0, 0, 0), ctx)!;
+    const { parts } = r;
+    expect(parts.profitFactor).toMatchObject({
+      raw: null,
+      score: 0,
+      plotted: 0,
+      why: 'no-profit',
+    });
+    expect(parts.winLoss).toMatchObject({
+      raw: null,
+      score: 0,
+      plotted: 0,
+      why: 'no-profit',
+    });
+    // Only the drawdown (no drop: 100, weight 0.2) counts: a low total, not 65.
+    expect(r.total).toBe(20);
+  });
+
+  test('a win and a breakeven but no loss still scores no-losses, not no-profit', () => {
+    const { parts } = scoreOf(nets(10000, 0), ctx)!;
+    expect(parts.profitFactor.why).toBe('no-losses');
+    expect(parts.winLoss.why).toBe('no-losses');
   });
 
   test('no decided trade has no win rate and scores 0 for it', () => {
