@@ -36,6 +36,7 @@ import {
   useSaveFeeRule,
   useSaveTargetRule,
   useSetActiveWorkspace,
+  useSetFillCosts,
   useSplitTrade,
   useTagCategories,
   useTags,
@@ -690,5 +691,51 @@ test('rule writes refresh the rule lists, the trades and the history', async () 
   await waitFor(() => expect(result.current.fees.data).toEqual([]));
   expect(result.current.trades.data!.find((t) => t.id === 'f-1')!.fees).toBe(
     was + 340,
+  );
+});
+
+test("a fill's costs refresh the trade and the history, and resolve to the trade", async () => {
+  const sample = () => {
+    const s = fixtureSample();
+    s.trades.find((t) => t.id === 'f-1')!.executions = [
+      fillOf('e1', 'buy', 6000, '2026-11-16T14:45:00.000Z'),
+      fillOf('e2', 'sell', 6005, '2026-11-16T15:10:00.000Z'),
+    ];
+    return s;
+  };
+  const { result } = renderHook(
+    () => ({
+      trade: useTrade('f-1'),
+      history: useHistory(),
+      setCosts: useSetFillCosts(),
+    }),
+    { wrapper: wrapper(sample) },
+  );
+  await waitFor(() => expect(result.current.trade.data).toBeTruthy());
+  await waitFor(() => expect(result.current.history.data).toEqual([]));
+  const was = result.current.trade.data!;
+  let saved: unknown;
+  await act(async () => {
+    saved = await result.current.setCosts.mutateAsync({
+      tradeId: 'f-1',
+      executionId: 'e2',
+      costs: { commission: 350, fees: 120 },
+    });
+  });
+  expect(saved).toMatchObject({ id: 'f-1', fees: was.fees + 470 });
+  await waitFor(() =>
+    expect(result.current.trade.data!.fees).toBe(was.fees + 470),
+  );
+  expect(result.current.trade.data!.net).toBe(was.net - 470);
+  await waitFor(() =>
+    expect(
+      result.current.history.data?.map((r) => [
+        r.entityId,
+        r.field,
+        r.source,
+        r.oldValue,
+        r.newValue,
+      ]),
+    ).toEqual([['f-1', 'fees', 'you', was.fees, was.fees + 470]]),
   );
 });

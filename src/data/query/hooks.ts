@@ -12,6 +12,7 @@ import { useHydrated } from '@/lib/use-hydrated';
 import type {
   Account,
   CashFlow,
+  Cents,
   Challenge,
   DayRecord,
   DayShot,
@@ -606,6 +607,30 @@ export function useSplitTrade(): UseMutationResult<
     'trades.split',
     (r, ws, v: { id: string; moved: readonly string[] }) =>
       r.trades.split(ws, v.id, v.moved),
+  );
+}
+
+/** Replaces the commission and fee of one execution (B58); resolves to the trade with its fees and net recomputed. */
+export function useSetFillCosts(): UseMutationResult<
+  Trade,
+  Error,
+  {
+    tradeId: string;
+    executionId: string;
+    costs: { commission: Cents; fees: Cents };
+  }
+> {
+  return useWorkspaceWrite(
+    'trades.setFillCosts',
+    (
+      r,
+      ws,
+      v: {
+        tradeId: string;
+        executionId: string;
+        costs: { commission: Cents; fees: Cents };
+      },
+    ) => r.trades.setFillCosts(ws, v.tradeId, v.executionId, v.costs),
   );
 }
 

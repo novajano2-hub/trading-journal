@@ -243,6 +243,24 @@ export interface TradesRepo {
     fromAccountId: string,
     toAccountId: string,
   ): Promise<number>;
+  /**
+   * Replaces the commission and fee of one execution (B58), in the trade's own
+   * currency. The trade's `fees` and `net` move by the change in what the fills
+   * cost, and `gross`, the swap, the currency and the excursions stay (a
+   * rebuild would change a closed-trades file's currency and drop its MAE and
+   * MFE). One `edited` history row, source you, for `fees` in raw cents; none
+   * when the fees do not change. Allowed on a finished day (B55): its frozen
+   * score stays. Moves the import state when anything changed. Throws
+   * RangeError for costs that are not whole, non-negative cents, NotFoundError
+   * for a missing trade or execution, ArchivedAccountError for a trade in an
+   * archived account. One transaction.
+   */
+  setFillCosts(
+    ws: string,
+    tradeId: string,
+    executionId: string,
+    costs: { commission: Cents; fees: Cents },
+  ): Promise<Trade>;
 }
 
 export type NewAccount = Omit<Account, 'id' | 'workspaceId'>;

@@ -65,6 +65,13 @@ import type { NoteEditorHandle } from '../notes/note-editor';
 import { price } from '@/lib/format';
 import { StatusChip } from './cells';
 import { qty } from './columns';
+import {
+  CostCell,
+  FillCostsNote,
+  rowKeys,
+  RowControls,
+  useFillCosts,
+} from './fill-costs';
 import { FillsTimeline, positions, sortedFills } from './fills-timeline';
 import { LevelsBlock, noun } from './levels-block';
 import { RatingRow } from '../routine/rating-row';
@@ -513,11 +520,14 @@ function Executions({
   trade,
   timeZone,
   display,
+  readOnly,
 }: {
   trade: Trade;
   timeZone: string;
   display: Display;
+  readOnly: boolean;
 }): React.JSX.Element {
+  const edit = useFillCosts(trade, display, readOnly);
   const fills = sortedFills(trade);
   const held = positions(trade, fills);
   const tick = trade.instrument.tickSize;
@@ -525,91 +535,133 @@ function Executions({
     <FigureText f={display.cash(cents, false, trade.pnlCurrency)} />
   );
   const TH =
-    'h-9 border-b border-line pr-3.5 text-left text-xs font-medium text-faint last:pr-0';
+    'h-9 border-b border-line pr-3.5 text-left text-xs font-medium whitespace-nowrap text-faint last:pr-0';
   const TD = 'h-9 border-b border-line/70 pr-3.5 last:pr-0';
   return (
-    <div className="relative mt-3.5 overflow-x-auto">
-      <table
-        aria-label="Executions"
-        className="w-full min-w-[560px] border-collapse text-[13.5px]"
+    <>
+      {/* The cost buttons reach 6px past the column, so the scroller's padding keeps their focus ring and its edge from scrolling. */}
+      <div
+        ref={(el) => edit.setScroller(el)}
+        className="relative -mx-1.5 mt-3.5 overflow-x-auto px-1.5"
       >
-        <thead>
-          <tr>
-            <th scope="col" className={TH}>
-              Time
-            </th>
-            <th scope="col" className={TH}>
-              Side
-            </th>
-            <th scope="col" className={`${TH} text-right`}>
-              Quantity
-            </th>
-            <th scope="col" className={`${TH} text-right`}>
-              Price
-            </th>
-            <th scope="col" className={`${TH} text-right`}>
-              Position
-            </th>
-            <th scope="col" className={`${TH} text-right`}>
-              Exchange fees
-            </th>
-            <th scope="col" className={`${TH} text-right`}>
-              Commission
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {fills.map((f, i) => (
-            <tr key={f.id}>
-              <td
-                className={`${TD} font-semibold whitespace-nowrap tabular-nums`}
-              >
-                {clockOnDay(f.time, trade.openedAt, timeZone)}
-              </td>
-              <td className={TD}>
-                <span className="inline-flex h-[22px] items-center rounded-[7px] bg-sunken px-2 text-xs font-semibold text-muted">
-                  {f.side === 'buy' ? 'Buy' : 'Sell'}
-                </span>
-              </td>
-              <td className={`${TD} text-right tabular-nums`}>{qty(f.qty)}</td>
-              <td className={`${TD} text-right font-medium tabular-nums`}>
-                {price(f.price, tick)}
-              </td>
-              <td
-                className={`${TD} text-right tabular-nums ${held[i] === 0 ? 'text-faint' : ''}`}
-              >
-                {held[i] === 0
-                  ? 'Flat'
-                  : `${held[i]! > 0 ? '+' : '−'}${qty(Math.abs(held[i]!))}`}
-              </td>
-              <td className={`${TD} text-right text-muted tabular-nums`}>
-                {cash(f.fees)}
-              </td>
-              <td className={`${TD} text-right text-muted tabular-nums`}>
-                {cash(f.commission)}
-              </td>
+        <table
+          aria-label="Executions"
+          className="w-full min-w-[560px] border-collapse text-[13.5px]"
+        >
+          <thead>
+            <tr>
+              <th scope="col" className={TH}>
+                Time
+              </th>
+              <th scope="col" className={TH}>
+                Side
+              </th>
+              <th scope="col" className={`${TH} text-right`}>
+                Quantity
+              </th>
+              <th scope="col" className={`${TH} text-right`}>
+                Price
+              </th>
+              <th scope="col" className={`${TH} text-right`}>
+                Position
+              </th>
+              <th scope="col" className={`${TH} text-right`}>
+                Exchange fees
+              </th>
+              <th scope="col" className={`${TH} text-right`}>
+                Commission
+              </th>
+              {edit.openId !== null ? (
+                <th scope="col" className={`${TH} w-[76px]`}>
+                  <span className="sr-only">Save the row</span>
+                </th>
+              ) : null}
             </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr className="font-semibold text-text">
-            <td className="h-[38px] pr-3.5">Total</td>
-            <td />
-            <td className="pr-3.5 text-right tabular-nums">
-              {qty(sum(fills, (e) => e.qty))}
-            </td>
-            <td />
-            <td />
-            <td className="pr-3.5 text-right tabular-nums">
-              {cash(sum(fills, (e) => e.fees))}
-            </td>
-            <td className="text-right tabular-nums">
-              {cash(sum(fills, (e) => e.commission))}
-            </td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {fills.map((f, i) => {
+              const open = edit.openId === f.id;
+              const when = `${f.side} at ${clockOnDay(f.time, trade.openedAt, timeZone)}`;
+              return (
+                <tr
+                  key={f.id}
+                  className={open ? 'bg-accent-soft/55' : undefined}
+                  onKeyDown={open ? rowKeys(edit, f) : undefined}
+                >
+                  <td
+                    className={`${TD} font-semibold whitespace-nowrap tabular-nums`}
+                  >
+                    {clockOnDay(f.time, trade.openedAt, timeZone)}
+                  </td>
+                  <td className={TD}>
+                    <span className="inline-flex h-[22px] items-center rounded-[7px] bg-sunken px-2 text-xs font-semibold text-muted">
+                      {f.side === 'buy' ? 'Buy' : 'Sell'}
+                    </span>
+                  </td>
+                  <td className={`${TD} text-right tabular-nums`}>
+                    {qty(f.qty)}
+                  </td>
+                  <td className={`${TD} text-right font-medium tabular-nums`}>
+                    {price(f.price, tick)}
+                  </td>
+                  <td
+                    className={`${TD} text-right tabular-nums ${held[i] === 0 ? 'text-faint' : ''}`}
+                  >
+                    {held[i] === 0
+                      ? 'Flat'
+                      : `${held[i]! > 0 ? '+' : '−'}${qty(Math.abs(held[i]!))}`}
+                  </td>
+                  <td className={`${TD} text-right text-muted tabular-nums`}>
+                    <CostCell
+                      edit={edit}
+                      fill={f}
+                      field="fees"
+                      when={when}
+                      figure={cash(f.fees)}
+                    />
+                  </td>
+                  <td className={`${TD} text-right text-muted tabular-nums`}>
+                    <CostCell
+                      edit={edit}
+                      fill={f}
+                      field="commission"
+                      when={when}
+                      figure={cash(f.commission)}
+                    />
+                  </td>
+                  {edit.openId !== null ? (
+                    <td className={TD}>
+                      {open ? <RowControls edit={edit} fill={f} /> : null}
+                    </td>
+                  ) : null}
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr className="font-semibold text-text">
+              <td className="h-[38px] pr-3.5">Total</td>
+              <td />
+              <td className="pr-3.5 text-right tabular-nums">
+                {qty(sum(fills, (e) => e.qty))}
+              </td>
+              <td />
+              <td />
+              <td className="pr-3.5 text-right tabular-nums">
+                {cash(sum(fills, (e) => e.fees))}
+              </td>
+              <td
+                className={`text-right tabular-nums ${edit.openId !== null ? 'pr-3.5' : ''}`}
+              >
+                {cash(sum(fills, (e) => e.commission))}
+              </td>
+              {edit.openId !== null ? <td /> : null}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <FillCostsNote edit={edit} />
+    </>
   );
 }
 
@@ -1078,7 +1130,12 @@ function TradePage({
               Plotted from your fills only. The price path between fills needs
               market data, which Keel does not have yet.
             </p>
-            <Executions trade={trade} timeZone={timeZone} display={display} />
+            <Executions
+              trade={trade}
+              timeZone={timeZone}
+              display={display}
+              readOnly={readOnly}
+            />
           </section>
         </div>
 

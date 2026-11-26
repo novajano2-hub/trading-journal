@@ -1,3 +1,4 @@
+import { withCosts } from '../fill-costs';
 import { roundHalfAway } from '../money';
 import type { Cents, Execution, FeeRule, Trade } from '../types';
 import { ruleAssetError } from './match';
@@ -8,8 +9,6 @@ import { ruleAssetError } from './match';
  * follow from the change. Pure: the data layer decides which trades a rule
  * covers and when, and writes what these functions return.
  */
-
-const costOf = (e: Execution): Cents => e.commission + e.fees;
 
 /**
  * Whether any fill of the trade carries a commission or a fee. TradeZella
@@ -110,21 +109,7 @@ export function withFeeRule(
 ): Trade | undefined {
   if (t.pnlCurrency !== o.accountCurrency) return undefined;
   if (!o.override && hasCosts(t, o.fills)) return undefined;
-  const executions = applyFeeRule(t, rule, o.fills);
-  const before = t.executions.reduce((sum, e) => sum + costOf(e), 0);
-  const after = executions.reduce((sum, e) => sum + costOf(e), 0);
-  const changed = executions.some(
-    (e, i) =>
-      e.commission !== t.executions[i]!.commission ||
-      e.fees !== t.executions[i]!.fees,
-  );
-  if (!changed) return undefined;
-  return {
-    ...t,
-    executions,
-    fees: t.fees + (after - before),
-    net: t.net - (after - before),
-  };
+  return withCosts(t, applyFeeRule(t, rule, o.fills));
 }
 
 /** A message for what keeps a fee rule from being kept, or null when it is fine. */

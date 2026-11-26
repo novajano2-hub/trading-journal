@@ -85,6 +85,9 @@ test('Plan 5 writes invalidate what they change', () => {
       'trades.move',
       k('trades', 'journal', 'imports', 'history', 'days', 'filesAll'),
     ],
+    // A fill's costs: the trade, the import context (its revision moves), the
+    // log, and the day figures, which read the trades.
+    ['trades.setFillCosts', k('trades', 'imports', 'history', 'days')],
     ['cashFlows.create', k('cashFlows', 'history')],
     ['cashFlows.update', k('cashFlows', 'history')],
     ['cashFlows.remove', k('cashFlows', 'history')],
@@ -130,6 +133,7 @@ test('every trade write makes the edit history stale', () => {
     'trades.merge',
     'trades.split',
     'trades.move',
+    'trades.setFillCosts',
   ] as const)
     expect(invalidationsFor(write, 'mine'), write).toContainEqual(
       keys.history('mine'),
@@ -237,6 +241,7 @@ test('every write that changes what an import context holds makes it stale', () 
     'trades.merge',
     'trades.split',
     'trades.move',
+    'trades.setFillCosts',
     'journal.ensureTradeNote',
     'rules.apply',
   ] as const)

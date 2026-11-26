@@ -1,3 +1,4 @@
+import { fillCostsError, withFillCosts } from '@/domain/fill-costs';
 import { buildManualTrade, keepHiddenSides } from '@/domain/manual-trade';
 import { strategyRules, type HistoryRow, type Trade } from '@/domain/types';
 import {
@@ -14,7 +15,13 @@ import { rwTx } from './tx';
 import { assertEditable } from './editable';
 import { deleteOwnerFiles } from './files';
 import { localGrouping } from './grouping';
-import { logHistory, tradeChanges, tradeLabel } from './history';
+import {
+  changeRows,
+  fieldChanges,
+  logHistory,
+  tradeChanges,
+  tradeLabel,
+} from './history';
 import { pruneJournalLinks } from './journal';
 import { bumpImportRevision } from './imports';
 import { readPrefs } from './prefs';
@@ -227,6 +234,43 @@ export function localTrades(ctx: LocalContext): TradesRepo {
           await bumpImportRevision(db, ws);
           const { timeZone } = await readPrefs(db);
           await logHistory(db, ws, editRows(old, next, timeZone), ctx);
+          return next;
+        },
+      );
+    },
+
+    async setFillCosts(ws, tradeId, executionId, costs) {
+      const problem = fillCostsError(costs);
+      if (problem) throw new RangeError(problem);
+      const db = await ctx.db();
+      return rwTx(
+        db,
+        [db.trades, db.accounts, db.history, db.meta],
+        async () => {
+          const before = await db.trades.get([ws, tradeId]);
+          if (!before) throw new NotFoundError('trade', tradeId);
+          await assertEditable(db, ws, [before]);
+          if (!before.executions.some((e) => e.id === executionId))
+            throw new NotFoundError('execution', executionId);
+          // Nothing else of the trade is recomputed: no `buildGroupedTrade`.
+          const next = withFillCosts(before, executionId, costs);
+          if (!next) return before;
+          await db.trades.put(next);
+          // A pending import plan carries the stored open trades it would overwrite.
+          await bumpImportRevision(db, ws);
+          const { timeZone } = await readPrefs(db);
+          // The log holds the trade's fees, in raw cents. A cost moved between the commission and the fee leaves them as they were, and then there is no row.
+          await logHistory(
+            db,
+            ws,
+            changeRows(
+              'trade',
+              next.id,
+              tradeLabel(next, timeZone),
+              fieldChanges(before, next, ['fees']),
+            ),
+            ctx,
+          );
           return next;
         },
       );

@@ -56,6 +56,7 @@ export type WriteKind =
   | 'trades.merge'
   | 'trades.split'
   | 'trades.move'
+  | 'trades.setFillCosts'
   | 'accounts.create'
   | 'accounts.update'
   | 'accounts.remove'
@@ -145,6 +146,16 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
         keys.history(ws),
         keys.days(ws),
         keys.filesAll(ws),
+      ];
+    // A fill's costs move the trade's fees and net, and the import state (a
+    // pending plan carries the open trades); a day's figures read the trades,
+    // while a finished day's frozen score does not move.
+    case 'trades.setFillCosts':
+      return [
+        keys.trades(ws),
+        keys.imports(ws),
+        keys.history(ws),
+        keys.days(ws),
       ];
     case 'journal.remove':
       return [
