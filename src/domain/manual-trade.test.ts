@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import type { ManualTradeInput } from '@/data/repository';
 import { resolveInstrument } from './instruments';
 import { plannedR } from './metrics/summary';
+import { hasCosts } from './rules/fee-rules';
 import type { Instrument, LevelSide } from './types';
 import {
   ASSET_TYPES,
@@ -55,6 +56,30 @@ describe('buildManualTrade', () => {
     });
     expect(r.trade.executions).toHaveLength(2);
     expect(r.trade.executions[0]!.id).not.toBe(r.trade.executions[1]!.id);
+  });
+
+  test('a negative cost is a credit: it flows through fees and net, and the gross stays', () => {
+    const r = buildManualTrade(
+      input({
+        fills: [
+          { ...fillOf('buy', 2, 5000, 0), commission: 350, fees: -500 },
+          { ...fillOf('sell', 2, 5010, 5), commission: -120 },
+        ],
+      }),
+      ctx,
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // 3.50 - 5.00 - 1.20 = -2.70: the credits outweigh the charges.
+    expect(r.trade.fees).toBe(-270);
+    expect(r.trade.gross).toBe(100000);
+    expect(r.trade.net).toBe(100000 + 270);
+    expect(r.trade.executions.map((e) => [e.commission, e.fees])).toEqual([
+      [350, -500],
+      [-120, 0],
+    ]);
+    // A fee rule reads a credit as a cost, so it does not fill over it without override.
+    expect(hasCosts(r.trade)).toBe(true);
   });
 
   test('a partial exit leaves the trade open', () => {

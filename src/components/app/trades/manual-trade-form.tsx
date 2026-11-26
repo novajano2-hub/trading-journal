@@ -27,6 +27,7 @@ import {
   useTrade,
 } from '@/data/query/hooks';
 import { ManualTradeRejected, type ManualTradeInput } from '@/data/repository';
+import { centsFromText } from '@/domain/fill-costs';
 import { fillTimeToUtc } from '@/domain/import/fill-time';
 import {
   ASSET_TYPES,
@@ -42,7 +43,6 @@ import {
   type AssetType,
   type ManualTradeError,
 } from '@/domain/manual-trade';
-import { toCents } from '@/domain/money';
 import { sidesOf } from '@/domain/risk';
 import { localDate } from '@/domain/time';
 import type { Account, Side, Trade } from '@/domain/types';
@@ -413,22 +413,23 @@ function Form({
         timeZone: zone,
         dateOrder: 'mdy',
       });
-      const cost = (s: string) => (s.trim() === '' ? 0 : num(s));
+      // A blank cost is nothing; a negative one is a credit (a swap credit goes in the fees, as in
+      // TradeZella); a decimal comma or letters are refused, not read as another amount.
+      const commission = centsFromText(r.commission);
+      const fees = centsFromText(r.fees);
       if (!r.date || !r.time || time === null)
         local[`row:${r.key}`] = `Check fill ${i + 1}: enter its date and time.`;
-      else if (Number.isNaN(cost(r.commission)) || Number.isNaN(cost(r.fees)))
+      else if (commission === null || fees === null)
         local[`row:${r.key}`] =
           `Check fill ${i + 1}: commission and fees must be numbers.`;
-      else if (cost(r.commission) < 0 || cost(r.fees) < 0)
-        local[`row:${r.key}`] = 'Enter fees as a positive amount.';
       else
         fills.push({
           time,
           side: r.side,
           qty: num(r.qty),
           price: num(r.price),
-          commission: toCents(cost(r.commission)),
-          fees: toCents(cost(r.fees)),
+          commission,
+          fees,
         });
     });
     const price = (s: string, k: 'stop' | 'target') => {
@@ -694,7 +695,7 @@ function Form({
             Fills
           </h2>
           <span className="text-xs text-faint">
-            Commission and fees in {account.currency}
+            Commission and fees in {account.currency}. A credit is negative.
           </span>
         </div>
 

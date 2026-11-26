@@ -28,6 +28,8 @@ function sample(
   withManual = false,
   plan: { plannedStop?: number; plannedTarget?: number } = {},
   levels: Partial<Trade> = {},
+  /** The first fill's costs, in cents. */
+  costs: { commission: number; fees: number } = { commission: 0, fees: 0 },
 ) {
   return async (): Promise<SampleWorkspace> => {
     const fx = fixtureSample();
@@ -45,8 +47,8 @@ function sample(
               side: 'buy',
               qty: 2,
               price: 5000,
-              commission: 0,
-              fees: 0,
+              commission: costs.commission,
+              fees: costs.fees,
             },
             {
               time: '2026-11-19T15:00:00.000Z',
@@ -360,7 +362,33 @@ test('the links back to a trade encode an id that holds a slash', async () => {
     expect(cancel.getAttribute('href')).toBe('/app/trades/acc%3AEUR%2FUSD%3Ax');
 });
 
-test('a negative commission or fee is refused at its fill, not flipped', async () => {
+test('a negative commission or fee is a credit: saved as typed, and the trade’s fees and net follow', async () => {
+  const { repo } = renderApp(<ManualTradeForm />, {
+    sample: sample(),
+    url: '/app/trades/new',
+  });
+  await fillFuture();
+  addExit('1');
+  set('Fill 1 commission', '-1.5');
+  set('Fill 1 fees', '-5');
+  set('Fill 2 commission', '3.50');
+  fireEvent.click(screen.getByRole('button', { name: 'Save trade' }));
+  await waitFor(() =>
+    expect(window.location.pathname).toMatch(/^\/app\/trades\/manual%3A/),
+  );
+  const made = (await repo.trades.list(WS)).find((t) => t.source === 'manual')!;
+  expect(made.executions.map((e) => [e.commission, e.fees])).toEqual([
+    [-150, -500],
+    [350, 0],
+  ]);
+  // -1.50 - 5.00 + 3.50 = -3.00 of fees: net is $3.00 over gross.
+  expect(made.fees).toBe(-300);
+  expect(made.gross).toBe(50000);
+  expect(made.net).toBe(50300);
+  expect(screen.queryByText('Enter fees as a positive amount.')).toBeNull();
+});
+
+test('a cost that is not an amount is refused at its fill, a decimal comma too', async () => {
   const { repo } = renderApp(<ManualTradeForm />, {
     sample: sample(),
     url: '/app/trades/new',
@@ -368,17 +396,64 @@ test('a negative commission or fee is refused at its fill, not flipped', async (
   await fillFuture();
   addExit('1');
   const before = (await repo.trades.list(WS)).length;
-  for (const field of ['commission', 'fees']) {
-    set(`Fill 1 ${field}`, '-1.5');
-    fireEvent.click(screen.getByRole('button', { name: 'Save trade' }));
-    const msg = await screen.findByText('Enter fees as a positive amount.');
-    expect(
-      screen.getByLabelText(`Fill 1 ${field}`).getAttribute('aria-describedby'),
-    ).toContain(msg.id);
-    expect((await repo.trades.list(WS)).length).toBe(before);
-    set(`Fill 1 ${field}`, '');
-  }
+  for (const field of ['commission', 'fees'])
+    for (const bad of ['abc', '2,43', '--', '-', '1e3', '$2']) {
+      set(`Fill 1 ${field}`, bad);
+      fireEvent.click(screen.getByRole('button', { name: 'Save trade' }));
+      const msg = await screen.findByText(
+        'Check fill 1: commission and fees must be numbers.',
+      );
+      expect(
+        screen
+          .getByLabelText(`Fill 1 ${field}`)
+          .getAttribute('aria-describedby'),
+      ).toContain(msg.id);
+      expect((await repo.trades.list(WS)).length).toBe(before);
+    }
   expect(window.location.pathname).toBe('/app/trades/new');
+});
+
+test('thousands commas and a blank cost still read: 1,234.50 is 123450 cents, blank is nothing', async () => {
+  const { repo } = renderApp(<ManualTradeForm />, {
+    sample: sample(),
+    url: '/app/trades/new',
+  });
+  await fillFuture();
+  addExit('1');
+  set('Fill 1 commission', '1,234.50');
+  fireEvent.click(screen.getByRole('button', { name: 'Save trade' }));
+  await waitFor(() =>
+    expect(window.location.pathname).toMatch(/^\/app\/trades\/manual%3A/),
+  );
+  const made = (await repo.trades.list(WS)).find((t) => t.source === 'manual')!;
+  expect(made.executions.map((e) => [e.commission, e.fees])).toEqual([
+    [123450, 0],
+    [0, 0],
+  ]);
+});
+
+test('a credit saved on a trade reopens in the form as typed, and saving it again keeps it', async () => {
+  const { repo } = renderApp(<ManualTradeForm tradeId="man-1" />, {
+    sample: sample(true, {}, {}, { commission: -150, fees: -500 }),
+    url: '/app/trades/man-1/edit',
+  });
+  await screen.findByText(/^Times in New York, UTC-0[45]:00$/);
+  expect((screen.getByLabelText('Fill 1 fees') as HTMLInputElement).value).toBe(
+    '-5',
+  );
+  expect(
+    (screen.getByLabelText('Fill 1 commission') as HTMLInputElement).value,
+  ).toBe('-1.5');
+  // Changing something else keeps both credits.
+  set('Fill 2 price', '5020');
+  fireEvent.click(screen.getByRole('button', { name: 'Save trade' }));
+  await waitFor(() =>
+    expect(window.location.pathname).toBe('/app/trades/man-1'),
+  );
+  const t = (await repo.trades.get(WS, 'man-1'))!;
+  expect(t.executions[0]).toMatchObject({ commission: -150, fees: -500 });
+  expect(t.fees).toBe(-650);
+  expect(t.net).toBe(t.gross + 650);
 });
 
 test('the account query parameter preselects an active account; an unknown or archived one is ignored', async () => {

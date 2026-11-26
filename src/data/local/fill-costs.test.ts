@@ -1,7 +1,12 @@
 import { describe, expect, test, vi } from 'vitest';
 import { rulesSetup, DAY, M } from '../__fixtures__/rules';
 import { freezeDay, scoreHistory, type RoutineEnv } from '../routine';
-import { ArchivedAccountError, NotFoundError } from '../repository';
+import type { Trade } from '@/domain/types';
+import {
+  ArchivedAccountError,
+  NotFoundError,
+  type ManualTradeInput,
+} from '../repository';
 
 /** A closed long ES: in 1 at 6000 with a $3.50 commission and a $1.20 fee, out 1 at 6001 with a $3.50 commission. */
 async function setup() {
@@ -259,6 +264,72 @@ describe('setFillCosts', () => {
         fees: 1,
       }),
     ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe('a manual trade with a credit', () => {
+  /** The fills of `trade` as the form sends them back: their costs as stored. */
+  const asInput = (accountId: string, t: Trade): ManualTradeInput => ({
+    accountId,
+    instrument: t.instrument,
+    fills: t.executions.map((e) => ({
+      time: e.time,
+      side: e.side,
+      qty: e.qty,
+      price: e.price,
+      commission: e.commission,
+      fees: e.fees,
+    })),
+  });
+
+  test('a manual trade can be made with a credit, and its figures follow', async () => {
+    const { repo, acc, manual } = await rulesSetup();
+    const made = await manual(acc.id, [
+      ['buy', 1, 6000, '14:30', { commission: 350, fees: -500 }],
+      ['sell', 1, 6001, '14:40'],
+    ]);
+    expect(made.fees).toBe(-150);
+    expect(made.net).toBe(made.gross + 150);
+    expect(await repo.trades.get(M, made.id)).toEqual(made);
+  });
+
+  test('replaceManual keeps a credit and recomputes from it, and a credit set on the trade page survives an edit of the fills', async () => {
+    const { repo, acc, manual, rows } = await rulesSetup();
+    const made = await manual(acc.id, [
+      ['buy', 1, 6000, '14:30', { commission: 350 }],
+      ['sell', 1, 6001, '14:40', { commission: 350 }],
+    ]);
+    // A credit entered on the trade page ...
+    const credited = await repo.trades.setFillCosts(
+      M,
+      made.id,
+      made.executions[1]!.id,
+      { commission: 0, fees: -500 },
+    );
+    expect(credited.fees).toBe(350 - 500);
+    // ... is what the form offers back, and saving the form with a changed price keeps it.
+    const form = asInput(acc.id, credited);
+    form.fills[1] = { ...form.fills[1]!, price: 6002 };
+    const rebuilt = await repo.trades.replaceManual(M, made.id, form);
+    expect(rebuilt.executions.map((e) => [e.commission, e.fees])).toEqual([
+      [350, 0],
+      [0, -500],
+    ]);
+    expect(rebuilt.fees).toBe(-150);
+    expect(rebuilt.net).toBe(rebuilt.gross + 150);
+    expect(rebuilt.net).toBe(made.gross + 5000 + 150);
+    expect(await repo.trades.get(M, made.id)).toEqual(rebuilt);
+    // The change is logged as the person's own edit of the fills.
+    expect((await rows('trade')).at(-1)).toMatchObject({
+      source: 'you',
+      entityId: made.id,
+    });
+    // And a form that types a new credit replaces it.
+    const again = asInput(acc.id, rebuilt);
+    again.fills[0] = { ...again.fills[0]!, commission: -200 };
+    const twice = await repo.trades.replaceManual(M, made.id, again);
+    expect(twice.fees).toBe(-200 - 500);
+    expect(twice.net).toBe(twice.gross + 700);
   });
 });
 
