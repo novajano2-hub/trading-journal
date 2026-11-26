@@ -18,7 +18,8 @@ const MENU_ITEM =
 
 export interface MenuAction {
   label: string;
-  onSelect(): void;
+  /** `from` is the menu's button, for a dialog that grows out of it and hands focus back. */
+  onSelect(from: HTMLElement | null): void;
   /** Destructive: loss ink. */
   danger?: boolean;
   /** Runs once the menu has closed, in place of returning focus to its button (to move it to a card, say). */
@@ -35,9 +36,11 @@ export function RowMenu({
   actions: readonly MenuAction[];
 }): React.JSX.Element {
   const after = useRef<(() => void) | null>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
+        ref={trigger}
         aria-label={label}
         className="inline-grid size-7 place-items-center rounded-[8px] border border-line text-muted outline-offset-2 hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:size-11"
       >
@@ -62,7 +65,7 @@ export function RowMenu({
               className={`${MENU_ITEM} ${a.danger ? 'text-loss' : ''}`}
               onSelect={() => {
                 after.current = a.afterClose ?? null;
-                a.onSelect();
+                a.onSelect(trigger.current);
               }}
             >
               {a.label}

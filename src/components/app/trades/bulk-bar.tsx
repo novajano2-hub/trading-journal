@@ -4,7 +4,11 @@ import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { DropdownMenu, Popover } from 'radix-ui';
 import {
+  ArrowsLeftRight,
+  ArrowsMerge,
+  ArrowsSplit,
   CaretDown,
+  DotsThree,
   DownloadSimple,
   Seal,
   SealCheck,
@@ -15,11 +19,23 @@ import {
   X,
 } from '@phosphor-icons/react/dist/ssr';
 import { Button } from '@/components/ui/button';
-import { useRemoveTrades, useUpdateTrades } from '@/data/query/hooks';
-import { strategyRules, type Strategy, type Trade } from '@/domain/types';
+import {
+  useAccounts,
+  useRemoveTrades,
+  useUpdateTrades,
+} from '@/data/query/hooks';
+import { canMerge } from '@/domain/grouping';
+import {
+  strategyRules,
+  type Account,
+  type Strategy,
+  type Trade,
+} from '@/domain/types';
 import { plural } from '@/lib/format';
 import { ConfirmDialog } from '../confirm-dialog';
 import { TagPicker } from '../tag-picker';
+import { MergeDialog, SplitDialog } from './group-dialogs';
+import { MoveDialog } from './move-dialog';
 
 const IMPORT_HISTORY = '/app/settings/import-history';
 
@@ -99,6 +115,95 @@ function StrategyMenu({
   );
 }
 
+/** Why a grouping is off for this selection, or null when it is on. */
+export interface GroupReasons {
+  merge: string | null;
+  split: string | null;
+  /** Null too while the accounts load, with the item off. */
+  move: string | null;
+  moveReady: boolean;
+}
+
+const READ_ONLY = 'Archived accounts are read-only.';
+
+/**
+ * What the Merge, split or move menu offers (spec 5.1, B1, B4, B6). `trades`
+ * is the whole selection and `editable` the part outside archived accounts,
+ * which a grouping leaves out as every other bulk action does.
+ */
+export function groupReasons(
+  trades: readonly Trade[],
+  editable: readonly Trade[],
+  accounts: readonly Account[] | undefined,
+): GroupReasons {
+  const refusal = canMerge(editable);
+  const outside = trades.length > editable.length;
+  const merge =
+    refusal === null
+      ? null
+      : refusal === 'too-few'
+        ? outside
+          ? 'Merge needs two or more trades outside archived accounts.'
+          : 'Merge needs two or more trades.'
+        : 'Merge needs one account and one instrument.';
+  const only = trades.length === 1 ? trades[0] : undefined;
+  const split =
+    trades.length !== 1
+      ? 'Split works on one trade at a time.'
+      : editable.length === 0
+        ? READ_ONLY
+        : (only?.executions.length ?? 0) < 2
+          ? 'Split needs a trade with two or more executions.'
+          : null;
+  const own = new Set(editable.map((t) => t.accountId));
+  const move =
+    editable.length === 0
+      ? READ_ONLY
+      : accounts &&
+          !accounts.some((a) => a.status === 'active' && !own.has(a.id))
+        ? 'There is no other active account to move to.'
+        : null;
+  return { merge, split, move, moveReady: accounts !== undefined };
+}
+
+const MENU_ITEM_TWO =
+  'flex min-h-9 cursor-pointer flex-col justify-center gap-px rounded-[8px] px-2.5 py-1.5 text-[13.5px] outline-none data-[disabled]:cursor-default data-[disabled]:text-faint data-[highlighted]:bg-sunken pointer-coarse:min-h-11';
+
+/** One entry of the grouping menu: its icon and name, and when it is off, why, on a second line. */
+function GroupItem({
+  icon,
+  label,
+  reason,
+  off = reason !== null,
+  onSelect,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  reason: string | null;
+  off?: boolean;
+  onSelect(): void;
+}): React.JSX.Element {
+  return (
+    <DropdownMenu.Item
+      disabled={off}
+      onSelect={onSelect}
+      // The reason is also the item's tooltip (spec 5.1).
+      title={reason ?? undefined}
+      className={MENU_ITEM_TWO}
+    >
+      <span className="flex items-center gap-2.5">
+        {icon}
+        {label}
+      </span>
+      {reason ? (
+        <span className="pl-[26px] text-[12px] leading-[1.4] text-faint">
+          {reason}
+        </span>
+      ) : null}
+    </DropdownMenu.Item>
+  );
+}
+
 /**
  * The floating bar over a selection: add tags, add to or remove from a
  * strategy, mark reviewed, export, delete. Tags are only ever added. Every
@@ -123,11 +228,18 @@ export function BulkBar({
 }): React.JSX.Element {
   const update = useUpdateTrades();
   const remove = useRemoveTrades();
+  const accounts = useAccounts().data;
   const [tagOpen, setTagOpen] = useState(false);
   const [pending, setPending] = useState<string[]>([]);
   const [confirming, setConfirming] = useState(false);
   // Read by onClose in the same tick the delete settles, so not state.
   const deleted = useRef(false);
+  const [grouping, setGrouping] = useState<'merge' | 'split' | 'move' | null>(
+    null,
+  );
+  const menuButton = useRef<HTMLButtonElement>(null);
+  // An item that opens a dialog keeps the menu from taking focus back from it.
+  const opening = useRef(false);
 
   // Archived accounts are read-only: only the other trades are edited.
   const locked = trades.filter((t) => archivedAccountIds.has(t.accountId));
@@ -164,6 +276,25 @@ export function BulkBar({
   const removable = strategies.filter((s) => onStrategies.has(s.id));
 
   const { deletable, kept } = splitDeletable(editable);
+  const reasons = groupReasons(trades, editable, accounts);
+  const only =
+    trades.length === 1 && editable.length === 1 ? editable[0] : undefined;
+  const choose = (which: 'merge' | 'split' | 'move') => {
+    opening.current = true;
+    setGrouping(which);
+  };
+  const grouped = {
+    origin: menuButton,
+    returnFocus: menuButton,
+    onOpenChange: (next: boolean) => {
+      if (!next) setGrouping(null);
+    },
+    // The write is in: say so in the log's toast, and let the selection go.
+    onDone: (message: React.ReactNode) => {
+      onResult(message);
+      onClear();
+    },
+  };
 
   return (
     <>
@@ -304,6 +435,69 @@ export function BulkBar({
           aria-hidden="true"
           className="mx-1 h-[22px] w-px flex-none bg-line"
         />
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger
+            ref={menuButton}
+            className={`${BTN} w-8 justify-center px-0 pointer-coarse:w-11`}
+            aria-label="Merge, split or move"
+            title="Merge, split or move"
+          >
+            <DotsThree
+              size={16}
+              weight="bold"
+              aria-hidden="true"
+              className={ICON}
+            />
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content
+              side="top"
+              align="center"
+              sideOffset={8}
+              collisionPadding={12}
+              className={MENU}
+              onCloseAutoFocus={(event) => {
+                if (!opening.current) return;
+                opening.current = false;
+                event.preventDefault();
+              }}
+            >
+              <GroupItem
+                icon={
+                  <ArrowsMerge size={16} aria-hidden="true" className={ICON} />
+                }
+                label="Merge"
+                reason={reasons.merge}
+                onSelect={() => choose('merge')}
+              />
+              <GroupItem
+                icon={
+                  <ArrowsSplit size={16} aria-hidden="true" className={ICON} />
+                }
+                label="Split"
+                reason={reasons.split}
+                onSelect={() => choose('split')}
+              />
+              <GroupItem
+                icon={
+                  <ArrowsLeftRight
+                    size={16}
+                    aria-hidden="true"
+                    className={ICON}
+                  />
+                }
+                label="Move to account"
+                reason={reasons.move}
+                off={reasons.move !== null || !reasons.moveReady}
+                onSelect={() => choose('move')}
+              />
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
+        <span
+          aria-hidden="true"
+          className="mx-1 h-[22px] w-px flex-none bg-line"
+        />
         <button
           type="button"
           className={BTN}
@@ -394,6 +588,12 @@ export function BulkBar({
           if (deleted.current) onClear();
         }}
       />
+
+      <MergeDialog {...grouped} open={grouping === 'merge'} trades={editable} />
+      {only ? (
+        <SplitDialog {...grouped} open={grouping === 'split'} trade={only} />
+      ) : null}
+      <MoveDialog {...grouped} open={grouping === 'move'} trades={editable} />
     </>
   );
 }

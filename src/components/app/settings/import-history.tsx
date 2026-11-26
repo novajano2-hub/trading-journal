@@ -75,7 +75,7 @@ export function ImportHistory() {
     }
     if (result.reason === 'regrouped') {
       setBlocked(
-        `${job.fileName} can't be undone. Some of its trades were merged, split or moved since. Delete or regroup them first.`,
+        `${job.fileName} can't be undone. Some of its trades were merged, split or moved since it came in, and Keel can't take that back. Delete those trades, or move them back to ${accountName(job.accountId)}, then undo the import.`,
       );
       return;
     }

@@ -30,7 +30,14 @@ const SECOND =
   H +
   '2026-11-17 09:41:00,NQZ5,Buy,1,21000\n2026-11-17 10:00:00,NQZ5,Sell,1,21010\n';
 
-async function seeded(archive = false) {
+async function seeded(
+  archive = false,
+  /** Runs once both imports are in, before the page renders. */
+  before?: (
+    repo: ReturnType<typeof createLocalRepository>,
+    accountId: string,
+  ) => Promise<void>,
+) {
   const repo = createLocalRepository({
     indexedDB: new IDBFactory(),
     IDBKeyRange,
@@ -63,6 +70,7 @@ async function seeded(archive = false) {
     );
     await repo.imports.commit('mine', plan);
   }
+  await before?.(repo, account.id);
   if (archive)
     await repo.accounts.update('mine', account.id, { status: 'archived' });
   renderApp(<ImportHistory />, {
@@ -146,4 +154,37 @@ test("an archived account's imports offer no Undo, and say why (M6)", async () =
   expect(why?.textContent).toBe(
     "Imports into an archived account can't be undone: its trades are read-only. Unarchive the account in Accounts to undo one.",
   );
+});
+
+test('an undo refused for regrouping says why', async () => {
+  const repo = await seeded(false, async (r) => {
+    // A trade of first.csv moved to another account since.
+    const other = await r.accounts.create('mine', {
+      name: 'Prop',
+      broker: 'b',
+      type: 'prop-funded',
+      currency: 'USD',
+      startingBalance: 0,
+      status: 'active',
+    });
+    const [first] = (await r.trades.list('mine')).filter(
+      (t) => t.importId === 'first.csv',
+    );
+    await r.trades.move('mine', [first!.id], other.id);
+  });
+  const rows = (await screen.findAllByRole('row')).slice(1);
+  fireEvent.click(
+    within(rows[1]!).getByRole('button', { name: 'Undo first.csv' }),
+  );
+  fireEvent.click(await screen.findByRole('button', { name: 'Undo import' }));
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toBe(
+    "first.csv can't be undone. Some of its trades were merged, split or moved since it came in, and Keel can't take that back. Delete those trades, or move them back to Futures, then undo the import.",
+  );
+  // Nothing was removed, and the job is still active.
+  expect(await repo.trades.list('mine')).toHaveLength(2);
+  expect((await repo.imports.list('mine')).map((j) => j.status)).toEqual([
+    'active',
+    'active',
+  ]);
 });
