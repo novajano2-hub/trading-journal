@@ -8,7 +8,12 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { glide } from '@/lib/motion';
 
-export type TabOption<T extends string> = { value: T; label: string };
+export type TabOption<T extends string> = {
+  value: T;
+  label: string;
+  /** A quiet count after the label. */
+  count?: number;
+};
 
 export const tabId = (base: string, value: string) => `${base}-tab-${value}`;
 export const panelId = (base: string) => `${base}-panel`;
@@ -128,7 +133,7 @@ export function Tabs<T extends string>({
               aria-controls={panelId(id)}
               tabIndex={active ? 0 : -1}
               onClick={() => select(i, false)}
-              className={`relative inline-flex h-7 items-center rounded-[8px] px-2.5 text-[13.5px] font-medium whitespace-nowrap transition-colors duration-300 ease-[var(--ease-glide)] sm:px-[13px] ${
+              className={`relative inline-flex h-7 items-center gap-1.5 rounded-[8px] px-2.5 text-[13.5px] font-medium whitespace-nowrap transition-colors duration-300 ease-[var(--ease-glide)] sm:px-[13px] ${
                 coarseTargets ? 'pointer-coarse:min-h-11' : ''
               } ${
                 active
@@ -137,6 +142,14 @@ export function Tabs<T extends string>({
               }`}
             >
               {o.label}
+              {o.count !== undefined ? (
+                <>
+                  {/* A flex item's whitespace is not drawn; the name still reads "Funded 1". */}{' '}
+                  <span className="text-[12px] font-medium text-faint tabular-nums">
+                    {o.count}
+                  </span>
+                </>
+              ) : null}
             </button>
           );
         })}

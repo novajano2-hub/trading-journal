@@ -122,7 +122,7 @@ function daysBetween(from: string, to: string): number {
 }
 
 /** The earliest start date any phase has; undefined when none has one. */
-function firstStart(c: Challenge): string | undefined {
+export function firstStart(c: Challenge): string | undefined {
   let first: string | undefined;
   for (const p of c.phases)
     if (
@@ -131,6 +131,20 @@ function firstStart(c: Challenge): string | undefined {
     )
       first = p.startDate;
   return first;
+}
+
+export type AccountsGroup = 'evaluations' | 'funded' | 'breached';
+
+/**
+ * The Accounts sub-tab a challenge sits in (C62). Breached: breached, whatever
+ * its phase. Funded: funded, or passed (Keel's "passed" waits there until its
+ * funded account is linked), and not breached. Evaluations: the rest, the
+ * active challenges in an evaluation phase.
+ */
+export function accountsGroup(c: Challenge): AccountsGroup {
+  if (c.status === 'breached') return 'breached';
+  if (c.phase === 'funded' || c.status === 'passed') return 'funded';
+  return 'evaluations';
 }
 
 /**

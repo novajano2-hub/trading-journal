@@ -3,12 +3,17 @@
 import { CheckCircle, XCircle } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { CARD, signTone } from '@/components/app/dashboard/shared';
+import { CARD } from '@/components/app/dashboard/shared';
 import { FigureText } from '@/components/product/figure-text';
 import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/ui/chip';
 import { MetricTip } from '@/components/ui/metric-tip';
-import type { ChallengePatch } from '@/data/repository';
+import {
+  BREACH_REASON_LABELS,
+  CHALLENGE_TYPE_LABELS,
+  challengeType,
+  firstStart,
+} from '@/domain/prop/finance';
 import {
   drawdownLabel,
   findingText,
@@ -17,7 +22,6 @@ import {
 } from '@/domain/prop/challenge';
 import type { Cents, Challenge, ChallengeStep } from '@/domain/types';
 import { useDisplay } from '@/lib/display';
-import { plural } from '@/lib/format';
 
 /** "Thu 19 Nov". */
 function dayLabel(date: string): string {
@@ -26,6 +30,16 @@ function dayLabel(date: string): string {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
+  }).format(new Date(`${date}T00:00:00Z`));
+}
+
+/** "1 Oct 2026". */
+export function dateLabel(date: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
   }).format(new Date(`${date}T00:00:00Z`));
 }
 
@@ -67,65 +81,6 @@ const BAR: Record<BarTone, string> = {
   loss: 'bg-loss',
   gain: 'bg-gain',
 };
-
-/** One tracked figure: its label, a value, a bar and a line under it. */
-function Track({
-  tip,
-  note,
-  value,
-  tone = '',
-  bar,
-  mark,
-  children,
-}: {
-  tip: ReactNode;
-  /** Beside the label, at the right. */
-  note?: string;
-  value: ReactNode;
-  tone?: string;
-  bar?: { fraction: number; tone: BarTone };
-  /** A tick on the bar, 0 to 1. */
-  mark?: number;
-  children: ReactNode;
-}): React.JSX.Element {
-  return (
-    <div className="min-w-0 border-t border-line px-4 pt-3.5 pb-3 lg:border-t-0 lg:border-l">
-      <div className="flex items-baseline gap-1.5 text-[12px] whitespace-nowrap text-faint">
-        {tip}
-        {note ? (
-          <em className="ml-auto truncate text-[12px] text-muted not-italic">
-            {note}
-          </em>
-        ) : null}
-      </div>
-      <b
-        className={`mt-1 block text-[18px] font-semibold tracking-[-0.025em] whitespace-nowrap tabular-nums ${tone}`}
-      >
-        {value}
-      </b>
-      <div
-        aria-hidden="true"
-        className="relative mt-2 h-1.5 rounded-full bg-sunken"
-      >
-        {bar ? (
-          <i
-            className={`absolute inset-y-0 left-0 block rounded-full ${BAR[bar.tone]}`}
-            style={{ width: `${(clamp(bar.fraction) * 100).toFixed(1)}%` }}
-          />
-        ) : null}
-        {mark !== undefined ? (
-          <s
-            className="absolute -top-[3px] -bottom-[3px] w-0.5 rounded-[1px] bg-text no-underline"
-            style={{ left: `${(clamp(mark) * 100).toFixed(1)}%` }}
-          />
-        ) : null}
-      </div>
-      <small className="mt-1.5 block text-[12px] leading-[1.4] text-faint">
-        {children}
-      </small>
-    </div>
-  );
-}
 
 const STATUS = {
   active: { tone: 'accent', label: 'Active' },
@@ -177,6 +132,32 @@ export function maskedReason(text: string, privacy: boolean): string {
 }
 
 /**
+ * Why and when a breached challenge broke, in loss ink: the date, the reason
+ * from the list and the trader's own words (a challenge breached before the
+ * list kept only its words). Money in the words reads "hidden amount" under
+ * Privacy.
+ */
+function BreachLine({
+  c,
+  privacy,
+}: {
+  c: Challenge;
+  privacy: boolean;
+}): React.JSX.Element {
+  const reason = c.breachReason ? BREACH_REASON_LABELS[c.breachReason] : null;
+  const words = c.failureReason
+    ? maskedReason(c.failureReason, privacy).replace(/−(?=\S)/g, '−\u2060')
+    : null;
+  const detail = [reason, words].filter(Boolean).join(': ');
+  return (
+    <p className="mt-2 text-[12.5px] font-semibold text-loss">
+      Breached{c.breachedOn ? ` ${dayLabel(c.breachedOn)}` : ''}
+      {detail ? `: ${detail}` : ''}
+    </p>
+  );
+}
+
+/**
  * The status chip a challenge shows: the trader's own status (a breached one is
  * settled), else read against the numbers: near a limit, passed (every
  * evaluation step on target and no funded account yet) or active.
@@ -201,38 +182,37 @@ export function challengeChip(
 }
 
 /**
- * One challenge: who it is and where it stands (name, firm, phase, status,
- * balance, fees, the reason it failed), the phase's five tracked rules, a
- * suggestion when the numbers say the status is out of date, and its rules.
- * The status is the trader's: the suggestion changes nothing until it is
- * accepted.
+ * One challenge as a card of the Accounts grid (comp 05): its name, firm and
+ * phase, the status chip and the row menu; the balance with its start and the
+ * type; the linked trading account and the start date; the phase's tracked
+ * rules; and, in the card's one live region, what the numbers suggest: a rule
+ * broken (Mark as breached), a target met (Move to funded, or link the next
+ * step). The status is the trader's: a suggestion changes nothing until it is
+ * accepted, and each action asks first. Money reads in the account's currency
+ * through the display, so Privacy hides it.
  */
 export function ChallengeCard({
   challenge: c,
   check,
-  today,
-  saving,
-  saveFailed,
+  menu,
   onEdit,
-  onSave,
   onMarkBreached,
+  onMoveToFunded,
 }: {
   challenge: Challenge;
   check: ChallengeCheck;
-  today: string;
-  saving: boolean;
-  saveFailed: boolean;
+  /** The row menu, at the head's end. */
+  menu?: ReactNode;
   onEdit(): void;
-  onSave(patch: ChallengePatch): void;
   /** Opens the Mark as breached dialog, which asks why. */
   onMarkBreached(): void;
+  /** Asks, then moves the challenge to its funded phase. */
+  onMoveToFunded(): void;
 }): React.JSX.Element {
   const display = useDisplay();
   const headingId = `challenge-${c.id}`;
   const phase = shownPhase(c, check);
   const account = phase?.account;
-  const rules = account?.propRules;
-  const s = phase?.state;
   const currency = account?.currency ?? 'USD';
   const money = (cents: Cents, signed = false) => (
     <FigureText f={display.cash(cents, signed, currency)} />
@@ -252,8 +232,7 @@ export function ChallengeCard({
     check.currentStep === lastEval &&
     check.phases.find((p) => p.step === lastEval)?.state?.overall ===
       'target-reached';
-  const chip = challengeChip(c, check);
-  const funded = phase?.step === 'funded';
+  const started = firstStart(c);
 
   const sentence = finding
     ? (() => {
@@ -270,203 +249,59 @@ export function ChallengeCard({
       })()
     : null;
 
-  const period = s?.period;
-  const daysNote = !rules
-    ? ''
-    : rules.periodDays === undefined
-      ? 'no time limit'
-      : period?.ended
-        ? 'period ended'
-        : period && period.daysLeft === 0
-          ? 'last day'
-          : period
-            ? `${period.daysLeft} ${plural(period.daysLeft, 'day')} left`
-            : `${rules.periodDays} days from the first trade`;
-
   return (
     <article
       aria-labelledby={headingId}
-      className={`${CARD} grid grid-cols-2 overflow-hidden lg:grid-cols-[288px_repeat(5,minmax(0,1fr))]`}
+      className={`${CARD} flex min-w-0 flex-col px-5 pt-4 pb-4`}
     >
-      <div className="col-span-2 flex flex-col gap-2 px-5 pt-3.5 pb-3 lg:col-span-1">
-        <div className="flex items-center">
-          <div className="min-w-0">
-            <h2
-              id={headingId}
-              className="text-[15px] leading-tight font-semibold tracking-[-0.015em]"
-            >
-              {c.name}
-            </h2>
-            <span className="text-[12px] text-faint">{c.firm}</span>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="inline-flex h-[22px] items-center rounded-[7px] bg-sunken px-2 text-xs font-semibold text-muted">
-            {phase ? phaseLabel(c, phase.step) : 'Evaluation'}
+      <header className="flex flex-wrap items-center gap-x-2.5 gap-y-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2.5">
+          <h2
+            id={headingId}
+            className="text-[15px] leading-tight font-semibold tracking-[-0.015em]"
+          >
+            {c.name}
+          </h2>
+          <span className="text-[12.5px] text-faint">
+            {c.firm},{' '}
+            {(phase ? phaseName(c, phase.step) : 'Evaluation').toLowerCase()}
           </span>
-          <StatusChip kind={chip} />
         </div>
-        {phase?.archived ? (
-          <p className="text-[12.5px] font-medium text-warn">
-            Account archived
-          </p>
-        ) : phase?.balance !== undefined && account ? (
-          <p className="text-[12.5px] text-muted">
-            Balance {money(phase.balance)} from {money(account.startingBalance)}
-          </p>
-        ) : null}
-        {c.status === 'breached' && c.failureReason ? (
-          <p className="text-[12.5px] font-semibold text-loss">
-            {maskedReason(c.failureReason, display.unit === 'privacy').replace(
-              /−(?=\S)/g,
-              '−\u2060',
-            )}
-          </p>
-        ) : null}
-        {c.evaluationFee !== undefined || c.activationFee !== undefined ? (
-          <p className="text-[12px] text-faint">
-            Fees {money(c.evaluationFee ?? 0)} + {money(c.activationFee ?? 0)}
-          </p>
-        ) : null}
-      </div>
+        <div className="ml-auto flex items-center gap-2">
+          <StatusChip kind={challengeChip(c, check)} />
+          {menu}
+        </div>
+      </header>
 
-      {s && rules && account ? (
-        <>
-          <Track
-            tip={
-              <MetricTip
-                id={funded ? 'prop-profit-funded' : 'prop-profit'}
-                basis="net"
-              />
-            }
-            value={money(s.profit.current, true)}
-            tone={signTone(s.profit.current)}
-            bar={
-              funded
-                ? undefined
-                : {
-                    fraction: s.profit.progress,
-                    tone: s.overall === 'target-reached' ? 'gain' : 'accent',
-                  }
-            }
-          >
-            {funded ? (
-              phase?.paidOut ? (
-                <>no target once funded, {money(phase.paidOut)} paid out</>
-              ) : (
-                'no target once funded'
-              )
-            ) : s.overall === 'target-reached' ? (
-              <>target reached, {money(s.profit.target)}</>
-            ) : (
-              <>
-                {Math.round(s.profit.progress * 100)}% of{' '}
-                {money(s.profit.target)}
-              </>
-            )}
-          </Track>
-          <Track
-            tip={<MetricTip id="prop-drawdown-left" basis="net" />}
-            value={money(Math.max(0, s.drawdown.remaining))}
-            tone={s.drawdown.state === 'clear' ? '' : 'text-loss'}
-            bar={{
-              fraction: s.drawdown.remaining / rules.maxDrawdown,
-              tone: s.drawdown.state === 'clear' ? 'accent' : 'loss',
-            }}
-          >
-            {s.drawdown.state === 'breached' ? (
-              <>
-                <span className="block text-muted">
-                  {drawdownLabel(s.drawdown.type)}
-                </span>
-                limit broken
-              </>
-            ) : (
-              <>
-                <span className="block text-muted">
-                  {drawdownLabel(s.drawdown.type)}
-                </span>
-                of {money(rules.maxDrawdown)}, floor {money(s.drawdown.floor)}
-              </>
-            )}
-          </Track>
-          <Track
-            tip={<MetricTip id="prop-daily-loss" basis="net" />}
-            note={dayLabel(today)}
-            value={money(s.dailyLoss.todayNet, true)}
-            tone={signTone(s.dailyLoss.todayNet)}
-            bar={{
-              fraction: Math.max(0, -s.dailyLoss.todayNet) / s.dailyLoss.limit,
-              tone: s.dailyLoss.remaining <= 0 ? 'loss' : 'accent',
-            }}
-          >
-            {s.dailyLoss.breachedOn ? (
-              `limit broken on ${dayLabel(s.dailyLoss.breachedOn)}`
-            ) : (
-              <>
-                {money(Math.max(0, s.dailyLoss.remaining))} left of{' '}
-                {money(s.dailyLoss.limit)}
-              </>
-            )}
-          </Track>
-          <Track
-            tip={<MetricTip id="prop-trading-days" basis="net" />}
-            value={
-              <>
-                {s.tradingDays.count}{' '}
-                <span className="text-[14px] font-medium text-muted">
-                  of {s.tradingDays.min}
-                </span>
-              </>
-            }
-            bar={{
-              fraction:
-                s.tradingDays.min === 0
-                  ? 1
-                  : s.tradingDays.count / s.tradingDays.min,
-              tone: s.tradingDays.met ? 'gain' : 'accent',
-            }}
-          >
-            {s.tradingDays.met
-              ? 'minimum met'
-              : `${s.tradingDays.min - s.tradingDays.count} more needed`}
-            {daysNote ? `, ${daysNote}` : ''}
-          </Track>
-          {s.consistency ? (
-            <Track
-              tip={<MetricTip id="prop-consistency" basis="net" />}
-              value={
-                s.consistency.bestDayShare === null
-                  ? 'None'
-                  : `${(s.consistency.bestDayShare * 100).toFixed(1)}%`
-              }
-              tone={
-                s.consistency.bestDayShare !== null && !s.consistency.met
-                  ? 'text-loss'
-                  : ''
-              }
-              bar={{
-                fraction: s.consistency.bestDayShare ?? 0,
-                tone:
-                  s.consistency.bestDayShare !== null && !s.consistency.met
-                    ? 'loss'
-                    : 'accent',
-              }}
-              mark={s.consistency.limitPct}
-            >
-              best day share, {Math.round(s.consistency.limitPct * 100)}% max
-            </Track>
-          ) : (
-            <Track
-              tip={<MetricTip id="prop-consistency" basis="net" />}
-              value={<span className="text-muted">None</span>}
-            >
-              not part of this plan
-            </Track>
-          )}
-        </>
-      ) : (
-        <div className="col-span-2 flex flex-wrap items-center gap-3 border-t border-line px-5 py-3 text-[13px] text-muted lg:col-span-5 lg:border-t-0 lg:border-l">
+      {phase?.archived ? (
+        <p className="mt-2.5 text-[12.5px] font-medium text-warn">
+          Account archived
+        </p>
+      ) : phase?.balance !== undefined && account ? (
+        <p className="mt-2.5 flex flex-wrap items-baseline gap-x-2.5">
+          <b className="text-[24px] leading-tight font-semibold tracking-[-0.03em] tabular-nums">
+            {money(phase.balance)}
+          </b>
+          <span className="text-[12.5px] text-muted">
+            from {money(account.startingBalance)},{' '}
+            {CHALLENGE_TYPE_LABELS[challengeType(c)]}
+          </span>
+        </p>
+      ) : null}
+      <p className="mt-1 text-[12.5px] text-muted">
+        {account ? account.name : 'No trading account linked'}
+        {started ? `, started ${dateLabel(started)}` : ''}
+        {phase?.step === 'funded' && phase.paidOut ? (
+          <>, {money(phase.paidOut)} paid out</>
+        ) : null}
+      </p>
+      {c.status === 'breached' ? (
+        <BreachLine c={c} privacy={display.unit === 'privacy'} />
+      ) : null}
+
+      {phase ? <RuleLines phase={phase} className="mt-2.5" /> : null}
+      {!phase?.state || !account?.propRules ? (
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-[13px] text-muted">
           <p className="min-w-0 flex-1">
             {phase?.archived
               ? 'Its account is archived, so Keel has no rules to read here.'
@@ -478,45 +313,28 @@ export function ChallengeCard({
             Set up rules
           </Button>
         </div>
-      )}
+      ) : null}
 
       {/* The card's one live region: always mounted, so a change in it is announced. */}
-      <div role="status" className="col-span-full empty:hidden">
-        {sentence || targetMet || saveFailed ? (
+      <div role="status" className="empty:hidden">
+        {sentence || targetMet ? (
           <div
-            className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line bg-loss-soft/60 px-5 py-2.5 text-[13px] data-[kind=met]:bg-gain-soft/60"
+            className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-control bg-loss-soft/60 px-3 py-2.5 text-[13px] data-[kind=met]:bg-gain-soft/60"
             data-kind={targetMet && !sentence ? 'met' : 'breach'}
           >
             <span className="min-w-0 flex-1 font-medium text-text">
               {sentence ??
-                (targetMet
-                  ? lastMet
-                    ? 'The profit target is met, with the minimum days and consistency.'
-                    : 'This step is on target. Link the next step in Edit to carry on.'
-                  : null)}
-              {saveFailed ? (
-                <span className="ml-2 text-loss">
-                  Couldn&apos;t save that. Try again.
-                </span>
-              ) : null}
+                (lastMet
+                  ? 'The profit target is met, with the minimum days and consistency.'
+                  : 'This step is on target. Link the next step in Edit to carry on.')}
             </span>
             {sentence && finding ? (
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={saving}
-                onClick={onMarkBreached}
-              >
+              <Button size="sm" variant="secondary" onClick={onMarkBreached}>
                 Mark as breached
               </Button>
             ) : lastMet ? (
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={saving}
-                onClick={() => onSave({ status: 'active', phase: 'funded' })}
-              >
-                Mark step passed
+              <Button size="sm" variant="secondary" onClick={onMoveToFunded}>
+                Move to funded
               </Button>
             ) : targetMet ? (
               <Button size="sm" variant="secondary" onClick={onEdit}>
@@ -525,43 +343,6 @@ export function ChallengeCard({
             ) : null}
           </div>
         ) : null}
-      </div>
-
-      <div className="col-span-full flex items-center gap-3 border-t border-line bg-sunken/55 px-5 py-1.5 text-[12px] text-faint">
-        <span className="min-w-0 flex-1">
-          {rules && account ? (
-            <>
-              Rules: {funded ? null : <>target {money(rules.profitTarget)}, </>}
-              daily loss {money(rules.dailyLossLimit)}, max drawdown{' '}
-              {money(rules.maxDrawdown)}{' '}
-              {drawdownLabel(rules.drawdownType)
-                .replace(' drawdown', '')
-                .toLowerCase()}
-              , at least {rules.minTradingDays} trading{' '}
-              {plural(rules.minTradingDays, 'day')}
-              {rules.consistencyPct !== undefined
-                ? `, best day ${Math.round(rules.consistencyPct * 100)}% max`
-                : ''}
-              {funded
-                ? ''
-                : rules.periodDays !== undefined
-                  ? `, ${rules.periodDays} days`
-                  : ', no time limit'}
-              .
-            </>
-          ) : (
-            'No rules set for this phase.'
-          )}
-        </span>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onEdit}
-          aria-label={`Edit ${c.name}`}
-          className="h-8 px-2 text-[12.5px] font-semibold text-accent-ink! pointer-coarse:h-11"
-        >
-          Edit
-        </Button>
       </div>
     </article>
   );
@@ -617,6 +398,158 @@ function RuleLine({
 }
 
 /**
+ * The phase's tracked rules, a line each with its figures and a track: profit,
+ * daily loss, max drawdown, trading days, and best-day consistency where the
+ * plan has it. Money reads in the account's own currency through the display.
+ * Nothing for a phase with no rules to read.
+ */
+export function RuleLines({
+  phase,
+  className = '',
+}: {
+  phase: ChallengePhaseCheck;
+  className?: string;
+}): React.JSX.Element | null {
+  const display = useDisplay();
+  const account = phase.account;
+  const rules = account?.propRules;
+  const s = phase.state;
+  if (!s || !rules || !account) return null;
+  const money = (cents: Cents, signed = false) => (
+    <FigureText f={display.cash(cents, signed, account.currency)} />
+  );
+  const funded = phase.step === 'funded';
+  const used = rules.maxDrawdown - s.drawdown.remaining;
+  return (
+    <div className={`flex flex-col ${className}`}>
+      <RuleLine
+        rule="profit"
+        name={
+          <MetricTip
+            id={funded ? 'prop-profit-funded' : 'prop-profit'}
+            basis="net"
+          >
+            {funded ? 'Profit' : 'Profit target'}
+          </MetricTip>
+        }
+        value={
+          funded ? (
+            <>{money(s.profit.current, true)}, no target once funded</>
+          ) : (
+            <>
+              {money(s.profit.current, true)} of {money(s.profit.target)}
+              {s.overall === 'target-reached' ? ', reached' : ''}
+            </>
+          )
+        }
+        bar={
+          funded
+            ? undefined
+            : {
+                fraction: s.profit.progress,
+                tone: s.overall === 'target-reached' ? 'gain' : 'accent',
+              }
+        }
+      />
+      <RuleLine
+        rule="daily-loss"
+        name={
+          <MetricTip id="prop-daily-loss" basis="net">
+            Daily loss
+          </MetricTip>
+        }
+        value={
+          s.dailyLoss.breachedOn ? (
+            `limit broken on ${dayLabel(s.dailyLoss.breachedOn)}`
+          ) : (
+            <>
+              {money(Math.max(0, -s.dailyLoss.todayNet))} of{' '}
+              {money(s.dailyLoss.limit)} used today
+            </>
+          )
+        }
+        bar={{
+          fraction: Math.max(0, -s.dailyLoss.todayNet) / s.dailyLoss.limit,
+          tone: s.dailyLoss.remaining <= 0 ? 'loss' : 'accent',
+        }}
+      />
+      <RuleLine
+        rule="drawdown"
+        name={
+          <MetricTip id="prop-drawdown-left" basis="net">
+            {`Max drawdown, ${drawdownLabel(s.drawdown.type)
+              .replace(' drawdown', '')
+              .toLowerCase()}`}
+          </MetricTip>
+        }
+        value={
+          s.drawdown.state === 'breached' ? (
+            'limit broken'
+          ) : (
+            <>
+              {money(Math.max(0, used))} of {money(rules.maxDrawdown)} used
+            </>
+          )
+        }
+        bar={{
+          fraction: used / rules.maxDrawdown,
+          tone: s.drawdown.state === 'clear' ? 'accent' : 'loss',
+        }}
+      />
+      <RuleLine
+        rule="trading-days"
+        name={
+          <MetricTip id="prop-trading-days" basis="net">
+            Trading days
+          </MetricTip>
+        }
+        value={`${s.tradingDays.count} of ${s.tradingDays.min}`}
+        bar={{
+          fraction:
+            s.tradingDays.min === 0
+              ? 1
+              : s.tradingDays.count / s.tradingDays.min,
+          tone: s.tradingDays.met ? 'gain' : 'accent',
+        }}
+      />
+      {s.consistency ? (
+        <RuleLine
+          rule="consistency"
+          name={
+            <MetricTip id="prop-consistency" basis="net">
+              Best day
+            </MetricTip>
+          }
+          value={`${
+            s.consistency.bestDayShare === null
+              ? 'None'
+              : `${(s.consistency.bestDayShare * 100).toFixed(1)}% of profit`
+          }, limit ${Math.round(s.consistency.limitPct * 100)}%`}
+          bar={{
+            fraction: s.consistency.bestDayShare ?? 0,
+            tone:
+              s.consistency.bestDayShare !== null && !s.consistency.met
+                ? 'loss'
+                : 'accent',
+          }}
+          mark={s.consistency.limitPct}
+        />
+      ) : (
+        <RuleLine
+          rule="consistency"
+          name={
+            <MetricTip id="prop-consistency" basis="net">
+              Best day
+            </MetricTip>
+          }
+          value="not part of this plan"
+        />
+      )}
+    </div>
+  );
+}
+
+/**
  * The challenge as a dashboard widget draws it inside its own frame (C11): the
  * balance and the phase's five tracked rules, a line each with its figures and
  * a track, and the sentence when a rule has been broken. The frame carries the
@@ -642,7 +575,6 @@ export function ChallengeCompact({
     <FigureText f={display.cash(cents, signed, currency)} />
   );
   const text = (cents: Cents) => display.cash(cents, false, currency);
-  const funded = phase?.step === 'funded';
   const finding =
     c.status !== 'breached' && check.health === 'breached'
       ? check.finding
@@ -661,7 +593,6 @@ export function ChallengeCompact({
         );
       })()
     : null;
-  const used = s && rules ? rules.maxDrawdown - s.drawdown.remaining : 0;
 
   return (
     <div className="mt-3 flex flex-1 flex-col">
@@ -677,13 +608,8 @@ export function ChallengeCompact({
           </span>
         </p>
       ) : null}
-      {c.status === 'breached' && c.failureReason ? (
-        <p className="mt-2 text-[12.5px] font-semibold text-loss">
-          {maskedReason(c.failureReason, display.unit === 'privacy').replace(
-            /−(?=\S)/g,
-            '−\u2060',
-          )}
-        </p>
+      {c.status === 'breached' ? (
+        <BreachLine c={c} privacy={display.unit === 'privacy'} />
       ) : null}
       <div role="status" className="empty:hidden">
         {sentence ? (
@@ -693,131 +619,7 @@ export function ChallengeCompact({
         ) : null}
       </div>
       {s && rules && account ? (
-        <div className="mt-2.5 flex flex-col">
-          <RuleLine
-            rule="profit"
-            name={
-              <MetricTip
-                id={funded ? 'prop-profit-funded' : 'prop-profit'}
-                basis="net"
-              >
-                {funded ? 'Profit' : 'Profit target'}
-              </MetricTip>
-            }
-            value={
-              funded ? (
-                <>{money(s.profit.current, true)}, no target once funded</>
-              ) : (
-                <>
-                  {money(s.profit.current, true)} of {money(s.profit.target)}
-                  {s.overall === 'target-reached' ? ', reached' : ''}
-                </>
-              )
-            }
-            bar={
-              funded
-                ? undefined
-                : {
-                    fraction: s.profit.progress,
-                    tone: s.overall === 'target-reached' ? 'gain' : 'accent',
-                  }
-            }
-          />
-          <RuleLine
-            rule="daily-loss"
-            name={
-              <MetricTip id="prop-daily-loss" basis="net">
-                Daily loss
-              </MetricTip>
-            }
-            value={
-              s.dailyLoss.breachedOn ? (
-                `limit broken on ${dayLabel(s.dailyLoss.breachedOn)}`
-              ) : (
-                <>
-                  {money(Math.max(0, -s.dailyLoss.todayNet))} of{' '}
-                  {money(s.dailyLoss.limit)} used today
-                </>
-              )
-            }
-            bar={{
-              fraction: Math.max(0, -s.dailyLoss.todayNet) / s.dailyLoss.limit,
-              tone: s.dailyLoss.remaining <= 0 ? 'loss' : 'accent',
-            }}
-          />
-          <RuleLine
-            rule="drawdown"
-            name={
-              <MetricTip id="prop-drawdown-left" basis="net">
-                {`Max drawdown, ${drawdownLabel(s.drawdown.type)
-                  .replace(' drawdown', '')
-                  .toLowerCase()}`}
-              </MetricTip>
-            }
-            value={
-              s.drawdown.state === 'breached' ? (
-                'limit broken'
-              ) : (
-                <>
-                  {money(Math.max(0, used))} of {money(rules.maxDrawdown)} used
-                </>
-              )
-            }
-            bar={{
-              fraction: used / rules.maxDrawdown,
-              tone: s.drawdown.state === 'clear' ? 'accent' : 'loss',
-            }}
-          />
-          <RuleLine
-            rule="trading-days"
-            name={
-              <MetricTip id="prop-trading-days" basis="net">
-                Trading days
-              </MetricTip>
-            }
-            value={`${s.tradingDays.count} of ${s.tradingDays.min}`}
-            bar={{
-              fraction:
-                s.tradingDays.min === 0
-                  ? 1
-                  : s.tradingDays.count / s.tradingDays.min,
-              tone: s.tradingDays.met ? 'gain' : 'accent',
-            }}
-          />
-          {s.consistency ? (
-            <RuleLine
-              rule="consistency"
-              name={
-                <MetricTip id="prop-consistency" basis="net">
-                  Best day
-                </MetricTip>
-              }
-              value={`${
-                s.consistency.bestDayShare === null
-                  ? 'None'
-                  : `${(s.consistency.bestDayShare * 100).toFixed(1)}% of profit`
-              }, limit ${Math.round(s.consistency.limitPct * 100)}%`}
-              bar={{
-                fraction: s.consistency.bestDayShare ?? 0,
-                tone:
-                  s.consistency.bestDayShare !== null && !s.consistency.met
-                    ? 'loss'
-                    : 'accent',
-              }}
-              mark={s.consistency.limitPct}
-            />
-          ) : (
-            <RuleLine
-              rule="consistency"
-              name={
-                <MetricTip id="prop-consistency" basis="net">
-                  Best day
-                </MetricTip>
-              }
-              value="not part of this plan"
-            />
-          )}
-        </div>
+        <RuleLines phase={phase!} className="mt-2.5" />
       ) : (
         <p className="mt-3 text-[13px] leading-snug text-muted">
           {phase?.archived

@@ -13,10 +13,12 @@ import type {
 } from '../types';
 import {
   accountSize,
+  accountsGroup,
   breachInsights,
   breakdown,
   challengeType,
   filterChallenges,
+  firstStart,
   filterItems,
   passRates,
   roiSeries,
@@ -308,6 +310,59 @@ describe('challengeType', () => {
       phases: [{ step: 'step-1' }, { step: 'step-2' }, { step: 'funded' }],
     });
     expect(challengeType(fresh)).toBe('2-step');
+  });
+});
+
+describe('accountsGroup (C62)', () => {
+  test('the comps sample splits 2, 1, 2', () => {
+    const groups = CHALLENGES.map((c) => accountsGroup(c));
+    expect(groups.filter((g) => g === 'evaluations')).toHaveLength(2);
+    expect(groups.filter((g) => g === 'funded')).toHaveLength(1);
+    expect(groups.filter((g) => g === 'breached')).toHaveLength(2);
+    expect(accountsGroup(F100)).toBe('evaluations');
+    expect(accountsGroup(F50)).toBe('funded');
+    expect(accountsGroup(X50)).toBe('breached');
+  });
+
+  test('an active evaluation is in Evaluations; passed waits in Funded; funded is Funded', () => {
+    expect(accountsGroup(challenge('a', { status: 'active' }))).toBe(
+      'evaluations',
+    );
+    expect(accountsGroup(challenge('p', { status: 'passed' }))).toBe('funded');
+    expect(
+      accountsGroup(challenge('f', { phase: 'funded', status: 'active' })),
+    ).toBe('funded');
+  });
+
+  test('a breach is Breached whatever the phase, and never leaves it', () => {
+    expect(
+      accountsGroup(challenge('b1', { phase: 'funded', status: 'breached' })),
+    ).toBe('breached');
+    expect(accountsGroup(challenge('b2', { status: 'breached' }))).toBe(
+      'breached',
+    );
+  });
+});
+
+describe('firstStart', () => {
+  test('is the earliest start date any phase has', () => {
+    expect(firstStart(F50)).toBe('2026-09-14');
+    expect(
+      firstStart(
+        challenge('x', {
+          phases: [
+            { step: 'step-1' },
+            { step: 'funded', startDate: '2026-10-02' },
+          ],
+        }),
+      ),
+    ).toBe('2026-10-02');
+  });
+
+  test('is undefined when no phase has one', () => {
+    expect(firstStart(challenge('n', { phases: [{ step: 'step-1' }] }))).toBe(
+      undefined,
+    );
   });
 });
 

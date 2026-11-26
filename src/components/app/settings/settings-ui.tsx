@@ -1,8 +1,9 @@
 'use client';
 
 import { DotsThree, X } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { Dialog, DropdownMenu } from 'radix-ui';
-import { useRef, type ReactNode } from 'react';
+import { Fragment, useRef, type ReactNode } from 'react';
 
 /** Table header and cell looks shared by the settings tables (the comp's 46px rows). */
 export const TH =
@@ -18,7 +19,14 @@ const MENU_ITEM =
 
 export interface MenuAction {
   label: string;
-  onSelect(): void;
+  /** Not needed for a link. */
+  onSelect?(): void;
+  /** A link: the item navigates instead of running `onSelect`. */
+  href?: string;
+  /** A glyph before the label, decorative. */
+  icon?: ReactNode;
+  /** A rule above it, setting it apart from the actions before. */
+  separated?: boolean;
   /** Destructive: loss ink. */
   danger?: boolean;
   /** Runs once the menu has closed, in place of returning focus to its button (to move it to a card, say). */
@@ -56,18 +64,46 @@ export function RowMenu({
             run();
           }}
         >
-          {actions.map((a) => (
-            <DropdownMenu.Item
-              key={a.label}
-              className={`${MENU_ITEM} ${a.danger ? 'text-loss' : ''}`}
-              onSelect={() => {
-                after.current = a.afterClose ?? null;
-                a.onSelect();
-              }}
-            >
-              {a.label}
-            </DropdownMenu.Item>
-          ))}
+          {actions.map((a) => {
+            const className = `${MENU_ITEM} ${a.icon ? 'gap-2.5' : ''} ${a.danger ? 'text-loss' : ''}`;
+            const content = (
+              <>
+                {a.icon ? (
+                  <span
+                    aria-hidden="true"
+                    className={`flex-none ${a.danger ? '' : 'text-muted'}`}
+                  >
+                    {a.icon}
+                  </span>
+                ) : null}
+                {a.label}
+              </>
+            );
+            return (
+              <Fragment key={a.label}>
+                {a.separated ? (
+                  <DropdownMenu.Separator className="mx-1 my-1.5 h-px bg-line" />
+                ) : null}
+                {a.href !== undefined ? (
+                  <DropdownMenu.Item asChild>
+                    <Link href={a.href} className={`${className} no-underline`}>
+                      {content}
+                    </Link>
+                  </DropdownMenu.Item>
+                ) : (
+                  <DropdownMenu.Item
+                    className={className}
+                    onSelect={() => {
+                      after.current = a.afterClose ?? null;
+                      a.onSelect?.();
+                    }}
+                  >
+                    {content}
+                  </DropdownMenu.Item>
+                )}
+              </Fragment>
+            );
+          })}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
