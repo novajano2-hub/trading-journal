@@ -10,6 +10,7 @@ import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import { createLocalRepository } from '@/data/local/local-repository';
+import { useMarkBreached } from '@/data/query/hooks';
 import type { Repository } from '@/data/repository';
 import {
   generateSampleWorkspace,
@@ -423,4 +424,362 @@ test('it waits while the workspace loads, and says plainly when it cannot', asyn
   renderApp(<PropDashboard />, { repository: failing, url: URL });
   expect(await screen.findByRole('alert')).toBeTruthy();
   expect(screen.getByText("The prop dashboard couldn't load.")).toBeTruthy();
+});
+
+// ---- Where the money went, pass rate and why accounts broke -------------
+
+const switchOf = (name: string) => screen.findByRole('radiogroup', { name });
+const choose = async (group: string, option: string) =>
+  fireEvent.click(
+    within(await switchOf(group)).getByRole('radio', { name: option }),
+  );
+const checked = async (group: string) =>
+  within(await switchOf(group))
+    .getAllByRole('radio')
+    .filter((x) => (x as HTMLInputElement).checked)
+    .map((x) => x.parentElement?.textContent);
+
+/** The rows of a card's list: each row's words, bars aside. */
+const rowsOf = (id: string) =>
+  [...document.querySelectorAll<HTMLElement>(`[data-list="${id}"] > li`)].map(
+    (li) => li.textContent,
+  );
+
+test('Where the money went: firms by what they took and paid, net at the right, with their challenges (comp 04)', async () => {
+  const r = repo();
+  await inNewYork(r);
+  renderApp(<PropDashboard />, { repository: r, url: URL });
+  expect(await switchOf('Break down by')).toBeTruthy();
+  expect(await checked('Break down by')).toEqual(['Firm']);
+  await waitFor(() => expect(rowsOf('money').length).toBe(2));
+  expect(rowsOf('money')).toEqual([
+    'Sample prop firm3 challenges+$3,010.00',
+    'Sample data feedNo challenge−$29.00',
+  ]);
+  // Net wears its sign's colour.
+  const nets = [
+    ...document.querySelectorAll<HTMLElement>('[data-list="money"] b'),
+  ];
+  expect(nets[0]!.className).toContain('text-gain');
+  expect(nets[1]!.className).toContain('text-loss');
+});
+
+test('the bars are drawn against the biggest amount of any row, spent and earned apart', async () => {
+  const r = repo();
+  await inNewYork(r);
+  renderApp(<PropDashboard />, { repository: r, url: URL });
+  await waitFor(() => expect(rowsOf('money').length).toBe(2));
+  const width = (row: number, kind: string) =>
+    document
+      .querySelectorAll<HTMLElement>('[data-list="money"] > li')
+      [row]!.querySelector<HTMLElement>(`[data-bar="${kind}"]`)?.style.width;
+  // $4,500.00 earned is the longest; $1,490.00 spent is 33.1% of it.
+  expect(width(0, 'earned')).toBe('100.0%');
+  expect(width(0, 'spent')).toBe('33.1%');
+  // Nothing earned, nothing drawn.
+  expect(width(1, 'earned')).toBeUndefined();
+  expect(width(1, 'spent')).toBe('0.6%');
+});
+
+test('by Type, Size and Fee the rows regroup, and a row with no challenge reads None (C60)', async () => {
+  const r = repo();
+  await inNewYork(r);
+  renderApp(<PropDashboard />, { repository: r, url: URL });
+  await waitFor(() => expect(rowsOf('money').length).toBe(2));
+  await choose('Break down by', 'Type');
+  await waitFor(() =>
+    expect(rowsOf('money')).toEqual([
+      '1-step2 challenges+$3,708.00',
+      '2-step1 challenge−$698.00',
+      'NoneNo challenge−$29.00',
+    ]),
+  );
+  await choose('Break down by', 'Size');
+  await waitFor(() =>
+    expect(rowsOf('money')).toEqual([
+      '$50,000.001 challenge+$4,205.00',
+      '$100,000.002 challenges−$1,195.00',
+      'NoneNo challenge−$29.00',
+    ]),
+  );
+  // By fee type it groups the costs, in the fees' order, with their transactions.
+  await choose('Break down by', 'Fee');
+  await waitFor(() =>
+    expect(rowsOf('money')).toEqual([
+      'Evaluation fee3 transactions−$1,013.00',
+      'Activation fee2 transactions−$279.00',
+      'Reset fee2 transactions−$198.00',
+      'Uncategorized1 transaction−$29.00',
+    ]),
+  );
+  expect(await checked('Break down by')).toEqual(['Fee']);
+});
+
+test('the breakdown has a hidden table with every figure, and its name says how it is grouped', async () => {
+  const r = repo();
+  await inNewYork(r);
+  renderApp(<PropDashboard />, { repository: r, url: URL });
+  await waitFor(() => expect(rowsOf('money').length).toBe(2));
+  const table = screen.getByRole('table', {
+    name: 'Where the money went, by firm',
+  });
+  expect(table.closest('.sr-only')).not.toBeNull();
+  expect(
+    within(table)
+      .getAllByRole('columnheader')
+      .map((h) => h.textContent),
+  ).toEqual(['Firm', 'Challenges', 'Spent', 'Earned', 'Net']);
+  const first = within(table).getAllByRole('row')[1]!;
+  expect(within(first).getByRole('rowheader').textContent).toBe(
+    'Sample prop firm',
+  );
+  expect(
+    within(first)
+      .getAllByRole('cell')
+      .map((c) => c.textContent),
+  ).toEqual(['3', '−$1,490.00', '+$4,500.00', '+$3,010.00']);
+  // The visible rows are decoration for the table.
+  expect(
+    document.querySelector('[data-list="money"]')?.getAttribute('aria-hidden'),
+  ).toBe('true');
+  await choose('Break down by', 'Fee');
+  const fees = await screen.findByRole('table', {
+    name: 'Where the money went, by fee type',
+  });
+  expect(
+    within(fees)
+      .getAllByRole('columnheader')
+      .map((h) => h.textContent),
+  ).toEqual(['Fee type', 'Transactions', 'Spent', 'Earned', 'Net']);
+});
+
+test('the breakdown follows the filters: one firm leaves one row', async () => {
+  const r = repo();
+  await inNewYork(r);
+  renderApp(<PropDashboard />, {
+    repository: r,
+    url: `${URL}?pfirm=${encodeURIComponent('Sample data feed')}`,
+  });
+  await waitFor(() =>
+    expect(rowsOf('money')).toEqual(['Sample data feedNo challenge−$29.00']),
+  );
+});
+
+test('under Privacy the breakdown names and counts stay and no amount shows, bars and table included', async () => {
+  const r = repo();
+  await inNewYork(r);
+  await r.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<PropDashboard />, { repository: r, url: URL });
+  await waitFor(() => expect(rowsOf('money').length).toBe(2));
+  const list = document.querySelector('[data-list="money"]')!;
+  expect(list.textContent).toContain('Sample prop firm');
+  expect(list.textContent).toContain('3 challenges');
+  expect(list.textContent).not.toMatch(/\d,\d{3}/);
+  for (const el of list.querySelectorAll('[title]'))
+    expect(el.getAttribute('title')).not.toMatch(/\d,\d{3}|\$\d/);
+  const table = screen.getByRole('table', {
+    name: 'Where the money went, by firm',
+  });
+  expect(table.textContent).not.toMatch(/\d,\d{3}/);
+  expect(within(table).getAllByText('hidden amount').length).toBeGreaterThan(0);
+  await choose('Break down by', 'Size');
+  await waitFor(() => expect(rowsOf('money').length).toBe(3));
+  expect(list.textContent).not.toMatch(/\d,\d{3}|\d{2},\d{3}/);
+});
+
+test('Pass rate: passed over evaluations that ended, overall and by firm, straight to funded left out (C32)', async () => {
+  const r = repo();
+  await inNewYork(r);
+  renderApp(<PropDashboard />, { repository: r, url: URL });
+  expect(await switchOf('Pass rate by')).toBeTruthy();
+  expect(await checked('Pass rate by')).toEqual(['Firm']);
+  const card = await screen.findByRole('region', { name: 'Pass rate' });
+  await waitFor(() =>
+    expect(card.textContent).toContain('1 of 2 evaluations passed'),
+  );
+  expect(within(card).getByText('50.0%')).toBeTruthy();
+  expect(rowsOf('pass')).toEqual(['Sample prop firmpassed 1 of 250%']);
+});
+
+test('pass rate by Type, Size and Strategy regroups, strategies by name', async () => {
+  const r = repo();
+  await inNewYork(r);
+  renderApp(<PropDashboard />, { repository: r, url: URL });
+  await waitFor(() => expect(rowsOf('pass').length).toBe(1));
+  await choose('Pass rate by', 'Type');
+  await waitFor(() =>
+    expect(rowsOf('pass')).toEqual(['1-steppassed 1 of 250%']),
+  );
+  await choose('Pass rate by', 'Size');
+  await waitFor(() =>
+    expect(rowsOf('pass')).toEqual([
+      '$50,000.00passed 1 of 1100%',
+      '$100,000.00passed 0 of 10%',
+    ]),
+  );
+  await choose('Pass rate by', 'Strategy');
+  await waitFor(() =>
+    expect(rowsOf('pass')).toEqual([
+      'Opening range breakoutpassed 1 of 1100%',
+      'Trend pullbackpassed 0 of 10%',
+    ]),
+  );
+});
+
+test('with no evaluation ended the card says no challenge has an outcome yet (C69)', async () => {
+  const r = repo((s) => {
+    s.challenges = [];
+  });
+  await inNewYork(r);
+  renderApp(<PropDashboard />, { repository: r, url: URL });
+  const card = await screen.findByRole('region', { name: 'Pass rate' });
+  expect(
+    within(card).getByText('No challenge has an outcome yet.'),
+  ).toBeTruthy();
+  expect(rowsOf('pass')).toEqual([]);
+  const breach = await screen.findByRole('region', {
+    name: 'Why accounts broke',
+  });
+  expect(
+    within(breach).getByText('No challenge has an outcome yet.'),
+  ).toBeTruthy();
+});
+
+test('Why accounts broke: the reasons ranked with their share, and the four facts (C33, C34)', async () => {
+  const r = repo((s) => {
+    // A second evaluation breach, for another reason.
+    const forex = s.challenges.find(
+      (c) => c.id === 'sample-challenge-forex-100k',
+    )!;
+    forex.status = 'breached';
+    forex.breachReason = 'overtrading';
+    forex.breachedOn = '2026-11-10';
+  });
+  await inNewYork(r);
+  renderApp(<PropDashboard />, { repository: r, url: URL });
+  expect(await switchOf('Breaches in')).toBeTruthy();
+  expect(await checked('Breaches in')).toEqual(['Evaluation']);
+  await waitFor(() => expect(rowsOf('breaches').length).toBe(2));
+  // A tie goes to the latest breach: the 10 Nov one first.
+  expect(rowsOf('breaches')).toEqual([
+    'Overtrading or forcing trades1 breach50%',
+    'Broke the max drawdown1 breach50%',
+  ]);
+  const card = await screen.findByRole('region', {
+    name: 'Why accounts broke',
+  });
+  const facts = [...card.querySelectorAll('dl > div')].map((d) => [
+    d.querySelector('dt')?.textContent,
+    d.querySelector('dd')?.textContent,
+  ]);
+  expect(facts.map((f) => f[0])).toEqual([
+    'Average days before a breach',
+    'Average P&L before a breach',
+    'Most common size',
+    'Most common firm',
+  ]);
+  expect(facts[2]![1]).toBe('$100,000.00');
+  // Forex 100K is no 'Sample prop firm' tie-break matter: both are one firm.
+  expect(facts[3]![1]).toBe('Sample prop firm');
+  expect(facts[0]![1]).toMatch(/^\d+ days?$/);
+  expect(facts[1]![1]).toMatch(/^[−+]?\$[\d,]+\.\d\d$/);
+});
+
+test('the breach facts of the sample: 42 days and a loss of $4,236.75, on a $100,000 account', async () => {
+  const r = repo();
+  await inNewYork(r);
+  renderApp(<PropDashboard />, { repository: r, url: URL });
+  const card = await screen.findByRole('region', {
+    name: 'Why accounts broke',
+  });
+  await waitFor(() => expect(rowsOf('breaches').length).toBe(1));
+  expect(rowsOf('breaches')).toEqual(['Broke the max drawdown1 breach100%']);
+  const fact = (label: string) =>
+    [...card.querySelectorAll('dl > div')]
+      .find((d) => d.querySelector('dt')?.textContent === label)
+      ?.querySelector('dd');
+  expect(fact('Average days before a breach')?.textContent).toBe('42 days');
+  expect(fact('Average P&L before a breach')?.textContent).toBe('−$4,236.75');
+  expect(fact('Average P&L before a breach')?.className).toContain('text-loss');
+  expect(fact('Most common size')?.textContent).toBe('$100,000.00');
+  expect(fact('Most common firm')?.textContent).toBe('Sample prop firm');
+  // Each fact is a defined term.
+  expect(card.querySelectorAll('dl button[data-metric-tip]').length).toBe(4);
+});
+
+test('the switch moves to funded breaches; with none, it says so and the facts read None', async () => {
+  const r = repo();
+  await inNewYork(r);
+  renderApp(<PropDashboard />, { repository: r, url: URL });
+  await waitFor(() => expect(rowsOf('breaches').length).toBe(1));
+  await choose('Breaches in', 'Funded');
+  const card = await screen.findByRole('region', {
+    name: 'Why accounts broke',
+  });
+  expect(
+    await within(card).findByText('No funded account has breached.'),
+  ).toBeTruthy();
+  expect([...card.querySelectorAll('dl dd')].map((d) => d.textContent)).toEqual(
+    ['None', 'None', 'None', 'None'],
+  );
+  expect(await checked('Breaches in')).toEqual(['Funded']);
+});
+
+test('under Privacy the breach card hides the P&L and the size, and keeps days, firm and shares', async () => {
+  const r = repo();
+  await inNewYork(r);
+  await r.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<PropDashboard />, { repository: r, url: URL });
+  const card = await screen.findByRole('region', {
+    name: 'Why accounts broke',
+  });
+  await waitFor(() => expect(rowsOf('breaches').length).toBe(1));
+  expect(card.textContent).toContain('42 days');
+  expect(card.textContent).toContain('Sample prop firm');
+  expect(card.textContent).toContain('100%');
+  expect(card.textContent).not.toMatch(/\d,\d{3}/);
+  expect(within(card).getAllByText('hidden amount').length).toBe(2);
+});
+
+test('marking a challenge breached moves the figures: the breach card, the pass rate and the evaluation balance', async () => {
+  const r = repo();
+  await inNewYork(r);
+  function Marker(): React.JSX.Element {
+    const mark = useMarkBreached();
+    return (
+      <button
+        onClick={() =>
+          mark.mutate({
+            id: 'sample-challenge-forex-100k',
+            reason: 'time-pressure',
+            on: '2026-11-18',
+          })
+        }
+      >
+        Mark Forex 100K breached
+      </button>
+    );
+  }
+  renderApp(
+    <>
+      <Marker />
+      <PropDashboard />
+    </>,
+    { repository: r, url: URL },
+  );
+  await waitFor(() => expect(rowsOf('breaches').length).toBe(1));
+  expect(await cardText('Evaluation')).toContain('1 active evaluation account');
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Mark Forex 100K breached' }),
+  );
+  await waitFor(() => expect(rowsOf('breaches').length).toBe(2));
+  expect(rowsOf('breaches').join('|')).toContain('Time pressure');
+  expect(await cardText('Evaluation')).toContain(
+    'No active evaluation account',
+  );
+  const pass = await screen.findByRole('region', { name: 'Pass rate' });
+  await waitFor(() =>
+    expect(pass.textContent).toContain('1 of 3 evaluations passed'),
+  );
+  expect(within(pass).getByText('33.3%')).toBeTruthy();
 });

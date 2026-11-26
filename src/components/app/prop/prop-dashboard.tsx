@@ -10,7 +10,6 @@ import {
   type DualSeries,
 } from '@/components/charts/dual-axis-chart';
 import { dateTicks } from '@/components/charts/chart-kit';
-import { FigureText } from '@/components/product/figure-text';
 import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { MetricTip } from '@/components/ui/metric-tip';
@@ -28,7 +27,7 @@ import {
 import type { Trade } from '@/domain/types';
 import { FigureSourceContext, useDisplay } from '@/lib/display';
 import { formatPct, plural } from '@/lib/format';
-import { CARD, CARD_PAD, CardHeader, signTone } from '../dashboard/shared';
+import { CARD, CardHeader, signTone } from '../dashboard/shared';
 import { TipGlyph } from '../dashboard/widgets/frame';
 import { UpperStrip } from '../dashboard/widgets/layout';
 import { periodText } from '../reports/report-chart';
@@ -38,24 +37,12 @@ import {
   StrategySkeleton,
 } from '../strategies/strategy-states';
 import { ChallengeForm } from './challenge-form';
+import { MoneyCard } from './prop-money';
+import { BreachCard, PassRateCard } from './prop-insights';
+import { Cash, PANEL } from './prop-parts';
 import { usePropFilters } from './use-prop-filters';
 
 const NO_TRADES: ReadonlyMap<string, Trade> = new Map();
-
-/** A card of the dashboard's grid: a section named by its heading. */
-export const PANEL = `${CARD} ${CARD_PAD} flex min-w-0 flex-col`;
-
-/** A money figure, signed or not, as the display shows it: hidden under Privacy, in the base currency, never in a percentage. */
-function Cash({
-  cents,
-  signed = true,
-}: {
-  cents: number;
-  signed?: boolean;
-}): React.JSX.Element {
-  const display = useDisplay();
-  return <FigureText f={display.cash(cents, signed)} />;
-}
 
 /** The return on spend as a percentage; "None" while nothing has been spent (C32). */
 function roiText(roi: number | null): string {
@@ -358,11 +345,30 @@ export function PropDashboard(): React.JSX.Element {
     >
       <KeyCards d={d} />
       {d.leftOut > 0 ? <LeftOut n={d.leftOut} /> : null}
-      <ReturnCard
-        d={d}
-        period={view.roi}
-        onPeriod={(roi) => setView((v) => ({ ...v, roi }))}
-      />
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+        <ReturnCard
+          d={d}
+          period={view.roi}
+          onPeriod={(roi) => setView((v) => ({ ...v, roi }))}
+        />
+        <MoneyCard
+          d={d}
+          by={view.breakdown}
+          onBy={(breakdown) => setView((v) => ({ ...v, breakdown }))}
+        />
+      </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <PassRateCard
+          d={d}
+          by={view.passRate}
+          onBy={(passRate) => setView((v) => ({ ...v, passRate }))}
+        />
+        <BreachCard
+          d={d}
+          which={view.breaches}
+          onWhich={(breaches) => setView((v) => ({ ...v, breaches }))}
+        />
+      </div>
     </FigureSourceContext.Provider>
   );
 }
