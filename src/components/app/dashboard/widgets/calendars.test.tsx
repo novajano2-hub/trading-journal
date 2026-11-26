@@ -12,6 +12,7 @@ import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { JournalEntry, UserPrefs, WidgetKey } from '@/domain/types';
 import { SAMPLE_WORKSPACE } from '@/data/workspaces';
+import { svgDataUrl } from '@/lib/calendar-image';
 import {
   esTrade,
   renderWidgets,
@@ -21,6 +22,12 @@ import {
 } from '../../__fixtures__/dashboard-widgets';
 
 vi.mock('next/navigation', () => import('../../__fixtures__/navigation'));
+
+// The page has no canvas here: the image is made, not drawn.
+vi.mock('@/lib/calendar-image', async (original) => ({
+  ...(await original<typeof import('@/lib/calendar-image')>()),
+  calendarPng: async () => new Blob(['png'], { type: 'image/png' }),
+}));
 
 // Animations finish at once here, as in dashboard-view.test.tsx.
 MotionGlobalConfig.skipAnimations = true;
@@ -384,7 +391,7 @@ describe('the mini calendar (C12): 6A’s month, a day opens its Day view', () =
   });
 });
 
-describe('the calendar with stats: Calendar page’s month, its Stats shown, no snapshot yet', () => {
+describe('the calendar with stats: Calendar page’s month, its Stats shown and its Snapshot', () => {
   test('the month stats beside the heading, a This month button and the Stats shown menu', async () => {
     await renderWidgets([ADV], { sample: november });
     await ready(ADV);
@@ -407,10 +414,67 @@ describe('the calendar with stats: Calendar page’s month, its Stats shown, no 
     expect(said(ADV)).toContain('Green day');
     expect(said(ADV)).toContain('Journal entry');
     expect(said(ADV)).not.toMatch(/whatever the date range/);
-    // Task 16 adds the Snapshot button; it is not here yet.
-    expect(
-      within(card).queryByRole('button', { name: /snapshot/i }),
-    ).toBeNull();
+    expect(within(card).getByRole('button', { name: 'Snapshot' })).toBeTruthy();
+  });
+
+  /** The SVG the open panel previews. */
+  const previewSvg = async () => {
+    const img = await screen.findByRole('img', {
+      name: 'Preview of the November 2026 calendar image',
+    });
+    const src = img.getAttribute('src')!;
+    return decodeURIComponent(src.slice(src.indexOf(',') + 1));
+  };
+
+  test('Snapshot opens the Calendar image panel with the widget’s own month, as it shows it', async () => {
+    await renderWidgets([ADV], { sample: november });
+    await ready(ADV);
+    fireEvent.click(
+      within(widget(ADV)).getByRole('button', { name: 'Snapshot' }),
+    );
+    const panel = await screen.findByRole('dialog', {
+      name: 'Calendar image',
+    });
+    const svg = await previewSvg();
+    // The days, the weekly column with its day count, the month's net and the foot.
+    for (const figure of ['+$100.00', '−$50.00', '+$200.00', '+$250.00'])
+      expect(svg).toContain(`>${figure}<`);
+    expect(svg).toContain('>4 days<');
+    expect(svg).toContain('+$250.00');
+    expect(svg).toContain('4 trading days');
+    expect(svg).toContain('data-note="2026-11-03"');
+    expect(svg).toContain('>Keel<');
+    expect(svg).toContain('Sample workspace, all accounts');
+    expect(panel.textContent).toContain('keel-calendar-2026-11.png');
+    expect(svgDataUrl(svg)).toBeTruthy();
+  });
+
+  test('the image follows the widget’s month and its Stats shown', async () => {
+    await renderWidgets([ADV], {
+      sample: november,
+      prefs: { calendarStats: ['net'] },
+    });
+    await ready(ADV);
+    fireEvent.click(
+      within(widget(ADV)).getByRole('button', { name: 'Snapshot' }),
+    );
+    const svg = await previewSvg();
+    expect(svg).not.toMatch(/\d trades?</);
+    expect(svg).not.toContain('win rate');
+  });
+
+  test('under Privacy the image carries no amount', async () => {
+    await renderWidgets([ADV], {
+      sample: november,
+      prefs: { displayUnit: 'privacy' as UserPrefs['displayUnit'] },
+    });
+    await ready(ADV);
+    fireEvent.click(
+      within(widget(ADV)).getByRole('button', { name: 'Snapshot' }),
+    );
+    const svg = await previewSvg();
+    expect(svg).not.toMatch(/\$\d/);
+    expect(svg).toContain('$•••');
   });
 
   test('a week total at the end of each row, and a pencil on the day with a note', async () => {

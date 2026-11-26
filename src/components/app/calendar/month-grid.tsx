@@ -70,7 +70,7 @@ const FULL_FROM_SHOW = 'hidden @[1000px]/cal:inline';
 /** The longest lead figure that fits the cell as written ('+$951.10'); a longer one reads short until the cell is wide. */
 const LEAD_FITS = 8;
 
-interface Line {
+export interface Line {
   key: CalendarStat;
   node: React.ReactNode;
   /** Money and R take the day's tone; counts stay quiet. */
@@ -83,7 +83,8 @@ interface Line {
   label: string;
 }
 
-function linesOf(
+/** The lines a day's cell stacks, in the order of the chosen stats: the Calendar image writes the same ones. */
+export function linesOf(
   day: CalendarDay,
   stats: readonly CalendarStat[],
   fmt: FormatMoney,

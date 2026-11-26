@@ -58,6 +58,7 @@ import { DayPanel } from './day-panel';
 import { MonthPanel } from './month-panel';
 import { dayLabel, MonthGrid } from './month-grid';
 import { monthFormat } from './month-format';
+import { CalendarSnapshot } from './snapshot-panel';
 
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DAY = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
@@ -430,6 +431,12 @@ export function CalendarView(): React.JSX.Element {
             <StatsMenu
               stats={stats}
               onChange={(next) => updatePrefs.mutate({ calendarStats: next })}
+            />
+            <CalendarSnapshot
+              month={month}
+              data={model}
+              stats={stats}
+              fmt={fmt}
             />
             <Link href={yearHref} className={TEXT_BUTTON}>
               <CalendarBlank

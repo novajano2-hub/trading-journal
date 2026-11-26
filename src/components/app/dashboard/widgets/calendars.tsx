@@ -49,6 +49,7 @@ import {
 import { DayPanel } from '../../calendar/day-panel';
 import { monthFormat } from '../../calendar/month-format';
 import { MonthGrid } from '../../calendar/month-grid';
+import { CalendarSnapshot } from '../../calendar/snapshot-panel';
 import { YearGrid } from '../../calendar/year-grid';
 import { MiniCalendar } from '../../trades/log/mini-calendar';
 import { CARD, CARD_PAD, signTone } from '../shared';
@@ -286,6 +287,12 @@ function MonthCard({
           <StatsMenu
             stats={stats}
             onChange={(next) => updatePrefs.mutate({ calendarStats: next })}
+          />
+          <CalendarSnapshot
+            month={month}
+            data={model}
+            stats={stats}
+            fmt={fmt}
           />
         </>
       ) : null}
