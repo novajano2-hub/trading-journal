@@ -237,13 +237,14 @@ const usd = (cents: number): string =>
     currency: 'USD',
   }).format(cents / 100);
 
-/** The reason a rule check's finding gives the trader's list (C33). */
-const REASON_OF: Record<BreachFinding['rule'], BreachReason> = {
-  'max-drawdown': 'max-drawdown',
-  'daily-loss': 'risk-management',
-  'period-ended': 'time-pressure',
-  consistency: 'other',
-};
+/**
+ * The reason a rule check's finding gives the trader's list (C33). Only a max
+ * drawdown has a reason of its own; no C-row maps the other rules onto the
+ * list, so they read 'other': Keel's call.
+ */
+export function reasonOf(rule: BreachFinding['rule']): BreachReason {
+  return rule === 'max-drawdown' ? 'max-drawdown' : 'other';
+}
 
 /** The accounts, their trades and the three challenges of the sample's Prop firms page. */
 export function addPropFirms(
@@ -341,7 +342,7 @@ export function addPropFirms(
     throw new Error("the sample's breached challenge has no breach");
   breached.failureReason = findingText(finding, usd);
   // v7: the reason and the day, as the rule check found them (C33, C34).
-  breached.breachReason = REASON_OF[finding.rule];
+  breached.breachReason = reasonOf(finding.rule);
   breached.breachedOn = finding.date;
   return { accounts, trades, challenges };
 }
@@ -449,12 +450,17 @@ export function addPropFinances(args: {
     -broken.evaluationFee!,
     'reviewed',
   );
-  // Two resets inside the breached challenge's life, a week apart at least.
+  // Two resets inside the breached challenge's life, a week apart at least:
+  // none after the day it broke.
   const born = startOf(broken, trades);
   const resetOne = rng.int(6, 12);
   const resetTwo = resetOne + rng.int(7, 14);
+  const inLife = (date: string): string =>
+    broken.breachedOn !== undefined && date > broken.breachedOn
+      ? broken.breachedOn
+      : date;
   add(
-    addDays(born, resetOne),
+    inLife(addDays(born, resetOne)),
     'Reset',
     broken,
     'reset-fee',
@@ -462,7 +468,7 @@ export function addPropFinances(args: {
     'reviewed',
   );
   add(
-    notAfterEnd(addDays(born, resetTwo)),
+    notAfterEnd(inLife(addDays(born, resetTwo))),
     'Reset',
     broken,
     'reset-fee',
