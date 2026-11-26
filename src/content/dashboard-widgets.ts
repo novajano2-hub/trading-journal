@@ -58,7 +58,7 @@ export const WIDGET_BLURBS: Record<WidgetKey, string> = {
   expectancy: 'What an average closed trade has made.',
   'day-streak': 'Winning days in a row, up to your last trading day.',
   'trade-streak': 'Winning trades in a row, up to your last closed trade.',
-  streaks: 'Both current runs, in days and in trades.',
+  streaks: 'Winning days and winning trades in a row, side by side.',
   'max-drawdown':
     'The deepest fall from a peak, in money and percent, with its date.',
   'avg-drawdown':

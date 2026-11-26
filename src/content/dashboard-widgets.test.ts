@@ -40,3 +40,9 @@ test('the streak blurbs count winning runs only, as the figures do (C16)', () =>
   for (const key of ['day-streak', 'trade-streak'] as const)
     expect(WIDGET_BLURBS[key], key).not.toMatch(/losing/i);
 });
+
+test('the Streaks blurb says what the widget lays out: both streaks, side by side (C16)', () => {
+  expect(WIDGET_BLURBS.streaks).toBe(
+    'Winning days and winning trades in a row, side by side.',
+  );
+});
