@@ -1,7 +1,7 @@
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
-import { expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { fixtureSample } from '../__fixtures__/sample';
-import { NotFoundError } from '../repository';
+import { NotFoundError, PayoutRefusedError } from '../repository';
 import { createLocalRepository } from './local-repository';
 
 const S = 'sample';
@@ -173,6 +173,113 @@ test('removing a challenge keeps its rows and unlinks them', async () => {
   const [after] = await repo.propTxns.list(S);
   expect(after).toMatchObject({ id: t.id, amount: -54_000 });
   expect('challengeId' in after!).toBe(false);
+});
+
+describe('logPayout (C29)', () => {
+  const challenge = {
+    name: 'Futures 50K',
+    firm: ' Sample firm ',
+    steps: 1 as const,
+    phases: [{ step: 'step-1' as const }, { step: 'funded' as const }],
+    phase: 'funded' as const,
+    status: 'active' as const,
+  };
+  const payout = { amount: 90_000, date: '2026-11-17' };
+
+  test('writes a payout in the funded challenge firm, not reviewed, and no withdrawal', async () => {
+    const repo = setup();
+    const c = await repo.challenges.create(S, challenge);
+    const flows = await repo.cashFlows.list(S);
+    const t = await repo.propTxns.logPayout(S, {
+      challengeId: c.id,
+      ...payout,
+      description: ' First payout ',
+    });
+    expect(t).toEqual({
+      id: 'id-2',
+      workspaceId: S,
+      date: '2026-11-17',
+      description: 'First payout',
+      firm: 'Sample firm',
+      challengeId: c.id,
+      category: 'payout',
+      amount: 90_000,
+      status: 'not-reviewed',
+    });
+    expect(await repo.propTxns.list(S)).toEqual([t]);
+    expect(await repo.cashFlows.list(S)).toEqual(flows);
+    const bare = await repo.propTxns.logPayout(S, {
+      challengeId: c.id,
+      ...payout,
+    });
+    expect('description' in bare).toBe(false);
+  });
+
+  test('refuses a challenge that is still in an evaluation, writing nothing', async () => {
+    const repo = setup();
+    const c = await repo.challenges.create(S, {
+      ...challenge,
+      phase: 'evaluation',
+    });
+    const attempt = repo.propTxns.logPayout(S, {
+      challengeId: c.id,
+      ...payout,
+    });
+    await expect(attempt).rejects.toBeInstanceOf(PayoutRefusedError);
+    await expect(attempt).rejects.toMatchObject({
+      challengeId: c.id,
+      reason: 'not-funded',
+    });
+    expect(await repo.propTxns.list(S)).toEqual([]);
+  });
+
+  test('refuses a breached challenge, even one in its funded phase', async () => {
+    const repo = setup();
+    const c = await repo.challenges.create(S, challenge);
+    await repo.challenges.markBreached(S, c.id, {
+      reason: 'max-drawdown',
+      on: '2026-11-12',
+    });
+    const attempt = repo.propTxns.logPayout(S, {
+      challengeId: c.id,
+      ...payout,
+    });
+    await expect(attempt).rejects.toBeInstanceOf(PayoutRefusedError);
+    await expect(attempt).rejects.toMatchObject({
+      challengeId: c.id,
+      reason: 'breached',
+    });
+    expect(await repo.propTxns.list(S)).toEqual([]);
+  });
+
+  test('refuses an amount that is not income, a bad date, and a challenge that is not there', async () => {
+    const repo = setup();
+    const c = await repo.challenges.create(S, challenge);
+    for (const amount of [0, -100, 12.5, Number.NaN])
+      await expect(
+        repo.propTxns.logPayout(S, {
+          challengeId: c.id,
+          ...payout,
+          amount,
+        }),
+        String(amount),
+      ).rejects.toBeInstanceOf(RangeError);
+    await expect(
+      repo.propTxns.logPayout(S, {
+        challengeId: c.id,
+        ...payout,
+        date: '17 Nov',
+      }),
+    ).rejects.toBeInstanceOf(RangeError);
+    await expect(
+      repo.propTxns.logPayout(S, { challengeId: 'nope', ...payout }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    // Another workspace's challenge is not this one's.
+    await expect(
+      repo.propTxns.logPayout(M, { challengeId: c.id, ...payout }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    expect(await repo.propTxns.list(S)).toEqual([]);
+  });
 });
 
 test('clearing My workspace clears its rows; the sample keeps its own', async () => {

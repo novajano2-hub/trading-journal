@@ -9,7 +9,11 @@ import { summarize } from '@/domain/metrics/summary';
 import type { WidgetKey } from '@/domain/types';
 import { DEFAULT_PROP_VIEW } from '../prop-finance';
 import { createLocalRepository } from '../local/local-repository';
-import { ChallengeBreachedError, NotFoundError } from '../repository';
+import {
+  ChallengeBreachedError,
+  NotFoundError,
+  PayoutRefusedError,
+} from '../repository';
 import {
   generateSampleWorkspace,
   SAMPLE_SEED,
@@ -143,6 +147,35 @@ describe('prop transactions', () => {
       before.payouts + 1,
     );
     expect(result.current.list.data).toHaveLength(10);
+  });
+
+  test('useLogPayout refuses an evaluation challenge and a breached one: only a funded account is paid (C29)', async () => {
+    const { repository, Wrapper } = setup();
+    const { result } = renderHook(() => useLogPayout(), { wrapper: Wrapper });
+    await act(async () => {
+      await expect(
+        result.current.mutateAsync({
+          challengeId: FOREX,
+          amount: 90_000,
+          date: '2026-11-17',
+        }),
+      ).rejects.toMatchObject({
+        name: 'PayoutRefusedError',
+        reason: 'not-funded',
+      });
+      await repository.challenges.markBreached('sample', FUNDED, {
+        reason: 'max-drawdown',
+        on: '2026-11-17',
+      });
+      const breached = result.current.mutateAsync({
+        challengeId: FUNDED,
+        amount: 90_000,
+        date: '2026-11-17',
+      });
+      await expect(breached).rejects.toBeInstanceOf(PayoutRefusedError);
+      await expect(breached).rejects.toMatchObject({ reason: 'breached' });
+    });
+    expect(await repository.propTxns.list('sample')).toHaveLength(9);
   });
 
   test('useLogPayout refuses an amount that is not income and a challenge that is not there', async () => {

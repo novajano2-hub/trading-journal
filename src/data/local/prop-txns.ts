@@ -2,6 +2,7 @@ import type { PropTxn, PropTxnCategory, PropTxnStatus } from '@/domain/types';
 import { mergePatch } from '../merge';
 import {
   NotFoundError,
+  PayoutRefusedError,
   type NewPropTxn,
   type PropTxnsRepo,
 } from '../repository';
@@ -93,6 +94,38 @@ export function localPropTxns(ctx: LocalContext): PropTxnsRepo {
         await assertValid(db, next);
         await db.propTxns.put(next);
         return next;
+      });
+    },
+
+    async logPayout(ws, input) {
+      // A payout is income: positive (a transaction itself may be negative).
+      if (!Number.isInteger(input.amount) || input.amount <= 0)
+        throw new RangeError('A payout is a positive whole number of cents');
+      const db = await ctx.db();
+      return rwTx(db, [db.propTxns, db.challenges], async () => {
+        const challenge = await db.challenges.get([ws, input.challengeId]);
+        if (!challenge) throw new NotFoundError('challenge', input.challengeId);
+        // Payouts are paid on the funded account (C29): not an evaluation, not a breach.
+        if (challenge.status === 'breached')
+          throw new PayoutRefusedError(challenge.id, 'breached');
+        if (challenge.phase !== 'funded')
+          throw new PayoutRefusedError(challenge.id, 'not-funded');
+        const row = tidy({
+          id: ctx.newId(),
+          workspaceId: ws,
+          date: input.date,
+          ...(input.description !== undefined && {
+            description: input.description,
+          }),
+          firm: challenge.firm,
+          challengeId: challenge.id,
+          category: 'payout',
+          amount: input.amount,
+          status: 'not-reviewed',
+        });
+        await assertValid(db, row);
+        await db.propTxns.put(row);
+        return row;
       });
     },
 

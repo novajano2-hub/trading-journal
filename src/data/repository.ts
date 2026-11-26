@@ -475,6 +475,39 @@ export interface PropTxnsRepo {
   update(ws: string, id: string, patch: PropTxnPatch): Promise<PropTxn>;
   /** For good. Throws NotFoundError for an unknown id. */
   remove(ws: string, id: string): Promise<void>;
+  /**
+   * Log a payout (C29): a `payout` row linked to the funded challenge, in its
+   * firm, not yet reviewed, written in one transaction with the challenge
+   * read. It counts in total earned at once and writes no withdrawal. Throws
+   * RangeError for an amount that is not a positive whole number of cents or
+   * a date that is not a real YYYY-MM-DD; NotFoundError for a challenge that
+   * is not in the workspace; PayoutRefusedError, writing nothing, for one not
+   * in its funded phase ('not-funded') or breached ('breached').
+   */
+  logPayout(
+    ws: string,
+    input: {
+      challengeId: string;
+      amount: Cents;
+      date: string;
+      description?: string;
+    },
+  ): Promise<PropTxn>;
+}
+
+/** A payout is only logged on a funded account: the challenge is still in an evaluation, or is breached. */
+export class PayoutRefusedError extends Error {
+  override name = 'PayoutRefusedError';
+  constructor(
+    readonly challengeId: string,
+    readonly reason: 'not-funded' | 'breached',
+  ) {
+    super(
+      reason === 'breached'
+        ? `Challenge "${challengeId}" is breached, so no payout can be logged on it`
+        : `Challenge "${challengeId}" is not in its funded phase, so no payout can be logged on it`,
+    );
+  }
 }
 
 /** The date is finished: nothing on it can change. */

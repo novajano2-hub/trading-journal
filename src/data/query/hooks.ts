@@ -53,7 +53,6 @@ import type {
   TemplateDraft,
   UndoResult,
 } from '../repository';
-import { NotFoundError } from '../repository';
 import type { TradePatch } from '../trade-patch';
 import { USER_WORKSPACE } from '../workspaces';
 import { keys, type WriteKind } from './keys';
@@ -965,8 +964,10 @@ export function useRemovePropTxn(): UseMutationResult<void, Error, string> {
 /**
  * Log a payout (C29): a payout row linked to the funded challenge, in its
  * firm, for a positive amount, not yet reviewed. It counts in total earned at
- * once. It writes no withdrawal. Rejects with RangeError for an amount that is
- * not income, NotFoundError for a challenge that is not there.
+ * once. It writes no withdrawal. The repository's rule: rejects with
+ * PayoutRefusedError for a challenge not in its funded phase or breached,
+ * RangeError for an amount that is not income, NotFoundError for a challenge
+ * that is not there.
  */
 export function useLogPayout(): UseMutationResult<
   PropTxn,
@@ -975,7 +976,7 @@ export function useLogPayout(): UseMutationResult<
 > {
   return useWorkspaceWrite(
     'propTxns.add',
-    async (
+    (
       r,
       ws,
       v: {
@@ -984,23 +985,7 @@ export function useLogPayout(): UseMutationResult<
         date: string;
         description?: string;
       },
-    ) => {
-      if (!Number.isInteger(v.amount) || v.amount <= 0)
-        throw new RangeError('A payout is a positive whole number of cents');
-      const challenge = (await r.challenges.list(ws)).find(
-        (c) => c.id === v.challengeId,
-      );
-      if (!challenge) throw new NotFoundError('challenge', v.challengeId);
-      return r.propTxns.add(ws, {
-        date: v.date,
-        ...(v.description !== undefined && { description: v.description }),
-        firm: challenge.firm,
-        challengeId: challenge.id,
-        category: 'payout',
-        amount: v.amount,
-        status: 'not-reviewed',
-      });
-    },
+    ) => r.propTxns.logPayout(ws, v),
   );
 }
 
