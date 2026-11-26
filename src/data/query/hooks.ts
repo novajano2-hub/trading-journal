@@ -7,7 +7,7 @@ import {
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { ImportContext, ImportPlan } from '@/domain/import/plan';
 import { computePatterns, type PatternEnv } from '@/domain/patterns';
 import { useHydrated } from '@/lib/use-hydrated';
@@ -26,6 +26,7 @@ import type {
   NoteFolder,
   NoteTemplate,
   StoredFile,
+  StoredFileMeta,
   Strategy,
   Tag,
   TagCategory,
@@ -192,8 +193,11 @@ export function useDayShots(date: string): UseQueryResult<DayShot[]> {
   );
 }
 
-/** The owner's files (`trade:<id>`, `note:<id>` or `strategy:<id>`), in upload order. */
-export function useFiles(owner: string): UseQueryResult<StoredFile[]> {
+/**
+ * The owner's files (`trade:<id>`, `note:<id>` or `strategy:<id>`), in upload
+ * order, as metadata only: no bytes (see `useReadFile`).
+ */
+export function useFiles(owner: string): UseQueryResult<StoredFileMeta[]> {
   return useWorkspaceQuery(
     (ws) => keys.files(ws, owner),
     (r, ws) => r.files.list(ws, owner),
@@ -208,6 +212,24 @@ export function useFile(
     (ws) => keys.file(ws, id ?? ''),
     async (r, ws) => (await r.files.get(ws, id!)) ?? null,
     id !== undefined,
+  );
+}
+
+/**
+ * Reads one file with its bytes, on demand. The bytes are not kept: the result
+ * goes to the caller (an object URL, a download) and nothing stays in the
+ * query cache, so a note full of images holds each once. Resolves to
+ * `undefined` for a file that is gone.
+ */
+export function useReadFile(): (id: string) => Promise<StoredFile | undefined> {
+  const repo = useRepository();
+  const qc = useQueryClient();
+  return useCallback(
+    async (id) => {
+      const ws = (await qc.ensureQueryData(activeWorkspaceQuery(repo))).id;
+      return repo.files.get(ws, id);
+    },
+    [repo, qc],
   );
 }
 

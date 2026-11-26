@@ -446,6 +446,8 @@ export interface StoredFile {
   size: number;
   createdAt: string;
 }
+/** A file's row without its contents: what a list holds; `FilesRepo.get` returns the bytes. */
+export type StoredFileMeta = Omit<StoredFile, 'bytes'>;
 export interface NoteVersion {
   id: string;
   workspaceId: string;

@@ -1,6 +1,11 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, test } from 'vitest';
-import { Editor } from '@tiptap/core';
+import { Editor, getSchema } from '@tiptap/core';
+import {
+  DOMParser as PMParser,
+  DOMSerializer,
+  type Node as PMNode,
+} from '@tiptap/pm/model';
 import { INDENT_MAX, INDENT_STEP } from './indent';
 import { noteExtensions } from './index';
 
@@ -159,4 +164,126 @@ test('insert puts a toggle below a block with text, and takes over an empty one'
   expect(empty.commands.insertToggle(0)).toBe(true);
   expect(blocks(empty)[0]?.type).toBe('details');
   expect(blocks(empty)[0]?.attrs?.toggle).toBe(0);
+});
+
+// ---- images ------------------------------------------------------------------
+
+const schema = getSchema(noteExtensions());
+const toHTML = (doc: unknown) => {
+  const node = schema.nodeFromJSON(doc);
+  const box = document.createElement('div');
+  box.append(DOMSerializer.fromSchema(schema).serializeFragment(node.content));
+  return box.innerHTML;
+};
+const fromHTML = (html: string): Node => {
+  const box = document.createElement('div');
+  box.innerHTML = html;
+  return PMParser.fromSchema(schema).parse(box).toJSON() as Node;
+};
+const imageDoc = docOf({
+  type: 'image',
+  attrs: { src: 'keel-file:f-1', alt: 'Chart', width: 60, caption: 'ES 5m' },
+});
+const findAll = (n: Node, type: string): Node[] => [
+  ...(n.type === type ? [n] : []),
+  ...(n.content ?? []).flatMap((c) => findAll(c, type)),
+];
+
+test('an image is a figure holding the reference, the width and the caption', () => {
+  expect(schema.nodes.image!.isAtom).toBe(true);
+  expect(schema.nodes.image!.isBlock).toBe(true);
+  expect(schema.nodes.inlineImage!.isAtom).toBe(true);
+  expect(schema.nodes.inlineImage!.isInline).toBe(true);
+  const html = toHTML(imageDoc);
+  expect(html).toContain('<figure data-keel-image=""');
+  expect(html).toContain('data-width="60"');
+  expect(html).toContain('src="keel-file:f-1"');
+  expect(html).toContain('<figcaption>ES 5m</figcaption>');
+});
+
+test('an image reads back from its figure, width and caption kept', () => {
+  const back = fromHTML(toHTML(imageDoc));
+  expect(findAll(back, 'image')[0]).toMatchObject({
+    attrs: { src: 'keel-file:f-1', alt: 'Chart', width: 60, caption: 'ES 5m' },
+  });
+});
+
+test('an image with no width or caption has neither in its figure', () => {
+  const html = toHTML(
+    docOf({ type: 'image', attrs: { src: 'keel-file:f-2', alt: 'x' } }),
+  );
+  expect(html).not.toContain('data-width');
+  expect(html).not.toContain('figcaption');
+  expect(findAll(fromHTML(html), 'image')[0]!.attrs).toMatchObject({
+    width: null,
+    caption: '',
+  });
+});
+
+test('an inline image sits in its paragraph and reads back', () => {
+  const doc = docOf({
+    type: 'paragraph',
+    content: [
+      { type: 'text', text: 'See ' },
+      {
+        type: 'inlineImage',
+        attrs: { src: 'keel-file:f-3', alt: 'Chip', width: 20 },
+      },
+      { type: 'text', text: ' here' },
+    ],
+  });
+  const html = toHTML(doc);
+  expect(html).toContain('<p>See <span data-keel-inline-image=""');
+  const back = fromHTML(html);
+  expect(findAll(back, 'inlineImage')[0]).toMatchObject({
+    attrs: { src: 'keel-file:f-3', alt: 'Chip', width: 20 },
+  });
+});
+
+test('a width read from outside is brought into range, or dropped', () => {
+  const figure = (w: string) =>
+    `<figure data-keel-image="" data-width="${w}"><img src="keel-file:f-1" alt=""></figure>`;
+  const width = (w: string) =>
+    findAll(fromHTML(figure(w)), 'image')[0]!.attrs?.width;
+  expect(width('500')).toBe(100);
+  expect(width('2')).toBe(10);
+  expect(width('wide')).toBeNull();
+});
+
+test('a picture pasted as plain HTML is not kept: only a figure Keel wrote is an image', () => {
+  const back = fromHTML(
+    '<p>a</p><img src="https://example.com/x.png" alt="x"><p>b</p>',
+  );
+  expect(findAll(back, 'image')).toHaveLength(0);
+  expect(findAll(back, 'inlineImage')).toHaveLength(0);
+});
+
+test('pickImage asks the bridge for a picker, and does nothing without one', () => {
+  const calls: boolean[] = [];
+  const bridge = {
+    pick: (inline: boolean) => {
+      calls.push(inline);
+      return true;
+    },
+  };
+  const editor = new Editor({
+    extensions: noteExtensions(undefined, bridge),
+    content: docOf(para('x')) as never,
+  });
+  editors.push(editor);
+  expect(editor.commands.pickImage()).toBe(true);
+  expect(editor.commands.pickImage(true)).toBe(true);
+  expect(calls).toEqual([false, true]);
+  const bare = make(docOf(para('x')));
+  expect(bare.commands.pickImage()).toBe(false);
+});
+
+test('caretAt puts the caret in the nearest text, even from between blocks', () => {
+  const editor = make(docOf(para('one'), para('two')));
+  // Position 5 is between the two paragraphs.
+  expect(editor.commands.caretAt(5)).toBe(true);
+  const { $from } = editor.state.selection;
+  expect($from.parent.textContent).toBe('two');
+  const node: PMNode = editor.state.doc;
+  expect(node.childCount).toBe(2);
 });

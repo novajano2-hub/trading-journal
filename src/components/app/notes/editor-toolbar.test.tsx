@@ -742,3 +742,32 @@ test('a toggle has no room on the first line of a list item, and says so', async
       .hasAttribute('data-disabled'),
   ).toBe(false);
 });
+
+test('Insert offers Image and Inline image when the note takes images, each asking the host for a file', async () => {
+  const pick = vi.fn(() => true);
+  const editor = new Editor({
+    extensions: noteExtensions(undefined, { pick }),
+    content: PLAN as never,
+  });
+  editors.push(editor);
+  render(<EditorToolbar editor={editor} images />);
+  await openMenu('Insert');
+  const items = screen.getAllByRole('menuitem').map((i) => i.textContent);
+  // Image and Inline image lead the menu, as the comp has them, before Table.
+  expect(items.slice(0, 3)).toEqual(['Image', 'Inline image', 'Table']);
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Image' }));
+  await waitFor(() => expect(pick).toHaveBeenCalledWith(false));
+  await openMenu('Insert');
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Inline image' }));
+  await waitFor(() => expect(pick).toHaveBeenLastCalledWith(true));
+  expect(pick).toHaveBeenCalledTimes(2);
+});
+
+test('Insert has no Image or Inline image for a note that cannot take images', async () => {
+  setup();
+  await openMenu('Insert');
+  const items = screen.getAllByRole('menuitem').map((i) => i.textContent);
+  expect(items).not.toContain('Image');
+  expect(items).not.toContain('Inline image');
+  expect(items[0]).toBe('Table');
+});

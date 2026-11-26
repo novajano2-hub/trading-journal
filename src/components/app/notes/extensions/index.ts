@@ -23,6 +23,8 @@ import {
   TextStyle,
 } from '@tiptap/extension-text-style';
 import { HIGHLIGHTS } from '../note-style';
+import { NoteImage, NoteInlineImage } from './image';
+import type { ImageBridge } from './image-model';
 import { Indent } from './indent';
 import { KeelDetails } from './toggle';
 
@@ -42,7 +44,15 @@ const KeelSuperscript = Superscript.extend({
 });
 const KeelSubscript = Subscript.extend({ excludes: 'subscript superscript' });
 
-export function noteExtensions(placeholder?: string): Extensions {
+/**
+ * `images` is the editor's bridge to the code that stores a note's images
+ * (paste, drop and the picker call it); left out, a note shows images but
+ * takes none.
+ */
+export function noteExtensions(
+  placeholder?: string,
+  images: Partial<ImageBridge> = {},
+): Extensions {
   return [
     StarterKit.configure({
       heading: { levels: [1, 2, 3] },
@@ -79,6 +89,8 @@ export function noteExtensions(placeholder?: string): Extensions {
       alignments: ['left', 'center', 'right', 'justify', 'start', 'end'],
     }),
     Indent,
+    NoteImage.configure({ bridge: () => images }),
+    NoteInlineImage,
     ...(placeholder === undefined
       ? []
       : [Placeholder.configure({ placeholder })]),

@@ -1,4 +1,4 @@
-import type { StoredFile } from '@/domain/types';
+import type { StoredFile, StoredFileMeta } from '@/domain/types';
 import {
   FileRejected,
   IMAGE_TYPES,
@@ -83,7 +83,30 @@ export function localFiles(ctx: LocalContext): FilesRepo {
         .where('[workspaceId+owner]')
         .equals([ws, owner])
         .toArray();
-      return rows.sort(byUpload);
+      // The caller gets the metadata only: a trade or note with many images
+      // must not keep a second copy of each in memory (the bytes come from
+      // `get`, when an image shows).
+      return rows
+        .sort(byUpload)
+        .map(
+          ({
+            id,
+            workspaceId,
+            owner: o,
+            type,
+            name,
+            size,
+            createdAt,
+          }): StoredFileMeta => ({
+            id,
+            workspaceId,
+            owner: o,
+            type,
+            name,
+            size,
+            createdAt,
+          }),
+        );
     },
 
     async get(ws, id) {

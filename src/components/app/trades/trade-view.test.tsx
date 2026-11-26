@@ -16,7 +16,9 @@ import type { SampleWorkspace } from '@/data/seed/generate';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import { resolveInstrument } from '@/domain/instruments';
 import type { Execution, Trade } from '@/domain/types';
+import { pasteFiles } from '../__fixtures__/clipboard';
 import { everyString } from '../__fixtures__/every-string';
+import { fakeIntersectionObserver } from '../__fixtures__/intersection';
 import { renderApp } from '../__fixtures__/render-app';
 import type { NoteEditorHandle } from '../notes/note-editor';
 import { NOTE_SAVE_DELAY_MS } from './trade-journal';
@@ -432,6 +434,46 @@ test('the note editor stays mounted and focused across the first change', async 
   expect(screen.getByRole('textbox', { name: 'Trade note' })).toBe(box);
   expect(box.isConnected).toBe(true);
   expect(document.activeElement).toBe(box);
+});
+
+test('an image pasted into a trade note stores the note, which owns the image', async () => {
+  fakeIntersectionObserver({ auto: true });
+  URL.createObjectURL = vi.fn(() => 'blob:trade-note');
+  URL.revokeObjectURL = vi.fn();
+  const { repo } = renderApp(<TradeView id="t-c" />, {
+    sample: sample(),
+    url: URL_C,
+  });
+  const box = await screen.findByRole('textbox', { name: 'Trade note' });
+  // The trade has no note yet; the first image makes it.
+  expect((await repo.trades.get(WS, 't-c'))?.noteId).toBeUndefined();
+  pasteFiles(box, [
+    new File([new Uint8Array([137, 80, 78, 71])], 'entry.png', {
+      type: 'image/png',
+    }),
+  ]);
+  await waitFor(
+    async () =>
+      expect((await repo.trades.get(WS, 't-c'))?.noteId).toBeDefined(),
+    { timeout: 3000 },
+  );
+  const noteId = (await repo.trades.get(WS, 't-c'))!.noteId!;
+  await waitFor(async () =>
+    expect(await repo.files.list(WS, `note:${noteId}`)).toHaveLength(1),
+  );
+  const [file] = await repo.files.list(WS, `note:${noteId}`);
+  // The saved body refers to the file, and the picture shows in the editor.
+  await waitFor(
+    async () =>
+      expect(
+        JSON.stringify((await repo.journal.get(WS, noteId))?.body),
+      ).toContain(`keel-file:${file!.id}`),
+    { timeout: 3000 },
+  );
+  expect(await screen.findByRole('img', { name: 'entry' })).toBeTruthy();
+  // The editor is the same one, still there.
+  expect(screen.getByRole('textbox', { name: 'Trade note' })).toBe(box);
+  vi.unstubAllGlobals();
 });
 
 test('an archived account makes the trade read-only', async () => {

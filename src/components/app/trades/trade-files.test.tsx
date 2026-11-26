@@ -13,6 +13,7 @@ import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import { FileRejected, SHOT_MAX_BYTES } from '@/data/repository';
 import { makeTrade } from '@/domain/__fixtures__/trades';
+import { fakeIntersectionObserver } from '../__fixtures__/intersection';
 import { renderApp } from '../__fixtures__/render-app';
 import { TradeFiles } from './trade-files';
 
@@ -28,9 +29,12 @@ beforeEach(() => {
   made = 0;
   URL.createObjectURL = vi.fn(() => `blob:file-${(made += 1)}`);
   URL.revokeObjectURL = vi.fn();
+  // Every thumbnail counts as in sight, unless a test says otherwise.
+  fakeIntersectionObserver({ auto: true });
 });
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -99,7 +103,9 @@ test('images show as thumbnails, other files as rows', async () => {
     'Open image, EURUSD 15m entry.png',
     'Open image, EURUSD 1h context.webp',
   ]);
-  for (const t of thumbs) expect(t.querySelector('img')).not.toBeNull();
+  // Each picture arrives once its own bytes are read.
+  for (const t of thumbs)
+    await waitFor(() => expect(t.querySelector('img')).not.toBeNull());
   // The PDF is a named row with its size and an Open action, and no picture.
   const row = within(c).getByText('Statement 25 Nov.pdf').closest('li')!;
   expect(row.textContent).toContain('412 KB');
@@ -210,10 +216,15 @@ test('a thumbnail opens the viewer on that image, which steps through the images
     await screen.findByRole('button', { name: 'Open image, two.gif' }),
   );
   const viewer = await screen.findByRole('dialog', { name: 'Image 2 of 2' });
-  expect(within(viewer).getByRole('img', { name: 'two.gif' })).toBeTruthy();
+  // The picture arrives once its bytes are read.
+  expect(
+    await within(viewer).findByRole('img', { name: 'two.gif' }),
+  ).toBeTruthy();
   fireEvent.click(within(viewer).getByRole('button', { name: 'Previous' }));
   const first = await screen.findByRole('dialog', { name: 'Image 1 of 2' });
-  expect(within(first).getByRole('img', { name: 'one.png' })).toBeTruthy();
+  expect(
+    await within(first).findByRole('img', { name: 'one.png' }),
+  ).toBeTruthy();
 });
 
 test('delete asks first: an image from the viewer, a file from its row', async () => {
@@ -315,14 +326,15 @@ test('Open on a PDF opens it in a tab; any other file is downloaded, never opene
   fireEvent.click(
     within(pdf).getByRole('button', { name: 'Open Statement.pdf' }),
   );
-  expect(opened).toHaveBeenCalledTimes(1);
+  // The file's bytes are read when it is opened, not before.
+  await waitFor(() => expect(opened).toHaveBeenCalledTimes(1));
   expect(opened.mock.calls[0]![0]).toMatch(/^blob:/);
   expect(opened.mock.calls[0]![2]).toContain('noopener');
 
   const html = (await screen.findByText('page.html')).closest('li')!;
   fireEvent.click(within(html).getByRole('button', { name: 'Open page.html' }));
+  await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
   expect(opened).toHaveBeenCalledTimes(1);
-  expect(click).toHaveBeenCalledTimes(1);
 });
 
 test('there are no captions: nothing to type into on the card or in the viewer', async () => {
@@ -380,10 +392,48 @@ test('thumbnails revoke their object URLs on unmount', async () => {
 
 test('thumbnails load lazily', async () => {
   await open([{ name: 'one.png', type: 'image/png' }]);
-  const img = (
-    await screen.findByRole('button', { name: 'Open image, one.png' })
-  ).querySelector('img')!;
-  expect(img.getAttribute('loading')).toBe('lazy');
+  const thumb = await screen.findByRole('button', {
+    name: 'Open image, one.png',
+  });
+  await waitFor(() => expect(thumb.querySelector('img')).not.toBeNull());
+  expect(thumb.querySelector('img')!.getAttribute('loading')).toBe('lazy');
+});
+
+test('thumbnails read their bytes only when they are near the viewport', async () => {
+  const io = fakeIntersectionObserver();
+  const view = await open([
+    { name: 'one.png', type: 'image/png' },
+    { name: 'two.png', type: 'image/png' },
+    { name: 'three.png', type: 'image/png' },
+  ]);
+  const get = vi.spyOn(view.repo.files, 'get');
+  const one = await screen.findByRole('button', {
+    name: 'Open image, one.png',
+  });
+  await screen.findByRole('button', { name: 'Open image, three.png' });
+  // Listed, but none near the screen: no bytes read, no URL made.
+  expect(get).not.toHaveBeenCalled();
+  expect(URL.createObjectURL).not.toHaveBeenCalled();
+  expect(one.querySelector('img')).toBeNull();
+  io.reveal(one);
+  await waitFor(() => expect(one.querySelector('img')).not.toBeNull());
+  expect(get).toHaveBeenCalledTimes(1);
+  expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+});
+
+test('an upload does not read the images already showing again', async () => {
+  const view = await open([
+    { name: 'one.png', type: 'image/png' },
+    { name: 'two.png', type: 'image/png' },
+  ]);
+  const get = vi.spyOn(view.repo.files, 'get');
+  await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
+  await pick(file('three.png', 'image/png'));
+  await screen.findByRole('button', { name: 'Open image, three.png' });
+  await waitFor(() => expect(get).toHaveBeenCalledTimes(3));
+  // Only the new image was read; the two before it kept their URLs.
+  expect(URL.createObjectURL).toHaveBeenCalledTimes(3);
+  expect(URL.revokeObjectURL).not.toHaveBeenCalled();
 });
 
 test("another trade's files stay out of this card", async () => {

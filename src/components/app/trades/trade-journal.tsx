@@ -406,6 +406,15 @@ function NoteBody({
     [],
   );
 
+  // The note owns its images (`note:<id>`), so an image needs a note: the one
+  // the trade or day has, or the one the first change would make.
+  const ensureNoteId = async () => {
+    const pending = (note.current ??= ensureRef.current());
+    pending.catch(() => {
+      if (note.current === pending) note.current = null;
+    });
+    return (await pending).id;
+  };
   return (
     <NoteEditor
       label={label}
@@ -413,6 +422,8 @@ function NoteBody({
       readOnly={readOnly}
       handleRef={handleRef}
       placeholder={placeholder}
+      noteId={entry?.id}
+      ensureNoteId={ensureNoteId}
       onChange={(doc) => {
         latest.current = doc;
         onStatus('saving');

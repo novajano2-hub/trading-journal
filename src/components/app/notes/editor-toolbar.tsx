@@ -405,7 +405,7 @@ const paragraphEntries = (s: BarState): Entry[] => [
  * What Insert offers. Rows are plain commands; a host or a later block adds
  * its own (image, columns, page break, equation) by adding an entry here.
  */
-function insertEntries(s: BarState): Entry[] {
+function insertEntries(s: BarState, images: boolean): Entry[] {
   const action = (
     id: string,
     label: string,
@@ -413,6 +413,19 @@ function insertEntries(s: BarState): Entry[] {
     disabled: boolean,
   ): Item => ({ kind: 'action', id, label, run, disabled });
   return [
+    // Image and Inline image open the host's file picker (`pickImage`); a
+    // note that cannot take images has neither.
+    ...(images
+      ? [
+          action('image', 'Image', (c) => c.pickImage(false), false),
+          action(
+            'inline-image',
+            'Inline image',
+            (c) => c.pickImage(true),
+            false,
+          ),
+        ]
+      : []),
     action(
       'table',
       'Table',
@@ -779,6 +792,8 @@ export interface EditorToolbarProps {
   onFullScreen?: () => void;
   /** Starts dictation, for a host whose browser has speech recognition. */
   onDictate?: () => void;
+  /** The note can take images: Insert offers Image and Inline image. */
+  images?: boolean;
 }
 
 export function EditorToolbar({
@@ -786,6 +801,7 @@ export function EditorToolbar({
   onHistory,
   onFullScreen,
   onDictate,
+  images = false,
 }: EditorToolbarProps): React.JSX.Element {
   const phone = usePhone();
   const [linkOpen, setLinkOpen] = useState(false);
@@ -917,7 +933,7 @@ export function EditorToolbar({
 
   const insert = menu(
     'Insert',
-    insertEntries(s),
+    insertEntries(s, images),
     <Trigger label="Insert">
       <Plus {...ICON} />
       Insert

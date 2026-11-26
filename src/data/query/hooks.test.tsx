@@ -32,6 +32,7 @@ import {
   usePatterns,
   useRemoveAccount,
   useRemoveFeeRule,
+  useReadFile,
   useRemoveFile,
   useRemoveTrades,
   useRemoveTagCategory,
@@ -213,6 +214,40 @@ test('file hooks list an owner’s files; adding and removing refresh them', asy
   });
   await waitFor(() => expect(result.current.files.data).toEqual([]));
   await waitFor(() => expect(result.current.one.data).toBeNull());
+});
+
+test('useReadFile reads one file with its bytes, and the list keeps none', async () => {
+  const { result } = renderHook(
+    () => ({
+      files: useFiles('note:n-1'),
+      add: useAddFile(),
+      read: useReadFile(),
+    }),
+    { wrapper: wrapper() },
+  );
+  await waitFor(() => expect(result.current.files.data).toEqual([]));
+  let id = '';
+  await act(async () => {
+    id = (
+      await result.current.add.mutateAsync({
+        owner: 'note:n-1',
+        file: {
+          bytes: new Uint8Array([1, 2, 3, 4, 5]).buffer as ArrayBuffer,
+          type: 'image/png',
+          name: 'shot.png',
+        },
+        images: true,
+      })
+    ).id;
+  });
+  await waitFor(() => expect(result.current.files.data).toHaveLength(1));
+  // The listed row is metadata only.
+  expect('bytes' in result.current.files.data![0]!).toBe(false);
+  // One file's bytes come from the read, which leaves nothing in the cache.
+  const stored = await result.current.read(id);
+  expect(stored?.name).toBe('shot.png');
+  expect([...new Uint8Array(stored!.bytes)]).toEqual([1, 2, 3, 4, 5]);
+  expect(await result.current.read('missing')).toBeUndefined();
 });
 
 test('an update shows up in the list', async () => {

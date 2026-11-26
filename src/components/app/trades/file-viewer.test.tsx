@@ -2,18 +2,24 @@
 import {
   cleanup,
   fireEvent,
-  render,
   screen,
   waitFor,
   within,
 } from '@testing-library/react';
+import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
 import { useRef, useState } from 'react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import type { StoredFile } from '@/domain/types';
+import { fixtureSample } from '@/data/__fixtures__/sample';
+import { createLocalRepository } from '@/data/local/local-repository';
+import type { StoredFileMeta } from '@/domain/types';
+import { renderApp } from '../__fixtures__/render-app';
 import { FileViewer } from './file-viewer';
 
+vi.mock('next/navigation', () => import('../__fixtures__/navigation'));
 MotionGlobalConfig.skipAnimations = true;
+
+const WS = fixtureSample().trades[0]!.workspaceId;
 
 let made = 0;
 beforeEach(() => {
@@ -23,16 +29,26 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-const stored = (n: number): StoredFile => ({
-  id: `f-${n}`,
-  workspaceId: 'ws',
-  owner: 'trade:t-1',
-  bytes: new Uint8Array([n]).buffer as ArrayBuffer,
-  type: 'image/png',
-  name: `shot-${n}.png`,
-  size: 1,
-  createdAt: `2026-11-20T10:0${n}:00.000Z`,
-});
+/** A store that holds `n` images (shot-1.png ...), and the metadata the viewer is given for them. */
+async function seeded(n: number) {
+  const repo = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+  for (let i = 1; i <= n; i += 1)
+    await repo.files.add(
+      WS,
+      'trade:t-1',
+      {
+        bytes: new Uint8Array([i]).buffer as ArrayBuffer,
+        type: 'image/png',
+        name: `shot-${i}.png`,
+      },
+      { images: true },
+    );
+  return { repo, files: await repo.files.list(WS, 'trade:t-1') };
+}
 
 function Harness({
   files,
@@ -40,9 +56,9 @@ function Harness({
   onDelete,
   deleteBody,
 }: {
-  files: StoredFile[];
+  files: StoredFileMeta[];
   start?: number | null;
-  onDelete?: (file: StoredFile) => Promise<void>;
+  onDelete?: (file: StoredFileMeta) => Promise<void>;
   deleteBody?: string;
 }) {
   const [index, setIndex] = useState<number | null>(start);
@@ -64,14 +80,19 @@ function Harness({
 }
 
 test('shows the file at its index, named by its place, with the file name under the title', async () => {
-  render(<Harness files={[stored(1), stored(2), stored(3)]} start={1} />);
+  const { repo, files } = await seeded(3);
+  renderApp(<Harness files={files} start={1} />, { repository: repo });
   const viewer = await screen.findByRole('dialog', { name: 'Image 2 of 3' });
-  expect(within(viewer).getByRole('img', { name: 'shot-2.png' })).toBeTruthy();
+  // The picture arrives once its bytes are read.
+  expect(
+    await within(viewer).findByRole('img', { name: 'shot-2.png' }),
+  ).toBeTruthy();
   expect(viewer.textContent).toContain('shot-2.png');
 });
 
 test('Previous and Next step through, and stop at the ends', async () => {
-  render(<Harness files={[stored(1), stored(2)]} />);
+  const { repo, files } = await seeded(2);
+  renderApp(<Harness files={files} />, { repository: repo });
   await screen.findByRole('dialog', { name: 'Image 1 of 2' });
   const prev = () =>
     screen.getByRole('button', { name: 'Previous' }) as HTMLButtonElement;
@@ -86,7 +107,8 @@ test('Previous and Next step through, and stop at the ends', async () => {
 });
 
 test('the arrow keys step too', async () => {
-  render(<Harness files={[stored(1), stored(2)]} />);
+  const { repo, files } = await seeded(2);
+  renderApp(<Harness files={files} />, { repository: repo });
   const viewer = await screen.findByRole('dialog', { name: 'Image 1 of 2' });
   fireEvent.keyDown(viewer, { key: 'ArrowRight' });
   await screen.findByRole('dialog', { name: 'Image 2 of 2' });
@@ -95,36 +117,41 @@ test('the arrow keys step too', async () => {
 });
 
 test('without onDelete there is no Delete', async () => {
-  render(<Harness files={[stored(1)]} />);
+  const { repo, files } = await seeded(1);
+  renderApp(<Harness files={files} />, { repository: repo });
   await screen.findByRole('dialog');
   expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
 });
 
 test('Delete asks first, in words the caller can set, and calls onDelete only on confirm', async () => {
   const onDelete = vi.fn(async () => {});
-  render(
+  const { repo, files } = await seeded(2);
+  renderApp(
     <Harness
-      files={[stored(1), stored(2)]}
+      files={files}
       onDelete={onDelete}
       deleteBody="It is removed from this note."
     />,
+    { repository: repo },
   );
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   const ask = await screen.findByRole('dialog', { name: 'Delete this image?' });
   expect(ask.textContent).toContain('It is removed from this note.');
   expect(onDelete).not.toHaveBeenCalled();
   fireEvent.click(within(ask).getByRole('button', { name: 'Delete image' }));
-  await waitFor(() => expect(onDelete).toHaveBeenCalledWith(stored(1)));
+  await waitFor(() => expect(onDelete).toHaveBeenCalledWith(files[0]));
 });
 
 test('a rejected delete says so in the confirmation and leaves the viewer open', async () => {
-  render(
+  const { repo, files } = await seeded(1);
+  renderApp(
     <Harness
-      files={[stored(1)]}
+      files={files}
       onDelete={async () => {
         throw new Error('disk');
       }}
     />,
+    { repository: repo },
   );
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   const ask = await screen.findByRole('dialog', { name: 'Delete this image?' });
@@ -138,7 +165,10 @@ test('a rejected delete says so in the confirmation and leaves the viewer open',
 });
 
 test('deleting the only image closes the viewer', async () => {
-  render(<Harness files={[stored(1)]} onDelete={async () => {}} />);
+  const { repo, files } = await seeded(1);
+  renderApp(<Harness files={files} onDelete={async () => {}} />, {
+    repository: repo,
+  });
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   const ask = await screen.findByRole('dialog', { name: 'Delete this image?' });
   fireEvent.click(within(ask).getByRole('button', { name: 'Delete image' }));
@@ -146,7 +176,8 @@ test('deleting the only image closes the viewer', async () => {
 });
 
 test('Escape closes it and focus returns to the opener', async () => {
-  render(<Harness files={[stored(1)]} />);
+  const { repo, files } = await seeded(1);
+  renderApp(<Harness files={files} />, { repository: repo });
   const viewer = await screen.findByRole('dialog');
   fireEvent.keyDown(viewer, { key: 'Escape' });
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
@@ -156,8 +187,12 @@ test('Escape closes it and focus returns to the opener', async () => {
 });
 
 test('the object URL is made when the image shows and revoked when it goes', async () => {
-  render(<Harness files={[stored(1), stored(2)]} />);
+  const { repo, files } = await seeded(2);
+  const get = vi.spyOn(repo.files, 'get');
+  renderApp(<Harness files={files} />, { repository: repo });
   await screen.findByRole('img', { name: 'shot-1.png' });
+  // Only the image on show is read, not its neighbours.
+  expect(get).toHaveBeenCalledTimes(1);
   expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
   fireEvent.click(screen.getByRole('button', { name: 'Next' }));
   await screen.findByRole('img', { name: 'shot-2.png' });
@@ -166,8 +201,23 @@ test('the object URL is made when the image shows and revoked when it goes', asy
   expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:viewer-2');
 });
 
-test('closed, it draws nothing and makes no URL', () => {
-  render(<Harness files={[stored(1)]} start={null} />);
+test('closed, it draws nothing, reads nothing and makes no URL', async () => {
+  const { repo, files } = await seeded(1);
+  const get = vi.spyOn(repo.files, 'get');
+  renderApp(<Harness files={files} start={null} />, { repository: repo });
   expect(screen.queryByRole('dialog')).toBeNull();
+  expect(URL.createObjectURL).not.toHaveBeenCalled();
+  expect(get).not.toHaveBeenCalled();
+});
+
+test('an image that is no longer stored says so, and nothing breaks', async () => {
+  const { repo, files } = await seeded(1);
+  const gone: StoredFileMeta = { ...files[0]!, id: 'gone', name: 'old.png' };
+  renderApp(<Harness files={[gone]} />, { repository: repo });
+  const viewer = await screen.findByRole('dialog', { name: 'Image 1 of 1' });
+  expect((await within(viewer).findByText('Image not found')).textContent).toBe(
+    'Image not found',
+  );
+  expect(within(viewer).queryByRole('img')).toBeNull();
   expect(URL.createObjectURL).not.toHaveBeenCalled();
 });

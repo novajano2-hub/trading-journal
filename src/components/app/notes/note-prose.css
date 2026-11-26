@@ -442,3 +442,187 @@
     min-width: 0 !important;
   }
 }
+
+/*
+ * Images (comp 05, B32): a block image is a figure with its picture and a
+ * caption under it; an inline image sits in the line. A width is a percentage
+ * of the block the image is in (inline style); with none the picture keeps its
+ * own size, never wider than the block. The selected image gets the accent
+ * ring and four corner handles; a handle's hit area is wider than what is drawn.
+ */
+.note-prose .note-image {
+  position: relative;
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 14px 0 6px;
+}
+.note-prose .note-image-inline {
+  display: inline-block;
+  margin: 0;
+  vertical-align: middle;
+}
+.note-prose .note-image-frame {
+  position: relative;
+  border-radius: 8px;
+}
+.note-prose .note-image-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+.note-prose .note-image[data-selected] .note-image-frame,
+.note-prose .note-image-frame:has(.note-image-slider:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.note-prose .note-image-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  border: 2px solid var(--accent);
+  background: var(--surface-1);
+  touch-action: none;
+}
+.note-prose .note-image-handle::before {
+  content: '';
+  position: absolute;
+  inset: -9px;
+}
+.note-prose .note-image-handle[data-resize-handle='tl'] {
+  top: -7px;
+  left: -7px;
+  cursor: nwse-resize;
+}
+.note-prose .note-image-handle[data-resize-handle='br'] {
+  right: -7px;
+  bottom: -7px;
+  cursor: nwse-resize;
+}
+.note-prose .note-image-handle[data-resize-handle='tr'] {
+  top: -7px;
+  right: -7px;
+  cursor: nesw-resize;
+}
+.note-prose .note-image-handle[data-resize-handle='bl'] {
+  bottom: -7px;
+  left: -7px;
+  cursor: nesw-resize;
+}
+/* The keyboard's width control: there to be focused, not seen. */
+.note-prose .note-image-slider {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* Open larger: out of the way until the image is hovered, focused or selected. */
+.note-prose .note-image-open {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface-1) 90%, transparent);
+  box-shadow: var(--shadow-chip);
+  opacity: 0;
+}
+.note-prose .note-image:hover .note-image-open,
+.note-prose .note-image:focus-within .note-image-open,
+.note-prose .note-image[data-selected] .note-image-open {
+  opacity: 1;
+}
+.note-prose .note-image-open:focus-visible,
+.note-prose .note-image-caption-field:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.note-prose .note-image-caption,
+.note-prose .note-image-caption-field {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.note-prose .note-image-caption-field {
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.note-prose .note-image-caption-field::placeholder {
+  color: var(--faint);
+}
+.note-prose .note-image-caption-field:hover {
+  background: var(--sunken);
+}
+/* A picture still on its way, or one that is not there. */
+.note-prose .note-image-loading,
+.note-prose .note-image-missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-width: min(320px, 100%);
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  background: var(--sunken);
+  color: var(--muted);
+  font-size: 13.5px;
+}
+.note-prose .note-image-missing {
+  border: 1px dashed var(--line-2);
+}
+.note-prose .note-image-inline .note-image-loading,
+.note-prose .note-image-inline .note-image-missing {
+  display: inline-flex;
+  width: auto;
+  min-width: 0;
+  aspect-ratio: auto;
+  padding: 2px 8px;
+}
+@media (pointer: coarse) {
+  /* Drawn at 32px, 44px to touch. */
+  .note-prose .note-image-open {
+    width: 32px;
+    height: 32px;
+  }
+  .note-prose .note-image-open::before {
+    content: '';
+    position: absolute;
+    inset: -6px;
+  }
+  .note-prose .note-image-handle::before {
+    inset: -17px;
+  }
+  .note-prose .note-image-caption-field {
+    min-height: 44px;
+  }
+}
+@media print {
+  .note-prose .note-image-open,
+  .note-prose .note-image-handle,
+  .note-prose .note-image-slider {
+    display: none;
+  }
+}

@@ -93,6 +93,31 @@ test('add keeps upload order and owner', async () => {
   expect(await repo.files.get(S, 'nope')).toBeUndefined();
 });
 
+test('listing does not return bytes', async () => {
+  const { repo } = setup();
+  const a = await repo.files.add(S, 'trade:f-1', png(8), { images: true });
+  await repo.files.add(S, 'trade:f-1', pdf(3), { images: false });
+  const listed = await repo.files.list(S, 'trade:f-1');
+  expect(listed).toHaveLength(2);
+  for (const row of listed) {
+    // The metadata only: nothing of the file's contents, not even an empty buffer.
+    expect(Object.keys(row).sort()).toEqual([
+      'createdAt',
+      'id',
+      'name',
+      'owner',
+      'size',
+      'type',
+      'workspaceId',
+    ]);
+    expect('bytes' in row).toBe(false);
+  }
+  expect(listed[0]).toMatchObject({ id: a.id, name: 'a.png', size: 8 });
+  // The bytes come from `get`, one file at a time.
+  const got = await repo.files.get(S, a.id);
+  expect(got?.bytes.byteLength).toBe(8);
+});
+
 test('add refuses a type', async () => {
   const { repo, db } = setup();
   const refused = repo.files.add(S, 'strategy:str-1', pdf(), { images: true });

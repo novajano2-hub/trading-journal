@@ -18,6 +18,8 @@ import { SAMPLE_WORKSPACE } from '@/data/workspaces';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import { resolveInstrument } from '@/domain/instruments';
 import type { JournalEntry } from '@/domain/types';
+import { pasteFiles } from '../__fixtures__/clipboard';
+import { fakeIntersectionObserver } from '../__fixtures__/intersection';
 import { renderApp } from '../__fixtures__/render-app';
 import { NotebookView } from './notebook-view';
 
@@ -452,6 +454,39 @@ test('a day with no trades says so, and visiting it writes nothing until an edit
   );
   expect(await dailyNotes(repo, '2026-11-21')).toHaveLength(1);
   expect(screen.getByRole('textbox', { name: 'Note title' })).toBe(title);
+});
+
+test("an image pasted into a draft day stores the day's note first, and the note owns it", async () => {
+  fakeIntersectionObserver({ auto: true });
+  URL.createObjectURL = vi.fn(() => 'blob:draft');
+  URL.revokeObjectURL = vi.fn();
+  const { repo } = await openWith('/app/notebook/daily/2026-11-21');
+  const box = await screen.findByRole('textbox', { name: 'Note' });
+  expect(await dailyNotes(repo, '2026-11-21')).toHaveLength(0);
+  pasteFiles(box, [
+    new File([new Uint8Array([137, 80, 78, 71])], 'open.png', {
+      type: 'image/png',
+    }),
+  ]);
+  await waitFor(
+    async () => expect(await dailyNotes(repo, '2026-11-21')).toHaveLength(1),
+    { timeout: 3000 },
+  );
+  const note = (await dailyNotes(repo, '2026-11-21'))[0]!;
+  await waitFor(async () =>
+    expect(await repo.files.list(WS, `note:${note.id}`)).toHaveLength(1),
+  );
+  // One note, not two, and the picture is in the body it saves.
+  await waitFor(
+    async () =>
+      expect(
+        JSON.stringify((await dailyNotes(repo, '2026-11-21'))[0]!.body),
+      ).toContain('keel-file:'),
+    { timeout: 3000 },
+  );
+  expect(await dailyNotes(repo, '2026-11-21')).toHaveLength(1);
+  expect(await screen.findByRole('img', { name: 'open' })).toBeTruthy();
+  vi.unstubAllGlobals();
 });
 
 test('a tag on a draft day makes its note too', async () => {

@@ -12,15 +12,21 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import { useRef, useState } from 'react';
 import { buttonClasses } from '@/components/ui/button-styles';
-import { useAddFile, useFiles, useRemoveFile } from '@/data/query/hooks';
+import {
+  useAddFile,
+  useFiles,
+  useReadFile,
+  useRemoveFile,
+} from '@/data/query/hooks';
 import { FileRejected, IMAGE_TYPES, SHOT_MAX_BYTES } from '@/data/repository';
-import type { StoredFile, Trade } from '@/domain/types';
+import type { StoredFile, StoredFileMeta, Trade } from '@/domain/types';
 import { formatBytes, plural } from '@/lib/format';
 import { Caption, CARD, CARD_PAD, CardHeader } from '../dashboard/shared';
 import { ConfirmDialog, ConfirmFailure } from '../confirm-dialog';
-import { FileViewer, useFileUrl } from './file-viewer';
+import { useLazyFileUrl } from '../use-file-url';
+import { FileViewer } from './file-viewer';
 
-const isImage = (f: Pick<StoredFile, 'type'>) =>
+const isImage = (f: Pick<StoredFileMeta, 'type'>) =>
   (IMAGE_TYPES as readonly string[]).includes(f.type);
 
 /** Types a browser shows without running anything of the file's own. Everything else is saved to disk. */
@@ -49,7 +55,7 @@ function openFile(file: StoredFile): void {
 }
 
 /** A glyph for the kind of file: a PDF, a table, an archive, text, or any other. */
-function FileGlyph({ file }: { file: StoredFile }): React.JSX.Element {
+function FileGlyph({ file }: { file: StoredFileMeta }): React.JSX.Element {
   const name = file.name.toLowerCase();
   const props = {
     size: 18,
@@ -66,16 +72,18 @@ function FileGlyph({ file }: { file: StoredFile }): React.JSX.Element {
   return <FileIcon {...props} />;
 }
 
+/** A thumbnail: its bytes are read, and its object URL made, when it comes near the viewport. */
 function Thumb({
   file,
   onOpen,
 }: {
-  file: StoredFile;
+  file: StoredFileMeta;
   onOpen(button: HTMLButtonElement): void;
 }): React.JSX.Element {
-  const url = useFileUrl(file);
+  const { url, ref } = useLazyFileUrl<HTMLButtonElement>(file.id);
   return (
     <button
+      ref={ref}
       type="button"
       aria-label={`Open image, ${file.name}`}
       onClick={(e) => onOpen(e.currentTarget)}
@@ -98,10 +106,12 @@ function Thumb({
 function FileRow({
   file,
   readOnly,
+  onOpen,
   onDelete,
 }: {
-  file: StoredFile;
+  file: StoredFileMeta;
   readOnly: boolean;
+  onOpen(): void;
   onDelete(): void;
 }): React.JSX.Element {
   return (
@@ -122,7 +132,7 @@ function FileRow({
       <button
         type="button"
         aria-label={`Open ${file.name}`}
-        onClick={() => openFile(file)}
+        onClick={onOpen}
         className={`${buttonClasses('ghost', 'sm')} flex-none gap-1.5 px-2 outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent`}
       >
         <ArrowSquareOut size={16} aria-hidden="true" />
@@ -161,6 +171,7 @@ export function TradeFiles({
   const files = useFiles(owner).data ?? [];
   const add = useAddFile();
   const remove = useRemoveFile();
+  const read = useReadFile();
   const picker = useRef<HTMLInputElement>(null);
   const card = useRef<HTMLElement>(null);
   const origin = useRef<HTMLElement | null>(null);
@@ -171,7 +182,7 @@ export function TradeFiles({
   const [problems, setProblems] = useState<{ id: number; text: string }[]>([]);
   const [over, setOver] = useState(false);
   const [viewing, setViewing] = useState<number | null>(null);
-  const [deleting, setDeleting] = useState<StoredFile | null>(null);
+  const [deleting, setDeleting] = useState<StoredFileMeta | null>(null);
 
   const images = files.filter(isImage);
   const others = files.filter((f) => !isImage(f));
@@ -250,6 +261,12 @@ export function TradeFiles({
               key={file.id}
               file={file}
               readOnly={readOnly}
+              onOpen={() => {
+                // The bytes are read now, for this one file.
+                void read(file.id).then((stored) => {
+                  if (stored) openFile(stored);
+                });
+              }}
               onDelete={() => setDeleting(file)}
             />
           ))}

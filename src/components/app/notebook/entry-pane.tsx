@@ -348,6 +348,17 @@ export function EntryPane({
           value={seed}
           readOnly={frozen}
           placeholder="Write here, or type / for blocks"
+          // A draft has no id to own an image yet: its first image stores it.
+          noteId={isDraft ? undefined : entry.id}
+          ensureNoteId={
+            isDraft && ensure
+              ? async () => {
+                  if (base.current.id === DRAFT_ID)
+                    base.current = await ensure();
+                  return base.current.id;
+                }
+              : undefined
+          }
           onChange={(doc) => {
             draft.current.body = doc;
             later();

@@ -24,6 +24,7 @@ import type {
   RuleGroup,
   Side,
   StoredFile,
+  StoredFileMeta,
   Strategy,
   SurveyAnswers,
   Tag,
@@ -590,8 +591,12 @@ export interface NewFile {
  * its own store.
  */
 export interface FilesRepo {
-  /** The owner's files in upload order. */
-  list(ws: string, owner: string): Promise<StoredFile[]>;
+  /**
+   * The owner's files in upload order, without their bytes (id, owner, type,
+   * name, size, createdAt): a list never holds the contents of every file.
+   * Read one file's bytes with `get` when it is shown.
+   */
+  list(ws: string, owner: string): Promise<StoredFileMeta[]>;
   get(ws: string, id: string): Promise<StoredFile | undefined>;
   /**
    * With `images`, the type must be one of IMAGE_TYPES (FileRejected 'type'); any
