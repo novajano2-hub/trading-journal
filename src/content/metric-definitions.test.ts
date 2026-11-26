@@ -165,6 +165,9 @@ test("the list, calendar and report widgets have a tip of their own, in Keel's w
   expect(recent.definition).toMatch(/newest closed trades/);
   expect(recent.definition).toMatch(/gross P&L/);
   expect(recent.definition).toMatch(/Open positions/);
+  // It says what a third-width card shows: the time, the instrument and the result.
+  expect(recent.definition).toMatch(/time, .*instrument/);
+  expect(recent.definition).not.toMatch(/strategy|mistake|rules/i);
 
   const challenge = metricDefinition('challenge-card', 'net');
   expect(challenge.definition).toMatch(/most urgent active one/);

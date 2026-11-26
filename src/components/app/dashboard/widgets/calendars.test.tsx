@@ -366,6 +366,10 @@ describe('the calendar with stats: Calendar page’s month, its Stats shown, no 
     expect(
       within(card).getByRole('button', { name: 'Stats shown' }),
     ).toBeTruthy();
+    // The legend names the tints and the pencil; it does not explain the date range.
+    expect(said(ADV)).toContain('Green day');
+    expect(said(ADV)).toContain('Journal entry');
+    expect(said(ADV)).not.toMatch(/whatever the date range/);
     // Task 16 adds the Snapshot button; it is not here yet.
     expect(
       within(card).queryByRole('button', { name: /snapshot/i }),

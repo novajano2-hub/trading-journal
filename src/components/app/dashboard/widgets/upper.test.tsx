@@ -230,11 +230,12 @@ describe('over the sample', () => {
     expect(toned.map((e) => e.textContent)).toEqual(['+$201.44', '−$169.60']);
   });
 
-  test('trade expectancy: per closed trade, with the count', async () => {
+  test('trade expectancy: the figure and nothing under it', async () => {
     await renderUpper();
     expect(said('expectancy')).toContain('Trade expectancy');
     expect(said('expectancy')).toContain('+$11.52');
-    expect(said('expectancy')).toContain('per closed trade, 1,518 trades');
+    // TradeZella's card has no line of its own under the figure.
+    expect(said('expectancy')).not.toMatch(/per closed trade|1,518/);
   });
 
   test('the streaks count winning runs ending at the last day and the last trade: 0 days after a losing day', async () => {
@@ -271,13 +272,14 @@ describe('over the sample', () => {
     );
   });
 
-  test('average drawdown with a date range is the mean of the days under a high', async () => {
+  test('average drawdown with a date range is the mean of the days under a high, with no count under it', async () => {
     await renderUpper({
       keys: ['avg-drawdown'],
       url: '/app/dashboard?from=2026-01-01&to=2026-11-19',
     });
     expect(said('avg-drawdown')).toContain('−$1,944.46');
-    expect(said('avg-drawdown')).toContain('89 days under a high');
+    // No line of its own under the figure (a day count is not on TradeZella's card).
+    expect(said('avg-drawdown')).not.toMatch(/under a high|89/);
     expect(said('avg-drawdown')).not.toContain('no date range set');
   });
 });

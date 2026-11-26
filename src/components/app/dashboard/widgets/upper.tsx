@@ -399,10 +399,6 @@ export function Expectancy(): React.JSX.Element {
           <FigureText f={shown} />
         </Fig>
       )}
-      <Sub>
-        per closed trade, {formatCount(s.closedCount)}{' '}
-        {plural(s.closedCount, 'trade')}
-      </Sub>
     </Card>
   );
 }
@@ -551,11 +547,9 @@ export function AvgDrawdown(): React.JSX.Element {
       <Fig chars={shown.text.length} className={depth < 0 ? 'text-loss' : ''}>
         <FigureText f={shown} />
       </Fig>
-      <Sub>
-        {noRange
-          ? `today, ${depth < 0 ? 'from' : 'at'} the high; no date range set`
-          : `${s.days} ${plural(s.days, 'day')} under a high`}
-      </Sub>
+      {noRange ? (
+        <Sub>{`today, ${depth < 0 ? 'from' : 'at'} the high; no date range set`}</Sub>
+      ) : null}
     </Card>
   );
 }

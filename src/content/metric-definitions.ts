@@ -541,7 +541,7 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'recent-trades': {
     label: 'Recent trades',
     definition:
-      "The newest closed trades in your filters, each with its strategy, its first mistake, its {basis} P&L and how it went against its strategy's rules. The Open positions tab lists the trades still open, with what each holds and has booked so far. A row opens the trade.",
+      'The newest closed trades in your filters, each with its time, its instrument and its {basis} P&L. The Open positions tab lists the trades still open. A row opens the trade.',
   },
   'challenge-card': {
     label: 'Challenge',

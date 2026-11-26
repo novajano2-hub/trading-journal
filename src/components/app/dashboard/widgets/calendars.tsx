@@ -344,7 +344,6 @@ function MonthCard({
             <NotePencil size={15} aria-hidden="true" className="text-muted" />
             Journal entry
           </span>
-          <span>The whole month shows, whatever the date range.</span>
         </div>
       ) : null}
       <DaySheet
