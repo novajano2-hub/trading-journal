@@ -20,15 +20,24 @@ export interface RadarAxis {
 }
 
 // The drawing box, in viewBox units: wide enough that the names at the sides stay inside it.
-const W = 320;
-const H = 250;
+const W = 300;
+const H = 260;
 const CX = W / 2;
 const CY = H / 2;
 /** The outermost ring's radius, and the five rings inside it. */
-const R = 80;
+const R = 86;
 const RINGS = 5;
 /** How far from the centre a spoke's name sits. */
-const LABEL_R = 98;
+const LABEL_R = 102;
+
+/** The drawing's geometry, in viewBox units: for tests that read where a part is drawn. */
+export const RADAR = {
+  width: W,
+  height: H,
+  cx: CX,
+  cy: CY,
+  radius: R,
+} as const;
 
 const clamp = (n: number) => Math.min(100, Math.max(0, n));
 /** The angle of spoke `i` of `n`: the first is straight up, the rest follow clockwise. */

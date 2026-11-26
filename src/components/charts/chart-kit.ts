@@ -51,3 +51,23 @@ export function thinTicks<T extends { px: number }>(
 /** The look of a chart's hover and focus readout: one card, in the house style. */
 export const READOUT =
   'pointer-events-none absolute top-1 z-10 min-w-[150px] rounded-control border border-line bg-surface-1 px-2.5 py-2 text-[12.5px] whitespace-nowrap text-muted shadow-[var(--shadow)]';
+
+/**
+ * How far the plot stops short of the chart's right edge: at least `base`, and
+ * enough for the last x label, which is centred on its tick and would run off
+ * the edge (and be clipped) when its tick is at the plot's end.
+ */
+export function endRoom(
+  ticks: readonly { at: number; text: string }[],
+  lo: number,
+  hi: number,
+  base: number,
+): number {
+  const near = hi - Math.max((hi - lo) * 0.04, 0.51);
+  return Math.max(
+    base,
+    ...ticks
+      .filter((t) => t.at >= near)
+      .map((t) => Math.ceil(t.text.length * 3.3) + 2),
+  );
+}

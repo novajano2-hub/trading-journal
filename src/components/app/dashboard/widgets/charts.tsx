@@ -1,11 +1,19 @@
 'use client';
 
 import { format, parseISO } from 'date-fns';
-import { useMemo, type ReactNode } from 'react';
+import { useContext, useMemo, type ReactNode } from 'react';
 import {
   DualAxisChart,
   type DualSeries,
 } from '@/components/charts/dual-axis-chart';
+import {
+  ScatterChart,
+  type DotReadout,
+  type ScatterDot,
+} from '@/components/charts/scatter-chart';
+import { FigureText } from '@/components/product/figure-text';
+import { Segmented } from '@/components/ui/segmented';
+import { UNIT_SCOPE } from '@/content/display-units';
 import {
   formatterOf,
   periodText,
@@ -16,22 +24,31 @@ import { usePrefs } from '@/data/query/hooks';
 import { WIDGETS } from '@/domain/dashboard/widgets';
 import type { MetricContext } from '@/domain/metrics/context';
 import { dayValue, type DayStat } from '@/domain/metrics/days';
-import { clockText, timeAxis } from '@/domain/metrics/scatter';
+import { clockText, durationAxis, timeAxis } from '@/domain/metrics/scatter';
 import {
   seriesUnit,
   type SeriesPoint,
   type SeriesUnit,
 } from '@/domain/metrics/series';
 import { isTradeUnit } from '@/domain/metrics/units';
-import type { WidgetKey } from '@/domain/types';
-import { useDisplay } from '@/lib/display';
-import { formatCount, plural } from '@/lib/format';
+import { isClosed } from '@/domain/trade-status';
+import type { WidgetKey, WidgetSettings } from '@/domain/types';
+import { FigureSourceContext, useDisplay } from '@/lib/display';
+import {
+  formatCount,
+  formatDuration,
+  formatInstrument,
+  formatMinutes,
+  plural,
+} from '@/lib/format';
+import { shortTime } from '@/lib/time-format';
 import { zoneLabel } from '@/lib/time-zone-label';
 import { noBalanceIn, STARTING_BALANCE_PROMPT } from './balance-states';
 import { useWidgetCtx, useWidgetPage, useWidgetValue } from './context';
 import { WidgetFrame } from './frame';
 import type { WidgetRender } from './registry';
 import { sentenceCase } from './text';
+import { useSetWidgetSetting } from './use-widget-setting';
 
 /**
  * The chart widgets (#46): the running and the daily net P&L, the two on one
@@ -462,6 +479,169 @@ export function Balance(): React.JSX.Element {
   );
 }
 
+/**
+ * What a scatter's readout says of a trade, and where it leads: the trade's
+ * instrument and side, the time read, how long it was held and its P&L (with
+ * the unit's own figure under a narrowing unit).
+ */
+function useDescribe(
+  time: 'entry' | 'exit' | 'duration',
+): ((id: string) => DotReadout | undefined) | undefined {
+  const source = useContext(FigureSourceContext);
+  const page = useWidgetPage();
+  const display = useDisplay();
+  const basis = usePrefs().data?.pnlBasis ?? 'net';
+  if (!source || !page) return undefined;
+  const { timeZone } = source.ctx;
+  const currency = page.currency;
+  return (id) => {
+    const t = source.tradesById.get(id);
+    if (!t || !isClosed(t)) return undefined;
+    const held = formatDuration(
+      Date.parse(t.closedAt) - Date.parse(t.openedAt),
+    );
+    const name = formatInstrument(t.instrument, t.openedAt, timeZone).name;
+    const pnl = display.ofTrade(t);
+    return {
+      title: `${name} ${t.direction}`,
+      lines: [
+        time === 'entry'
+          ? { label: 'Entered', value: shortTime(t.openedAt, timeZone) }
+          : { label: 'Closed', value: shortTime(t.closedAt, timeZone) },
+        { label: 'Held', value: held },
+        {
+          label: `${sentenceCase(basis)} P&L`,
+          value: <FigureText f={display.cash(pnl.money, true, currency)} />,
+        },
+        ...(isTradeUnit(display.unit)
+          ? [
+              {
+                label: UNIT_SCOPE[display.unit].name,
+                value: <FigureText f={display.figure(pnl, true, currency)} />,
+              },
+            ]
+          : []),
+      ],
+      href: `/app/trades/${encodeURIComponent(id)}`,
+    };
+  };
+}
+
+/** How many of the dots won, lost and broke even, by the sign of the P&L. */
+function tally(dots: readonly ScatterDot[]) {
+  let won = 0;
+  let lost = 0;
+  for (const d of dots) {
+    if (d.y > 0) won += 1;
+    else if (d.y < 0) lost += 1;
+  }
+  return { won, lost, even: dots.length - won - lost };
+}
+
+/** The dots' sentence for a label: how many won and lost, with the best and the worst. */
+function describeDots(
+  dots: readonly ScatterDot[],
+  fmt: ReturnType<typeof formatterOf>,
+): string {
+  const { won, lost, even } = tally(dots);
+  const best = Math.max(...dots.map((d) => d.y));
+  const worst = Math.min(...dots.map((d) => d.y));
+  return `${won} won (filled dots), ${lost} lost (hollow dots)${even > 0 ? `, ${even} breakeven` : ''}. Best ${fmt.text('money', best)}, worst ${fmt.text('money', worst)}.`;
+}
+
+/** Each closed trade by the time of day it was entered or exited, and what it made. */
+export function TradeTime({
+  settings,
+}: {
+  settings?: WidgetSettings;
+}): React.JSX.Element {
+  const data = useWidgetValue('trade-time');
+  const { page, ctx, fmt } = useChartEnv();
+  const describe = useDescribe(settings?.time ?? 'entry');
+  const setSetting = useSetWidgetSetting('trade-time');
+  const time = settings?.time ?? 'entry';
+  const points = data?.[time];
+  const dots = useMemo<ScatterDot[]>(
+    () => points?.map((p) => ({ id: p.tradeId, x: p.x, y: p.pnl })) ?? [],
+    [points],
+  );
+  const oneDay =
+    ctx?.range?.from !== undefined && ctx.range.from === ctx.range.to;
+  const xAxis = useMemo(
+    () =>
+      timeAxis(
+        dots.map((d) => d.x),
+        oneDay,
+      ),
+    [dots, oneDay],
+  );
+  if (!data || !page || !ctx || !fmt || !describe)
+    return <Loading k="trade-time" />;
+  // The switch stays, whatever the range holds: it is the widget's setting.
+  const end = (
+    <Segmented
+      label="Time of"
+      options={[
+        { value: 'entry', label: 'Entry' },
+        { value: 'exit', label: 'Exit' },
+      ]}
+      value={time}
+      onChange={(value) => setSetting({ time: value })}
+      coarseTargets
+    />
+  );
+  if (dots.length === 0)
+    return <Card k="trade-time" end={end} state="empty" empty={NONE} />;
+  return (
+    <Card k="trade-time" end={end}>
+      <div className="mt-3">
+        <ScatterChart
+          label={`Trade time performance by ${time} time, ${formatCount(dots.length)} closed ${plural(dots.length, 'trade')}, ${page.caption}. ${describeDots(dots, fmt)}`}
+          currency={page.currency}
+          dots={dots}
+          xAxis={xAxis}
+          describe={describe}
+          note={`Times in ${zoneLabel(ctx.timeZone)}`}
+        />
+      </div>
+    </Card>
+  );
+}
+
+/** Each closed trade by how long it was held, on a log scale, and what it made. */
+export function TradeDuration(): React.JSX.Element {
+  const points = useWidgetValue('trade-duration');
+  const { page, ctx, fmt } = useChartEnv();
+  const describe = useDescribe('duration');
+  const dots = useMemo<ScatterDot[]>(
+    () => points?.map((p) => ({ id: p.tradeId, x: p.x, y: p.pnl })) ?? [],
+    [points],
+  );
+  const xAxis = useMemo(() => durationAxis(dots.map((d) => d.x)), [dots]);
+  if (!points || !page || !ctx || !fmt || !describe)
+    return <Loading k="trade-duration" />;
+  const caption = sentenceCase('log scale');
+  if (dots.length === 0)
+    return (
+      <Card k="trade-duration" caption={caption} state="empty" empty={NONE} />
+    );
+  const xs = dots.map((d) => d.x);
+  const spread = `Held from ${formatMinutes(10 ** Math.min(...xs))} to ${formatMinutes(10 ** Math.max(...xs))}.`;
+  return (
+    <Card k="trade-duration" caption={caption}>
+      <div className="mt-3">
+        <ScatterChart
+          label={`Trade duration performance, ${formatCount(dots.length)} closed ${plural(dots.length, 'trade')}, ${page.caption}. ${spread} ${describeDots(dots, fmt)}`}
+          currency={page.currency}
+          dots={dots}
+          xAxis={xAxis}
+          describe={describe}
+        />
+      </div>
+    </Card>
+  );
+}
+
 export const CHART_RENDER = {
   'cum-pnl': CumPnl,
   'daily-pnl': DailyPnl,
@@ -469,4 +649,6 @@ export const CHART_RENDER = {
   drawdown: Drawdown,
   'win-avg': WinAvg,
   balance: Balance,
+  'trade-time': TradeTime,
+  'trade-duration': TradeDuration,
 } satisfies Partial<Record<WidgetKey, WidgetRender>>;

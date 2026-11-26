@@ -16,7 +16,7 @@ import {
 import { usePrefs } from '@/data/query/hooks';
 import type { SeriesUnit } from '@/domain/metrics/series';
 import { useDisplay } from '@/lib/display';
-import { READOUT, thinTicks, useBoxWidth } from './chart-kit';
+import { endRoom, READOUT, thinTicks, useBoxWidth } from './chart-kit';
 
 /** One series of the chart, on the left or the right scale. */
 export interface DualSeries {
@@ -424,7 +424,7 @@ export function DualAxisChart({
     const padR =
       right && onRight.length > 0
         ? Math.max(36, Math.ceil(widest(right, onRight) * 6.4) + 14)
-        : PAD_R;
+        : endRoom(xAxis.ticks, xAxis.lo, xAxis.hi, PAD_R);
     const plotW = Math.max(40, width - padL - padR);
     const span = xAxis.hi - xAxis.lo || 1;
     const x = (v: number) => padL + ((v - xAxis.lo) / span) * plotW;

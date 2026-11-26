@@ -7,7 +7,9 @@ import {
   within,
 } from '@testing-library/react';
 import { afterEach, expect, test } from 'vitest';
-import { RadarChart, type RadarAxis } from './radar-chart';
+import { RADAR, RadarChart, type RadarAxis } from './radar-chart';
+
+const { cx: CX, cy: CY, radius: R } = RADAR;
 
 afterEach(cleanup);
 
@@ -35,19 +37,19 @@ test('six axes clockwise from the top, five rings, each part at its own value', 
     )!;
     return [Number(dot.getAttribute('cx')), Number(dot.getAttribute('cy'))];
   };
-  // The first axis is straight up; value 100 reaches the outer ring (radius 80 around 160, 125).
-  expect(at('win')[0]).toBeCloseTo(160, 5);
-  expect(at('win')[1]).toBeCloseTo(45, 5);
-  // The second is 60 degrees round, to the right: half way out is 40.
-  expect(at('pf')[0]).toBeCloseTo(160 + 40 * Math.cos(-Math.PI / 6), 5);
-  expect(at('pf')[1]).toBeCloseTo(125 + 40 * Math.sin(-Math.PI / 6), 5);
+  // The first axis is straight up; value 100 reaches the outer ring (radius 86 around 150, 130).
+  expect(at('win')[0]).toBeCloseTo(CX, 5);
+  expect(at('win')[1]).toBeCloseTo(CY - R, 5);
+  // The second is 60 degrees round, to the right: half way out is 43.
+  expect(at('pf')[0]).toBeCloseTo(CX + (R / 2) * Math.cos(-Math.PI / 6), 5);
+  expect(at('pf')[1]).toBeCloseTo(CY + (R / 2) * Math.sin(-Math.PI / 6), 5);
   // Third at 30 degrees below the right, fourth straight down, then left.
-  expect(at('wl')[1]).toBeCloseTo(125 + 20 * Math.sin(Math.PI / 6), 5);
-  expect(at('rec')[0]).toBeCloseTo(160, 5);
-  expect(at('rec')[1]).toBeCloseTo(125, 5);
-  expect(at('dd')[0]).toBeLessThan(160);
-  expect(at('con')[0]).toBeLessThan(160);
-  expect(at('con')[1]).toBeLessThan(125);
+  expect(at('wl')[1]).toBeCloseTo(CY + (R / 4) * Math.sin(Math.PI / 6), 5);
+  expect(at('rec')[0]).toBeCloseTo(CX, 5);
+  expect(at('rec')[1]).toBeCloseTo(CY, 5);
+  expect(at('dd')[0]).toBeLessThan(CX);
+  expect(at('con')[0]).toBeLessThan(CX);
+  expect(at('con')[1]).toBeLessThan(CY);
 });
 
 test('draws the part names and no axis values', () => {
@@ -98,15 +100,15 @@ test('focus reads the first part, the arrows step round and wrap, Home and End j
 test('hovering reads the part in the direction of the pointer', () => {
   const { container } = chart();
   const svg = container.querySelector('svg')!;
-  // 320 by 250 units drawn at 320 by 250 pixels from the page's corner.
+  // The drawing's own units, drawn at one pixel each from the page's corner.
   svg.getBoundingClientRect = () =>
-    ({ left: 0, top: 0, width: 320, height: 250 }) as DOMRect;
+    ({ left: 0, top: 0, width: RADAR.width, height: RADAR.height }) as DOMRect;
   const status = () => screen.getByRole('status').textContent;
-  // Straight below the centre (160, 125): the fourth part.
-  fireEvent.pointerMove(svg, { clientX: 160, clientY: 200 });
+  // Straight below the centre: the fourth part.
+  fireEvent.pointerMove(svg, { clientX: CX, clientY: CY + 75 });
   expect(status()).toContain('Recovery');
   // Up and to the right, at 60 degrees from the top: the second.
-  fireEvent.pointerMove(svg, { clientX: 160 + 60, clientY: 125 - 35 });
+  fireEvent.pointerMove(svg, { clientX: CX + 60, clientY: CY - 35 });
   expect(status()).toContain('Profit factor');
   fireEvent.pointerLeave(svg);
   expect(status()).toBe('');
@@ -121,7 +123,7 @@ test('values past the ends are drawn at the ends', () => {
     />,
   );
   const top = container.querySelector<SVGCircleElement>('[data-axis="win"]')!;
-  expect(Number(top.getAttribute('cy'))).toBeCloseTo(45, 5);
+  expect(Number(top.getAttribute('cy'))).toBeCloseTo(CY - R, 5);
   const low = container.querySelector<SVGCircleElement>('[data-axis="rec"]')!;
-  expect(Number(low.getAttribute('cy'))).toBeCloseTo(125, 5);
+  expect(Number(low.getAttribute('cy'))).toBeCloseTo(CY, 5);
 });

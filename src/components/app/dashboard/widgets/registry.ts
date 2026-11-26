@@ -33,8 +33,6 @@ export const WIDGET_RENDER: Record<WidgetKey, WidgetRender> = {
   // Lower
   ...SCORE_RENDER,
   ...CHART_RENDER,
-  'trade-time': placeholder('trade-time'),
-  'trade-duration': placeholder('trade-duration'),
   recent: placeholder('recent'),
   calendar: placeholder('calendar'),
   challenge: placeholder('challenge'),

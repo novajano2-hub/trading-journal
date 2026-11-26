@@ -105,7 +105,7 @@ function ScoreTrack({ total }: { total: number }): React.JSX.Element {
   const band = bandOf(total);
   const place = `${Math.min(100, Math.max(0, total))}%`;
   return (
-    <div className="min-w-0 flex-1 pb-0.5">
+    <div className="min-w-[236px] flex-1 pb-0.5">
       <div
         role="img"
         aria-label={`${scoreText(total)} of 100, in the ${band.word.toLowerCase()} band (${band.from} to ${band.to})`}
@@ -143,7 +143,7 @@ function ScoreTrack({ total }: { total: number }): React.JSX.Element {
             ['40', 40, '-translate-x-1/2'],
             ['Building', 55, '-translate-x-1/2'],
             ['70', 70, '-translate-x-1/2'],
-            ['Strong', 85, '-translate-x-1/2'],
+            ['Strong', 83, '-translate-x-1/2'],
             ['100', 100, '-translate-x-full'],
           ] as const
         ).map(([text, at, shift]) => (
@@ -216,7 +216,7 @@ export function Score(): React.JSX.Element {
           label={label}
           caption="Edge score parts, each out of 100"
         />
-        <div className="mt-auto flex items-end gap-3.5 border-t border-line pt-3">
+        <div className="mt-auto flex flex-wrap items-end gap-x-3.5 gap-y-3 border-t border-line pt-3">
           <div className="flex flex-col">
             <span className="text-[30px] leading-none font-semibold tracking-[-0.04em] tabular-nums">
               {total}

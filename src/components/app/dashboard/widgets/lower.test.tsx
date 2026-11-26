@@ -2,9 +2,16 @@
 // The lower widgets (#46, Task 9): the Edge score and the charts, over the
 // sample's closed trades on 20 Nov 2026 and over small trade sets whose
 // answers are worked out by hand.
-import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { RADAR } from '@/components/charts/radar-chart';
 import { scoreOf } from '@/domain/metrics/score';
 import {
   byDay,
@@ -171,13 +178,19 @@ describe('the Edge score', () => {
         widget('score').querySelector<SVGCircleElement>(
           `[data-axis="${key}"]`,
         )!;
-      // The outer ring is 80 units from the centre (125): recovery, straight down, is drawn there.
-      expect(Number(dot('recovery').getAttribute('cy'))).toBeCloseTo(205, 5);
+      // The outer ring is one radius from the centre: recovery, straight down, is drawn there.
+      expect(Number(dot('recovery').getAttribute('cy'))).toBeCloseTo(
+        RADAR.cy + RADAR.radius,
+        5,
+      );
       expect(parts().Recovery).toContain('0 of 100');
       expect(parts().Recovery).toMatch(/no drawdown/i);
       expect(parts().Recovery).toMatch(/adds nothing to the score/i);
       // A part that is full is drawn full and scores so.
-      expect(Number(dot('winRate').getAttribute('cy'))).toBeCloseTo(45, 5);
+      expect(Number(dot('winRate').getAttribute('cy'))).toBeCloseTo(
+        RADAR.cy - RADAR.radius,
+        5,
+      );
       expect(parts()['Win rate']).toContain('100 of 100');
     });
 
@@ -614,5 +627,218 @@ describe('the account balance chart (C75)', () => {
     expect(
       chartOf('balance', /^Account balance by day/).getAttribute('aria-label'),
     ).not.toMatch(/\$\d/);
+  });
+});
+
+describe('the trade scatters (C19)', () => {
+  // Three trades, opened at 10:00 New York and closed at 10:10, 10:11 and 10:12; held 10, 11 and 12 minutes.
+  const three = tradesSample(() => [
+    esTrade(0, '2026-11-02', 10000),
+    esTrade(1, '2026-11-03', -5000),
+    esTrade(2, '2026-11-04', 0),
+  ]);
+  const dots = (key: Parameters<typeof widget>[0]) => [
+    ...widget(key).querySelectorAll<SVGCircleElement>('[data-dot]'),
+  ];
+
+  test('trade time: a dot a closed trade, filled when it won, a ring when it lost, a quiet ring when it broke even', async () => {
+    await renderWidgets(['trade-time'], { sample: three });
+    expect(said('trade-time')).toContain('Trade time performance');
+    expect(said('trade-time')).toContain('Win');
+    expect(said('trade-time')).toContain('Loss');
+    expect(said('trade-time')).toContain('Times in New York');
+    expect(dots('trade-time').map((d) => d.getAttribute('data-tone'))).toEqual([
+      'gain',
+      'loss',
+      'flat',
+    ]);
+    // Shape as well as colour.
+    expect(dots('trade-time').map((d) => d.getAttribute('fill'))).toEqual([
+      'var(--gain-fill)',
+      'none',
+      'none',
+    ]);
+    chartOf(
+      'trade-time',
+      /^Trade time performance by entry time, 3 closed trades, all time\. 1 won \(filled dots\), 1 lost \(hollow dots\), 1 breakeven\./,
+    );
+  });
+
+  test('the Entry and Exit switch picks the time, and the choice is saved on the template in use', async () => {
+    const { repo } = await renderWidgets(['trade-time'], { sample: three });
+    const group = within(widget('trade-time')).getByRole('radiogroup', {
+      name: 'Time of',
+    });
+    const entry = within(group).getByRole('radio', { name: 'Entry' });
+    const exit = within(group).getByRole('radio', { name: 'Exit' });
+    expect((entry as HTMLInputElement).checked).toBe(true);
+    // Entry: all three opened at 10:00, the axis fits that hour.
+    const xAt = () =>
+      [...widget('trade-time').querySelectorAll('[data-axis-label="x"]')].map(
+        (t) => t.textContent,
+      );
+    expect(xAt()[0]).toBe('10:00');
+    fireEvent.click(exit);
+    await waitFor(async () => {
+      const prefs = await repo.prefs.get();
+      expect(prefs.dashboards?.templates[0]?.lower[0]?.settings).toEqual({
+        time: 'exit',
+      });
+    });
+    // The page follows the template: Exit is chosen and the label says so.
+    await waitFor(() =>
+      expect(
+        (
+          within(widget('trade-time')).getByRole('radio', {
+            name: 'Exit',
+          }) as HTMLInputElement
+        ).checked,
+      ).toBe(true),
+    );
+    chartOf(
+      'trade-time',
+      /^Trade time performance by exit time, 3 closed trades/,
+    );
+    expect(within(widget('trade-time')).getByRole('status').textContent).toBe(
+      '',
+    );
+  });
+
+  test('a template that asks for the exit time draws it from the start', async () => {
+    await renderWidgets([{ key: 'trade-time', settings: { time: 'exit' } }], {
+      sample: three,
+    });
+    chartOf('trade-time', /by exit time/);
+    expect(
+      (
+        within(widget('trade-time')).getByRole('radio', {
+          name: 'Exit',
+        }) as HTMLInputElement
+      ).checked,
+    ).toBe(true);
+  });
+
+  test('the readout names the trade and a click opens it', async () => {
+    await renderWidgets(['trade-time'], { sample: three });
+    const img = chartOf('trade-time', /^Trade time performance by entry time/);
+    fireEvent.focus(img);
+    const status = within(widget('trade-time')).getByRole('status');
+    expect(status.textContent).toContain('ES Dec 25 long');
+    expect(status.textContent).toContain('Entered');
+    expect(status.textContent).toContain('02 Nov 10:00');
+    expect(status.textContent).toContain('Held');
+    expect(status.textContent).toContain('10m 00s');
+    expect(status.textContent).toContain('+$100.00');
+    fireEvent.keyDown(img, { key: 'Enter' });
+    expect(window.location.pathname).toBe('/app/trades/u-1');
+  });
+
+  test('over the sample both axes fit the trades: hourly clock labels and money from the biggest loss to the biggest win', async () => {
+    await renderWidgets(['trade-time']);
+    const xs = [
+      ...widget('trade-time').querySelectorAll('[data-axis-label="x"]'),
+    ].map((t) => t.textContent!);
+    expect(xs.length).toBeGreaterThan(3);
+    for (const t of xs) expect(t).toMatch(/^\d\d:00$/);
+    expect(dots('trade-time').length).toBe(1518);
+    expect(
+      [...widget('trade-time').querySelectorAll('[data-axis-label="y"]')].some(
+        (t) => t.textContent === '$0',
+      ),
+    ).toBe(true);
+  });
+
+  test('on a one day range the clock reads finer than the hour', async () => {
+    // A long range reads by the hour; one day, whose trades fall within minutes of each other, by five minutes.
+    await renderWidgets(['trade-time'], {
+      sample: three,
+      url: '/app/dashboard?from=2026-11-02&to=2026-11-02',
+    });
+    const xs = [
+      ...widget('trade-time').querySelectorAll('[data-axis-label="x"]'),
+    ].map((t) => t.textContent!);
+    expect(xs).toEqual(['10:00', '10:05']);
+  });
+
+  test('trade duration: hold time on a log scale, ticks from the ladder tightened to the range', async () => {
+    await renderWidgets(['trade-duration'], { sample: three });
+    expect(said('trade-duration')).toContain('Trade duration performance');
+    expect(said('trade-duration')).toContain('Log scale');
+    expect(dots('trade-duration')).toHaveLength(3);
+    // Held 10 to 12 minutes: the rungs around them are 8m and 15m.
+    const xs = [
+      ...widget('trade-duration').querySelectorAll('[data-axis-label="x"]'),
+    ].map((t) => t.textContent);
+    expect(xs).toEqual(['8m', '15m']);
+    chartOf(
+      'trade-duration',
+      /^Trade duration performance, 3 closed trades, all time\. /,
+    );
+    // Over the sample the ladder spreads wide, and only its own rungs appear.
+  });
+
+  test('trade duration over the sample uses only the ladder', async () => {
+    await renderWidgets(['trade-duration']);
+    const ladder = [
+      '1m',
+      '2m',
+      '4m',
+      '8m',
+      '15m',
+      '30m',
+      '1h',
+      '2h',
+      '4h',
+      '7h',
+      '14h',
+      '1d',
+      '2d',
+      '4d',
+      '8d',
+    ];
+    const xs = [
+      ...widget('trade-duration').querySelectorAll('[data-axis-label="x"]'),
+    ].map((t) => t.textContent!);
+    expect(xs.length).toBeGreaterThan(2);
+    for (const t of xs) expect(ladder).toContain(t);
+  });
+
+  test('Privacy hides the money on the axis, in the label and in the readout', async () => {
+    await renderWidgets(['trade-time', 'trade-duration'], {
+      sample: three,
+      prefs: { displayUnit: 'privacy' },
+    });
+    for (const key of ['trade-time', 'trade-duration'] as const) {
+      const card = widget(key);
+      const img = within(card).getByRole('img');
+      expect(img.getAttribute('aria-label'), key).not.toMatch(/\$\d/);
+      fireEvent.focus(img);
+      expect(within(card).getByRole('status').textContent, key).toContain(
+        '$•••',
+      );
+      expect(within(card).getByRole('status').textContent, key).not.toMatch(
+        /\$\d/,
+      );
+      expect(card.textContent, key).toContain('$•••');
+    }
+  });
+
+  test('a filter that matches nothing says so, in both', async () => {
+    await renderWidgets(['trade-time', 'trade-duration'], {
+      url: '/app/dashboard?symbol=ZZZ',
+    });
+    for (const key of ['trade-time', 'trade-duration'] as const) {
+      expect(said(key)).toMatch(/No closed trades in this range\./);
+      expect(within(widget(key)).queryAllByRole('img')).toHaveLength(0);
+    }
+  });
+
+  test('every scatter is an image with a label', async () => {
+    await renderWidgets(['trade-time', 'trade-duration'], { sample: three });
+    for (const key of ['trade-time', 'trade-duration'] as const) {
+      const img = within(widget(key)).getByRole('img');
+      expect(img.getAttribute('aria-label')!.length).toBeGreaterThan(20);
+      expect(img.getAttribute('tabindex')).toBe('0');
+    }
   });
 });

@@ -8,6 +8,7 @@ import {
   moveWidget,
   newTemplate,
   removeWidget,
+  setWidgetSettings,
   templatesOf,
 } from './templates';
 
@@ -374,5 +375,72 @@ describe('missingFrom', () => {
     const t = tpl({ upper: [{ key: 'from-the-future' }], lower: [] });
     expect(missingFrom(t, 'upper')).toHaveLength(12);
     expect(missingFrom(t, 'lower')).toHaveLength(17);
+  });
+});
+
+describe("setWidgetSettings (the scatter's Entry or Exit, saved on the template in use)", () => {
+  const stored = {
+    inUse: 't2',
+    templates: [
+      tpl({ id: 't1', name: 'Other', lower: [{ key: 'trade-time' }] }),
+      tpl({
+        id: 't2',
+        name: 'Mine',
+        lower: [
+          { key: 'trade-time', settings: { time: 'entry' } },
+          { key: 'report', settings: { metrics: ['net', 'win-rate'] } },
+        ],
+      }),
+    ],
+  };
+
+  test('with no dashboards pref the default template is saved with the setting', () => {
+    const next = setWidgetSettings({}, 'trade-time', { time: 'exit' });
+    expect(next.inUse).toBe('main');
+    expect(next.templates).toHaveLength(1);
+    expect(next.templates[0]!.name).toBe('Main');
+    const widget = next.templates[0]!.lower.find((r) => r.key === 'trade-time');
+    expect(widget?.settings).toEqual({ time: 'exit' });
+    // The rest of the default is as it was, and the constant is untouched.
+    expect(keys(next.templates[0]!.lower)).toEqual(
+      keys(DEFAULT_TEMPLATE.lower),
+    );
+    expect(
+      DEFAULT_TEMPLATE.lower.find((r) => r.key === 'trade-time')?.settings,
+    ).toBeUndefined();
+  });
+
+  test('only the template in use changes, and only the widget asked for', () => {
+    const next = setWidgetSettings({ dashboards: stored }, 'trade-time', {
+      time: 'exit',
+    });
+    expect(next.inUse).toBe('t2');
+    expect(next.templates[0]).toBe(stored.templates[0]);
+    const mine = next.templates[1]!;
+    expect(mine.lower[0]).toEqual({
+      key: 'trade-time',
+      settings: { time: 'exit' },
+    });
+    expect(mine.lower[1]).toBe(stored.templates[1]!.lower[1]);
+    expect(mine.upper).toBe(stored.templates[1]!.upper);
+    // The stored pref is not written through.
+    expect(stored.templates[1]!.lower[0]!.settings).toEqual({ time: 'entry' });
+  });
+
+  test('a patch merges into the settings the widget has', () => {
+    const next = setWidgetSettings({ dashboards: stored }, 'report', {
+      challengeId: 'c1',
+    });
+    expect(next.templates[1]!.lower[1]!.settings).toEqual({
+      metrics: ['net', 'win-rate'],
+      challengeId: 'c1',
+    });
+  });
+
+  test('a widget not on the template in use changes nothing', () => {
+    const next = setWidgetSettings({ dashboards: stored }, 'year', {
+      time: 'exit',
+    });
+    expect(next).toEqual(stored);
   });
 });
