@@ -12,6 +12,7 @@ import type {
   Trade,
 } from '../types';
 import { evaluateProp, type PropStatus } from './evaluate';
+import { accountTrades, phaseTradesOf } from './phase';
 
 export type BreachFinding = {
   rule: 'daily-loss' | 'max-drawdown' | 'period-ended' | 'consistency';
@@ -144,14 +145,8 @@ function phaseCheck(
   const account = accounts.find((a) => a.id === phase.accountId);
   if (!account) return { step: phase.step, archived: false };
   // The account holds every trade of its own, whatever the phase's start date.
-  const all = trades.filter(
-    (t) => t.accountId === account.id && t.pnlCurrency === account.currency,
-  );
-  const own = all.filter(
-    (t) =>
-      phase.startDate === undefined ||
-      localDate(t.closedAt ?? t.openedAt, ctx.timeZone) >= phase.startDate,
-  );
+  const all = accountTrades(account, trades);
+  const own = phaseTradesOf(phase.startDate, all, ctx.timeZone);
   return {
     step: phase.step,
     accountId: account.id,

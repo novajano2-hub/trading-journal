@@ -19,10 +19,12 @@ import {
   challengeType,
   filterChallenges,
   firstStart,
+  firstTradeDays,
   filterItems,
   passRates,
   roiSeries,
   spendItems,
+  startedOn,
   totals,
 } from './finance';
 
@@ -363,6 +365,48 @@ describe('firstStart', () => {
     expect(firstStart(challenge('n', { phases: [{ step: 'step-1' }] }))).toBe(
       undefined,
     );
+  });
+});
+
+describe('startedOn', () => {
+  const trade = (accountId: string, openedAt: string): Trade =>
+    makeTrade({ accountId, net: 1_000, openedAt, closedAt: openedAt });
+
+  test('the earliest day each account first traded, in the profile zone', () => {
+    const days = firstTradeDays(
+      [
+        trade('f50e', '2026-09-16T14:00:00Z'),
+        trade('f50e', '2026-09-15T14:00:00Z'),
+        // 02:00 UTC on the 12th is still the 11th in New York.
+        trade('f50f', '2026-09-12T02:00:00Z'),
+      ],
+      'America/New_York',
+    );
+    expect([...days]).toEqual([
+      ['f50e', '2026-09-15'],
+      ['f50f', '2026-09-11'],
+    ]);
+  });
+
+  test('a start date wins; with none it is the day its first account traded', () => {
+    const days = new Map([
+      ['f100', '2026-10-09'],
+      ['f50f', '2026-09-30'],
+    ]);
+    expect(startedOn(F50, days)).toBe('2026-09-14');
+    const undated = challenge('u', {
+      phases: [
+        { step: 'step-1', accountId: 'f100' },
+        { step: 'funded', accountId: 'f50f' },
+      ],
+    });
+    expect(startedOn(undated, days)).toBe('2026-09-30');
+  });
+
+  test('is null with no start date and no trade', () => {
+    expect(
+      startedOn(challenge('n', { phases: [{ step: 'step-1' }] }), new Map()),
+    ).toBeNull();
   });
 });
 

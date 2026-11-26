@@ -1,6 +1,7 @@
 import { balanceAt, dayBefore } from '../metrics/balance';
 import { inRange, type MetricContext } from '../metrics/context';
 import { roundHalfAway } from '../money';
+import { localDate } from '../time';
 import type {
   Account,
   BreachReason,
@@ -131,6 +132,38 @@ export function firstStart(c: Challenge): string | undefined {
     )
       first = p.startDate;
   return first;
+}
+
+/** The local day each account first traded (by account id), from when each trade opened. */
+export function firstTradeDays(
+  trades: readonly Trade[],
+  timeZone: string,
+): Map<string, string> {
+  const first = new Map<string, string>();
+  for (const t of trades) {
+    const day = localDate(t.openedAt, timeZone);
+    const seen = first.get(t.accountId);
+    if (seen === undefined || day < seen) first.set(t.accountId, day);
+  }
+  return first;
+}
+
+/**
+ * The day a challenge started: its earliest phase start date, else the day its
+ * accounts first traded (`firstTradeDays`); null with neither.
+ */
+export function startedOn(
+  c: Challenge,
+  firstTrade: ReadonlyMap<string, string>,
+): string | null {
+  return (
+    firstStart(c) ??
+    c.phases
+      .map((p) => firstTrade.get(p.accountId ?? ''))
+      .filter((d): d is string => d !== undefined)
+      .sort()[0] ??
+    null
+  );
 }
 
 export type AccountsGroup = 'evaluations' | 'funded' | 'breached';
