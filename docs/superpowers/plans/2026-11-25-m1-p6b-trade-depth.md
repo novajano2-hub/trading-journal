@@ -541,7 +541,7 @@ Delivers B58 and P6B-02. Comp: `01-trade-page.html?state=fill-costs`.
 - Modify: `src/data/repository.ts` (`TradesRepo.setFillCosts`), `src/data/local/trades.ts`, `src/data/query/hooks.ts`, `src/components/app/trades/trade-view.tsx` (`Executions`)
 
 **Interfaces:**
-- Produces: `setFillCosts(ws: string, tradeId: string, executionId: string, costs: { commission: Cents; fees: Cents }): Promise<Trade>` (rebuilds `fees`, `gross` and `net` with `buildGroupedTrade` on the trade's own fills, ledger R2; logs a history row, source you; refuses archived accounts); hook `useSetFillCosts()`.
+- Produces: `setFillCosts(ws: string, tradeId: string, executionId: string, costs: { commission: Cents; fees: Cents }): Promise<Trade>` (adjusts `fees`, `gross` and `net` by the change in the fills' costs, the way Task 11's `withFeeRule` does, not by a rebuild: a rebuild would change a closed-trades import's currency and drop MAE and MFE (ledger ruling, Task 11); logs a history row, source you; refuses archived accounts); hook `useSetFillCosts()`.
 - A row's commission and fee are inputs while editing, saved when the row is confirmed.
 
 - [ ] **Step 1: Write the failing tests:** `'editing a fill's costs recomputes the trade'`; `'it logs one history row'`; `'it is allowed on a finished day and leaves the frozen score'`; `'Privacy masks the inputs' values'`.
@@ -781,6 +781,7 @@ Delivers B29 and spec §5.9's screen. Comp: `08-history.html`.
 **Interfaces:**
 - Consumes: `useHistory()` (Task 3).
 - Rows of one edit share one timestamp: order them by `field` when reading.
+- History fields that hold raw numbers need labels: `fees` (cents, written by Apply to existing trades and by costs by hand) shows as money through Display; `targets` and `stops` show as a levels summary; `fills` shows a count.
 - Columns in Keel's order: Time (profile zone, GMT offset); Record (type over identifier); Change (field, then from and to on one line, formatted with Display; Privacy masks money); Action; Source. Search over type, identifier and field; Filter by type, action and source; 50 rows a page. Phone: the time and the record, then the change, action and source.
 
 - [ ] **Step 1: Write the failing tests:** `'rows are newest first and page at 50'`; `'search and each filter narrow the rows'`; `'money values are masked under Privacy'`; `'the empty and no-match states'`.
