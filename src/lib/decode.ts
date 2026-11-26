@@ -57,10 +57,18 @@ export interface ImportFile {
 
 export class ImportFileError extends Error {}
 
+/** The largest file an import takes: its rows and the plan made from them are held in memory together. */
+export const MAX_IMPORT_BYTES = 20 * 1024 * 1024;
+
 let opened = 0;
 
 /** Reads a chosen file into rows. Throws `ImportFileError` with a sentence for the visitor. */
 export async function readImportFile(file: File): Promise<ImportFile> {
+  // Refused on its size alone, before a byte is read.
+  if (file.size > MAX_IMPORT_BYTES)
+    throw new ImportFileError(
+      `This file is larger than ${MAX_IMPORT_BYTES / (1024 * 1024)} MB`,
+    );
   const xlsx = /\.xlsx$/i.test(file.name);
   let text: string;
   let encoding: TextEncoding = 'utf-8';

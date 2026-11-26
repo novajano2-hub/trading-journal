@@ -162,7 +162,7 @@ export function PreviewStep({
   if (!plan)
     return (
       <p role="status" className="text-[13.5px] text-muted">
-        Building the preview...
+        Reading the file...
       </p>
     );
 

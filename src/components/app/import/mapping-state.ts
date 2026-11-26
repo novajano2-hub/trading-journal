@@ -105,6 +105,27 @@ export function openMapState(
   };
 }
 
+/**
+ * The first values of a column that are not empty, in file order. It stops
+ * reading rows once it has them, so a file of a hundred thousand rows costs
+ * what a small one does each time Map renders.
+ */
+export function columnSample(
+  parsed: ParsedCsv,
+  index: number | undefined,
+  count = 3,
+): string[] {
+  const out: string[] = [];
+  if (index === undefined) return out;
+  for (const row of parsed.rows) {
+    const cell = row.cells[index] ?? '';
+    if (cell === '') continue;
+    out.push(cell);
+    if (out.length === count) break;
+  }
+  return out;
+}
+
 /** The column that holds the first date and time, whose samples say how dates are written. */
 export function timeColumn(mapping: ImportMapping): number | undefined {
   return mapping.kind === 'fills'

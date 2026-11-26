@@ -1,10 +1,11 @@
 'use client';
 
 import { usePathname, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ImportMapping } from '@/domain/import/mapping';
 import type { ParsedCsv } from '@/domain/import/csv';
-import { planImport, type ImportPlan } from '@/domain/import/plan';
+import type { ImportContext, ImportPlan } from '@/domain/import/plan';
+import { planInWorker, StalePlanError } from '@/lib/import/plan-client';
 import type { Account, Trade, WidgetKey } from '@/domain/types';
 import type { PropFilters } from '@/domain/prop/finance';
 import { localDate } from '@/domain/time';
@@ -336,18 +337,52 @@ function sameInput(a: ImportInput | null, b: ImportInput | null): boolean {
   );
 }
 
+/** What a point value takes to settle, so a keystroke is not a plan: the edits that follow it are waited for. */
+const POINT_VALUE_DEBOUNCE_MS = 150;
+
 /**
- * The plan for a file. Its id and time hold while the input's fields (`parsed`,
- * `mapping`, `accountId`, `fileName`, compared by reference, so an inline
- * object is fine) and the workspace's import revision stay the same, so
- * re-renders and refetches keep one plan identity. A new input, or an import
- * committed or undone since, makes a new plan with a new id: a commit never
- * reuses an id in the history. Keep `parsed` and `mapping` stable (state or a
- * memo) while the file and mapping are unchanged.
+ * Whether the inputs differ in the point values alone: the same file, account
+ * and settings, a mapping whose only changed part is its `overrides`. Those
+ * are typed, a key at a time; every other change is a choice made at once.
+ */
+function onlyPointValuesDiffer(a: ImportInput, b: ImportInput): boolean {
+  if (
+    a.mapping === b.mapping ||
+    a.parsed !== b.parsed ||
+    a.accountId !== b.accountId ||
+    a.fileName !== b.fileName
+  )
+    return false;
+  const before: Record<string, unknown> = { ...a.mapping };
+  const after: Record<string, unknown> = { ...b.mapping };
+  return [...new Set([...Object.keys(before), ...Object.keys(after)])].every(
+    (key) => key === 'overrides' || before[key] === after[key],
+  );
+}
+
+/** A plan, or why there is none, with what it was made for. */
+interface Made {
+  identity: PlanIdentity;
+  context: ImportContext;
+  plan?: ImportPlan;
+  error?: Error;
+}
+
+/**
+ * The plan for a file, made in a worker (the main thread where there is none),
+ * so a large file never holds the page. Its id and time hold while the input's
+ * fields (`parsed`, `mapping`, `accountId`, `fileName`, compared by reference,
+ * so an inline object is fine) and the workspace's import revision stay the
+ * same, so re-renders and refetches keep one plan identity. A new input, or an
+ * import committed or undone since, makes a new plan with a new id: a commit
+ * never reuses an id in the history. Keep `parsed` and `mapping` stable (state
+ * or a memo) while the file and mapping are unchanged.
  *
- * The plan is made from the stored identity's input, and the status stays
- * `pending` until that identity matches the current input and revision, so no
- * render pass reports `success` without data or with a plan for an old input.
+ * The status stays `pending` until the plan for the current identity and the
+ * context it read has come back: no pass reports `success` without data or
+ * with a plan for an old input, and a plan that came back late for an earlier
+ * input is not used. Point values edited in a run are planned once, 150 ms
+ * after the last edit; any other change is planned at once.
  */
 export function useImportPlan(input: ImportInput | null): Derived<ImportPlan> {
   const context = useImportContext(input?.accountId);
@@ -360,27 +395,65 @@ export function useImportPlan(input: ImportInput | null): Derived<ImportPlan> {
     sameInput(identity.input, input) && identity.revision === revision;
   if (!current) setIdentity(newPlanIdentity(input, revision));
   const planInput = identity.input;
-  const data = useMemo(
-    () =>
-      current && planInput && context.data
-        ? planImport(planInput.parsed, planInput.mapping, context.data, {
-            importId: identity.importId,
-            now: identity.now,
-            fileName: planInput.fileName,
-          })
-        : undefined,
-    [current, planInput, context.data, identity],
-  );
+  const read = current ? context.data : undefined;
+  const [made, setMade] = useState<Made | null>(null);
+  const lastAsked = useRef<ImportInput | null>(null);
+
+  useEffect(() => {
+    if (!planInput || !read) return;
+    let live = true;
+    const ask = () => {
+      lastAsked.current = planInput;
+      planInWorker({
+        parsed: planInput.parsed,
+        mapping: planInput.mapping,
+        ctx: read,
+        meta: {
+          importId: identity.importId,
+          fileName: planInput.fileName,
+          now: identity.now,
+        },
+      }).then(
+        (plan) => {
+          if (live) setMade({ identity, context: read, plan });
+        },
+        (error: unknown) => {
+          // A request a later one replaced is not a failure: the later one is awaited.
+          if (live && !(error instanceof StalePlanError))
+            setMade({
+              identity,
+              context: read,
+              error: error instanceof Error ? error : new Error(String(error)),
+            });
+        },
+      );
+    };
+    const before = lastAsked.current;
+    if (before && onlyPointValuesDiffer(before, planInput)) {
+      const timer = setTimeout(ask, POINT_VALUE_DEBOUNCE_MS);
+      return () => {
+        live = false;
+        clearTimeout(timer);
+      };
+    }
+    ask();
+    return () => {
+      live = false;
+    };
+  }, [identity, planInput, read]);
+
   // A failure wins even before the identity catches up.
-  const state =
-    current || context.status === 'error'
-      ? context
-      : { status: 'pending' as const, error: null };
-  return {
-    status: state.status === 'success' && !data ? 'pending' : state.status,
-    error: state.error,
-    data,
-  };
+  if (context.status === 'error')
+    return { status: 'error', error: context.error, data: undefined };
+  const result =
+    made && read && made.identity === identity && made.context === read
+      ? made
+      : null;
+  if (result?.error)
+    return { status: 'error', error: result.error, data: undefined };
+  if (result?.plan)
+    return { status: 'success', error: null, data: result.plan };
+  return { status: 'pending', error: null, data: undefined };
 }
 
 /**

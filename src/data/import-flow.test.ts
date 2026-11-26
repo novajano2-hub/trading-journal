@@ -1,11 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { expect, test } from 'vitest';
-import { parseCsv } from '@/domain/import/csv';
 import { guessMapping } from '@/domain/import/mapping';
 import { planImport } from '@/domain/import/plan';
 import { defaultMetricContext } from '@/domain/metrics/context';
-import { readImportFile } from '@/lib/import/read-file';
+import { readImportFile } from '@/lib/decode';
 import { createLocalRepository } from './local/local-repository';
 import { metricsByCurrency } from './metrics';
 
@@ -18,13 +17,12 @@ test(
       IDBKeyRange,
       now: () => new Date('2026-11-20T15:00:00Z'),
     });
-    const text = await readImportFile(
+    const { parsed } = await readImportFile(
       new File(
         [readFileSync('e2e/fixtures/sample-fills.csv')],
         'sample-fills.csv',
       ),
     );
-    const parsed = parseCsv(text);
     const mapping = guessMapping(parsed, {
       sourceTimeZone: 'America/New_York',
     });

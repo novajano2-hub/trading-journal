@@ -33,8 +33,16 @@ import {
   type ImportInput,
 } from './derived';
 import { defaultVersion } from '@/domain/tracker/defaults';
+import { holdPlans } from '@/lib/import/__fixtures__/held-plans';
+import { StalePlanError } from '@/lib/import/plan-client';
 import { useCommitImport, useUndoImport } from './hooks';
 import { DataProvider } from './provider';
+
+// The real client (no Worker here, so it plans on the main thread), watched; a test can take over one call.
+vi.mock('@/lib/import/plan-client', async (original) => {
+  const actual = await original<typeof import('@/lib/import/plan-client')>();
+  return { ...actual, planInWorker: vi.fn(actual.planInWorker) };
+});
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(window.location.search),
@@ -355,6 +363,137 @@ test('useImportPlan: an inline input object does not loop', async () => {
   await new Promise((r) => setTimeout(r, 50));
   expect(renders).toBeLessThan(10);
   expect(result.current.data).toBeDefined();
+});
+
+test('useImportPlan: pending while the plan is made, and never success with the plan of an earlier input', async () => {
+  const { repository, Wrapper } = setup();
+  const a = await importFixture(repository, 'a', TWO_FILLS);
+  const b = await importFixture(repository, 'b', TWO_FILLS);
+  const c = await importFixture(repository, 'c', TWO_FILLS);
+  const calls = holdPlans();
+  const passes: { want: string; plan: Derived<ImportPlan> }[] = [];
+  const { result, rerender } = renderHook(
+    ({ i }: { i: ImportInput }) => {
+      const plan = useImportPlan(i);
+      passes.push({ want: i.fileName, plan });
+      return plan;
+    },
+    { wrapper: Wrapper, initialProps: { i: a } },
+  );
+
+  // The plan is asked for once the account's trades are read, and is awaited.
+  await waitFor(() => expect(calls).toHaveLength(1));
+  expect(calls[0]!.input.meta.fileName).toBe('a.csv');
+  expect(result.current).toMatchObject({ status: 'pending', data: undefined });
+  act(() => calls[0]!.resolve());
+  await waitFor(() => expect(result.current.status).toBe('success'));
+  expect(result.current.data!.fileName).toBe('a.csv');
+
+  // A new input is pending in the very pass that gets it, not success with the old plan.
+  rerender({ i: b });
+  expect(result.current).toMatchObject({ status: 'pending', data: undefined });
+  await waitFor(() => expect(calls).toHaveLength(2));
+  // Another before b's plan is back; b's plan then comes in late and is not shown.
+  rerender({ i: c });
+  await waitFor(() => expect(calls).toHaveLength(3));
+  act(() => calls[1]!.resolve());
+  expect(result.current).toMatchObject({ status: 'pending', data: undefined });
+  act(() => calls[2]!.resolve());
+  await waitFor(() => expect(result.current.status).toBe('success'));
+  expect(result.current.data!.fileName).toBe('c.csv');
+
+  for (const { want, plan } of passes) {
+    expect(plan.status !== 'success' || plan.data !== undefined).toBe(true);
+    expect(plan.data === undefined || plan.data.fileName === want).toBe(true);
+  }
+});
+
+test('useImportPlan: the plan is made from the input, the context and the identity the pass holds', async () => {
+  const { repository, Wrapper } = setup();
+  const a = await importFixture(repository, 'a', TWO_FILLS);
+  const calls = holdPlans();
+  const { result } = renderHook(() => useImportPlan(a), { wrapper: Wrapper });
+  await waitFor(() => expect(calls).toHaveLength(1));
+  act(() => calls[0]!.resolve());
+  await waitFor(() => expect(result.current.status).toBe('success'));
+  const { input } = calls[0]!;
+  expect(input.parsed).toBe(a.parsed);
+  expect(input.mapping).toBe(a.mapping);
+  expect(input.ctx.accountId).toBe(a.accountId);
+  expect(input.meta).toEqual({
+    importId: result.current.data!.importId,
+    fileName: 'a.csv',
+    now: result.current.data!.createdAt,
+  });
+});
+
+test("useImportPlan: a plan that fails is the import's error; a plan that went stale is not an error", async () => {
+  const { repository, Wrapper } = setup();
+  const a = await importFixture(repository, 'a', TWO_FILLS);
+  const b = await importFixture(repository, 'b', TWO_FILLS);
+  const calls = holdPlans();
+  const { result, rerender } = renderHook(
+    ({ i }: { i: ImportInput }) => useImportPlan(i),
+    { wrapper: Wrapper, initialProps: { i: a } },
+  );
+  await waitFor(() => expect(calls).toHaveLength(1));
+  act(() => calls[0]!.reject(new StalePlanError()));
+  expect(result.current.status).toBe('pending');
+  rerender({ i: b });
+  await waitFor(() => expect(calls).toHaveLength(2));
+  act(() => calls[1]!.reject(new Error('the plan failed')));
+  await waitFor(() => expect(result.current.status).toBe('error'));
+  expect(result.current.error?.message).toBe('the plan failed');
+  expect(result.current.data).toBeUndefined();
+});
+
+test('useImportPlan: a point value edited again and again is planned once, 150 ms after the last edit', async () => {
+  const { repository, Wrapper } = setup();
+  const a = await importFixture(repository, 'a', TWO_FILLS);
+  const calls = holdPlans();
+  const withPoint = (pointValue: number): ImportInput => ({
+    ...a,
+    mapping: {
+      ...a.mapping,
+      overrides: { XYZ: { pointValue, tickSize: 0.25 } },
+    },
+  });
+  const { result, rerender } = renderHook(
+    ({ i }: { i: ImportInput }) => useImportPlan(i),
+    { wrapper: Wrapper, initialProps: { i: a } },
+  );
+  // The first plan is not held back.
+  await waitFor(() => expect(calls).toHaveLength(1));
+  act(() => calls[0]!.resolve());
+  await waitFor(() => expect(result.current.status).toBe('success'));
+
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  onTestFinished(() => void vi.useRealTimers());
+  for (const value of [1, 12, 125]) {
+    rerender({ i: withPoint(value) });
+    act(() => void vi.advanceTimersByTime(60));
+  }
+  expect(result.current.status).toBe('pending');
+  expect(calls).toHaveLength(1);
+  act(() => void vi.advanceTimersByTime(89));
+  expect(calls).toHaveLength(1);
+  act(() => void vi.advanceTimersByTime(1));
+  expect(calls).toHaveLength(2);
+  expect(calls[1]!.input.mapping.overrides).toEqual({
+    XYZ: { pointValue: 125, tickSize: 0.25 },
+  });
+
+  // Any other setting is chosen, not typed: it is planned at once.
+  rerender({
+    i: {
+      ...withPoint(125),
+      mapping: { ...withPoint(125).mapping, forexQtyUnit: 'units' },
+    },
+  });
+  expect(calls).toHaveLength(3);
+  vi.useRealTimers();
+  act(() => calls[2]!.resolve());
+  await waitFor(() => expect(result.current.status).toBe('success'));
 });
 
 test('useMetrics: day figures keep an exit dated inside the range when the open trade is matched outside it', async () => {
