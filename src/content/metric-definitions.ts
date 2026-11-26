@@ -155,6 +155,7 @@ export const METRIC_IDS = [
   'tracker-history',
   'tracker-card',
   'tracker-follow-rate',
+  'cost-method',
 ] as const;
 
 export type MetricId = (typeof METRIC_IDS)[number];
@@ -916,6 +917,11 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Follow rate',
     definition:
       "The days that kept this rule, divided by the days it was decided, in the date range. A day still pending doesn't count, and a rule with no decided day reads 0%.",
+  },
+  'cost-method': {
+    label: 'Cost method',
+    definition:
+      'Which lots an exit closes first: the oldest (FIFO), the newest (LIFO), or all at their average cost.',
   },
 };
 

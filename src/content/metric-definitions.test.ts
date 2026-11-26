@@ -201,3 +201,11 @@ test("the list, calendar and report widgets have a tip of their own, in Keel's w
     /opens it in the Calendar/,
   );
 });
+
+test('the cost method has a definition that names all three methods', () => {
+  expect(METRIC_IDS).toContain('cost-method');
+  const d = metricDefinition('cost-method', 'net');
+  expect(d.label).toBe('Cost method');
+  for (const word of ['oldest', 'FIFO', 'newest', 'LIFO', 'average'])
+    expect(d.definition).toContain(word);
+});
