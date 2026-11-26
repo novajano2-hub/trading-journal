@@ -422,3 +422,31 @@ test('in dollars the same values show as the file writes them', async () => {
   expect(document.body.textContent).toContain('$1,2x');
   expect(screen.queryByLabelText('hidden amount')).toBeNull();
 });
+
+const SWAP_HEADER =
+  'Open Time,Close Time,Symbol,Side,Qty,Entry Price,Exit Price,Commission,Swap,P&L';
+const SWAP_ROWS = [
+  '2026-11-16 09:30:00,2026-11-16 09:45:00,ESZ6,Long,1,6000,6004,3.75,-4.86,21.90',
+];
+
+test('a closed-trades file with a Swap column has it matched on Map', async () => {
+  await open([futures]);
+  await upload(csvFile(SWAP_ROWS, SWAP_HEADER));
+  const swap = screen.getByLabelText('Swap column') as HTMLSelectElement;
+  expect(swap.value).toBe('8');
+  expect(document.body.textContent).toContain('-4.86');
+});
+
+test('a file without a Swap column leaves it as Do not import', async () => {
+  await open([futures]);
+  await upload(csvFile(TRIPS_ROWS.slice(0, 1), TRIPS_HEADER));
+  const swap = screen.getByLabelText('Swap column') as HTMLSelectElement;
+  expect(swap.value).toBe('');
+});
+
+test('under Privacy the Swap values are masked on Map', async () => {
+  await open([futures], '/app/import', { displayUnit: 'privacy' });
+  await upload(csvFile(SWAP_ROWS, SWAP_HEADER));
+  await screen.findByLabelText('Swap column');
+  expect(document.body.textContent).not.toContain('-4.86');
+});

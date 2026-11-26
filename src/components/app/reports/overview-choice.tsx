@@ -114,7 +114,7 @@ export const FIGURE_GROUPS = [
   {
     id: 'costs',
     title: 'Costs',
-    figures: ['commissions', 'fill-fees'],
+    figures: ['commissions', 'fill-fees', 'swap'],
   },
 ] as const;
 

@@ -373,15 +373,20 @@ export function holdTimes(
 /**
  * The commissions and the fees of the closed trades' fills, each in its own
  * total. A trade with no fills (typed in by hand) carries its whole cost as
- * fees. Their sum is `Summary.fees`.
+ * fees. Their sum is `Summary.fees`. Swap is a third total, signed (a charge
+ * is negative) and not part of `Summary.fees`: it is inside net, outside gross.
+ * It is null while no closed trade carries one, so the page can say None.
  */
 export function costsOf(trades: readonly Trade[]): {
   commissions: Cents;
   fees: Cents;
+  swap: Cents | null;
 } {
   let commissions = 0;
   let fees = 0;
+  let swap: Cents | null = null;
   for (const t of trades.filter(isClosed)) {
+    if (t.swap !== undefined) swap = (swap ?? 0) + t.swap;
     if (t.executions.length === 0) {
       fees += t.fees;
       continue;
@@ -391,5 +396,5 @@ export function costsOf(trades: readonly Trade[]): {
       fees += e.fees;
     }
   }
-  return { commissions, fees };
+  return { commissions, fees, swap };
 }

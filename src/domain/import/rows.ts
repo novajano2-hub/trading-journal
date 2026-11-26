@@ -33,6 +33,8 @@ export interface ImportedTrip {
   entry: Execution;
   exit: Execution;
   filePnl?: Cents;
+  /** Overnight financing as the file gives it: signed, a charge is negative. */
+  swap?: Cents;
   fingerprint: string;
 }
 
@@ -57,6 +59,7 @@ const TRADE_ORDER: readonly TradeRowField[] = [
   'exitPrice',
   'fees',
   'commission',
+  'swap',
   'pnl',
 ];
 
@@ -254,6 +257,7 @@ function readTrip(
   let fees = 0;
   let commission = 0;
   let filePnl: Cents | undefined;
+  let swap: Cents | undefined;
   for (const field of TRADE_ORDER) {
     switch (field) {
       case 'openTime': {
@@ -288,6 +292,10 @@ function readTrip(
         break;
       case 'commission':
         commission = r.cost('commission');
+        break;
+      case 'swap':
+        // Signed, unlike a cost: a charge is negative, a credit positive.
+        if (r.raw('swap')) swap = toCents(r.number('swap'));
         break;
       case 'pnl':
         if (r.raw('pnl')) filePnl = toCents(r.number('pnl'));
@@ -333,5 +341,6 @@ function readTrip(
     ]),
   };
   if (filePnl !== undefined) trip.filePnl = filePnl;
+  if (swap !== undefined) trip.swap = swap;
   return trip;
 }

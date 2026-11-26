@@ -199,7 +199,7 @@ test('the cost rows say what they are: Commissions and fees in Gross to net, Com
   const labels = [...costs.querySelectorAll('[data-stat]')].map((el) =>
     el.previousElementSibling?.textContent?.trim(),
   );
-  expect(labels).toEqual(['Commissions', 'Fees']);
+  expect(labels).toEqual(['Commissions', 'Fees', 'Swap']);
 });
 
 test('trade and day counts read in neutral ink: gain and loss colour are for signed money', async () => {

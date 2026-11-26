@@ -490,12 +490,17 @@ describe('costsOf', () => {
       executions: [fill(50, 100), fill(100, 200)],
     });
     const b = makeTrade({ net: 0, fees: 25, executions: [fill(5, 20)] });
-    expect(costsOf([a, b])).toEqual({ commissions: 320, fees: 155 });
+    expect(costsOf([a, b])).toEqual({
+      commissions: 320,
+      fees: 155,
+      swap: null,
+    });
   });
   test('a trade with no fills carries its total as fees', () => {
     expect(costsOf([makeTrade({ net: 0, fees: 40 })])).toEqual({
       commissions: 0,
       fees: 40,
+      swap: null,
     });
   });
   test('open trades are left out, as in gross to net', () => {
@@ -505,7 +510,23 @@ describe('costsOf', () => {
       fees: 25,
       executions: [fill(5, 20)],
     });
-    expect(costsOf([open])).toEqual({ commissions: 0, fees: 0 });
+    expect(costsOf([open])).toEqual({ commissions: 0, fees: 0, swap: null });
+  });
+  test('swap adds up apart from the fees, signed, over the trades that carry one', () => {
+    const a = makeTrade({ net: 0, fees: 100, swap: -486 });
+    const b = makeTrade({ net: 0, fees: 100, swap: 120 });
+    const none = makeTrade({ net: 0, fees: 100 });
+    expect(costsOf([a, b, none])).toEqual({
+      commissions: 0,
+      fees: 300,
+      swap: -366,
+    });
+  });
+  test('a swap of 0 is still a swap, so the total reads 0 and not None', () => {
+    expect(costsOf([makeTrade({ net: 0, swap: 0 })]).swap).toBe(0);
+    expect(
+      costsOf([makeTrade({ net: 0, swap: -50, status: 'open' })]).swap,
+    ).toBeNull();
   });
 });
 

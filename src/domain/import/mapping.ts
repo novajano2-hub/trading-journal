@@ -24,6 +24,7 @@ export type TradeRowField =
   | 'exitPrice'
   | 'fees'
   | 'commission'
+  | 'swap'
   | 'pnl';
 export type InstrumentOverrides = NonNullable<ResolveOptions['overrides']>;
 
@@ -68,6 +69,8 @@ export const REQUIRED_FIELDS: {
 
 const FEES = ['fees', 'fee', 'total fees'];
 const COMMISSION = ['commission', 'commissions', 'comm'];
+// "Financing" is the same figure under another name (spec §5.4).
+const SWAP = ['swap', 'swaps', 'rollover', 'financing'];
 const PNL = [
   'profit',
   'pnl',
@@ -169,6 +172,7 @@ const TRADE_FIELDS: readonly TradeRowField[] = [
   'qty',
   'fees',
   'commission',
+  'swap',
   'pnl',
 ];
 const TRADE_SYNONYMS: Record<TradeRowField, readonly string[]> = {
@@ -201,6 +205,7 @@ const TRADE_SYNONYMS: Record<TradeRowField, readonly string[]> = {
   qty: QTY,
   fees: FEES,
   commission: COMMISSION,
+  swap: SWAP,
   pnl: PNL,
 };
 
@@ -305,7 +310,7 @@ function numericColumns(mapping: ImportMapping): (number | undefined)[] {
   const c: Record<string, number | undefined> = mapping.columns;
   return mapping.kind === 'fills'
     ? [c.price, c.qty, c.fees, c.commission]
-    : [c.entryPrice, c.exitPrice, c.qty, c.fees, c.commission];
+    : [c.entryPrice, c.exitPrice, c.qty, c.fees, c.commission, c.swap];
 }
 
 /** The decimal mark this file proves for the columns the mapping reads, if it proves one. */
@@ -374,6 +379,7 @@ export function guessMapping(
         columns.qty,
         columns.fees,
         columns.commission,
+        columns.swap,
       ]),
     };
   }

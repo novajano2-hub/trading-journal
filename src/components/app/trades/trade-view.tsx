@@ -292,8 +292,8 @@ function Stats({
 
   const GRID =
     'grid grid-cols-2 gap-px bg-line sm:grid-cols-4 [&>div]:border-0';
-  // 7 cells today; Swap takes the eighth (spec §5.4).
-  const FIRST_CELLS = 7;
+  // Eight cells: Swap shares the second row with Gross P&L and Fees (spec §5.4).
+  const FIRST_CELLS = 8;
   const realizedSub =
     r !== undefined && trade.initialRisk !== undefined ? (
       <>
@@ -371,6 +371,15 @@ function Stats({
           }
         >
           {cash(-trade.fees)}
+        </Stat>
+        <Stat
+          label="Swap"
+          tip="swap"
+          basis={basis}
+          tone={trade.swap === undefined ? '' : tone(trade.swap)}
+          sub={trade.swap === undefined ? undefined : 'from the import'}
+        >
+          {trade.swap === undefined ? none : cash(trade.swap)}
         </Stat>
         <Stat label="Cost basis" sub="entry price x size">
           {cash(costBasis(trade), false)}
@@ -796,6 +805,10 @@ function TradePage({
   }, [set.data?.trades, trade]);
 
   const roi = netRoiOf(trade);
+  // The header's sub-line adds the swap so its figures add up to the net; a
+  // trade with none, or a swap of nothing, reads as it always did.
+  const swap =
+    trade.swap === undefined || trade.swap === 0 ? undefined : trade.swap;
   // Realized R needs a closed trade (spec §5.2).
   const r = trade.status === 'open' ? undefined : rOf(trade, basis);
   const planned = plannedR(trade);
@@ -950,7 +963,16 @@ function TradePage({
             </span>{' '}
             <span className="whitespace-nowrap">
               <FigureText f={display.cash(-trade.fees, true, cur)} /> fees
+              {swap === undefined ? '' : ','}
             </span>
+            {swap === undefined ? null : (
+              <>
+                {' '}
+                <span className="whitespace-nowrap">
+                  <FigureText f={display.cash(swap, true, cur)} /> swap
+                </span>
+              </>
+            )}
           </small>
         </div>
         <div className="min-w-0 lg:border-l lg:border-line lg:px-7">

@@ -35,7 +35,8 @@ export interface SizedRealization extends Realization {
  * Every exit fill of the trade so far, including the partial exits of an open trade.
  * Entry fees are shared among the exits by matched quantity (the cents left over go
  * to the last exit of a closed trade), so the realizations of a closed trade add up
- * to its gross, fees and net. A closed trade without fills books once at its close.
+ * to its gross, fees and net. Its swap, inside the net, books with the last
+ * exit. A closed trade without fills books once at its close.
  */
 export function sizedRealizations(trade: Trade): SizedRealization[] {
   const sign = trade.direction === 'long' ? 1 : -1;
@@ -104,12 +105,14 @@ export function sizedRealizations(trade: Trade): SizedRealization[] {
     const fees = last ? feesLeft : x.ownFees + roundHalfEven(x.entryFees);
     grossLeft -= gross;
     feesLeft -= fees;
+    // The swap is only known for the whole trade, so it books with the last exit.
+    const swap = last ? (trade.swap ?? 0) : 0;
     return {
       tradeId: trade.id,
       time: x.time,
       gross,
       fees,
-      net: gross - fees,
+      net: gross - fees + swap,
       qty: x.qty,
       price: x.price,
     };

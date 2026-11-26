@@ -141,6 +141,7 @@ test('a group whose figures are all hidden disappears; one figure back brings it
   const { root } = await page([
     'costs:commissions',
     'costs:fill-fees',
+    'costs:swap',
     'hold:hold-time',
   ]);
   await waitFor(() =>
@@ -169,6 +170,31 @@ test('a group whose figures are all hidden disappears; one figure back brings it
   );
   expect(shown(root)).toContain('costs:commissions');
   expect(shown(root)).not.toContain('costs:fill-fees');
+});
+
+test('the Overview lists Swap in costs and can hide it', async () => {
+  const { root, repo } = await page();
+  expect(shown(root)).toContain('costs:swap');
+  const dialog = await openDialog();
+  const box = within(group(dialog, 'Costs')).getByRole('checkbox', {
+    name: 'Swap',
+  }) as HTMLInputElement;
+  // On by default, and None while no closed trade carries a swap.
+  expect(box.checked).toBe(true);
+  expect(
+    document.getElementById(box.getAttribute('aria-describedby')!)!.textContent,
+  ).toBe('None');
+  fireEvent.click(box);
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+  await waitFor(() =>
+    expect(root.querySelector('[data-figure="costs:swap"]')).toBeNull(),
+  );
+  // The other costs stay, so does the card.
+  expect(shown(root)).toContain('costs:commissions');
+  expect(shown(root)).toContain('costs:fill-fees');
+  await waitFor(async () =>
+    expect((await repo.prefs.get()).overviewHidden).toEqual(['costs:swap']),
+  );
 });
 
 test('hiding every key figure removes the key figures section', async () => {

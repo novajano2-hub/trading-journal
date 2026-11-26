@@ -363,6 +363,8 @@ test('every metric carries its definition', async () => {
     'planned-risk',
     'mae',
     'mfe',
+    // On the trade page's Swap row and the Overview's costs card (Plan 6B, Task 13).
+    'swap',
     'sharpe',
     'sortino',
     'longest-day',

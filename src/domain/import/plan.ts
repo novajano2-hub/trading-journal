@@ -175,13 +175,19 @@ function buildTrips(
     const t = built.trades[0];
     if (!t) continue;
     trades.push(t);
+    // The swap sits inside the net and outside the gross (B49), so the P&L
+    // checks below read gross and this net.
+    if (trip.swap !== undefined) {
+      t.swap = trip.swap;
+      t.net += trip.swap;
+    }
     const file = trip.filePnl;
     if (file === undefined) continue;
     filePnl[t.id] = file;
     if (t.pnlCurrency !== ctx.accountCurrency) {
       // A pair without the account currency: the file's figure is the conversion.
       t.gross = file;
-      t.net = file - t.fees;
+      t.net = file - t.fees + (t.swap ?? 0);
       t.pnlCurrency = ctx.accountCurrency;
     } else if (
       Math.abs(file - t.gross) > PNL_TOLERANCE &&

@@ -1101,3 +1101,81 @@ test("the Daily note dates by the trader's zone, not the account's (K35)", async
   });
   expect(link.getAttribute('href')).toBe('/app/notebook/daily/2026-11-19');
 });
+
+/** The ES trade with a swap of -$4.86 inside its net (gross $112.50, fees $31.20). */
+const swapped = (patch: Partial<Trade> = {}) =>
+  sample({ swap: -486, gross: 11250, net: 7644, ...patch });
+
+test('the Swap row follows Fees in the first grid, signed, and fills its last cell', async () => {
+  renderApp(<TradeView id="t-c" />, { sample: swapped(), url: URL_C });
+  await screen.findByRole('region', { name: 'Execution' });
+  const text = execText();
+  expect(text).toContain('Swap−$4.86from the import');
+  expect(text.indexOf('Fees')).toBeLessThan(text.indexOf('Swap'));
+  expect(text.indexOf('Swap')).toBeLessThan(text.indexOf('Cost basis'));
+  // Eight cells and no blank one: Swap shares the row with Gross P&L and Fees.
+  const swapCell = screen.getByText('Swap').closest('div')!;
+  const grid = swapCell.parentElement!;
+  expect(grid.children).toHaveLength(8);
+  expect(grid.querySelector('[aria-hidden="true"]')).toBeNull();
+  // A charge reads in the loss colour, as in the comp.
+  expect(swapCell.querySelector('b')!.className).toContain('text-loss');
+});
+
+test('a swap credit reads with a plus sign', async () => {
+  renderApp(<TradeView id="t-c" />, {
+    sample: swapped({ swap: 120, net: 8250 }),
+    url: URL_C,
+  });
+  await screen.findByRole('region', { name: 'Execution' });
+  expect(execText()).toContain('Swap+$1.20');
+});
+
+test('the header adds the swap to its sub-line so the figures add up to the net', async () => {
+  renderApp(<TradeView id="t-c" />, { sample: swapped(), url: URL_C });
+  const head = await screen.findByRole('region', { name: 'Trade 1132' });
+  expect(within(head).getByText('+$76.44')).toBeTruthy();
+  expect(head.textContent).toContain(
+    '+$112.50 gross, −$31.20 fees, −$4.86 swap',
+  );
+});
+
+test('a trade with no swap reads None on the row and leaves the header as it was', async () => {
+  renderApp(<TradeView id="t-c" />, { sample: sample(), url: URL_C });
+  const head = await screen.findByRole('region', { name: 'Trade 1132' });
+  expect(execText()).toContain('SwapNone');
+  expect(execText()).not.toContain('from the import');
+  expect(head.textContent).toContain('+$112.50 gross, −$31.20 fees');
+  expect(head.textContent).not.toContain('swap');
+});
+
+test('a swap of 0 reads $0.00 on the row and stays out of the header', async () => {
+  renderApp(<TradeView id="t-c" />, {
+    sample: sample({ swap: 0 }),
+    url: URL_C,
+  });
+  const head = await screen.findByRole('region', { name: 'Trade 1132' });
+  expect(execText()).toContain('Swap$0.00');
+  expect(head.textContent).not.toContain('swap');
+});
+
+test('the Swap label carries its definition', async () => {
+  renderApp(<TradeView id="t-c" />, { sample: swapped(), url: URL_C });
+  const exec = await screen.findByRole('region', { name: 'Execution' });
+  expect(exec.querySelector('[data-metric-tip="swap"]')).not.toBeNull();
+});
+
+test('Privacy masks swap in the row and in the header', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: swapped(),
+  });
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<TradeView id="t-c" />, { repository, url: URL_C });
+  const head = await screen.findByRole('region', { name: 'Trade 1132' });
+  expect(execText()).toContain('Swap−$•••hidden amount');
+  expect(head.textContent).toContain('swap');
+  expect(document.body.textContent).not.toContain('4.86');
+  expect(everyString(document.body).filter((s) => /\$\d/.test(s))).toEqual([]);
+});

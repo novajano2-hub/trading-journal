@@ -88,6 +88,7 @@ export const METRIC_IDS = [
   'hold-time-breakevens',
   'commissions',
   'fill-fees',
+  'swap',
   'avg-win-loss',
   'longest-trade',
   'avg-day-length',
@@ -571,6 +572,11 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Fees',
     definition:
       'The total of the exchange and regulatory fees on the fills of closed trades, apart from commissions. A trade typed in without fills counts its whole cost here.',
+  },
+  swap: {
+    label: 'Swap',
+    definition:
+      'What your broker charged or paid for holding positions overnight, also called rollover or financing. A charge is negative and a credit positive. It sits inside net P&L and outside gross P&L. It comes from the Swap column of a closed-trades import, so a fills import and a trade typed in have none. On the Overview, the total over the closed trades in your filters; None when none of them has one.',
   },
   'avg-win-loss': {
     label: 'Average win to loss',

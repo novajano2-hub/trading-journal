@@ -3,7 +3,11 @@ import { describe, expect, test } from 'vitest';
 import { parseCsv } from './csv';
 import { guessMapping, type MappingOptions } from './mapping';
 import { planImport, type ImportContext } from './plan';
-import type { Trade } from '../types';
+import { mergeTrades, splitTrade } from '../grouping';
+import { resolveInstrument } from '../instruments';
+import { withFeeRule } from '../rules/fee-rules';
+import type { BuildOptions } from '../trade-builder';
+import type { FeeRule, Trade } from '../types';
 
 const csv = readFileSync('e2e/fixtures/sample-fills.csv', 'utf8');
 const H = 'Date/Time,Symbol,Buy/Sell,Quantity,Price\n';
@@ -611,4 +615,192 @@ describe('planImport', () => {
 
   test('nothing valid to import', () =>
     expect(plan(H + 'x,ESZ5,Buy,0,1\n').blocked).toBe('no-rows'));
+});
+
+describe('swap in a closed-trades import', () => {
+  const T =
+    'Open Time,Close Time,Symbol,Side,Qty,Entry Price,Exit Price,Commission,Swap,P&L\n';
+  /** Long one ES: gross +$530.00 on 6000 to 6010.60, with $14.00 of commission. */
+  const row = (
+    swap: string,
+    pnl = '530.00',
+    o: {
+      sym?: string;
+      entry?: string;
+      exit?: string;
+      comm?: string;
+      at?: string;
+    } = {},
+  ) =>
+    `2026-11-16 ${o.at ?? '09:30'}:00,2026-11-16 ${o.at ?? '09:30'}:30,${o.sym ?? 'ESZ5'},Long,1,${o.entry ?? '6000'},${o.exit ?? '6010.60'},${o.comm ?? '14.00'},${swap},${pnl}`;
+
+  test('swap enters net, not gross', () => {
+    const p = plan(T + row('-4.86'));
+    expect(p.trades[0]).toMatchObject({
+      gross: 53000,
+      fees: 1400,
+      swap: -486,
+      net: 51114,
+    });
+    // The file's P&L is the gross, so there is nothing to flag.
+    expect(p.flags).toEqual([]);
+  });
+
+  test('a swap credit adds to the net', () => {
+    expect(plan(T + row('1.20')).trades[0]).toMatchObject({
+      gross: 53000,
+      swap: 120,
+      net: 51720,
+    });
+  });
+
+  test('a file P&L is checked against the gross and against the net with swap', () => {
+    const p = plan(
+      T +
+        [
+          row('-4.86', '530.00'),
+          row('-4.86', '511.14'),
+          row('-4.86', '516.00'),
+        ].join('\n'),
+    );
+    // 516.00 is gross less fees but the net also carries the swap: only that one is flagged.
+    expect(p.flags).toEqual([
+      {
+        tradeId: p.trades[2]!.id,
+        code: 'pnl-mismatch',
+        file: 51600,
+        keel: 53000,
+      },
+    ]);
+    // Every trade keeps the figure the file gave.
+    expect(p.filePnl).toEqual({
+      [p.trades[0]!.id]: 53000,
+      [p.trades[1]!.id]: 51114,
+      [p.trades[2]!.id]: 51600,
+    });
+  });
+
+  test('a pair without the account currency takes the file P&L as gross and still carries the swap', () => {
+    const p = plan(
+      T +
+        row('-2.00', '125.00', {
+          sym: 'EURGBP',
+          entry: '0.8700',
+          exit: '0.8710',
+          comm: '0',
+        }),
+    );
+    expect(p.trades[0]).toMatchObject({
+      pnlCurrency: 'USD',
+      gross: 12500,
+      fees: 0,
+      swap: -200,
+      net: 12300,
+    });
+    expect(p.filePnl).toEqual({ [p.trades[0]!.id]: 12500 });
+  });
+
+  test('a file without a swap column moves nothing', () => {
+    const p = plan(
+      'Open Time,Close Time,Symbol,Side,Qty,Entry Price,Exit Price,Commission,P&L\n' +
+        '2026-11-16 09:30:00,2026-11-16 09:30:30,ESZ5,Long,1,6000,6010.60,14.00,530.00',
+    );
+    expect(p.trades[0]).toMatchObject({ gross: 53000, net: 51600 });
+    expect(p.trades[0]).not.toHaveProperty('swap');
+  });
+
+  test('a blank swap cell is no swap; a 0 is a swap of 0', () => {
+    const p = plan(T + [row('', '530.00'), row('0.00', '530.00')].join('\n'));
+    expect(p.trades[0]).not.toHaveProperty('swap');
+    expect(p.trades[1]).toMatchObject({ swap: 0, net: 51600 });
+  });
+
+  test('a fills import has no swap', () => {
+    const p = plan(
+      'Date/Time,Symbol,Buy/Sell,Quantity,Price,Commission,Swap\n' +
+        '2026-11-16 09:30:00,ESZ5,Buy,1,6000,7.00,-4.86\n' +
+        '2026-11-16 09:30:30,ESZ5,Sell,1,6010.60,7.00,-4.86\n',
+    );
+    expect(p.trades).toHaveLength(1);
+    expect(p.trades[0]).not.toHaveProperty('swap');
+    expect(p.trades[0]).toMatchObject({ gross: 53000, fees: 1400, net: 51600 });
+  });
+
+  test('the same file again adds nothing: the swap is not in the row fingerprint', () => {
+    const first = plan(T + row('-4.86'));
+    const again = plan(
+      T + row('-4.86'),
+      ctx({ fingerprints: first.fingerprints }),
+    );
+    expect(again.blocked).toBe('nothing-new');
+  });
+
+  describe('R3: swap survives a merge, a split and a fill-cost edit', () => {
+    const opts: BuildOptions = {
+      workspaceId: 'mine',
+      startSerial: 1,
+      resolve: (s) => resolveInstrument(s),
+      accountCurrency: () => 'USD',
+    };
+    // A wins 530.00 and pays -4.86 of swap; B loses 250.00 and earns 1.20.
+    const rows = [
+      row('-4.86', '530.00', { at: '09:30' }),
+      row('1.20', '-250.00', { at: '10:00', entry: '6020', exit: '6015' }),
+    ].join('\n');
+    const [a, b] = plan(T + rows).trades as [Trade, Trade];
+    const picked = new Set([...a.executions, ...b.executions].map((e) => e.id));
+
+    test('imported with their own swaps', () => {
+      expect([a.swap, b.swap]).toEqual([-486, 120]);
+      expect([a.net, b.net]).toEqual([51114, -26280]);
+    });
+
+    test('a merge adds the swaps and keeps gross apart', () => {
+      const { kept } = mergeTrades([a, b], picked, opts);
+      expect(kept).toMatchObject({
+        gross: 28000,
+        fees: 2800,
+        swap: -366,
+        net: 24834,
+      });
+    });
+
+    test('a split keeps the swap on the original', () => {
+      const { kept } = mergeTrades([a, b], picked, opts);
+      const moved = new Set(b.executions.map((e) => e.id));
+      const { original, created } = splitTrade(kept, moved, {
+        ...opts,
+        serial: 9,
+        id: 'split',
+      });
+      expect(original).toMatchObject({ gross: 53000, swap: -366, net: 51234 });
+      expect(created).not.toHaveProperty('swap');
+    });
+
+    test('a fill-cost edit moves fees and net by the change and leaves the swap', () => {
+      const rule: FeeRule = {
+        id: 'f1',
+        workspaceId: 'mine',
+        accountId: 'acc1',
+        assetClass: 'future',
+        symbols: [],
+        mode: 'per-execution',
+        applyOn: 'all',
+        commission: 200,
+        fee: 0,
+        createdAt: '2026-01-01T00:00:00.000Z',
+      };
+      const out = withFeeRule(a, rule, {
+        override: true,
+        accountCurrency: 'USD',
+      })!;
+      // Two fills at $2.00 each replace the $14.00 the file gave.
+      expect(out).toMatchObject({
+        gross: 53000,
+        fees: 400,
+        swap: -486,
+        net: 52114,
+      });
+    });
+  });
 });
