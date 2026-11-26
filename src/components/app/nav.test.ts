@@ -12,6 +12,7 @@ import {
   filtersApply,
   datesOnly,
   hidesDisplayMenu,
+  isHomePage,
   type AppModuleId,
 } from './nav';
 
@@ -199,4 +200,15 @@ test('Home is the first module, with the House glyph, and is not filter-scoped',
   });
   expect(pageTitle('/app/home')).toBe('Home');
   expect(filtersApply('/app/home')).toBe(false);
+});
+
+test('only Home itself is Home: a collapsed sidebar is hidden there and nowhere else', () => {
+  expect(isHomePage('/app/home')).toBe(true);
+  for (const path of [
+    '/app',
+    '/app/dashboard',
+    '/app/home/extra',
+    '/app/day/2026-11-24',
+  ])
+    expect(isHomePage(path), path).toBe(false);
 });

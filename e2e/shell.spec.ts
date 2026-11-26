@@ -1,0 +1,342 @@
+import { expect, test, type Page } from '@playwright/test';
+
+// The collapsible sidebar (#50, C47 to C49): the rail on every desktop page,
+// remembered across loads; Home with no rail at all; day pages and phones
+// unchanged. The prefs load a moment after the shell paints (the first frame
+// is the full sidebar), so every check after a load waits for what it expects.
+
+test.beforeEach(async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-11-20T15:00:00Z'));
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+});
+
+const collapseButton = (page: Page) =>
+  page.getByRole('button', { name: 'Collapse the sidebar' });
+const expandButton = (page: Page) =>
+  page.getByRole('button', { name: 'Expand the sidebar' });
+/** The desktop column, as a landmark: the pages have links of their own to the same places. */
+const sidebar = (page: Page) =>
+  page.getByRole('complementary', { name: 'Sidebar' });
+const addTrade = (page: Page) =>
+  sidebar(page).getByRole('link', { name: 'Add trade' });
+const notLive = (page: Page) =>
+  sidebar(page).getByRole('list', { name: 'Not live yet' });
+
+/** The choice as the database holds it: the write lands a moment after the click. */
+const saved = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<string | undefined>((resolve, reject) => {
+        const open = indexedDB.open('keel-data');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const get = open.result
+            .transaction('meta', 'readonly')
+            .objectStore('meta')
+            .get('prefs');
+          get.onsuccess = () => {
+            open.result.close();
+            resolve(get.result?.value?.sidebar);
+          };
+          get.onerror = () => reject(get.error);
+        };
+      }),
+  );
+
+/** Writes the choice into the database, as an earlier visit would have left it. */
+const save = (page: Page, sidebar: 'expanded' | 'collapsed') =>
+  page.evaluate(
+    (value) =>
+      new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open('keel-data');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const db = open.result;
+          const store = db.transaction('meta', 'readwrite').objectStore('meta');
+          const get = store.get('prefs');
+          get.onsuccess = () => {
+            store.put({
+              key: 'prefs',
+              value: { ...(get.result?.value ?? {}), sidebar: value },
+            });
+            store.transaction.oncomplete = () => {
+              db.close();
+              resolve();
+            };
+            store.transaction.onerror = () => reject(store.transaction.error);
+          };
+        };
+      }),
+    sidebar,
+  );
+
+/** Past the loading skeletons: the layout that matters is the data's. */
+async function settled(page: Page) {
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect(page.locator('[aria-label^="Loading"]')).toHaveCount(0, {
+    timeout: 30_000,
+  });
+}
+
+const contentWidth = (page: Page) =>
+  page
+    .locator('main#content')
+    .evaluate((el) => el.getBoundingClientRect().width);
+
+test('collapse, reload: still collapsed; expand, reload: expanded again (desktop)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop');
+  await page.goto('/app/trades');
+  await settled(page);
+  await expect(collapseButton(page)).toHaveAttribute('aria-expanded', 'true');
+  await expect(notLive(page)).toBeVisible();
+  await expect(addTrade(page)).toHaveCount(0);
+  const expanded = await contentWidth(page);
+
+  await collapseButton(page).click();
+  await expect(expandButton(page)).toHaveAttribute('aria-expanded', 'false');
+  // The rail: add trade first, then the modules as icons with names; the page widens.
+  await expect(addTrade(page)).toHaveAttribute('href', '/app/trades/new');
+  await expect(sidebar(page).getByText('Not live yet')).toHaveCount(0);
+  await expect.poll(() => contentWidth(page)).toBeGreaterThan(expanded + 140);
+  await expect.poll(() => saved(page)).toBe('collapsed');
+
+  await page.reload();
+  await settled(page);
+  await expect(expandButton(page)).toBeVisible();
+  await expect(addTrade(page)).toBeVisible();
+  // The choice holds on another page, too.
+  await page.goto('/app/calendar');
+  await settled(page);
+  await expect(expandButton(page)).toBeVisible();
+  await expect(addTrade(page)).toBeVisible();
+
+  // By keyboard the new toggle takes focus, so Tab carries on from the same place.
+  await expandButton(page).focus();
+  await page.keyboard.press('Enter');
+  await expect(collapseButton(page)).toBeFocused();
+  await expect.poll(() => saved(page)).toBe('expanded');
+  await page.reload();
+  await settled(page);
+  await expect(collapseButton(page)).toBeVisible();
+  await expect(notLive(page)).toBeVisible();
+  await expect(addTrade(page)).toHaveCount(0);
+});
+
+test('the rail by keyboard: every item in order, each named by a tooltip (desktop)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop');
+  await page.goto('/app/trades');
+  await settled(page);
+  await collapseButton(page).click();
+  await expect.poll(() => saved(page)).toBe('collapsed');
+  await page.reload();
+  await settled(page);
+  await expect(expandButton(page)).toBeVisible();
+
+  const order = [
+    'Expand the sidebar',
+    'Add trade',
+    /^Workspace: /,
+    'Home',
+    'Dashboard',
+    'Trades',
+    'Calendar',
+    'Reports',
+    'Progress tracker',
+    'Strategies',
+    'Notebook',
+    'Import',
+    'Prop firms',
+    'Backtesting',
+    'Replay',
+    'Mentors',
+    'Assistant',
+    'Settings',
+  ];
+  await sidebar(page).getByRole('link', { name: 'Keel' }).focus();
+  for (const name of order) {
+    await page.keyboard.press('Tab');
+    await expect(page.locator(':focus')).toHaveAccessibleName(name);
+    // A tooltip says the same, beside the glyph (the workspace has its own title).
+    if (typeof name === 'string')
+      await expect(page.getByRole('tooltip')).toHaveText(name);
+  }
+  // Past the last, focus goes on into the page rather than looping or sticking.
+  await page.keyboard.press('Tab');
+  await expect(page.locator(':focus')).not.toHaveAccessibleName('Settings');
+  await expect(sidebar(page).locator(':focus')).toHaveCount(0);
+
+  // The tip sits beside its glyph, at its height. (The tooltip role is a hidden
+  // copy for readers; the drawn card is Radix's popper wrapper, placed a frame late.)
+  const reports = sidebar(page).getByRole('link', { name: 'Reports' });
+  await reports.hover();
+  await expect(page.getByRole('tooltip')).toHaveText('Reports');
+  const glyph = (await reports.boundingBox())!;
+  await expect
+    .poll(async () => {
+      const at = await page
+        .locator('[data-radix-popper-content-wrapper]')
+        .boundingBox();
+      if (!at) return false;
+      return (
+        at.x >= glyph.x + glyph.width &&
+        Math.abs(at.y + at.height / 2 - (glyph.y + glyph.height / 2)) < 14
+      );
+    })
+    .toBe(true);
+});
+
+test('Home collapses its sidebar and centres its content (desktop)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop');
+  await page.goto('/app/home');
+  await settled(page);
+  await expect(page.getByRole('region', { name: 'Get started' })).toBeVisible();
+  await expect(page.locator('[data-centred="false"]')).toBeVisible();
+  await collapseButton(page).focus();
+  await page.keyboard.press('Enter');
+  // No rail at all; the top bar has the way back, and focus is on it; the cards sit in a centred column.
+  const back = page
+    .getByRole('banner')
+    .first()
+    .getByRole('button', { name: 'Expand the sidebar' });
+  await expect(back).toBeFocused();
+  await expect(sidebar(page)).toHaveCount(0);
+  await expect(page.getByRole('navigation', { name: 'App' })).toHaveCount(0);
+  const column = page.locator('[data-centred="true"]');
+  await expect(column).toBeVisible();
+  await expect
+    .poll(async () => {
+      const box = (await column.boundingBox())!;
+      const left = box.x;
+      const right = page.viewportSize()!.width - (box.x + box.width);
+      return Math.abs(left - right) <= 1 && left >= 100;
+    })
+    .toBe(true);
+  await expect.poll(() => saved(page)).toBe('collapsed');
+
+  await page.reload();
+  await settled(page);
+  await expect(back).toBeVisible();
+  await expect(sidebar(page)).toHaveCount(0);
+  await expect(page.locator('[data-centred="true"]')).toBeVisible();
+
+  // Another page shows the rail; back on Home, the bar's button expands.
+  await page.goto('/app/trades');
+  await settled(page);
+  await expect(addTrade(page)).toBeVisible();
+  await page.goto('/app/home');
+  await settled(page);
+  await back.click();
+  await expect(collapseButton(page)).toBeVisible();
+  await expect(sidebar(page)).toBeVisible();
+  await expect(page.locator('[data-centred="false"]')).toBeVisible();
+});
+
+test('a day page keeps the slim rail whatever the choice, with no toggle (desktop)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop');
+  const day = '/app/day/2026-11-20/plan';
+  const railLeft = async () => {
+    await expect(addTrade(page)).toBeVisible();
+    // Past the prefs landing: the page is the same rail either way.
+    await page.waitForTimeout(400);
+    await expect(
+      sidebar(page).getByRole('button', { name: /the sidebar$/ }),
+    ).toHaveCount(0);
+    await expect(sidebar(page).getByText('Not live yet')).toHaveCount(0);
+    return (await addTrade(page).boundingBox())!.x;
+  };
+  await page.goto(day);
+  const expanded = await railLeft();
+  await page.goto('/app/trades');
+  await settled(page);
+  await collapseButton(page).click();
+  await expect.poll(() => saved(page)).toBe('collapsed');
+  await page.goto(day);
+  expect(await railLeft()).toBe(expanded);
+});
+
+test('no horizontal overflow from 1024 to 1680, expanded and collapsed (desktop)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop');
+  test.setTimeout(240_000);
+  const routes = [
+    '/app/home',
+    '/app/dashboard',
+    '/app/trades',
+    '/app/calendar',
+  ];
+  const widths = [1024, 1100, 1280, 1440, 1680];
+  for (const state of ['expanded', 'collapsed'] as const) {
+    if (state === 'collapsed') {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto('/app/trades');
+      await settled(page);
+      await collapseButton(page).click();
+      await expect.poll(() => saved(page)).toBe('collapsed');
+    }
+    for (const route of routes) {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto(route);
+      await settled(page);
+      if (route === '/app/dashboard')
+        await expect(page.getByTestId('dashboard-ready')).toBeVisible({
+          timeout: 20_000,
+        });
+      await expect(
+        state === 'collapsed' ? expandButton(page) : collapseButton(page),
+      ).toBeVisible();
+      for (const width of widths) {
+        await page.setViewportSize({ width, height: 800 });
+        await expect
+          .poll(
+            () =>
+              page.evaluate(
+                () => document.documentElement.scrollWidth - innerWidth,
+              ),
+            { message: `${route} ${state} at ${width}` },
+          )
+          .toBeLessThanOrEqual(0);
+      }
+    }
+  }
+});
+
+test('a phone has the tab bar and More, and no sidebar toggle, whatever the saved choice (mobile)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'mobile');
+  for (const choice of ['expanded', 'collapsed'] as const) {
+    await page.goto('/app/trades');
+    await settled(page);
+    await save(page, choice);
+    for (const route of ['/app/trades', '/app/home']) {
+      await page.goto(route);
+      await settled(page);
+      await expect.poll(() => saved(page)).toBe(choice);
+      // Past the prefs landing.
+      await page.waitForTimeout(300);
+      await expect(
+        page.getByRole('navigation', { name: 'Main' }),
+      ).toBeVisible();
+      await expect(collapseButton(page)).toBeHidden();
+      await expect(expandButton(page)).toBeHidden();
+      await expect(sidebar(page)).toBeHidden();
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+        `${route} ${choice}`,
+      ).toBe(true);
+    }
+  }
+});

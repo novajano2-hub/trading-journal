@@ -382,6 +382,39 @@ export function useUpdatePrefs(): UseMutationResult<
 }
 
 /**
+ * Saves the sidebar's state (C47). The cached prefs change at once, so every
+ * reader (the rail, Home's shell, the toggle itself) follows the click
+ * without waiting for the write; the write then settles the cache, and a
+ * write that fails puts the saved value back.
+ */
+export function useSetSidebar(): UseMutationResult<
+  UserPrefs,
+  Error,
+  NonNullable<UserPrefs['sidebar']>
+> {
+  const repo = useRepository();
+  const invalidate = useInvalidate();
+  const queryClient = useQueryClient();
+  return useMutation<UserPrefs, Error, NonNullable<UserPrefs['sidebar']>>({
+    mutationFn: async (sidebar) => {
+      const saved = await repo.prefs.update({ sidebar });
+      await invalidate('prefs.update', '');
+      return saved;
+    },
+    onMutate: async (sidebar) => {
+      // A read already under way must not land over the choice.
+      await queryClient.cancelQueries({ queryKey: keys.prefs() });
+      queryClient.setQueryData<UserPrefs>(
+        keys.prefs(),
+        (prefs) => prefs && { ...prefs, sidebar },
+      );
+    },
+    onError: () =>
+      void queryClient.invalidateQueries({ queryKey: keys.prefs() }),
+  });
+}
+
+/**
  * Rewrites the `dashboards` pref from what is stored now: `change` gets the
  * prefs read afresh at the write, so a template saved in another tab is not
  * overwritten by a list this tab has not refetched. `change` may throw to

@@ -23,11 +23,13 @@ import { PlanTheDay } from './routine/plan-the-day';
 import { useStrategy, useTrade } from '@/data/query/hooks';
 import { LOG_VIEW_HREF, useLastLogView } from '@/lib/log-view';
 import { usePhone } from '@/lib/use-phone';
+import { HomeSidebarToggle } from './sidebar-toggle';
 import {
   dayPageDate,
   filtersApply,
   hidesDisplayMenu,
   isComparePage,
+  isHomePage,
   pageTitle,
   strategyEditId,
   strategyPageId,
@@ -306,6 +308,8 @@ export function TopBar({
           {/* Below sm the title and its badge take the room the icons leave; from sm its items join the bar's. */}
           <div className="flex min-w-0 flex-1 items-center gap-2 sm:contents">
             {menu}
+            {/* A collapsed Home has no rail: the way back to the sidebar is here, from lg. */}
+            {isHomePage(pathname) ? <HomeSidebarToggle /> : null}
             {dayDate !== undefined ? (
               <DayHeader
                 date={dayDate}

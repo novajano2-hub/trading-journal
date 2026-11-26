@@ -1,7 +1,16 @@
 // @vitest-environment happy-dom
-import { cleanup, screen, waitFor, within } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { afterEach, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
+import { createLocalRepository } from '@/data/local/local-repository';
+import type { UserPrefs } from '@/domain/types';
 import { renderApp } from './__fixtures__/render-app';
 import { TopBar } from './top-bar';
 
@@ -369,4 +378,61 @@ test('the bar publishes its measured height for what pins under it, and Plan the
   expect(screen.getByRole('button', { name: 'Plan the day' })).toBeTruthy();
   cleanup();
   expect(document.documentElement.style.getPropertyValue('--top-bar')).toBe('');
+});
+
+/** A repository whose saved sidebar choice is `sidebar`. */
+async function repoWith(sidebar: UserPrefs['sidebar']) {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+  await repository.prefs.update({ sidebar });
+  return repository;
+}
+
+test('on Home a collapsed sidebar leaves the bar a way back from lg, and nowhere else does', async () => {
+  const collapsed = await repoWith('collapsed');
+  const { repo } = renderApp(<TopBar />, {
+    url: '/app/home',
+    repository: collapsed,
+  });
+  const expand = await screen.findByRole('button', {
+    name: 'Expand the sidebar',
+  });
+  expect(
+    within(screen.getByRole('banner')).getByRole('button', {
+      name: 'Expand the sidebar',
+    }),
+  ).toBe(expand);
+  expect(expand.getAttribute('aria-expanded')).toBe('false');
+  // The drawer's own button serves below lg.
+  expect(expand.className).toContain('max-lg:hidden');
+  fireEvent.click(expand);
+  await waitFor(async () =>
+    expect((await repo.prefs.get()).sidebar).toBe('expanded'),
+  );
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('button', { name: 'Expand the sidebar' }),
+    ).toBeNull(),
+  );
+  cleanup();
+
+  // Expanded, Home's own sidebar has the button, not the bar.
+  renderApp(<TopBar />, {
+    url: '/app/home',
+    repository: await repoWith('expanded'),
+  });
+  await new Promise((r) => setTimeout(r, 30));
+  expect(screen.queryByRole('button', { name: /the sidebar$/ })).toBeNull();
+  cleanup();
+
+  // Another page keeps its rail, which has the button itself.
+  renderApp(<TopBar />, {
+    url: '/app/trades',
+    repository: await repoWith('collapsed'),
+  });
+  await new Promise((r) => setTimeout(r, 30));
+  expect(screen.queryByRole('button', { name: /the sidebar$/ })).toBeNull();
 });

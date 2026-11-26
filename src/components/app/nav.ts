@@ -268,6 +268,11 @@ export function dayPageDate(pathname: string): string | undefined {
   return /^\/app\/day\/([^/]+)(?:\/(?:plan|review))?\/?$/.exec(pathname)?.[1];
 }
 
+/** Whether `pathname` is Home, which hides a collapsed sidebar entirely instead of showing the rail. */
+export function isHomePage(pathname: string): boolean {
+  return pathname === navItem('home').href;
+}
+
 /** The top bar's title: the active module, else the product name. */
 export function pageTitle(pathname: string): string {
   return activeItem(pathname)?.label ?? 'Keel';

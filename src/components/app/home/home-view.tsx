@@ -24,6 +24,7 @@ import {
   usePrefs,
   useTrades,
 } from '@/data/query/hooks';
+import { useSidebarState } from '../use-sidebar-state';
 import { dateLine, greeting } from './greeting';
 import { GettingStartedCard } from './getting-started';
 
@@ -220,8 +221,13 @@ function HomeLayout({
   progress: GettingStarted | undefined;
 }): React.JSX.Element {
   const now = new Date();
+  // With the sidebar collapsed Home has no rail: its content sits in a centred column.
+  const { collapsed } = useSidebarState();
   return (
-    <div className="flex flex-col gap-4 px-5 pt-0.5 pb-7">
+    <div
+      data-centred={collapsed}
+      className={`flex flex-col gap-4 px-5 pt-0.5 pb-7${collapsed ? ' mx-auto w-full max-w-[1200px]' : ''}`}
+    >
       <header className="pt-1.5 pb-0.5">
         {prefs ? (
           <>
