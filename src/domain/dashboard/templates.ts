@@ -214,14 +214,19 @@ export function setWidgetSettings(
 
 type Dashboards = NonNullable<UserPrefs['dashboards']>;
 
-/** A widget's settings, empty ones left out, in a fixed key order, for comparing. */
+/**
+ * A widget's settings as one string for comparing: the settings that are set,
+ * in key order, so the order they were written in does not matter and a key
+ * only a newer build knows still counts.
+ */
 function settingsKey(ref: WidgetRef): string {
-  const s = ref.settings ?? {};
-  return JSON.stringify([
-    s.time ?? null,
-    s.metrics ?? null,
-    s.challengeId ?? null,
-  ]);
+  const s: Record<string, unknown> = { ...ref.settings };
+  return JSON.stringify(
+    Object.keys(s)
+      .filter((k) => s[k] !== undefined)
+      .sort()
+      .map((k) => [k, s[k]]),
+  );
 }
 
 /** Whether two templates hold the same name, widgets, places and settings. */

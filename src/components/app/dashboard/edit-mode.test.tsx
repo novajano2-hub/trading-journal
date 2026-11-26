@@ -252,7 +252,7 @@ test('Remove takes a widget off the draft; Save writes the template without it',
   );
 });
 
-test('Remove hands focus to the next widget, and to the add place when the last goes', async () => {
+test('Remove hands focus to the next widget, or the one before when it was the last', async () => {
   await mount();
   await edit();
   await nameField();
@@ -265,6 +265,36 @@ test('Remove hands focus to the next widget, and to the add place when the last 
     expect(document.activeElement).toBe(
       button('Remove Trade time performance'),
     ),
+  );
+});
+
+test('removing the last widget of a section hands focus to its add place', async () => {
+  await mount({
+    dashboards: {
+      inUse: 'one',
+      templates: [
+        {
+          id: 'one',
+          name: 'One',
+          upper: [{ key: 'net-pnl' }],
+          lower: [{ key: 'score' }],
+        },
+      ],
+    },
+  });
+  await edit('One');
+  await nameField();
+  fireEvent.click(button('Remove Net P&L'));
+  await waitFor(() =>
+    expect(
+      (document.activeElement as HTMLElement).getAttribute('data-edit-slot'),
+    ).toBe('upper'),
+  );
+  fireEvent.click(button('Remove Edge score'));
+  await waitFor(() =>
+    expect(
+      (document.activeElement as HTMLElement).getAttribute('data-edit-slot'),
+    ).toBe('lower'),
   );
 });
 

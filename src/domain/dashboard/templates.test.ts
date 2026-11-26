@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import type { DashTemplate, WidgetRef } from '../types';
+import type { DashTemplate, WidgetRef, WidgetSettings } from '../types';
 import {
   DEFAULT_TEMPLATE,
   addWidget,
@@ -505,6 +505,18 @@ describe('sameTemplate', () => {
         tpl({ lower: [{ key: 'trade-time', settings: { time: 'exit' } }] }),
       ),
     ).toBe(false);
+    // A setting only a newer build knows still tells templates apart.
+    const odd = (v: string) =>
+      tpl({
+        lower: [
+          {
+            key: 'score',
+            settings: { future: v } as unknown as WidgetSettings,
+          },
+        ],
+      });
+    expect(sameTemplate(odd('a'), odd('a'))).toBe(true);
+    expect(sameTemplate(odd('a'), odd('b'))).toBe(false);
     // An empty settings object is no setting at all.
     expect(
       sameTemplate(

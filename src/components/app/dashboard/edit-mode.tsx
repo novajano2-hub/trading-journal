@@ -157,10 +157,13 @@ function useEditActions(
         []),
     ].find((el) => el.dataset.section === section && el.dataset.key === key) ??
     null;
+  // The section's add place, or its heading when there is none (a full upper section).
   const placeEl = (section: WidgetSection) =>
+    root.current?.querySelector<HTMLElement>(`[data-edit-slot="${section}"]`) ??
     root.current?.querySelector<HTMLElement>(
-      `[data-edit-slot="${section}"], [data-edit-heading="${section}"]`,
-    ) ?? null;
+      `[data-edit-heading="${section}"]`,
+    ) ??
+    null;
 
   const move = (section: WidgetSection, index: number, delta: -1 | 1) => {
     const refs = draft[section];
