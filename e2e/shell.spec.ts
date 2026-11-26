@@ -163,8 +163,13 @@ test('the rail by keyboard: every item in order, each named by a tooltip (deskto
     await page.keyboard.press('Tab');
     await expect(page.locator(':focus')).toHaveAccessibleName(name);
     // A tooltip says the same, beside the glyph (the workspace has its own title).
-    if (typeof name === 'string')
+    if (typeof name === 'string') {
       await expect(page.getByRole('tooltip')).toHaveText(name);
+      // ...and is not also the glyph's description: a reader would say the name twice.
+      await expect(page.locator(':focus')).not.toHaveAttribute(
+        'aria-describedby',
+      );
+    }
   }
   // Past the last, focus goes on into the page rather than looping or sticking.
   await page.keyboard.press('Tab');

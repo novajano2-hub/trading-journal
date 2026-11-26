@@ -218,6 +218,8 @@ test('hovering or tabbing to a rail icon names it in a tooltip', async () => {
     act(() => target.focus());
     const tip = await screen.findByRole('tooltip');
     expect(tip.textContent).toBe(name);
+    // The tip repeats the control's name: it must not also be its description.
+    expect(target.hasAttribute('aria-describedby')).toBe(false);
     act(() => target.blur());
     await waitFor(() => expect(screen.queryByRole('tooltip')).toBeNull());
   }

@@ -195,6 +195,8 @@ test('collapsed, hovering or tabbing to an icon names the page in a tooltip', as
     act(() => link.focus());
     const tip = await screen.findByRole('tooltip');
     expect(tip.textContent).toBe(name);
+    // The tip repeats the link's name: it must not also be its description.
+    expect(link.hasAttribute('aria-describedby')).toBe(false);
     act(() => link.blur());
     await waitFor(() => expect(screen.queryByRole('tooltip')).toBeNull());
   }

@@ -1,15 +1,28 @@
 'use client';
 
 import { useReducedMotion } from 'motion/react';
-import { Tooltip } from 'radix-ui';
-import type { ReactElement } from 'react';
+import { Slot, Tooltip } from 'radix-ui';
+import type { ComponentProps, ReactElement } from 'react';
+
+/**
+ * Slots the trigger's props onto the control, minus the tooltip's
+ * `aria-describedby`. Radix describes the open trigger by its tip, and here
+ * the tip is the control's own name, so a screen reader would say it twice.
+ * (The control's own description, if it has one, stays: it is on the child.)
+ */
+function Undescribed(props: ComponentProps<typeof Slot.Root>) {
+  const rest = { ...props };
+  delete rest['aria-describedby'];
+  return <Slot.Root {...rest} />;
+}
 
 /**
  * Names a rail's glyph beside it: on hover and on keyboard focus (a native
  * `title` shows on neither focus nor touch, and lags behind the pointer). The
  * tip sits on Radix Tooltip, like the metric tips, in the same card and reveal.
  * Wrap the rail in a `Tooltip.Provider` so moving from one glyph to the next
- * skips the delay. The control keeps its own accessible name.
+ * skips the delay. The control keeps its own accessible name, and the tip must
+ * say the same (it is not announced as a description as well).
  */
 export function RailTip({
   label,
@@ -27,7 +40,9 @@ export function RailTip({
     : 'data-[state=closed]:animate-tip-out data-[state=delayed-open]:animate-tip-in data-[state=instant-open]:animate-tip-in';
   return (
     <Tooltip.Root>
-      <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
+      <Tooltip.Trigger asChild>
+        <Undescribed>{children}</Undescribed>
+      </Tooltip.Trigger>
       <Tooltip.Portal>
         <Tooltip.Content
           side={side}
