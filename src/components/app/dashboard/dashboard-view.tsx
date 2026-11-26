@@ -35,7 +35,10 @@ import {
 } from '@/lib/display';
 import { rangeCaption } from '@/lib/range-label';
 import { shortTime } from '@/lib/time-format';
+import { usePhone } from '@/lib/use-phone';
 import { switchWorkspaceFilters } from '../filter-model';
+import { EditSurface } from './edit-mode';
+import { useDashboardEdit } from './edit-session';
 import { DashboardEmpty, DashboardError, DashboardSkeleton } from './states';
 import { WidgetPageContext, type WidgetPage } from './widgets/context';
 import { LowerGrid, UpperStrip, WidgetCell } from './widgets/layout';
@@ -128,6 +131,8 @@ export function DashboardView(): React.JSX.Element {
   const queryClient = useQueryClient();
   const imports = useImportHistory().data;
   const userAccounts = useUserAccounts().data;
+  const edit = useDashboardEdit();
+  const phone = usePhone();
 
   // The template in use, and the widgets of it this build knows.
   const template = prefs ? templatesOf(prefs).inUse : DEFAULT_TEMPLATE;
@@ -231,6 +236,11 @@ export function DashboardView(): React.JSX.Element {
         : undefined,
     [widgets.data, view],
   );
+
+  // Editing the template: its bars and add places take the page, whatever the data is doing.
+  // (A phone edits in a sheet over the page, which EditSheet draws.)
+  if (edit?.session && !phone)
+    return <EditSurface edit={edit} session={edit.session} />;
 
   const error = workspace.error ?? set.error ?? widgets.error;
   if (error) {

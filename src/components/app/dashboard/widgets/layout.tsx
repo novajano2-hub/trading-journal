@@ -13,13 +13,16 @@ export function Bar({ className }: { className: string }): React.JSX.Element {
  */
 export function UpperStrip({
   children,
+  label = 'Figures',
 }: {
   children: ReactNode;
+  /** The group's name for a screen reader. */
+  label?: string;
 }): React.JSX.Element {
   return (
     <div
       role="group"
-      aria-label="Figures"
+      aria-label={label}
       data-grid="upper"
       className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 xl:grid-cols-5 max-md:[&>:last-child:nth-child(odd)]:col-span-2"
     >
@@ -54,15 +57,18 @@ export function LowerGrid({
  */
 export function WidgetCell({
   wide = false,
+  stretch = true,
   children,
 }: {
   /** The advanced and the yearly calendar (C4). */
   wide?: boolean;
+  /** False keeps the card at its own height (edit mode's bars, whose bodies are all alike). */
+  stretch?: boolean;
   children: ReactNode;
 }): React.JSX.Element {
   return (
     <div
-      className={`flex min-w-0 flex-col *:grow ${wide ? 'md:col-span-2 xl:row-span-2' : ''}`}
+      className={`flex min-w-0 flex-col ${stretch ? '*:grow' : ''} ${wide ? 'md:col-span-2 xl:row-span-2' : ''}`}
     >
       {children}
     </div>

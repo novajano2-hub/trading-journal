@@ -5,6 +5,8 @@ import { MagnifyingGlass } from '@phosphor-icons/react/dist/ssr';
 import { EMPTY_FILTERS } from '@/data/filters';
 import { AccountSwitcher } from './account-switcher';
 import { AppSearch } from './app-search';
+import { EditSheet } from './dashboard/edit-mode';
+import { DashboardEditProvider } from './dashboard/edit-session';
 import { DisplayMenu } from './display-menu';
 import { FilterBar, FilterBarView } from './filter-bar';
 import { MobileNav } from './mobile-nav';
@@ -49,48 +51,52 @@ export function AppShell({
   children: ReactNode;
 }): React.JSX.Element {
   return (
-    <div className="flex flex-1">
-      <a
-        href="#content"
-        className="sr-only rounded-control bg-surface-1 text-[15px] font-medium text-text focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:border focus:border-line focus:px-4 focus:py-2.5 focus:shadow-[var(--shadow-chip)]"
-      >
-        Skip to content
-      </a>
-      <AppearanceSync />
-      <Sidebar
-        switcher={<AccountSwitcher />}
-        railSwitcher={<AccountSwitcher compact />}
-      />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar
-          menu={<MobileNav switcher={<AccountSwitcher />} />}
-          filters={
-            <Suspense fallback={FILTERS_FALLBACK}>
-              <FilterBar />
-            </Suspense>
-          }
-          search={
-            <Suspense fallback={<SearchFallback />}>
-              <AppSearch />
-            </Suspense>
-          }
-          basis={<DisplayMenu />}
-          label={<SampleLabel />}
-          badge={<SampleLabel badge />}
-        />
-        {/* How many trades the display unit leaves out of the page, when it narrows them. */}
-        <Suspense fallback={null}>
-          <UnitNotice />
-        </Suspense>
-        <main
-          id="content"
-          tabIndex={-1}
-          className="flex min-w-0 flex-1 flex-col pb-(--tab-bar) outline-none"
+    <DashboardEditProvider>
+      <div className="flex flex-1">
+        <a
+          href="#content"
+          className="sr-only rounded-control bg-surface-1 text-[15px] font-medium text-text focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:border focus:border-line focus:px-4 focus:py-2.5 focus:shadow-[var(--shadow-chip)]"
         >
-          {children}
-        </main>
+          Skip to content
+        </a>
+        <AppearanceSync />
+        <Sidebar
+          switcher={<AccountSwitcher />}
+          railSwitcher={<AccountSwitcher compact />}
+        />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <TopBar
+            menu={<MobileNav switcher={<AccountSwitcher />} />}
+            filters={
+              <Suspense fallback={FILTERS_FALLBACK}>
+                <FilterBar />
+              </Suspense>
+            }
+            search={
+              <Suspense fallback={<SearchFallback />}>
+                <AppSearch />
+              </Suspense>
+            }
+            basis={<DisplayMenu />}
+            label={<SampleLabel />}
+            badge={<SampleLabel badge />}
+          />
+          {/* How many trades the display unit leaves out of the page, when it narrows them. */}
+          <Suspense fallback={null}>
+            <UnitNotice />
+          </Suspense>
+          <main
+            id="content"
+            tabIndex={-1}
+            className="flex min-w-0 flex-1 flex-col pb-(--tab-bar) outline-none"
+          >
+            {children}
+          </main>
+        </div>
+        <TabBar switcher={<AccountSwitcher appearance={false} />} />
       </div>
-      <TabBar switcher={<AccountSwitcher appearance={false} />} />
-    </div>
+      {/* The Dashboard's edit mode on a phone: a sheet over the page. */}
+      <EditSheet />
+    </DashboardEditProvider>
   );
 }

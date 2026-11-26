@@ -12,6 +12,8 @@ import {
   type RefObject,
 } from 'react';
 import { RAISED } from '@/components/ui/button-styles';
+import { EditBar } from './dashboard/edit-mode';
+import { useDashboardEdit } from './dashboard/edit-session';
 import { TemplateMenu } from './dashboard/template-menu';
 import { DayHeader } from './day/day-header';
 import { useImportPicker } from './day/import-picker';
@@ -20,6 +22,7 @@ import { isRealDate } from './notebook/notebook-model';
 import { PlanTheDay } from './routine/plan-the-day';
 import { useStrategy, useTrade } from '@/data/query/hooks';
 import { LOG_VIEW_HREF, useLastLogView } from '@/lib/log-view';
+import { usePhone } from '@/lib/use-phone';
 import {
   dayPageDate,
   filtersApply,
@@ -74,12 +77,15 @@ type Ref = RefObject<HTMLElement | null>;
  * either way: narrower than the room beside the title means they fit there.
  */
 function useChipsFit({
+  active,
   bar,
   title,
   tail,
   controls,
   chips,
 }: {
+  /** False while the bar is not drawn (edit mode has taken its place): nothing to measure. */
+  active: boolean;
   bar: Ref;
   /** The title's text, sized to its words. */
   title: Ref;
@@ -91,6 +97,7 @@ function useChipsFit({
 }): ChipsFit {
   const [fit, setFit] = useState<ChipsFit>('unknown');
   useLayoutEffect(() => {
+    if (!active) return;
     const sm = matchMedia('(min-width: 640px)');
     const measure = () => {
       // The bar's measured height, for what pins itself under it (the trade views' switch row).
@@ -125,7 +132,7 @@ function useChipsFit({
       observer.disconnect();
       unpublish();
     };
-  }, [bar, title, tail, controls, chips]);
+  }, [active, bar, title, tail, controls, chips]);
   return fit;
 }
 
@@ -250,6 +257,11 @@ export function TopBar({
   badge?: ReactNode;
 }): React.JSX.Element {
   const pathname = usePathname();
+  const edit = useDashboardEdit();
+  const phone = usePhone();
+  // On a wide screen, edit mode takes the Dashboard's bar (a phone edits in a sheet).
+  const session =
+    pathname === '/app/dashboard' && !phone ? edit?.session : undefined;
   const bar = useRef<HTMLElement>(null);
   const title = useRef<HTMLSpanElement>(null);
   const tail = useRef<HTMLDivElement>(null);
@@ -267,7 +279,14 @@ export function TopBar({
   const dayDate =
     rawDate !== undefined && isRealDate(rawDate) ? rawDate : undefined;
   const imports = useImportPicker();
-  const measured = useChipsFit({ bar, title, tail, controls, chips });
+  const measured = useChipsFit({
+    active: session === undefined,
+    bar,
+    title,
+    tail,
+    controls,
+    chips,
+  });
   // The chips show only where the filters drive the page. A trade page's bar
   // carries none (its Previous and Next keep the URL's), nor does Import; those
   // are laid out as the chips-beside-the-title case.
@@ -276,136 +295,140 @@ export function TopBar({
 
   return (
     <>
-      <header
-        ref={bar}
-        data-chips={showFilters ? fit : undefined}
-        className={`sticky top-0 z-30 flex items-center bg-bg px-5 max-sm:h-14 max-sm:border-b max-sm:border-line sm:gap-x-2 ${dayDate !== undefined ? 'sm:h-[68px]' : ''} ${FIT.bar[fit]}`}
-      >
-        {/* Below sm the title and its badge take the room the icons leave; from sm its items join the bar's. */}
-        <div className="flex min-w-0 flex-1 items-center gap-2 sm:contents">
-          {menu}
-          {dayDate !== undefined ? (
-            <DayHeader
-              date={dayDate}
-              mode={pathname.endsWith('/review') ? 'review' : 'plan'}
-              onImport={imports.open}
-            />
-          ) : (
-            <h1
-              className={`flex h-[68px] min-w-0 flex-1 items-center text-[24px] leading-[1.2] font-[650] tracking-[-0.035em] max-sm:h-auto max-sm:flex-initial max-sm:text-[20px] ${FIT.title[fit]}`}
-            >
-              <span
-                ref={title}
-                className={
-                  crumbed
-                    ? 'flex min-w-0 items-center whitespace-nowrap'
-                    : 'truncate'
-                }
+      {session && edit ? (
+        <EditBar edit={edit} session={session} />
+      ) : (
+        <header
+          ref={bar}
+          data-chips={showFilters ? fit : undefined}
+          className={`sticky top-0 z-30 flex items-center bg-bg px-5 max-sm:h-14 max-sm:border-b max-sm:border-line sm:gap-x-2 ${dayDate !== undefined ? 'sm:h-[68px]' : ''} ${FIT.bar[fit]}`}
+        >
+          {/* Below sm the title and its badge take the room the icons leave; from sm its items join the bar's. */}
+          <div className="flex min-w-0 flex-1 items-center gap-2 sm:contents">
+            {menu}
+            {dayDate !== undefined ? (
+              <DayHeader
+                date={dayDate}
+                mode={pathname.endsWith('/review') ? 'review' : 'plan'}
+                onImport={imports.open}
+              />
+            ) : (
+              <h1
+                className={`flex h-[68px] min-w-0 flex-1 items-center text-[24px] leading-[1.2] font-[650] tracking-[-0.035em] max-sm:h-auto max-sm:flex-initial max-sm:text-[20px] ${FIT.title[fit]}`}
               >
-                {tradeId !== undefined ? (
-                  <>
-                    <Suspense fallback={<span>Trades</span>}>
-                      <BackToTrades />
-                    </Suspense>
-                    <TradeNumber id={tradeId} />
-                  </>
-                ) : strategyId !== undefined || editingId !== undefined ? (
-                  <StrategyCrumb
-                    id={(strategyId ?? editingId)!}
-                    edit={editingId !== undefined}
-                  />
-                ) : (
-                  pageTitle(pathname)
-                )}
-              </span>
-            </h1>
-          )}
-          {badge}
-        </div>
-        {showFilters ? (
-          <>
-            {/* Ends the title's row when the chips lead the next. */}
-            <div
-              aria-hidden="true"
-              className={`hidden basis-full ${FIT.breaker[fit]}`}
-            />
-            {/* As wide as the chips need, up to the room left; they scroll inside their own group. */}
-            <div
-              ref={chips}
-              className="flex max-w-max min-w-0 grow basis-0 items-center max-sm:flex-none max-sm:grow-0 max-sm:basis-auto"
-            >
-              {filters}
-            </div>
-          </>
-        ) : null}
-        {isComparePage(pathname) ? (
-          <p className="flex-none text-[13px] text-faint max-sm:hidden">
-            Each group has its own filters
-          </p>
-        ) : null}
-        {/* Below sm the icons at the row's end; from sm its items join the bar's, at its end. */}
-        <div className="flex flex-none items-center max-sm:-mr-2.5 sm:contents">
-          {/* Search starts the controls at the bar's end. */}
-          <div ref={tail} className="flex flex-none items-center sm:ml-auto">
-            {search}
+                <span
+                  ref={title}
+                  className={
+                    crumbed
+                      ? 'flex min-w-0 items-center whitespace-nowrap'
+                      : 'truncate'
+                  }
+                >
+                  {tradeId !== undefined ? (
+                    <>
+                      <Suspense fallback={<span>Trades</span>}>
+                        <BackToTrades />
+                      </Suspense>
+                      <TradeNumber id={tradeId} />
+                    </>
+                  ) : strategyId !== undefined || editingId !== undefined ? (
+                    <StrategyCrumb
+                      id={(strategyId ?? editingId)!}
+                      edit={editingId !== undefined}
+                    />
+                  ) : (
+                    pageTitle(pathname)
+                  )}
+                </span>
+              </h1>
+            )}
+            {badge}
           </div>
-          {label || basis ? (
-            <div ref={controls} className="flex flex-none items-center gap-2">
-              {label}
-              {/* The tracker has no unit menu: money there is net, in its currency. */}
-              {hidesDisplayMenu(pathname) ? null : (
-                <div className="flex">{basis}</div>
-              )}
-            </div>
-          ) : null}
-          {/* The start-my-day popover, before Import, on the Dashboard and the Trades views only. */}
-          {pathname === '/app/dashboard' ||
-          pathname === '/app/trades' ||
-          pathname === '/app/trades/day' ||
-          pathname === '/app/trades/week' ? (
-            <div className="flex flex-none max-sm:hidden">
-              <PlanTheDay />
-            </div>
-          ) : null}
-          {/* The dashboard's template, beside it (comp 01). */}
-          {pathname === '/app/dashboard' ? (
-            <div className="flex flex-none">
-              <TemplateMenu />
-            </div>
-          ) : null}
-          {/* The day's one session, on today's plan page (K30); review has none. */}
-          {dayDate !== undefined && !pathname.endsWith('/review') ? (
-            <div className="flex flex-none max-sm:ml-1">
-              <SessionButton date={dayDate} />
-            </div>
-          ) : null}
-          {/* Import's own page needs no link to itself; a day page opens the method picker instead. The bar's last control: Keel has no signed-in person, so no avatar. */}
-          {dayDate !== undefined ? (
-            <button
-              type="button"
-              aria-haspopup="dialog"
-              onClick={(e) => imports.open(e.currentTarget)}
-              className={IMPORT}
-            >
-              <UploadSimple
-                size={16}
+          {showFilters ? (
+            <>
+              {/* Ends the title's row when the chips lead the next. */}
+              <div
                 aria-hidden="true"
-                className="flex-none"
+                className={`hidden basis-full ${FIT.breaker[fit]}`}
               />
-              Import
-            </button>
-          ) : pathname === '/app/import' ? null : (
-            <Link href="/app/import" className={IMPORT}>
-              <UploadSimple
-                size={16}
-                aria-hidden="true"
-                className="flex-none"
-              />
-              Import
-            </Link>
-          )}
-        </div>
-      </header>
+              {/* As wide as the chips need, up to the room left; they scroll inside their own group. */}
+              <div
+                ref={chips}
+                className="flex max-w-max min-w-0 grow basis-0 items-center max-sm:flex-none max-sm:grow-0 max-sm:basis-auto"
+              >
+                {filters}
+              </div>
+            </>
+          ) : null}
+          {isComparePage(pathname) ? (
+            <p className="flex-none text-[13px] text-faint max-sm:hidden">
+              Each group has its own filters
+            </p>
+          ) : null}
+          {/* Below sm the icons at the row's end; from sm its items join the bar's, at its end. */}
+          <div className="flex flex-none items-center max-sm:-mr-2.5 sm:contents">
+            {/* Search starts the controls at the bar's end. */}
+            <div ref={tail} className="flex flex-none items-center sm:ml-auto">
+              {search}
+            </div>
+            {label || basis ? (
+              <div ref={controls} className="flex flex-none items-center gap-2">
+                {label}
+                {/* The tracker has no unit menu: money there is net, in its currency. */}
+                {hidesDisplayMenu(pathname) ? null : (
+                  <div className="flex">{basis}</div>
+                )}
+              </div>
+            ) : null}
+            {/* The start-my-day popover, before Import, on the Dashboard and the Trades views only. */}
+            {pathname === '/app/dashboard' ||
+            pathname === '/app/trades' ||
+            pathname === '/app/trades/day' ||
+            pathname === '/app/trades/week' ? (
+              <div className="flex flex-none max-sm:hidden">
+                <PlanTheDay />
+              </div>
+            ) : null}
+            {/* The dashboard's template, beside it (comp 01). */}
+            {pathname === '/app/dashboard' ? (
+              <div className="flex flex-none">
+                <TemplateMenu />
+              </div>
+            ) : null}
+            {/* The day's one session, on today's plan page (K30); review has none. */}
+            {dayDate !== undefined && !pathname.endsWith('/review') ? (
+              <div className="flex flex-none max-sm:ml-1">
+                <SessionButton date={dayDate} />
+              </div>
+            ) : null}
+            {/* Import's own page needs no link to itself; a day page opens the method picker instead. The bar's last control: Keel has no signed-in person, so no avatar. */}
+            {dayDate !== undefined ? (
+              <button
+                type="button"
+                aria-haspopup="dialog"
+                onClick={(e) => imports.open(e.currentTarget)}
+                className={IMPORT}
+              >
+                <UploadSimple
+                  size={16}
+                  aria-hidden="true"
+                  className="flex-none"
+                />
+                Import
+              </button>
+            ) : pathname === '/app/import' ? null : (
+              <Link href="/app/import" className={IMPORT}>
+                <UploadSimple
+                  size={16}
+                  aria-hidden="true"
+                  className="flex-none"
+                />
+                Import
+              </Link>
+            )}
+          </div>
+        </header>
+      )}
       {imports.picker}
       {/* On a phone the note sits under the bar. */}
       {isComparePage(pathname) ? (
