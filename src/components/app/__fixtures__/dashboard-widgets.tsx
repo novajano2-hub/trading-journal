@@ -5,7 +5,7 @@ import { screen } from '@testing-library/react';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
-import type { NewCashFlow } from '@/data/repository';
+import type { NewCashFlow, Repository } from '@/data/repository';
 import {
   generateSampleWorkspace,
   SAMPLE_SEED,
@@ -67,6 +67,24 @@ export async function renderWidgets(
   const rendered = renderApp(<DashboardView />, { repository, url: opts.url });
   await screen.findByTestId('dashboard-ready');
   return rendered;
+}
+
+/**
+ * What another tab does while the page is open: saves a second template, "Other",
+ * and puts it in use. The page's cache has not heard of it, so the template the
+ * page draws is no longer the one in use. (A widget's settings write must keep both.)
+ */
+export async function saveTemplateElsewhere(repo: Repository): Promise<void> {
+  const now = (await repo.prefs.get()).dashboards!;
+  await repo.prefs.update({
+    dashboards: {
+      inUse: 'other',
+      templates: [
+        ...now.templates,
+        { id: 'other', name: 'Other', upper: [], lower: [] },
+      ],
+    },
+  });
 }
 
 export const widget = (key: WidgetKey): HTMLElement =>

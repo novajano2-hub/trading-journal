@@ -184,31 +184,36 @@ export function missingFrom(
 }
 
 /**
- * The `dashboards` pref after a widget's settings change, on the template in
- * use: the patch merges into the settings the widget has there. With no pref
- * the default template is saved whole, with the change in it. A widget the
- * template in use does not hold changes nothing, and neither does any other
- * template. Nothing passed in is written through.
+ * The `dashboards` pref after a widget's settings change: the patch merges into
+ * the settings the widget has on template `templateId`, or on the template in
+ * use when no id is given. A page passes the id of the template it draws, which
+ * another tab may have swapped out of use since: the template in use stays as
+ * the pref has it. With no pref the default template is saved whole, with the
+ * change in it. A widget the template does not hold changes nothing, and
+ * neither does an id the pref does not have, or any other template. Nothing
+ * passed in is written through.
  */
 export function setWidgetSettings(
   prefs: Pick<UserPrefs, 'dashboards'>,
   key: WidgetKey,
   patch: WidgetSettings,
+  templateId?: string,
 ): NonNullable<UserPrefs['dashboards']> {
   const { inUse, all } = templatesOf(prefs);
+  const target =
+    templateId === undefined ? inUse : all.find((t) => t.id === templateId);
   // A section without the widget is the same list, so it is not rewritten.
   const merged = (refs: WidgetRef[]): WidgetRef[] =>
     refs.some((r) => r.key === key)
       ? refs.map((r) => (r.key === key ? withSettings(r, patch) : r))
       : refs;
-  const next: DashTemplate = {
-    ...inUse,
-    upper: merged(inUse.upper),
-    lower: merged(inUse.lower),
-  };
   return {
     inUse: inUse.id,
-    templates: all.map((t) => (t === inUse ? next : t)),
+    templates: all.map((t) =>
+      t === target
+        ? { ...t, upper: merged(t.upper), lower: merged(t.lower) }
+        : t,
+    ),
   };
 }
 

@@ -29,6 +29,7 @@ import {
   byDay,
   renderWidgets,
   said,
+  saveTemplateElsewhere,
   widget,
 } from '../../__fixtures__/dashboard-widgets';
 
@@ -723,6 +724,27 @@ describe('the challenge widget', () => {
     );
   });
 
+  test('the pick is written on the template drawn and keeps what another tab saved since (C70)', async () => {
+    const { repo } = await renderWidgets(['challenge'], {
+      sample: twoChallenges,
+    });
+    const trigger = await waitFor(() =>
+      within(card()).getByRole('button', {
+        name: 'Challenge shown, Most urgent',
+      }),
+    );
+    await saveTemplateElsewhere(repo);
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+    fireEvent.click((await screen.findAllByRole('menuitemradio'))[1]!);
+    await waitFor(async () => {
+      const t = (await repo.prefs.get()).dashboards!.templates[0]!;
+      expect(t.lower[0]?.settings).toEqual({ challengeId: 'c-1' });
+    });
+    const stored = (await repo.prefs.get()).dashboards!;
+    expect(stored.templates.map((t) => t.id)).toEqual(['t', 'other']);
+    expect(stored.inUse).toBe('other');
+  });
+
   test('with no challenge the widget says so and links to the Prop firms page', async () => {
     await renderWidgets(['challenge'], { sample: fixtureSample });
     await waitFor(() =>
@@ -879,6 +901,24 @@ describe('the report widget', () => {
       }),
     );
     await waitFor(() => expect(said('report')).toContain('By day, 2 metrics'));
+  });
+
+  test('a change of metrics is written on the template drawn and keeps what another tab saved since (C70)', async () => {
+    const { repo } = await renderWidgets(['report'], { sample: three });
+    const menu = await open();
+    await saveTemplateElsewhere(repo);
+    fireEvent.click(
+      within(menu).getByRole('button', { name: 'Remove Profit factor' }),
+    );
+    await waitFor(async () => {
+      const t = (await repo.prefs.get()).dashboards!.templates[0]!;
+      expect(t.lower[0]?.settings).toEqual({
+        metrics: ['net:line:running', 'win-rate:line:running'],
+      });
+    });
+    const stored = (await repo.prefs.get()).dashboards!;
+    expect(stored.templates.map((t) => t.id)).toEqual(['t', 'other']);
+    expect(stored.inUse).toBe('other');
   });
 
   test('switching a metric to bars and to per day is saved with it', async () => {

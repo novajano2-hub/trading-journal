@@ -44,3 +44,10 @@ export function useWidgetValue<K extends keyof WidgetValues>(
 export function useWidgetCtx(): MetricContext | undefined {
   return useContext(FigureSourceContext)?.ctx;
 }
+
+/**
+ * The id of the template the page draws. A widget's settings control writes to
+ * that template, not to whichever is in use when the write lands (another tab
+ * may have changed that). Null outside the page.
+ */
+export const WidgetTemplateContext = createContext<string | null>(null);

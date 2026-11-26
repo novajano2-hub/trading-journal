@@ -477,6 +477,49 @@ describe("setWidgetSettings (the scatter's Entry or Exit, saved on the template 
     });
     expect(next).toEqual(stored);
   });
+
+  describe('for the template a page draws (its id), which may no longer be the one in use', () => {
+    test('that template changes, and the one in use stays in use as it was', () => {
+      const next = setWidgetSettings(
+        { dashboards: stored },
+        'trade-time',
+        { time: 'exit' },
+        't1',
+      );
+      expect(next.inUse).toBe('t2');
+      expect(next.templates[0]!.lower[0]).toEqual({
+        key: 'trade-time',
+        settings: { time: 'exit' },
+      });
+      expect(next.templates[1]).toBe(stored.templates[1]);
+      // The stored pref is not written through.
+      expect(stored.templates[0]!.lower[0]).toEqual({ key: 'trade-time' });
+    });
+
+    test('a template that is gone changes nothing, and writes no template of its own', () => {
+      expect(
+        setWidgetSettings(
+          { dashboards: stored },
+          'trade-time',
+          { time: 'exit' },
+          'gone',
+        ),
+      ).toEqual(stored);
+    });
+
+    test('with no dashboards pref the default is the template, under its id', () => {
+      const next = setWidgetSettings(
+        {},
+        'trade-time',
+        { time: 'exit' },
+        'main',
+      );
+      expect(next.inUse).toBe('main');
+      expect(
+        next.templates[0]!.lower.find((r) => r.key === 'trade-time')?.settings,
+      ).toEqual({ time: 'exit' });
+    });
+  });
 });
 
 describe('sameTemplate', () => {

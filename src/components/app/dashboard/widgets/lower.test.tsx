@@ -18,6 +18,7 @@ import {
   esTrade,
   renderWidgets,
   said,
+  saveTemplateElsewhere,
   theSample,
   tradesSample,
   widget,
@@ -702,6 +703,21 @@ describe('the trade scatters (C19)', () => {
     expect(within(widget('trade-time')).getByRole('status').textContent).toBe(
       '',
     );
+  });
+
+  test('the Entry and Exit switch writes on the template drawn and keeps what another tab saved since (C70)', async () => {
+    const { repo } = await renderWidgets(['trade-time'], { sample: three });
+    await saveTemplateElsewhere(repo);
+    fireEvent.click(
+      within(widget('trade-time')).getByRole('radio', { name: 'Exit' }),
+    );
+    await waitFor(async () => {
+      const t = (await repo.prefs.get()).dashboards!.templates[0]!;
+      expect(t.lower[0]?.settings).toEqual({ time: 'exit' });
+    });
+    const stored = (await repo.prefs.get()).dashboards!;
+    expect(stored.templates.map((t) => t.id)).toEqual(['t', 'other']);
+    expect(stored.inUse).toBe('other');
   });
 
   test('a template that asks for the exit time draws it from the start', async () => {

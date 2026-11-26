@@ -1,27 +1,28 @@
 'use client';
 
-import { useCallback } from 'react';
-import { usePrefs, useUpdatePrefs } from '@/data/query/hooks';
+import { useCallback, useContext } from 'react';
+import { useChangeDashboards } from '@/data/query/hooks';
 import { setWidgetSettings } from '@/domain/dashboard/templates';
 import type { WidgetKey, WidgetSettings } from '@/domain/types';
+import { WidgetTemplateContext } from './context';
 
 /**
- * Saves a change to one widget's settings on the template in use (the
- * scatter's Entry or Exit), through the prefs. With no template saved yet the
- * default one is saved with the change. It writes straight to the template:
- * the draft an edit mode holds is for the edit mode's own controls.
+ * Saves a change to one widget's settings on the template the page draws (the
+ * scatter's Entry or Exit, the challenge shown, the report's metrics), through
+ * the prefs. The write rebuilds the `dashboards` pref from what is stored when
+ * it lands (C70), so a template saved in another tab is kept and so is the
+ * one it put in use. It writes straight to the template: the draft an edit
+ * mode holds is for the edit mode's own controls.
  */
 export function useSetWidgetSetting(
   key: WidgetKey,
 ): (patch: WidgetSettings) => void {
-  const prefs = usePrefs().data;
-  const update = useUpdatePrefs();
-  const { mutate } = update;
+  const templateId = useContext(WidgetTemplateContext) ?? undefined;
+  const { mutate } = useChangeDashboards();
   return useCallback(
     (patch) => {
-      if (!prefs) return;
-      mutate({ dashboards: setWidgetSettings(prefs, key, patch) });
+      mutate((current) => setWidgetSettings(current, key, patch, templateId));
     },
-    [prefs, key, mutate],
+    [key, templateId, mutate],
   );
 }

@@ -40,7 +40,11 @@ import { switchWorkspaceFilters } from '../filter-model';
 import { EditSurface } from './edit-mode';
 import { useDashboardEdit } from './edit-session';
 import { DashboardEmpty, DashboardError, DashboardSkeleton } from './states';
-import { WidgetPageContext, type WidgetPage } from './widgets/context';
+import {
+  WidgetPageContext,
+  WidgetTemplateContext,
+  type WidgetPage,
+} from './widgets/context';
 import { LowerGrid, UpperStrip, WidgetCell } from './widgets/layout';
 import { WIDGET_RENDER } from './widgets/registry';
 
@@ -315,16 +319,18 @@ export function DashboardView(): React.JSX.Element {
               </p>
             </div>
           ) : null}
-          {template.upper.length > 0 ? (
-            <UpperStrip>
-              <Widgets refs={template.upper} section="upper" />
-            </UpperStrip>
-          ) : null}
-          {template.lower.length > 0 ? (
-            <LowerGrid>
-              <Widgets refs={template.lower} section="lower" />
-            </LowerGrid>
-          ) : null}
+          <WidgetTemplateContext.Provider value={template.id}>
+            {template.upper.length > 0 ? (
+              <UpperStrip>
+                <Widgets refs={template.upper} section="upper" />
+              </UpperStrip>
+            ) : null}
+            {template.lower.length > 0 ? (
+              <LowerGrid>
+                <Widgets refs={template.lower} section="lower" />
+              </LowerGrid>
+            ) : null}
+          </WidgetTemplateContext.Provider>
         </div>
       </WidgetPageContext.Provider>
     </FigureSourceContext.Provider>
