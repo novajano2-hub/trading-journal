@@ -36,6 +36,29 @@ const input = (p: Partial<ManualTradeInput> = {}): ManualTradeInput => ({
 });
 
 describe('buildManualTrade', () => {
+  test("the account's method builds the trade and is stamped on it", () => {
+    const open = input({
+      fills: [
+        fillOf('buy', 1, 5000, 0),
+        fillOf('buy', 1, 5010, 1),
+        fillOf('sell', 1, 5020, 2),
+      ],
+    });
+    const gross = (costMethod?: 'fifo' | 'lifo' | 'average') => {
+      const r = buildManualTrade(open, { ...ctx, costMethod });
+      if (!r.ok) throw new Error(r.error);
+      return r.trade;
+    };
+    expect(gross()).toMatchObject({ status: 'open', gross: 100000 });
+    expect(gross()).not.toHaveProperty('costMethod');
+    expect(gross('fifo')).not.toHaveProperty('costMethod');
+    expect(gross('lifo')).toMatchObject({ gross: 50000, costMethod: 'lifo' });
+    expect(gross('average')).toMatchObject({
+      gross: 75000,
+      costMethod: 'average',
+    });
+  });
+
   test('a long closed by a sell is a closed manual trade', () => {
     const r = buildManualTrade(input(), ctx);
     expect(r.ok).toBe(true);

@@ -1,8 +1,9 @@
 'use client';
 
 import { DotsThree, X } from '@phosphor-icons/react/dist/ssr';
+import Link from 'next/link';
 import { Dialog, DropdownMenu } from 'radix-ui';
-import { useRef, type ReactNode } from 'react';
+import { Fragment, useRef, type ReactNode, type RefObject } from 'react';
 
 /** Table header and cell looks shared by the settings tables (the comp's 46px rows). */
 export const TH =
@@ -11,14 +12,22 @@ export const TD =
   'h-[46px] px-1.5 align-middle first:pl-5 last:pr-5 border-t border-line';
 export const NUM = 'text-right tabular-nums';
 
-const MENU =
+/** The look of a menu's panel and its items, for a menu a row builds for itself (a category's, say). */
+export const MENU =
   'z-[60] min-w-[180px] origin-(--radix-dropdown-menu-content-transform-origin) rounded-[12px] border border-line bg-surface-1 p-1.5 text-text shadow-[var(--shadow)] outline-none motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in';
-const MENU_ITEM =
+export const MENU_ITEM =
   'flex min-h-9 cursor-pointer items-center rounded-[8px] px-2.5 text-[13.5px] outline-none data-[highlighted]:bg-sunken pointer-coarse:min-h-11';
 
 export interface MenuAction {
   label: string;
-  onSelect(): void;
+  /** Not needed for a link. */
+  onSelect?(): void;
+  /** A link: the item navigates instead of running `onSelect`. */
+  href?: string;
+  /** A glyph before the label, decorative. */
+  icon?: ReactNode;
+  /** A rule above it, setting it apart from the actions before. */
+  separated?: boolean;
   /** Destructive: loss ink. */
   danger?: boolean;
   /** Runs once the menu has closed, in place of returning focus to its button (to move it to a card, say). */
@@ -56,18 +65,46 @@ export function RowMenu({
             run();
           }}
         >
-          {actions.map((a) => (
-            <DropdownMenu.Item
-              key={a.label}
-              className={`${MENU_ITEM} ${a.danger ? 'text-loss' : ''}`}
-              onSelect={() => {
-                after.current = a.afterClose ?? null;
-                a.onSelect();
-              }}
-            >
-              {a.label}
-            </DropdownMenu.Item>
-          ))}
+          {actions.map((a) => {
+            const className = `${MENU_ITEM} ${a.icon ? 'gap-2.5' : ''} ${a.danger ? 'text-loss' : ''}`;
+            const content = (
+              <>
+                {a.icon ? (
+                  <span
+                    aria-hidden="true"
+                    className={`flex-none ${a.danger ? '' : 'text-muted'}`}
+                  >
+                    {a.icon}
+                  </span>
+                ) : null}
+                {a.label}
+              </>
+            );
+            return (
+              <Fragment key={a.label}>
+                {a.separated ? (
+                  <DropdownMenu.Separator className="mx-1 my-1.5 h-px bg-line" />
+                ) : null}
+                {a.href !== undefined ? (
+                  <DropdownMenu.Item asChild>
+                    <Link href={a.href} className={`${className} no-underline`}>
+                      {content}
+                    </Link>
+                  </DropdownMenu.Item>
+                ) : (
+                  <DropdownMenu.Item
+                    className={className}
+                    onSelect={() => {
+                      after.current = a.afterClose ?? null;
+                      a.onSelect?.();
+                    }}
+                  >
+                    {content}
+                  </DropdownMenu.Item>
+                )}
+              </Fragment>
+            );
+          })}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
@@ -83,14 +120,24 @@ export function SettingsDialog({
   onClose,
   title,
   description,
+  describedBy,
   wide = false,
+  returnFocus,
   children,
 }: {
   open: boolean;
   onClose(): void;
   title: string;
   description?: ReactNode;
+  /**
+   * The `id` of a line in the body that describes the dialog, read out instead of
+   * `description`. For a question whose own first paragraph says what it asks;
+   * the header then carries no description of its own.
+   */
+  describedBy?: string;
   wide?: boolean;
+  /** Where focus goes back to on close; a dialog opened from a menu has no button of its own to return to. */
+  returnFocus?: RefObject<HTMLElement | null>;
   children: ReactNode;
 }): React.JSX.Element {
   return (
@@ -103,6 +150,12 @@ export function SettingsDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-veil" />
         <Dialog.Content
+          aria-describedby={describedBy}
+          onCloseAutoFocus={(e) => {
+            if (!returnFocus) return;
+            e.preventDefault();
+            returnFocus.current?.focus();
+          }}
           className={`fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100dvh-32px)] ${wide ? 'w-[min(680px,calc(100vw-32px))]' : 'w-[min(480px,calc(100vw-32px))]'} -translate-x-1/2 -translate-y-1/2 flex-col rounded-[16px] border border-line bg-surface-1 text-text shadow-[var(--shadow)] outline-none motion-safe:data-[state=open]:animate-pop-in`}
         >
           <div className="flex items-start gap-3 px-6 pt-5">
@@ -110,11 +163,13 @@ export function SettingsDialog({
               <Dialog.Title className="text-[17px] leading-snug font-semibold tracking-[-0.015em] text-balance">
                 {title}
               </Dialog.Title>
-              <Dialog.Description asChild>
-                <div className="mt-1 text-[13.5px] leading-snug text-muted">
-                  {description ?? <span className="sr-only">{title}</span>}
-                </div>
-              </Dialog.Description>
+              {describedBy === undefined ? (
+                <Dialog.Description asChild>
+                  <div className="mt-1 text-[13.5px] leading-snug text-muted">
+                    {description ?? <span className="sr-only">{title}</span>}
+                  </div>
+                </Dialog.Description>
+              ) : null}
             </div>
             <Dialog.Close
               aria-label="Close"

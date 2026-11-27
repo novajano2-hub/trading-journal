@@ -66,6 +66,7 @@ export function sizedRealizations(trade: Trade): SizedRealization[] {
       e.price,
       trade.instrument.pointValue,
       sign,
+      trade.costMethod ?? 'fifo',
     );
     const entryFees = matched.reduce(
       (s, m) => s + ((m.lot.fees ?? 0) * m.qty) / (m.lot.origQty ?? m.qty),

@@ -1,11 +1,13 @@
 'use client';
 
 import { usePathname, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ImportMapping } from '@/domain/import/mapping';
 import type { ParsedCsv } from '@/domain/import/csv';
-import { planImport, type ImportPlan } from '@/domain/import/plan';
-import type { Account, Trade } from '@/domain/types';
+import type { ImportContext, ImportPlan } from '@/domain/import/plan';
+import { planInWorker, StalePlanError } from '@/lib/import/plan-client';
+import type { Account, Trade, WidgetKey } from '@/domain/types';
+import type { PropFilters } from '@/domain/prop/finance';
 import { localDate } from '@/domain/time';
 import {
   applyFilters,
@@ -24,6 +26,13 @@ import {
   metricsByCurrency,
   type CurrencyMetrics,
 } from '../metrics';
+import {
+  DEFAULT_PROP_VIEW,
+  propFinance,
+  type PropFinance,
+  type PropFinanceView,
+} from '../prop-finance';
+import { widgetData, type WidgetData } from '../widget-data';
 import { routineNow, routineToday } from '@/domain/tracker/defaults';
 import {
   msToLocalMidnight,
@@ -35,9 +44,11 @@ import {
   useAccounts,
   useActiveWorkspace,
   useCashFlows,
+  useChallenges,
   useDays,
   useImportContext,
   usePrefs,
+  usePropTxns,
   useStrategies,
   useTags,
   useTracker,
@@ -150,6 +161,8 @@ export interface TradeSet {
   filters: GlobalFilters;
   /** The trades the filters match that the display unit reads. */
   trades: Trade[];
+  /** The trades the filters match, whatever the display unit: what the score reads (it reads money). */
+  matched: Trade[];
   /** The same filters except the date, narrowed the same way: what the day figures are built from. */
   dayTrades: Trade[];
   /** The selected accounts: the active ones when no account is filtered. */
@@ -226,6 +239,7 @@ export function useTradeSet(filters: GlobalFilters): Derived<TradeSet> {
     return {
       filters: clean,
       trades: kept,
+      matched,
       dayTrades: narrowToUnit(dayMatched, unit),
       accounts: selectedAccounts(accounts.data, clean),
       unitLeftOut: matched.length - kept.length,
@@ -323,18 +337,52 @@ function sameInput(a: ImportInput | null, b: ImportInput | null): boolean {
   );
 }
 
+/** What a point value takes to settle, so a keystroke is not a plan: the edits that follow it are waited for. */
+const POINT_VALUE_DEBOUNCE_MS = 150;
+
 /**
- * The plan for a file. Its id and time hold while the input's fields (`parsed`,
- * `mapping`, `accountId`, `fileName`, compared by reference, so an inline
- * object is fine) and the workspace's import revision stay the same, so
- * re-renders and refetches keep one plan identity. A new input, or an import
- * committed or undone since, makes a new plan with a new id: a commit never
- * reuses an id in the history. Keep `parsed` and `mapping` stable (state or a
- * memo) while the file and mapping are unchanged.
+ * Whether the inputs differ in the point values alone: the same file, account
+ * and settings, a mapping whose only changed part is its `overrides`. Those
+ * are typed, a key at a time; every other change is a choice made at once.
+ */
+function onlyPointValuesDiffer(a: ImportInput, b: ImportInput): boolean {
+  if (
+    a.mapping === b.mapping ||
+    a.parsed !== b.parsed ||
+    a.accountId !== b.accountId ||
+    a.fileName !== b.fileName
+  )
+    return false;
+  const before: Record<string, unknown> = { ...a.mapping };
+  const after: Record<string, unknown> = { ...b.mapping };
+  return [...new Set([...Object.keys(before), ...Object.keys(after)])].every(
+    (key) => key === 'overrides' || before[key] === after[key],
+  );
+}
+
+/** A plan, or why there is none, with what it was made for. */
+interface Made {
+  identity: PlanIdentity;
+  context: ImportContext;
+  plan?: ImportPlan;
+  error?: Error;
+}
+
+/**
+ * The plan for a file, made in a worker (the main thread where there is none),
+ * so a large file never holds the page. Its id and time hold while the input's
+ * fields (`parsed`, `mapping`, `accountId`, `fileName`, compared by reference,
+ * so an inline object is fine) and the workspace's import revision stay the
+ * same, so re-renders and refetches keep one plan identity. A new input, or an
+ * import committed or undone since, makes a new plan with a new id: a commit
+ * never reuses an id in the history. Keep `parsed` and `mapping` stable (state
+ * or a memo) while the file and mapping are unchanged.
  *
- * The plan is made from the stored identity's input, and the status stays
- * `pending` until that identity matches the current input and revision, so no
- * render pass reports `success` without data or with a plan for an old input.
+ * The status stays `pending` until the plan for the current identity and the
+ * context it read has come back: no pass reports `success` without data or
+ * with a plan for an old input, and a plan that came back late for an earlier
+ * input is not used. Point values edited in a run are planned once, 150 ms
+ * after the last edit; any other change is planned at once.
  */
 export function useImportPlan(input: ImportInput | null): Derived<ImportPlan> {
   const context = useImportContext(input?.accountId);
@@ -347,27 +395,81 @@ export function useImportPlan(input: ImportInput | null): Derived<ImportPlan> {
     sameInput(identity.input, input) && identity.revision === revision;
   if (!current) setIdentity(newPlanIdentity(input, revision));
   const planInput = identity.input;
-  const data = useMemo(
-    () =>
-      current && planInput && context.data
-        ? planImport(planInput.parsed, planInput.mapping, context.data, {
+  const read = current ? context.data : undefined;
+  const [made, setMade] = useState<Made | null>(null);
+  const lastAsked = useRef<ImportInput | null>(null);
+
+  useEffect(() => {
+    if (!planInput || !read) return;
+    let live = true;
+    // Gone, or moved on to another input: the request is dropped, and its worker stopped.
+    const gone = new AbortController();
+    let askedAgain = false;
+    const ask = () => {
+      lastAsked.current = planInput;
+      planInWorker(
+        {
+          parsed: planInput.parsed,
+          mapping: planInput.mapping,
+          ctx: read,
+          meta: {
             importId: identity.importId,
-            now: identity.now,
             fileName: planInput.fileName,
-          })
-        : undefined,
-    [current, planInput, context.data, identity],
-  );
+            now: identity.now,
+          },
+        },
+        gone.signal,
+      ).then(
+        (plan) => {
+          if (live) setMade({ identity, context: read, plan });
+        },
+        (error: unknown) => {
+          if (!live) return;
+          if (error instanceof StalePlanError) {
+            // Not this hook's doing (its own requests are dropped as it moves on):
+            // another consumer took the client. Ask again, once, so the plan comes.
+            if (!askedAgain) {
+              askedAgain = true;
+              ask();
+            }
+            return;
+          }
+          setMade({
+            identity,
+            context: read,
+            error: error instanceof Error ? error : new Error(String(error)),
+          });
+        },
+      );
+    };
+    const before = lastAsked.current;
+    if (before && onlyPointValuesDiffer(before, planInput)) {
+      const timer = setTimeout(ask, POINT_VALUE_DEBOUNCE_MS);
+      return () => {
+        live = false;
+        clearTimeout(timer);
+        gone.abort();
+      };
+    }
+    ask();
+    return () => {
+      live = false;
+      gone.abort();
+    };
+  }, [identity, planInput, read]);
+
   // A failure wins even before the identity catches up.
-  const state =
-    current || context.status === 'error'
-      ? context
-      : { status: 'pending' as const, error: null };
-  return {
-    status: state.status === 'success' && !data ? 'pending' : state.status,
-    error: state.error,
-    data,
-  };
+  if (context.status === 'error')
+    return { status: 'error', error: context.error, data: undefined };
+  const result =
+    made && read && made.identity === identity && made.context === read
+      ? made
+      : null;
+  if (result?.error)
+    return { status: 'error', error: result.error, data: undefined };
+  if (result?.plan)
+    return { status: 'success', error: null, data: result.plan };
+  return { status: 'pending', error: null, data: undefined };
 }
 
 /**
@@ -481,5 +583,142 @@ export function useDayScores(): Derived<ScoreHistory> {
     return () => clearInterval(id);
   }, [live, refresh]);
 
+  return { ...state, data: state.status === 'success' ? data : undefined };
+}
+
+// Plan 6C: the dashboard's widgets and the prop dashboard.
+
+export interface WidgetDataResult {
+  /** The series of the widgets asked for, as far as they are built. */
+  values: WidgetData;
+  /** The P&L currency read: the one asked for when the filtered trades have it, else the base. */
+  currency: string;
+  /** The base currency first, then the others the trades are in. More than one shows the currency switch. */
+  currencies: string[];
+  /** The trades the filters matched that the display unit leaves out; 0 otherwise. */
+  unitLeftOut: number;
+}
+
+/**
+ * What the listed widgets read (#46), from the URL's filters, the date range
+ * and the display unit: only the series those widgets need, in one P&L
+ * currency (`opts.currency`, else the base). The score reads every trade the
+ * filters match, the other widgets the ones the unit keeps. Call it under a
+ * `<Suspense>` boundary, as `useGlobalFilters` needs.
+ */
+export function useWidgetData(
+  keys: readonly WidgetKey[],
+  opts: { currency?: string } = {},
+): Derived<WidgetDataResult> {
+  const { filters } = useGlobalFilters();
+  const set = useTradeSet(filters);
+  const flows = useCashFlows();
+  const everyTrade = useTrades();
+  const prefs = usePrefs();
+  const state = combine([set, flows]);
+  // The keys may arrive as a fresh array every render.
+  const keyList = keys.join(',');
+  const currency = opts.currency;
+  const data = useMemo(() => {
+    if (!set.data || !prefs.data || !flows.data || !everyTrade.data)
+      return undefined;
+    const today = localDate(new Date().toISOString(), prefs.data.timeZone);
+    const read = widgetData(
+      keyList === '' ? [] : (keyList.split(',') as WidgetKey[]),
+      {
+        matched: set.data.matched,
+        trades: set.data.trades,
+        dayTrades: set.data.dayTrades,
+        accounts: set.data.accounts,
+        flows: flows.data,
+        balanceTrades: everyTrade.data,
+        // Day figures count only the exits dated inside the date range.
+        ctx: {
+          ...metricContextOf(prefs.data),
+          range: resolveRange(
+            set.data.filters.range,
+            today,
+            prefs.data.weekStart,
+          ),
+        },
+        baseCurrency: prefs.data.baseCurrency,
+        ...(currency !== undefined && { currency }),
+        today,
+      },
+    );
+    return { ...read, unitLeftOut: set.data.unitLeftOut };
+  }, [set.data, prefs.data, flows.data, everyTrade.data, keyList, currency]);
+  return { ...state, data: state.status === 'success' ? data : undefined };
+}
+
+/**
+ * The prop dashboard's figures (#45) for the page's filters and switches, in
+ * the workspace's base currency (C58). The filters may be an inline object:
+ * what they hold is what counts.
+ */
+export function usePropFinance(
+  filters: PropFilters,
+  view: PropFinanceView = DEFAULT_PROP_VIEW,
+): Derived<PropFinance> {
+  const challenges = useChallenges();
+  const accounts = useAccounts();
+  const trades = useTrades();
+  const flows = useCashFlows();
+  const txns = usePropTxns();
+  const strategies = useStrategies();
+  const prefs = usePrefs();
+  const state = combine([
+    challenges,
+    accounts,
+    trades,
+    flows,
+    txns,
+    strategies,
+    prefs,
+  ]);
+  const filterKey = JSON.stringify(filters);
+  const viewKey = JSON.stringify(view);
+  const timeZone = prefs.data?.timeZone;
+  const today =
+    timeZone === undefined
+      ? undefined
+      : localDate(new Date().toISOString(), timeZone);
+  const data = useMemo(() => {
+    if (
+      !challenges.data ||
+      !accounts.data ||
+      !trades.data ||
+      !flows.data ||
+      !txns.data ||
+      !strategies.data ||
+      !prefs.data ||
+      today === undefined
+    )
+      return undefined;
+    return propFinance({
+      challenges: challenges.data,
+      accounts: accounts.data,
+      trades: trades.data,
+      flows: flows.data,
+      txns: txns.data,
+      strategies: strategies.data,
+      filters: JSON.parse(filterKey) as PropFilters,
+      view: JSON.parse(viewKey) as PropFinanceView,
+      baseCurrency: prefs.data.baseCurrency,
+      ctx: metricContextOf(prefs.data),
+      today,
+    });
+  }, [
+    challenges.data,
+    accounts.data,
+    trades.data,
+    flows.data,
+    txns.data,
+    strategies.data,
+    prefs.data,
+    today,
+    filterKey,
+    viewKey,
+  ]);
   return { ...state, data: state.status === 'success' ? data : undefined };
 }

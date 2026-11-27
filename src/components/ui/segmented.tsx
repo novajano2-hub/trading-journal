@@ -1,8 +1,13 @@
 'use client';
 
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 
-export type SegmentedOption<T extends string> = { value: T; label: string };
+export type SegmentedOption<T extends string> = {
+  value: T;
+  label: string;
+  /** A glyph before the label, decorative. */
+  icon?: ReactNode;
+};
 
 /**
  * Radio-style segmented control. Arrow keys move through the group natively.
@@ -41,8 +46,9 @@ export function Segmented<T extends string>({
       {options.map((o) => (
         <label
           key={o.value}
-          className={`relative inline-flex h-7 items-center rounded-[8px] px-[13px] ${coarseTargets ? 'pointer-coarse:min-h-11' : ''} text-[13.5px] font-medium transition-[background-color,color,box-shadow] duration-200 ease-(--ease-glide) has-[:checked]:bg-surface-1 has-[:checked]:font-semibold has-[:checked]:shadow-[var(--shadow-chip)] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent [[data-theme=dark]_&]:has-[:checked]:bg-line-2 ${disabled ? 'cursor-default text-faint' : 'cursor-pointer text-muted has-[:checked]:text-text'}`}
+          className={`relative inline-flex h-7 items-center gap-1.5 rounded-[8px] px-[13px] ${coarseTargets ? 'pointer-coarse:min-h-11' : ''} text-[13.5px] font-medium transition-[background-color,color,box-shadow] duration-200 ease-(--ease-glide) has-[:checked]:bg-surface-1 has-[:checked]:font-semibold has-[:checked]:shadow-[var(--shadow-chip)] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent [[data-theme=dark]_&]:has-[:checked]:bg-line-2 ${disabled ? 'cursor-default text-faint' : 'cursor-pointer text-muted has-[:checked]:text-text'}`}
         >
+          {o.icon}
           <input
             type="radio"
             name={name}

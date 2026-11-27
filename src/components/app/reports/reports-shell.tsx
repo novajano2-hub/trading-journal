@@ -99,10 +99,10 @@ export function ReportsShell({
     </Link>
   );
   return (
-    <div className="flex min-w-0 flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0">
+    <div className="flex min-w-0 flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0 print:p-0">
       <ScrollFade
         tone="bg"
-        rootClassName="-mx-5 max-w-[100vw] lg:max-w-full"
+        rootClassName="-mx-5 max-w-[100vw] lg:max-w-full print:hidden"
         className="px-5 pb-1 [scrollbar-width:none]"
       >
         <nav aria-label="Reports">

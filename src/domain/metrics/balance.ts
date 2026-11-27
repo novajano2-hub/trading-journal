@@ -36,3 +36,45 @@ export function balanceAt(
   }
   return balance;
 }
+
+/** One day of the balance chart: what the accounts held at its close, and the net deposits and withdrawals so far. */
+export interface BalancePoint {
+  date: string;
+  balance: Cents;
+  /** The deposits and withdrawals from the range's start through this date, net. */
+  flows: Cents;
+}
+
+/**
+ * The balance a day at a time (C75): a point on each date that has a trading
+ * day or a deposit or withdrawal, inside `range`. `days` are the net P&L of
+ * every trade of the accounts, by exit day, from the beginning; `start` is the
+ * accounts' starting balances. The balance is the same figure `balanceAt`
+ * reads, so a range starts from everything booked before it; `flows` counts
+ * only what moved inside the range.
+ */
+export function balanceSeries(
+  days: readonly { date: string; net: Cents }[],
+  start: Cents,
+  flows: readonly { date: string; amount: Cents }[],
+  range: { from?: string; to?: string } = {},
+): BalancePoint[] {
+  const dates = [
+    ...new Set([...days.map((d) => d.date), ...flows.map((f) => f.date)]),
+  ].sort();
+  const net = new Map<string, Cents>();
+  for (const d of days) net.set(d.date, (net.get(d.date) ?? 0) + d.net);
+  const moved = new Map<string, Cents>();
+  for (const f of flows) moved.set(f.date, (moved.get(f.date) ?? 0) + f.amount);
+  let balance = start;
+  let inside = 0;
+  const out: BalancePoint[] = [];
+  for (const date of dates) {
+    balance += (net.get(date) ?? 0) + (moved.get(date) ?? 0);
+    if (range.to !== undefined && date > range.to) break;
+    if (range.from !== undefined && date < range.from) continue;
+    inside += moved.get(date) ?? 0;
+    out.push({ date, balance, flows: inside });
+  }
+  return out;
+}

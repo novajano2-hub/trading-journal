@@ -15,6 +15,7 @@ import {
   type Side,
   type Challenge,
   type DayRecord,
+  type PropTxn,
   type Tracker,
   type Strategy,
   type Tag,
@@ -49,7 +50,7 @@ import {
   type InstSpec,
 } from './instruments';
 import { writeDailyNotes, writeJournal } from './journal';
-import { addPropFirms } from './prop';
+import { addPropFinances, addPropFirms } from './prop';
 import { writeRoutine } from './routine';
 import { createRandom, type Random } from './random';
 import { CATEGORIES, categoryIn } from './templates';
@@ -69,6 +70,8 @@ export interface SampleWorkspace {
   trades: Trade[];
   journal: JournalEntry[];
   challenges: Challenge[];
+  /** The prop money ledger (v7); My workspace's starts empty. */
+  propTxns: PropTxn[];
   tracker: Tracker;
   days: DayRecord[];
 }
@@ -335,9 +338,19 @@ export function generateSampleWorkspace(opts: {
 
   markReviewed(createRandom(opts.seed + 105), prop.trades, endDate);
 
-  // The routine comes last, from a stream of its own, so nothing above moves.
   const allAccounts = [...accounts, ...prop.accounts];
   const allTrades = [...trades, ...prop.trades];
+  // v7: what the challenges record beyond v6 and the prop money ledger, each
+  // from a stream of its own, so nothing above moves.
+  const finances = addPropFinances({
+    endDate,
+    challenges: prop.challenges,
+    trades: allTrades,
+    strategyRng: createRandom(opts.seed + 108),
+    txnRng: createRandom(opts.seed + 107),
+  });
+
+  // The routine comes last, from a stream of its own, so nothing above moves.
   const startedOn = allTrades
     .map((t) => localDate(t.openedAt, NY))
     .reduce((a, b) => (a < b ? a : b));
@@ -358,7 +371,8 @@ export function generateSampleWorkspace(opts: {
     tags,
     trades: allTrades,
     journal: [...journal, ...routine.notes],
-    challenges: prop.challenges,
+    challenges: finances.challenges,
+    propTxns: finances.propTxns,
     tracker: routine.tracker,
     days: routine.days,
   };

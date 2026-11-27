@@ -11,7 +11,9 @@ import type { ImportContext, ImportPlan } from '@/domain/import/plan';
 import { useHydrated } from '@/lib/use-hydrated';
 import type {
   Account,
+  BreachReason,
   CashFlow,
+  Cents,
   Challenge,
   DayRecord,
   DayShot,
@@ -20,6 +22,7 @@ import type {
   JournalEntry,
   NoteFolder,
   NoteTemplate,
+  PropTxn,
   Strategy,
   Tag,
   TagCategory,
@@ -36,8 +39,11 @@ import type {
   ManualTradeInput,
   NewAccount,
   NewCashFlow,
-  NewChallenge,
+  NewChallengeAccount,
+  NewChallengeEntry,
+  NewPropTxn,
   ChallengePatch,
+  PropTxnPatch,
   FirstRunInput,
   NewStrategy,
   NewTag,
@@ -370,6 +376,89 @@ export function useUpdatePrefs(): UseMutationResult<
 > {
   return useFixedWrite('prefs.update', '', (r, patch: Partial<UserPrefs>) =>
     r.prefs.update(patch),
+  );
+}
+
+/**
+ * Saves the sidebar's state (C47). The cached prefs change at once, so every
+ * reader (the rail, Home's shell, the toggle itself) follows the click
+ * without waiting for the write; the write then settles the cache, and a
+ * write that fails puts the saved value back.
+ */
+export function useSetSidebar(): UseMutationResult<
+  UserPrefs,
+  Error,
+  NonNullable<UserPrefs['sidebar']>
+> {
+  const repo = useRepository();
+  const invalidate = useInvalidate();
+  const queryClient = useQueryClient();
+  return useMutation<UserPrefs, Error, NonNullable<UserPrefs['sidebar']>>({
+    mutationFn: async (sidebar) => {
+      const saved = await repo.prefs.update({ sidebar });
+      await invalidate('prefs.update', '');
+      return saved;
+    },
+    onMutate: async (sidebar) => {
+      // A read already under way must not land over the choice.
+      await queryClient.cancelQueries({ queryKey: keys.prefs() });
+      queryClient.setQueryData<UserPrefs>(
+        keys.prefs(),
+        (prefs) => prefs && { ...prefs, sidebar },
+      );
+    },
+    onError: () =>
+      void queryClient.invalidateQueries({ queryKey: keys.prefs() }),
+  });
+}
+
+/**
+ * Rewrites the `dashboards` pref from what is stored now: `change` gets the
+ * prefs read afresh at the write, so a template saved in another tab is not
+ * overwritten by a list this tab has not refetched. `change` may throw to
+ * refuse (nothing is written, and the write rejects with its error).
+ */
+export function useChangeDashboards(): UseMutationResult<
+  UserPrefs,
+  Error,
+  (current: UserPrefs) => NonNullable<UserPrefs['dashboards']>
+> {
+  return useFixedWrite(
+    'prefs.update',
+    '',
+    async (
+      r,
+      change: (current: UserPrefs) => NonNullable<UserPrefs['dashboards']>,
+    ) => r.prefs.update({ dashboards: change(await r.prefs.get()) }),
+  );
+}
+
+/**
+ * Ends the prop first run of one workspace (C71): `propStart[workspaceId]`
+ * becomes `{ answer, done: true }` (the answer only when one was given). The
+ * prefs are read afresh at the write, so another workspace's entry, or a run
+ * finished in another tab, is kept. Nothing else is written.
+ */
+export function useFinishPropStart(): UseMutationResult<
+  UserPrefs,
+  Error,
+  { workspaceId: string; answer?: 'own' | 'prop' | 'both' }
+> {
+  return useFixedWrite(
+    'prefs.update',
+    '',
+    async (r, v: { workspaceId: string; answer?: 'own' | 'prop' | 'both' }) => {
+      const current = await r.prefs.get();
+      return r.prefs.update({
+        propStart: {
+          ...current.propStart,
+          [v.workspaceId]:
+            v.answer === undefined
+              ? { done: true }
+              : { answer: v.answer, done: true },
+        },
+      });
+    },
   );
 }
 
@@ -769,25 +858,38 @@ export function useUndoImport(): UseMutationResult<UndoResult, Error, string> {
   });
 }
 
-export function useCreateChallenge(): UseMutationResult<
-  Challenge,
+/**
+ * Creates the challenges and the new accounts they ask for in one write, all or
+ * none (C-02); an entry's `breach` creates it already breached (C-04).
+ */
+export function useCreateChallenges(): UseMutationResult<
+  Challenge[],
   Error,
-  NewChallenge
+  NewChallengeEntry[]
 > {
-  return useWorkspaceWrite('challenges.create', (r, ws, v: NewChallenge) =>
-    r.challenges.create(ws, v),
+  return useWorkspaceWrite(
+    'challenges.createMany',
+    (r, ws, v: NewChallengeEntry[]) => r.challenges.createMany(ws, v),
   );
 }
 
+/** `newAccounts` are created and linked in the same write, all or none. */
 export function useUpdateChallenge(): UseMutationResult<
   Challenge,
   Error,
-  { id: string; patch: ChallengePatch }
+  { id: string; patch: ChallengePatch; newAccounts?: NewChallengeAccount[] }
 > {
   return useWorkspaceWrite(
     'challenges.update',
-    (r, ws, v: { id: string; patch: ChallengePatch }) =>
-      r.challenges.update(ws, v.id, v.patch),
+    (
+      r,
+      ws,
+      v: {
+        id: string;
+        patch: ChallengePatch;
+        newAccounts?: NewChallengeAccount[];
+      },
+    ) => r.challenges.update(ws, v.id, v.patch, v.newAccounts),
   );
 }
 
@@ -921,5 +1023,85 @@ export function useCompleteFirstRun(): UseMutationResult<
 > {
   return useFixedWrite('onboarding.complete', '', (r, input: FirstRunInput) =>
     r.onboarding.complete(input),
+  );
+}
+
+// Plan 6C: the prop money ledger, breaches and the cost method.
+
+export function usePropTxns(): UseQueryResult<PropTxn[]> {
+  return useWorkspaceQuery(keys.propTxns, (r, ws) => r.propTxns.list(ws));
+}
+
+export function useAddPropTxn(): UseMutationResult<PropTxn, Error, NewPropTxn> {
+  return useWorkspaceWrite('propTxns.add', (r, ws, v: NewPropTxn) =>
+    r.propTxns.add(ws, v),
+  );
+}
+
+export function useUpdatePropTxn(): UseMutationResult<
+  PropTxn,
+  Error,
+  { id: string; patch: PropTxnPatch }
+> {
+  return useWorkspaceWrite(
+    'propTxns.update',
+    (r, ws, v: { id: string; patch: PropTxnPatch }) =>
+      r.propTxns.update(ws, v.id, v.patch),
+  );
+}
+
+/** For good; the row cannot be undone. */
+export function useRemovePropTxn(): UseMutationResult<void, Error, string> {
+  return useWorkspaceWrite('propTxns.remove', (r, ws, id: string) =>
+    r.propTxns.remove(ws, id),
+  );
+}
+
+/**
+ * Log a payout (C29): a payout row linked to the funded challenge, in its
+ * firm, for a positive amount, not yet reviewed. It counts in total earned at
+ * once. It writes no withdrawal. The repository's rule: rejects with
+ * PayoutRefusedError for a challenge not in its funded phase or breached,
+ * RangeError for an amount that is not income, NotFoundError for a challenge
+ * that is not there.
+ */
+export function useLogPayout(): UseMutationResult<
+  PropTxn,
+  Error,
+  { challengeId: string; amount: Cents; date: string; description?: string }
+> {
+  return useWorkspaceWrite(
+    'propTxns.add',
+    (
+      r,
+      ws,
+      v: {
+        challengeId: string;
+        amount: Cents;
+        date: string;
+        description?: string;
+      },
+    ) => r.propTxns.logPayout(ws, v),
+  );
+}
+
+/** A breach is permanent. Rejects with ChallengeBreachedError for a challenge already breached. */
+export function useMarkBreached(): UseMutationResult<
+  Challenge,
+  Error,
+  { id: string; reason: BreachReason; note?: string; on: string }
+> {
+  return useWorkspaceWrite(
+    'challenges.markBreached',
+    (
+      r,
+      ws,
+      v: { id: string; reason: BreachReason; note?: string; on: string },
+    ) =>
+      r.challenges.markBreached(ws, v.id, {
+        reason: v.reason,
+        ...(v.note !== undefined && { note: v.note }),
+        on: v.on,
+      }),
   );
 }

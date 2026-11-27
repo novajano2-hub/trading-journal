@@ -8,6 +8,7 @@ import type {
   JournalEntry,
   NoteFolder,
   NoteTemplate,
+  PropTxn,
   Strategy,
   Tag,
   TagCategory,
@@ -35,6 +36,7 @@ export class KeelDb extends Dexie {
   declare readonly trackers: Table<Tracker, Key>;
   declare readonly days: Table<DayRecord, Key>;
   declare readonly dayShots: Table<DayShot, Key>;
+  declare readonly propTxns: Table<PropTxn, Key>;
   declare readonly meta: Table<MetaRecord, string>;
 
   /** Opens nothing: Dexie connects on `open()` or the first query. */
@@ -75,6 +77,10 @@ export class KeelDb extends Dexie {
         dayShots: '[workspaceId+id], workspaceId, [workspaceId+date]',
       })
       .upgrade(toVersion3);
+    // The prop money ledger: one new, empty table. No row is rewritten.
+    this.version(4).stores({
+      propTxns: '[workspaceId+id], workspaceId, [workspaceId+date]',
+    });
   }
 }
 

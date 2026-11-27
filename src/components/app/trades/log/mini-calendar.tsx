@@ -101,14 +101,20 @@ export function MiniCalendar({
   onPick,
   weekStart,
   bare = false,
+  tip,
+  note,
 }: {
   groups: readonly DayGroup[];
   today: string;
   selected?: string;
   onPick(date: string): void;
   weekStart: WeekStart;
-  /** Without the card around it (inside a sheet). */
+  /** Without the card around it (inside a sheet, or a dashboard widget's own card). */
   bare?: boolean;
+  /** Beside the month's title: the dashboard widget's info tip. */
+  tip?: React.ReactNode;
+  /** In place of the line under the days, which says what a pick does here. */
+  note?: React.ReactNode;
 }): React.JSX.Element {
   const titleId = useId();
   const figures = useTileFigures();
@@ -210,13 +216,16 @@ export function MiniCalendar({
       className={bare ? '' : `${CARD} px-4 pt-4 pb-3.5`}
     >
       <div className="flex items-center justify-between">
-        <h2
-          id={titleId}
-          aria-live="polite"
-          className="text-[15px] font-semibold tracking-[-0.015em] text-text"
-        >
-          {title}
-        </h2>
+        <span className="flex items-center gap-1.5">
+          <h2
+            id={titleId}
+            aria-live="polite"
+            className="text-[15px] font-semibold tracking-[-0.015em] text-text"
+          >
+            {title}
+          </h2>
+          {tip}
+        </span>
         <span className="flex gap-1.5">
           <button
             type="button"
@@ -344,8 +353,8 @@ export function MiniCalendar({
         })}
       </div>
       <p className="mt-3 border-t border-line pt-3 text-xs leading-normal text-faint">
-        Underlined days have trades: green for a net gain, red for a net loss,
-        grey for a flat day. Pick a day to see only its trades.
+        {note ??
+          'Underlined days have trades: green for a net gain, red for a net loss, grey for a flat day. Pick a day to see only its trades.'}
       </p>
     </Root>
   );

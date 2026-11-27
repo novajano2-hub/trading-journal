@@ -81,8 +81,7 @@ export const APP_NAV: readonly NavItem[] = [
     group: 'modules',
     filterScoped: true,
     built: true,
-    summary:
-      'How well you kept your plan, what breaking it cost, and your results.',
+    summary: 'Your results as widgets, in a layout you save.',
   },
   {
     id: 'trades',
@@ -268,6 +267,11 @@ export function dayPageDate(pathname: string): string | undefined {
   return /^\/app\/day\/([^/]+)(?:\/(?:plan|review))?\/?$/.exec(pathname)?.[1];
 }
 
+/** Whether `pathname` is Home, which hides a collapsed sidebar entirely instead of showing the rail. */
+export function isHomePage(pathname: string): boolean {
+  return pathname === navItem('home').href;
+}
+
 /** The top bar's title: the active module, else the product name. */
 export function pageTitle(pathname: string): string {
   return activeItem(pathname)?.label ?? 'Keel';
@@ -293,9 +297,17 @@ export function strategyEditId(pathname: string): string | undefined {
   return m ? decodedSegment(m[1]!) : undefined;
 }
 
+/** The challenge id when `pathname` is one challenge's details page (not the Accounts list), decoded. */
+export function challengePageId(pathname: string): string | undefined {
+  const m = /^\/app\/prop-firms\/accounts\/([^/]+)\/?$/.exec(pathname);
+  return m ? decodedSegment(m[1]!) : undefined;
+}
+
 /**
  * Whether the global filters drive this page: Dashboard, the trade log, Calendar,
  * Strategies (the list and one strategy), the progress tracker (its date range only) and Reports, except Compare, whose two groups each own their filters.
+ * The prop Dashboard and Accounts take the date range and their own six
+ * filters (C37); their Transactions and a challenge's details read neither.
  * Elsewhere the bar shows no chips.
  */
 export function filtersApply(pathname: string): boolean {
@@ -306,7 +318,8 @@ export function filtersApply(pathname: string): boolean {
       pathname !== '/app/strategies/new') ||
     (/^\/app\/reports(\/|$)/.test(pathname) &&
       !/^\/app\/reports\/compare\/?$/.test(pathname)) ||
-    pathname === '/app/progress'
+    pathname === '/app/progress' ||
+    hasPropChips(pathname)
   );
 }
 
@@ -317,9 +330,23 @@ export function filtersApply(pathname: string): boolean {
 export const datesOnly = (pathname: string): boolean =>
   pathname === '/app/progress';
 
-/** Pages with no Display menu: money there is always net, in its own currency (P6A-03). */
+/** The prop pages that take the date range and the six prop filters: the Dashboard and Accounts tabs. */
+export const hasPropChips = (pathname: string): boolean =>
+  /^\/app\/prop-firms(\/accounts)?\/?$/.test(pathname);
+
+/** The Prop firms pages: its three tabs and a challenge's details. */
+export const isPropPage = (pathname: string): boolean =>
+  /^\/app\/prop-firms(\/|$)/.test(pathname);
+
+/**
+ * Pages with no Display menu: money there is always net, in its own currency
+ * (P6A-03). The prop pages read net money in the base currency, whatever the
+ * menu says (C72).
+ */
 export const hidesDisplayMenu = (pathname: string): boolean =>
-  pathname === '/app/progress' || dayPageDate(pathname) !== undefined;
+  pathname === '/app/progress' ||
+  dayPageDate(pathname) !== undefined ||
+  isPropPage(pathname);
 
 /** The page where each group of trades has its own filters rather than the global ones. */
 export const isComparePage = (pathname: string): boolean =>

@@ -1,9 +1,11 @@
 import { expect, test } from 'vitest';
 import {
+  challengePageId,
   APP_NAV,
   activeItem,
   dayPageDate,
   navHref,
+  navItem,
   pageTitle,
   strategyEditId,
   strategyPageId,
@@ -11,6 +13,7 @@ import {
   filtersApply,
   datesOnly,
   hidesDisplayMenu,
+  isHomePage,
   type AppModuleId,
 } from './nav';
 
@@ -113,6 +116,10 @@ test('filtersApply is true only on the routes the global filters drive', () => {
     '/app/strategies',
     '/app/strategies/str-1',
     '/app/progress',
+    // The prop Dashboard and Accounts: the date range and the six prop filters (C37).
+    '/app/prop-firms',
+    '/app/prop-firms/',
+    '/app/prop-firms/accounts',
   ])
     expect(filtersApply(p), p).toBe(true);
   for (const p of [
@@ -126,6 +133,9 @@ test('filtersApply is true only on the routes the global filters drive', () => {
     '/app/strategies/new',
     '/app/strategies/str-1/edit',
     '/app/settings',
+    // Transactions and a challenge's details read neither (Ruling 27).
+    '/app/prop-firms/transactions',
+    '/app/prop-firms/accounts/c-1',
   ])
     expect(filtersApply(p), p).toBe(false);
 });
@@ -146,6 +156,21 @@ test('the tracker shows the date range alone and no Display menu', () => {
     expect(datesOnly(p), p).toBe(false);
     expect(hidesDisplayMenu(p), p).toBe(false);
   }
+});
+
+test('the prop pages sit under Prop firms, with no Display menu (C72)', () => {
+  for (const path of [
+    '/app/prop-firms',
+    '/app/prop-firms/accounts',
+    '/app/prop-firms/transactions',
+    '/app/prop-firms/accounts/c-1',
+  ]) {
+    expect(activeItem(path)?.id, path).toBe('prop-firms');
+    expect(pageTitle(path), path).toBe('Prop firms');
+    expect(hidesDisplayMenu(path), path).toBe(true);
+  }
+  // The sidebar entry and the More sheet's both open the Dashboard.
+  expect(navItem('prop-firms').href).toBe('/app/prop-firms');
 });
 
 test('a day page sits under Trades, with no Display menu and no filters', () => {
@@ -176,4 +201,25 @@ test('Home is the first module, with the House glyph, and is not filter-scoped',
   });
   expect(pageTitle('/app/home')).toBe('Home');
   expect(filtersApply('/app/home')).toBe(false);
+});
+
+test('only Home itself is Home: a collapsed sidebar is hidden there and nowhere else', () => {
+  expect(isHomePage('/app/home')).toBe(true);
+  for (const path of [
+    '/app',
+    '/app/dashboard',
+    '/app/home/extra',
+    '/app/day/2026-11-24',
+  ])
+    expect(isHomePage(path), path).toBe(false);
+});
+
+test("challengePageId reads the id of a challenge's details page, decoded, and nothing else under Prop firms", () => {
+  expect(challengePageId('/app/prop-firms/accounts/c-1')).toBe('c-1');
+  expect(challengePageId('/app/prop-firms/accounts/c-1/')).toBe('c-1');
+  expect(challengePageId('/app/prop-firms/accounts/a%20b%2Fc')).toBe('a b/c');
+  expect(challengePageId('/app/prop-firms')).toBeUndefined();
+  expect(challengePageId('/app/prop-firms/accounts')).toBeUndefined();
+  expect(challengePageId('/app/prop-firms/transactions')).toBeUndefined();
+  expect(challengePageId('/app/prop-firms/accounts/c-1/extra')).toBeUndefined();
 });

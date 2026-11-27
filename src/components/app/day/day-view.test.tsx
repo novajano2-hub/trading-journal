@@ -229,7 +229,7 @@ test('day pages show the slim rail with add trade', async () => {
   // Icons only: the modules keep their names as labels, and Trades is current.
   const trades = screen
     .getAllByRole('link', { name: 'Trades' })
-    .find((a) => a.getAttribute('title') === 'Trades');
+    .find((a) => a.getAttribute('aria-label') === 'Trades');
   expect(trades?.getAttribute('aria-current')).toBe('page');
   expect(
     await screen.findByRole('button', { name: /^Workspace:/ }),

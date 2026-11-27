@@ -16,10 +16,16 @@ import type { NewAccount, Repository } from '@/data/repository';
 import { parseCsv } from '@/domain/import/csv';
 import type { UserPrefs } from '@/domain/types';
 import { guessMapping, type ImportMapping } from '@/domain/import/mapping';
+import { holdPlans } from '@/lib/import/__fixtures__/held-plans';
 import { renderApp } from '../__fixtures__/render-app';
 import { ImportFlow } from './import-flow';
 
 vi.mock('next/navigation', () => import('../__fixtures__/navigation'));
+// The real plan client (no Worker here), watched; a test can hold the plans.
+vi.mock('@/lib/import/plan-client', async (original) => {
+  const actual = await original<typeof import('@/lib/import/plan-client')>();
+  return { ...actual, planInWorker: vi.fn(actual.planInWorker) };
+});
 MotionGlobalConfig.skipAnimations = true;
 
 afterEach(cleanup);
@@ -94,6 +100,20 @@ test('a file whose time column holds 19/11/2026 is read day first', async () => 
       .closest('li')
       ?.getAttribute('aria-current'),
   ).toBe('step');
+});
+
+test('while the plan is slow Map says it is reading the file, and stops when it is made; a quick plan says nothing', async () => {
+  const plans = holdPlans();
+  await open([futures]);
+  await upload(csvFile(ROWS));
+  await waitFor(() => expect(plans).toHaveLength(1));
+  // Not at once: a plan that is made in a moment is not announced.
+  expect(screen.queryByText('Reading the file...')).toBeNull();
+  expect(await screen.findByText('Reading the file...')).toBeTruthy();
+  plans[0]!.resolve();
+  await waitFor(() =>
+    expect(screen.queryByText('Reading the file...')).toBeNull(),
+  );
 });
 
 test('the fields Keel found read Matched, and Continue opens the preview step', async () => {

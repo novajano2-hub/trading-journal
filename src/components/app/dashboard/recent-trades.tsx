@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useId } from 'react';
 import { CheckCircle, XCircle } from '@phosphor-icons/react/dist/ssr';
 import { Chip, SideChip } from '@/components/ui/chip';
 import { Segmented } from '@/components/ui/segmented';
@@ -17,26 +16,20 @@ import { useDisplay } from '@/lib/display';
 import { FigureText } from '@/components/product/figure-text';
 import { formatQty, keepHyphens, plural, price } from '@/lib/format';
 import { shortTime } from '@/lib/time-format';
-import { navHref, navItem } from '../nav';
 import { TradeLink } from '../trades/cells';
-import {
-  CARD,
-  Caption,
-  CardHeader,
-  HEADER_LINK,
-  InstrumentName,
-  signTone,
-  TradeTime,
-} from './shared';
-
-// "All trades" is a drill-down: it lands on the All view, not Trades' own Day view (spec 5.3).
-const TRADES = { ...navItem('trades'), href: '/app/trades' as const };
+import { InstrumentName, signTone, TradeTime } from './shared';
 
 const FIGURE = 'font-[550] tabular-nums';
 const TH =
   'h-[34px] border-b border-line align-middle text-left text-xs font-medium text-faint';
-/** Cells after the first: 16px apart from sm, 12px on phones. */
-const GAP = 'pl-3 sm:pl-4';
+/**
+ * Cells after the first: 16px apart from the card's width at 36rem, 12px
+ * under it. The table answers to the width of its card (a container query),
+ * not the screen's: the widget is a third of the page at most, so by default it
+ * reads time, instrument and result, as the comp does, and takes the side, the
+ * rules (36rem), the strategy and the mistake (56rem) only where there is room.
+ */
+const GAP = 'pl-3 @[36rem]:pl-4';
 
 /** "a and b", "a, b and c". */
 function listOf(items: readonly string[]): string {
@@ -46,9 +39,9 @@ function listOf(items: readonly string[]): string {
 
 /**
  * The Rules cell: kept, broken (the first rule, then a "+n" chip for the
- * rest) or not graded. A broken rule reads on one line from `xl`, cut short
- * with its whole text in the title; below `xl` it wraps to two lines rather
- * than cutting to a stub (touch and keyboard can't reach the title).
+ * rest) or not graded. A broken rule reads on one line where the card is 64rem
+ * wide, cut short with its whole text in the title; narrower it wraps to two
+ * lines rather than cutting to a stub (touch and keyboard can't reach the title).
  */
 function RulesCell({ rules }: { rules: TradeRulesSummary }): React.JSX.Element {
   if (rules.kind === 'ungraded')
@@ -76,20 +69,23 @@ function RulesCell({ rules }: { rules: TradeRulesSummary }): React.JSX.Element {
     first === undefined
       ? `Broke ${brokenCount} ${plural(brokenCount, 'rule')}`
       : `Broke: ${listOf(rules.broken)}`;
-  // From xl one line: icon, rule, then the chip right after it. Below xl the
+  // From a 64rem card one line: icon, rule, then the chip right after it. Narrower the
   // rule keeps the cell's width and the chip sits under its first word.
   return (
     <span
       title={rules.broken.join(', ') || undefined}
-      className="grid min-w-0 grid-cols-[16px_minmax(0,1fr)] items-start gap-x-[7px] xl:flex xl:items-center"
+      className="grid min-w-0 grid-cols-[16px_minmax(0,1fr)] items-start gap-x-[7px] @[64rem]:flex @[64rem]:items-center"
     >
       <XCircle
         size={16}
         weight="fill"
         aria-hidden="true"
-        className="mt-px flex-none text-loss-fill xl:mt-0"
+        className="mt-px flex-none text-loss-fill @[64rem]:mt-0"
       />
-      <span aria-hidden="true" className="line-clamp-2 min-w-0 xl:truncate">
+      <span
+        aria-hidden="true"
+        className="line-clamp-2 min-w-0 @[64rem]:truncate"
+      >
         {first === undefined ? (
           <span className="font-semibold text-loss">{spoken}</span>
         ) : (
@@ -102,7 +98,7 @@ function RulesCell({ rules }: { rules: TradeRulesSummary }): React.JSX.Element {
       {rest.length > 0 ? (
         <span
           aria-hidden="true"
-          className="col-start-2 mt-1 inline-flex h-5 items-center justify-self-start rounded-chip bg-loss-soft px-1.5 text-[11.5px] font-semibold text-loss tabular-nums xl:mt-0 xl:flex-none"
+          className="col-start-2 mt-1 inline-flex h-5 items-center justify-self-start rounded-chip bg-loss-soft px-1.5 text-[11.5px] font-semibold text-loss tabular-nums @[64rem]:mt-0 @[64rem]:flex-none"
         >
           +{rest.length}
         </span>
@@ -181,15 +177,14 @@ function OpenRow({
   const time = shortTime(t.openedAt, timeZone);
   const realized = useRealized(p);
   return (
-    <tr className="border-t border-line/70 text-text transition-colors duration-200 ease-[var(--ease-glide)] first:border-t-0 hover:bg-sunken/60 md:h-[34px]">
-      <td className="max-md:hidden">
+    <tr className="border-t border-line/70 text-text transition-colors duration-200 ease-[var(--ease-glide)] first:border-t-0 hover:bg-sunken/60">
+      <td className="h-[34px]">
         <TradeTime text={time} />
       </td>
-      <td className="py-1.5 md:py-0 md:pl-4">
+      <td className="pl-4">
         <TradeLink id={t.id}>
           <InstrumentName trade={t} timeZone={timeZone} showExpiry={false} />
         </TradeLink>
-        <TradeTime text={time} className="block text-xs md:hidden" />
       </td>
       <td className={`${GAP}`}>
         <SideChip side={t.direction} />
@@ -269,8 +264,8 @@ function OpenPhoneRow({
  * The open trades: when each opened, what is still held at what average
  * entry, and what its exits so far booked, in the unit shown. There is no
  * unrealized P&L (Keel has no live prices), so a trade with no exit yet says
- * None. Below `sm` each is a two-line row, as the trade log's; from `sm` a
- * table.
+ * None. Where the card is narrower than 48rem each is a two-line row, as the
+ * trade log's; from there a table.
  */
 function OpenPositions({
   open,
@@ -289,7 +284,7 @@ function OpenPositions({
     <>
       <ul
         aria-label="Open positions"
-        className="m-0 mt-2 list-none p-0 sm:hidden"
+        className="m-0 mt-2 list-none p-0 @[48rem]:hidden"
       >
         {open.map((p) => (
           <OpenPhoneRow key={p.trade.id} p={p} timeZone={timeZone} />
@@ -297,14 +292,14 @@ function OpenPositions({
       </ul>
       <table
         aria-label="Open positions"
-        className="mt-2 w-full table-fixed border-collapse text-[13.5px] max-sm:hidden"
+        className="mt-2 w-full table-fixed border-collapse text-[13.5px] @max-[48rem]:hidden"
       >
         <thead>
           <tr>
-            <th scope="col" className={`${TH} w-28 max-md:hidden`}>
+            <th scope="col" className={`${TH} w-28`}>
               Opened
             </th>
-            <th scope="col" className={`${TH} md:pl-4`}>
+            <th scope="col" className={`${TH} pl-4`}>
               Instrument
             </th>
             <th scope="col" className={`${TH} ${GAP} w-[78px]`}>
@@ -342,6 +337,12 @@ function ClosedTrades({
   timeZone: string;
 }): React.JSX.Element {
   const display = useDisplay();
+  if (recent.length === 0)
+    return (
+      <p className="mt-3 pb-4 text-[13.5px] text-muted">
+        No closed trades in this range.
+      </p>
+    );
   return (
     <table
       aria-label="Recent trades"
@@ -349,38 +350,37 @@ function ClosedTrades({
     >
       <thead>
         <tr>
-          <th scope="col" className={`${TH} w-24 max-md:hidden xl:w-28`}>
+          <th scope="col" className={`${TH} w-[104px] @max-[20rem]:hidden`}>
             Time
+          </th>
+          <th scope="col" className={`${TH} @[20rem]:pl-4 @[36rem]:w-[168px]`}>
+            Instrument
           </th>
           <th
             scope="col"
-            className={`${TH} w-[100px] md:w-32 md:pl-4 xl:w-[176px]`}
+            className={`${TH} ${GAP} hidden w-[78px] @[36rem]:table-cell`}
           >
-            Instrument
-          </th>
-          <th scope="col" className={`${TH} ${GAP} w-[78px] max-sm:hidden`}>
             Side
           </th>
           <th
             scope="col"
-            // 90rem, not 1440px: Tailwind orders min-[...] against xl (80rem) only in the same unit.
-            className={`${TH} ${GAP} w-28 max-sm:hidden lg:w-32 xl:w-[136px] min-[90rem]:w-[208px]`}
+            className={`${TH} ${GAP} hidden w-32 @[56rem]:table-cell`}
           >
             Strategy
           </th>
           <th
             scope="col"
-            className={`${TH} ${GAP} w-28 max-sm:hidden lg:w-32 xl:w-[136px] min-[90rem]:w-[172px]`}
+            className={`${TH} ${GAP} hidden w-32 @[56rem]:table-cell`}
           >
             Mistake
           </th>
           <th
             scope="col"
-            className={`${TH} ${GAP} w-[92px] text-right sm:w-[104px]`}
+            className={`${TH} ${GAP} w-[88px] text-right @[36rem]:w-[104px]`}
           >
             {basis === 'gross' ? 'Gross P&L' : 'Net P&L'}
           </th>
-          <th scope="col" className={`${TH} ${GAP}`}>
+          <th scope="col" className={`${TH} ${GAP} hidden @[36rem]:table-cell`}>
             Rules
           </th>
         </tr>
@@ -393,29 +393,32 @@ function ClosedTrades({
           return (
             <tr
               key={t.id}
-              className="border-t border-line/70 text-text transition-colors duration-200 ease-[var(--ease-glide)] first:border-t-0 hover:bg-sunken/60 md:h-[34px]"
+              className="border-t border-line/70 text-text transition-colors duration-200 ease-[var(--ease-glide)] first:border-t-0 hover:bg-sunken/60 @[20rem]:h-[34px]"
             >
-              <td className="max-md:hidden">
+              <td className="@max-[20rem]:hidden">
                 <TradeTime text={time} />
               </td>
-              <td className="py-1.5 md:pl-4 xl:py-0">
+              <td className="py-1.5 @[20rem]:pl-4">
                 <TradeLink id={t.id}>
                   <InstrumentName
                     trade={t}
                     timeZone={timeZone}
-                    className="xl:flex-nowrap"
-                    detailClassName="max-md:hidden"
+                    className="@[36rem]:flex-nowrap"
+                    detailClassName="@max-[20rem]:hidden"
                   />
                 </TradeLink>
-                <TradeTime text={time} className="block text-xs md:hidden" />
+                <TradeTime
+                  text={time}
+                  className="block text-xs @[20rem]:hidden"
+                />
               </td>
-              <td className={`${GAP} max-sm:hidden`}>
+              <td className={`${GAP} hidden @[36rem]:table-cell`}>
                 <SideChip side={t.direction} />
               </td>
-              <td className={`${GAP} max-sm:hidden`}>
+              <td className={`${GAP} hidden @[56rem]:table-cell`}>
                 <StrategyCell row={row} />
               </td>
-              <td className={`${GAP} max-sm:hidden`}>
+              <td className={`${GAP} hidden @[56rem]:table-cell`}>
                 <MistakeCell row={row} />
               </td>
               <td
@@ -425,7 +428,7 @@ function ClosedTrades({
                   f={display.figure(display.ofTrade(t), true, t.pnlCurrency)}
                 />
               </td>
-              <td className={`${GAP} py-1.5`}>
+              <td className={`${GAP} hidden py-1.5 @[36rem]:table-cell`}>
                 <RulesCell rules={row.rules} />
               </td>
             </tr>
@@ -437,49 +440,32 @@ function ClosedTrades({
 }
 
 /**
- * Row 3: the newest closed trades in the filters, each with how it went
- * against its strategy's rules. Rules takes the width the fixed columns
- * leave, at least 280px from `xl`, where every row is one 34px line. Below
- * `md` the time folds under the symbol; below `sm` Side and Strategy hide.
+ * The recent trades widget's body: the newest closed trades in the filters,
+ * each with how it went against its strategy's rules, and the open positions
+ * on a tab beside them; a row opens its trade. The widget's frame draws the
+ * card, its title and its info tip. The closed table answers to the width of its
+ * card: time, instrument and result (the time folds under the symbol below
+ * 20rem), then side and rules from 36rem, then strategy and mistake from 56rem.
  */
 export function RecentTrades({
   recent,
   open,
   basis,
   timeZone,
-  caption,
   tab,
   onTab,
 }: {
   recent: readonly RecentTrade[];
   /** The open trades in the filters, newest first. */
   open: readonly OpenPosition[];
-  /** Kept by the Dashboard, so a filter change doesn't reset it. */
+  /** Kept by the widget, so a filter change doesn't reset it. */
   tab: 'closed' | 'open';
   onTab: (tab: 'closed' | 'open') => void;
   basis: PnlBasis;
   timeZone: string;
-  /** The range, e.g. "1-20 Nov". */
-  caption: string;
 }): React.JSX.Element {
-  const headingId = useId();
-  // The Trades page opens on the same filters.
-  const allTrades = navHref(TRADES, useSearchParams());
   return (
-    <section
-      aria-labelledby={headingId}
-      className={`${CARD} px-5 pt-[18px] pb-1`}
-    >
-      <CardHeader
-        headingId={headingId}
-        title="Recent trades"
-        after={<Caption>{caption}</Caption>}
-        end={
-          <Link href={allTrades} className={HEADER_LINK}>
-            All trades
-          </Link>
-        }
-      />
+    <div className="@container min-w-0">
       <Segmented
         label="Recent trades view"
         options={[
@@ -496,6 +482,6 @@ export function RecentTrades({
       ) : (
         <ClosedTrades recent={recent} basis={basis} timeZone={timeZone} />
       )}
-    </section>
+    </div>
   );
 }

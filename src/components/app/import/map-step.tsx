@@ -29,6 +29,7 @@ import {
 import type { Account } from '@/domain/types';
 import type { ImportFile } from '@/lib/decode';
 import { useDisplay } from '@/lib/display';
+import { useAfter } from '@/lib/use-after';
 import {
   columnLetter,
   FIELD_HINT,
@@ -40,6 +41,7 @@ import {
 } from './fields';
 import { HiddenAmount } from './hidden-amount';
 import {
+  columnSample,
   timeColumn,
   withColumn,
   withKind,
@@ -55,6 +57,8 @@ import { TimeZoneField } from './time-zone-field';
 
 const ICON = { 'aria-hidden': true } as const;
 const NEW_ACCOUNT = '__new';
+/** How long the plan may take before Map says it is reading the file. */
+const SLOW_READ_MS = 400;
 
 /** A point value the way the file writes numbers: 25,000 or 25.000. */
 function showPoint(value: number, mark: DecimalMark): string {
@@ -152,20 +156,21 @@ export function MapStep({
 
   // The plan reads the file with these settings: here, only to say what it would skip.
   // No file or account yet: null, which stays pending without a spinner.
-  const plan = useImportPlan(
+  const planned = useImportPlan(
     valid && accountId && !showCreate
       ? { parsed, mapping, accountId, fileName: file.name }
       : null,
-  ).data;
+  );
+  const plan = planned.data;
+  // A large file takes a while to read in the worker; a small one is not announced.
+  const slowRead = useAfter(
+    valid && accountId !== null && !showCreate && planned.status === 'pending',
+    SLOW_READ_MS,
+  );
 
   const headers = parsed.headers;
   const sample = (index: number | undefined): string[] =>
-    index === undefined
-      ? []
-      : parsed.rows
-          .map((r) => r.cells[index] ?? '')
-          .filter((c) => c !== '')
-          .slice(0, 3);
+    columnSample(parsed, index);
   // Three values when they are short; long ones (timestamps) show one.
   const fit = (values: string[]): string[] => {
     const out: string[] = [];
@@ -718,6 +723,7 @@ export function MapStep({
                   : ''}
               </p>
             )}
+            {slowRead ? <p>Reading the file...</p> : null}
             {saveError ? (
               <p className="mt-1 font-medium text-loss">
                 Couldn&apos;t save the mapping for {account?.name}. Untick Save

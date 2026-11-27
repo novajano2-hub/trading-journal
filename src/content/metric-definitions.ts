@@ -65,6 +65,25 @@ export const METRIC_IDS = [
   'logged-days',
   'daily-drawdown',
   'account-balance',
+  'balance-and-pnl',
+  'current-day-streak',
+  'current-trade-streak',
+  'current-streaks',
+  'avg-drawdown-card',
+  'edge-score',
+  'win-avg-through-day',
+  'daily-net-pnl',
+  'daily-and-cumulative',
+  'balance-chart',
+  'trade-time-scatter',
+  'trade-duration-scatter',
+  'recent-trades',
+  'challenge-card',
+  'report-chart',
+  'month-calendar',
+  'mini-calendar',
+  'advanced-calendar',
+  'year-calendar',
   'long-winners',
   'long-losers',
   'long-breakevens',
@@ -102,6 +121,21 @@ export const METRIC_IDS = [
   'prop-daily-loss',
   'prop-trading-days',
   'prop-consistency',
+  'phase-balance',
+  'challenge-strategies',
+  'prop-funded',
+  'prop-evaluation',
+  'prop-spent',
+  'prop-earned',
+  'prop-net',
+  'prop-return',
+  'prop-money',
+  'prop-pass-rate',
+  'prop-breach-reasons',
+  'prop-breach-days',
+  'prop-breach-pnl',
+  'prop-breach-size',
+  'prop-breach-firm',
   'day-ticks',
   'day-pips',
   'day-points',
@@ -121,6 +155,7 @@ export const METRIC_IDS = [
   'tracker-history',
   'tracker-card',
   'tracker-follow-rate',
+  'cost-method',
 ] as const;
 
 export type MetricId = (typeof METRIC_IDS)[number];
@@ -459,6 +494,101 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     definition:
       'What the selected accounts hold at the end of the period: their balance the day before the date range starts, the deposits and withdrawals after it, and the net P&L of the trades in your filters booked up to then. It has no value in R, ticks, pips or points.',
   },
+  'balance-and-pnl': {
+    label: 'Account balance and P&L',
+    definition:
+      'What the selected accounts hold at the end of the date range, with the closed net P&L of the trades in your filters under it. The balance is the starting balances, the deposits and withdrawals, and the net P&L booked up to then. It has no value in R, ticks, pips or points.',
+  },
+  'current-day-streak': {
+    label: 'Winning day streak',
+    definition:
+      'Winning days in a row, counted back from the last trading day of your date range. A losing or flat day, inside your breakeven range, ends the run, so it reads 0 after one.',
+  },
+  'current-trade-streak': {
+    label: 'Winning trade streak',
+    definition:
+      'Winning trades in a row, counted back from your last closed trade, in the order they closed. A losing or breakeven trade ends the run, so it reads 0 after one.',
+  },
+  'current-streaks': {
+    label: 'Streaks',
+    definition:
+      'Winning days in a row up to your last trading day, and winning trades in a row up to your last trade. A losing or breakeven day or trade ends a run.',
+  },
+  'avg-drawdown-card': {
+    label: 'Average drawdown',
+    definition:
+      "How far the close of a trading day sat under its running peak, averaged over the days that closed under one. With no date range set, it shows today's drawdown from the high instead. It reads the day-by-day {basis} P&L, as the max drawdown does.",
+  },
+  'edge-score': {
+    label: 'Edge score',
+    definition:
+      'One score from 0 to 100 for six parts of your trading: win rate, profit factor, average win to loss, recovery, drawdown and consistency. Each part is scored from 0 to 100 and weighted into the total, which reads Weak under 40, Building from 40 and Strong from 70. It follows your filters, date range and accounts, and always reads money, whatever the display unit.',
+  },
+  'win-avg-through-day': {
+    label: 'Win rate, average win and average loss',
+    definition:
+      'Your closed trades in order of the time of day they closed, whatever the day, with the running win rate, average win and average loss after each. The win rate is on the left scale and the averages on the right scale. Breakeven trades, inside your breakeven range, are left out of all three.',
+  },
+  'daily-net-pnl': {
+    label: '{Basis} daily P&L',
+    definition:
+      "Each trading day's {basis} P&L, booked on the day each trade exited: a day that made money rises above the line, a day that lost falls below it.",
+  },
+  'daily-and-cumulative': {
+    label: 'Daily and cumulative {basis} P&L',
+    definition:
+      "Bars: each trading day's {basis} P&L, on the left scale. Line: the running total from the start of the date range, on the right scale.",
+  },
+  'balance-chart': {
+    label: 'Account balance',
+    definition:
+      'What the selected accounts held at the close of each day, on the left scale: their starting balances, the deposits and withdrawals on their dates, and the net P&L booked by then. The second line is the deposits and withdrawals, net, running from the start of the date range, on the right scale. It has no value in R, ticks, pips or points.',
+  },
+  'trade-time-scatter': {
+    label: 'Trade time performance',
+    definition:
+      'Each closed trade by the time of day it was entered or exited, in your timezone, and its {basis} P&L. A filled dot is a gain, a hollow one a loss. Both scales fit the trades in your filters. The switch picks entry or exit.',
+  },
+  'trade-duration-scatter': {
+    label: 'Trade duration performance',
+    definition:
+      'Each closed trade by how long it was held, from open to close, on a log scale, and its {basis} P&L. A filled dot is a gain, a hollow one a loss. A trade held under a minute sits at one minute. Both scales fit the trades in your filters.',
+  },
+  'recent-trades': {
+    label: 'Recent trades',
+    definition:
+      'The newest closed trades in your filters, each with its time, its instrument and its {basis} P&L. The Open positions tab lists the trades still open. A row opens the trade.',
+  },
+  'challenge-card': {
+    label: 'Challenge',
+    definition:
+      "One prop firm challenge, as its card on the Prop firms page reads it: where it stands against the firm's profit target, drawdown, daily loss, trading days and consistency rules. It shows the challenge you pick in the widget's settings, or the most urgent active one.",
+  },
+  'report-chart': {
+    label: 'Report',
+    definition:
+      "A chart of up to three metrics from the Performance report, by trading day. Each metric is bars or a line, and is either its value for each day or running from the start of the date range. Pick them in the widget's Metrics menu. It follows your filters, date range and display unit.",
+  },
+  'month-calendar': {
+    label: 'Calendar',
+    definition:
+      'A month at a glance: each trading day shows its {basis} P&L and is tinted green for a gain, red for a loss and neutral inside your breakeven range. Days are booked on the date a trade exits. It shows the whole month whatever the date range, and follows your other filters.',
+  },
+  'mini-calendar': {
+    label: 'Mini calendar',
+    definition:
+      'A small month. A day with trades is underlined green for a net gain, red for a net loss and grey when flat. Pick a day to open it in the Trades Day view. It shows the whole month whatever the date range, and follows your other filters.',
+  },
+  'advanced-calendar': {
+    label: 'Calendar with stats',
+    definition:
+      "A month with the figures you choose in each day (Stats shown, the same as on the Calendar page), a total for each week and the month's own net and trading days. A pencil marks a day with a note. Pick a day to see its trades. It shows the whole month whatever the date range, and follows your other filters.",
+  },
+  'year-calendar': {
+    label: 'Year calendar',
+    definition:
+      "The twelve months of a year: a square for each day, tinted by how it ended, and each month's net. Pick a month and Keel opens it in the Calendar. It shows the whole year whatever the date range, and follows your other filters.",
+  },
   'long-winners': {
     label: 'Long winners',
     definition:
@@ -639,6 +769,80 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     definition:
       "The best day's net P&L as a share of the phase's profit. The rule is kept while it stays at or under the limit. It reads only once the phase is in profit.",
   },
+  'phase-balance': {
+    label: 'Phase balance',
+    definition:
+      "What the phase's trading account holds at each point: its balance the day before the phase starts, the deposits and withdrawals after it, and the net P&L booked through the point. By day it is the balance at each trading day's close, by hour at the end of each hour with an exit, and by trade after each closed trade. It has no value in R, ticks, pips or points.",
+  },
+  'challenge-strategies': {
+    label: 'Strategies',
+    definition:
+      "The strategies this challenge is traded with. They feed the Prop firms dashboard's pass rate by strategy and its strategy filter.",
+  },
+  'prop-funded': {
+    label: 'Funded',
+    definition:
+      'The balance of your active funded accounts: challenges in their funded phase that have not breached. Closed trades, net, in your base currency. An account in another currency is left out.',
+  },
+  'prop-evaluation': {
+    label: 'Evaluation',
+    definition:
+      'The balance of your active evaluation accounts: open challenges still in an evaluation phase. Closed trades, net, in your base currency. An account in another currency is left out.',
+  },
+  'prop-spent': {
+    label: 'Total spent',
+    definition:
+      'Every cost in your transactions, not ignored, plus challenge fees with no transaction of their own. The sign decides: a negative amount is spent, whatever its category.',
+  },
+  'prop-earned': {
+    label: 'Total earned',
+    definition:
+      'Every income in your transactions, not ignored: payouts, refunds and affiliate income. The sign decides: a positive amount is earned, whatever its category.',
+  },
+  'prop-net': {
+    label: 'Net',
+    definition:
+      'Earned minus spent. Return on spend is the net over what you spent; it has no value until you have spent something.',
+  },
+  'prop-return': {
+    label: 'Return over time',
+    definition:
+      "Cumulative income, cumulative costs and the running net, from the first day of the period chosen to its last. A transaction counts on its own date; a challenge fee on the challenge's first start date.",
+  },
+  'prop-money': {
+    label: 'Where the money went',
+    definition:
+      'Spent, earned and net by firm, account type, account size, or costs by fee type. A transaction with no challenge reads None by type and size.',
+  },
+  'prop-pass-rate': {
+    label: 'Pass rate',
+    definition:
+      'Evaluations passed over evaluations that passed or were breached. Active ones are not counted yet, and neither are accounts that went straight to funded, which never took an evaluation. A challenge counts under each of its strategies.',
+  },
+  'prop-breach-reasons': {
+    label: 'Why accounts broke',
+    definition:
+      'The reasons you gave when marking a challenge breached, most common first, as a share of the breaches in the phase chosen.',
+  },
+  'prop-breach-days': {
+    label: 'Average days before a breach',
+    definition:
+      'From the start of the phase that broke to the day it breached, averaged over the breaches that have both dates.',
+  },
+  'prop-breach-pnl': {
+    label: 'Average P&L before a breach',
+    definition:
+      "The breached phase account's net P&L from its start to the breach, averaged. Always net, in your base currency.",
+  },
+  'prop-breach-size': {
+    label: 'Most common size',
+    definition: 'The account size breached most often.',
+  },
+  'prop-breach-firm': {
+    label: 'Most common firm',
+    definition:
+      'The firm with the most breaches; a tie goes to the latest breach.',
+  },
   'tracker-streak': {
     label: 'Current streak',
     definition:
@@ -713,6 +917,11 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Follow rate',
     definition:
       "The days that kept this rule, divided by the days it was decided, in the date range. A day still pending doesn't count, and a rule with no decided day reads 0%.",
+  },
+  'cost-method': {
+    label: 'Cost method',
+    definition:
+      'Which lots an exit closes first: the oldest (FIFO), the newest (LIFO), or all at their average cost.',
   },
 };
 

@@ -72,6 +72,37 @@ test('the table reads each account with its balance today and its status', async
   expect(cell(old, 'Status').textContent).toContain('Archived');
 });
 
+test('the Cost method column sits next to the balance, reads FIFO where none is set, and its label carries a tip', async () => {
+  const r = repo();
+  await r.accounts.setCostMethod('sample', 'acc-a', 'lifo');
+  renderApp(<AccountsSettings />, { repository: r, url: URL });
+  const futures = await rowOf('Futures main');
+  const heads = [...futures.closest('table')!.querySelectorAll('thead th')].map(
+    (h) => h.textContent!.trim(),
+  );
+  expect(heads.indexOf('Cost method')).toBe(heads.indexOf('Balance today') + 1);
+  const head = futures.closest('table')!.querySelectorAll('thead th')[
+    heads.indexOf('Cost method')
+  ]!;
+  expect(head.querySelector('[data-metric-tip="cost-method"]')).not.toBeNull();
+  await waitFor(() =>
+    expect(cell(futures, 'Cost method').textContent).toBe('LIFO'),
+  );
+  // Never set: FIFO. An archived account keeps showing its method.
+  expect(cell(await rowOf('Old demo'), 'Cost method').textContent).toBe('FIFO');
+});
+
+test('the Cost method column reads Average for the weighted average', async () => {
+  const r = repo();
+  await r.accounts.setCostMethod('sample', 'acc-a', 'average');
+  renderApp(<AccountsSettings />, { repository: r, url: URL });
+  await waitFor(async () =>
+    expect(cell(await rowOf('Futures main'), 'Cost method').textContent).toBe(
+      'Average',
+    ),
+  );
+});
+
 const card = () => screen.findByRole('region', { name: 'Balance adjustments' });
 
 test('the Balance adjustments card shows the first active account, whose row is marked', async () => {
@@ -430,6 +461,22 @@ describe('below 640px', () => {
   });
   afterEach(() => {
     window.innerWidth = 1024;
+  });
+
+  test('line two of each row names the cost method', async () => {
+    const r = repo();
+    await r.accounts.setCostMethod('sample', 'acc-a', 'lifo');
+    renderApp(<AccountsSettings />, { repository: r, url: URL });
+    const list = await screen.findByRole('list', { name: 'Accounts' });
+    const two = (name: string) =>
+      within(list)
+        .getAllByRole('listitem')
+        .find((li) => li.textContent!.startsWith(name))!
+        .querySelector('[data-line="2"]')!;
+    await waitFor(() =>
+      expect(two('Futures main').textContent).toContain('LIFO'),
+    );
+    expect(two('Old demo').textContent).toContain('FIFO');
   });
 
   test('accounts are two-line rows: name and balance, then type, status and prop rules, with the row menu kept', async () => {

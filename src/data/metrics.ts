@@ -49,6 +49,29 @@ export function metricContextOf(prefs: UserPrefs): MetricContext {
   };
 }
 
+/**
+ * What the risk figures start from: the balance the day before `startDay` (the
+ * starting balances, the flows dated before it and the net booked before it),
+ * and the flows dated after it. With no start day, the starting balance and no
+ * flows. The accounts, flows and trades are one currency's.
+ */
+export function riskBasisOf(a: {
+  accounts: readonly Account[];
+  flows: readonly CashFlow[];
+  trades: readonly Trade[];
+  startDay: string | undefined;
+  startingBalance: Cents;
+  ctx: MetricContext;
+}): { riskStart: Cents; riskFlows: readonly CashFlow[] } {
+  if (a.startDay === undefined)
+    return { riskStart: a.startingBalance, riskFlows: [] };
+  const before = dayBefore(a.startDay);
+  return {
+    riskStart: balanceAt(a.accounts, a.flows, a.trades, before, a.ctx),
+    riskFlows: a.flows.filter((f) => f.date > before),
+  };
+}
+
 export interface CurrencyMetrics {
   currency: string;
   /** The trades matched by every filter, the date included: the trade log, win rate and summary. */
@@ -104,7 +127,7 @@ export function metricsByCurrency(
     dayTrades?: readonly Trade[];
     /** The deposits and withdrawals of the workspace's accounts; the risk ratios' start balance counts those before the range. */
     flows?: readonly CashFlow[];
-    /** Every trade of the selected accounts, whatever the other filters: what the balance before the range is booked from. Defaults to `dayTrades`. */
+    /** Every trade of the workspace, whatever the filters: what the balance before the range is booked from (`balanceAt` keeps the selected accounts'). Defaults to `dayTrades`. */
     balanceTrades?: readonly Trade[];
   },
 ): CurrencyMetrics[] {
@@ -125,29 +148,20 @@ export function metricsByCurrency(
     const days = dailyPnl(dayOwn, ctx);
     const netCtx = { ...ctx, pnlBasis: 'net' as const };
     const netDays = ctx.pnlBasis === 'net' ? days : dailyPnl(dayOwn, netCtx);
-    // The balance the day before the range starts: the starting balances,
-    // the flows dated before it and the net booked before it.
     // An open range starts the day before its first day.
-    const startDay = ctx.range?.from ?? netDays[0]?.date;
     const ownFlows = (opts.flows ?? []).filter((f) =>
       currencyAccounts.some((a) => a.id === f.accountId),
     );
-    const riskStart =
-      startDay === undefined
-        ? startingBalance
-        : balanceAt(
-            currencyAccounts,
-            ownFlows,
-            (opts.balanceTrades ?? opts.dayTrades ?? trades).filter(
-              (t) => t.pnlCurrency === currency,
-            ),
-            dayBefore(startDay),
-            ctx,
-          );
-    const riskFlows =
-      startDay === undefined
-        ? []
-        : ownFlows.filter((f) => f.date > dayBefore(startDay));
+    const { riskStart, riskFlows } = riskBasisOf({
+      accounts: currencyAccounts,
+      flows: ownFlows,
+      trades: (opts.balanceTrades ?? opts.dayTrades ?? trades).filter(
+        (t) => t.pnlCurrency === currency,
+      ),
+      startDay: ctx.range?.from ?? netDays[0]?.date,
+      startingBalance,
+      ctx,
+    });
     const drawdown = maxDrawdown(days, riskStart, riskFlows);
     const avgDd = avgDrawdown(days, riskStart, riskFlows);
     const volume = volumeOf(own);

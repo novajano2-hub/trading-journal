@@ -39,7 +39,7 @@ export function dayValue(d: DayStat, ctx: Pick<MetricContext, 'unit'>): number {
 }
 
 /** Classify a day's result against the breakeven range; a flat day is breakeven. */
-function dayOutcome(d: DayStat, ctx: MetricContext) {
+export function dayOutcome(d: DayStat, ctx: MetricContext) {
   return outcomeOf(
     d.net,
     ctx.breakevenRange,

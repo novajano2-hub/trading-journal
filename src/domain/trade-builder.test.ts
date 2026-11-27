@@ -1,7 +1,13 @@
 import { describe, expect, test } from 'vitest';
 import { resolveInstrument } from './instruments';
-import { buildTrades } from './trade-builder';
-import type { Execution, Side } from './types';
+import { realizations } from './metrics/realized';
+import {
+  buildTrades,
+  finalizeTrade,
+  matchLots,
+  type Lot,
+} from './trade-builder';
+import type { CostMethod, Execution, Side, Trade } from './types';
 
 const T1 = '2026-03-02T15:00:00Z';
 const T2 = '2026-03-02T15:01:00Z';
@@ -269,6 +275,174 @@ describe('buildTrades', () => {
     expect(at(r.trades, 0)).toMatchObject({
       status: 'open',
       pnlCurrency: 'USD',
+    });
+  });
+});
+
+describe('a symbol with a very long history', () => {
+  test('its trades are gathered one by one: no call takes them all as arguments, which a worker, with a small stack, cannot', () => {
+    const fills = Array.from({ length: 3_000 }, (_, i) =>
+      fill(
+        `f${i}`,
+        i % 2 === 0 ? 'buy' : 'sell',
+        1,
+        6000 + (i % 7),
+        new Date(Date.UTC(2026, 0, 5, 14, 0, i)).toISOString(),
+      ),
+    );
+    const push = Array.prototype.push;
+    let widest = 0;
+    Array.prototype.push = function (this: unknown[], ...items: unknown[]) {
+      widest = Math.max(widest, items.length);
+      return push.apply(this, items);
+    };
+    let built: ReturnType<typeof build>;
+    try {
+      built = build(fills, 'ESZ6');
+    } finally {
+      Array.prototype.push = push;
+    }
+    expect(built.trades).toHaveLength(1_500);
+    // A call with many arguments overflows the stack at some tens of thousands; this holds at a few.
+    expect(widest).toBeLessThan(100);
+  });
+});
+
+describe('cost methods (#49)', () => {
+  const T5 = '2026-03-02T15:04:00Z';
+  const build2 = (
+    fills: Execution[],
+    symbol: string,
+    method: CostMethod,
+  ): Trade[] =>
+    buildTrades(
+      fills.map((f) => ({ ...f, symbol })),
+      {
+        workspaceId: 'w',
+        startSerial: 1,
+        resolve: (s) => resolveInstrument(s),
+        accountCurrency: () => 'USD',
+        costMethodOf: () => method,
+      },
+    ).trades;
+  const METHODS: CostMethod[] = ['fifo', 'lifo', 'average'];
+
+  test('the help example: 100 at $10, 100 at $15, sell 100 at $20', () => {
+    const lots = (): Lot[] => [
+      { qty: 100, price: 10 },
+      { qty: 100, price: 15 },
+    ];
+    expect(matchLots(lots(), 100, 20, 1, 1, 'fifo').pnl).toBe(1000);
+    expect(matchLots(lots(), 100, 20, 1, 1, 'lifo').pnl).toBe(500);
+    expect(matchLots(lots(), 100, 20, 1, 1, 'average').pnl).toBe(750);
+    expect(matchLots(lots(), 100, 20, 1, 1).pnl).toBe(1000);
+  });
+
+  test('a flat-to-flat trade has the same total under every method', () => {
+    const fills = [
+      fill('f1', 'buy', 100, 10, T1),
+      fill('f2', 'buy', 50, 12, T2),
+      fill('f3', 'buy', 50, 11, T3),
+      fill('f4', 'sell', 120, 14, T4),
+      fill('f5', 'sell', 80, 13, T5),
+    ];
+    const gross = METHODS.map((m) => at(build2(fills, 'AAPL', m), 0).gross);
+    expect(new Set(gross).size).toBe(1);
+    expect(at(gross, 0)).toBe(
+      Math.round((120 * 14 + 80 * 13 - 1000 - 600 - 550) * 100),
+    );
+  });
+
+  test('a reversal closes and opens a new trade under every method', () => {
+    const fills = [
+      fill('f1', 'buy', 10, 100, T1),
+      fill('f2', 'buy', 10, 110, T2),
+      fill('f3', 'sell', 30, 120, T3),
+      fill('f4', 'buy', 10, 115, T4),
+    ];
+    for (const m of METHODS) {
+      const trades = build2(fills, 'AAPL', m);
+      expect(trades).toHaveLength(2);
+      expect(at(trades, 0)).toMatchObject({
+        direction: 'long',
+        status: 'closed',
+      });
+      expect(at(trades, 1)).toMatchObject({
+        direction: 'short',
+        status: 'closed',
+      });
+      expect(at(trades, 1).gross).toBe(5000);
+    }
+  });
+
+  test('USDJPY with two entries and two exits: the closed total depends on the method', () => {
+    const fills = [
+      fill('f1', 'buy', 1, 154, T1),
+      fill('f2', 'buy', 1, 155, T2),
+      fill('f3', 'sell', 1, 155.5, T3),
+      fill('f4', 'sell', 1, 156, T4),
+    ];
+    const g = (m: CostMethod): number =>
+      at(build2(fills, 'USDJPY', m), 0).gross;
+    expect(g('fifo')).not.toBe(g('lifo'));
+    for (const m of METHODS) {
+      const t = at(build2(fills, 'USDJPY', m), 0);
+      expect(realizations(t).reduce((n, r) => n + r.gross, 0)).toBe(t.gross);
+    }
+  });
+
+  test('average: an exit does not change the average', () => {
+    const lots: Lot[] = [
+      { qty: 10, price: 100 },
+      { qty: 10, price: 110 },
+    ];
+    expect(matchLots(lots, 5, 120, 1, 1, 'average').pnl).toBe(75);
+    lots.push({ qty: 5, price: 120 });
+    const avg = (15 * 105 + 5 * 120) / 20;
+    expect(matchLots(lots, 20, 130, 1, 1, 'average').pnl).toBeCloseTo(
+      (130 - avg) * 20,
+      9,
+    );
+  });
+
+  test('buildTrades stamps costMethod from costMethodOf and omits FIFO', () => {
+    const fills = [fill('f1', 'buy', 1, 10, T1), fill('f2', 'sell', 1, 11, T2)];
+    expect(at(build2(fills, 'AAPL', 'fifo'), 0).costMethod).toBeUndefined();
+    expect(at(build2(fills, 'AAPL', 'lifo'), 0).costMethod).toBe('lifo');
+    expect(at(build2(fills, 'AAPL', 'average'), 0).costMethod).toBe('average');
+    expect(at(build(fills, 'AAPL').trades, 0)).not.toHaveProperty('costMethod');
+  });
+
+  test('finalizeTrade re-derives the figures and keeps every other field', () => {
+    const fills = [
+      fill('f1', 'buy', 100, 10, T1),
+      fill('f2', 'buy', 100, 15, T2),
+      fill('f3', 'sell', 100, 20, T3),
+      fill('f4', 'sell', 100, 20, T4),
+    ];
+    const t0 = at(build2(fills, 'AAPL', 'fifo'), 0);
+    const tagged: Trade = {
+      ...t0,
+      tagIds: ['x'],
+      noteId: 'keep',
+      importId: 'i1',
+    };
+    const mid = finalizeTrade(tagged, 'lifo');
+    expect(mid).toMatchObject({
+      tagIds: ['x'],
+      noteId: 'keep',
+      importId: 'i1',
+      costMethod: 'lifo',
+      id: t0.id,
+    });
+    expect(mid.gross).toBe(t0.gross);
+    const back = finalizeTrade(mid, 'fifo');
+    expect(back).not.toHaveProperty('costMethod');
+    expect(back).toEqual(tagged);
+    const open = at(build2(fills.slice(0, 3), 'AAPL', 'fifo'), 0);
+    expect(finalizeTrade(open, 'average')).toMatchObject({
+      status: 'open',
+      costMethod: 'average',
     });
   });
 });

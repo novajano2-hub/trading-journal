@@ -93,3 +93,119 @@ test("the day's volume says it counts both sides", () => {
     /both sides/,
   );
 });
+
+test('the upper dashboard widgets have a tip each, apart from the longest-streak ones', () => {
+  const streaks = {
+    'current-day-streak': /winning days in a row/i,
+    'current-trade-streak': /winning trades in a row/i,
+    'current-streaks': /winning days in a row.*winning trades in a row/i,
+  } as const;
+  for (const [id, words] of Object.entries(streaks)) {
+    const d = metricDefinition(id as keyof typeof streaks, 'net');
+    expect(METRIC_IDS as readonly string[], id).toContain(id);
+    expect(d.definition, id).toMatch(words);
+    // The current run, counted back from the last day or trade; a breakeven ends it.
+    expect(d.definition, id).toMatch(/breakeven/i);
+    expect(d.definition, id).not.toMatch(/longest|most/i);
+  }
+  const balance = metricDefinition('balance-and-pnl', 'net');
+  expect(balance.label).toBe('Account balance and P&L');
+  expect(balance.definition).toMatch(/end of the date range/);
+  expect(balance.definition).toMatch(/no value in R, ticks, pips or points/);
+  const avg = metricDefinition('avg-drawdown-card', 'net');
+  expect(avg.definition).toMatch(/no date range/);
+  expect(avg.definition).toMatch(/today/i);
+});
+
+test("the chart widgets have a tip of their own, in Keel's words", () => {
+  const edge = metricDefinition('edge-score', 'net');
+  expect(edge.label).toBe('Edge score');
+  expect(edge.definition).toMatch(/0 to 100/);
+  for (const part of [
+    'win rate',
+    'profit factor',
+    'average win to loss',
+    'recovery',
+    'drawdown',
+    'consistency',
+  ])
+    expect(edge.definition).toContain(part);
+  // The bands, and the unit it never reads.
+  expect(edge.definition).toMatch(/Weak.*Building.*Strong/);
+  expect(edge.definition).toMatch(/whatever the display unit/);
+
+  const winAvg = metricDefinition('win-avg-through-day', 'net');
+  expect(winAvg.definition).toMatch(/time of day/);
+  expect(winAvg.definition).toMatch(/left scale.*right scale/);
+
+  expect(metricDefinition('daily-net-pnl', 'gross').label).toBe(
+    'Gross daily P&L',
+  );
+  expect(metricDefinition('daily-and-cumulative', 'net').definition).toMatch(
+    /Bars.*Line/,
+  );
+  const balance = metricDefinition('balance-chart', 'net');
+  expect(balance.definition).toMatch(/deposits and withdrawals/);
+  expect(balance.definition).toMatch(/right scale/);
+  expect(balance.definition).toMatch(/no value in R, ticks, pips or points/);
+  for (const id of ['trade-time-scatter', 'trade-duration-scatter'] as const) {
+    const d = metricDefinition(id, 'net');
+    expect(d.definition, id).toMatch(/filled dot.*hollow/);
+  }
+  expect(metricDefinition('trade-time-scatter', 'net').definition).toMatch(
+    /entered or exited/,
+  );
+  expect(metricDefinition('trade-duration-scatter', 'net').definition).toMatch(
+    /log scale/,
+  );
+});
+
+test("the list, calendar and report widgets have a tip of their own, in Keel's words", () => {
+  const recent = metricDefinition('recent-trades', 'gross');
+  expect(recent.definition).toMatch(/newest closed trades/);
+  expect(recent.definition).toMatch(/gross P&L/);
+  expect(recent.definition).toMatch(/Open positions/);
+  // It says what a third-width card shows: the time, the instrument and the result.
+  expect(recent.definition).toMatch(/time, .*instrument/);
+  expect(recent.definition).not.toMatch(/strategy|mistake|rules/i);
+
+  const challenge = metricDefinition('challenge-card', 'net');
+  expect(challenge.definition).toMatch(/most urgent active one/);
+  expect(challenge.definition).toMatch(/widget's settings/);
+
+  const report = metricDefinition('report-chart', 'net');
+  expect(report.definition).toMatch(/up to three metrics/);
+  expect(report.definition).toMatch(/Performance/);
+  expect(report.definition).toMatch(/running/);
+
+  // The calendars all say they show the whole month or year, whatever the date range.
+  for (const id of [
+    'month-calendar',
+    'mini-calendar',
+    'advanced-calendar',
+    'year-calendar',
+  ] as const)
+    expect(metricDefinition(id, 'net').definition, id).toMatch(
+      /whatever the date range/,
+    );
+  expect(metricDefinition('month-calendar', 'net').definition).toMatch(
+    /breakeven/,
+  );
+  expect(metricDefinition('mini-calendar', 'net').definition).toMatch(
+    /Day view/,
+  );
+  expect(metricDefinition('advanced-calendar', 'net').definition).toMatch(
+    /Stats shown/,
+  );
+  expect(metricDefinition('year-calendar', 'net').definition).toMatch(
+    /opens it in the Calendar/,
+  );
+});
+
+test('the cost method has a definition that names all three methods', () => {
+  expect(METRIC_IDS).toContain('cost-method');
+  const d = metricDefinition('cost-method', 'net');
+  expect(d.label).toBe('Cost method');
+  for (const word of ['oldest', 'FIFO', 'newest', 'LIFO', 'average'])
+    expect(d.definition).toContain(word);
+});

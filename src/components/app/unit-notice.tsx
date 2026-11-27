@@ -71,6 +71,9 @@ function FilteredNotice(): React.JSX.Element | null {
   const set = useTradeSet(filters);
   if (!set.data) return null;
   return (
-    <UnitLeftOut count={set.data.unitLeftOut} className="px-5 [&>p]:pb-2" />
+    <UnitLeftOut
+      count={set.data.unitLeftOut}
+      className="px-5 print:hidden [&>p]:pb-2"
+    />
   );
 }

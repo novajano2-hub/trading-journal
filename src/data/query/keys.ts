@@ -31,6 +31,7 @@ export const keys = {
   dayShots: (ws: string, date: string) =>
     [...W(ws), 'day-shots', date] as const,
   imports: (ws: string) => [...W(ws), 'imports'] as const,
+  propTxns: (ws: string) => [...W(ws), 'prop-txns'] as const,
   importContext: (ws: string, accountId: string) =>
     [...W(ws), 'imports', 'context', accountId] as const,
 };
@@ -84,7 +85,14 @@ export type WriteKind =
   | 'dayShots.add'
   | 'dayShots.remove'
   | 'imports.commit'
-  | 'imports.undo';
+  | 'imports.undo'
+  // Plan 6C
+  | 'propTxns.add'
+  | 'propTxns.update'
+  | 'propTxns.remove'
+  | 'challenges.markBreached'
+  | 'challenges.createMany'
+  | 'accounts.setCostMethod';
 
 /** The query keys a successful write makes stale, in workspace `ws`. */
 export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
@@ -128,8 +136,9 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
       ];
     case 'accounts.create':
       return [keys.accounts(ws)];
+    // A new cost method (C40) rewrites the account's trades too.
     case 'accounts.update':
-      return [keys.accounts(ws), keys.imports(ws)];
+      return [keys.accounts(ws), keys.trades(ws), keys.imports(ws)];
     case 'accounts.remove':
       return [
         keys.accounts(ws),
@@ -140,9 +149,15 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
         keys.challenges(ws),
       ];
     case 'challenges.create':
-    case 'challenges.update':
-    case 'challenges.remove':
+    case 'challenges.markBreached':
       return [keys.challenges(ws)];
+    // An update can make an account for a phase, and a quantity makes its accounts too.
+    case 'challenges.update':
+    case 'challenges.createMany':
+      return [keys.challenges(ws), keys.accounts(ws)];
+    // Its prop transactions are unlinked.
+    case 'challenges.remove':
+      return [keys.challenges(ws), keys.propTxns(ws)];
     case 'cashFlows.create':
     case 'cashFlows.update':
     case 'cashFlows.remove':
@@ -150,8 +165,15 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
     case 'strategies.create':
       return [keys.strategies(ws)];
     case 'strategies.update':
-    case 'strategies.remove':
       return [keys.strategies(ws), keys.trades(ws), keys.imports(ws)];
+    // A challenge traded with it no longer lists it.
+    case 'strategies.remove':
+      return [
+        keys.strategies(ws),
+        keys.trades(ws),
+        keys.imports(ws),
+        keys.challenges(ws),
+      ];
     case 'tags.create':
     case 'tags.update':
       return [keys.tags(ws)];
@@ -195,5 +217,12 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
       return [keys.dayShotsAll(ws)];
     case 'imports.commit':
       return [keys.imports(ws), keys.trades(ws)];
+    case 'propTxns.add':
+    case 'propTxns.update':
+    case 'propTxns.remove':
+      return [keys.propTxns(ws)];
+    // The rebuild rewrites the account's trades, and the import context carries the method.
+    case 'accounts.setCostMethod':
+      return [keys.accounts(ws), keys.trades(ws), keys.imports(ws)];
   }
 }

@@ -52,8 +52,10 @@ test('Plan 5 writes invalidate what they change', () => {
     ['cashFlows.update', k('cashFlows')],
     ['cashFlows.remove', k('cashFlows')],
     ['challenges.create', k('challenges')],
-    ['challenges.update', k('challenges')],
-    ['challenges.remove', k('challenges')],
+    // An update can make the account of a phase (C-02).
+    ['challenges.update', k('challenges', 'accounts')],
+    // Its transactions are unlinked.
+    ['challenges.remove', k('challenges', 'propTxns')],
     ['journal.save', k('journal', 'days')],
     ['journal.trash', k('journal', 'days')],
     ['journal.restore', k('journal', 'days')],
@@ -113,4 +115,66 @@ test('a list key covers its details and nothing in another workspace or entity',
   );
   expect(qc.getQueryState(keys.trades('mine'))!.isInvalidated).toBe(false);
   expect(qc.getQueryState(keys.journal('sample'))!.isInvalidated).toBe(false);
+});
+
+test('Plan 6C writes invalidate what they change', () => {
+  const ws = 'mine';
+  const k = (...names: (keyof typeof keys)[]) =>
+    names.map((n) => (keys[n] as (w: string) => readonly unknown[])(ws));
+  const table: [Parameters<typeof invalidationsFor>[0], unknown[]][] = [
+    ['propTxns.add', k('propTxns')],
+    ['propTxns.update', k('propTxns')],
+    ['propTxns.remove', k('propTxns')],
+    ['challenges.markBreached', k('challenges')],
+    // A quantity and its new accounts are written together.
+    ['challenges.createMany', k('challenges', 'accounts')],
+    // The rebuild rewrites the account's trades, and the import context carries the method.
+    ['accounts.setCostMethod', k('accounts', 'trades', 'imports')],
+    // A strategy leaves the challenges that list it.
+    ['strategies.remove', k('strategies', 'trades', 'imports', 'challenges')],
+  ];
+  for (const [write, expected] of table)
+    expect(invalidationsFor(write, ws), write).toEqual(expected);
+});
+
+test('every write behind a figure of the widgets or the prop dashboard refreshes the query it reads', () => {
+  // The derived figures are memos over these queries, so a stale query is a stale figure.
+  const reads: [string, readonly unknown[]][] = [
+    ['trades', keys.trades('mine')],
+    ['accounts', keys.accounts('mine')],
+    ['cash flows', keys.cashFlows('mine')],
+    ['challenges', keys.challenges('mine')],
+    ['prop transactions', keys.propTxns('mine')],
+  ];
+  const writes: [Parameters<typeof invalidationsFor>[0], string][] = [
+    ['trades.update', 'trades'],
+    ['trades.createManual', 'trades'],
+    ['trades.remove', 'trades'],
+    ['imports.commit', 'trades'],
+    ['imports.undo', 'trades'],
+    ['accounts.setCostMethod', 'trades'],
+    // `update` with a new method does the same rebuild.
+    ['accounts.update', 'trades'],
+    ['accounts.create', 'accounts'],
+    ['accounts.update', 'accounts'],
+    ['accounts.setCostMethod', 'accounts'],
+    ['cashFlows.create', 'cash flows'],
+    ['cashFlows.update', 'cash flows'],
+    ['cashFlows.remove', 'cash flows'],
+    ['challenges.create', 'challenges'],
+    ['challenges.createMany', 'challenges'],
+    ['challenges.createMany', 'accounts'],
+    ['challenges.update', 'challenges'],
+    ['challenges.markBreached', 'challenges'],
+    ['challenges.remove', 'challenges'],
+    ['propTxns.add', 'prop transactions'],
+    ['propTxns.update', 'prop transactions'],
+    ['propTxns.remove', 'prop transactions'],
+    ['challenges.remove', 'prop transactions'],
+  ];
+  for (const [write, read] of writes)
+    expect(
+      invalidationsFor(write, 'mine'),
+      `${write} refreshes ${read}`,
+    ).toContainEqual(reads.find(([name]) => name === read)![1]);
 });

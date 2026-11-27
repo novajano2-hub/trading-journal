@@ -47,6 +47,8 @@ test('every app route renders its title without overflow; placeholders state it 
         '/app/calendar',
         '/app/reports',
         '/app/strategies',
+        // The prop Dashboard: the date range and Filters (its Transactions has none).
+        '/app/prop-firms',
       ].includes(path)
         ? 1
         : 0,
@@ -306,10 +308,7 @@ test('below sm the bar is one row pinned to the top, and the page scrolls clear 
   const tabs = (await page
     .getByRole('navigation', { name: 'Main' })
     .boundingBox())!;
-  const last = await page
-    .locator('section')
-    .filter({ has: page.getByRole('heading', { name: 'Recent trades' }) })
-    .boundingBox();
+  const last = await page.locator('[data-widget]').last().boundingBox();
   expect(last!.y + last!.height).toBeLessThanOrEqual(tabs.y);
 });
 
@@ -365,7 +364,7 @@ async function walkBar(page: Page, from: Locator, stops: Locator[]) {
   }
 }
 
-test('Tab walks the top bar in the order it reads: title, chips, search, Display, Import', async ({
+test('Tab walks the top bar in the order it reads: title, chips, search, Display, template, Import', async ({
   page,
 }, info) => {
   const mobile = info.project.name === 'mobile';
@@ -377,12 +376,10 @@ test('Tab walks the top bar in the order it reads: title, chips, search, Display
   const tail = [
     bar.getByRole('combobox', { name: 'Search' }),
     bar.getByRole('button', { name: /show as / }),
-    ...(mobile
-      ? []
-      : [
-          bar.getByRole('button', { name: 'Plan the day' }),
-          bar.getByRole('link', { name: 'Import' }),
-        ]),
+    ...(mobile ? [] : [bar.getByRole('button', { name: 'Plan the day' })]),
+    // The Dashboard's template button follows Plan the day; on a phone it ends the bar.
+    bar.getByRole('button', { name: /^Dashboard template/ }),
+    ...(mobile ? [] : [bar.getByRole('link', { name: 'Import' })]),
   ];
   // What comes before the bar: the skip link on phones, the sidebar's last link on desktop.
   const before = mobile
@@ -426,12 +423,225 @@ test('Tab walks the top bar in the order it reads: title, chips, search, Display
   ]);
 });
 
+test('Tab walks the bar in reading order from 640 to 1023, where the drawer button leads, and at the lg edge (desktop)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop');
+  test.setTimeout(120_000);
+  const bar = page.getByRole('banner');
+  const filters = bar.getByRole('group', { name: 'Filters' });
+  const chip = (name: string) =>
+    filters.getByRole('button', { name, exact: true });
+  const controls = [
+    bar.getByRole('combobox', { name: 'Search' }),
+    bar.getByRole('button', { name: /show as / }),
+    bar.getByRole('button', { name: 'Plan the day' }),
+    bar.getByRole('button', { name: /^Dashboard template/ }),
+    bar.getByRole('link', { name: 'Import' }),
+  ];
+  const rest = [
+    'All time',
+    'Symbol',
+    'Side',
+    'Strategy',
+    'Tags',
+    'More filters',
+  ];
+  const busy = [
+    '5 Oct-20 Nov 2026',
+    'AUDUSD, BTCUSD',
+    'Short',
+    'Opening range breakout',
+    'trend continuation',
+    'More filters',
+    'Clear filters',
+  ];
+  // 640 to 1023 has no sidebar: the skip link comes first, then the drawer's button. From 1024 the sidebar's last link does.
+  for (const width of [640, 768, 1023, 1024]) {
+    await page.setViewportSize({ width, height: 900 });
+    const before =
+      width < 1024
+        ? page.getByRole('link', { name: 'Skip to content' })
+        : page.getByRole('link', { name: 'Settings' });
+    const menu =
+      width < 1024
+        ? [bar.getByRole('button', { name: 'Open navigation' })]
+        : [];
+    for (const [url, names] of [
+      ['/app/dashboard', rest],
+      [`/app/dashboard${BUSY}`, busy],
+    ] as const) {
+      await page.goto(url);
+      await ready(page);
+      await expect(chip(names[0]!)).toBeEnabled();
+      // Chips that outgrow the title's row take their own, and the controls the next: the reading order is the row order.
+      await expect(bar, `${width} ${url}`).toHaveAttribute(
+        'data-chips',
+        'wrapped',
+      );
+      await walkBar(page, before, [...menu, ...names.map(chip), ...controls]);
+    }
+  }
+});
+
+test('wrapped chips keep a full row of their own, with the controls on the row after it (desktop)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'desktop');
+  test.setTimeout(120_000);
+  const bar = page.getByRole('banner');
+  const group = bar.getByRole('group', { name: 'Filters' });
+  // What shows of the chips, against what they need: a row they share with the controls would scroll them.
+  const clipped = () =>
+    group.evaluate((el) => {
+      const scroller = el.firstElementChild as HTMLElement;
+      return scroller.scrollWidth - scroller.clientWidth;
+    });
+  for (const [width, url] of [
+    [640, '/app/dashboard'],
+    [768, '/app/dashboard'],
+    [1024, '/app/dashboard'],
+    [1270, '/app/dashboard'],
+    [1280, `/app/dashboard${BUSY}`],
+    [1440, `/app/dashboard${BUSY}`],
+  ] as const) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(url);
+    await ready(page);
+    await expect(
+      group.getByRole('button', { name: 'More filters' }),
+    ).toBeEnabled();
+    await expect(bar).toHaveAttribute('data-chips', 'wrapped');
+    expect(
+      await clipped(),
+      `${width} ${url}: chips are cut off`,
+    ).toBeLessThanOrEqual(2);
+    const chips = (await group.boundingBox())!;
+    const importLink = (await bar
+      .getByRole('link', { name: 'Import' })
+      .boundingBox())!;
+    const title = (await bar.getByRole('heading', { level: 1 }).boundingBox())!;
+    // Rows from the top: the title, the chips, the controls; the controls end at the bar's right edge.
+    expect(chips.y, `${width}`).toBeGreaterThanOrEqual(
+      title.y + title.height - 1,
+    );
+    expect(importLink.y, `${width}`).toBeGreaterThanOrEqual(
+      chips.y + chips.height - 1,
+    );
+    expect(importLink.x + importLink.width, `${width}`).toBeGreaterThan(
+      width - 40,
+    );
+    const box = (await bar.boundingBox())!;
+    expect(
+      box.height,
+      `${width}: the bar stays a row or two short of a third of the screen`,
+    ).toBeLessThan(160);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth - innerWidth,
+      ),
+    ).toBeLessThanOrEqual(0);
+  }
+});
+
+test("a challenge's page titles a phone's bar with the challenge's name, and a wider screen's with Prop firms", async ({
+  page,
+}, info) => {
+  const mobile = info.project.name === 'mobile';
+  await page.goto('/app/prop-firms/accounts/sample-challenge-futures-50k');
+  const title = page.getByRole('banner').getByRole('heading', { level: 1 });
+  await expect(title).toHaveText(mobile ? 'Futures 50K' : 'Prop firms');
+  // The other prop pages keep the module's name on a phone.
+  for (const path of ['/app/prop-firms', '/app/prop-firms/accounts']) {
+    await page.goto(path);
+    await expect(title, path).toHaveText('Prop firms');
+  }
+});
+
+test('below 375px the phone bar keeps its title and stays inside the screen (mobile)', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== 'mobile');
+  test.setTimeout(120_000);
+  const bar = page.getByRole('banner');
+  for (const route of [
+    '/app/dashboard',
+    '/app/trades',
+    '/app/progress',
+    '/app/prop-firms',
+  ]) {
+    await page.setViewportSize({ width: 390, height: 800 });
+    await page.goto(route);
+    await expect(bar.getByRole('heading', { level: 1 })).toBeVisible();
+    for (const width of [390, 374, 360, 320]) {
+      await page.setViewportSize({ width, height: 800 });
+      const where = `${route} at ${width}`;
+      // Nothing in the bar sits past either edge, and the title is whole.
+      await expect
+        .poll(
+          () =>
+            page.evaluate(() => {
+              const h = document.querySelector('header')!;
+              // The search's input is wider than its resting shell, which clips it.
+              const out = [...h.querySelectorAll('*:not(input)')].filter(
+                (el) => {
+                  const r = el.getBoundingClientRect();
+                  return (
+                    r.width > 1 && (r.right > innerWidth + 0.5 || r.left < -0.5)
+                  );
+                },
+              );
+              const span =
+                h.querySelector('h1 > span') ?? h.querySelector('h1')!;
+              return {
+                out: out.length,
+                truncated: span.scrollWidth - span.clientWidth,
+                page: document.documentElement.scrollWidth - innerWidth,
+              };
+            }),
+          { message: where },
+        )
+        .toEqual({ out: 0, truncated: 0, page: 0 });
+      // The "Sample" pill gives its room to the title below 375, the words staying for a screen reader.
+      // The words inside the pill: its own box is the one that gives way.
+      const pill = bar.getByText('Sample', { exact: true }).locator('xpath=..');
+      await expect(pill, where).toBeAttached();
+      const drawn = (await pill.boundingBox())!;
+      if (width < 375) expect(drawn.width, where).toBeLessThanOrEqual(1);
+      else expect(drawn.width, where).toBeGreaterThan(30);
+      await expect(
+        bar
+          .getByText('Sample data. Not a real account.')
+          .filter({ visible: true }),
+        where,
+      ).toHaveCount(1);
+      // The search opens within the screen: from the left gutter to where it rests.
+      const search = bar.getByRole('combobox', { name: 'Search' });
+      await search.click({ position: { x: 10, y: 10 } });
+      await expect
+        .poll(
+          async () => {
+            const r = await search.evaluate((el) => {
+              const b = el.parentElement!.getBoundingClientRect();
+              return { left: b.left, right: b.right };
+            });
+            return r.left >= 19 && r.right <= width;
+          },
+          { message: `${where}: the open search` },
+        )
+        .toBe(true);
+      await page.keyboard.press('Escape');
+      await search.blur();
+    }
+  }
+});
+
 test('the chips sit beside the title while they fit, and never clip "Clear filters" (desktop)', async ({
   page,
 }, info) => {
   test.skip(info.project.name !== 'desktop');
   const bar = page.getByRole('banner');
-  // Busy chips are wider since the rebrand's 13.5px chips; they share the title's row from 1680 (the Display button is narrower than the Gross/Net switch was).
+  // Busy chips are wider since the rebrand's 13.5px chips; they share the title's row from 1920 (the Display button is narrower than the Gross/Net switch was, and the Dashboard's template button takes 42px of it).
   for (const width of [1280, 1366, 1440, 1680, 1920]) {
     await page.setViewportSize({ width, height: 800 });
     await page.goto('/app/dashboard');
@@ -449,7 +659,7 @@ test('the chips sit beside the title while they fit, and never clip "Clear filte
     await expect(clear, `${width} busy`).toBeInViewport({ ratio: 1 });
     await expect(bar).toHaveAttribute(
       'data-chips',
-      width >= 1680 ? 'inline' : 'wrapped',
+      width >= 1920 ? 'inline' : 'wrapped',
     );
     expect(
       await page.evaluate(

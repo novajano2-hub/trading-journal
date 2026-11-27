@@ -3,7 +3,7 @@ import { makeTrade } from '../__fixtures__/trades';
 import { resolveInstrument } from '../instruments';
 import { buildTrades } from '../trade-builder';
 import type { Account, CashFlow, Execution } from '../types';
-import { balanceAt, dayBefore } from './balance';
+import { balanceAt, balanceSeries, dayBefore } from './balance';
 import { defaultMetricContext } from './context';
 
 const ctx = defaultMetricContext('UTC');
@@ -124,4 +124,62 @@ test('dayBefore steps over month and year ends', () => {
   expect(dayBefore('2026-11-01')).toBe('2026-10-31');
   expect(dayBefore('2026-01-01')).toBe('2025-12-31');
   expect(dayBefore('2024-03-01')).toBe('2024-02-29');
+});
+
+describe('balanceSeries (C75)', () => {
+  const days = [
+    { date: '2026-11-01', net: 50_000 },
+    { date: '2026-11-03', net: -20_000 },
+    { date: '2026-11-05', net: 10_000 },
+  ];
+  const flows = [
+    { date: '2026-11-02', amount: 100_000 },
+    { date: '2026-11-04', amount: -30_000 },
+  ];
+
+  test('a point on every trading day and every day with a deposit or a withdrawal', () => {
+    const points = balanceSeries(days, 1_000_000, flows);
+    expect(points.map((p) => p.date)).toEqual([
+      '2026-11-01',
+      '2026-11-02',
+      '2026-11-03',
+      '2026-11-04',
+      '2026-11-05',
+    ]);
+    // The starting balance, the flows and the net booked through the day.
+    expect(points.map((p) => p.balance)).toEqual([
+      1_050_000, 1_150_000, 1_130_000, 1_100_000, 1_110_000,
+    ]);
+    // The deposits and withdrawals, net, running.
+    expect(points.map((p) => p.flows)).toEqual([
+      0, 100_000, 100_000, 70_000, 70_000,
+    ]);
+  });
+
+  test('a range keeps its own days; the net flows count from its start', () => {
+    const points = balanceSeries(days, 1_000_000, flows, {
+      from: '2026-11-03',
+      to: '2026-11-04',
+    });
+    expect(points.map((p) => p.date)).toEqual(['2026-11-03', '2026-11-04']);
+    // Everything before the range is already in the balance.
+    expect(points.map((p) => p.balance)).toEqual([1_130_000, 1_100_000]);
+    expect(points.map((p) => p.flows)).toEqual([0, -30_000]);
+  });
+
+  test('no day and no flow is no point', () => {
+    expect(balanceSeries([], 1_000_000, [])).toEqual([]);
+    expect(balanceSeries(days, 0, [], { from: '2027-01-01' })).toEqual([]);
+  });
+
+  test('a flow and a trading day on one date make one point', () => {
+    const points = balanceSeries(
+      [{ date: '2026-11-02', net: 5_000 }],
+      100_000,
+      [{ date: '2026-11-02', amount: 1_000 }],
+    );
+    expect(points).toEqual([
+      { date: '2026-11-02', balance: 106_000, flows: 1_000 },
+    ]);
+  });
 });

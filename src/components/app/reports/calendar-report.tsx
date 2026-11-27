@@ -8,7 +8,7 @@ import { calendarYear } from '@/data/calendar';
 import { parseFilters, queryString, serializeFilters } from '@/data/filters';
 import { useDisplay } from '@/lib/display';
 import { CARD, CARD_PAD, CardHeader, signTone } from '../dashboard/shared';
-import type { FormatMoney } from '../calendar/month-grid';
+import { monthFormat } from '../calendar/month-format';
 import { YearGrid } from '../calendar/year-grid';
 import { ReportScope } from './report-scope';
 import { writeParam, type ReportData } from './use-report-data';
@@ -40,20 +40,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
   };
   const pctBase = data.source.pctBase;
   // Each month and the year read in the display unit, as the Calendar's do.
-  const fmt: FormatMoney = (money, r, compact, units) =>
-    display.figure(
-      {
-        money,
-        pct: pctBase ? money / pctBase : null,
-        r: r ?? null,
-        ticks: units?.ticks ?? null,
-        pips: units?.pips ?? null,
-        points: units?.points ?? null,
-      },
-      true,
-      currency,
-      compact,
-    );
+  const fmt = monthFormat(display, pctBase, currency);
   const traded = months.reduce(
     (n, m) => n + m.days.filter((d) => d.trades > 0).length,
     0,

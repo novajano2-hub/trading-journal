@@ -86,3 +86,31 @@ test('a footer is pinned under the scrolling body, never inside it', async () =>
   expect(dialog.contains(save)).toBe(true);
   expect(scroller.parentElement).toBe(save.parentElement!.parentElement);
 });
+
+test('the form size is a full-height sheet on a phone and a 460px dialog from sm', async () => {
+  function Form() {
+    const ref = useRef<HTMLButtonElement>(null);
+    return (
+      <>
+        <button ref={ref}>Open</button>
+        <MorphDialog
+          open
+          onOpenChange={() => {}}
+          origin={ref}
+          returnFocus={ref}
+          title="Log a payout"
+          size="form"
+        >
+          <p>fields</p>
+        </MorphDialog>
+      </>
+    );
+  }
+  render(<Form />);
+  const classes = (await screen.findByRole('dialog')).className.split(' ');
+  // The sheet's phone look (top gutter, no bottom gap), then its own width.
+  expect(classes).toContain('top-3');
+  expect(classes).toContain('bottom-0');
+  expect(classes).toContain('sm:max-w-[460px]');
+  expect(classes).not.toContain('sm:max-w-[760px]');
+});

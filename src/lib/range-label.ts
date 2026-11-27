@@ -48,3 +48,42 @@ export function rangeChipLabel(range: DateRange, resolved: Resolved): string {
     return 'All time';
   return caption(resolved, '', true);
 }
+
+const fullDay = (iso: string) => format(parseISO(iso), 'd MMM yyyy');
+
+/** Two days as one phrase: "12 Jun to 24 Nov 2026", the year said once when it is shared. */
+function between(from: string, to: string): string {
+  if (from === to) return fullDay(to);
+  return year(from) === year(to)
+    ? `${dayMonth(from)} to ${fullDay(to)}`
+    : `${fullDay(from)} to ${fullDay(to)}`;
+}
+
+/**
+ * The range for a printed page, in full: a preset or "All time" by name with
+ * the days it covers, a custom range as its dates. `span` is the first and last
+ * day the report's trades fall on, which an open end reads from; with neither
+ * end to name, the name stands alone.
+ */
+export function rangeInWords(
+  range: DateRange,
+  resolved: Resolved,
+  span: Resolved,
+): string {
+  const from = resolved.from ?? span.from;
+  const to = resolved.to ?? span.to;
+  const days = from !== undefined && to !== undefined ? between(from, to) : '';
+  if ('preset' in range)
+    return days
+      ? `${PRESET_LABELS[range.preset]} (${days})`
+      : PRESET_LABELS[range.preset];
+  const { from: a, to: b } = resolved;
+  if (a !== undefined && b !== undefined) return between(a, b);
+  const name =
+    a !== undefined
+      ? `Since ${fullDay(a)}`
+      : b !== undefined
+        ? `Up to ${fullDay(b)}`
+        : 'All time';
+  return days ? `${name} (${days})` : name;
+}

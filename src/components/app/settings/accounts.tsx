@@ -12,6 +12,7 @@ import { SelectBox } from '@/components/app/trades/select-box';
 import { FigureText } from '@/components/product/figure-text';
 import { buttonClasses } from '@/components/ui/button-styles';
 import { Chip } from '@/components/ui/chip';
+import { MetricTip } from '@/components/ui/metric-tip';
 import {
   useAccounts,
   useActiveWorkspace,
@@ -47,6 +48,7 @@ import {
 } from './accounts-list';
 import { AccountsToolbar } from './accounts-toolbar';
 import { BalanceAdjustments } from './cash-flows';
+import { costMethodInfo, methodOf } from './cost-methods';
 import {
   NUM,
   RowMenu,
@@ -55,9 +57,12 @@ import {
   type MenuAction,
 } from './settings-ui';
 
-// Ten columns in a 982px card: the gap between columns is 8px here (12px in the
-// other settings tables) so the full broker name fits without a sideways scroll.
+// Eleven columns in a 982px card: the gap between columns is 8px here (12px in
+// the other settings tables) and three of them give way (the Cost method and
+// Time zone headers and the Prop rules cell may break onto a second line), so
+// the full broker name fits without a sideways scroll.
 const TH = TH_BASE.replace('px-1.5', 'px-1');
+const TH_WRAP = TH.replace('whitespace-nowrap', 'whitespace-normal');
 /** Both pills on the selected row: the accent-soft Type fill would vanish into the row, so each takes a raised ground and an outline. */
 const SELECTED_PILL = 'bg-surface-1! ring-1 ring-inset ring-line-2';
 const TD = TD_BASE.replace('px-1.5', 'px-1');
@@ -500,6 +505,7 @@ function AccountsBody(): React.JSX.Element {
                         >
                           {typeLabel(a)}
                         </Chip>
+                        <span>{costMethodInfo(methodOf(a)).short}</span>
                         <Chip
                           className={a.id === selected?.id ? SELECTED_PILL : ''}
                         >
@@ -557,13 +563,16 @@ function AccountsBody(): React.JSX.Element {
                   <th scope="col" className={`${TH} ${NUM}`}>
                     Balance today
                   </th>
-                  <th scope="col" className={TH}>
+                  <th scope="col" className={TH_WRAP}>
+                    <MetricTip id="cost-method" basis="net" />
+                  </th>
+                  <th scope="col" className={TH_WRAP}>
                     Time zone
                   </th>
                   <th scope="col" className={TH}>
                     Status
                   </th>
-                  <th scope="col" className={`${TH} min-w-[96px]`}>
+                  <th scope="col" className={TH}>
                     Prop rules
                   </th>
                   <th
@@ -648,6 +657,13 @@ function AccountsBody(): React.JSX.Element {
                           f={display.cash(balance, false, a.currency)}
                         />
                       </td>
+                      <td className={`${TD} whitespace-nowrap`}>
+                        <Chip
+                          className={a.id === selected?.id ? SELECTED_PILL : ''}
+                        >
+                          {costMethodInfo(methodOf(a)).short}
+                        </Chip>
+                      </td>
                       <td
                         className={`${TD} whitespace-nowrap text-muted`}
                         title={
@@ -666,7 +682,7 @@ function AccountsBody(): React.JSX.Element {
                           {gone ? 'Archived' : 'Active'}
                         </Chip>
                       </td>
-                      <td className={`${TD} min-w-[96px] whitespace-nowrap`}>
+                      <td className={TD}>
                         <PropRules account={a} />
                       </td>
                       <td

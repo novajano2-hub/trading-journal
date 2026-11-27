@@ -11,6 +11,7 @@ import { localImports } from './imports';
 import { localJournal } from './journal';
 import { localOnboarding } from './onboarding';
 import { localPrefs } from './prefs';
+import { localPropTxns } from './prop-txns';
 import { localStrategies } from './strategies';
 import { localTagCategories } from './tag-categories';
 import { localTags } from './tags';
@@ -54,5 +55,6 @@ export function createLocalRepository(
     days: localDays(ctx),
     dayShots: localDayShots(ctx),
     onboarding: localOnboarding(ctx),
+    propTxns: localPropTxns(ctx),
   };
 }

@@ -1,6 +1,6 @@
 import { outcomeOf } from '../outcome';
 import { closedInOrder } from '../trade-status';
-import type { Trade } from '../types';
+import type { Cents, Trade } from '../types';
 import { costBasis, pnlOf, type MetricContext } from './context';
 
 export interface StreakResult {
@@ -47,4 +47,16 @@ export function tradeStreaks(
       return o === 'breakeven' ? undefined : o;
     }),
   );
+}
+
+/**
+ * The wins in a row ending at the last item (C16): 0 when the last is not a
+ * win. A breakeven or a loss ends a run, unlike `streaksOf`, which skips
+ * breakevens. A win is a P&L above zero, so a caller with a breakeven range
+ * passes its breakevens as 0.
+ */
+export function winStreak(items: readonly { pnl: Cents }[]): number {
+  let n = 0;
+  for (let i = items.length - 1; i >= 0 && items[i]!.pnl > 0; i--) n++;
+  return n;
 }

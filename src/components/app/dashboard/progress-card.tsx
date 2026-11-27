@@ -35,6 +35,7 @@ export function ProgressCard(): React.JSX.Element {
 
   return (
     <section
+      data-widget="progress"
       aria-labelledby="progress-card-title"
       className={`${CARD} ${CARD_PAD} min-w-0`}
     >
