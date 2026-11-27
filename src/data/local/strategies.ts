@@ -14,6 +14,7 @@ import {
   logHistory,
   type FieldChange,
 } from './history';
+import { deleteStrategyMissedTrades } from './missed-trades';
 import { rwTx } from './tx';
 import { mergePatch } from '../merge';
 
@@ -132,12 +133,14 @@ export function localStrategies(ctx: LocalContext): StrategiesRepo {
 
     async update(ws, id, patch) {
       const db = await ctx.db();
-      return rwTx(db, [db.strategies, db.trades, db.history], async () => {
+      const tables = [db.strategies, db.trades, db.files, db.history];
+      return rwTx(db, tables, async () => {
         const strategy = await db.strategies.get([ws, id]);
         if (!strategy) throw new NotFoundError('strategy', id);
         const { groups, ...rest } = patch;
         const next: Strategy = {
-          ...mergePatch(strategy, rest, ['icon', 'tone']),
+          // `photoId` sent as undefined clears the photo.
+          ...mergePatch(strategy, rest, ['icon', 'tone', 'photoId']),
           id,
           workspaceId: ws,
         };
@@ -150,6 +153,15 @@ export function localStrategies(ctx: LocalContext): StrategiesRepo {
           if (gone.size > 0) await onItsTrades(db, ws, id, gone, false);
         }
         await db.strategies.put(next);
+        // A photo that is cleared or replaced is deleted with the write (B56).
+        if (
+          strategy.photoId !== undefined &&
+          next.photoId !== strategy.photoId
+        ) {
+          const old = await db.files.get([ws, strategy.photoId]);
+          if (old?.owner === `strategy:${id}`)
+            await db.files.delete([ws, old.id]);
+        }
         await logHistory(
           db,
           ws,
@@ -169,7 +181,14 @@ export function localStrategies(ctx: LocalContext): StrategiesRepo {
       const db = await ctx.db();
       await rwTx(
         db,
-        [db.strategies, db.trades, db.files, db.history, db.challenges],
+        [
+          db.strategies,
+          db.trades,
+          db.files,
+          db.history,
+          db.challenges,
+          db.missedTrades,
+        ],
         async () => {
           const strategy = await db.strategies.get([ws, id]);
           if (!strategy) throw new NotFoundError('strategy', id);
@@ -188,6 +207,7 @@ export function localStrategies(ctx: LocalContext): StrategiesRepo {
           );
           await db.strategies.delete([ws, id]);
           await deleteOwnerFiles(db, ws, `strategy:${id}`);
+          await deleteStrategyMissedTrades(db, ws, id);
           // One row for the strategy, not one per trade it leaves.
           await logHistory(
             db,

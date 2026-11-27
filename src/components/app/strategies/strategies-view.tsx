@@ -19,7 +19,11 @@ import { StateGlyph } from '@/components/ui/state-glyph';
 import { MetricTip } from '@/components/ui/metric-tip';
 import { Segmented } from '@/components/ui/segmented';
 import { Tabs, panelId, tabId } from '@/components/ui/tabs';
-import { useRemoveStrategy, useUpdateStrategy } from '@/data/query/hooks';
+import {
+  useMissedTrades,
+  useRemoveStrategy,
+  useUpdateStrategy,
+} from '@/data/query/hooks';
 import type { Strategy } from '@/domain/types';
 import { FigureSourceContext, useDisplay } from '@/lib/display';
 import { plural } from '@/lib/format';
@@ -40,6 +44,7 @@ import {
   StrategySkeleton,
 } from './strategy-states';
 import { EquityLine } from './equity-line';
+import { PhotoBand } from './photo-field';
 import {
   useStrategyData,
   type StrategyData,
@@ -155,13 +160,20 @@ function StrategyCard({
   const display = useDisplay();
   const router = useRouter();
   const { strategy: s, summary } = f;
+  const missed = useMissedTrades(s.id).data?.length ?? 0;
   const Glyph = STRATEGY_ICON_GLYPH[s.icon ?? 'target'];
   const rules = f.rules.length;
   const money = display.figure(display.ofTrades(f.closedIds, f.pnl));
   return (
     <article
-      className={`${CARD} grid items-center gap-x-7 gap-y-5 px-[22px] py-[18px] lg:grid-cols-[minmax(0,286px)_minmax(0,1fr)_228px]`}
+      className={`${CARD} grid items-center gap-x-7 gap-y-5 px-[22px] py-[18px] max-sm:p-4 lg:grid-cols-[minmax(0,286px)_minmax(0,1fr)_228px]`}
     >
+      {/* The photo is the card's band; the icon stays beside the name. */}
+      <PhotoBand
+        photoId={s.photoId}
+        name={s.name}
+        className="col-span-full -mx-[22px] -mt-[18px] h-24 rounded-t-[15px] max-sm:-mx-4 max-sm:-mt-4"
+      />
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           {/* The strategy's own mark, plain beside its name. */}
@@ -207,9 +219,10 @@ function StrategyCard({
         <Kpi
           label={<MetricTip id="trades" basis={basis} />}
           value={summary.closedCount}
-          sub={
-            summary.openCount > 0 ? `${summary.openCount} open` : 'none open'
-          }
+          sub={[
+            summary.openCount > 0 ? `${summary.openCount} open` : 'none open',
+            ...(missed > 0 ? [`${missed} missed`] : []),
+          ].join(', ')}
         />
         <Kpi
           label={<MetricTip id="pnl" basis={basis} />}
@@ -355,6 +368,8 @@ export function StrategiesView(): React.JSX.Element {
   const newButton = useRef<HTMLButtonElement>(null);
   const [status, setStatus] = useState<Status>('active');
   const [deleting, setDeleting] = useState<string | null>(null);
+  // What goes with a strategy that is being deleted.
+  const deletingMissed = useMissedTrades(deleting ?? undefined).data?.length;
 
   const tab: Tab = params.get('tab') === 'templates' ? 'templates' : 'mine';
   const chooserOpen = params.get('choose') === '1';
@@ -492,7 +507,10 @@ export function StrategiesView(): React.JSX.Element {
       <ConfirmDialog
         open={target !== undefined}
         title={`Delete ${target?.name ?? 'this strategy'}?`}
-        body={deleteBody(targetTrades)}
+        body={deleteBody(targetTrades, {
+          missed: deletingMissed ?? 0,
+          photo: target?.photoId !== undefined,
+        })}
         confirmLabel="Delete"
         danger
         onConfirm={async () => {

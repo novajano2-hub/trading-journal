@@ -29,6 +29,7 @@ import {
   useJournal,
   useKeepVersion,
   useMergeTrades,
+  useMissedTrades,
   useMoveAccountTrades,
   useMoveTrades,
   useNoteVersions,
@@ -38,12 +39,14 @@ import {
   useRemoveFeeRule,
   useReadFile,
   useRemoveFile,
+  useRemoveMissedTrade,
   useRemoveTrades,
   useRemoveTagCategory,
   useRemoveTargetRule,
   useRestoreVersion,
   useSaveFeeRule,
   useSaveJournalEntry,
+  useSaveMissedTrade,
   useSaveTargetRule,
   useSetActiveWorkspace,
   useSetFillCosts,
@@ -981,4 +984,59 @@ test('useChangeDashboards writes nothing when the updater throws, and rejects wi
   });
   expect(caught).toBeInstanceOf(Refused);
   expect((await repository.prefs.get()).dashboards).toBeUndefined();
+});
+
+test('missed trade hooks list a strategy’s, save, edit and remove, and refresh every list', async () => {
+  const { result } = renderHook(
+    () => ({
+      mine: useMissedTrades('str-1'),
+      other: useMissedTrades('str-2'),
+      idle: useMissedTrades(undefined),
+      save: useSaveMissedTrade(),
+      remove: useRemoveMissedTrade(),
+    }),
+    { wrapper: wrapper() },
+  );
+  await waitFor(() => expect(result.current.mine.data).toEqual([]));
+  // A read with no strategy waits.
+  expect(result.current.idle.data).toBeUndefined();
+  expect(result.current.idle.fetchStatus).toBe('idle');
+
+  let id = '';
+  await act(async () => {
+    id = (
+      await result.current.save.mutateAsync({
+        missed: {
+          strategyId: 'str-1',
+          symbol: 'ES',
+          at: '2026-11-24T15:42:00.000Z',
+          price: 6618.5,
+        },
+      })
+    ).id;
+  });
+  await waitFor(() => expect(result.current.mine.data).toHaveLength(1));
+  expect(result.current.other.data).toEqual([]);
+
+  // An edit has the id; the strategy is not part of it, and a cleared price is gone.
+  await act(async () => {
+    await result.current.save.mutateAsync({
+      id,
+      missed: {
+        strategyId: 'str-1',
+        symbol: 'NQ',
+        at: '2026-11-24T15:42:00.000Z',
+        price: undefined,
+      },
+    });
+  });
+  await waitFor(() =>
+    expect(result.current.mine.data?.[0]).toMatchObject({ symbol: 'NQ' }),
+  );
+  expect(result.current.mine.data?.[0]).not.toHaveProperty('price');
+
+  await act(async () => {
+    await result.current.remove.mutateAsync(id);
+  });
+  await waitFor(() => expect(result.current.mine.data).toEqual([]));
 });

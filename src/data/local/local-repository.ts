@@ -7,6 +7,7 @@ import { localChallenges } from './challenges';
 import { localDays } from './days';
 import { localDayShots } from './day-shots';
 import { localFeeRules } from './fee-rules';
+import { localMissedTrades } from './missed-trades';
 import { localFiles } from './files';
 import { localFolders } from './folders';
 import { localHistory } from './history';
@@ -65,6 +66,7 @@ export function createLocalRepository(
     history: localHistory(ctx),
     targetRules: localTargetRules(ctx),
     feeRules: localFeeRules(ctx),
+    missedTrades: localMissedTrades(ctx),
     onboarding: localOnboarding(ctx),
     propTxns: localPropTxns(ctx),
   };

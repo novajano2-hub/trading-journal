@@ -155,6 +155,8 @@ test('every write that deletes or moves files makes the file lists stale', () =>
     'trades.merge',
     'trades.split',
     'trades.move',
+    // A cleared or replaced photo goes with the write.
+    'strategies.update',
     'strategies.remove',
     'journal.remove',
     'imports.undo',
@@ -299,10 +301,18 @@ test('Plan 6C writes invalidate what they change', () => {
     ['challenges.createMany', k('challenges', 'accounts')],
     // The rebuild rewrites the account's trades, and the import context carries the method.
     ['accounts.setCostMethod', k('accounts', 'trades', 'imports')],
-    // A strategy leaves the challenges that list it, and takes its photo and leaves a history row (6B).
+    // A strategy leaves the challenges that list it, and takes its photo and its missed trades and leaves a history row (6B).
     [
       'strategies.remove',
-      k('strategies', 'trades', 'imports', 'history', 'filesAll', 'challenges'),
+      k(
+        'strategies',
+        'trades',
+        'imports',
+        'history',
+        'filesAll',
+        'challenges',
+        'missedTradesAll',
+      ),
     ],
   ];
   for (const [write, expected] of table)
@@ -349,4 +359,38 @@ test('every write behind a figure of the widgets or the prop dashboard refreshes
       invalidationsFor(write, 'mine'),
       `${write} refreshes ${read}`,
     ).toContainEqual(reads.find(([name]) => name === read)![1]);
+});
+
+test('missed trades are their own lists, per workspace and per strategy', () => {
+  const ws = 'mine';
+  const k = (...names: (keyof typeof keys)[]) =>
+    names.map((n) => (keys[n] as (w: string) => readonly unknown[])(ws));
+  // A save or a delete refreshes every strategy's list, and nothing a figure reads.
+  expect(invalidationsFor('missedTrades.save', ws)).toEqual(
+    k('missedTradesAll'),
+  );
+  expect(invalidationsFor('missedTrades.remove', ws)).toEqual(
+    k('missedTradesAll'),
+  );
+  // One strategy's list sits under all of them.
+  expect(keys.missedTrades(ws, 's-1').slice(0, 4)).toEqual(
+    keys.missedTradesAll(ws),
+  );
+  expect(keys.missedTrades(ws, 's-1')).not.toEqual(
+    keys.missedTrades(ws, 's-2'),
+  );
+  expect(keys.missedTradesAll('mine')).not.toEqual(
+    keys.missedTradesAll('sample'),
+  );
+  // They log no history and touch no trade, file or strategy list.
+  for (const write of ['missedTrades.save', 'missedTrades.remove'] as const)
+    for (const stale of [
+      keys.trades(ws),
+      keys.history(ws),
+      keys.strategies(ws),
+      keys.filesAll(ws),
+      keys.days(ws),
+      keys.journal(ws),
+    ])
+      expect(invalidationsFor(write, ws), write).not.toContainEqual(stale);
 });

@@ -2,7 +2,14 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
 import {
   ArrowDown,
   ArrowUp,
@@ -19,17 +26,22 @@ import {
   type StrategyTemplate,
 } from '@/content/strategy-templates';
 import {
+  useAddFile,
   useCreateStrategy,
+  useFiles,
+  useMissedTrades,
+  useRemoveFile,
   useRemoveStrategy,
   useStrategy,
   useUpdateStrategy,
   useTrades,
 } from '@/data/query/hooks';
-import type { NewStrategy } from '@/data/repository';
+import { FileRejected, type NewStrategy } from '@/data/repository';
 import {
   STRATEGY_ICONS,
   type AssetClass,
   type RuleShowWhen,
+  type StoredFile,
   type Strategy,
   type StrategyIcon,
 } from '@/domain/types';
@@ -44,9 +56,10 @@ import {
   STRATEGY_ICON_GLYPH,
   deleteBody,
 } from './strategy-style';
+import { PhotoField, type PhotoDraft, type PhotoValue } from './photo-field';
 import { NoStrategy, StrategySkeleton } from './strategy-states';
+import { coverFile } from './template-cover';
 import { useChooserPref } from './template-chooser';
-import { useCopyTemplate } from './use-copy-template';
 
 const INPUT =
   'block h-[38px] w-full rounded-control border border-line-2 bg-surface-1 px-3 text-[14px] font-[550] text-text shadow-[var(--shadow-chip)] transition-[border-color,box-shadow] duration-200 ease-[var(--ease-glide)] outline-none placeholder:text-faint hover:border-faint focus-visible:border-accent focus-visible:shadow-[0_0_0_3px_var(--accent-soft)] aria-invalid:border-muted pointer-coarse:h-11';
@@ -130,6 +143,17 @@ function Field({
   );
 }
 
+/** Why a photo was not kept, for the line under the buttons. */
+function photoText(e: unknown, strategySaved: boolean): string {
+  const why =
+    e instanceof FileRejected && e.reason === 'quota'
+      ? ': this browser has no room left'
+      : '';
+  return strategySaved
+    ? `The strategy is saved, but its photo was not${why}. Try the photo again.`
+    : `The photo could not be saved${why}, so nothing was saved. Try again.`;
+}
+
 function StrategyEditor({
   initial,
   fromTemplate,
@@ -143,8 +167,23 @@ function StrategyEditor({
   const update = useUpdateStrategy();
   const remove = useRemoveStrategy();
   const trades = useTrades();
-  const { attachCover } = useCopyTemplate();
+  const addFile = useAddFile();
+  const removeFile = useRemoveFile();
   const chooser = useChooserPref();
+  const missed = useMissedTrades(initial?.id);
+  // The strategy's photo (an edit), and what the Photo field has done to it since: nothing is written until Save.
+  const stored = useFiles(
+    initial ? `strategy:${initial.id}` : '',
+    initial?.photoId !== undefined,
+  );
+  const storedPhoto = stored.data?.find((f) => f.id === initial?.photoId);
+  const [change, setChange] = useState<PhotoValue | null>(null);
+  const photo: PhotoValue =
+    change ??
+    (storedPhoto ? { kind: 'stored', file: storedPhoto } : { kind: 'none' });
+  const [photoFailed, setPhotoFailed] = useState<string | null>(null);
+  /** The strategy a first save made, so a second try after a failed photo edits it instead of making another. */
+  const made = useRef<string | undefined>(undefined);
 
   const [name, setName] = useState(initial?.name ?? fromTemplate?.name ?? '');
   const [description, setDescription] = useState(
@@ -197,6 +236,18 @@ function StrategyEditor({
   const groupRefs = useRef(new Map<number, HTMLInputElement>());
   const pending = saving || create.isPending || update.isPending;
 
+  // A form filled from a template shows the template's cover as its photo.
+  useEffect(() => {
+    if (initial || !fromTemplate) return;
+    let gone = false;
+    void coverFile(fromTemplate).then((file) => {
+      if (!gone) setChange((c) => c ?? { kind: 'chosen', file });
+    });
+    return () => {
+      gone = true;
+    };
+  }, [initial, fromTemplate]);
+
   const patchGroup = (key: number, f: (g: GroupDraft) => GroupDraft) =>
     setGroups((gs) => gs.map((g) => (g.key === key ? f(g) : g)));
   const patchRule = (
@@ -242,12 +293,77 @@ function StrategyEditor({
       ...(!initial && fromTemplate ? { templateId: fromTemplate.id } : {}),
     };
     setSaving(true);
+    setPhotoFailed(null);
+    // A strategy a first try already made is edited, not made again.
+    const existing = initial?.id ?? made.current;
+    let uploaded: StoredFile | undefined;
     try {
-      const saved = initial
-        ? await update.mutateAsync({ id: initial.id, patch: input })
-        : await create.mutateAsync(input);
-      // The template's cover comes with it, as a photo of the strategy's own.
-      if (!initial && fromTemplate) await attachCover(saved.id, fromTemplate);
+      // The photo to keep: what was chosen, or the template's cover if it has not finished drawing.
+      const draft: PhotoDraft | undefined =
+        photo.kind === 'chosen'
+          ? photo.file
+          : !initial && fromTemplate && change === null
+            ? await coverFile(fromTemplate)
+            : undefined;
+      const store = (strategyId: string, file: PhotoDraft) =>
+        addFile.mutateAsync({
+          owner: `strategy:${strategyId}`,
+          file,
+          // A photo is a PNG, JPEG or WebP, checked when it was chosen; a template's own SVG cover is Keel's drawing.
+          images: file.type !== 'image/svg+xml',
+        });
+
+      let photoPatch: { photoId?: string | undefined } = {};
+      if (existing && draft) {
+        // The new file goes in first, so a strategy is never left pointing at nothing; the old one goes with the write.
+        try {
+          uploaded = await store(existing, draft);
+        } catch (e) {
+          setPhotoFailed(photoText(e, false));
+          return setSaving(false);
+        }
+        photoPatch = { photoId: uploaded.id };
+      } else if (
+        existing &&
+        change?.kind === 'none' &&
+        initial?.photoId !== undefined
+      ) {
+        // Removed in the field: only an explicit Remove clears it, never a photo that has not loaded yet.
+        photoPatch = { photoId: undefined };
+      }
+
+      let saved: Strategy;
+      try {
+        saved = existing
+          ? await update.mutateAsync({
+              id: existing,
+              patch: { ...input, ...photoPatch },
+            })
+          : await create.mutateAsync(input);
+      } catch (e) {
+        // Nothing points at the file just stored: it goes too.
+        if (uploaded) {
+          try {
+            await removeFile.mutateAsync({ id: uploaded.id });
+          } catch {
+            /* an orphan the strategy's deletion cleans up */
+          }
+        }
+        throw e;
+      }
+      made.current = saved.id;
+      if (!existing && draft) {
+        try {
+          const file = await store(saved.id, draft);
+          await update.mutateAsync({
+            id: saved.id,
+            patch: { photoId: file.id },
+          });
+        } catch (e) {
+          setPhotoFailed(photoText(e, true));
+          return setSaving(false);
+        }
+      }
       router.push(`/app/strategies/${encodeURIComponent(saved.id)}`);
     } catch {
       setSaveFailed(true);
@@ -290,7 +406,7 @@ function StrategyEditor({
             />
             <span>
               Filled from the {fromTemplate.name} template. Nothing is saved
-              until you create it, and its cover comes with it.
+              until you create it.
             </span>
           </p>
         ) : null}
@@ -328,6 +444,17 @@ function StrategyEditor({
                 />
               )}
             </Field>
+
+            <PhotoField
+              value={photo}
+              onChange={(next) => {
+                setPhotoFailed(null);
+                setChange(next);
+              }}
+              loading={
+                initial?.photoId !== undefined && stored.data === undefined
+              }
+            />
 
             <div role="radiogroup" aria-label="Icon">
               <span className={LABEL} aria-hidden="true">
@@ -660,6 +787,17 @@ function StrategyEditor({
             Cancel
           </Link>
           <div aria-live="polite">
+            {photoFailed ? (
+              <p
+                role="alert"
+                className="flex items-center gap-1.5 text-[13px] text-text"
+              >
+                <Warning size={14} aria-hidden="true" className="text-muted" />
+                {photoFailed}
+              </p>
+            ) : null}
+          </div>
+          <div aria-live="polite">
             {saveFailed ? (
               <p
                 role="alert"
@@ -703,7 +841,10 @@ function StrategyEditor({
         <ConfirmDialog
           open={deleting}
           title={`Delete ${initial.name}?`}
-          body={deleteBody(tradeCount ?? 0)}
+          body={deleteBody(tradeCount ?? 0, {
+            missed: missed.data?.length ?? 0,
+            photo: initial.photoId !== undefined,
+          })}
           confirmLabel="Delete"
           danger
           onConfirm={async () => {

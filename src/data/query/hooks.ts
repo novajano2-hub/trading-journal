@@ -24,6 +24,7 @@ import type {
   HistoryRow,
   ImportJob,
   JournalEntry,
+  MissedTrade,
   NoteFolder,
   NoteTemplate,
   NoteVersion,
@@ -51,6 +52,7 @@ import type {
   NewChallengeEntry,
   NewFeeRule,
   NewFile,
+  NewMissedTrade,
   NewPropTxn,
   NewTargetRule,
   ChallengePatch,
@@ -203,10 +205,15 @@ export function useDayShots(date: string): UseQueryResult<DayShot[]> {
  * The owner's files (`trade:<id>`, `note:<id>` or `strategy:<id>`), in upload
  * order, as metadata only: no bytes (see `useReadFile`).
  */
-export function useFiles(owner: string): UseQueryResult<StoredFileMeta[]> {
+export function useFiles(
+  owner: string,
+  /** False reads nothing: a form with no owner yet. */
+  enabled = true,
+): UseQueryResult<StoredFileMeta[]> {
   return useWorkspaceQuery(
     (ws) => keys.files(ws, owner),
     (r, ws) => r.files.list(ws, owner),
+    enabled,
   );
 }
 
@@ -252,6 +259,20 @@ export function useTargetRules(): UseQueryResult<TargetRule[]> {
 /** The default commission and fee rules of the active workspace, newest first. */
 export function useFeeRules(): UseQueryResult<FeeRule[]> {
   return useWorkspaceQuery(keys.feeRules, (r, ws) => r.feeRules.list(ws));
+}
+
+/**
+ * One strategy's missed trades, newest first (B43). Idle while `strategyId`
+ * is undefined. Kept apart: no figure, filter, report or pattern reads them.
+ */
+export function useMissedTrades(
+  strategyId: string | undefined,
+): UseQueryResult<MissedTrade[]> {
+  return useWorkspaceQuery(
+    (ws) => keys.missedTrades(ws, strategyId ?? ''),
+    (r, ws) => r.missedTrades.list(ws, strategyId!),
+    strategyId !== undefined,
+  );
 }
 
 export function useTrades(): UseQueryResult<Trade[]> {
@@ -1515,5 +1536,37 @@ export function useMarkBreached(): UseMutationResult<
         ...(v.note !== undefined && { note: v.note }),
         on: v.on,
       }),
+  );
+}
+
+/**
+ * Adds a missed trade (no `id`) or edits one (its `id`; the strategy never
+ * changes). An optional field left undefined is cleared on an edit. Rejects
+ * with NotFoundError or RangeError as the repository does.
+ */
+export function useSaveMissedTrade(): UseMutationResult<
+  MissedTrade,
+  Error,
+  { id?: string; missed: NewMissedTrade }
+> {
+  return useWorkspaceWrite(
+    'missedTrades.save',
+    (r, ws, v: { id?: string; missed: NewMissedTrade }) => {
+      if (v.id === undefined) return r.missedTrades.create(ws, v.missed);
+      const { symbol, at, price, commission, fees } = v.missed;
+      return r.missedTrades.update(ws, v.id, {
+        symbol,
+        at,
+        price,
+        commission,
+        fees,
+      });
+    },
+  );
+}
+
+export function useRemoveMissedTrade(): UseMutationResult<void, Error, string> {
+  return useWorkspaceWrite('missedTrades.remove', (r, ws, id: string) =>
+    r.missedTrades.remove(ws, id),
   );
 }

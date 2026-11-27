@@ -40,6 +40,9 @@ export const keys = {
   history: (ws: string) => [...W(ws), 'history'] as const,
   targetRules: (ws: string) => [...W(ws), 'target-rules'] as const,
   feeRules: (ws: string) => [...W(ws), 'fee-rules'] as const,
+  missedTradesAll: (ws: string) => [...W(ws), 'missed-trades'] as const,
+  missedTrades: (ws: string, strategyId: string) =>
+    [...W(ws), 'missed-trades', strategyId] as const,
   imports: (ws: string) => [...W(ws), 'imports'] as const,
   propTxns: (ws: string) => [...W(ws), 'prop-txns'] as const,
   importContext: (ws: string, accountId: string) =>
@@ -108,6 +111,8 @@ export type WriteKind =
   | 'targetRules.remove'
   | 'feeRules.save'
   | 'feeRules.remove'
+  | 'missedTrades.save'
+  | 'missedTrades.remove'
   | 'rules.apply'
   // Plan 6C
   | 'propTxns.add'
@@ -233,14 +238,16 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
       return [keys.cashFlows(ws), keys.history(ws)];
     case 'strategies.create':
       return [keys.strategies(ws), keys.history(ws)];
+    // A photo that is cleared or replaced is deleted with the write (B56).
     case 'strategies.update':
       return [
         keys.strategies(ws),
         keys.trades(ws),
         keys.imports(ws),
         keys.history(ws),
+        keys.filesAll(ws),
       ];
-    // Its photo goes with it (B56), and a challenge traded with it no longer lists it.
+    // Its photo and its missed trades go with it (B56), and a challenge traded with it no longer lists it.
     case 'strategies.remove':
       return [
         keys.strategies(ws),
@@ -249,6 +256,7 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
         keys.history(ws),
         keys.filesAll(ws),
         keys.challenges(ws),
+        keys.missedTradesAll(ws),
       ];
     case 'tags.create':
     case 'tags.update':
@@ -315,6 +323,10 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
     case 'feeRules.save':
     case 'feeRules.remove':
       return [keys.feeRules(ws), keys.history(ws)];
+    // Missed trades are kept apart (B43): they log nothing and no figure reads them.
+    case 'missedTrades.save':
+    case 'missedTrades.remove':
+      return [keys.missedTradesAll(ws)];
     // Applying a rule rewrites open trades the next import plan carries.
     case 'rules.apply':
       return [

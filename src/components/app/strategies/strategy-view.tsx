@@ -20,7 +20,11 @@ import {
   type StrategyTemplate,
 } from '@/content/strategy-templates';
 import { EMPTY_FILTERS } from '@/data/filters';
-import { useStrategy, useUpdateStrategy } from '@/data/query/hooks';
+import {
+  useMissedTrades,
+  useStrategy,
+  useUpdateStrategy,
+} from '@/data/query/hooks';
 import type { RuleStat } from '@/domain/metrics/rules';
 import type { Rule, RuleGroup, Strategy } from '@/domain/types';
 import { FigureSourceContext, useDisplay } from '@/lib/display';
@@ -33,6 +37,8 @@ import {
   pctText,
 } from './strategy-style';
 import { EquityLine } from './equity-line';
+import { MissedTradesCard } from './missed-trades';
+import { PhotoBand } from './photo-field';
 import {
   ArchiveFailed,
   HiddenTrades,
@@ -428,13 +434,20 @@ function Header({
   leftOut: number;
 }): React.JSX.Element {
   const update = useUpdateStrategy();
+  const missed = useMissedTrades(s.id).data?.length ?? 0;
   const Glyph = STRATEGY_ICON_GLYPH[s.icon ?? 'target'];
   const archived = s.status === 'archived';
   return (
     <section
       aria-labelledby="strategy-h"
-      className={`${CARD} flex flex-wrap items-center gap-x-4 gap-y-3 px-[22px] py-4`}
+      className={`${CARD} flex flex-wrap items-center gap-x-4 gap-y-3 px-[22px] py-4 max-sm:px-4 max-sm:py-3.5`}
     >
+      {/* The photo is the header's band; the strategy's own icon stays beside its name. */}
+      <PhotoBand
+        photoId={s.photoId}
+        name={s.name}
+        className="-mx-[22px] -mt-4 mb-0.5 h-[140px] flex-none basis-[calc(100%+44px)] rounded-t-[15px] max-sm:-mx-4 max-sm:-mt-3.5 max-sm:h-[110px] max-sm:basis-[calc(100%+32px)]"
+      />
       <div className="min-w-0 flex-[1_1_260px]">
         <h2
           id="strategy-h"
@@ -499,6 +512,11 @@ function Header({
             View {tradeCount} {plural(tradeCount, 'trade')}
           </Link>
         )}
+        {missed > 0 ? (
+          <span className="text-[13px] text-muted tabular-nums">
+            {missed} missed
+          </span>
+        ) : null}
       </div>
       <LeftOutNote count={leftOut} className="basis-full" />
       {tradesHref === undefined && tradeCount > 0 ? (
@@ -740,6 +758,8 @@ function StrategyBody({
           </section>
 
           {template ? <ExamplesCard t={template} /> : null}
+
+          <MissedTradesCard strategy={s} />
         </div>
 
         <div className="flex min-w-0 flex-col gap-4">

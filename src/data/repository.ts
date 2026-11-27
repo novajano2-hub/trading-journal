@@ -21,6 +21,7 @@ import type {
   ImportJob,
   Instrument,
   JournalEntry,
+  MissedTrade,
   NoteFolder,
   NoteTemplate,
   NoteVersion,
@@ -858,6 +859,32 @@ export interface FeeRulesRepo {
   applyExisting(ws: string, id: string, override: boolean): Promise<number>;
 }
 
+/**
+ * The missed trades of a strategy (spec §5.7, B43): trades the trader saw and
+ * skipped, kept in a table of their own so no figure, list, filter, report,
+ * calendar, tracker or pattern ever reads one. A missed trade is exactly a
+ * symbol, a hypothetical date and time, a price, a commission and fees: no
+ * side, no quantity. They log no history.
+ */
+export type NewMissedTrade = Omit<MissedTrade, 'id' | 'workspaceId'>;
+/** What an edit can change: everything but the strategy. A field sent as undefined is cleared when it is optional. */
+export type MissedTradePatch = Partial<Omit<NewMissedTrade, 'strategyId'>>;
+export interface MissedTradesRepo {
+  /** One strategy's missed trades, newest first. */
+  list(ws: string, strategyId: string): Promise<MissedTrade[]>;
+  /**
+   * Throws NotFoundError for an unknown strategy and RangeError for an empty
+   * symbol, a time that is not a real instant, a price that is not a finite
+   * number, or a commission or fee that is not whole cents. A negative cost is
+   * a credit. Only the named fields are kept.
+   */
+  create(ws: string, input: NewMissedTrade): Promise<MissedTrade>;
+  /** Throws NotFoundError for an unknown missed trade; RangeError as `create`. The strategy never changes. */
+  update(ws: string, id: string, patch: MissedTradePatch): Promise<MissedTrade>;
+  /** Throws NotFoundError for an unknown missed trade. */
+  remove(ws: string, id: string): Promise<void>;
+}
+
 export interface FirstRunInput {
   firstName: string;
   lastName: string;
@@ -895,6 +922,7 @@ export interface Repository {
   history: HistoryRepo;
   targetRules: TargetRulesRepo;
   feeRules: FeeRulesRepo;
+  missedTrades: MissedTradesRepo;
   imports: ImportRepo;
   onboarding: OnboardingRepo;
   propTxns: PropTxnsRepo;
