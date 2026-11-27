@@ -430,6 +430,9 @@ describe('the calendar with stats: Calendar page’s month, its Stats shown and 
     expect(word.className).toContain('max-sm:sr-only');
     expect(button.className).toContain('max-sm:w-[30px]');
     expect(button.className).toContain('max-sm:px-0');
+    // A touch screen's 44px target: the icon-alone button is as wide as it is tall (the global 44px rule).
+    expect(button.className).toContain('max-sm:pointer-coarse:w-11');
+    expect(button.className).toContain('pointer-coarse:h-11');
     expect(button.querySelector('svg[aria-hidden="true"]')).toBeTruthy();
   });
 

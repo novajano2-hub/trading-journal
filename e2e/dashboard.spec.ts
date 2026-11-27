@@ -277,3 +277,54 @@ test("the calendar widget's controls keep one row on a phone: Stats shown is its
     expect(new Set(tops).size, `the controls' tops at ${width}`).toBe(1);
   }
 });
+
+test.describe('on a touch phone', () => {
+  test.use({ hasTouch: true });
+
+  test("the calendar widget's controls keep one row, each a 44px target (mobile, touch)", async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name !== 'mobile');
+    for (const width of [390, 360]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto('/app/dashboard');
+      await ready(page);
+      // What is measured is the coarse-pointer sizes: if the emulation does not make the pointer
+      // coarse, say so instead of measuring the 30px buttons again.
+      expect(
+        await page.evaluate(() => matchMedia('(pointer: coarse)').matches),
+        `a coarse pointer at ${width}`,
+      ).toBe(true);
+      const widget = page.locator('[data-widget="calendar-adv"]');
+      const names = [
+        'Previous month',
+        'Next month',
+        'This month',
+        'Stats shown',
+        'Snapshot',
+      ];
+      const boxes = await Promise.all(
+        names.map(async (name) => ({
+          name,
+          box: (await widget.getByRole('button', { name }).boundingBox())!,
+        })),
+      );
+      // One row, as on a mouse: the 44px targets must not push a control onto a second line.
+      expect(
+        new Set(boxes.map(({ box }) => Math.round(box.y))).size,
+        `the controls' tops at ${width}`,
+      ).toBe(1);
+      // And each is a target a thumb can hit, Stats shown's icon alone included.
+      for (const { name, box } of boxes) {
+        expect(
+          Math.round(box.width),
+          `${name} width at ${width}`,
+        ).toBeGreaterThanOrEqual(44);
+        expect(
+          Math.round(box.height),
+          `${name} height at ${width}`,
+        ).toBeGreaterThanOrEqual(44);
+      }
+    }
+  });
+});
