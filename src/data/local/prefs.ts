@@ -156,6 +156,19 @@ export function validate(p: Partial<UserPrefs>): void {
   }
 }
 
+/** A widget of a template: an object with a string key (any key: a newer build's stays) and, if present, settings that are an object. */
+function isWidgetRef(w: unknown): boolean {
+  if (typeof w !== 'object' || w === null) return false;
+  const { key, settings } = w as { key?: unknown; settings?: unknown };
+  return (
+    typeof key === 'string' &&
+    (settings === undefined ||
+      (typeof settings === 'object' &&
+        settings !== null &&
+        !Array.isArray(settings)))
+  );
+}
+
 function validateDashboards(d: UserPrefs['dashboards']): void {
   if (d === undefined) return;
   const ok =
@@ -173,13 +186,15 @@ function validateDashboards(d: UserPrefs['dashboards']): void {
         t.name.length <= 40 &&
         Array.isArray(t.upper) &&
         t.upper.length <= 5 &&
-        Array.isArray(t.lower),
+        t.upper.every(isWidgetRef) &&
+        Array.isArray(t.lower) &&
+        t.lower.every(isWidgetRef),
     ) &&
     d.templates.some((t) => t.id === d.inUse) &&
     new Set(d.templates.map((t) => t.id)).size === d.templates.length;
   if (!ok)
     throw new RangeError(
-      'Dashboards need one or more templates, each with its own id and a name of 1 to 40 characters, at most 5 upper widgets, and inUse naming one',
+      'Dashboards need one or more templates, each with its own id and a name of 1 to 40 characters, at most 5 upper widgets, widgets that each have a key, and inUse naming one',
     );
 }
 

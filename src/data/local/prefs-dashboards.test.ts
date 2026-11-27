@@ -50,6 +50,45 @@ test.each([
   );
 });
 
+test.each([
+  ['a null upper entry', tpl({ upper: [null as never] })],
+  ['a number in the lower widgets', tpl({ lower: [5 as never] })],
+  ['an entry without a key', tpl({ upper: [{} as never] })],
+  ['an entry whose key is not a string', tpl({ lower: [{ key: 7 } as never] })],
+  [
+    'settings that are a number',
+    tpl({ upper: [{ key: 'net-pnl', settings: 5 as never }] }),
+  ],
+  [
+    'settings that are null',
+    tpl({ upper: [{ key: 'net-pnl', settings: null as never }] }),
+  ],
+  [
+    'settings that are a list',
+    tpl({ lower: [{ key: 'net-pnl', settings: [] as never }] }),
+  ],
+])('a template with %s is refused with RangeError', async (_n, template) => {
+  const dashboards = { inUse: 'x', templates: [template] };
+  await expect(open().prefs.update({ dashboards })).rejects.toBeInstanceOf(
+    RangeError,
+  );
+});
+
+test('widget entries keep an unknown key, and settings when they are an object', async () => {
+  const dashboards = {
+    inUse: 'x',
+    templates: [
+      tpl({
+        upper: [{ key: 'from-a-newer-build' }],
+        lower: [{ key: 'balance', settings: { time: 'exit' } }],
+      }),
+    ],
+  };
+  expect((await open().prefs.update({ dashboards })).dashboards).toEqual(
+    dashboards,
+  );
+});
+
 test('templates with different ids and the same name pass', async () => {
   const dashboards = {
     inUse: 'y',
