@@ -387,7 +387,14 @@ test('Settings folds to an icon column with the sidebar and stays folded across 
   await collapseButton(page).click();
   await expect(expandButton(page)).toBeVisible();
   await expect.poll(async () => (await boxOf(nav)).width).toBe(60);
-  for (const name of ['Profile', 'Accounts', 'Trading', 'Tags', 'Logs']) {
+  for (const name of [
+    'Profile',
+    'Accounts',
+    'Trading',
+    'Tags',
+    'Notebook',
+    'Logs',
+  ]) {
     expect((await nameBox(page, name)).width, name).toBeLessThanOrEqual(1);
     const link = await boxOf(navLink(page, name));
     expect(link.width, name).toBeCloseTo(42, 0);
@@ -407,7 +414,7 @@ test('Settings folds to an icon column with the sidebar and stays folded across 
 
   // By keyboard each icon is named by a tooltip, and still by its link name.
   await navLink(page, 'Profile').focus();
-  for (const name of ['Accounts', 'Trading', 'Tags', 'Logs']) {
+  for (const name of ['Accounts', 'Trading', 'Tags', 'Notebook', 'Logs']) {
     await page.keyboard.press('Tab');
     await expect(page.locator(':focus')).toHaveAccessibleName(name);
     await expect(page.getByRole('tooltip')).toHaveText(name);

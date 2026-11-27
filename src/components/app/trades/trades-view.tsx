@@ -80,6 +80,7 @@ import { SelectBox } from './select-box';
 import {
   ALIGN,
   COLUMN_WIDTHS,
+  HANG_SORT,
   PAD_LEFT,
   buildColumns,
   features,
@@ -1012,7 +1013,7 @@ export function TradesView(): React.JSX.Element {
                               {canSort ? (
                                 HEADER_TIPS[id] ? (
                                   <span
-                                    className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}
+                                    className={`relative inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}
                                   >
                                     <MetricTip
                                       id={HEADER_TIPS[id]}
@@ -1021,12 +1022,21 @@ export function TradesView(): React.JSX.Element {
                                     >
                                       {COLUMN_LABELS[id].label}
                                     </MetricTip>
-                                    <SortButton
-                                      label={`Sort by ${COLUMN_LABELS[id].label}`}
-                                      align={align}
-                                      sorted={sorted}
-                                      onClick={header.column.getToggleSortingHandler()}
-                                    />
+                                    {/* A narrow column's mark hangs off the label's left, in no room of its own. */}
+                                    <span
+                                      className={
+                                        HANG_SORT.has(id)
+                                          ? 'absolute top-1/2 right-full -translate-y-1/2'
+                                          : 'contents'
+                                      }
+                                    >
+                                      <SortButton
+                                        label={`Sort by ${COLUMN_LABELS[id].label}`}
+                                        align={align}
+                                        sorted={sorted}
+                                        onClick={header.column.getToggleSortingHandler()}
+                                      />
+                                    </span>
                                   </span>
                                 ) : (
                                   <SortButton

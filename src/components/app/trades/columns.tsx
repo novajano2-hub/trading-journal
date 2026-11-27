@@ -87,37 +87,49 @@ export const ALIGN: Partial<Record<ColumnId, 'right' | 'center'>> = {
 };
 
 /**
- * Each column's width in px, as comp 01's colgroup has them for the defaults.
+ * Each column's width in px, close to comp 01's colgroup (comp 02 adds Patterns).
  * The table is fixed-layout, so a cell never pushes a neighbour: its text
- * truncates inside its own width. Qty holds "999,999" (shares, lots, coins).
+ * truncates inside its own width. Qty holds "25,000" (shares, lots, coins).
+ * The default columns sum to 1,152px with the select box, so they fit the
+ * log's card at 1440 with no sideways scroll: Strategy keeps room for "Opening
+ * range breakout" (its header is at least 165px there) and Tags, which ends in
+ * an ellipsis by design, takes what is left. Patterns is a count under a
+ * header whose sort mark hangs off its left (`HANG_SORT`).
  */
 export const COLUMN_WIDTHS: Record<ColumnId, number> = {
   open: 78,
   close: 78,
-  instrument: 90,
+  instrument: 88,
   account: 110,
   side: 50,
-  qty: 48,
+  qty: 46,
   entry: 62,
   exit: 62,
   gross: 72,
   fees: 58,
   net: 72,
-  roi: 58,
-  realizedR: 52,
+  roi: 54,
+  realizedR: 46,
   plannedR: 58,
   duration: 56,
-  strategies: 172,
-  tags: 130,
+  strategies: 166,
+  tags: 104,
   mistakes: 110,
-  patterns: 74,
-  rules: 76,
+  patterns: 50,
+  rules: 74,
   rating: 54,
   reviewed: 58,
   status: 72,
   ticker: 78,
   day: 116,
 };
+
+/**
+ * Columns whose sort mark hangs off the left of the header's label instead of
+ * taking room of its own, so a narrow column (a count) keeps its label inside
+ * its width and out of the next header.
+ */
+export const HANG_SORT = new Set<ColumnId>(['patterns']);
 
 /** Columns whose text starts after a gap, so a right-aligned neighbour's header never runs into it. */
 export const PAD_LEFT = new Set<ColumnId>(['strategies']);

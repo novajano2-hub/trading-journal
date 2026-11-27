@@ -18,6 +18,7 @@ import { makeTrade } from '@/domain/__fixtures__/trades';
 import type { Trade } from '@/domain/types';
 import { everyString } from '../__fixtures__/every-string';
 import { renderApp } from '../__fixtures__/render-app';
+import { COLUMN_WIDTHS, HANG_SORT } from './columns';
 import { TradesView } from './trades-view';
 
 vi.mock('next/navigation', () => import('../__fixtures__/navigation'));
@@ -473,6 +474,20 @@ test('every column has a fixed width in the colgroup, one for the selection box 
     expect(`${c.className} ${c.getAttribute('style') ?? ''}`).toMatch(
       /\bw-8\b|width: \d+px/,
     );
+});
+
+test("the default columns fit the log's card at 1440: 1,154px with the select box, Strategy at its 165px", () => {
+  // The card's table is 1,154px wide at 1440 (e2e `the log fits the card at 1440` is the check in the browser);
+  // a default column added or widened past it would scroll the log inside its card.
+  const SELECT = 32;
+  const sum = DEFAULT_COLUMNS.reduce((n, id) => n + COLUMN_WIDTHS[id], SELECT);
+  expect(sum).toBeLessThanOrEqual(1154);
+  // Strategy keeps room for "Opening range breakout" (the e2e asserts its header at 165px or more).
+  expect(COLUMN_WIDTHS.strategies).toBeGreaterThanOrEqual(165);
+  // Patterns is a count: narrower than the header's own label, with its sort mark hung off the label.
+  expect(DEFAULT_COLUMNS).toContain('patterns');
+  expect(COLUMN_WIDTHS.patterns).toBeLessThanOrEqual(56);
+  expect(HANG_SORT.has('patterns')).toBe(true);
 });
 
 test('the Net ROI and R headers carry their definitions, and still sort', async () => {
