@@ -169,9 +169,10 @@ function isWidgetRef(w: unknown): boolean {
   );
 }
 
-function validateDashboards(d: UserPrefs['dashboards']): void {
-  if (d === undefined) return;
-  const ok =
+/** True when the stored dashboards are readable: templates with ids, names, at most 5 upper widgets and widgets that each have a key. */
+function isDashboards(value: unknown): boolean {
+  const d = value as UserPrefs['dashboards'];
+  return (
     typeof d === 'object' &&
     d !== null &&
     Array.isArray(d.templates) &&
@@ -191,8 +192,13 @@ function validateDashboards(d: UserPrefs['dashboards']): void {
         t.lower.every(isWidgetRef),
     ) &&
     d.templates.some((t) => t.id === d.inUse) &&
-    new Set(d.templates.map((t) => t.id)).size === d.templates.length;
-  if (!ok)
+    new Set(d.templates.map((t) => t.id)).size === d.templates.length
+  );
+}
+
+function validateDashboards(d: UserPrefs['dashboards']): void {
+  if (d === undefined) return;
+  if (!isDashboards(d))
     throw new RangeError(
       'Dashboards need one or more templates, each with its own id and a name of 1 to 40 characters, at most 5 upper widgets, widgets that each have a key, and inUse naming one',
     );
@@ -224,12 +230,18 @@ export const asPartial = (value: unknown): Partial<UserPrefs> =>
     ? (value as Partial<UserPrefs>)
     : {};
 
-/** A `goals` key left by an older version is ignored on read, and stays in storage. */
+/**
+ * A `goals` key left by an older version is ignored on read, and stays in storage. So are `dashboards`
+ * that cannot be read (a hand edit, a build that wrote another shape): the Dashboard shows the default
+ * and the next write starts from it, instead of the page failing or every write being refused.
+ */
 const withDefaults = (stored: unknown): UserPrefs => {
   const kept: Partial<UserPrefs> & { goals?: unknown } = {
     ...asPartial(stored),
   };
   delete kept.goals;
+  if (kept.dashboards !== undefined && !isDashboards(kept.dashboards))
+    delete kept.dashboards;
   return { ...defaultPrefs(), ...kept };
 };
 

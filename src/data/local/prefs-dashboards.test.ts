@@ -2,6 +2,7 @@ import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { expect, test } from 'vitest';
 import type { DashTemplate } from '@/domain/types';
 import { fixtureSample } from '../__fixtures__/sample';
+import { KeelDb } from './db';
 import { createLocalRepository } from './local-repository';
 
 const open = () =>
@@ -145,5 +146,39 @@ test('propStart with and without an answer passes', async () => {
   };
   expect((await open().prefs.update({ propStart })).propStart).toEqual(
     propStart,
+  );
+});
+
+test('stored dashboards that cannot be read are ignored, the other prefs and the next write are not affected', async () => {
+  const indexedDB = new IDBFactory();
+  const seed = new KeelDb({ indexedDB, IDBKeyRange });
+  await seed.open();
+  await seed.meta.put({
+    key: 'prefs',
+    value: {
+      displayName: 'Sam',
+      sidebar: 'collapsed',
+      dashboards: {
+        inUse: 'x',
+        templates: [tpl({ upper: [null as never] })],
+      },
+    },
+  });
+  seed.close();
+
+  const repo = createLocalRepository({
+    indexedDB,
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+  const read = await repo.prefs.get();
+  expect(read.dashboards).toBeUndefined();
+  expect(read.displayName).toBe('Sam');
+  expect(read.sidebar).toBe('collapsed');
+
+  // A write that starts from what was read goes through, as the Dashboard's own writes do.
+  const dashboards = { inUse: 'x', templates: [tpl()] };
+  expect((await repo.prefs.update({ dashboards })).dashboards).toEqual(
+    dashboards,
   );
 });

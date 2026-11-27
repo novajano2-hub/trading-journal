@@ -127,7 +127,7 @@ export function metricsByCurrency(
     dayTrades?: readonly Trade[];
     /** The deposits and withdrawals of the workspace's accounts; the risk ratios' start balance counts those before the range. */
     flows?: readonly CashFlow[];
-    /** Every trade of the selected accounts, whatever the other filters: what the balance before the range is booked from. Defaults to `dayTrades`. */
+    /** Every trade of the workspace, whatever the filters: what the balance before the range is booked from (`balanceAt` keeps the selected accounts'). Defaults to `dayTrades`. */
     balanceTrades?: readonly Trade[];
   },
 ): CurrencyMetrics[] {
