@@ -593,6 +593,64 @@ Every row below is Keel's call (TradeZella unknown).
 | C81 | Transactions and the date chips | The Transactions tab ignores the global date range and Filters chips (the record shows only its income/costs/review filter); comp 07 draws the chips and is superseded here | [help 14499729]; comp 07 |
 | C61 | 6B's order | 6C plans against `main` after 6A. If 6B lands first, Task 1 takes the next Dexie version after 6B's, the migration test opens 6B's version, and the cost method joins 6B's builder changes | No 6B spec yet |
 
+**Calls made while building** (TradeZella unknown or not shown; each is marked where it is built)
+
+*Dashboard*
+
+| Id | Question | Keel's call | Basis |
+| --- | --- | --- | --- |
+| C82 | Editing a template that is not in use | Edit opens edit mode on that template, and Save puts it in use, so the page shows what was edited | Task 10 (`withSavedTemplate` in `templates.ts`; `template-menu.tsx`) |
+| C83 | New template | The copy of the template in use is stored at once under the name asked, put in use, and edit mode opens on it to arrange | Task 10 (`template-menu.tsx`) |
+| C84 | The picker after Add | It stays open so several widgets can go in; the added widget leaves the list; when the upper section reaches five the rest are greyed under "The upper section is full." | Task 10 (`widget-picker.tsx`) |
+| C85 | The template menu on a phone | A full-width panel under the button, rows 44px, as comp 01 draws it, not a bottom sheet (§5.1's "the template menu is a sheet" is superseded) | Task 10 (`template-menu.tsx`) |
+| C86 | Edit mode from 640 to 1023px | The edit bar takes the top bar's place, so the menu button is not shown while editing; below 640px edit mode is the full-height sheet of two lists | Task 10 (`edit-mode.tsx`) |
+| C87 | What the leave guard covers | A link asks first ("Leave without saving?"), and so does closing or reloading the tab, through the browser's own confirm; browser Back and the search's navigation drop the draft without asking, as any route change does. Adds to C8 | Task 10 and fix round (`edit-session.tsx`) |
+| C88 | An empty workspace | A workspace with no trade, or all accounts archived with none picked, keeps Plan 5's full-page state (a ghost of the dashboard, Import and "Open the sample workspace", or Open Accounts) in place of the widgets. Every other nothing (filters that match nothing, an open-only set, a unit that keeps no trade) leaves the widgets, each saying so. Supersedes §5.1's "No trades: each widget its own empty state" for these two cases | Task 7 (`dashboard-view.tsx`, `states.tsx`) |
+
+*Prop*
+
+| Id | Question | Keel's call | Basis |
+| --- | --- | --- | --- |
+| C89 | The accounts sub-tab, Started and Grid | The sub-tab is in the address (`?tab=funded` or `breached`; Evaluations is the default and writes none). Started reads the earliest phase start date, else the day the challenge's first account first traded, else None. Grid is the compact card of comp 05, not Plan 5's full card (supersedes C63's "today's cards") | Task 11 (`accounts-tab.tsx`, `accounts-list.tsx`) |
+| C90 | The prop pages' address | The six filters are `pfirm`, `pphase`, `pstatus`, `psize`, `ptype` and `pstrategy`: firms and strategies repeat, sizes are in cents, and the `p` keeps them clear of the trade filters' `status`, `size` and `strategy`, which the shell's cleaner would strip. `?add=1` on Transactions opens the add row once and leaves the address | Task 14A (`prop-filter-params.ts`, `transactions.tsx`) |
+| C91 | The first run's controls | Continue waits for an answer on step 1; Skip sits beside Back on steps 2 and 3 as well; Firm is required in this form only; a row typed and not added is added when Continue is pressed | Task 14B (`prop-first-run.tsx`) |
+| C92 | The first run's entry | `?new=challenge` skips it; `/app/prop-firms` shows a skeleton before the tabs, because the gate needs the data first; clearing My workspace keeps `propStart.done` (prefs are per browser), so the run does not return after a clear | Task 14B (`prop-first-run.tsx`, `prop-home.tsx`) |
+
+*Shell*
+
+| Id | Question | Keel's call | Basis |
+| --- | --- | --- | --- |
+| C93 | Before the prefs load, and short screens | A collapsed sidebar shows expanded for a few frames, as there is no pre-paint copy of the choice (C47 reads expanded until the prefs load). At 1024 by 768 the collapsed rail is about 811px tall, so Settings scrolls inside it | Task 17A (`use-sidebar-state.ts`, `sidebar.tsx`) |
+| C94 | Home collapsed | Home has no rail; its way back is a bordered toggle at the start of the top bar from `lg` (no comp); its content is a column of 1200px at most, centred | Task 17A (`sidebar-toggle.tsx`, `home-view.tsx`) |
+| C95 | Rail names and focus | Radix tooltips name the rail's links on hover and keyboard focus, replacing the native title (the compact workspace switcher keeps its native title); the sidebar and the rail are an `aside` named "Sidebar"; after a keyboard or assistive-technology press, focus moves to the toggle that replaces the one pressed, and after a pointer press it does not | Task 17A (`rail-tip.tsx`, `sidebar-toggle.tsx`) |
+| C96 | The wrapped top bar | When the chips do not fit beside the title the bar takes three rows: the title, the chips on a full row, then the controls, 132px against 102px, in the 640 to 1279 band and with busy filters at any width. The trade Day and Week views, with their pinned switch row, stand about 184px at 1024; a DOM reorder was rejected because it would blur a focused search or chip when the fit flips | Task 17B (`top-bar.tsx`, `globals.css`) |
+| C97 | Focus under the bar (E52) | `scroll-padding-top` is the pinned bar's measured height (plus the switch row) at every width, and is dropped while focus is inside a pinned row (`:has([data-pinned]:focus-within)`), verified in Chrome only | Task 17B (`globals.css`) |
+| C98 | The open phone search | It measures its room when it takes focus (the Dashboard's left edge cut it off before); rotating while it is open updates on the next focus | Task 17B (`top-bar.tsx`) |
+
+*Report PDF*
+
+| Id | Question | Keel's call | Basis |
+| --- | --- | --- | --- |
+| C99 | The print header | It carries no amount, so Privacy has nothing to hide in it, and under Privacy it names the unit "with amounts hidden"; the time on it is the print's own (`beforeprint`) | Task 18 (`print-header.tsx`) |
+| C100 | What prints of the page | The table prints the page it shows (50 rows); Export PDF and the Gross or Net control, the same saved choice as the top bar's menu, live in the ready body only, so an empty Performance prints without a header | Task 18 (`performance-actions.tsx`, `summary-table.tsx`) |
+| C101 | The one print sheet | The graphite tokens are declared for screens only, so paper is always light; the app's chrome is off the paper on every `/app` page (`data-pinned` and `data-print="hide"`), a sheet shared with 6B's note PDF; Firefox and Safari draw no "Page X of Y" margin boxes, and the browser's own footer, if kept on, stands there | Task 18 (`print.css`, `theme.css`) |
+
+*Import worker*
+
+| Id | Question | Keel's call | Basis |
+| --- | --- | --- | --- |
+| C102 | Long plan lists | The worker sends a plan's lists over 2,000 items in slices (opening a 34 MB plan whole took about 120 ms on the main thread, over the 50 ms budget); a smaller plan travels whole | Task 19 (`plan-client.ts`) |
+| C103 | A superseded request | It rejects with `StalePlanError`, and the worker is ended so the newest request is not queued behind it; the hook re-asks once per effect run when it is superseded while live | Task 19 and polish (`plan-client.ts`, `derived.ts`) |
+| C104 | What the main thread still does | A request still copies the parsed file to the worker on the main thread: within the 50 ms budget at 100,000 rows and at a 19 MiB file of 150,000 rows by 16 columns, over it for a 20 MB file of about 450,000 narrow rows (BACKLOG E304, E305) | Task 19 (`plan-client.ts`) |
+
+*Calendar image*
+
+| Id | Question | Keel's call | Basis |
+| --- | --- | --- | --- |
+| C105 | Copy and Download | Copy image shows wherever the browser can write an image to the clipboard, on a phone too; elsewhere the line "This browser can't copy images. Download saves or shares the file." takes its place (supersedes C46). On a touch device whose browser can share files, Download opens the device's share sheet with the PNG, and otherwise saves it as a link would | Task 16 and polish (`snapshot-panel.tsx`) |
+| C106 | The image's font | The picture and its preview are set in the device's system sans: an SVG drawn as an image cannot use the page's web fonts (BACKLOG E306) | Task 16 (`calendar-image.ts`) |
+| C107 | The button's name | It reads "Snapshot" with a camera (the camera alone below `sm`), where TradeZella shows a camera with a "snapshot" tooltip | Task 16 (`snapshot-panel.tsx`; comp 09) |
+
 ### 6.2 Decided by the owner (2026-11-25)
 
 - **D1. The score (#23): the same behaviour.** Keel's score has TZ's six components, weights and curves, as TZ's own figures show them (rec §2.4), and reproduces 76.3 on the 2 Nov forex trades. Its name, words and look are Keel's (C20, C22). Supersedes the backlog's "our own, not a copy" (§7).

@@ -80,7 +80,7 @@ The claim we can make truthfully is the complete loop under one subscription.
 - **App direction (user-picked, 2026-11-21): "Daylight premium".** The user rejected the Plan 4 app look as "too plain and grey… looks like AI slop" and chose comp C of three hi-fi comps: `.impeccable/mocks/rebrand-app/c-daylight-premium.html`.
   - Keel Ultramarine #2B35AF, the one hue the money palette never uses, carries the brand, spent sparingly (primary actions, the active state, focus, series 1).
   - Periwinkle-tinted canvas, white cards with brand-tinted shadows, Instrument Sans with tabular figures.
-  - **2026-11-24, the user's word, reversing parts of comp C:** no icon tiles anywhere ("AI slop"); the "Your plan" hero is a neutral card; a phone navigates from a bottom tab bar, not a hamburger drawer; the auth pages are centred.
+  - **2026-11-24, the user's word, reversing parts of comp C:** no icon tiles anywhere ("AI slop"); the "Your plan" hero is a neutral card (that card, and the "Plan vs actual" Dashboard it led, were retired in Plan 6C for the widget Dashboard, 2026-11-25); a phone navigates from a bottom tab bar, not a hamburger drawer; the auth pages are centred.
   - The whole product follows it: on 2026-11-21 the user asked that the landing "adapt to the new changes", so the marketing site moved to the same tokens, face and product-shot treatment, replacing the landing-v3 Geist and cobalt system.
 - **Rejected:** metaphor worlds (the earlier "Trading Floor" tickets and stamps), dark-mesh hero clichés, editorial serif display type, and anything that reads as AI-generated. The user's words: "no AI slop".
 - **Quality bars:** the design-taste-frontend and Impeccable skills. HorizonX coded components may be used directly under their commercial licence.
@@ -94,7 +94,7 @@ None yet. There are no customers, testimonials, user counts, trade counts, broke
 
 1. **Exact numbers.** P&L includes fees and commissions. Nothing is rounded or framed to look better than it was.
 2. **Review in minutes.** Automation does the logging, so the trader's time goes to reflection and decisions.
-3. **The trader's own rules are the yardstick.** Progress is measured against their plan, not a generic score alone.
+3. **The trader's own rules are the yardstick.** Progress is measured against their plan, not a generic score alone. Rules are measured on the Progress tracker and the Strategies pages; a composite score, the Edge score, is one widget on the Dashboard beside them and never in their place.
 4. **One loop, no tool-hopping.** Every module links back to the trades it came from.
 5. **Never fake capability.** A module that isn't live yet says so plainly.
 

@@ -33,7 +33,7 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | X7 | Trade-behaviour flags computed by rules, not AI: two losses in a row, a winner that gave back its whole gain, holding a loser too long, adding to or reducing a position, an unusually large size. They work as filters and on trades | New | P6 |
 | X8 | Field-level history of edits (entity, field, old value, new value, source: you, import or the app) | New | P6 |
 | X9 | Extra metrics: Sharpe, Sortino, max winning/losing streaks by day, avg daily win %, longest trading day | New | P5, Done |
-| X10 | Shell polish: collapse the sidebar to icons on desktop, and the Settings navigation likewise (with E52 and E55) | New (recording) | P6 (BACKLOG #50) |
+| X10 | Shell polish: collapse the sidebar to icons on desktop, and the Settings navigation likewise (with E52 and E55). **Built in Plan 6C (Task 17)** | Built | P6, Done in Plan 6C (BACKLOG #50) |
 
 ## Trades (`/app/trades`)
 
@@ -90,7 +90,7 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | CA2 | Choose which stats each day shows; a marker on days that have a note | Gap 9 | P5, Done |
 | CA3 | Year view: twelve small months, net or gross | Gap 9 | P5, Done |
 | CA4 | P&L is booked on the day a trade closes or is partly closed; open trades count nothing until then | Gap 8 | P5, Done |
-| CA5 | Save the calendar as an image | New | P6 |
+| CA5 | Save the calendar as an image. **Built in Plan 6C (Task 16):** a Snapshot panel with the picture of the month as shown, Download and Copy. The style-the-image action is not built: its behaviour was never seen (E300) | Built (partly) | P6, Done in Plan 6C (BACKLOG #49, E300) |
 
 ## Reports (`/app/reports`)
 
@@ -104,7 +104,7 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | RE6 | Performance report with a dollars/R switch | Gap 10 | P5, Done |
 | RE7 | Options report by days to expiry (moved into Plan 5) | Research "Later" | P5, Done |
 | RE8 | Weekly and monthly written recaps | AI | B#22 |
-| RE9 | Export a report as a PDF in a print layout, charts and tables included | New (recording) | P6 (BACKLOG #51) |
+| RE9 | Export a report as a PDF in a print layout, charts and tables included. **Built in Plan 6C (Task 18):** on the Performance tab only, through the browser's print dialog | Built | P6, Done in Plan 6C (BACKLOG #51) |
 | RE10 | Performance metrics, second pass: account balance, the daily drawdown series, logged days, average MAE and MFE, breakeven days and trades, as per-period and running series. Average drawdown was built in Task 25 | New (recording) | P6 (BACKLOG #54) |
 
 ## Strategies (`/app/strategies`)
@@ -159,7 +159,7 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | AC2 | Dated deposits and withdrawals that feed the balance and % drawdown | Gap 13 | P5, Done |
 | AC3 | Archive an account, which makes it read-only; clear an account's trades after a confirmation | Gap 13 | P5, Done |
 | AC4 | Each account's own time zone, used for manual entry and as the import default | New | P5, Done |
-| AC5 | Cost method per account (FIFO today; LIFO or average later) | Research "Later" | P6 |
+| AC5 | Cost method per account (FIFO, LIFO or weighted average). **Built in Plan 6C (Tasks 1, 2 and 15):** chosen in the account's Edit dialog and shown in the accounts table | Built | P6, Done in Plan 6C (BACKLOG #49) |
 | AC6 | Search the accounts list by name or broker, filter it, and select several rows | New (recording) | P5, Done (B#59) |
 
 ## Prop firms (`/app/prop-firms`)
@@ -170,8 +170,8 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | PF2 | **A challenge with phases:** 1-step or 2-step plus the funded phase. Each phase is linked to its own journal account and has its own rules (step 2 can copy step 1). The funded phase has no target or time limit | Gap 16 + New | P5, Done |
 | PF3 | Phase rules: minimum trading days, period length or none, profit target, max daily loss, max drawdown (static, end of day or trailing, each in % or $), drawdown floor (the level where a trailing drawdown stops trailing and locks: the starting balance, or a fixed level above it; a static drawdown has none), best-day consistency % | Spec + Gap 16 | P5, Done |
 | PF4 | Challenge status active, passed or breached (marking the last evaluation step passed saves the funded phase as active; the card reads Passed until a funded account is linked); why it was breached; its evaluation and activation fees | Gap 16 | P5, Done |
-| PF5 | Prop finances: payouts, fees and resets as dated transactions marked reviewed or ignored, with totals invested, earned and net | Research "Later" | P6 |
-| PF6 | Pass rate and top breach reasons across challenges | Research "Later" | P6 |
+| PF5 | Prop finances: payouts, fees and resets as dated transactions marked reviewed or ignored, with totals invested, earned and net. **Built in Plan 6C (Tasks 4, 11 to 14):** the Transactions and Dashboard tabs, Log payout and a first run | Built | P6, Done in Plan 6C (BACKLOG #45) |
+| PF6 | Pass rate and top breach reasons across challenges. **Built in Plan 6C (Task 14):** pass rate by firm, type, size and strategy, and ranked breach reasons with their facts | Built | P6, Done in Plan 6C (BACKLOG #45) |
 | PF7 | Firm presets (plans, sizes, fees). Our own data only | Backlog #24 | B#24 |
 | PF8 | Importing prop fees from a bank feed | New | B#10 |
 
@@ -193,10 +193,10 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 
 | ID | Feature | Keel today | Goes |
 |---|---|---|---|
-| DA1 | Saved dashboard layouts with widgets you add and remove | E51 | P6 |
-| DA2 | Charts for account balance, drawdown, performance by time of day and by duration | Built (partly) | P6 |
-| DA3 | The progress tracker's score and heatmap as a dashboard card. **Built in Plan 6A (Task 10):** the dashboard's Progress tracker card, which took the Goals card's place (U4). It becomes a removable widget with #46. | Built | P6, Done in Plan 6A |
-| DA4 | A composite performance score of our own | Backlog #23 | B#23 |
+| DA1 | Saved dashboard layouts with widgets you add and remove. **Built in Plan 6C (Tasks 5 to 10):** several templates in the prefs, each with an upper strip of at most five of 12 figure widgets and a lower grid of 17 larger ones, a template menu and an edit mode (add, remove, move, rename, delete). Keel's own Your plan, Mistakes and Performance cards left the dashboard (D2) | Built | P6, Done in Plan 6C |
+| DA2 | Charts for account balance, drawdown, performance by time of day and by duration. **Built in Plan 6C (Task 9):** as widgets: account balance with deposits and withdrawals, drawdown, and trade time and trade duration scatters | Built | P6, Done in Plan 6C |
+| DA3 | The progress tracker's score and heatmap as a dashboard card. **Built in Plan 6A (Task 10):** the dashboard's Progress tracker card, which took the Goals card's place (U4). It is now a removable widget (Plan 6C, #46). | Built | P6, Done in Plan 6A |
+| DA4 | A composite performance score. **Built in Plan 6C (Tasks 3 and 9):** TradeZella's score's behaviour (six components, weights and curves) in Keel's own name, "Edge score", words and look, as a dashboard widget (D1). Corrects "of our own" | Built | P6, Done in Plan 6C (BACKLOG #23) |
 
 ## Getting started
 
