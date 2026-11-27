@@ -60,18 +60,21 @@ function download(blob: Blob, name: string): void {
  * link would. Closing the sheet is the visitor's choice, not a failure.
  */
 async function saveImage(blob: Blob, name: string): Promise<void> {
-  const file = new File([blob], name, { type: 'image/png' });
-  if (
-    matchMedia('(pointer: coarse)').matches &&
-    typeof navigator.share === 'function' &&
-    navigator.canShare?.({ files: [file] })
-  ) {
-    try {
+  // The whole check is inside the try, and nothing awaits before `share`: it must run in the
+  // click's own turn (the share sheet needs the tap's activation), and a browser whose
+  // `canShare` throws still saves the file.
+  try {
+    const file = new File([blob], name, { type: 'image/png' });
+    if (
+      matchMedia('(pointer: coarse)').matches &&
+      typeof navigator.share === 'function' &&
+      navigator.canShare?.({ files: [file] })
+    ) {
       await navigator.share({ files: [file] });
       return;
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'AbortError') return;
     }
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') return;
   }
   download(blob, name);
 }

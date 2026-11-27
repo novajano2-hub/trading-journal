@@ -225,8 +225,10 @@ describe('Download image on a device that can share (D-05)', () => {
     pointer('coarse');
     const share = sharing();
     renderPanel();
-    await press();
-    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    await screen.findByRole('img');
+    fireEvent.click(screen.getByRole('button', { name: 'Download image' }));
+    // In the click's own turn, with no await before it: the share sheet needs the tap's activation.
+    expect(share).toHaveBeenCalledTimes(1);
     const { files } = share.mock.calls[0]![0] as { files: File[] };
     expect(files).toHaveLength(1);
     expect(files[0]!.name).toBe('keel-calendar-2026-11.png');
@@ -270,6 +272,18 @@ describe('Download image on a device that can share (D-05)', () => {
     await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
     await new Promise((r) => setTimeout(r, 30));
     expect(clicks).toEqual([]);
+  });
+
+  test('a canShare that throws saves the file instead of failing quietly', async () => {
+    pointer('coarse');
+    const share = sharing(undefined, () => {
+      throw new TypeError('canShare is not supported here');
+    });
+    renderPanel();
+    await press();
+    await waitFor(() => expect(clicks).toHaveLength(1));
+    expect(clicks[0]!.download).toBe('keel-calendar-2026-11.png');
+    expect(share).not.toHaveBeenCalled();
   });
 
   test('a share sheet that fails falls back to saving the file', async () => {
