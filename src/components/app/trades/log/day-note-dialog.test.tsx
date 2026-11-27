@@ -7,6 +7,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
+import type { Editor } from '@tiptap/core';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -257,6 +258,8 @@ async function menuKeeps(dialog: HTMLElement) {
       .getAllByRole('menuitem')
       .map((i) => i.textContent),
   ).toEqual(['Export as PDF', 'Export as Keel note', 'Import a Keel note']);
+  // It fades over a dialog: a closing menu takes no pointer (`!` beats Radix's inline value).
+  expect(menu.className).toContain('data-[state=closed]:pointer-events-none!');
   fireEvent.keyDown(menu, { key: 'Escape' });
   await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
 }
@@ -565,6 +568,68 @@ test('after a restore, the star saves on top of the restored text, not the copy 
     ),
   );
   // Starring did not bring the old text back.
+  expect((await repo.journal.get(WS, 'note-2026-11-23'))!.body).toEqual(
+    earlier,
+  );
+});
+
+test('a failed write followed by a restore does not flush the old text over the restored note, and the failure is let go', async () => {
+  const earlier = {
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        content: [{ type: 'text', text: 'An earlier day' }],
+      },
+    ],
+  };
+  const { repo } = await renderApp({ journal: [dailyNote('2026-11-23')] });
+  await repo.noteVersions.keep(WS, 'note-2026-11-23', earlier, 'auto');
+  const dialog = await open(MON, 'View note');
+  const box = await within(dialog).findByRole('textbox', {
+    name: 'Daily note',
+  });
+  // Typed text whose write fails: the dialog says so, and holds the text.
+  vi.spyOn(repo.journal, 'save').mockRejectedValueOnce(new Error('disk full'));
+  const editor = (box as unknown as { editor: Editor }).editor;
+  act(() => {
+    editor.commands.insertContent(' and then some typed text');
+  });
+  expect(
+    await within(dialog).findByText("Couldn't save. Press Save to try again.", {
+      exact: false,
+    }),
+  ).toBeTruthy();
+
+  // A restore lands (it is its own write, and it succeeds).
+  fireEvent.click(
+    await within(dialog).findByRole('button', { name: 'Version history' }),
+  );
+  const history = await screen.findByRole('dialog', {
+    name: 'Version history',
+  });
+  fireEvent.click(
+    await within(history).findByRole('button', {
+      name: 'Restore this version',
+    }),
+  );
+  const ask = await screen.findByRole('dialog', {
+    name: 'Restore this version?',
+  });
+  await act(async () => {
+    fireEvent.click(within(ask).getByRole('button', { name: 'Restore' }));
+  });
+  await within(dialog).findByText(/^Restored the version from/);
+  // The failure is let go with the text it was about.
+  await waitFor(() =>
+    expect(
+      within(dialog).queryByText("Couldn't save. Press Save to try again."),
+    ).toBeNull(),
+  );
+
+  // Save writes what is waiting: nothing is, so the restored note stands.
+  fireEvent.click(await within(dialog).findByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   expect((await repo.journal.get(WS, 'note-2026-11-23'))!.body).toEqual(
     earlier,
   );

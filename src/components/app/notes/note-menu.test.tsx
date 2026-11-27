@@ -83,6 +83,8 @@ test('the menu offers both exports and an import', async () => {
       .getAllByRole('menuitem')
       .map((i) => i.textContent),
   ).toEqual(['Export as PDF', 'Export as Keel note', 'Import a Keel note']);
+  // A closing menu takes no pointer, inside a dialog too.
+  expect(menu.className).toContain('data-[state=closed]:pointer-events-none!');
 });
 
 test('Export as Keel note downloads the note as it stands now', async () => {

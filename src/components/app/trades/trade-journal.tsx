@@ -430,14 +430,17 @@ function NoteBody({
       ensureNoteId={ensureNoteId}
       templateSlot={templateSlot}
       // The store has the restored text: the next write (a star) builds on that
-      // note, and text typed before it that was still waiting is let go.
+      // note. Text typed before it, waiting or held after a failed write, is let
+      // go with the failure, or the next settle would write it over the restore.
       onRestored={(restored) => {
         note.current = Promise.resolve(restored);
         if (timer.current !== undefined) {
           clearTimeout(timer.current);
           timer.current = undefined;
-          onStatus('saved');
         }
+        latest.current = undefined;
+        failed.current = false;
+        onStatus('saved');
       }}
       onChange={(doc) => {
         latest.current = doc;

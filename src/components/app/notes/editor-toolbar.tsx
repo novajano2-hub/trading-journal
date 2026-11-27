@@ -513,13 +513,15 @@ const BTN =
   'relative inline-flex h-[30px] min-w-[30px] flex-none items-center justify-center gap-1 rounded-[7px] px-1.5 text-[13px] font-medium whitespace-nowrap text-muted hover:bg-surface-1 hover:text-text aria-pressed:bg-surface-1 aria-pressed:text-accent-ink aria-pressed:shadow-[var(--shadow-chip)] data-[state=open]:bg-surface-1 data-[state=open]:text-text disabled:opacity-40 disabled:hover:bg-transparent pointer-coarse:h-11 pointer-coarse:min-w-11';
 const TEXT_BTN = `${BTN} px-2 text-text`;
 // A menu that is closing takes no pointer: while it fades, Radix would still
-// focus an item the pointer passes over, and pull the keyboard back from the text.
+// focus an item the pointer passes over, and pull the keyboard back from the
+// text. The `!` matters: inside a modal dialog Radix gives the menu an inline
+// pointer-events of auto, which a plain class does not beat.
 const MENU =
-  'z-[60] max-h-(--radix-dropdown-menu-content-available-height) min-w-[200px] max-w-[320px] origin-(--radix-dropdown-menu-content-transform-origin) overflow-y-auto rounded-[12px] border border-line bg-surface-1 p-1.5 text-text shadow-[var(--shadow)] outline-none data-[state=closed]:pointer-events-none motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in';
+  'z-[60] max-h-(--radix-dropdown-menu-content-available-height) min-w-[200px] max-w-[320px] origin-(--radix-dropdown-menu-content-transform-origin) overflow-y-auto rounded-[12px] border border-line bg-surface-1 p-1.5 text-text shadow-[var(--shadow)] outline-none data-[state=closed]:pointer-events-none! motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in';
 // On a phone a menu is a sheet from the bottom edge; note-prose.css pins its
 // popper wrapper there, and the shadow is the veil over the page.
 const SHEET =
-  'note-sheet z-[60] data-[state=closed]:pointer-events-none max-h-[88dvh] w-full overflow-y-auto rounded-t-[16px] border-t border-line bg-surface-1 p-1.5 pb-[calc(10px+env(safe-area-inset-bottom))] text-text shadow-[0_0_0_100vmax_var(--veil)] outline-none';
+  'note-sheet z-[60] data-[state=closed]:pointer-events-none! max-h-[88dvh] w-full overflow-y-auto rounded-t-[16px] border-t border-line bg-surface-1 p-1.5 pb-[calc(10px+env(safe-area-inset-bottom))] text-text shadow-[0_0_0_100vmax_var(--veil)] outline-none';
 
 const itemClass = (phone: boolean, marked: boolean) =>
   `relative flex cursor-pointer items-center gap-2 rounded-[8px] ${
@@ -703,7 +705,7 @@ function MenuBody({
  * `editor.commands.focus()`: that waits a frame, and a key typed in that frame
  * lands on the menu that is closing.
  */
-function focusText(editor: Editor): void {
+export function focusText(editor: Editor): void {
   if (!editor.isDestroyed) editor.view.focus();
 }
 
@@ -873,6 +875,8 @@ export interface TemplateSlotProps {
   trigger: React.ReactElement;
   open?: boolean;
   onOpenChange?(open: boolean): void;
+  /** Pass to the menu's content: keeps the keyboard in the text as the menu goes (see `TemplateMenu`). */
+  onCloseAutoFocus?(event: Event, picked: boolean): void;
 }
 
 /** Draws the host's own template menu on the toolbar's trigger (Insert's group). */
@@ -1073,6 +1077,12 @@ export function EditorToolbar({
                 // Closed without a choice: back to the text, not to a button that is not there.
                 if (!next) setTimeout(() => focusText(editor), 0);
               },
+              // Picked or not, never to the anchor: it is hidden, and Radix
+              // would send the keyboard there as the menu unmounts.
+              onCloseAutoFocus: (event) => {
+                event.preventDefault();
+                focusText(editor);
+              },
             }
           : {
               trigger: (
@@ -1081,6 +1091,13 @@ export function EditorToolbar({
                   Template
                 </Trigger>
               ),
+              // A pick leaves the keyboard in the text, as the other menus do;
+              // Escape still returns to the button.
+              onCloseAutoFocus: (event, picked) => {
+                if (!picked) return;
+                event.preventDefault();
+                focusText(editor);
+              },
             },
       )
     : null;

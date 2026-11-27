@@ -21,6 +21,7 @@ import type { Repository } from '@/data/repository';
 import type { FrozenDay } from '@/domain/types';
 import { fakeIntersectionObserver } from '../__fixtures__/intersection';
 import { renderApp } from '../__fixtures__/render-app';
+import { TemplateMenu } from '../day/template-menu';
 import { NoteEditor, type NoteEditorProps } from './note-editor';
 
 vi.mock('next/navigation', () => import('../__fixtures__/navigation'));
@@ -474,6 +475,54 @@ test('a read-only note with no stored id has no history to open', async () => {
   app(newRepo(), { readOnly: true });
   await screen.findByRole('textbox', { name: 'Note' });
   expect(screen.queryByRole('button', { name: 'Version history' })).toBeNull();
+});
+
+// A host's own menu, drawn on the toolbar's trigger, as the day card has it.
+const dailyTemplates: NonNullable<NoteEditorProps['templateSlot']> = (slot) => (
+  <TemplateMenu {...slot} onPick={() => {}} />
+);
+
+test('after a template is picked the keyboard is in the text, not on the Template button the closing menu would return it to', async () => {
+  app(newRepo(), { templateSlot: dailyTemplates });
+  const textbox = await screen.findByRole('textbox', { name: 'Note' });
+  const button = await screen.findByRole('button', {
+    name: 'Insert a template',
+  });
+  fireEvent.keyDown(button, { key: 'Enter' });
+  fireEvent.click(
+    await screen.findByRole('menuitem', { name: 'Daily game plan' }),
+  );
+  // The menu has gone, and with it Radix's return of the focus to its trigger.
+  await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+  await new Promise((r) => setTimeout(r, 50));
+  expect(document.activeElement).toBe(textbox);
+});
+
+test('on a phone the template menu, picked or not, leaves the keyboard in the text and not on its hidden anchor', async () => {
+  window.innerWidth = 390;
+  try {
+    app(newRepo(), { templateSlot: dailyTemplates });
+    const textbox = await screen.findByRole('textbox', { name: 'Note' });
+    for (const pick of [false, true]) {
+      fireEvent.keyDown(
+        await screen.findByRole('button', { name: 'More tools' }),
+        { key: 'Enter' },
+      );
+      const more = await screen.findByRole('menuitem', { name: 'Template' });
+      await new Promise((r) => setTimeout(r, 400));
+      fireEvent.click(more);
+      const item = await screen.findByRole('menuitem', {
+        name: 'Daily game plan',
+      });
+      if (pick) fireEvent.click(item);
+      else fireEvent.keyDown(item, { key: 'Escape' });
+      await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+      await new Promise((r) => setTimeout(r, 50));
+      expect(document.activeElement, pick ? 'picked' : 'escaped').toBe(textbox);
+    }
+  } finally {
+    window.innerWidth = 1024;
+  }
 });
 
 // ---- the template slot -----------------------------------------------------------

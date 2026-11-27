@@ -780,6 +780,8 @@ test('Move up and Move down move a block', async () => {
     return screen.findByRole('menu');
   };
   let menu = await open();
+  // A closing menu takes no pointer, inside a dialog too (the `!` beats Radix's inline value).
+  expect(menu.className).toContain('data-[state=closed]:pointer-events-none!');
   fireEvent.click(within(menu).getByRole('menuitem', { name: 'Move down' }));
   await waitFor(() =>
     expect((json(editor).content ?? []).map(textOf)).toEqual([

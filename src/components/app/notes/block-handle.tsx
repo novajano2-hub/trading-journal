@@ -11,7 +11,7 @@ import type { Editor } from '@tiptap/core';
 import { DragHandle } from '@tiptap/extension-drag-handle-react';
 import { DropdownMenu } from 'radix-ui';
 import { useRef, useState } from 'react';
-import { ariaKeys, keyLabel } from './editor-toolbar';
+import { ariaKeys, focusText, keyLabel } from './editor-toolbar';
 import { blockHoverKey } from './extensions/block-hover';
 import { blockPosOf } from './extensions/blocks';
 
@@ -24,7 +24,7 @@ const PLACEMENT = { placement: 'left-start', strategy: 'absolute' } as const;
 const HANDLE_BUTTON =
   'inline-grid h-[22px] w-[18px] place-items-center rounded-[5px] text-faint hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent aria-expanded:bg-sunken aria-expanded:text-text';
 const MENU =
-  'z-[60] min-w-[200px] overflow-y-auto rounded-[12px] border border-line bg-surface-1 p-1.5 text-text shadow-[var(--shadow)] outline-none motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in';
+  'z-[60] min-w-[200px] overflow-y-auto rounded-[12px] border border-line bg-surface-1 p-1.5 text-text shadow-[var(--shadow)] outline-none data-[state=closed]:pointer-events-none! motion-safe:data-[state=closed]:animate-tip-out motion-safe:data-[state=open]:animate-pop-in';
 const ITEM =
   'relative flex min-h-9 cursor-pointer items-center justify-between gap-6 rounded-[8px] px-2.5 text-[13.5px] text-text outline-none select-none data-[disabled]:cursor-default data-[disabled]:text-faint data-[highlighted]:bg-sunken';
 
@@ -149,7 +149,7 @@ export function BlockHandle({ editor }: { editor: Editor }): React.JSX.Element {
               aria-label="Block"
               onCloseAutoFocus={(e) => {
                 e.preventDefault();
-                if (!editor.isDestroyed) editor.commands.focus();
+                focusText(editor);
               }}
             >
               <DropdownMenu.Item

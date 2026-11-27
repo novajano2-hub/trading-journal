@@ -10,7 +10,7 @@ import {
   within,
 } from '@testing-library/react';
 import { Editor } from '@tiptap/core';
-import { DropdownMenu } from 'radix-ui';
+import { Dialog, DropdownMenu } from 'radix-ui';
 import { EditorToolbar, type TemplateSlot } from './editor-toolbar';
 import { noteExtensions } from './extensions';
 import { NoteEditor } from './note-editor';
@@ -737,7 +737,7 @@ test('a menu that is closing cannot pull focus or the pointer back: its class tu
   const { editor } = setup();
   await openMenu(STYLE);
   expect(screen.getByRole('menu').className).toContain(
-    'data-[state=closed]:pointer-events-none',
+    'data-[state=closed]:pointer-events-none!',
   );
   fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
   await waitFor(() => expect(screen.queryAllByRole('menu')).toHaveLength(0));
@@ -748,7 +748,31 @@ test('a menu that is closing cannot pull focus or the pointer back: its class tu
   render(<EditorToolbar editor={editor} />);
   await openMenu('More tools');
   expect(screen.getByRole('menu').className).toContain(
-    'data-[state=closed]:pointer-events-none',
+    'data-[state=closed]:pointer-events-none!',
+  );
+});
+
+test('inside a modal dialog Radix gives a menu an inline pointer-events of auto, so only an important class can turn the pointer off while it fades', async () => {
+  const { editor } = setup();
+  cleanup();
+  render(
+    <Dialog.Root open>
+      <Dialog.Portal>
+        <Dialog.Content aria-describedby={undefined}>
+          <Dialog.Title>Day note</Dialog.Title>
+          <EditorToolbar editor={editor} />
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>,
+  );
+  await openMenu(STYLE);
+  const menu = screen.getByRole('menu');
+  // The layer that disables the page's pointer events enables the menu's own, inline.
+  expect(menu.style.pointerEvents).toBe('auto');
+  // An inline style beats a plain utility class; the `!` form is the one that wins.
+  expect(menu.className).toContain('data-[state=closed]:pointer-events-none!');
+  expect(menu.className).not.toMatch(
+    /data-\[state=closed\]:pointer-events-none(?!!)/,
   );
 });
 

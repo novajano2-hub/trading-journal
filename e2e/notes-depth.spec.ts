@@ -260,3 +260,42 @@ test('typing straight after a toolbar menu choice lands in the note, not on the 
     'Range held until the break held and so did the plan',
   );
 });
+
+test('typing straight after a toolbar menu choice inside the Day note dialog lands in the note, not on the fading menu', async ({
+  page,
+}) => {
+  // Inside a Radix modal, a menu is given an inline pointer-events of auto by
+  // the layer that disables the page; only an important class beats that.
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/app/trades/day');
+  const card = page.getByRole('article').first();
+  await expect(card).toBeVisible({ timeout: 30_000 });
+  await card.getByRole('button', { name: /^(Add|View) note$/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Day note' });
+  const note = dialog.getByRole('textbox', { name: 'Daily note' });
+  await expect(note).toHaveAttribute('contenteditable', 'true');
+  await note.click();
+  await page.keyboard.press('ControlOrMeta+End');
+  await page.keyboard.type(' range held');
+
+  await dialog.getByRole('button', { name: /^Style:/ }).click();
+  const item = page.getByRole('menuitemradio', {
+    name: 'Heading 2',
+    exact: true,
+  });
+  const at = (await item.boundingBox())!;
+  await item.click();
+  // The pointer moves over the menu as it fades, and the keys come at once.
+  await page.mouse.move(at.x + 12, at.y + 10);
+  await page.keyboard.press('End');
+  await page.keyboard.type(' until the close held');
+  await page.mouse.move(at.x + 14, at.y + 12);
+  await page.keyboard.type(' and so did the plan');
+  // The keys went to the note, in the heading the choice made (a space or an
+  // Enter on the menu would have chosen the item again and undone it).
+  await expect(
+    note
+      .locator('h2')
+      .filter({ hasText: 'until the close held and so did the plan' }),
+  ).toHaveCount(1);
+});
