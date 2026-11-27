@@ -1,4 +1,5 @@
 import type { TradeUnit } from '@/domain/metrics/units';
+import type { DisplayUnit } from '@/domain/types';
 
 /** How each unit that narrows the trade set is named, and the trades it keeps, in words. */
 export const UNIT_SCOPE: Record<TradeUnit, { name: string; keeps: string }> = {
@@ -19,3 +20,14 @@ export function unitEmptyCopy(
     body: `${name} counts ${keeps} only.`,
   };
 }
+
+/** What each display unit says in a caption: "in dollars", "with amounts hidden". The snapshot and the printed report read it. */
+export const UNIT_WORDS: Record<DisplayUnit, string> = {
+  dollar: 'in dollars',
+  percent: 'in percent',
+  r: 'in R',
+  ticks: 'in ticks',
+  pips: 'in pips',
+  points: 'in points',
+  privacy: 'with amounts hidden',
+};

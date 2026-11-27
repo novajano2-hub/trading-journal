@@ -15,10 +15,16 @@ import { createLocalRepository } from '@/data/local/local-repository';
 import type { NewAccount, Repository } from '@/data/repository';
 import type { UserPrefs } from '@/domain/types';
 import { useActiveWorkspace, useSetActiveWorkspace } from '@/data/query/hooks';
+import { holdPlans } from '@/lib/import/__fixtures__/held-plans';
 import { renderApp } from '../__fixtures__/render-app';
 import { ImportFlow } from './import-flow';
 
 vi.mock('next/navigation', () => import('../__fixtures__/navigation'));
+// The real plan client (no Worker here), watched; a test can hold the plans.
+vi.mock('@/lib/import/plan-client', async (original) => {
+  const actual = await original<typeof import('@/lib/import/plan-client')>();
+  return { ...actual, planInWorker: vi.fn(actual.planInWorker) };
+});
 MotionGlobalConfig.skipAnimations = true;
 
 afterEach(cleanup);
@@ -87,6 +93,33 @@ async function toPreview(
 const tile = (name: string) =>
   within(screen.getByRole('region', { name: 'What Keel read' })).getByText(name)
     .parentElement!;
+
+test('Preview says it is reading the file until the plan is made, then shows it', async () => {
+  const plans = holdPlans();
+  await toPreview(csv([TRIPS, row('200.00', '09'), row('10.00', '10')]));
+  expect(await screen.findByRole('status')).toHaveProperty(
+    'textContent',
+    'Reading the file...',
+  );
+  expect(screen.queryByRole('region', { name: 'What Keel read' })).toBeNull();
+  // The plan that is awaited is the Preview's own, the latest one asked for.
+  await waitFor(() => expect(plans.length).toBeGreaterThan(1));
+  plans.at(-1)!.resolve();
+  const tiles = await screen.findByRole('region', { name: 'What Keel read' });
+  expect(within(tiles).getByText('Trades built')).toBeTruthy();
+  expect(screen.queryByText('Reading the file...')).toBeNull();
+});
+
+test('a plan that cannot be made says so and offers Back', async () => {
+  const plans = holdPlans();
+  await toPreview(csv([TRIPS, row('200.00')]));
+  await waitFor(() => expect(plans.length).toBeGreaterThan(1));
+  plans.at(-1)!.reject(new Error('the plan failed'));
+  expect((await screen.findByRole('alert')).textContent).toMatch(
+    /couldn.t read this account.s trades/,
+  );
+  expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
+});
 
 test('the tiles match the plan, and a P&L mismatch row says what the file says', async () => {
   await toPreview(

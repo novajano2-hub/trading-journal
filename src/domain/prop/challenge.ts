@@ -12,6 +12,7 @@ import type {
   Trade,
 } from '../types';
 import { evaluateProp, type PropStatus } from './evaluate';
+import { accountTrades, phaseTradesOf } from './phase';
 
 export type BreachFinding = {
   rule: 'daily-loss' | 'max-drawdown' | 'period-ended' | 'consistency';
@@ -55,13 +56,27 @@ export function drawdownLabel(t: DrawdownType): string {
       : 'Trailing drawdown';
 }
 
-/** "12 Nov". */
-function shortDate(date: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'UTC',
-    day: 'numeric',
-    month: 'short',
-  }).format(new Date(`${date}T00:00:00Z`));
+// Spelled out, not read from Intl: the en-GB short month for September is
+// "Sept" in current engines, and Keel writes "Sep".
+const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+
+/** "12 Nov", from YYYY-MM-DD. */
+export function shortDate(date: string): string {
+  const [, month, day] = date.split('-');
+  return `${Number(day)} ${MONTHS[Number(month) - 1]}`;
 }
 
 /** The sentence the card shows, and the failure reason it saves. `money` formats cents without a sign. */
@@ -144,14 +159,8 @@ function phaseCheck(
   const account = accounts.find((a) => a.id === phase.accountId);
   if (!account) return { step: phase.step, archived: false };
   // The account holds every trade of its own, whatever the phase's start date.
-  const all = trades.filter(
-    (t) => t.accountId === account.id && t.pnlCurrency === account.currency,
-  );
-  const own = all.filter(
-    (t) =>
-      phase.startDate === undefined ||
-      localDate(t.closedAt ?? t.openedAt, ctx.timeZone) >= phase.startDate,
-  );
+  const all = accountTrades(account, trades);
+  const own = phaseTradesOf(phase.startDate, all, ctx.timeZone);
   return {
     step: phase.step,
     accountId: account.id,
@@ -239,4 +248,36 @@ export function checkChallenge(
     daysLeft: state?.period?.daysLeft ?? null,
     phases,
   };
+}
+
+/**
+ * How urgent a challenge is, the least first: a breach to confirm, a limit
+ * near, a target met, then the rest of the active ones, then those passed and
+ * those breached. The Prop firms page sorts its cards by it.
+ */
+export function urgencyOf(c: Challenge, check: ChallengeCheck): number {
+  if (c.status === 'active') {
+    if (check.health === 'breached') return 0;
+    if (check.health === 'near') return 1;
+    if (check.health === 'target-met') return 2;
+    return 3;
+  }
+  return c.status === 'passed' ? 4 : 5;
+}
+
+/**
+ * The challenge a dashboard widget shows: the one asked for, when it is still
+ * there, else the most urgent (as the Prop firms page sorts, so an active one
+ * comes before any passed or breached one). Undefined with no challenge.
+ */
+export function shownChallenge<
+  T extends { c: Challenge; check: ChallengeCheck },
+>(rows: readonly T[], asked: string | undefined): T | undefined {
+  const named =
+    asked === undefined ? undefined : rows.find((r) => r.c.id === asked);
+  if (named) return named;
+  // The sort is stable, so equally urgent challenges stay in their stored order.
+  return [...rows].sort(
+    (a, b) => urgencyOf(a.c, a.check) - urgencyOf(b.c, b.check),
+  )[0];
 }

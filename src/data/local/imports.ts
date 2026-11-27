@@ -27,6 +27,7 @@ import { META, type ImportJobRecord } from './schema';
 import { pruneJournalLinks } from './journal';
 import { readPrefs } from './prefs';
 import { withDefaultRules } from './rule-shared';
+import { rebuiltUnder } from './cost-method';
 import { rwTx } from './tx';
 
 /** The job as the history shows it, without what dedupe and undo work from. */
@@ -368,6 +369,7 @@ export function localImports(ctx: LocalContext): ImportRepo {
             workspaceId: ws,
             accountId,
             accountCurrency: account.currency,
+            ...(account.costMethod && { costMethod: account.costMethod }),
             nextSerial: highest + 1,
             openTrades: openTrades.sort((a, b) => a.serial - b.serial),
             fingerprints: jobs.flatMap((j) => j.fingerprints),
@@ -493,8 +495,8 @@ export function localImports(ctx: LocalContext): ImportRepo {
           if (!job) throw new NotFoundError('import', jobId);
           if (job.status === 'undone') return { ok: true };
           // An archived account is read-only: undo would delete and restore its trades.
-          const archived =
-            (await db.accounts.get([ws, job.accountId]))?.status === 'archived';
+          const account = await db.accounts.get([ws, job.accountId]);
+          const archived = account?.status === 'archived';
           if (archived)
             throw new ArchivedAccountError([job.accountId], job.tradeIds);
           // Trades the user has deleted since the import are simply not found.
@@ -527,7 +529,17 @@ export function localImports(ctx: LocalContext): ImportRepo {
             ws,
             gone.map((id) => `trade:${id}`),
           );
-          await db.trades.bulkPut(await withLiveReferences(db, ws, restored));
+          // The snapshot was built under the method of its day: the account's current one rebuilds it (C40).
+          const live = await withLiveReferences(db, ws, restored);
+          await db.trades.bulkPut(
+            account
+              ? rebuiltUnder(
+                  live,
+                  account.costMethod ?? 'fifo',
+                  account.currency,
+                )
+              : live,
+          );
           await db.imports.put({
             ...job,
             status: 'undone',

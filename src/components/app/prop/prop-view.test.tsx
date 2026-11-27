@@ -11,12 +11,13 @@ import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
+import type { Repository } from '@/data/repository';
 import { SAMPLE_WORKSPACE } from '@/data/workspaces';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import type { Account, Challenge, PropRuleSet, Trade } from '@/domain/types';
 import { renderApp } from '../__fixtures__/render-app';
 import { maskedReason } from './challenge-card';
-import { PropView } from './prop-view';
+import { AccountsTab } from './accounts-tab';
 
 vi.mock('next/navigation', () => import('../__fixtures__/navigation'));
 MotionGlobalConfig.skipAnimations = true;
@@ -68,6 +69,18 @@ const challenge = (over: Partial<Challenge>): Challenge => ({
   ...over,
 });
 
+/**
+ * The Accounts tab on its Grid layout: a card a challenge, as the Prop firms
+ * page listed them before the tabs. `tab` is the sub-tab, for a funded one.
+ */
+async function renderGrid(opts: { repository: Repository; tab?: string }) {
+  await opts.repository.prefs.update({ propLayout: 'grid' });
+  return renderApp(<AccountsTab />, {
+    repository: opts.repository,
+    url: `/app/prop-firms/accounts${opts.tab ? `?tab=${opts.tab}` : ''}`,
+  });
+}
+
 function repo(
   extra: {
     accounts?: Account[];
@@ -99,32 +112,32 @@ function repo(
   });
 }
 
-test('the Forex card reads Step 1 of 2 and labels its drawdown from its type', async () => {
-  renderApp(<PropView />, {
+test('the Forex card reads its firm and step, its balance and type, and labels its drawdown from its type', async () => {
+  await renderGrid({
     repository: repo({
       accounts: [prop('p-forex', 'Forex evaluation')],
       challenges: [challenge({})],
     }),
-    url: '/app/prop-firms',
   });
   const card = await screen.findByRole('article', { name: 'Forex 100K' });
-  expect(within(card).getByText('Step 1 of 2')).toBeTruthy();
-  expect(within(card).getByText('Trailing drawdown')).toBeTruthy();
+  expect(card.textContent).toContain('Apex, step 1');
+  expect(card.textContent).toContain('$100,000.00');
+  expect(card.textContent).toContain('from $100,000.00, 2-step');
+  expect(within(card).getByText('Max drawdown, trailing')).toBeTruthy();
   expect(within(card).getByText('Active')).toBeTruthy();
-  expect(card.textContent).toContain('Fees $549.00 + $149.00');
   // Nothing suggests a change on a clean phase.
   expect(
     within(card).queryByRole('button', { name: 'Mark as breached' }),
   ).toBeNull();
 });
 
-test('a broken rule on an active challenge offers Mark as breached, and saves the status and reason', async () => {
+test('a broken rule on an active challenge offers Mark as breached, which asks why before it writes anything', async () => {
   const r = repo({
     accounts: [prop('p-forex', 'Forex evaluation')],
     challenges: [challenge({})],
     loss: true,
   });
-  renderApp(<PropView />, { repository: r, url: '/app/prop-firms' });
+  await renderGrid({ repository: r });
   const card = await screen.findByRole('article', { name: 'Forex 100K' });
   const sentence =
     'Daily loss limit broken on 10 Nov (−$1,500.00 of −$1,000.00).';
@@ -134,20 +147,65 @@ test('a broken rule on an active challenge offers Mark as breached, and saves th
   fireEvent.click(
     within(card).getByRole('button', { name: 'Mark as breached' }),
   );
+  const dialog = await screen.findByRole('dialog', {
+    name: 'Mark Forex 100K as breached',
+  });
+  // No reason is chosen for the trader, and nothing is stored yet.
+  expect(
+    (
+      within(dialog).getByRole('button', {
+        name: 'Mark as breached',
+      }) as HTMLButtonElement
+    ).disabled,
+  ).toBe(true);
+  expect((await r.challenges.list(WS))[0]!.status).toBe('active');
+});
+
+test('Mark as breached dates the breach on the day the rule broke, not today (C34), and the card moves to Breached', async () => {
+  const r = repo({
+    accounts: [prop('p-forex', 'Forex evaluation')],
+    challenges: [challenge({})],
+    loss: true,
+  });
+  await renderGrid({ repository: r });
+  const card = await screen.findByRole('article', { name: 'Forex 100K' });
+  fireEvent.click(
+    await within(card).findByRole('button', { name: 'Mark as breached' }),
+  );
+  const dialog = await screen.findByRole('dialog');
+  fireEvent.click(within(dialog).getByRole('radio', { name: /max drawdown/ }));
+  fireEvent.click(
+    within(dialog).getByRole('button', { name: 'Mark as breached' }),
+  );
+  // The finding is dated 10 Nov, the loss's day: a breach is permanent, so
+  // the date it keeps is that one, whenever the trader confirms it.
   await waitFor(async () => {
     const [saved] = await r.challenges.list(WS);
     expect(saved).toMatchObject({
       status: 'breached',
-      failureReason: sentence,
+      breachReason: 'max-drawdown',
+      breachedOn: '2026-11-10',
     });
   });
-  expect(await within(card).findByText('Breached')).toBeTruthy();
+  const todayNy = new Date().toLocaleDateString('en-CA', {
+    timeZone: 'America/New_York',
+  });
+  expect(todayNy > '2026-11-10').toBe(true);
+  // The card leaves Evaluations for Breached, where it reads why, and has no
+  // way back.
+  await waitFor(() => expect(screen.queryByRole('article')).toBeNull());
+  fireEvent.click(await screen.findByRole('tab', { name: 'Breached 1' }));
+  const breached = await screen.findByRole('article', { name: 'Forex 100K' });
+  expect(within(breached).getByText('Breached')).toBeTruthy();
+  expect(breached.textContent).toContain(
+    'Breached Tue 10 Nov: Broke the max drawdown',
+  );
   expect(
-    within(card).queryByRole('button', { name: 'Mark as breached' }),
+    within(breached).queryByRole('button', { name: 'Mark as breached' }),
   ).toBeNull();
 });
 
-test('a target met on the last evaluation step offers Mark step passed, which moves the challenge to funded and active', async () => {
+test('a target met on the last evaluation step offers Move to funded, which asks first and then moves the challenge to funded and active', async () => {
   const r = repo({
     accounts: [
       prop('p-one', 'Futures 50K evaluation', {
@@ -187,33 +245,44 @@ test('a target met on the last evaluation step offers Mark step passed, which mo
       }),
     ],
   });
-  renderApp(<PropView />, { repository: r, url: '/app/prop-firms' });
+  await renderGrid({ repository: r });
   const card = await screen.findByRole('article', { name: 'Futures 50K' });
   fireEvent.click(
-    await within(card).findByRole('button', { name: 'Mark step passed' }),
+    await within(card).findByRole('button', { name: 'Move to funded' }),
+  );
+  const dialog = await screen.findByRole('dialog', {
+    name: 'Move Futures 50K to funded?',
+  });
+  // Nothing moves until it is confirmed.
+  expect((await r.challenges.list(WS))[0]).toMatchObject({
+    phase: 'evaluation',
+  });
+  fireEvent.click(
+    within(dialog).getByRole('button', { name: 'Move to funded' }),
   );
   await waitFor(async () => {
     const [saved] = await r.challenges.list(WS);
+    // The funded phase starts active, as TradeZella stores it.
     expect(saved).toMatchObject({ phase: 'funded', status: 'active' });
   });
-  // The funded phase starts active, as TradeZella stores it.
-  expect(await within(card).findByText('Active')).toBeTruthy();
+  // The challenge left Evaluations for Funded.
+  await waitFor(() => expect(screen.queryByRole('article')).toBeNull());
+  expect(screen.getByRole('tab', { name: 'Funded 1' })).toBeTruthy();
 });
 
 test('an archived account reads Account archived', async () => {
-  renderApp(<PropView />, {
+  await renderGrid({
     repository: repo({
       accounts: [prop('p-forex', 'Forex evaluation', { status: 'archived' })],
       challenges: [challenge({})],
     }),
-    url: '/app/prop-firms',
   });
   const card = await screen.findByRole('article', { name: 'Forex 100K' });
   expect(within(card).getByText('Account archived')).toBeTruthy();
 });
 
 test('with no challenges it says so and offers New challenge', async () => {
-  renderApp(<PropView />, { repository: repo(), url: '/app/prop-firms' });
+  await renderGrid({ repository: repo() });
   expect(await screen.findByText('No challenges yet.')).toBeTruthy();
   expect(
     screen.getAllByRole('button', { name: /New challenge/ }).length,
@@ -274,13 +343,12 @@ const easy: PropRuleSet = {
 };
 
 test('a met step before an unlinked one says so and offers Edit to link the next', async () => {
-  renderApp(<PropView />, {
+  await renderGrid({
     repository: repo({
       accounts: [prop('p-forex', 'Forex evaluation', { propRules: easy })],
       challenges: [challenge({})],
       trades: stepOneMet('p-forex'),
     }),
-    url: '/app/prop-firms',
   });
   const card = await screen.findByRole('article', { name: 'Forex 100K' });
   expect(
@@ -289,7 +357,7 @@ test('a met step before an unlinked one says so and offers Edit to link the next
     ),
   ).toBeTruthy();
   expect(
-    within(card).queryByRole('button', { name: 'Mark step passed' }),
+    within(card).queryByRole('button', { name: 'Move to funded' }),
   ).toBeNull();
   fireEvent.click(
     within(card).getByRole('button', { name: 'Link the next step' }),
@@ -297,7 +365,7 @@ test('a met step before an unlinked one says so and offers Edit to link the next
   expect(await screen.findByRole('dialog')).toBeTruthy();
 });
 
-test('every evaluation step met with no funded account reads Passed; once funded it reads Active', async () => {
+test('every evaluation step met with no funded account reads Passed; once moved to funded it reads Active', async () => {
   const r = repo({
     accounts: [prop('p-forex', 'Forex evaluation', { propRules: easy })],
     challenges: [
@@ -308,14 +376,20 @@ test('every evaluation step met with no funded account reads Passed; once funded
     ],
     trades: stepOneMet('p-forex'),
   });
-  renderApp(<PropView />, { repository: r, url: '/app/prop-firms' });
+  await renderGrid({ repository: r });
   const card = await screen.findByRole('article', { name: 'Forex 100K' });
   expect(await within(card).findByText('Passed')).toBeTruthy();
+  fireEvent.click(within(card).getByRole('button', { name: 'Move to funded' }));
   fireEvent.click(
-    within(card).getByRole('button', { name: 'Mark step passed' }),
+    within(await screen.findByRole('dialog')).getByRole('button', {
+      name: 'Move to funded',
+    }),
   );
-  expect(await within(card).findByText('Active')).toBeTruthy();
-  expect(within(card).queryByText('Passed')).toBeNull();
+  // It moves to the Funded tab; there it reads Active.
+  fireEvent.click(await screen.findByRole('tab', { name: 'Funded 1' }));
+  const funded = await screen.findByRole('article', { name: 'Forex 100K' });
+  expect(within(funded).getByText('Active')).toBeTruthy();
+  expect(within(funded).queryByText('Passed')).toBeNull();
 });
 
 test('a stored passed challenge still gets the suggestion and the near chip, and reads Active', async () => {
@@ -324,7 +398,8 @@ test('a stored passed challenge still gets the suggestion and the near chip, and
     challenges: [challenge({ status: 'passed' })],
     loss: true,
   });
-  renderApp(<PropView />, { repository: r, url: '/app/prop-firms' });
+  // Keel's passed waits under Funded (C62).
+  await renderGrid({ repository: r, tab: 'funded' });
   const card = await screen.findByRole('article', { name: 'Forex 100K' });
   expect(
     await within(card).findByRole('button', { name: 'Mark as breached' }),
@@ -333,7 +408,7 @@ test('a stored passed challenge still gets the suggestion and the near chip, and
 });
 
 test('"Near a limit" shows for a funded challenge, as the loss-outlined chip', async () => {
-  renderApp(<PropView />, {
+  await renderGrid({
     repository: repo({
       accounts: [prop('p-forex', 'Forex funded')],
       challenges: [
@@ -348,7 +423,7 @@ test('"Near a limit" shows for a funded challenge, as the loss-outlined chip', a
       ],
       trades: losses('p-forex', 9),
     }),
-    url: '/app/prop-firms',
+    tab: 'funded',
   });
   const card = await screen.findByRole('article', { name: 'Forex 100K' });
   const chip = await within(card).findByText('Near a limit');
@@ -357,25 +432,41 @@ test('"Near a limit" shows for a funded challenge, as the loss-outlined chip', a
   expect(chip.className).not.toContain('bg-warn');
 });
 
-test('a failed save shows one live region on the card, with no nested alert', async () => {
+test('the card has one live region, and a failed Move to funded says so in its dialog', async () => {
   const r = repo({
-    accounts: [prop('p-forex', 'Forex evaluation')],
-    challenges: [challenge({})],
-    loss: true,
+    accounts: [
+      prop('p-one', 'Futures 50K evaluation', { propRules: { ...easy } }),
+    ],
+    challenges: [
+      challenge({
+        name: 'Futures 50K',
+        steps: 1,
+        phases: [{ step: 'step-1', accountId: 'p-one' }, { step: 'funded' }],
+      }),
+    ],
+    trades: stepOneMet('p-one'),
   });
   r.challenges.update = vi.fn().mockRejectedValue(new Error('no'));
-  renderApp(<PropView />, { repository: r, url: '/app/prop-firms' });
-  const card = await screen.findByRole('article', { name: 'Forex 100K' });
+  await renderGrid({ repository: r });
+  const card = await screen.findByRole('article', { name: 'Futures 50K' });
   fireEvent.click(
-    await within(card).findByRole('button', { name: 'Mark as breached' }),
+    await within(card).findByRole('button', { name: 'Move to funded' }),
   );
-  expect(await within(card).findByText(/Couldn.t save that/)).toBeTruthy();
+  const dialog = await screen.findByRole('dialog');
+  fireEvent.click(
+    within(dialog).getByRole('button', { name: 'Move to funded' }),
+  );
+  expect(await within(dialog).findByRole('alert')).toBeTruthy();
+  // Still where it was, and still one live region on the card.
+  expect((await r.challenges.list(WS))[0]).toMatchObject({
+    phase: 'evaluation',
+  });
   expect(
     card.querySelectorAll('[role="status"], [role="alert"], [aria-live]'),
   ).toHaveLength(1);
 });
 
-test('the funded track reads how much has been paid out', async () => {
+test('a funded card reads how much has been paid out', async () => {
   const r = repo({
     accounts: [prop('p-fund', 'Futures funded', { type: 'prop-funded' })],
     challenges: [
@@ -401,16 +492,13 @@ test('the funded track reads how much has been paid out', async () => {
     date: '2026-11-04',
     amount: 50_000,
   });
-  renderApp(<PropView />, { repository: r, url: '/app/prop-firms' });
+  await renderGrid({ repository: r, tab: 'funded' });
   const card = await screen.findByRole('article', { name: 'Forex 100K' });
-  expect(
-    await within(card).findByText(
-      /no target once funded, \$1,750\.00 paid out/,
-    ),
-  ).toBeTruthy();
+  expect(await within(card).findByText(/\$1,750\.00 paid out/)).toBeTruthy();
+  expect(card.textContent).toContain('no target once funded');
 });
 
-test('under Privacy no currency symbol is followed by a digit anywhere on the card', async () => {
+test('under Privacy no currency symbol is followed by a digit anywhere on a card', async () => {
   const r = repo({
     accounts: [
       prop('p-forex', 'Forex evaluation'),
@@ -432,10 +520,11 @@ test('under Privacy no currency symbol is followed by a digit anywhere on the ca
     loss: true,
   });
   await r.prefs.update({ displayUnit: 'privacy' });
-  renderApp(<PropView />, { repository: r, url: '/app/prop-firms' });
+  await renderGrid({ repository: r });
   const forex = await screen.findByRole('article', { name: 'Forex 100K' });
   await within(forex).findByRole('button', { name: 'Mark as breached' });
-  const gbp = screen.getByRole('article', { name: 'Failed GBP' });
+  fireEvent.click(screen.getByRole('tab', { name: 'Breached 1' }));
+  const gbp = await screen.findByRole('article', { name: 'Failed GBP' });
   for (const card of [forex, gbp]) {
     expect(card.textContent).not.toMatch(/\p{Sc}\s?\d/u);
     expect(card.textContent).not.toMatch(/\d,\d{3}/);
@@ -451,24 +540,4 @@ test.each([
 ])('maskedReason hides %s', (text, out) => {
   expect(maskedReason(text, true)).toBe(out);
   expect(maskedReason(text, false)).toBe(text);
-});
-
-test('?new=challenge opens the new-challenge form once and leaves the address clean', async () => {
-  const r = repo({
-    accounts: [prop('p-forex', 'Forex evaluation')],
-    challenges: [challenge({})],
-  });
-  renderApp(<PropView />, {
-    repository: r,
-    url: '/app/prop-firms?new=challenge&phase=funded',
-  });
-  expect(
-    await screen.findByRole('dialog', { name: 'New challenge' }),
-  ).toBeTruthy();
-  // The param goes with a replace; the rest of the address stays.
-  expect(window.location.search).toBe('?phase=funded');
-  fireEvent.keyDown(document.activeElement ?? document.body, {
-    key: 'Escape',
-  });
-  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 });

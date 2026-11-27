@@ -15,6 +15,7 @@ import { USER_WORKSPACE } from '../workspaces';
 import {
   useActiveWorkspace,
   useAddFile,
+  useChangeDashboards,
   useCommitImport,
   useCreateAccount,
   useCreateTagCategory,
@@ -32,6 +33,7 @@ import {
   useMoveTrades,
   useNoteVersions,
   usePatterns,
+  usePrefs,
   useRemoveAccount,
   useRemoveFeeRule,
   useReadFile,
@@ -901,4 +903,82 @@ test('kept versions list, restore and refresh the note and its list', async () =
       'auto',
     ]),
   );
+});
+
+test('useChangeDashboards hands the updater the prefs as stored now, and writes what it returns', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+  });
+  const Wrapper = ({ children }: { children: ReactNode }) => (
+    <DataProvider repository={repository} queryClient={queryClient}>
+      {children}
+    </DataProvider>
+  );
+  const { result } = renderHook(
+    () => ({ prefs: usePrefs(), change: useChangeDashboards() }),
+    { wrapper: Wrapper },
+  );
+  await waitFor(() => expect(result.current.prefs.data).toBeDefined());
+  expect(result.current.prefs.data!.dashboards).toBeUndefined();
+
+  // Another tab saved a template; this tab's cache has not heard of it yet.
+  const other = { id: 'other', name: 'Other', upper: [], lower: [] };
+  await repository.prefs.update({
+    dashboards: { inUse: 'other', templates: [other] },
+  });
+  const seen = vi.fn();
+  await act(async () => {
+    await result.current.change.mutateAsync((current) => {
+      seen(current.dashboards);
+      return {
+        inUse: 'other',
+        templates: [...current.dashboards!.templates, { ...other, id: 'b' }],
+      };
+    });
+  });
+  expect(seen).toHaveBeenCalledWith({ inUse: 'other', templates: [other] });
+  expect((await repository.prefs.get()).dashboards?.templates).toHaveLength(2);
+  // The cache follows the write.
+  await waitFor(() =>
+    expect(result.current.prefs.data!.dashboards?.templates).toHaveLength(2),
+  );
+});
+
+test('useChangeDashboards writes nothing when the updater throws, and rejects with its error', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+  const Wrapper = ({ children }: { children: ReactNode }) => (
+    <DataProvider
+      repository={repository}
+      queryClient={
+        new QueryClient({
+          defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+        })
+      }
+    >
+      {children}
+    </DataProvider>
+  );
+  const { result } = renderHook(() => useChangeDashboards(), {
+    wrapper: Wrapper,
+  });
+  class Refused extends Error {}
+  let caught: unknown;
+  await act(async () => {
+    await result.current
+      .mutateAsync(() => {
+        throw new Refused();
+      })
+      .catch((e: unknown) => (caught = e));
+  });
+  expect(caught).toBeInstanceOf(Refused);
+  expect((await repository.prefs.get()).dashboards).toBeUndefined();
 });

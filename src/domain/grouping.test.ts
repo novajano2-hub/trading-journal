@@ -209,6 +209,28 @@ describe('buildGroupedTrade', () => {
     expect(t.stops).toEqual(a.stops);
   });
 
+  test("is built under the account's cost method, and carries it", () => {
+    // 10 and 14 in, 20 out: FIFO closes the 10 lot (+1,000 cents), LIFO the 14 lot (+600).
+    const base = one([
+      fill('c1', 'buy', 1, 10, 0),
+      fill('c2', 'buy', 1, 14, 1),
+      fill('c3', 'sell', 1, 20, 2),
+    ]);
+    const lifo: BuildOptions = { ...opts, costMethodOf: () => 'lifo' };
+    expect(buildGroupedTrade(base.executions, base, opts)).toMatchObject({
+      gross: 1000,
+    });
+    expect(buildGroupedTrade(base.executions, base, lifo)).toMatchObject({
+      gross: 600,
+      costMethod: 'lifo',
+    });
+    // A stamp left by an earlier method does not outlive it.
+    const stamped = { ...base, costMethod: 'lifo' as const };
+    expect(
+      buildGroupedTrade(stamped.executions, stamped, opts),
+    ).not.toHaveProperty('costMethod');
+  });
+
   test('refuses no fills', () => {
     expect(() => buildGroupedTrade([], tripA(), opts)).toThrow();
   });

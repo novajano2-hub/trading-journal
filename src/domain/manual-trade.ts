@@ -8,7 +8,7 @@ import {
 } from './instruments';
 import { copySide, sidesOf, tradeRisk } from './risk';
 import { buildTrades, canonicalSymbol } from './trade-builder';
-import type { Instrument, LevelSide, Trade } from './types';
+import type { CostMethod, Instrument, LevelSide, Trade } from './types';
 
 export type ManualTradeError =
   'no-fills' | 'reversal' | 'option-fields' | 'multiplier' | 'bad-fill';
@@ -248,6 +248,8 @@ export function buildManualTrade(
     workspaceId: string;
     serial: number;
     accountCurrency: string;
+    /** The account's cost method; absent reads FIFO. */
+    costMethod?: CostMethod;
     id?: string;
   },
 ):
@@ -287,6 +289,7 @@ export function buildManualTrade(
       startSerial: ctx.serial,
       resolve: () => inst,
       accountCurrency: () => ctx.accountCurrency,
+      costMethodOf: () => ctx.costMethod ?? 'fifo',
     },
   );
   const [trade, ...rest] = result.trades;

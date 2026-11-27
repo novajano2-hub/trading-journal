@@ -58,6 +58,7 @@ export const DATA_TABLES = [
   'trackers',
   'days',
   'dayShots',
+  'propTxns',
   'files',
   'noteVersions',
   'history',

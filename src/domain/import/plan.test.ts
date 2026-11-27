@@ -804,3 +804,27 @@ describe('swap in a closed-trades import', () => {
     });
   });
 });
+
+describe("planImport and the account's cost method", () => {
+  // Two lots in, one out: the open part's realized P&L is the method's.
+  const OPEN =
+    H +
+    '2026-11-16 09:41:00,ESZ5,Buy,1,6000\n2026-11-16 09:42:00,ESZ5,Buy,1,6010\n2026-11-16 09:43:00,ESZ5,Sell,1,6020\n';
+
+  test("the context's method builds the trades and is stamped on them; unset reads FIFO", () => {
+    const grossOf = (c: ImportContext) => plan(OPEN, c).trades[0]!;
+    expect(grossOf(ctx())).toMatchObject({ gross: 100000 });
+    expect(grossOf(ctx())).not.toHaveProperty('costMethod');
+    expect(grossOf(ctx({ costMethod: 'fifo' }))).toMatchObject({
+      gross: 100000,
+    });
+    expect(grossOf(ctx({ costMethod: 'lifo' }))).toMatchObject({
+      gross: 50000,
+      costMethod: 'lifo',
+    });
+    expect(grossOf(ctx({ costMethod: 'average' }))).toMatchObject({
+      gross: 75000,
+      costMethod: 'average',
+    });
+  });
+});

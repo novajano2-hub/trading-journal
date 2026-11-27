@@ -47,7 +47,8 @@ export function ScrollFade({
   }, []);
   return (
     <div className={`relative ${rootClassName}`}>
-      <div ref={scroller} className={`overflow-x-auto ${className}`}>
+      {/* Positioned, so that what is absolutely placed inside it (a visually hidden heading, say) is clipped with the rest: its containing block would otherwise be the root, which does not clip, and the page would scroll sideways. */}
+      <div ref={scroller} className={`relative overflow-x-auto ${className}`}>
         {children}
       </div>
       {more ? (

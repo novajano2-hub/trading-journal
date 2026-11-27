@@ -123,12 +123,12 @@ typography:
     fontSize: '13px'
     fontWeight: 550
     fontFeature: 'tnum'
-  figure-hero:
+  figure-score:
     fontFamily: 'Instrument Sans, system-ui, sans-serif'
-    fontSize: '104px'
+    fontSize: '30px'
     fontWeight: 600
-    lineHeight: 0.82
-    letterSpacing: '-0.05em'
+    lineHeight: 1
+    letterSpacing: '-0.04em'
     fontFeature: 'tnum'
   figure-pnl:
     fontFamily: 'Instrument Sans, system-ui, sans-serif'
@@ -267,13 +267,13 @@ components:
 
 ## Overview
 
-**Creative North Star: "Daylight Premium"** names a register, not a metaphor world. Keel looks like a premium product used in daylight: a periwinkle canvas, white cards that lift on brand-tinted shadows, one deep brand hue (Keel Ultramarine) spent sparingly, and one family, Instrument Sans, whose tabular figures set every number. Every card is a neutral surface, the "Your plan" card included; the accent marks only what acts or is chosen. The product itself is the illustration: real-looking app windows made of the app's own cards, with labelled sample data, carry the marketing pages. The bar is the pro trading platforms (Kraken Pro, Coinbase Advanced, Gemini ActiveTrader, Public): no icon tiles, no boxed hamburger, no generated-looking theme.
+**Creative North Star: "Daylight Premium"** names a register, not a metaphor world. Keel looks like a premium product used in daylight: a periwinkle canvas, white cards that lift on brand-tinted shadows, one deep brand hue (Keel Ultramarine) spent sparingly, and one family, Instrument Sans, whose tabular figures set every number. Every card is a neutral surface; the accent marks only what acts or is chosen. The product itself is the illustration: real-looking app windows made of the app's own cards, with labelled sample data, carry the marketing pages. The bar is the pro trading platforms (Kraken Pro, Coinbase Advanced, Gemini ActiveTrader, Public): no icon tiles, no boxed hamburger, no generated-looking theme.
 
 The whole product wears one world. The app (`/app/*`) and the marketing site share the same tokens, face, cards and product-shot components. The tokens live once, on `:root`, in `src/styles/theme.css`.
 
 **Appearance** is a setting: System (the default), Light or Dark, saved in the prefs (`UserPrefs.appearance`) and chosen in Settings, Profile, in the workspace menu on desktop and in the More sheet on a phone. A script in `<head>` resolves it before first paint from a mirrored copy (`keel-appearance` in localStorage), sets `data-appearance` (the choice) and `data-theme` (light or dark) on `<html>`, and keeps System in step with `prefers-color-scheme`. Once the prefs load, they win. Dark is a neutral **graphite**, the family pro terminals use: near-black canvas, surfaces lifted a step at a time, hairline borders, grey text, every grey with equal red, green and blue so nothing reads blue. There is no sun or moon toggle anywhere.
 
-Rejected, and recorded so they are not rebuilt: metaphor worlds (the earlier trading-floor tickets and stamps), dark mesh hero clichés, editorial serif display type, the earlier flat grey-and-cobalt Geist look, the navy-tinted dark palette, the ultramarine "Your plan" hero, coloured icon tiles, the phone drawer behind a boxed hamburger, and anything that reads as AI-generated.
+Rejected, and recorded so they are not rebuilt: metaphor worlds (the earlier trading-floor tickets and stamps), dark mesh hero clichés, editorial serif display type, the earlier flat grey-and-cobalt Geist look, the navy-tinted dark palette, the ultramarine "Your plan" hero, coloured icon tiles, the phone drawer behind a boxed hamburger, the "Plan vs actual" Dashboard (the "Your plan", "Mistakes" and "Performance" cards, retired in Plan 6C for the widget Dashboard, D2), and anything that reads as AI-generated.
 
 **Key Characteristics:**
 
@@ -283,7 +283,7 @@ Rejected, and recorded so they are not rebuilt: metaphor worlds (the earlier tra
 - Tight negative tracking on large type, generous leading on body.
 - Motion is short and decelerating; it announces arrival and selection, then stops.
 - No icon tiles. A card's header is its title; a glyph appears only where it carries meaning, plain and at text size.
-- The app (`/app`) is the same system at working density: a labelled sidebar on the canvas (a tab bar at a phone's foot), a top bar, a "Plan vs actual" Dashboard led by the "Your plan" card. Its direction is the trader's own plan as the yardstick: adherence and the cost of broken rules lead, performance follows.
+- The app (`/app`) is the same system at working density: a labelled sidebar on the canvas that folds to an icon rail (a tab bar at a phone's foot), a top bar, and a widget Dashboard: a template of small figure widgets above and larger charts, lists and calendars below, arranged by the trader (see Widget dashboard). The trader's own rules are measured on the Progress tracker and Strategies pages, not on a Dashboard card of their own.
 
 ## Colors
 
@@ -291,9 +291,9 @@ A periwinkle-tinted neutral field (graphite in dark), one ultramarine voice used
 
 ### Primary
 
-- **Keel Ultramarine** (#2b35af light, #4c57dc dark; `--accent`): the primary button, selection and caret, focus ring, the current tab and nav glyph, adherence bars, the plan's kept bar, series 1 (the equity line) and the brand tile. The brand's hue, which the money palette never uses.
+- **Keel Ultramarine** (#2b35af light, #4c57dc dark; `--accent`): the primary button, selection and caret, focus ring, the current tab and nav glyph, progress bars, the Edge score's radar and marker, series 1 (the equity line, a chart's first series) and the brand tile. The brand's hue, which the money palette never uses.
 - **Ultramarine Hover** (#1f278c light, #5c66e6 dark): primary button hover.
-- **Ultramarine Soft** (#eeeffc light, #1c1d2e dark): accent chip fill, a selected row, adherence rail, hover wash on text actions. Never a panel.
+- **Ultramarine Soft** (#eeeffc light, #1c1d2e dark): accent chip fill, a selected row, the progress track, hover wash on text actions. Never a panel.
 - **Ultramarine Ink** (#2b35af light, #aeb4ff dark): text and glyphs on ultramarine-soft, links in cards, the current nav glyph and the current tab.
 - **Ultramarine Deep** (#1f278c both): the dark end of brand gradients.
 - **Ultramarine Tint** (#dcdff8 light, #2a2f5e dark): text selection.
@@ -306,7 +306,7 @@ Light is periwinkle-tinted; dark is graphite, every grey with equal red, green a
 
 - **Canvas** (#eceef8 / #0b0b0b): the page, the sidebar, the top bar and the tab bar, scrollbar track.
 - **Surface** (#ffffff / #141414): cards, the app window's controls, secondary buttons, popovers, sheets, the chosen segment.
-- **Sunken** (#f0f1f8 / #1b1b1b): neutral chips, ghost hover, the plan card's cost band, the current settings row, the search key hint.
+- **Sunken** (#f0f1f8 / #1b1b1b): neutral chips, ghost hover, the cost band of the marketing plan card, the current settings row, the search key hint, the skeleton bars.
 - **Line** (#e7e9f3 / #252525): hairline borders and row dividers, the progress bar's track rail in dark, the phone bar's rule.
 - **Line Strong** (#d5d8ea / #313131): control borders, scrollbar thumb, the dark chosen-segment fill.
 - **Text** (#121633 / #ededed): headings and primary copy.
@@ -326,15 +326,15 @@ Each has a text token, a `-fill` for bars and marks, and a `-soft` for chip fill
 ### Named Rules
 
 **The One Brand Hue Rule.** Ultramarine is the only brand colour. Never use it for money, and never add another hue for brand, emphasis or decoration.
-**The Accent Restraint Rule.** The accent marks what acts or is chosen: primary actions, the active state (current tab, nav glyph, selected segment), focus, and series 1 in a chart. It never fills a panel or a card, in either theme; the "Your plan" card is a neutral surface with the accent on its kept bar alone.
+**The Accent Restraint Rule.** The accent marks what acts or is chosen: primary actions, the active state (current tab, nav glyph, selected segment), focus, and series 1 in a chart. It never fills a panel or a card, in either theme; the Edge score card is a neutral surface with the accent on its radar, its track and its marker alone.
 **The Neutral Graphite Rule.** Dark greys carry no hue: canvas, surfaces, lines and text each have equal red, green and blue.
 **The Fixed Jobs Rule.** Marigold means a mistake, green and red mean signed money or kept and broken. A hue never takes a second job. Zero is uncoloured.
 **The Neutral Error Rule.** Failures to load or save (storage unavailable, dashboard could not load, "Couldn't save") are neutral: sunken or faint, with a Warning or ArrowClockwise glyph in muted ink. Loss red is money and broken rules, never an error state, and marigold is mistakes, never a warning state.
-**The Never Colour Alone Rule.** Sign and state also carry text or an icon (a leading sign in the figure, "Kept" and "Broken" for screen readers and the plan card's Kept and Broken labels, "Broke:" in a trade's rules cell). Long and Short are neutral words, never a result colour.
+**The Never Colour Alone Rule.** Sign and state also carry text or an icon (a leading sign in the figure, "Kept" and "Broken" for screen readers, "Broke:" in a trade's rules cell, a hollow dot below zero on a scatter and a band word beside the Edge score). Long and Short are neutral words, never a result colour.
 
 ## Typography
 
-**Face:** Instrument Sans (via `next/font/google`, `--font-keel`, `wdth` axis loaded, fallback system-ui, sans-serif). `font-sans` and `font-mono` both resolve to it, so `.font-mono` keeps its job (tabular figures, the number's role) in the same face. `tabular-nums` is applied to `.font-mono`, `.tnum` and every figure so columns align. The hero numeral also condenses to `font-stretch: 88%`.
+**Face:** Instrument Sans (via `next/font/google`, `--font-keel`, `wdth` axis loaded, fallback system-ui, sans-serif). `font-sans` and `font-mono` both resolve to it, so `.font-mono` keeps its job (tabular figures, the number's role) in the same face. `tabular-nums` is applied to `.font-mono`, `.tnum` and every figure so columns align.
 
 **Character:** One humanist grotesque for words and data. Weight does the hierarchy (400, 500, 550, 600, 650) with negative tracking on display and figure sizes. No uppercase labels, no letter-spaced small caps.
 
@@ -342,42 +342,43 @@ Each has a text token, a `-fill` for bars and marks, and a `-soft` for chip fill
 
 The ramp as shipped. Half-pixel sizes are deliberate steps between 15 and 17, not accidents; use only values in this table.
 
-| Role            | Size                                       | Weight | Leading          | Tracking | Use                                                          |
-| --------------- | ------------------------------------------ | ------ | ---------------- | -------- | ------------------------------------------------------------ |
-| Hero display    | clamp(40px, 3.125vw + 18px, 58px)          | 600    | 1.04             | -0.032em | Landing hero                                                 |
-| Page display    | clamp(36px, 2.6vw + 16px, 52px)            | 600    | 1.06             | -0.032em | Page h1                                                      |
-| Closing display | clamp(38px, 5vw, 52px)                     | 600    | 1.04             | -0.032em | Closing section                                              |
-| Section heading | clamp(2rem, 1.6rem + 1.6vw, 2.625rem)      | 600    | 1.08             | -0.028em | Landing section heading                                      |
-| Sub-headline    | 26px                                       | 600    | 1.15             | -0.03em  | Legal and read-page section h2, the auth h1                  |
-| Hero numeral    | 88px, 104px from sm                        | 600    | 0.82             | -0.05em  | Adherence percentage on the Your plan card (stretch 88%)     |
-| P&L figure      | 31px                                       | 600    | 1.15             | -0.04em  | Performance card net P&L                                     |
-| App title       | 24px (20px on phones)                      | 650    | 1.2              | -0.035em | Top bar page title                                           |
-| Cost figure     | 21px                                       | 600    | default          | -0.02em  | Cost band on the plan card                                   |
-| Tracker figure  | 22px                                       | 600    | 1.25             | -0.03em  | Today's "x of y rules met" on the Progress tracker card      |
-| KPI figure      | 22px marketing; 20px app, shrinking to fit | 600    | 1.25             | -0.03em  | Marketing KPI strip; app rolling KPIs via NumberTicker       |
-| Card title      | 15px                                       | 600    | 1.375 (snug)     | -0.015em | Every dashboard and product card heading                     |
-| Brand           | 19px                                       | 650    | default          | -0.03em  | Brand mark                                                   |
-| Dialog title    | 17px                                       | 600    | snug             | -0.015em | Morph dialog title                                           |
-| Accordion       | 17px                                       | 500    | default          | 0        | Accordion headings                                           |
-| Lead            | 17px                                       | 400    | 1.6              | 0        | Section subhead (56ch)                                       |
-| Reading body    | 16.5px                                     | 400    | 1.7              | 0        | Legal and changelog prose (68ch)                             |
-| Body            | 15.5px                                     | 400    | 1.65             | 0        | Feature and pricing descriptions                             |
-| UI              | 15px                                       | 500    | 1.6 in accordion | 0        | Buttons, accordion body, state body                          |
-| Nav             | 14.5px                                     | 500    | default          | 0        | Header and menu links                                        |
-| Row             | 13.5px                                     | 500    | default          | 0        | Sidebar rows, filter chips, rule text, tables, detail        |
-| Control         | 13.5px                                     | 500    | default          | 0        | Segmented and tab labels                                     |
-| Figure          | 13px                                       | 550    | default          | 0        | Row figures in the Rules table, tabular                      |
-| Caption         | 12.5px                                     | 400    | default          | 0        | Card ranges, app window bar, metric tip text, row captions   |
-| Label           | 12px (`text-xs`)                           | 400    | default          | 0        | KPI labels, chips (550), captions, table headers             |
-| Side chip       | 12px                                       | 600    | default          | 0        | Long and Short                                               |
-| Axis            | 11px (12px from sm)                        | 400    | 1rem             | 0        | Chart labels, search key hint, tab labels (500, 600 current) |
+| Role            | Size                                    | Weight | Leading          | Tracking | Use                                                          |
+| --------------- | --------------------------------------- | ------ | ---------------- | -------- | ------------------------------------------------------------ |
+| Hero display    | clamp(40px, 3.125vw + 18px, 58px)       | 600    | 1.04             | -0.032em | Landing hero                                                 |
+| Page display    | clamp(36px, 2.6vw + 16px, 52px)         | 600    | 1.06             | -0.032em | Page h1                                                      |
+| Closing display | clamp(38px, 5vw, 52px)                  | 600    | 1.04             | -0.032em | Closing section                                              |
+| Section heading | clamp(2rem, 1.6rem + 1.6vw, 2.625rem)   | 600    | 1.08             | -0.028em | Landing section heading                                      |
+| Sub-headline    | 26px                                    | 600    | 1.15             | -0.03em  | Legal and read-page section h2, the auth h1                  |
+| P&L figure      | 31px (20 to 22px on phones)             | 600    | 1.15             | -0.04em  | Progress tracker tiles, the trade page's P&L                 |
+| Score figure    | 30px                                    | 600    | 1                | -0.04em  | The Edge score's total                                       |
+| App title       | 24px (20px on phones)                   | 650    | 1.2              | -0.035em | Top bar page title                                           |
+| Cost figure     | 21px                                    | 600    | default          | -0.02em  | Cost band on the marketing plan card                         |
+| Tracker figure  | 22px                                    | 600    | 1.25             | -0.03em  | Today's "x of y rules met" on the Progress tracker widget    |
+| KPI figure      | 22px (18px on phones), shrinking to fit | 600    | 1.25             | -0.02em  | Dashboard figure widgets, prop money cards, Trades summary   |
+| Marketing KPI   | 22px                                    | 600    | 1.25             | -0.03em  | Marketing KPI strip via NumberTicker                         |
+| Card title      | 15px                                    | 600    | 1.375 (snug)     | -0.015em | Every widget and product card heading                        |
+| Brand           | 19px                                    | 650    | default          | -0.03em  | Brand mark                                                   |
+| Dialog title    | 17px                                    | 600    | snug             | -0.015em | Morph dialog title                                           |
+| Accordion       | 17px                                    | 500    | default          | 0        | Accordion headings                                           |
+| Lead            | 17px                                    | 400    | 1.6              | 0        | Section subhead (56ch)                                       |
+| Reading body    | 16.5px                                  | 400    | 1.7              | 0        | Legal and changelog prose (68ch)                             |
+| Body            | 15.5px                                  | 400    | 1.65             | 0        | Feature and pricing descriptions                             |
+| UI              | 15px                                    | 500    | 1.6 in accordion | 0        | Buttons, accordion body, state body                          |
+| Nav             | 14.5px                                  | 500    | default          | 0        | Header and menu links                                        |
+| Row             | 13.5px                                  | 500    | default          | 0        | Sidebar rows, filter chips, rule text, tables, detail        |
+| Control         | 13.5px                                  | 500    | default          | 0        | Segmented and tab labels                                     |
+| Figure          | 13px                                    | 550    | default          | 0        | Row figures in the Rules table, tabular                      |
+| Caption         | 12.5px                                  | 400    | default          | 0        | Card ranges, app window bar, metric tip text, row captions   |
+| Label           | 12px (`text-xs`)                        | 400    | default          | 0        | KPI labels, chips (550), captions, table headers             |
+| Side chip       | 12px                                    | 600    | default          | 0        | Long and Short                                               |
+| Axis            | 11px (12px from sm)                     | 400    | 1rem             | 0        | Chart labels, search key hint, tab labels (500, 600 current) |
 
 Also in use: 24px (`text-2xl`) for mobile menu links, 16px (`text-base`) default body and the large CTA, 14px (`text-sm`) for small CTAs and rule list rows, 11.5px for the "+n" chip. KPI figures in the app shrink with their tile: `min(20px, max(12px, (100cqi - trend) / chars / 0.56))`, so a long P&L never spills. Marketing KPIs use `clamp(15px, 3.6cqi, 22px)` in a wide strip.
 
 ### Named Rules
 
 **The Tabular Numbers Rule.** Every number a trader reads uses tabular figures (`tnum` or `font-mono`, both the same face). Never set a figure with proportional digits where it sits in a column or beside another figure.
-**The Figure Ramp Rule.** Big figures take their own sizes (88/104 hero numeral, 31 P&L, 21 cost, 22 tracker card, 20 KPI); everything else in `/app` is a row above. Do not mint a size for one surface.
+**The Figure Ramp Rule.** Big figures take their own sizes (31 P&L, 30 score, 22 KPI and tracker, 21 cost); everything else in `/app` is a row above. A figure widget sets its size from its card's width (a container query: 22px, 18px on a phone, never under 13px), so a long figure never spills. Do not mint a size for one surface.
 **The Measure Rule.** Display headings cap at 11 to 20ch, ledes at 40 to 60ch, reading prose at 68ch.
 
 ## Layout
@@ -392,12 +393,13 @@ Log in and Sign up live in their own route group (`src/app/(auth)`) with no site
 
 ### App shell
 
-The app is a labelled **220px sidebar** (sticky, full height, no fill and no divider: it sits on the canvas) beside a column holding the **top bar** and the page. From `sm` to `lg` the sidebar is a 280px drawer from the left (Radix Dialog, veil, focus trap, closes on Escape, veil, link, route change or workspace switch, focus returns to the trigger) opened from a plain 44px menu glyph that leads the bar. Below `sm` there is no drawer and no menu button: the **tab bar** navigates (see Tab bar and More sheet). A skip link, "Skip to content", is the first tab stop: visually hidden until focused, then a fixed surface chip at top-left targeting `#content` (`main`, `tabIndex -1`).
+The app is a labelled **220px sidebar** (sticky, full height, no fill and no divider: it sits on the canvas) beside a column holding the **top bar** and the page. From `lg` the sidebar folds to a 68px icon rail by a button in its head (see Sidebar rail). From `sm` to `lg` the sidebar is a 280px drawer from the left (Radix Dialog, veil, focus trap, closes on Escape, veil, link, route change or workspace switch, focus returns to the trigger) opened from a plain 44px menu glyph that leads the bar. Below `sm` there is no drawer and no menu button: the **tab bar** navigates (see Tab bar and More sheet). A skip link, "Skip to content", is the first tab stop: visually hidden until focused, then a fixed surface chip at top-left targeting `#content` (`main`, `tabIndex -1`).
 
-- **Top bar:** sticky, canvas fill (no border from `sm`, no white strip), 20px side padding. Order from the left: menu, title (24px/650), the phone's sample badge, chips, then search, sample label, the Display menu and Import. There is no theme toggle. The source keeps that order at every width and nothing is reordered by CSS, so Tab reads the bar as the eye does. One row while the chips fit beside the title; where they do not (measured, not guessed) the chips lead a second row with the controls after them at its end.
+- **Top bar:** sticky, canvas fill (no border from `sm`, no white strip), 20px side padding. Order from the left: menu, title (24px/650), the phone's sample badge, chips, then search, sample label, the Display menu and Import. There is no theme toggle. The source keeps that order at every width and nothing is reordered by CSS, so Tab reads the bar as the eye does. One row while the chips fit beside the title; where they do not (measured, not guessed) the bar takes three rows: the title, the chips on a full row of their own, then the controls (132px tall against 102px, from 640 to 1279 and with busy filters at any width). The reading order is the row order at every width.
 - **Filter row:** leaves the title's row only when it overflows. Where even the second row is short, the chips scroll sideways inside their own scroller with an edge fade at whichever side has more past it. "Clear filters" (shown only while a filter is set) sits outside the scroller so it never fades or scrolls away.
 - **Below `sm`:** one 56px row pinned to the top with a hairline beneath it. The title (20px/650) on the left with a quiet "Sample" badge beside it in the sample workspace (a 20px neutral pill, 11.5px/550); on the right, plain 44px icon buttons with no box: Filters (where the page has filters; a funnel, filled in accent ink with a count on its shoulder while any filter is set), search (it opens over the row, from the left gutter to the Display button) and Display (the unit's mark: "$", "%", "R", "ticks", "pips", "pts", or a crossed eye for Privacy). Import is in More and in the empty states. The page keeps clear of the tab bar at the foot: `main` pads by `--tab-bar` (56px plus `env(safe-area-inset-bottom)`, zero from `sm`), the trade log's bulk bar floats 16px above it, and on a phone `scroll-padding` keeps focus clear of both bars.
-- **Dashboard grid:** page padding 20px, 16px gaps. Row 1 is the plan: the plan card (340px column from `xl`, 400px from 1440) beside the Rules card, stacked below. Row 2 is three cards (one column, two from `md` with Performance spanning, three from `xl`): Performance, Mistakes, Progress tracker. Row 3 is the recent trades card.
+- **Focus clears what is pinned:** `scroll-padding-top` is the pinned bar's measured height (the editing bar's too, plus the trade views' switch row) at every width, so a control reached by Shift+Tab is never under it. It is dropped while focus is inside a pinned row (`data-pinned`), or the page would scroll whenever a bar control took focus.
+- **Dashboard grid:** page padding 20px, 16px gaps (12px on a phone). The upper strip is two columns on a phone (an odd last widget takes the row), three from `md`, five from `xl`. The lower grid is one column, two from `md`, three from `xl`, packed densely; a wide widget spans two columns and, from `xl`, two rows (see Widget dashboard).
 - **Plain pages** (module placeholders, error and empty states): a centred 520px column with an optional plain glyph (the state glyph), a 17px/600 title, 15px muted body and one action.
 
 ## Elevation & Depth
@@ -406,7 +408,7 @@ White cards on a tinted canvas, lifted by brand-tinted shadows. A hairline `line
 
 ### Shadow Vocabulary
 
-- **Card** (`--shadow-card`: `0 1px 2px rgba(18,22,51,0.05), 0 4px 10px -6px rgba(34,42,150,0.1), 0 18px 34px -22px rgba(34,42,150,0.38)` light; `0 1px 2px rgba(0,0,0,0.4)` dark): every dashboard card, the plan card, product card and the accordion.
+- **Card** (`--shadow-card`: `0 1px 2px rgba(18,22,51,0.05), 0 4px 10px -6px rgba(34,42,150,0.1), 0 18px 34px -22px rgba(34,42,150,0.38)` light; `0 1px 2px rgba(0,0,0,0.4)` dark): every widget card, the marketing plan card, the product card and the accordion.
 - **Shadow** (`--shadow`: `0 1px 2px rgba(18,22,51,0.06), 0 24px 48px -20px rgba(34,42,150,0.28)` light; `0 1px 2px rgba(0,0,0,0.5), 0 24px 48px -20px rgba(0,0,0,0.75)` dark): the app window, the trade detail card, and the floating layers: popovers, the account menu, metric tooltips, search results, the Morph dialog.
 - **Chip** (`--shadow-chip`: `0 1px 2px rgba(18,22,51,0.06), 0 2px 6px -2px rgba(34,42,150,0.1)` light; `0 1px 2px rgba(0,0,0,0.45)` dark): the chosen segment or tab, the current nav row, the account box, secondary site CTAs, the task checkbox.
 - **Raised primary:** an inset 1px white highlight at 20%, `0 1px 2px rgba(31,39,140,0.4)` and `0 6px 14px -6px rgba(43,53,175,0.6)`; in dark the outer shadows go neutral black.
@@ -462,14 +464,14 @@ The marketing illustration: a piece of the app on its canvas. 16px radius, 1px `
 ### Product shot components
 
 - **ProductCard / CARD:** the card above for shots; `CARD` is the surface alone.
-- **PLAN_SURFACE and CostBand:** the Your plan card for marketing, a white card like the rest. `CostBand` is the foot band naming what broken rules cost (sunken at 60%, a `line` hairline above, the figure in loss), with `bleed` set to the card's side padding.
+- **PLAN_SURFACE and CostBand:** the Your plan card for marketing shots only, a white card like the rest (the app's Dashboard no longer has it). `CostBand` is the foot band naming what broken rules cost (sunken at 60%, a `line` hairline above, the figure in loss), with `bleed` set to the card's side padding.
 - **TradeDetailCard:** a white card, 16px radius, `--shadow`, 16px padding: symbol and time, a two-column grid of values (13.5px/600), then a rules checklist with CheckCircle in `gain-fill` and XCircle in `loss-fill`.
 - **RuleList:** rows on hairline dividers, 14px, with kept and broken marks as above; `bare` sets the rows straight on a card instead of in their own panel.
 - **Pill, KpiStrip, TradeRows, equity chart, BreakdownChart:** see below.
 
-### The plan card ("Your plan")
+### The plan card (marketing shots only)
 
-A neutral card like every other (surface, 16px radius, hairline, `--shadow-card`), in both themes. Contents on the Dashboard: a 28px header ("Your plan" at 15px/600, the range at 12.5px faint on the right); the adherence numeral at 88px (104 from `sm`), 600, tracking -0.05em, stretch 88%, in text ink, with a small raised "%" at 0.42em in faint, captioned by a metric tip ("of rule checks kept") in muted; a split bar of kept (the accent, the card's one accent touch) and broken (`loss-fill`) with "Kept" and "Broken" in faint under it; and a foot cost band (sunken at 60%, a `line` hairline above, bleeding to the card's edge, min 54px) with the "Broken rules cost" label in muted and the signed cost at 21px/600 in sign colour. The numeral counts up once in view; screen readers get the final string once; reduced motion and no-JS show the final figure.
+A neutral card like every other (surface, 16px radius, hairline, `--shadow-card`), in both themes, drawn by `PLAN_SURFACE` and `CostBand` for the marketing pages: a 28px header ("Your plan" at 15px/600), a `RuleList` on hairline dividers showing one trade's rules, and a foot cost band (sunken at 60%, a `line` hairline above, bleeding to the card's edge, min 54px) with the "Broken rules cost" label in muted and the signed cost at 21px/600 in sign colour. The app's Dashboard had a live version of this card, led by an adherence numeral and a Rules card; Plan 6C retired it with "Mistakes" and "Performance" (D2). Rules are measured on the Progress tracker and Strategies pages now.
 
 ### KPI strip (marketing)
 
@@ -485,13 +487,15 @@ Positive is gain, negative is loss, zero stays text colour. Applies to ticker fi
 
 ### Charts
 
-- **Equity area (marketing and Performance card):** an accent line (2px on the marketing chart, 1.75px in the Performance card, rounded joins, non-scaling stroke), an accent area gradient (30% at the top, 11% at 55%, 0 at the foot), a dashed `line-strong` hairline at the starting value ("2 4" dash), and a ringed end dot (surface fill, accent stroke; HTML in the card so a stretched viewBox never makes it an oval). The line draws in (`draw`) and the area and dot fade after it; reduced motion shows them finished. The equity line is accent because it shows the account, not a sign.
-- **Rolling KPI sparkline:** `Sparkline variant="line"`: the line alone, 1.5px accent at 85% opacity, 56 by 24 viewBox, `h-6 w-12` beside each app KPI figure (win rate, profit factor, expectancy). Each point is a rolling window of the last 20 closed trades (or an eighth of the range, if more), at up to 24 evenly spaced points; a range with no more closed trades than one window has no line. Labelled for assistive tech ("Rolling n-trade win rate, from x to y") and as its hover title. Hidden in a narrow tile (container under 7rem), where the figure takes the room.
+- **Equity area (marketing):** an accent line (2px, rounded joins, non-scaling stroke), an accent area gradient (30% at the top, 11% at 55%, 0 at the foot), a dashed `line-strong` hairline at the starting value ("2 4" dash), and a ringed end dot (surface fill, accent stroke; HTML in the card so a stretched viewBox never makes it an oval). The line draws in (`draw`) and the area and dot fade after it; reduced motion shows them finished. The equity line is accent because it shows the account, not a sign.
+- **Trend line:** `Sparkline variant="line"`: the line alone, 1.5px accent at 85% opacity, `h-4 w-8` beside the Trades summary's P&L, drawn from the running P&L by exit date. Labelled for assistive tech ("Running P&L by exit date, over n trading days") and as its hover title.
 - **Breakdown bars:** `BreakdownChart` is a 220px area with a `line-strong` baseline; each slot holds a bar that slides up from the baseline (transform only), 6px top radius, max 56px wide, `gain-fill` or `loss-fill`, with a signed value above (11px, 12px from `sm`) and an axis label under. Bars reveal in order on first view; finished without JS or under reduced motion.
-- **Cost bars (Mistakes card):** a 4px bar anchored at the right foot of each row, gradient from the fill to 18% transparent (`loss-fill` for negative cost, `gain-fill` for positive), 80% opacity, 100% on row hover.
-- **Adherence track:** 6px, 3px ends, an accent-soft rail under a left-to-right accent gradient (accent mixed 78% with white up to accent).
-- **Progress bars:** 6px on an `accent-soft` track (`line` in dark), 3px ends, filled with an accent gradient (accent mixed 78% with white up to accent). One component serves the tracker's tiles, rules table and dashboard card.
-- **Heat grid (Progress tracker):** one square per scored day, five accent steps (`--hg0` to `--hg4`) by the share of rules met, blank for days that aren't scored. 22px squares 5px apart on a wide card, 14 and 4 narrow, 11 and 3 on the dashboard card. A keyboard grid with one tab stop; arrow keys page past the edge of the window. Each square's label reads "Tue 24 Nov, 4 of 8 rules met".
+- **Progress bars:** 6px on an `accent-soft` track (`line` in dark), 3px ends, filled with an accent gradient (accent mixed 78% with white up to accent). One component serves the tracker's tiles, its rules table and the Progress tracker widget.
+- **Heat grid (Progress tracker):** one square per scored day, five accent steps (`--hg0` to `--hg4`) by the share of rules met, blank for days that aren't scored. 22px squares 5px apart on a wide card, 14 and 4 narrow, 11 and 3 in the Progress tracker widget. A keyboard grid with one tab stop; arrow keys page past the edge of the window. Each square's label reads "Tue 24 Nov, 4 of 8 rules met".
+- **Split bar** (`SplitBar`): a thin bar split into shares, 6px high with 2px between segments and 2px ends (a sliver still shows: a share is at least 2px wide). The tones are `gain-fill`, `loss-fill` and `line-2` for neutral: won, breakeven and lost; green, flat and red days; gross profit against gross loss; average win against average loss. It replaces the half gauges and rings a figure might wear; the counts and amounts sit beside it in words, so it is hidden from assistive tech. With no share left, or a hidden amount under Privacy, it is its empty `sunken` track.
+- **Radar (Edge score):** six spokes clockwise from the top, five unlabelled rings at 20, 40, 60, 80 and 100 in `line`, the six part scores joined into one accent polygon (fill at 16%, 1.6px stroke, round joins) with a 3px vertex dot (surface fill, accent stroke). The drawing is 300 by 260 units, the outer ring 86 units out, each spoke named 10.5px/500 in `muted` at its end, capped at 340px wide and centred. It draws no number: hover, or the arrow keys (Home and End jump), pick a part, whose spoke turns accent, whose dot grows and fills, and whose name and score open in a readout card (210px at most, 12.5px muted, 10px radius, `line` border, `--shadow`) in the top corner away from the part. It is an image with a label naming the score, its band and its strongest and weakest part, and its parts sit in a table only assistive technology sees.
+- **Scatter** (`ScatterChart`, the trade time and duration widgets): one dot per closed trade, net P&L on y over a 210px plot and a 24px axis. Sign is shape as well as colour: a filled `gain-fill` dot (2.6px radius) above zero, a hollow `loss-fill` ring (2.3px) below, a hollow `faint` ring at zero. A pointer within 14px picks the nearest dot, which takes an accent ring (6px radius) and a readout that names the trade; a click opens it. Both axes rescale to the range's trades; the left and right arrow keys step through the trades (PageUp and PageDown by ten, Home and End jump).
+- **Two-scale chart** (`DualAxisChart`): bars, lines and step lines on a left and a right scale, 8px of padding above and 12px at the right; `alignZero` puts both scales' zero on one line (the daily and cumulative P&L). The win rate and averages through the day (win % left, money right), the daily and cumulative P&L, the balance (deposits and withdrawals on their own right scale) and the prop return chart use it. Each is an image with a label naming the range and its key values, with a hidden table and a readout.
 
 ### Accordion
 
@@ -560,23 +564,45 @@ Every metric label is a button with a dotted underline that is transparent at re
 
 #### Morph dialog (HorizonX)
 
-The rule and mistake drill-down. A Radix Dialog whose panel grows from the row that opened it (FLIP from the opener's rect over `glide`, closes back over `exit`; opacity only under reduced motion). 760px max, 80dvh max, 16px radius, 1px `line`, `--shadow`, over the veil. Header: 17px/600 title, 13px muted description, 44px close button; body scrolls. Focus is trapped and returns to the `returnFocus` element, which is the opener or, if it is gone, the card's fallback focus target. The trade list is the snapshot taken at opening, so a regraded trade stays put while the figures behind it update.
-
-In a rule's drill-down the first column is **Kept**: a native checkbox visually hidden over a 24px disc holding a gain CheckCircle (kept) or a loss XCircle (broken) that cross-fade and scale over 240ms. Space or a click regrades the trade; it flips at once and reverts with a neutral "Couldn't save. Try again." notice (sunken, 10px radius) if the save fails. The sr-only text says Kept or Broken.
+The dialog that grows out of what opened it: Add a widget, the expanded chart, Choose figures, the prop dialogs (Mark as breached, Log payout, a new transaction), the day-note dialog and the Edit template sheet. A Radix Dialog whose panel grows from the opener (FLIP from the opener's rect over `glide`, closes back over `exit`; opacity only under reduced motion). Sizes: default 760px max; `list` 560px for a list of choices with their descriptions; `wide` 960px for a table; `form` 460px for a short form; `compact` 480px, a small dialog even on a phone; `full` fills the screen inside a small gutter; `sheet` is the default size on a wide screen and a full-height sheet on a phone. 80dvh max on a wide screen, 16px radius, 1px `line`, `--shadow`, over the veil. Header: 17px/600 title, 13px muted description, 44px close button; body scrolls, with an optional fixed footer for the actions. Focus is trapped and returns to the `returnFocus` element, which is the opener or, if it is gone, the page's fallback focus target. The earlier rule and mistake drill-down, and the "Kept" disc that regraded a trade inside it, left the Dashboard with the cards (D2); the trade page's rule checklist still regrades.
 
 #### Task checkbox (HorizonX)
 
 Built and tested, not yet used. Reserved for Plan 5 review checklists. A visually hidden native checkbox in its label; an 18px box, 6px radius, `line-strong` border and chip shadow that fills `gain-fill` over 240ms on the glide curve (no overshoot) with a drawn white check; a soft gain disc that grows and fades on false-to-true only. 44px target on coarse pointers.
 
-#### Dashboard cards
+#### Widget dashboard
 
-Every card follows Cards above: a plain title, no tile.
+The Dashboard draws one **template**: a named list of widgets in two sections. Keel's own plan, mistakes and performance cards are gone (Plan 6C, D2); every card below is a widget, and every widget is a neutral card (see Cards) with a plain title, no tile.
 
-- **Plan.** Two columns from `xl` (340px plan card, 400px from 1440): the plan card (see The plan card) beside the **Rules card**, a white card holding a table with 36px rows on hairline dividers that stop at the content edge while the hover fill reaches 8px past it; columns Rule, Kept, Adherence (with the percentage) and Cost when broken, sorted by cost with an accent arrow. Rule text is 13.5px/500; Kept reads "x of y" at 13px/550, tabular, with a faint "of". Adherence is the 6px accent track beside the percentage, which never displays 100% or 0% unless exact (it gains one decimal short of it). Cost is signed, gain or loss text; "none" in faint when nothing broke. The costliest broken rule, first in cost order and negative, carries a warn "Costliest" chip. A rule that was broken opens its trades; the whole row is the target, the left button is the keyboard's way in. Five rules show, with "Show all n rules" in accent-ink. Column widths: Kept 92px (100 from 1440), Adherence 150px (180 from 1440; 52px, percentage only, below `sm`), Cost 128px (140 from 1440; 100px below `sm`); below `sm` Kept hides and the track moves under the rule text. With no graded trades the plan is one card: its header, "No graded trades in this range." and a muted line.
-- **Mistakes.** Rows 35px: a warn-toned mistake name, "n trades" in faint, signed cost, costliest first, each with a cost bar at its foot (see Charts); each row opens its trades.
-- **Progress tracker card.** The history grid, today's score as "x of y rules met" (0 of 0 on a non-trading day) over a progress bar, an "Open tracker" link that keeps the account selection and range, and a "Today's checklist" button to the day page. No caption line; while loading it shows a skeleton and no figures. The tracker is **always net**, in the base currency.
-- **Performance.** The P&L at 31px/600 counted up by the ticker with its metric tip, the equity area (see Charts) from the starting balance through each trading day's close, then a three-column strip under a hairline: win rate, profit factor, expectancy, each a 12px faint metric-tip label over a 20px/600 figure with its rolling sparkline, columns divided by hairlines; missing values read "None yet". The header shows the start and end balance in faint, tabular.
-- **Recent trades.** A table of the newest closed trades with columns Time, Symbol, Side, Strategy, P&L, Rules at 13.5px, rows on `line` at 70% that lift to sunken at 60% on hover. The instrument is written in words: "TSLA 370 Put" with the root in 600 and the contract muted, its expiry faint beside it ("20 Nov"), futures as "ES Dec 26"; the title keeps the traded symbol. Time shows the date muted and the clock time in 600. Where the table folds the time under the symbol (below `md`) the expiry is hidden so two dates never stack. Side uses the neutral side chip. Widths: Time 96px (112 from `xl`), Symbol 100px (128 from `md`, 176 from `xl`), Side 78px, Strategy 128px (144 from `lg`, 180 from `xl`, 272 from 1440), P&L 92px (104 from `sm`); **Rules flexes** and from `xl` every row is one 34px line. Strategy cells carry a warn chip for the first mistake and a neutral "+n" chip for the rest. Rules cell: "n of m kept" muted with a `gain-fill` mark, "Not graded" in faint, or a 14px `loss-fill` XCircle with a loss "Broke:" and the rule text, plus a "+n" loss chip. The "+n" chip sits inline after the rule text from `xl`, and under the text below it, where the rule text clamps to two lines (one line, truncated, from `xl`). Below `sm` Side and Strategy hide.
+- **Templates.** Saved in the prefs (`UserPrefs.dashboards`), one set per browser, shared by both workspaces, as the trade log's columns are. With no pref the page draws the default, "Main". The **upper** section holds at most five of 12 small figure widgets; the **lower** section holds any number of 17 larger ones. A widget appears once per template, and a key this build does not know is skipped on the page and kept on the template.
+- **The default, "Main".** Upper: Net P&L, Trade win rate, Profit factor, Day win rate, Average win to loss. Lower: Edge score, Progress tracker, Cumulative net P&L, Net daily P&L, Recent trades, Account balance, Calendar with stats (wide), Drawdown, Trade time performance, Trade duration performance.
+- **Grids.** Both sit under the page's 20px gutters. The upper strip is two columns on a phone (an odd last widget takes the row), three from `md`, five from `xl`, 12px gaps (16px from `md`). The lower grid is one column, two from `md`, three from `xl`, packed densely with `grid-flow-dense`: the Calendar with stats and the Year calendar are two columns wide and, from `xl`, two rows tall, and the widgets after them stack beside. A grid cell stretches its card to the row's height, so a row is as tall as its tallest card.
+- **Upper widget** (`WidgetFrame`, upper): a small card, `@container`, min 128px high (no minimum on a phone), 18px side padding, 16px above and 14px below (14, 14 and 12 on a phone). A 22px row holds the label, which is the metric's tip (12.5px, faint, left), and at the right an optional count chip. Under it the **figure**: 22px/600 (18px on a phone), tracking -0.02em, tabular, one line, set smaller where its characters would not fit the card; an absent value is "None" at 15px/500 faint. A **second line** (12.5px faint) sits at the card's foot so a row of cards lines up: the counts in words, or both amounts. Where a share is drawn, it is a split bar (see Charts), never a gauge or a ring.
+- **Lower widget** (`WidgetFrame`, lower): the Card above with its 28px header: a 15px/600 title, an info glyph (Info at 15px in a 22px target, faint, `muted` on hover) that opens the metric's definition as a tip and reads "About {name}" to a screen reader, a 12.5px faint caption (the range in sentence case, or what the chart is by), and at the far right a switch or action. A title follows the P&L basis where it carries one ("Net P&L", "Cumulative gross P&L").
+- **Widget states.** Every widget has its own. **Loading:** sunken skeleton bars in the card's shape (a figure bar, a track bar and a line for an upper widget; three lines and a plot block, 140px tall or 260px for a wide widget, for a lower one), `aria-busy` on the card. **No data:** the widget's own words at 13.5px muted, left under an upper label and centred in a lower card ("The Edge score needs at least one closed trade."). Filters that match nothing, a set of open trades only, and a unit that keeps no trade leave every widget on the page, each saying so. Only an **empty workspace** and an account selection that is **all archived** replace the page: a ghost of the dashboard in one card (a caption, "Your figures, charts and calendar will show here.", three outlined figure blocks and two chart blocks fading out at the foot), the state title, one line, Import and "Open the sample workspace" (or, for archived accounts, the Archive glyph and Open Accounts). The ghost has no numbers.
+- **Above the widgets.** A quiet 13px muted line, "Last import {time} into {account}.", with an accent-ink "Import history" link, when an import is on record. When more than one currency has closed trades, a Segmented control names the currency shown, with the note "Each currency is shown on its own. Converting between them isn't built yet."; every money widget and the score read the currency it picks.
+- **Calendars.** The three calendar widgets and the Year calendar reuse the Calendar page's month grid and year grid (see Calendar). They book every exit on its own day and show the whole month or year, so the date range does not touch them; the other filters, the unit, Privacy and the currency do. Calendar is the month with net only, each day tinted gain, loss or flat, no stats menu. **Calendar with stats** adds the Stats shown menu (the same `calendarStats` pref as the Calendar page), This month, the month's net and trading days, a week total on each row and the Snapshot button (see Calendar snapshot panel). Mini calendar is the Day view's month (see Mini calendar): a day opens the Day view on that date. A day on the first two opens its panel in a sheet.
+- **Recent trades.** One card with a Closed and Open positions switch. Its columns come and go with the card's own width (a container query, not the viewport): under 20rem the time folds under the instrument; Side and Rules show from 36rem; Strategy and Mistake from 56rem. Rows are 34px from 20rem, on `line` at 70% hairlines that lift to sunken at 60% on hover; the instrument is written in words (root 600, contract muted); a trade with a broken rule reads "Broke:" in loss with the rule text.
+- **Report widget.** One chart of up to three metrics (the Performance report's picker and Bar or Line and Period or Running choices), grouped by day, with the metrics kept in the widget's settings. **Challenge widget:** one challenge's compact card (see Prop firms), the most urgent active one unless the widget's settings pick another.
+
+##### Template menu
+
+The button is a `Layout` glyph (18px) in a 34px bordered control, named for the template in use ("Dashboard template: Main") and set with the search in the top bar; on a phone it is a plain 44px glyph with no box. It opens a Radix popover 280px wide (the screen less 16px on a phone), 12px radius, `line` border, `--shadow`, with a faint 12px "Templates" label over one row per template: 40px high (44px on touch and on a phone), 14px/500 name truncating, a 16px Check in accent-ink on the one in use (and "In use" for a screen reader). Picking a row switches to it at once. At the row's end a 30px pencil (44px on touch) opens edit mode on that template. Under a hairline, **New template** (Plus, accent-ink, 14px/600) turns into a name form in the menu: a "Name the new template" label, a 34px field prefilled "{name} copy", Cancel and Create. Create stores the copy, puts it in use and opens edit mode on it. Where there is no edit session the list only picks.
+
+##### Edit mode
+
+A draft: nothing is stored until Save. On a wide screen the **edit bar** takes the top bar's place (sticky, canvas fill, 68px at least, wrapping its hint to its own row below `xl`): a "Template name" label (13px/500 muted) and a 34px field 220px wide at 14px/600, a 13px muted hint ("Drag a widget, or use its arrows, to move it."), and at the right Delete template (ghost, a Trash glyph; offered only while there is more than one template), Cancel (secondary) and Save template (primary). Below it the page shows the two sections under their headings (15px/600 with a 12.5px faint note: "Up to 5 figures; 2 places left", "Charts, lists and calendars"). Each widget is a **bar over a ghost body**: a 22px grip (DotsSixVertical, faint, a grab cursor), the widget's name (13.5px/600, truncating), Move earlier, Move later (arrows pointing sideways over cards, up and down over rows) and Remove, each a 30px ghost button (44px on touch) with a 15px glyph; the body is a few sunken blocks at 55% opacity, so the layout reads without any data. Each open place is a **dashed add slot**: a 1.5px `line-2` dashed outline, 16px radius, a Plus, "Add a widget" and the section's name in 12px faint (at least 128px tall in the upper strip, 150px in the lower grid); it wakes to an accent border at 45% and a faint accent wash on hover. A full upper section shows no slots and says so in its note. A slot, and each Add in the picker, opens **Add a widget**, a `list` Morph dialog of the widgets for that section that are not yet on the template: name (14px/600), a one-line blurb (12.5px muted) and a secondary Add button. The list stays open after an Add so several can go in; when the upper section is full the rest are greyed under "The upper section is full."
+
+A drag follows the grip and the page scrolls when the pointer nears an edge; Escape drops it. The arrows are the keyboard's way, and a polite status line says where a widget went ("Net P&L moved to place 2 of 5 in the upper section."); focus stays where it was. On a phone, edit mode is a **full-height sheet** ("Edit template"): a card with the name field (44px), then each section as a list of rows with Move up, Move down and Remove, an add row that opens the picker, and a footer of full-width 44px buttons: Save template, Cancel, Delete template. Leaving with changes asks first ("Leave without saving?", Discard changes or Keep editing) for a link, and the browser asks for a closed or reloaded tab; browser Back drops the draft. Deleting asks too, and when the template in use goes it names the one the Dashboard will show instead; the last template cannot be deleted. A template changed in another tab since the edit began says so on Save, and Save again replaces it.
+
+##### Edge score
+
+Keel's own name for the composite score. A lower widget, titled "Edge score", with the range as its caption. The body is the **radar** (see Charts), then under a hairline the **total** and its **track**.
+
+- **Total:** the score out of 100 at 30px/600, tracking -0.04em, tabular, with up to two decimals and no trailing zero (63.73, 63.7, 64); under it the band's word at 12.5px muted: **Weak** (0 to 40), **Building** (40 to 70) or **Strong** (70 to 100).
+- **Track:** a neutral 6px `line` track, 3px ends, filled up to the total in the accent mixed 55% into the surface, with two 1px cuts in the surface colour at 40 and 70 and a **marker** (a 14px circle, surface fill, 3px accent border, chip shadow) at the total. Under it the scale in 11px faint: 0, Weak, 40, Building, 70, Strong, 100. It is not a red to green gradient: the bar measures against a standard, so no money hue touches it. It is an image labelled "63.73 of 100, in the building band (40 to 70)".
+- **Words:** each part has its score and a plain sentence ("Win rate 49.8%, where 60% scores full marks."), shown in the radar's readout and its table. A range with nothing won says "Nothing won in this range, so no edge is shown."; one with nothing lost says it "scores full marks"; no drawdown says there is nothing to recover from, that it adds nothing to the score, and that the radar draws it full.
+- **States:** no closed trade, "The Edge score needs at least one closed trade."; it follows the filters, the range and the accounts, never the display unit, and under Privacy only a ratio of money amounts is hidden.
 
 #### Plan 5 components
 
@@ -667,7 +693,7 @@ Five words, Rough, Low, Steady, Good and Great, in a 280px popover from a quiet 
 
 ##### Slim rail
 
-On a day page, from `lg`, the sidebar becomes a 68px rail: the brand mark, a 36px add-trade "+" button, the compact account switcher and the sidebar's links as glyphs with their names in `aria-label` and `title`. Below `lg` the usual menu and tab bar serve, as everywhere.
+On a day page, from `lg`, the sidebar becomes a 68px rail whatever the collapse choice: the brand mark, a 36px add-trade "+" button, the compact account switcher and the sidebar's links as glyphs named by a tooltip and an `aria-label`. It has no collapse toggle there. Below `lg` the usual menu and tab bar serve, as everywhere. Anywhere else the same rail is what a collapsed sidebar becomes (see Sidebar rail).
 
 ##### Mini calendar
 
@@ -685,13 +711,61 @@ Both are a `CARD` with a header and a collapsed body.
 
 The first run is three screens on the auth pages' centred layout: a welcome with one action, a six-step survey (a progress bar, Back from step 2, Continue disabled until the step is answered; one option per row, instruments two to a row on a phone, a type-ahead for the broker, a text box when Other is chosen) and the preferences dialog. The dialog is a centred 520px card (a full-height sheet below `sm`) that has no close control and cannot be skipped: first name, last name, username, currency (USD first) and time zone (US/Eastern first, shown as a GMT offset). Its submit makes "My account" and opens Home behind it. A quiet notice then says the new time zone is being applied to trades.
 
+#### Plan 6C components
+
+The widget Dashboard and the Edge score are under App components above. The rest of Plan 6C, recorded from the shipped code: the collapsed sidebar, the Settings menu, the prop module, the print layout and the calendar snapshot. They use only the tokens above.
+
+##### Sidebar rail and collapse toggle
+
+The sidebar folds to an icon rail on every desktop page (`lg` up). The choice is `UserPrefs.sidebar` (`expanded` or `collapsed`), remembered per browser; it reads expanded until the prefs load.
+
+- **Toggle:** a `SidebarSimple` glyph (18px) in a 32px button (9px radius, `faint`, surface at 60% and `text` on hover; 44px on a coarse pointer) at the far end of the sidebar's head, opposite the wordmark. Named "Collapse the sidebar" or "Expand the sidebar", with `aria-expanded`, and a tooltip on hover and keyboard focus.
+- **Rail:** an `aside` named "Sidebar", 68px wide, sticky and full height, 8px side padding, scrolling inside itself when the screen is short. Top to bottom: the compact brand mark (32px), the toggle, Add trade (a 36px raised primary "+", 10px radius, 16px bold glyph), the workspace as a 40px icon box (12px radius), the module links, a 20px rule in `line-strong` (it stands for the "Not live yet" group's label), the quiet group, and Settings at the foot. A link is a 40px by 34px row (44px on touch), 9px radius, an 18px glyph, in the sidebar's three looks (current: a white pill with the chip shadow and an accent-ink glyph; other: muted; not live: faint with the glyph at 70%). The words are gone, so each link's name is its `aria-label` and a Radix tooltip names it on hover and keyboard focus (to its right, in the metric tip's card and reveal); the tip never repeats the name as a description.
+- **Home** has no rail when collapsed. The content centres in one column (1200px at most), and a bordered 34px toggle (10px radius, `line` border, `muted`) leads the top bar from `lg` as the way back.
+- **Focus:** a keyboard or assistive-technology press hands focus to the toggle that replaces the one pressed, so the keyboard keeps its place; a pointer press does not, so no tooltip is left open.
+- **Elsewhere:** a day page keeps its slim rail whatever the choice and has no toggle; from `sm` to `lg` the drawer serves, and below `sm` the tab bar and More, neither with a toggle.
+
+##### Settings menu
+
+The sections in two groups, Profile, then Accounts, Trading, Tags and Logs, with a divider between the groups. From `lg` the menu is a card down the left (180px; `rounded-card`, `line` border, `--shadow-card`, 8px padding) beside the open page: rows 36px high (44px on touch), 9px radius, a 16px glyph and a 14px/500 label; the current row is `sunken` with 600 text and an accent-ink glyph. Collapsed with the sidebar it is a **60px icon column**: each row 42px wide with its label read by screen readers only and named by a tooltip, the divider kept as a hairline across the column, the page taking the room. Below `lg` it is a row of pills that scrolls sideways, with a 48px edge fade at the right while more lie beyond; it never collapses and keeps its words. A link keeps its focus as the width crosses `lg` or the sidebar folds.
+
+##### Prop firms
+
+Three routes under `/app/prop-firms`, each under the same head: **tabs** (Dashboard, Accounts, Transactions) as links on a `line` hairline, 40px high (44px on touch), 13.5px, the current one with a 2px accent underline and 600 text, the others `muted`; no counts; at the right Log payout (secondary, `HandCoins`) and New challenge (primary, a bold Plus), which take the full row on a phone. Every amount is money in the base currency, net, whatever the display menu says (the menu is hidden on prop pages); Privacy still masks it. The date chip and the Filters button belong to the Dashboard and Accounts tabs.
+
+- **Dashboard:** five money cards in the upper widget's small card (Funded, Evaluation, Total spent, Total earned, and Net with "Return on spend" under it; spent in `loss`, earned and net by sign, 22px figures), then **Return over time** (a two-scale chart 190px tall of income, costs below zero and net as a step line, with a 1W, 1M and 1Y Segmented) beside **Where the money went** (net, spent and earned by firm, type, size or fee type, each row's spent and earned figures shown, never only in a hover title) from `xl`, then **Pass rate** and **Why accounts broke** side by side from `md`. A line names any accounts left out for another currency. **Six filters** (firm, phase, status, size, type, strategy) sit in one popover and live in the address.
+- **Accounts:** a card holding **Evaluations, Funded and Breached** (the shared Tabs, each with its count) and a **List or Grid** Segmented, remembered. List is a table (Challenge, Firm, Trading account, Type, Size, Phase, Status, Balance, Started) and two-line rows on a phone; Grid is a compact challenge card per challenge. A row's menu holds View details, Move to funded, Mark as breached, Edit and Delete (permanent, confirmed). Move to funded is absent on a funded row; it and Mark as breached are absent on a breached row, since a breach is final.
+- **Details** (`/app/prop-firms/accounts/[id]`): a head with Edit and Delete, a tab per phase (Step 1, Step 2, Funded, each with its state word: Passed, Active, Breached, Not started), then for the phase shown a **Balance** card (by day, hour or trade), its **rules** (the path to funding: profit against target, days, daily loss used, drawdown used, best-day consistency), five stats (win rate, average win, average loss, best day, worst day), **Trades** (the newest five, then a link to the log filtered to the phase) and **Strategies** with an Attach control.
+- **Transactions:** a card with a Show Segmented (All, Income, Costs, To review) and an add row, over a table 960px at least (Date, Description, Firm, Challenge, Category with its edit control, Amount right-aligned and tinted by sign, Status, and an actions menu) with a ScrollFade; two-line rows on a phone. Status is a chip: "Not reviewed" in the quiet accent, "Reviewed" in the kept green, "Ignored" drawn transparent, faint, with a `line-strong` ring, so an ignored row is plainly out. A category carries a 24px pencil that opens the six categories. A row's menu sets the status, links a challenge or deletes. Log payout and a new transaction open `form`-size Morph dialogs.
+- **First run:** shown once, on the first visit with no challenge and no transaction. One centred card (640px at most, `CARD`, 24px side padding), headed by "Step n of 4" in 12.5px faint and four 28px by 4px bars (accent up to the step, `line` after), a 19px/650 title and a 12.5px muted hint. Step 1, "How do you trade?", three radio rows (Own capital, Prop firms, Both); step 2, "Add what you've paid and been paid", the transaction row form over a list of what was added; step 3, "Your prop-firm money so far", three totals (Spent, Earned, Net); step 4, "Track your active accounts". A hairline foot holds Back, Skip and Continue (Continue waits for an answer on step 1), and on step 4 "Go to the dashboard" and "Add active accounts", which opens New challenge. The bank link is not offered.
+- **Breach dialog:** "Mark {challenge} as breached", a `list` Morph dialog with the phase and firm as its description. "Why did it break?" is five radio rows (Broke the max drawdown; Overtrading or forcing trades; Time pressure; Lack of risk management; Other), none chosen at first, 10px radius, `line` border, an accent border at 45% and an `accent-soft` wash when chosen; Other opens a three-line field for the trader's own words. Under them a sunken note with an Info glyph: "A breach is final. The challenge moves to Breached, stays in your history and in the breach insights, and can't return to evaluation or funded." The footer holds Cancel and Mark as breached, which stays disabled until a reason is chosen (and, for Other, some words).
+
+##### Print layout
+
+`src/styles/print.css` is the one print sheet for everything Keel prints; Export PDF on Performance uses it, and a note's PDF will add its own section. The browser's print dialog writes the file (Save as PDF); no library.
+
+- **Page:** the user's own paper (A4 or Letter; no `size`), 14mm margins, white ground whatever the Appearance setting (the graphite tokens are declared for screens only, so paper is always light), colours printed as drawn (`print-color-adjust: exact`), no shadows, animation or transition. The footer is in the page margins: "Keel" at the left and "Page 1 of 3" at the right, 9pt system-ui at 500 in `#636889`. Chrome and Edge from 131 draw these; elsewhere the margin boxes are ignored and the browser's own footer, if kept on, stands.
+- **What never prints:** the pinned rows (the sidebar, the rail, the top bar, the edit bar, the trade views' switch row: `data-pinned`), any chrome marked `data-print="hide"` (the tab bar, the skip link) and the Export PDF row itself, on every `/app` page.
+- **What holds together:** a table row, and a block marked `data-print="keep"` (a chart card, the header) never splits across pages; a heading is never the last line on a page; a table's sort button prints as its label, so the header Chrome repeats on each page keeps it.
+- **Header:** a block that only prints. The report's name as a 22px/600 heading ("Performance report"), then one 12.5px muted paragraph: the workspace in 600 and the accounts in words, the range in words with its days, "Filters:" and the filters in words (or "none"), "Shown in dollars, net of fees." with how many trades the unit leaves out, the currency when more than one is in play, and "Made 27 Nov 2026, 14:30." (stamped when printing starts, not when the page opened). It carries no amount, so Privacy has nothing to hide in it; under Privacy it says the figures are shown "with amounts hidden".
+- **Body:** the page as shown: both chart slots, drawn at the printable width and shorter than on screen, and the summary table's visible page (50 rows). The **Export PDF** button (secondary, a 16px faint `FilePdf`) sits at the right above the charts beside the **P&L** Gross or Net Segmented, the same saved choice as the top bar's menu. They live in the ready body only: an empty Performance prints without a header and has neither.
+
+##### Calendar snapshot panel
+
+The **Snapshot** button sits in a month's header on the Calendar page and on the Calendar with stats widget: a 30px text button (a Camera at 15px in `faint`, and the word Snapshot from `sm`; the camera alone below, 30px wide and 44px on touch), the same look as Stats shown beside it, with an accent border and ink while the panel is open. It opens the **Calendar image** panel, which does not hold the page: a click behind it leaves it open, and a stat switched on behind it changes the picture.
+
+- **Panel:** a bottom sheet on a phone (full width, 90dvh at most, 20px top corners, a `line` top border, `--shadow`, padded above the safe area, sliding up) and from `sm` a 400px card at the bottom right (24px in from the edges, 16px radius, 20px padding, rising 12px as it fades in). Reduced motion fades only. Focus lands on the title, "Calendar image" (16px/600), and a 44px close sits at its end; closing returns focus to the Snapshot button.
+- **Preview:** the picture in a sunken frame (12px radius, `line` border, 10px padding), full width, 6px radius, over a 12.5px muted caption: "{Month} as shown: your chosen stats, {unit}. keel-calendar-YYYY-MM.png". While it is made, a pulsing `line` block in the picture's proportions (a status, "Making the image"). A failure is a sunken notice, "Couldn't make the image" over "Drawing the month did not work. Try again." with a Try again button.
+- **Actions:** **Download image** (primary, a `DownloadSimple`, half the row or all of it) and, only where the browser can write an image to the clipboard, **Copy image** (secondary) with a polite line ("Copied to the clipboard." or "Couldn't copy the image. Download saves or shares the file."). Elsewhere a line takes its place: "This browser can't copy images. Download saves or shares the file." On a touch device whose browser can share files, Download opens the device's share sheet with the PNG; otherwise the file is saved as a link would.
+- **The image:** the month as shown (the header and month figures, the grid with each day's chosen stats, the week column), in the display unit, Privacy and the appearance, with Keel's wordmark at the foot, drawn at twice its size. Its text is set in the device's system sans, not Instrument Sans: a picture made from an SVG cannot use the page's web fonts.
+
 #### Empty and error states
 
-- **No trades** (empty workspace): a ghosted "Your plan" preview (rule rows with empty tracks and no numbers, the last row fading out) captioned "Your rules and what breaking them costs will show here.", then the title, one line of body, Import and "Open the sample workspace". Chips are dashed and inert.
-- **No matches** (trades exist, the filters leave none): the state glyph, "No trades match these filters." and a single "Clear filters" button. Chips stay live.
+- **No trades** (empty workspace): a ghost of the Dashboard (one card captioned "Your figures, charts and calendar will show here.", outlined figure and chart blocks with no numbers, fading out at the foot), then the title, one line of body, Import and "Open the sample workspace". Chips are dashed and inert. The Dashboard keeps this full-page state only for an empty workspace and for all-archived accounts; see Widget dashboard.
+- **No matches** (trades exist, the filters leave none; the Trades and Reports pages, while the Dashboard keeps its widgets and each says so): the state glyph, "No trades match these filters." and a single "Clear filters" button. Chips stay live.
 - **No closed trades:** the state glyph, "No closed trades yet." and a short line saying open positions count once they close. When filters are set and hold only open trades, the title is "No closed trades in these filters yet." with a single "Clear filters" button.
 - **Errors:** the state glyph (Warning), neutral copy, a secondary "Try again". Never loss red.
-- **Loading:** a skeleton of row 1 and the three row-2 cards in sunken bars; no figures.
+- **Loading:** the Dashboard shows the default template's upper strip and lower grid as sunken bars in each widget's shape; no figures.
 
 #### Sample label
 
@@ -702,7 +776,7 @@ While the sample workspace is active quiet words reading "Sample data" sit among
 Commercial licence; each is rebuilt in Keel tokens, never copied wholesale.
 
 - **Signal Tooltip** (MetricTip): kept the reveal (rise 6px, scale up from 0.92). Dropped the button cluster, tones and signal mark. The trigger is the metric's own label.
-- **Morph Dialog** (drill-down): kept the shared-element morph from opener to panel and back. Dropped the looks, images, eyebrow, blur and spring. Rebuilt as a FLIP on Radix Dialog.
+- **Morph Dialog** (the grow-from-opener dialog): kept the shared-element morph from opener to panel and back. Dropped the looks, images, eyebrow, blur and spring. Rebuilt as a FLIP on Radix Dialog.
 - **Expanding Search** (top bar search): kept the field that grows as it takes focus. Dropped the gradient, drop shadow and hover width. Added the ARIA combobox and listbox.
 - **Task Checkbox** (reserved): kept the self-drawing check, the growing fill and the ripple (a soft disc). Dropped the fill's overshoot (it eases on the glide curve), the strike-through, gradient fill, drop shadow and foreign palette.
 - **Number ticker, button press, Beacon Tabs glide, animated accordion:** as listed under Motion.
@@ -723,11 +797,11 @@ Tokens in `src/lib/motion.ts`, mirrored as CSS variables. Several patterns are a
 
 ### Do:
 
-- **Do** use Keel Ultramarine (#2b35af) as the one brand hue, sparingly: primary action, the active state, focus, adherence bars and series 1.
+- **Do** use Keel Ultramarine (#2b35af) as the one brand hue, sparingly: primary action, the active state, focus, progress bars, the Edge score's radar and series 1.
 - **Do** give each data hue its one job: marigold for mistakes, green and red for signed money and kept or broken.
 - **Do** set every number with tabular figures, and colour only signed P&L green or red.
 - **Do** use the three radii: 6 chips, 10 buttons and inner panels, 16 cards, and only the documented role exceptions beside them.
-- **Do** put cards on the canvas as white surfaces with the card shadow and a hairline, the "Your plan" card included.
+- **Do** put cards on the canvas as white surfaces with the card shadow and a hairline, the widget cards included.
 - **Do** show the product as a real app window built from live components, and label it "Sample data. Not a real account." wherever invented figures appear.
 - **Do** write copy with commas, periods and colons. Use hyphens only inside words and in date ranges ("1-20 Nov").
 - **Do** use Phosphor icons at 18px, with Motion durations and curves from `src/lib/motion.ts`.
@@ -744,6 +818,8 @@ Tokens in `src/lib/motion.ts`, mirrored as CSS variables. Several patterns are a
 - **Do** keep a dialog's body in a scroller and its actions in a fixed footer (Choose figures, the expanded chart).
 - **Do** set every number with a thousands separator and its unit suffix, write an absent value as "None", and write numeric ranges as "a to b" (date ranges keep the hyphen).
 - **Do** keep the outcome chip neutral (Open is the accent) and the tag count chip neutral until a mistake is among the tags, then marigold.
+- **Do** give every widget its own loading and no-data state, and keep a Dashboard's widgets on the page when the filters leave nothing: only an empty workspace and all-archived accounts replace it.
+- **Do** show a share as a split bar with its counts in words, and a sign on a scatter as shape (filled above zero, hollow below) as well as colour.
 
 ### Don't:
 
@@ -765,6 +841,7 @@ Tokens in `src/lib/motion.ts`, mirrored as CSS variables. Several patterns are a
 - **Don't** stack a desktop table's columns into cells on a phone, or scroll it sideways there.
 - **Don't** give a chart series cyan or marigold, or tell series apart by colour alone: the third is dashed.
 - **Don't** write a numeric range with a hyphen or dash ("$100-$500", "2-3"); write "$100 to $500", "2 to 3". A date range keeps its hyphen ("1-20 Nov").
+- **Don't** draw a gauge, a ring or a red to green gradient for a figure or a score: a split bar and a neutral track with a marker and band words say it.
 
 ## Empty values
 

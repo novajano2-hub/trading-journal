@@ -63,8 +63,8 @@ async function heldTrades(
 }
 
 /**
- * What the builder needs to rebuild trades in `accountId`: its currency, the
- * way every build reads it. The instrument comes from the trade itself.
+ * What the builder needs to rebuild trades in `accountId`: its currency and
+ * its cost method, the way every build reads them. The instrument comes from the trade itself.
  */
 async function buildOptions(
   db: KeelDb,
@@ -78,6 +78,7 @@ async function buildOptions(
     startSerial: 0,
     resolve: () => null,
     accountCurrency: () => account.currency,
+    costMethodOf: () => account.costMethod ?? 'fifo',
   };
 }
 

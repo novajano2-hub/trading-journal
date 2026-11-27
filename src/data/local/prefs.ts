@@ -136,6 +136,20 @@ export function validate(p: Partial<UserPrefs>): void {
     throw new RangeError(
       'Onboarding must be { status: "done", at: <ISO time> }',
     );
+  validateDashboards(p.dashboards);
+  if (
+    p.sidebar !== undefined &&
+    p.sidebar !== 'expanded' &&
+    p.sidebar !== 'collapsed'
+  )
+    throw new RangeError(`Unknown sidebar state "${String(p.sidebar)}"`);
+  if (
+    p.propLayout !== undefined &&
+    p.propLayout !== 'grid' &&
+    p.propLayout !== 'list'
+  )
+    throw new RangeError(`Unknown prop layout "${String(p.propLayout)}"`);
+  validatePropStart(p.propStart);
   for (const key of [
     'dayColumns',
     'weekColumns',
@@ -171,17 +185,92 @@ export function validate(p: Partial<UserPrefs>): void {
     throw new RangeError('strategyChooser must be true or false');
 }
 
+/** A widget of a template: an object with a string key (any key: a newer build's stays) and, if present, settings that are an object. */
+function isWidgetRef(w: unknown): boolean {
+  if (typeof w !== 'object' || w === null) return false;
+  const { key, settings } = w as { key?: unknown; settings?: unknown };
+  return (
+    typeof key === 'string' &&
+    (settings === undefined ||
+      (typeof settings === 'object' &&
+        settings !== null &&
+        !Array.isArray(settings)))
+  );
+}
+
+/** True when the stored dashboards are readable: templates with ids, names, at most 5 upper widgets and widgets that each have a key. */
+function isDashboards(value: unknown): boolean {
+  const d = value as UserPrefs['dashboards'];
+  return (
+    typeof d === 'object' &&
+    d !== null &&
+    Array.isArray(d.templates) &&
+    d.templates.length > 0 &&
+    d.templates.every(
+      (t) =>
+        typeof t === 'object' &&
+        t !== null &&
+        typeof t.id === 'string' &&
+        typeof t.name === 'string' &&
+        t.name.length >= 1 &&
+        t.name.length <= 40 &&
+        Array.isArray(t.upper) &&
+        t.upper.length <= 5 &&
+        t.upper.every(isWidgetRef) &&
+        Array.isArray(t.lower) &&
+        t.lower.every(isWidgetRef),
+    ) &&
+    d.templates.some((t) => t.id === d.inUse) &&
+    new Set(d.templates.map((t) => t.id)).size === d.templates.length
+  );
+}
+
+function validateDashboards(d: UserPrefs['dashboards']): void {
+  if (d === undefined) return;
+  if (!isDashboards(d))
+    throw new RangeError(
+      'Dashboards need one or more templates, each with its own id and a name of 1 to 40 characters, at most 5 upper widgets, widgets that each have a key, and inUse naming one',
+    );
+}
+
+function validatePropStart(v: UserPrefs['propStart']): void {
+  if (v === undefined) return;
+  const ok =
+    typeof v === 'object' &&
+    v !== null &&
+    Object.values(v).every(
+      (e) =>
+        typeof e === 'object' &&
+        e !== null &&
+        e.done === true &&
+        (e.answer === undefined ||
+          e.answer === 'own' ||
+          e.answer === 'prop' ||
+          e.answer === 'both'),
+    );
+  if (!ok)
+    throw new RangeError(
+      'propStart must map workspaces to { answer?: own | prop | both, done: true }',
+    );
+}
+
 export const asPartial = (value: unknown): Partial<UserPrefs> =>
   typeof value === 'object' && value !== null
     ? (value as Partial<UserPrefs>)
     : {};
 
-/** A `goals` key left by an older version is ignored on read, and stays in storage. */
+/**
+ * A `goals` key left by an older version is ignored on read, and stays in storage. So are `dashboards`
+ * that cannot be read (a hand edit, a build that wrote another shape): the Dashboard shows the default
+ * and the next write starts from it, instead of the page failing or every write being refused.
+ */
 const withDefaults = (stored: unknown): UserPrefs => {
   const kept: Partial<UserPrefs> & { goals?: unknown } = {
     ...asPartial(stored),
   };
   delete kept.goals;
+  if (kept.dashboards !== undefined && !isDashboards(kept.dashboards))
+    delete kept.dashboards;
   return { ...defaultPrefs(), ...kept };
 };
 

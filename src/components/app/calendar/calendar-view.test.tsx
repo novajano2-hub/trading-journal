@@ -26,6 +26,11 @@ import { CalendarView } from './calendar-view';
 import { YearGrid } from './year-grid';
 
 vi.mock('next/navigation', () => import('../__fixtures__/navigation'));
+// The page has no canvas here: the image is made, not drawn.
+vi.mock('@/lib/calendar-image', async (original) => ({
+  ...(await original<typeof import('@/lib/calendar-image')>()),
+  calendarPng: async () => new Blob(['png'], { type: 'image/png' }),
+}));
 MotionGlobalConfig.skipAnimations = true;
 afterEach(cleanup);
 
@@ -1151,4 +1156,141 @@ test('the day panel on the net basis reads the gross, and the fees without the s
   const dd = await panelOn('net');
   expect(dd('Fees')).toBe('−$14.00');
   expect(dd('Gross')).toBe('+$530.00');
+});
+
+/** The SVG the open Calendar image panel previews. */
+async function previewSvg(month = 'November 2026') {
+  const img = await screen.findByRole('img', {
+    name: `Preview of the ${month} calendar image`,
+  });
+  const src = img.getAttribute('src')!;
+  return decodeURIComponent(src.slice(src.indexOf(',') + 1));
+}
+
+test('Snapshot sits in the month header beside Stats shown and Year view, and opens the Calendar image', async () => {
+  renderApp(<CalendarView />, { sample: withTrades(NOV), url: url() });
+  const section = await screen.findByRole('region', { name: 'November 2026' });
+  const snapshot = await within(section).findByRole('button', {
+    name: 'Snapshot',
+  });
+  expect(snapshot.getAttribute('aria-haspopup')).toBe('dialog');
+  // In the header's own row, after Stats shown and before Year view.
+  const header = snapshot.parentElement!;
+  expect(
+    within(header).getByRole('button', { name: 'Stats shown' }),
+  ).toBeTruthy();
+  const order = [...header.querySelectorAll('button, a')].map(
+    (el) => el.textContent?.trim() || el.getAttribute('aria-label'),
+  );
+  expect(order.indexOf('Stats shown')).toBeLessThan(order.indexOf('Snapshot'));
+  expect(order.indexOf('Snapshot')).toBeLessThan(order.indexOf('Year view'));
+  expect(screen.queryByRole('dialog', { name: 'Calendar image' })).toBeNull();
+
+  fireEvent.click(snapshot);
+  const panel = await screen.findByRole('dialog', { name: 'Calendar image' });
+  expect(snapshot.getAttribute('aria-expanded')).toBe('true');
+  const svg = await previewSvg();
+  // The month as the grid shows it: each traded day, its trades, the week and its days, the month, the foot.
+  for (const figure of ['+$1,020.93', '−$727.63', '+$49.05'])
+    expect(svg).toContain(`>${figure}<`);
+  expect(svg).toContain('>3 trades<');
+  expect(svg).toContain('>Week 3<');
+  expect(svg).toContain('>1 day<');
+  expect(svg).toContain('+$342.35');
+  expect(svg).toContain('3 trading days');
+  expect(svg).toContain('Sample workspace, all accounts');
+  expect(svg).toContain('>Keel<');
+  expect(panel.textContent).toContain('keel-calendar-2026-11.png');
+});
+
+test('the image is the month shown: another month, another file', async () => {
+  renderApp(<CalendarView />, {
+    sample: withTrades(NOV),
+    url: '/app/calendar?month=2026-10',
+  });
+  fireEvent.click(await screen.findByRole('button', { name: 'Snapshot' }));
+  const panel = await screen.findByRole('dialog', { name: 'Calendar image' });
+  const svg = await previewSvg('October 2026');
+  expect(svg).toContain('>October 2026<');
+  expect(svg).not.toContain('1,020.93');
+  expect(panel.textContent).toContain('keel-calendar-2026-10.png');
+});
+
+test('the image carries the chosen cell stats, and no more', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: withTrades(NOV),
+  });
+  await repository.prefs.update({ calendarStats: ['net'] });
+  renderApp(<CalendarView />, { repository, url: url() });
+  fireEvent.click(await screen.findByRole('button', { name: 'Snapshot' }));
+  const svg = await previewSvg();
+  expect(svg).toContain('>+$1,020.93<');
+  expect(svg).not.toMatch(/\d trades?</);
+  expect(svg).not.toContain('win rate');
+});
+
+test('the image follows a stat switched on while it is open', async () => {
+  renderApp(<CalendarView />, { sample: withTrades(NOV), url: url() });
+  fireEvent.click(await screen.findByRole('button', { name: 'Snapshot' }));
+  expect(await previewSvg()).toContain('>3 trades<');
+  fireEvent.click(screen.getByRole('button', { name: 'Stats shown' }));
+  const menu = await screen.findByRole('list', { name: 'Stats shown' });
+  fireEvent.click(within(menu).getByRole('checkbox', { name: 'Trades' }));
+  await waitFor(async () =>
+    expect(await previewSvg()).not.toMatch(/\d trades?</),
+  );
+});
+
+test('under Privacy the image carries no amount, and the caption says so', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: withTrades(NOV),
+  });
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<CalendarView />, { repository, url: url() });
+  fireEvent.click(await screen.findByRole('button', { name: 'Snapshot' }));
+  const panel = await screen.findByRole('dialog', { name: 'Calendar image' });
+  const svg = await previewSvg();
+  expect(svg).not.toMatch(/\$\d/);
+  expect(svg).toContain('+$•••');
+  expect(panel.textContent).toContain('with amounts hidden');
+});
+
+test('the image follows the appearance: graphite when it is dark', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: withTrades(NOV),
+  });
+  await repository.prefs.update({ appearance: 'dark' });
+  renderApp(<CalendarView />, { repository, url: url() });
+  fireEvent.click(await screen.findByRole('button', { name: 'Snapshot' }));
+  const svg = await previewSvg();
+  expect(svg).toContain('#141414');
+  expect(svg).not.toContain('#ffffff');
+});
+
+test('closing the panel hands focus back to Snapshot, and the panel leaves a day sheet and the grid alone', async () => {
+  renderApp(<CalendarView />, { sample: withTrades(NOV), url: url() });
+  const snapshot = await screen.findByRole('button', { name: 'Snapshot' });
+  snapshot.focus();
+  fireEvent.click(snapshot);
+  const panel = await screen.findByRole('dialog', { name: 'Calendar image' });
+  fireEvent.click(within(panel).getByRole('button', { name: 'Close' }));
+  await waitFor(() =>
+    expect(screen.queryByRole('dialog', { name: 'Calendar image' })).toBeNull(),
+  );
+  await waitFor(() => expect(document.activeElement).toBe(snapshot));
+  expect(snapshot.getAttribute('aria-expanded')).toBe('false');
+});
+
+test('with no trades at all the Snapshot still opens: an empty month is a month', async () => {
+  renderApp(<CalendarView />, { sample: withTrades([]), url: url() });
+  fireEvent.click(await screen.findByRole('button', { name: 'Snapshot' }));
+  const svg = await previewSvg();
+  expect(svg).toContain('0 trading days');
+  expect(svg.match(/>No trades</g)).toHaveLength(5);
 });

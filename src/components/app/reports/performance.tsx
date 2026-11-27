@@ -1,18 +1,13 @@
 'use client';
 
-import { MagnifyingGlass, Plus, X } from '@phosphor-icons/react/dist/ssr';
+import { Plus } from '@phosphor-icons/react/dist/ssr';
 import { format, parseISO } from 'date-fns';
 import { useSearchParams } from 'next/navigation';
 import { useId, useMemo, useState } from 'react';
 import { Popover } from 'radix-ui';
-import { MetricTip } from '@/components/ui/metric-tip';
 import { Segmented } from '@/components/ui/segmented';
-import type { MetricId } from '@/content/metric-definitions';
-import type { PnlBasis } from '@/domain/types';
 import {
-  SERIES_GROUPS,
   SERIES_META,
-  SERIES_METRICS,
   seriesUnit,
   timeSeries,
   type Bucket,
@@ -26,12 +21,21 @@ import { useDisplay } from '@/lib/display';
 import { CARD, CARD_PAD, CardHeader, signTone } from '../dashboard/shared';
 import {
   formatPicks,
-  labelOf,
   MAX_METRICS,
   modeOf,
   parsePicks,
   type Pick,
 } from './metric-chips';
+import {
+  align,
+  GAP_REASONS,
+  METRIC_POPOVER,
+  MetricCatalogue,
+  paperLabel,
+  PlottedMetrics,
+  SERIES_TIPS,
+  seriesLabel,
+} from './metric-picker';
 import {
   formatterOf,
   periodText,
@@ -39,69 +43,13 @@ import {
   useExpandSlot,
   type ChartSeries,
 } from './report-chart';
+import { PerformanceActions } from './performance-actions';
+import { PrintHeader } from './print-header';
 import { ReportScope } from './report-scope';
 import { SummaryTable, type SummaryColumn } from './summary-table';
 import { writeParam, type ReportData } from './use-report-data';
 
 const BUCKETS: readonly Bucket[] = ['day', 'week', 'month'];
-/** The metric each picker row's label defines. */
-const TIPS: Record<SeriesMetric, MetricId> = {
-  net: 'pnl',
-  'cumulative-net': 'cumulative-pnl',
-  'avg-daily-net': 'avg-daily-pnl',
-  'avg-daily-win-loss': 'avg-daily-win-loss',
-  'avg-win': 'avg-win',
-  'avg-loss': 'avg-loss',
-  'win-loss-ratio': 'avg-win-loss',
-  expectancy: 'expectancy',
-  'largest-win': 'largest-win',
-  'largest-loss': 'largest-loss',
-  'profit-factor': 'profit-factor',
-  'avg-trade': 'avg-trade',
-  fees: 'fees',
-  'red-day-count': 'red-day-count',
-  'flat-day-count': 'flat-day-count',
-  'avg-planned-r': 'planned-r',
-  'avg-realized-r': 'realized-r',
-  'max-drawdown': 'max-drawdown',
-  'avg-drawdown': 'avg-drawdown',
-  'avg-hold-time': 'hold-time',
-  'longest-trade': 'longest-trade',
-  'avg-day-length': 'avg-day-length',
-  'longest-day': 'longest-day',
-  trades: 'trades',
-  wins: 'winners',
-  losses: 'losers',
-  breakevens: 'breakevens',
-  'open-trades': 'open-trades',
-  'long-trades': 'long-trades',
-  'short-trades': 'short-trades',
-  volume: 'volume',
-  'avg-daily-volume': 'avg-daily-volume',
-  'daily-drawdown': 'daily-drawdown',
-  'net-balance': 'account-balance',
-  'logged-days': 'logged-days',
-  'long-wins': 'long-winners',
-  'long-losses': 'long-losers',
-  'long-breakevens': 'long-breakevens',
-  'long-open': 'long-open-trades',
-  'short-wins': 'short-winners',
-  'short-losses': 'short-losers',
-  'short-breakevens': 'short-breakevens',
-  'short-open': 'short-open-trades',
-  'win-rate': 'win-rate',
-  'long-win-rate': 'long-win-rate',
-  'short-win-rate': 'short-win-rate',
-  'green-days': 'daily-win-rate',
-  'green-day-count': 'green-day-count',
-  'win-streak': 'win-streak',
-  'loss-streak': 'loss-streak',
-  'green-day-streak': 'green-day-streak',
-  'red-day-streak': 'red-day-streak',
-  sharpe: 'sharpe',
-  sortino: 'sortino',
-};
-
 function bucketOf(param: string | null): Bucket {
   return BUCKETS.find((b) => b === param) ?? 'week';
 }
@@ -111,34 +59,6 @@ function periodOf(bucket: Bucket): (key: string) => string {
   return bucket === 'week'
     ? (key) => `Week of ${format(parseISO(key), 'd MMM')}`
     : periodText;
-}
-
-/** Every series on the same keys, a gap where a metric has no point. */
-function align(all: readonly SeriesPoint[][]): {
-  keys: string[];
-  aligned: SeriesPoint[][];
-} {
-  const keys = [...new Set(all.flatMap((s) => s.map((p) => p.key)))].sort();
-  return {
-    keys,
-    aligned: all.map((s) => {
-      const byKey = new Map(s.map((p) => [p.key, p.value]));
-      return keys.map((key) => ({ key, value: byKey.get(key) ?? null }));
-    }),
-  };
-}
-
-const MODES = [
-  { value: 'period', label: 'Period' },
-  { value: 'running', label: 'Running' },
-] as const;
-
-/** What a plotted metric is called: its name, and "(running)" when it is the running value. */
-function seriesLabel(pick: Pick, basis: PnlBasis): string {
-  const name = labelOf(pick.metric, basis);
-  return modeOf(pick) === 'running' && !SERIES_META[pick.metric].running
-    ? `${name} (running)`
-    : name;
 }
 
 type SlotNumber = 1 | 2;
@@ -249,14 +169,6 @@ function useSlot(data: ReportData, n: SlotNumber, active: boolean): Slot {
   };
 }
 
-/** Why a metric has no value in a period, where it is not simply that nothing happened. */
-const GAP_REASONS: Partial<Record<SeriesMetric, string>> = {
-  'avg-daily-win-loss':
-    'shows only for periods with both a green and a red day.',
-  'net-balance': 'has no value in R, ticks, pips or points.',
-  'logged-days': 'waits for your journal to load.',
-};
-
 const GHOST =
   'inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-control px-2 text-[12.5px] font-medium text-muted transition-colors duration-200 ease-(--ease-glide) hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 pointer-coarse:px-3';
 
@@ -293,17 +205,9 @@ function ChartSlot({
   const change = (pick: Pick, to: Partial<Pick>) =>
     setPicks(picks.map((x) => (x === pick ? { ...x, ...to } : x)));
 
-  const needle = query.trim().toLowerCase();
-  const groups = SERIES_GROUPS.map((group) => ({
-    group,
-    metrics: SERIES_METRICS.filter(
-      (m) =>
-        SERIES_META[m].group === group &&
-        (needle === '' || labelOf(m, basis).toLowerCase().includes(needle)),
-    ),
-  })).filter((g) => g.metrics.length > 0);
-
   const period = periodOf(bucket);
+  const named = series.map((s) => s.label).join(', ');
+  const onPaper = series.map((s) => paperLabel(s.label)).join(', ');
   const gapNote = (x: ChartSeries, pick: Pick) =>
     `${x.label} ${GAP_REASONS[pick.metric] ?? 'has no value in some periods.'}`;
   const gaps = series.flatMap((x, i) =>
@@ -330,15 +234,26 @@ function ChartSlot({
   return (
     <section
       aria-labelledby={chartId}
+      data-print="keep"
       className={`${CARD} ${CARD_PAD} min-w-0`}
     >
       <CardHeader
         headingId={chartId}
         title={`Chart ${slot.n}`}
         after={
-          <span className="text-[12.5px] text-faint">
-            By {bucket}, {data.caption}
-          </span>
+          <>
+            <span
+              className={`text-[12.5px] text-faint ${named ? 'print:hidden' : ''}`}
+            >
+              By {bucket}, {data.caption}
+            </span>
+            {/* On paper the metric rows are gone: the caption names what is plotted. */}
+            {named ? (
+              <span className="hidden text-[12.5px] text-faint print:inline">
+                {onPaper}, by {bucket}
+              </span>
+            ) : null}
+          </>
         }
         end={
           <>
@@ -348,7 +263,7 @@ function ChartSlot({
                 type="button"
                 aria-label={`Remove chart ${slot.n}`}
                 onClick={onRemove}
-                className={GHOST}
+                className={`${GHOST} print:hidden`}
               >
                 Remove
               </button>
@@ -357,53 +272,14 @@ function ChartSlot({
         }
       />
       {picks.length > 0 ? (
-        <ul
-          aria-label="Plotted metrics"
-          className="mt-3 divide-y divide-line/60 rounded-control border border-line"
-        >
-          {picks.map((pick) => {
-            const label = labelOf(pick.metric, basis);
-            return (
-              <li
-                key={pick.metric}
-                className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-1.5"
-              >
-                <span className="min-w-0 flex-1 text-[13.5px] font-medium text-text">
-                  {label}
-                </span>
-                <Segmented
-                  label={`${label} chart type`}
-                  options={[
-                    { value: 'bar', label: 'Bar' },
-                    { value: 'line', label: 'Line' },
-                  ]}
-                  value={pick.kind}
-                  onChange={(kind) => change(pick, { kind })}
-                  coarseTargets
-                />
-                {SERIES_META[pick.metric].running ? null : (
-                  <Segmented
-                    label={`${label} plotted`}
-                    options={MODES}
-                    value={pick.mode}
-                    onChange={(mode) => change(pick, { mode })}
-                    coarseTargets
-                  />
-                )}
-                <button
-                  type="button"
-                  aria-label={`Remove ${label}`}
-                  onClick={() => toggle(pick.metric, false)}
-                  className="inline-grid size-7 cursor-pointer place-items-center rounded-[7px] text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:size-11"
-                >
-                  <X size={13} weight="bold" aria-hidden="true" />
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        <PlottedMetrics
+          picks={picks}
+          basis={basis}
+          onChange={change}
+          onRemove={(metric) => toggle(metric, false)}
+        />
       ) : null}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 print:hidden">
         <div className="flex items-center gap-2.5">
           <Popover.Root>
             <Popover.Trigger
@@ -419,83 +295,16 @@ function ChartSlot({
                 sideOffset={6}
                 collisionPadding={12}
                 aria-label="Choose metrics"
-                className="z-50 flex max-h-[min(72dvh,30rem)] w-[min(calc(100vw-24px),640px)] flex-col rounded-control border border-line bg-surface-1 shadow-[var(--shadow)] outline-none"
+                className={METRIC_POPOVER}
               >
-                <div className="relative flex-none border-b border-line p-2">
-                  <MagnifyingGlass
-                    size={15}
-                    aria-hidden="true"
-                    className="pointer-events-none absolute top-1/2 left-5 -translate-y-1/2 text-faint"
-                  />
-                  <input
-                    type="search"
-                    aria-label="Search metrics"
-                    placeholder="Search metrics"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    className="h-9 w-full rounded-control border border-line bg-surface-1 pr-3 pl-9 text-[13.5px] text-text outline-none placeholder:text-faint focus-visible:border-accent/60 focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11"
-                  />
-                </div>
-                <div
-                  role="group"
-                  aria-label="Metrics"
-                  className="min-h-0 flex-1 overflow-y-auto px-3 pb-2"
-                >
-                  {groups.length === 0 ? (
-                    <p
-                      role="status"
-                      className="py-6 text-center text-[13.5px] text-faint"
-                    >
-                      {`No metric matches "${query.trim()}"`}
-                    </p>
-                  ) : null}
-                  {groups.map(({ group, metrics }) => (
-                    <div
-                      key={group}
-                      role="group"
-                      aria-label={group}
-                      className="mt-2"
-                    >
-                      <h3 className="py-1 text-[12.5px] font-semibold text-muted">
-                        {group}
-                      </h3>
-                      <div className="grid gap-x-6 gap-y-0.5 sm:grid-cols-2">
-                        {metrics.map((metric) => {
-                          const pick = picks.find((x) => x.metric === metric);
-                          const label = labelOf(metric, basis);
-                          const off = pick === undefined && full;
-                          return (
-                            <div
-                              key={metric}
-                              className="flex min-h-10 items-center gap-2.5 border-b border-line/60 py-1 pointer-coarse:min-h-11"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={pick !== undefined}
-                                disabled={off}
-                                aria-label={label}
-                                aria-describedby={
-                                  off ? `${metricsId}-limit` : undefined
-                                }
-                                onChange={(e) =>
-                                  toggle(metric, e.target.checked)
-                                }
-                                className="size-4 flex-none accent-[var(--accent)]"
-                              />
-                              <span
-                                className={`text-[13.5px] ${off ? 'text-faint' : 'text-text'}`}
-                              >
-                                <MetricTip id={TIPS[metric]} basis={basis}>
-                                  {label}
-                                </MetricTip>
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <MetricCatalogue
+                  picks={picks}
+                  basis={basis}
+                  query={query}
+                  onQuery={setQuery}
+                  onToggle={toggle}
+                  limitId={`${metricsId}-limit`}
+                />
               </Popover.Content>
             </Popover.Portal>
           </Popover.Root>
@@ -553,7 +362,7 @@ function ChartSlot({
 /** Where a removed chart was: one press brings it back. */
 function AddChart({ onAdd }: { onAdd(): void }): React.JSX.Element {
   return (
-    <div className="flex min-h-40 min-w-0 items-center justify-center rounded-card border border-dashed border-line-2 p-4">
+    <div className="flex min-h-40 min-w-0 items-center justify-center rounded-card border border-dashed border-line-2 p-4 print:hidden">
       <button
         type="button"
         onClick={onAdd}
@@ -607,7 +416,7 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
       return {
         id: x.metric,
         header: seriesLabel(x, basis),
-        tip: TIPS[x.metric],
+        tip: SERIES_TIPS[x.metric],
         align: 'right',
         value: (r) => r.values[i],
         cell: (r) => {
@@ -628,6 +437,8 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
 
   return (
     <>
+      <PrintHeader title="Performance report" data={data} />
+      <PerformanceActions basis={basis} />
       <div className="grid gap-4 lg:grid-cols-2">
         {([1, 2] as const).map((n) =>
           off.includes(n) ? (
@@ -674,7 +485,11 @@ function Body({ data }: { data: ReportData }): React.JSX.Element {
  * first chart. Each slot's choice is in the address bar
  * (`?m=net:bar,win-rate:line&bucket=week` for chart 1, `m2` and `bucket2` for
  * chart 2, `off=2` for a removed chart) so it can be linked. Day-level and
- * trade-level figures follow `timeSeries`'s rules. Render inside `<Suspense>`.
+ * trade-level figures follow `timeSeries`'s rules. Above them, the P&L basis
+ * and Export PDF, which opens the print dialog: under `@media print` (the
+ * shared sheet, `styles/print.css`) the page loses its chrome and controls and
+ * gains a header that names the workspace, accounts, range, filters, unit and
+ * basis. Render inside `<Suspense>`.
  */
 export function PerformanceView(): React.JSX.Element {
   return (

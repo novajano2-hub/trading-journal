@@ -169,11 +169,23 @@ export function localStrategies(ctx: LocalContext): StrategiesRepo {
       const db = await ctx.db();
       await rwTx(
         db,
-        [db.strategies, db.trades, db.files, db.history],
+        [db.strategies, db.trades, db.files, db.history, db.challenges],
         async () => {
           const strategy = await db.strategies.get([ws, id]);
           if (!strategy) throw new NotFoundError('strategy', id);
           await onItsTrades(db, ws, id, ruleIdsOf(strategy), true);
+          // A challenge traded with it no longer lists it.
+          const using = await db.challenges
+            .where('workspaceId')
+            .equals(ws)
+            .filter((c) => c.strategyIds?.includes(id) ?? false)
+            .toArray();
+          await db.challenges.bulkPut(
+            using.map((c) => ({
+              ...c,
+              strategyIds: c.strategyIds!.filter((s) => s !== id),
+            })),
+          );
           await db.strategies.delete([ws, id]);
           await deleteOwnerFiles(db, ws, `strategy:${id}`);
           // One row for the strategy, not one per trade it leaves.

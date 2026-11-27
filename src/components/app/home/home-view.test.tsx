@@ -1,5 +1,11 @@
 // @vitest-environment happy-dom
-import { cleanup, screen, waitFor, within } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -9,6 +15,7 @@ import { SAMPLE_WORKSPACE } from '@/data/workspaces';
 import { StorageUnavailableError } from '@/data/repository';
 import type { Account, Challenge } from '@/domain/types';
 import { renderApp } from '../__fixtures__/render-app';
+import { AppShell } from '../app-shell';
 import { AppLanding } from './landing';
 import { HomeView } from './home-view';
 
@@ -296,4 +303,72 @@ test('/app goes to Home when the workspace read fails, instead of staying blank'
   };
   renderApp(<AppLanding />, { repository: r, url: '/app' });
   await waitFor(() => expect(window.location.pathname).toBe('/app/home'));
+});
+
+/** The app's top bar (Home's greeting is a header too). */
+const topBar = () => screen.getAllByRole('banner')[0]!;
+
+test('Home collapses its sidebar and centres its content', async () => {
+  const repository = repo();
+  await repository.prefs.update({ sidebar: 'collapsed' });
+  renderApp(
+    <AppShell>
+      <HomeView />
+    </AppShell>,
+    { repository, url: '/app/home' },
+  );
+  // Collapsed, Home has no rail at all (not the icon rail other pages get)...
+  const expand = await screen.findByRole('button', {
+    name: 'Expand the sidebar',
+  });
+  expect(screen.queryByRole('link', { name: 'Add trade' })).toBeNull();
+  expect(screen.queryByRole('list', { name: 'Not live yet' })).toBeNull();
+  expect(
+    screen.queryByRole('button', { name: 'Collapse the sidebar' }),
+  ).toBeNull();
+  // ...the way back is the top bar's, and the content sits in a centred column.
+  expect(topBar().contains(expand)).toBe(true);
+  expect(expand.getAttribute('aria-expanded')).toBe('false');
+  const column = (await screen.findByRole('region', { name: 'Get started' }))
+    .parentElement!.parentElement!.parentElement!;
+  expect(column.getAttribute('data-centred')).toBe('true');
+  expect(column.className).toContain('mx-auto');
+  expect(column.className).toContain('max-w-');
+
+  // Expanding brings the sidebar back, with its collapse button, and the page
+  // returns to the full width beside it.
+  fireEvent.click(expand);
+  const collapse = await screen.findByRole('button', {
+    name: 'Collapse the sidebar',
+  });
+  expect(collapse.getAttribute('aria-expanded')).toBe('true');
+  expect(screen.getByRole('list', { name: 'Not live yet' })).toBeTruthy();
+  expect(
+    within(topBar()).queryByRole('button', {
+      name: 'Expand the sidebar',
+    }),
+  ).toBeNull();
+  expect(column.getAttribute('data-centred')).toBe('false');
+  expect(column.className).not.toContain('mx-auto');
+  await waitFor(async () =>
+    expect((await repository.prefs.get()).sidebar).toBe('expanded'),
+  );
+});
+
+test('Home keeps its full-width page beside the full sidebar', async () => {
+  renderApp(
+    <AppShell>
+      <HomeView />
+    </AppShell>,
+    { repository: repo(), url: '/app/home' },
+  );
+  expect(
+    await screen.findByRole('button', { name: 'Collapse the sidebar' }),
+  ).toBeTruthy();
+  const card = await screen.findByRole('region', { name: 'Get started' });
+  expect(
+    card.parentElement!.parentElement!.parentElement!.getAttribute(
+      'data-centred',
+    ),
+  ).toBe('false');
 });

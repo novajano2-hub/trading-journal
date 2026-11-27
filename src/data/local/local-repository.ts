@@ -15,6 +15,7 @@ import { localJournal } from './journal';
 import { localNoteVersions } from './note-versions';
 import { localOnboarding } from './onboarding';
 import { localPrefs } from './prefs';
+import { localPropTxns } from './prop-txns';
 import { localStrategies } from './strategies';
 import { localTagCategories } from './tag-categories';
 import { localTargetRules } from './target-rules';
@@ -65,5 +66,6 @@ export function createLocalRepository(
     targetRules: localTargetRules(ctx),
     feeRules: localFeeRules(ctx),
     onboarding: localOnboarding(ctx),
+    propTxns: localPropTxns(ctx),
   };
 }

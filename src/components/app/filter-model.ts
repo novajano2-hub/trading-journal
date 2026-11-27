@@ -6,6 +6,7 @@ import {
   type DateRange,
   type GlobalFilters,
   type NumRange,
+  type Outcome,
   type TimeWindow,
 } from '@/data/filters';
 import { ASSET_CLASSES, ASSET_CLASS_LABELS } from '@/domain/asset-class';
@@ -404,4 +405,94 @@ export function detailChips(
     { exitPrice: undefined },
   );
   return out;
+}
+
+/**
+ * Who a printed page is about, in words: "all accounts", the one account's
+ * name, up to three names ("A, B and C"), or a count past that.
+ */
+export function accountsInWords(
+  accounts: readonly Account[],
+  f: GlobalFilters,
+): string {
+  if (f.accountIds.length === 0) return 'all accounts';
+  const byId = new Map(accounts.map((a) => [a.id, a.name]));
+  const names = f.accountIds.flatMap((id) => byId.get(id) ?? []);
+  if (names.length === 0 || names.length > 3)
+    return `${f.accountIds.length} ${plural(f.accountIds.length, 'account')}`;
+  return names.length === 1
+    ? names[0]!
+    : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+}
+
+const OUTCOME_WORDS: Record<Outcome, string> = {
+  win: 'Wins',
+  loss: 'Losses',
+  breakeven: 'Breakeven',
+};
+const OUTCOME_ORDER: readonly Outcome[] = ['win', 'loss', 'breakeven'];
+
+/**
+ * The filters in `f` as short phrases for a printed page, "Side: Long" and
+ * "Symbols: ES, NQ", in the order the top bar and More filters lay them out
+ * (the chips first, then what the sheet holds). The date range and the
+ * accounts are left out: the page names those on lines of their own.
+ */
+export function filterWords(
+  f: GlobalFilters,
+  names: {
+    strategies: ReadonlyMap<string, string>;
+    tags: ReadonlyMap<string, string>;
+  },
+  weekStart?: WeekStart,
+): string[] {
+  const out: string[] = [];
+  /** `ids` by name under a label that agrees with how many are known; `all` says every one must match. */
+  const list = (
+    ids: readonly string[],
+    byId: ReadonlyMap<string, string>,
+    one: string,
+    many: string,
+    all = false,
+  ) => {
+    const known = ids.flatMap((id) => byId.get(id) ?? []);
+    if (known.length > 0)
+      out.push(
+        `${plural(known.length, one, many)}${all && known.length > 1 ? ', all of' : ''}: ${known.join(', ')}`,
+      );
+  };
+  if (f.symbols.length > 0)
+    out.push(`${plural(f.symbols.length, 'Symbol')}: ${f.symbols.join(', ')}`);
+  if (f.side !== undefined)
+    out.push(`Side: ${f.side === 'long' ? 'Long' : 'Short'}`);
+  list(
+    f.strategyIds,
+    names.strategies,
+    'Strategy',
+    'Strategies',
+    f.strategyMatch === 'all',
+  );
+  list(f.tagIds, names.tags, 'Tag', 'Tags', f.tagMatch === 'all');
+  if (f.outcomes.length > 0)
+    out.push(
+      `Outcome: ${OUTCOME_ORDER.filter((o) => f.outcomes.includes(o))
+        .map((o) => OUTCOME_WORDS[o])
+        .join(', ')}`,
+    );
+  if (f.status !== undefined)
+    out.push(`Status: ${f.status === 'open' ? 'Open' : 'Closed'}`);
+  if (f.holding !== undefined)
+    out.push(`Holding: ${f.holding === 'intraday' ? 'Intraday' : 'Multiday'}`);
+  if (f.reviewed !== undefined)
+    out.push(`Reviewed: ${f.reviewed ? 'Yes' : 'No'}`);
+  if (f.ratings.length > 0)
+    out.push(`Rating: ${[...f.ratings].sort().join(', ')}`);
+  list(
+    f.excludeStrategyIds,
+    names.strategies,
+    'Excluded strategy',
+    'Excluded strategies',
+  );
+  list(f.excludeTagIds, names.tags, 'Excluded tag', 'Excluded tags');
+  return [...out, ...detailChips(f, weekStart).map((c) => c.label)];
 }

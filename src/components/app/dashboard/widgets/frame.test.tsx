@@ -1,0 +1,152 @@
+// @vitest-environment happy-dom
+import { cleanup, screen, within } from '@testing-library/react';
+import { afterEach, expect, test, vi } from 'vitest';
+import { renderApp } from '../../__fixtures__/render-app';
+import { WidgetCard, widgetTitle, WidgetFrame, WidgetLoading } from './frame';
+
+vi.mock('next/navigation', () => import('../../__fixtures__/navigation'));
+
+afterEach(cleanup);
+
+test('a lower widget is a card: a heading, its info tip, the caption, its end and the body', async () => {
+  renderApp(
+    <WidgetFrame
+      widgetKey="drawdown"
+      title="Drawdown"
+      caption="By trading day"
+      tip="daily-drawdown"
+      end={<button type="button">Do</button>}
+    >
+      <p>the body</p>
+    </WidgetFrame>,
+  );
+  const card = await screen.findByRole('region', { name: 'Drawdown' });
+  expect(card.getAttribute('data-widget')).toBe('drawdown');
+  expect(
+    within(card).getByRole('heading', { level: 2, name: 'Drawdown' }),
+  ).toBeTruthy();
+  const tip = within(card).getByRole('button', { name: 'About Drawdown' });
+  expect(tip.dataset.metricTip).toBe('daily-drawdown');
+  expect(card.textContent).toContain('By trading day');
+  expect(within(card).getByRole('button', { name: 'Do' })).toBeTruthy();
+  expect(within(card).getByText('the body')).toBeTruthy();
+  expect(card.className).toContain('rounded-card');
+  expect(card.getAttribute('aria-busy')).toBeNull();
+});
+
+test('an upper widget is a small card whose label is the info tip, with no heading', async () => {
+  renderApp(
+    <WidgetFrame
+      widgetKey="net-pnl"
+      title="Net P&L"
+      tip="net-pnl"
+      end={<span>1,226 trades</span>}
+    >
+      <span>figure</span>
+    </WidgetFrame>,
+  );
+  const card = await screen.findByRole('region', { name: 'Net P&L' });
+  expect(card.getAttribute('data-widget')).toBe('net-pnl');
+  expect(within(card).queryByRole('heading')).toBeNull();
+  const tip = within(card).getByRole('button', { name: 'Net P&L' });
+  expect(tip.dataset.metricTip).toBe('net-pnl');
+  expect(card.textContent).toContain('1,226 trades');
+  expect(card.textContent).toContain('figure');
+  // The card is the container its figure sizes itself against, and a label that wraps stays left.
+  expect(card.className).toContain('@container');
+  expect(tip.className).toContain('text-left');
+});
+
+test('while it loads the card keeps its header and shows a skeleton instead of the body', async () => {
+  renderApp(
+    <WidgetFrame
+      widgetKey="cum-pnl"
+      title="Cumulative net P&L"
+      tip="cumulative-pnl"
+      state="loading"
+    >
+      <p>the body</p>
+    </WidgetFrame>,
+  );
+  const card = await screen.findByRole('region', {
+    name: 'Cumulative net P&L',
+  });
+  expect(card.getAttribute('aria-busy')).toBe('true');
+  expect(within(card).queryByText('the body')).toBeNull();
+  expect(card.textContent).not.toMatch(/\d/);
+  expect(card.querySelector('[data-skeleton]')).toBeTruthy();
+  expect(
+    within(card).getByRole('button', { name: 'About Cumulative net P&L' }),
+  ).toBeTruthy();
+});
+
+test('with no data it says so in its own words, in place of the body', async () => {
+  renderApp(
+    <WidgetFrame
+      widgetKey="drawdown"
+      title="Drawdown"
+      tip="daily-drawdown"
+      state="empty"
+      empty="No closed trades in these filters."
+    >
+      <p>the body</p>
+    </WidgetFrame>,
+  );
+  const card = await screen.findByRole('region', { name: 'Drawdown' });
+  expect(card.textContent).toContain('No closed trades in these filters.');
+  expect(within(card).queryByText('the body')).toBeNull();
+  expect(card.getAttribute('aria-busy')).toBeNull();
+});
+
+test('a card titled by something other than the widget says what its info tip is about', async () => {
+  renderApp(
+    <WidgetFrame
+      widgetKey="calendar"
+      title="November 2026"
+      about="Calendar"
+      tip="month-calendar"
+    >
+      <p>the month</p>
+    </WidgetFrame>,
+  );
+  const card = await screen.findByRole('region', { name: 'November 2026' });
+  expect(
+    within(card).getByRole('heading', { level: 2, name: 'November 2026' }),
+  ).toBeTruthy();
+  const tip = within(card).getByRole('button', { name: 'About Calendar' });
+  expect(tip.dataset.metricTip).toBe('month-calendar');
+  expect(
+    within(card).queryByRole('button', { name: 'About November 2026' }),
+  ).toBeNull();
+});
+
+test('the title of a widget that carries the P&L basis follows it; every other keeps its name', () => {
+  expect(widgetTitle('net-pnl', 'net')).toBe('Net P&L');
+  expect(widgetTitle('net-pnl', 'gross')).toBe('Gross P&L');
+  expect(widgetTitle('cum-pnl', 'gross')).toBe('Cumulative gross P&L');
+  expect(widgetTitle('daily-pnl', 'net')).toBe('Net daily P&L');
+  expect(widgetTitle('daily-cum', 'gross')).toBe(
+    'Daily and cumulative gross P&L',
+  );
+  expect(widgetTitle('drawdown', 'gross')).toBe('Drawdown');
+  expect(widgetTitle('recent', 'net')).toBe('Recent trades');
+});
+
+test('WidgetCard frames a widget by its key, with its tip and caption; WidgetLoading is its skeleton', async () => {
+  renderApp(
+    <>
+      <WidgetCard k="drawdown" caption="By trading day">
+        <p>the body</p>
+      </WidgetCard>
+      <WidgetLoading k="cum-pnl" />
+    </>,
+  );
+  const card = await screen.findByRole('region', { name: 'Drawdown' });
+  expect(card.getAttribute('data-widget')).toBe('drawdown');
+  expect(card.textContent).toContain('By trading day');
+  expect(within(card).getByText('the body')).toBeTruthy();
+  const loading = screen.getByRole('region', {
+    name: 'Cumulative net P&L',
+  });
+  expect(loading.getAttribute('aria-busy')).toBe('true');
+});

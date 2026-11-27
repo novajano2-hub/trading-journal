@@ -6,7 +6,7 @@
 // at rest it is a 34px icon button, and it widens over `glide` on focus,
 // staying put under reduced motion. Added: an ARIA combobox and its listbox.
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/ssr';
-import { useId, useState, type Ref } from 'react';
+import { useId, useRef, useState, type CSSProperties, type Ref } from 'react';
 
 export interface SearchOption {
   id: string;
@@ -16,13 +16,17 @@ export interface SearchOption {
 
 /**
  * Wide enough for the longest option, and never past the bar's edges. It
- * grows left from where it rests. On a phone, where the Display button is
- * the one control after it, it reaches the left gutter, over the title; from
- * `sm` to `md` (where it sits furthest left) it is capped so its ring keeps a
- * gutter.
+ * grows left from where it rests. On a phone it reaches the left gutter, over
+ * the title, from wherever it rests: the room is measured when it takes focus
+ * (`--search-room`), since the controls after it differ by page; until then
+ * the width assumes one. From `sm` to `md` (where it sits furthest left) it is
+ * capped so its ring keeps a gutter.
  */
 const EXPANDED =
-  'data-[open=true]:w-[280px] max-sm:data-[open=true]:w-[calc(100vw-4.625rem)] sm:max-md:data-[open=true]:w-[248px]';
+  'data-[open=true]:w-[280px] max-sm:data-[open=true]:w-[var(--search-room,calc(100vw-4.625rem))] sm:max-md:data-[open=true]:w-[248px]';
+
+/** The bar's side gutter, which the open field on a phone stops at. */
+const GUTTER = 20;
 
 /**
  * The search field and its results. At rest only the magnifier shows; it
@@ -53,6 +57,9 @@ export function ExpandingSearch({
   inputRef?: Ref<HTMLInputElement>;
 }): React.JSX.Element {
   const uid = useId();
+  const slot = useRef<HTMLDivElement>(null);
+  // On a phone: how far the open field may reach from where it rests.
+  const [room, setRoom] = useState<number>();
   const [focused, setFocused] = useState(false);
   const [active, setActive] = useState(-1);
   const open = focused && results.length > 0;
@@ -88,9 +95,17 @@ export function ExpandingSearch({
 
   return (
     // 34px at rest, level with the bar's controls. On a phone a plain 44px glyph, no box until it opens.
-    <div className="relative size-[34px] flex-none pointer-coarse:size-11 max-sm:size-11">
+    <div
+      ref={slot}
+      className="relative size-[34px] flex-none pointer-coarse:size-11 max-sm:size-11"
+    >
       <div
         data-open={focused}
+        style={
+          room === undefined
+            ? undefined
+            : ({ '--search-room': `${room}px` } as CSSProperties)
+        }
         className={`absolute top-0 right-0 z-10 w-full transition-[width] duration-[var(--dur-glide)] ease-[var(--ease-glide)] motion-reduce:transition-none ${EXPANDED}`}
       >
         <div className="relative h-[34px] overflow-hidden rounded-control border border-line bg-surface-1 transition-[border-color,box-shadow,background-color] duration-200 ease-(--ease-glide) hover:border-accent/35 focus-within:border-accent/35 focus-within:shadow-[var(--shadow-chip)] focus-within:outline-2 focus-within:outline-offset-3 focus-within:outline-accent pointer-coarse:h-11 max-sm:h-11 max-sm:border-transparent max-sm:bg-transparent max-sm:focus-within:border-line max-sm:focus-within:bg-surface-1">
@@ -116,7 +131,15 @@ export function ExpandingSearch({
               onQueryChange(e.target.value);
               setActive(-1);
             }}
-            onFocus={() => setFocused(true)}
+            onFocus={() => {
+              setFocused(true);
+              const rest = slot.current?.getBoundingClientRect();
+              setRoom(
+                rest && !matchMedia('(min-width: 640px)').matches
+                  ? Math.max(rest.right - GUTTER, 0)
+                  : undefined,
+              );
+            }}
             onBlur={() => {
               setFocused(false);
               setActive(-1);

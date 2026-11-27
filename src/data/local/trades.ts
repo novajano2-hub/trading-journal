@@ -171,6 +171,7 @@ export function localTrades(ctx: LocalContext): TradesRepo {
             workspaceId: ws,
             serial: highest + 1,
             accountCurrency: account.currency,
+            costMethod: account.costMethod,
             id,
           });
           if (!built.ok)
@@ -211,6 +212,7 @@ export function localTrades(ctx: LocalContext): TradesRepo {
             workspaceId: ws,
             serial: old.serial,
             accountCurrency: account.currency,
+            costMethod: account.costMethod,
             id,
           });
           if (!built.ok)

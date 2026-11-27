@@ -1,13 +1,18 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { Suspense, type ReactNode } from 'react';
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/ssr';
 import { EMPTY_FILTERS } from '@/data/filters';
 import { AccountSwitcher } from './account-switcher';
 import { AppSearch } from './app-search';
+import { EditSheet } from './dashboard/edit-mode';
+import { DashboardEditProvider } from './dashboard/edit-session';
 import { DisplayMenu } from './display-menu';
 import { FilterBar, FilterBarView } from './filter-bar';
 import { MobileNav } from './mobile-nav';
+import { hasPropChips } from './nav';
+import { PropChipsInert } from './prop/prop-filters';
 import { SampleLabel } from './sample-label';
 import { Sidebar } from './sidebar';
 import { AppearanceSync } from './appearance';
@@ -15,16 +20,20 @@ import { TabBar } from './tab-bar';
 import { TopBar } from './top-bar';
 import { UnitNotice } from './unit-notice';
 
-/** The chips as prerendered, before the URL is read: all unset and inert. */
-const FILTERS_FALLBACK = (
-  <FilterBarView
-    filters={EMPTY_FILTERS}
-    options={{ symbols: [], strategies: [], tags: [], categories: [] }}
-    today=""
-    onChange={() => {}}
-    disabled
-  />
-);
+/** The chips as prerendered, before the URL is read: all unset and inert; the prop pages' two chips on theirs. */
+function FiltersFallback(): React.JSX.Element {
+  return hasPropChips(usePathname()) ? (
+    <PropChipsInert />
+  ) : (
+    <FilterBarView
+      filters={EMPTY_FILTERS}
+      options={{ symbols: [], strategies: [], tags: [], categories: [] }}
+      today=""
+      onChange={() => {}}
+      disabled
+    />
+  );
+}
 
 /** The search before the URL is read: its resting icon (34px; a plain 44px glyph on a phone), inert, holding the bar's place. */
 function SearchFallback(): React.JSX.Element {
@@ -49,48 +58,52 @@ export function AppShell({
   children: ReactNode;
 }): React.JSX.Element {
   return (
-    <div className="flex flex-1">
-      <a
-        href="#content"
-        className="sr-only rounded-control bg-surface-1 text-[15px] font-medium text-text focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:border focus:border-line focus:px-4 focus:py-2.5 focus:shadow-[var(--shadow-chip)]"
-      >
-        Skip to content
-      </a>
-      <AppearanceSync />
-      <Sidebar
-        switcher={<AccountSwitcher />}
-        railSwitcher={<AccountSwitcher compact />}
-      />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar
-          menu={<MobileNav switcher={<AccountSwitcher />} />}
-          filters={
-            <Suspense fallback={FILTERS_FALLBACK}>
-              <FilterBar />
-            </Suspense>
-          }
-          search={
-            <Suspense fallback={<SearchFallback />}>
-              <AppSearch />
-            </Suspense>
-          }
-          basis={<DisplayMenu />}
-          label={<SampleLabel />}
-          badge={<SampleLabel badge />}
-        />
-        {/* How many trades the display unit leaves out of the page, when it narrows them. */}
-        <Suspense fallback={null}>
-          <UnitNotice />
-        </Suspense>
-        <main
-          id="content"
-          tabIndex={-1}
-          className="flex min-w-0 flex-1 flex-col pb-(--tab-bar) outline-none"
+    <DashboardEditProvider>
+      <div className="flex flex-1">
+        <a
+          href="#content"
+          className="sr-only rounded-control bg-surface-1 text-[15px] font-medium text-text focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:border focus:border-line focus:px-4 focus:py-2.5 focus:shadow-[var(--shadow-chip)]"
         >
-          {children}
-        </main>
+          Skip to content
+        </a>
+        <AppearanceSync />
+        <Sidebar
+          switcher={<AccountSwitcher />}
+          railSwitcher={<AccountSwitcher compact />}
+        />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <TopBar
+            menu={<MobileNav switcher={<AccountSwitcher />} />}
+            filters={
+              <Suspense fallback={<FiltersFallback />}>
+                <FilterBar />
+              </Suspense>
+            }
+            search={
+              <Suspense fallback={<SearchFallback />}>
+                <AppSearch />
+              </Suspense>
+            }
+            basis={<DisplayMenu />}
+            label={<SampleLabel />}
+            badge={<SampleLabel badge />}
+          />
+          {/* How many trades the display unit leaves out of the page, when it narrows them. */}
+          <Suspense fallback={null}>
+            <UnitNotice />
+          </Suspense>
+          <main
+            id="content"
+            tabIndex={-1}
+            className="flex min-w-0 flex-1 flex-col pb-(--tab-bar) outline-none"
+          >
+            {children}
+          </main>
+        </div>
+        <TabBar switcher={<AccountSwitcher appearance={false} />} />
       </div>
-      <TabBar switcher={<AccountSwitcher appearance={false} />} />
-    </div>
+      {/* The Dashboard's edit mode on a phone: a sheet over the page. */}
+      <EditSheet />
+    </DashboardEditProvider>
   );
 }

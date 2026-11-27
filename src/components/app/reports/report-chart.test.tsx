@@ -591,3 +591,32 @@ test('Expand sits in the card header slot when the card gives one', async () => 
     1,
   );
 });
+
+test('a line with the loss tone is drawn in the loss colour, its readout dot too', async () => {
+  const { container } = renderApp(
+    <ReportChart
+      label="Drawdown by day"
+      series={[
+        {
+          label: 'Drawdown',
+          kind: 'line',
+          unit: 'money',
+          tone: 'loss',
+          points: [
+            { key: '2026-11-02', value: 0 },
+            { key: '2026-11-03', value: -4000 },
+            { key: '2026-11-04', value: -1000 },
+          ],
+        },
+      ]}
+    />,
+  );
+  const chart = await screen.findByRole('img', { name: 'Drawdown by day' });
+  const stroke = container
+    .querySelector('[data-mark="line"] path:not([stroke="none"])')!
+    .getAttribute('stroke');
+  expect(stroke).toBe('var(--loss-fill)');
+  fireEvent.focus(chart);
+  const dot = container.querySelector('svg circle[stroke="var(--surface-1)"]');
+  expect(dot!.getAttribute('fill')).toBe('var(--loss-fill)');
+});

@@ -179,13 +179,19 @@ async function stripKpi(unit: DisplayUnit, id: string) {
   return text(strip.querySelector(`[data-kpi="${id}"]`));
 }
 
-async function dashboardKpi(unit: DisplayUnit, id: string) {
-  renderApp(<DashboardView />, {
-    repository: await inUnit(unit),
-    url: '/app/dashboard',
+/** The Dashboard's Trade expectancy widget (the only widget of the template), as the page shows it. */
+async function dashboardExpectancy(unit: DisplayUnit) {
+  const repository = await inUnit(unit);
+  await repository.prefs.update({
+    dashboards: {
+      inUse: 'one',
+      templates: [
+        { id: 'one', name: 'One', upper: [{ key: 'expectancy' }], lower: [] },
+      ],
+    },
   });
-  const perf = await screen.findByRole('region', { name: 'Performance' });
-  return text(perf.querySelector(`[data-kpi="${id}"]`));
+  renderApp(<DashboardView />, { repository, url: '/app/dashboard' });
+  return text(await screen.findByRole('region', { name: 'Trade expectancy' }));
 }
 
 async function compareRow(unit: DisplayUnit, name: RegExp) {
@@ -236,9 +242,12 @@ describe('expectancy reads the decided trades on every page (I1)', () => {
     expect(await stripKpi(unit, 'expectancy')).toContain(want);
   });
 
-  test.each(cases)('in %s, the Dashboard KPI', async (unit, want) => {
-    expect(await dashboardKpi(unit, 'expectancy')).toContain(want);
-  });
+  test.each(cases)(
+    'in %s, the Dashboard Trade expectancy widget',
+    async (unit, want) => {
+      expect(await dashboardExpectancy(unit)).toContain(want);
+    },
+  );
 
   test.each(cases)('in %s, Compare', async (unit, want) => {
     const cells = await compareRow(unit, /^Expectancy/);

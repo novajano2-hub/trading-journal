@@ -336,7 +336,7 @@ test('a fresh database is not onboarded', async () => {
 
 // ---- version 3 to 4 --------------------------------------------------------
 
-/** The stores as version 3 declared them: version 2's, plus the routine's. */
+/** The stores as version 3 declared them: version 2's, with version 3's tables. */
 const V3_STORES = {
   ...V2_STORES,
   trackers: '[workspaceId+id], workspaceId',
@@ -344,21 +344,75 @@ const V3_STORES = {
   dayShots: '[workspaceId+id], workspaceId, [workspaceId+date]',
 };
 
-/** A version 3 database holding `rows` (by table) and `meta` records. */
-async function openV3(
-  indexedDB: IDBFactory,
-  rows: V2Rows = {},
-  meta: { key: string; value: unknown }[] = [],
-): Promise<void> {
+test('v3 to v4 keeps every v3 row and adds an empty propTxns', async () => {
+  const indexedDB = new IDBFactory();
+  const rows: V2Rows = {
+    trades: [v2Trade(M), v2Trade(S)],
+    accounts: [account(M), account(S)],
+    strategies: [M, S].map((ws) => ({ id: `s-${ws}`, workspaceId: ws })),
+    tags: [M, S].map((ws) => ({ id: `g-${ws}`, workspaceId: ws })),
+    journal: [v2Entry(M), v2Entry(S)],
+    imports: [M, S].map((ws) => ({ id: `i-${ws}`, workspaceId: ws })),
+    tagCategories: [M, S].map((ws) => ({ id: `c-${ws}`, workspaceId: ws })),
+    templates: [v2Template(M), v2Template(S)],
+    folders: [M, S].map((ws) => ({ id: `f-${ws}`, workspaceId: ws })),
+    cashflows: [M, S].map((ws) => ({
+      id: `cf-${ws}`,
+      workspaceId: ws,
+      accountId: `a-${ws}`,
+    })),
+    challenges: [M, S].map((ws) => ({ id: `ch-${ws}`, workspaceId: ws })),
+    trackers: [M, S].map((ws) => ({ id: `tr-${ws}`, workspaceId: ws })),
+    days: [M, S].map((ws) => ({ id: `d-${ws}`, workspaceId: ws })),
+    dayShots: [M, S].map((ws) => ({
+      id: `ds-${ws}`,
+      workspaceId: ws,
+      date: '2026-11-20',
+    })),
+  };
   const v3 = new Dexie(DB_NAME, { indexedDB, IDBKeyRange });
   v3.version(3).stores(V3_STORES);
   for (const [table, list] of Object.entries(rows))
     await v3.table(table).bulkPut(list ?? []);
-  await v3.table('meta').bulkPut(meta);
+  await v3.table('meta').bulkPut([{ key: 'prefs', value: PREFS }, SEED_META]);
   v3.close();
+
+  const db = new KeelDb({ indexedDB, IDBKeyRange });
+  await db.open();
+  for (const [table, list] of Object.entries(rows))
+    for (const row of list ?? []) {
+      const { workspaceId, id } = row as { workspaceId: string; id: string };
+      expect(await db.table(table).get([workspaceId, id])).toEqual(row);
+    }
+  expect((await db.meta.get('prefs'))?.value).toEqual(PREFS);
+  expect((await db.meta.get('seed:sample'))?.value).toEqual(SEED_META.value);
+  expect(await db.propTxns.count()).toBe(0);
+  db.close();
+});
+
+// ---- version 4 to 5 (Plan 6B) ----------------------------------------------
+
+/** The stores as version 4 declared them: version 3's, plus the prop money ledger. */
+const V4_STORES = {
+  ...V3_STORES,
+  propTxns: '[workspaceId+id], workspaceId, [workspaceId+date]',
+};
+
+/** A version 4 database holding `rows` (by table) and `meta` records. */
+async function openV4(
+  indexedDB: IDBFactory,
+  rows: V2Rows = {},
+  meta: { key: string; value: unknown }[] = [],
+): Promise<void> {
+  const v4 = new Dexie(DB_NAME, { indexedDB, IDBKeyRange });
+  v4.version(4).stores(V4_STORES);
+  for (const [table, list] of Object.entries(rows))
+    await v4.table(table).bulkPut(list ?? []);
+  await v4.table('meta').bulkPut(meta);
+  v4.close();
 }
 
-test('the 6B upgrade keeps every row and adds empty tables', async () => {
+test('the 6B upgrade (version 5) keeps every row and adds empty tables', async () => {
   const indexedDB = new IDBFactory();
   const trade = (ws: string) => ({
     ...makeTrade({ id: `t-${ws}`, workspaceId: ws, net: 500 }),
@@ -381,8 +435,14 @@ test('the 6B upgrade keeps every row and adds empty tables', async () => {
       accountId: `a-${ws}`,
       replacedTrades: [trade(ws)],
     })),
+    // 6C's ledger rows ride through 6B's upgrade untouched.
+    propTxns: [M, S].map((ws) => ({
+      id: `pt-${ws}`,
+      workspaceId: ws,
+      date: '2026-11-20',
+    })),
   };
-  await openV3(indexedDB, rows, [{ key: 'prefs', value: PREFS }]);
+  await openV4(indexedDB, rows, [{ key: 'prefs', value: PREFS }, SEED_META]);
   const db = new KeelDb({ indexedDB, IDBKeyRange });
   await db.open();
   for (const [table, list] of Object.entries(rows))
@@ -391,6 +451,7 @@ test('the 6B upgrade keeps every row and adds empty tables', async () => {
       expect(await db.table(table).get([workspaceId, id])).toEqual(row);
     }
   expect((await db.meta.get('prefs'))?.value).toEqual(PREFS);
+  expect((await db.meta.get('seed:sample'))?.value).toEqual(SEED_META.value);
   for (const table of [
     'files',
     'noteVersions',
@@ -400,5 +461,6 @@ test('the 6B upgrade keeps every row and adds empty tables', async () => {
     'missedTrades',
   ])
     expect(await db.table(table).count()).toBe(0);
+  expect(db.verno).toBe(5);
   db.close();
 });

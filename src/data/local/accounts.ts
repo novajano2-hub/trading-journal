@@ -1,5 +1,10 @@
-import { NotFoundError, type AccountsRepo } from '../repository';
+import {
+  ArchivedAccountError,
+  NotFoundError,
+  type AccountsRepo,
+} from '../repository';
 import type { LocalContext } from './context';
+import { applyCostMethod } from './cost-method';
 import type { KeelDb } from './db';
 import { deleteOwnerFiles } from './files';
 import { changeRows, fieldChanges, lifecycleRow, logHistory } from './history';
@@ -48,6 +53,8 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
     async create(ws, input) {
       const db = await ctx.db();
       const account = { ...input, id: ctx.newId(), workspaceId: ws };
+      // FIFO is the unset method.
+      if (account.costMethod === 'fifo') delete account.costMethod;
       return rwTx(db, [db.accounts, db.history], async () => {
         await db.accounts.put(account);
         await logHistory(
@@ -62,32 +69,54 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
 
     async update(ws, id, patch) {
       const db = await ctx.db();
-      return rwTx(db, [db.accounts, db.history], async () => {
-        const account = await db.accounts.get([ws, id]);
-        if (!account) throw new NotFoundError('account', id);
-        const next = {
-          ...mergePatch(account, patch, [
-            'propRules',
-            'timeZone',
-            'importMapping',
-          ]),
-          id,
-          workspaceId: ws,
-        };
-        await db.accounts.put(next);
-        await logHistory(
-          db,
-          ws,
-          changeRows(
-            'account',
+      // The trades and meta tables are for a change of cost method (C40), which rebuilds the account's trades.
+      return rwTx(
+        db,
+        [db.accounts, db.trades, db.meta, db.history],
+        async () => {
+          const account = await db.accounts.get([ws, id]);
+          if (!account) throw new NotFoundError('account', id);
+          const next = {
+            ...mergePatch(account, patch, [
+              'propRules',
+              'timeZone',
+              'importMapping',
+            ]),
             id,
-            next.name,
-            fieldChanges(account, next, LOGGED_FIELDS),
-          ),
-          ctx,
-        );
-        return next;
-      });
+            workspaceId: ws,
+          };
+          // A change of method rebuilds the account's trades: the same path as setCostMethod.
+          const method = patch.costMethod;
+          const rebuild =
+            method !== undefined && method !== (account.costMethod ?? 'fifo');
+          if (rebuild && account.status === 'archived')
+            throw new ArchivedAccountError([id]);
+          let saved = next;
+          if (rebuild) {
+            saved = await applyCostMethod(
+              db,
+              next,
+              method,
+              account.costMethod ?? 'fifo',
+            );
+          } else {
+            if (next.costMethod === 'fifo') delete next.costMethod;
+            await db.accounts.put(next);
+          }
+          await logHistory(
+            db,
+            ws,
+            changeRows(
+              'account',
+              id,
+              next.name,
+              fieldChanges(account, next, LOGGED_FIELDS),
+            ),
+            ctx,
+          );
+          return saved;
+        },
+      );
     },
 
     async remove(ws, id) {
@@ -158,6 +187,16 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
           );
         },
       );
+    },
+
+    async setCostMethod(ws, id, method) {
+      const db = await ctx.db();
+      return rwTx(db, [db.accounts, db.trades, db.meta], async () => {
+        const account = await db.accounts.get([ws, id]);
+        if (!account) throw new NotFoundError('account', id);
+        if (account.status === 'archived') throw new ArchivedAccountError([id]);
+        return applyCostMethod(db, account, method);
+      });
     },
 
     async clearTrades(ws, id) {

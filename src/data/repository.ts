@@ -7,9 +7,12 @@ import type { ManualTradeError } from '@/domain/manual-trade';
 import { isValidTimeZone } from '@/domain/time';
 import type {
   Account,
+  BreachReason,
   CashFlow,
   Cents,
   Challenge,
+  ChallengeStep,
+  CostMethod,
   DayRecord,
   DayShot,
   FeeRule,
@@ -21,6 +24,7 @@ import type {
   NoteFolder,
   NoteTemplate,
   NoteVersion,
+  PropTxn,
   Rule,
   RuleGroup,
   Side,
@@ -277,6 +281,15 @@ export interface AccountsRepo {
   remove(ws: string, id: string): Promise<void>;
   /** Removes its trades (and their journal links) and import jobs; returns the count of trades. */
   clearTrades(ws: string, id: string): Promise<number>;
+  /**
+   * Sets the account's cost method and rebuilds each of its trades from their
+   * stored executions under it, in one transaction (C40): ids, journal fields
+   * and everything not derived from the fills are kept. FIFO is stored as
+   * unset. Throws NotFoundError for a missing account and ArchivedAccountError,
+   * changing nothing, for an archived one. `update` with a `costMethod` that
+   * differs does the same.
+   */
+  setCostMethod(ws: string, id: string, method: CostMethod): Promise<Account>;
 }
 
 /** A rule or group without an id gets one. */
@@ -483,6 +496,23 @@ export interface CashFlowsRepo {
 
 export type NewChallenge = Omit<Challenge, 'id' | 'workspaceId'>;
 export type ChallengePatch = Partial<NewChallenge>;
+/** An account to create and link to the phase `step` of a challenge, which must have none yet. */
+export interface NewChallengeAccount {
+  step: ChallengeStep;
+  account: NewAccount;
+}
+/** One challenge for `createMany`, with the accounts it makes and, optionally, the breach it is born with. */
+export interface NewChallengeEntry {
+  /** A phase with an `accountId` links that existing account. */
+  challenge: NewChallenge;
+  newAccounts: NewChallengeAccount[];
+  /**
+   * Creates the challenge already breached (TradeZella's create form offers
+   * active or breached): `status`, `breachReason`, `breachedOn` and, for
+   * 'other', the trimmed `note` as the failure reason, as `markBreached` writes them.
+   */
+  breach?: { reason: BreachReason; note?: string; on: string };
+}
 export interface ChallengesRepo {
   /** By name. */
   list(ws: string): Promise<Challenge[]>;
@@ -491,12 +521,114 @@ export interface ChallengesRepo {
    * then `step-2` for a two-step challenge, then `funded`, fees that aren't
    * whole non-negative cents, or a start date that isn't a real YYYY-MM-DD;
    * NotFoundError for a linked account that isn't in the workspace; and
-   * RangeError for one account linked to two phases.
+   * RangeError for one account linked to two phases, and for `status:
+   * 'breached'` (a breach goes through `markBreached`, which records the
+   * reason and the date).
    */
   create(ws: string, input: NewChallenge): Promise<Challenge>;
-  /** As `create` for what it sets; a key set to undefined is left unchanged, except `failureReason` and the fees, which it clears. Throws NotFoundError for an unknown id. */
-  update(ws: string, id: string, patch: ChallengePatch): Promise<Challenge>;
+  /**
+   * Creates every challenge, with the new accounts each asks for linked to its
+   * phases, in ONE transaction: all of them or none, so a failure part way
+   * leaves no orphan account and no part of a quantity. Each is checked as
+   * `create` checks it (a bare `status: 'breached'` is refused), RangeError
+   * for no entries, a new account for a phase the challenge lacks or one
+   * already linked, and a bad `breach` date or reason (the form makes
+   * "Create breached" through it). Returns them in order.
+   */
+  createMany(ws: string, items: NewChallengeEntry[]): Promise<Challenge[]>;
+  /**
+   * As `create` for what it sets; a key set to undefined is left unchanged,
+   * except `failureReason` and the fees, which it clears. Throws NotFoundError
+   * for an unknown id, ChallengeBreachedError (writing nothing) for a breached
+   * challenge's `status`, `phase` or `steps` set to a different value or its
+   * `phases` set to a different list of steps (an account link or a start date
+   * still edits), and RangeError for `status: 'breached'` on one that is not
+   * (that goes through `markBreached`, which records the reason and the date).
+   * `newAccounts` are created and linked to their phases in the same
+   * transaction, so a refused update leaves no account behind (RangeError for
+   * a phase the challenge lacks or one already linked).
+   */
+  update(
+    ws: string,
+    id: string,
+    patch: ChallengePatch,
+    newAccounts?: NewChallengeAccount[],
+  ): Promise<Challenge>;
+  /**
+   * Marks the challenge breached, for good: `status`, `breachReason` and
+   * `breachedOn` (a real YYYY-MM-DD) are written, and for 'other' a non-blank
+   * `note` becomes the failure reason; the phase and any earlier text stay.
+   * Throws ChallengeBreachedError, writing nothing, for a challenge already
+   * breached (one breached before reasons existed too), RangeError for a bad
+   * date or reason, NotFoundError for an unknown id. `update` refuses any
+   * status or phase change on a breached challenge the same way. Removing a challenge
+   * unlinks its prop transactions and keeps them.
+   */
+  markBreached(
+    ws: string,
+    id: string,
+    input: { reason: BreachReason; note?: string; on: string },
+  ): Promise<Challenge>;
   remove(ws: string, id: string): Promise<void>;
+}
+
+/** The challenge is breached, and a breach is permanent: it can't be marked again or move to another status or phase. */
+export class ChallengeBreachedError extends Error {
+  override name = 'ChallengeBreachedError';
+  constructor(readonly challengeId: string) {
+    super(`Challenge "${challengeId}" is breached, and a breach is permanent`);
+  }
+}
+
+export type NewPropTxn = Omit<PropTxn, 'id' | 'workspaceId'>;
+export type PropTxnPatch = Partial<NewPropTxn>;
+export interface PropTxnsRepo {
+  /** Newest date first, then by id. */
+  list(ws: string): Promise<PropTxn[]>;
+  /**
+   * The text is trimmed (an empty description is left out; a blank firm reads
+   * None). Throws RangeError for a date that isn't a real YYYY-MM-DD, an
+   * amount that isn't a nonzero whole number of cents, or an unknown category
+   * or status; NotFoundError for a challenge that isn't in the workspace.
+   */
+  add(ws: string, input: NewPropTxn): Promise<PropTxn>;
+  /** As `add` for what it sets; a key set to undefined is left unchanged, except `description` and `challengeId`, which it clears. */
+  update(ws: string, id: string, patch: PropTxnPatch): Promise<PropTxn>;
+  /** For good. Throws NotFoundError for an unknown id. */
+  remove(ws: string, id: string): Promise<void>;
+  /**
+   * Log a payout (C29): a `payout` row linked to the funded challenge, in its
+   * firm, not yet reviewed, written in one transaction with the challenge
+   * read. It counts in total earned at once and writes no withdrawal. Throws
+   * RangeError for an amount that is not a positive whole number of cents or
+   * a date that is not a real YYYY-MM-DD; NotFoundError for a challenge that
+   * is not in the workspace; PayoutRefusedError, writing nothing, for one not
+   * in its funded phase ('not-funded') or breached ('breached').
+   */
+  logPayout(
+    ws: string,
+    input: {
+      challengeId: string;
+      amount: Cents;
+      date: string;
+      description?: string;
+    },
+  ): Promise<PropTxn>;
+}
+
+/** A payout is only logged on a funded account: the challenge is still in an evaluation, or is breached. */
+export class PayoutRefusedError extends Error {
+  override name = 'PayoutRefusedError';
+  constructor(
+    readonly challengeId: string,
+    readonly reason: 'not-funded' | 'breached',
+  ) {
+    super(
+      reason === 'breached'
+        ? `Challenge "${challengeId}" is breached, so no payout can be logged on it`
+        : `Challenge "${challengeId}" is not in its funded phase, so no payout can be logged on it`,
+    );
+  }
 }
 
 /** The date is finished: nothing on it can change. */
@@ -765,4 +897,5 @@ export interface Repository {
   feeRules: FeeRulesRepo;
   imports: ImportRepo;
   onboarding: OnboardingRepo;
+  propTxns: PropTxnsRepo;
 }

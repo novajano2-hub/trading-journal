@@ -1,8 +1,19 @@
 // @vitest-environment happy-dom
-import { cleanup, screen, waitFor, within } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { afterEach, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
+import { createLocalRepository } from '@/data/local/local-repository';
+import { SAMPLE_WORKSPACE } from '@/data/workspaces';
+import type { Challenge, UserPrefs } from '@/domain/types';
 import { renderApp } from './__fixtures__/render-app';
+import { viewport } from './__fixtures__/viewport';
 import { TopBar } from './top-bar';
 
 vi.mock('next/navigation', () => import('./__fixtures__/navigation'));
@@ -72,6 +83,47 @@ test('the chips show only on the routes the filters drive', () => {
   }
   renderBar('/app/trades');
   expect(screen.getByTestId('chips')).toBeTruthy();
+});
+
+test('the chips show on the prop Dashboard and Accounts, and not on Transactions or a challenge (C37)', () => {
+  layOut({ titleWidth: 115, chipsWidth: 100 });
+  for (const path of ['/app/prop-firms', '/app/prop-firms/accounts']) {
+    renderBar(path);
+    expect(screen.getByTestId('chips'), path).toBeTruthy();
+    cleanup();
+  }
+  for (const path of [
+    '/app/prop-firms/transactions',
+    '/app/prop-firms/accounts/c-1',
+  ]) {
+    const bar = renderBar(path);
+    expect(screen.queryByTestId('chips'), path).toBeNull();
+    expect(bar.dataset.chips, path).toBeUndefined();
+    cleanup();
+  }
+});
+
+test('the prop pages carry no Display menu (C72); the trade log keeps it', () => {
+  layOut({ titleWidth: 115, chipsWidth: 100 });
+  const render = (path: string) =>
+    renderApp(
+      <TopBar
+        search={<button data-testid="search">Search</button>}
+        basis={<button>Display</button>}
+      />,
+      { url: path },
+    );
+  for (const path of [
+    '/app/prop-firms',
+    '/app/prop-firms/accounts',
+    '/app/prop-firms/transactions',
+  ]) {
+    render(path);
+    expect(screen.queryByRole('button', { name: 'Display' }), path).toBeNull();
+    cleanup();
+  }
+  render('/app/trades');
+  expect(screen.getByRole('button', { name: 'Display' })).toBeTruthy();
 });
 
 test('Compare shows no chips, and says the groups own their filters', () => {
@@ -149,6 +201,7 @@ test('the source reads as the bar does: menu, title, badge, chips, search, label
     'label',
     'basis',
     'Plan the day',
+    'Dashboard template',
     'Import',
   ]);
   // No theme toggle at any width: Appearance lives in Settings and the menus.
@@ -282,6 +335,30 @@ test('Plan the day sits before Import on the Dashboard and Trades only', () => {
   }
 });
 
+test('the template button follows Plan the day, before Import, on the Dashboard only', async () => {
+  const bar = renderBar('/app/dashboard');
+  const plan = within(bar).getByRole('button', { name: 'Plan the day' });
+  const template = await within(bar).findByRole('button', {
+    name: 'Dashboard template: Main',
+  });
+  const imp = within(bar).getByRole('link', { name: 'Import' });
+  expect(
+    plan.compareDocumentPosition(template) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(
+    template.compareDocumentPosition(imp) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  cleanup();
+  for (const path of ['/app/trades', '/app/calendar', '/app/trades/day']) {
+    const other = renderBar(path);
+    expect(
+      within(other).queryByRole('button', { name: /^Dashboard template/ }),
+      path,
+    ).toBeNull();
+    cleanup();
+  }
+});
+
 test('the bar publishes its measured height for what pins under it, and Plan the day shows on the day and week views', () => {
   layOut({ titleWidth: 115, chipsWidth: 100 });
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
@@ -303,4 +380,202 @@ test('the bar publishes its measured height for what pins under it, and Plan the
   expect(screen.getByRole('button', { name: 'Plan the day' })).toBeTruthy();
   cleanup();
   expect(document.documentElement.style.getPropertyValue('--top-bar')).toBe('');
+});
+
+/** A repository whose saved sidebar choice is `sidebar`. */
+async function repoWith(sidebar: UserPrefs['sidebar']) {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+  await repository.prefs.update({ sidebar });
+  return repository;
+}
+
+test('on Home a collapsed sidebar leaves the bar a way back from lg, and nowhere else does', async () => {
+  const collapsed = await repoWith('collapsed');
+  const { repo } = renderApp(<TopBar />, {
+    url: '/app/home',
+    repository: collapsed,
+  });
+  const expand = await screen.findByRole('button', {
+    name: 'Expand the sidebar',
+  });
+  expect(
+    within(screen.getByRole('banner')).getByRole('button', {
+      name: 'Expand the sidebar',
+    }),
+  ).toBe(expand);
+  expect(expand.getAttribute('aria-expanded')).toBe('false');
+  // The drawer's own button serves below lg.
+  expect(expand.className).toContain('max-lg:hidden');
+  fireEvent.click(expand);
+  await waitFor(async () =>
+    expect((await repo.prefs.get()).sidebar).toBe('expanded'),
+  );
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('button', { name: 'Expand the sidebar' }),
+    ).toBeNull(),
+  );
+  cleanup();
+
+  // Expanded, Home's own sidebar has the button, not the bar.
+  renderApp(<TopBar />, {
+    url: '/app/home',
+    repository: await repoWith('expanded'),
+  });
+  await new Promise((r) => setTimeout(r, 30));
+  expect(screen.queryByRole('button', { name: /the sidebar$/ })).toBeNull();
+  cleanup();
+
+  // Another page keeps its rail, which has the button itself.
+  renderApp(<TopBar />, {
+    url: '/app/trades',
+    repository: await repoWith('collapsed'),
+  });
+  await new Promise((r) => setTimeout(r, 30));
+  expect(screen.queryByRole('button', { name: /the sidebar$/ })).toBeNull();
+});
+
+// ---- Wrapped chips keep a full row (E55) -----------------------------------
+
+/** The bar's row breakers: the empty, hidden-from-assistive-tech blocks that end a row. */
+const breakers = (bar: HTMLElement) =>
+  [...bar.children].filter(
+    (el) =>
+      el.getAttribute('aria-hidden') === 'true' &&
+      el.className.includes('basis-full'),
+  ) as HTMLElement[];
+
+test('chips that need more than the room get a full row, and the controls drop to the row after it', () => {
+  layOut({ titleWidth: 115, chipsWidth: 517 });
+  const bar = renderBar();
+  expect(bar.dataset.chips).toBe('wrapped');
+  const chips = screen.getByTestId('chips').parentElement!;
+  const [afterTitle, afterChips] = breakers(bar);
+  // Title, a break, the chips, a break, then the controls: the reading order is the row order.
+  expect(afterTitle!.nextElementSibling).toBe(chips);
+  expect(chips.nextElementSibling).toBe(afterChips);
+  expect(
+    afterChips!.nextElementSibling!.contains(screen.getByTestId('search')),
+  ).toBe(true);
+  expect(afterChips!.className).toContain('sm:block');
+  expect(afterChips!.className).not.toContain('xl:');
+});
+
+test('chips that fit beside the title leave the controls on that row', () => {
+  layOut({ titleWidth: 115, chipsWidth: 516 });
+  const bar = renderBar();
+  expect(bar.dataset.chips).toBe('inline');
+  const [, afterChips] = breakers(bar);
+  expect(afterChips!.className).not.toMatch(/(^|\s)sm:block(\s|$)/);
+  expect(afterChips!.className).not.toMatch(/(^|\s)block(\s|$)/);
+});
+
+test('before the bar is measured the controls drop below xl, with the chips', () => {
+  vi.spyOn(window, 'matchMedia').mockImplementation(
+    (query: string) => ({ matches: false, media: query }) as MediaQueryList,
+  );
+  layOut({ titleWidth: 115, chipsWidth: 100 });
+  const bar = renderBar();
+  expect(bar.dataset.chips).toBe('unknown');
+  const [, afterChips] = breakers(bar);
+  expect(afterChips!.className).toContain('sm:block');
+  expect(afterChips!.className).toContain('xl:hidden');
+});
+
+test('a page without the chips has no breakers', () => {
+  layOut({ titleWidth: 115, chipsWidth: 517 });
+  const bar = renderBar('/app/import');
+  expect(breakers(bar)).toHaveLength(0);
+});
+
+test('the bar is a pinned row: focus inside it never sends the page scrolling', () => {
+  layOut({ titleWidth: 115, chipsWidth: 100 });
+  expect(renderBar().hasAttribute('data-pinned')).toBe(true);
+});
+
+// ---- The prop challenge's phone title --------------------------------------
+
+const CHALLENGE: Challenge = {
+  id: 'c-t1',
+  workspaceId: SAMPLE_WORKSPACE.id,
+  name: 'Futures 50K',
+  firm: 'Sample firm A',
+  steps: 1,
+  phases: [],
+  phase: 'evaluation',
+  status: 'active',
+};
+
+async function repoWithChallenge() {
+  const sample = fixtureSample();
+  sample.challenges.push(CHALLENGE);
+  return createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => sample,
+  });
+}
+
+const title = () => screen.getByRole('heading', { level: 1 });
+
+test("a challenge's details page titles a phone's bar with the challenge's name; wider screens keep the module's", async () => {
+  viewport({ phone: true });
+  renderApp(<TopBar />, {
+    url: '/app/prop-firms/accounts/c-t1',
+    repository: await repoWithChallenge(),
+  });
+  // The module's name until the challenge loads, so the bar never reads empty.
+  expect(title().textContent).toBe('Prop firms');
+  await waitFor(() => expect(title().textContent).toBe('Futures 50K'));
+  cleanup();
+  vi.restoreAllMocks();
+
+  viewport();
+  renderApp(<TopBar />, {
+    url: '/app/prop-firms/accounts/c-t1',
+    repository: await repoWithChallenge(),
+  });
+  await new Promise((r) => setTimeout(r, 50));
+  expect(title().textContent).toBe('Prop firms');
+});
+
+test('the title stays "Prop firms" for a challenge that is not there, and on the other prop pages', async () => {
+  viewport({ phone: true });
+  const repository = await repoWithChallenge();
+  renderApp(<TopBar />, {
+    url: '/app/prop-firms/accounts/nope',
+    repository,
+  });
+  await new Promise((r) => setTimeout(r, 50));
+  expect(title().textContent).toBe('Prop firms');
+  cleanup();
+  for (const path of [
+    '/app/prop-firms',
+    '/app/prop-firms/accounts',
+    '/app/prop-firms/transactions',
+  ]) {
+    renderApp(<TopBar />, { url: path, repository });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(title().textContent, path).toBe('Prop firms');
+    cleanup();
+  }
+});
+
+test("a challenge's name is read from its address, decoded", async () => {
+  viewport({ phone: true });
+  const sample = fixtureSample();
+  sample.challenges.push({ ...CHALLENGE, id: 'c a/b', name: 'Slash & space' });
+  renderApp(<TopBar />, {
+    url: '/app/prop-firms/accounts/c%20a%2Fb',
+    repository: createLocalRepository({
+      indexedDB: new IDBFactory(),
+      IDBKeyRange,
+      sample: async () => sample,
+    }),
+  });
+  await waitFor(() => expect(title().textContent).toBe('Slash & space'));
 });

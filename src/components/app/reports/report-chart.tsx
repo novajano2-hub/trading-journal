@@ -27,6 +27,7 @@ import {
   type Display,
 } from '@/lib/display';
 import { formatMinutes, formatPct, formatQty } from '@/lib/format';
+import { usePrintState } from '@/lib/use-printing';
 
 export interface ChartSeries {
   label: string;
@@ -36,6 +37,8 @@ export interface ChartSeries {
   points: readonly SeriesPoint[];
   /** `money` values are cents: they read in the chosen display unit. */
   unit: SeriesUnit;
+  /** `loss` draws the series in the loss colour: a measure of what was lost, such as the drawdown. */
+  tone?: 'loss';
   /** For `dots`: how much stands behind each point (its trades). More is larger and stronger. */
   counts?: readonly number[];
 }
@@ -48,6 +51,9 @@ const COLOURS = [
   'var(--muted)',
   'color-mix(in srgb, var(--accent) 55%, var(--surface-1))',
 ];
+const colourOf = (s: ChartSeries, i: number): string =>
+  s.tone === 'loss' ? 'var(--loss-fill)' : COLOURS[i % COLOURS.length]!;
+
 /** The third series' line is dashed, so it reads apart from the first two without colour. */
 const DASHES = [undefined, undefined, '5 4'] as const;
 
@@ -60,6 +66,13 @@ const TILT_STEP = 13;
 const TILT_MAX_CHARS = 14;
 const MIN_LABEL_GAP = 52;
 const DEFAULT_WIDTH = 720;
+/**
+ * On paper a chart is drawn at the width the printable column comes to (about
+ * 690px on A4 or Letter with the sheet's margins) and shorter than on screen,
+ * so the header and two charts share a page; the SVG then fits its box.
+ */
+const PRINT_WIDTH = 690;
+const PRINT_BAND = { one: 190, several: 130 } as const;
 
 /** "Fri 30 Oct" for a day, "Oct 2026" for a month. */
 export function periodText(key: string): string {
@@ -235,8 +248,18 @@ const multiple = (v: number, digits: number): string =>
  * through the display formatter, so Privacy and the unit apply to the axis,
  * the readout, the table and the label alike; shares, ratios, counts,
  * quantities and durations are not amounts and read as they are.
+ *
+ * `dollars` is for a page whose money is always dollars, whatever the unit
+ * (the prop pages, C72): the axis keeps its short dollar labels under a
+ * percentage or R unit too, and Privacy still hides them.
  */
-export function formatterOf(display: Display, currency: string): Formatter {
+export function formatterOf(
+  display: Display,
+  currency: string,
+  dollars = false,
+): Formatter {
+  const short =
+    display.unit === 'dollar' || (dollars && display.unit !== 'privacy');
   const unitText = (v: number, compact: boolean, signed: boolean) =>
     formatUnitValue(display.unit, v, { currency, signed, compact });
   const text = (unit: SeriesUnit, v: number): string => {
@@ -277,11 +300,11 @@ export function formatterOf(display: Display, currency: string): Formatter {
     tick(unit, v) {
       switch (unit) {
         case 'money':
-          return display.unit === 'dollar'
+          return short
             ? compactMoney(v, currency)
             : display.cash(v, v !== 0, currency).text;
         case 'balance':
-          return display.unit === 'dollar'
+          return short
             ? compactMoney(v, currency, false)
             : display.cash(v, false, currency).text;
         case 'tradeunit':
@@ -468,7 +491,7 @@ const Plot = memo(function Plot({
       ) : null}
       {series.map((s, si) => {
         const band = bands[si]!;
-        const colour = COLOURS[si % COLOURS.length]!;
+        const colour = colourOf(s, si);
         const top = layout.tops[si]!;
         const zero = band.y(0);
         const counts = s.counts ?? [];
@@ -851,7 +874,10 @@ function ChartBody({
   );
   const gradientId = `rc${useId().replace(/[^\w-]/g, '')}`;
   const box = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(DEFAULT_WIDTH);
+  const [measured, setWidth] = useState(DEFAULT_WIDTH);
+  // The screen's width cannot follow the paper: the print layout is not measured.
+  const { printing } = usePrintState();
+  const width = printing ? PRINT_WIDTH : measured;
   const [hover, setHover] = useState<number | null>(null);
   const [focused, setFocused] = useState<number | null>(null);
   // A press focuses the chart too; that focus must not default to the first period.
@@ -874,7 +900,15 @@ function ChartBody({
   }, [hasData]);
 
   const stacked = overlay ? 1 : series.length;
-  const bandH = height ?? (stacked === 1 ? 260 : 150);
+  const bandH =
+    height ??
+    (printing
+      ? stacked === 1
+        ? PRINT_BAND.one
+        : PRINT_BAND.several
+      : stacked === 1
+        ? 260
+        : 150);
   const layout = useMemo<Layout | undefined>(() => {
     if (n === 0) return undefined;
     const widest = Math.max(
@@ -1033,7 +1067,7 @@ function ChartBody({
             width={layout.width}
             height={layout.height}
             viewBox={`0 0 ${layout.width} ${layout.height}`}
-            className="block overflow-visible"
+            className="block overflow-visible print:h-auto print:w-full"
             aria-hidden="true"
           >
             <Plot
@@ -1072,7 +1106,7 @@ function ChartBody({
                           ? v < 0
                             ? 'var(--loss-fill)'
                             : 'var(--gain-fill)'
-                          : COLOURS[si % COLOURS.length]
+                          : colourOf(s, si)
                       }
                       stroke="var(--surface-1)"
                       strokeWidth={2}
@@ -1120,7 +1154,7 @@ function ChartBody({
                     <span
                       aria-hidden="true"
                       className="size-2 rounded-full"
-                      style={{ background: COLOURS[i % COLOURS.length] }}
+                      style={{ background: colourOf(s, i) }}
                     />
                     {s.label}
                   </span>
@@ -1275,7 +1309,7 @@ export function ReportChart({
       aria-haspopup="dialog"
       aria-expanded={open}
       onClick={() => setOpen(true)}
-      className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-control px-2 text-[12.5px] font-medium text-muted transition-colors duration-200 ease-(--ease-glide) hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 pointer-coarse:px-3"
+      className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-control px-2 text-[12.5px] font-medium text-muted transition-colors duration-200 ease-(--ease-glide) hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11 pointer-coarse:px-3 print:hidden"
     >
       <ArrowsOut size={14} aria-hidden="true" />
       Expand

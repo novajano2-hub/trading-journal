@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import '../styles/theme.css';
+/* The one print sheet, shared by Export PDF (Plan 6C) and the note PDF (Plan 6B). */
 @import '../styles/print.css';
 
 @theme inline {
@@ -144,12 +145,33 @@ html {
 }
 
 /*
- * On a phone in the app, focus and in-page jumps land clear of the pinned top
- * bar and the tab bar at the foot.
+ * In the app shell (`data-shell`, set by the (app) layout; the welcome has the
+ * app's tokens and no bar), focus and in-page jumps land clear of what is
+ * pinned at the top (WCAG 2.4.11, Focus Not Obscured): the bar, at the height
+ * it measured for itself (`--top-bar`, the editing bar's too), and under it
+ * the trade views' switch row (`--log-switch`). The fallbacks are the bar's
+ * resting heights until it has measured: 68px, 56px on a phone.
+ *
+ * On a phone the foot is cleared as well: the tab bar in the app, and the
+ * welcome's fixed Continue bar, so that one is on the app surface, not the
+ * shell.
+ *
+ * Not while focus is inside a pinned row itself (`data-pinned`): that row is
+ * what the padding clears, so with it a control in the bar, the chips
+ * included, would send the page scrolling each time it took focus. The
+ * sidebar and the rail are pinned rows too: `sticky top-0` in the same
+ * scroller, their head controls sit inside the padded band.
  */
+html:has([data-shell]):not(:has([data-pinned]:focus-within)) {
+  scroll-padding-top: calc(var(--top-bar, 68px) + var(--log-switch, 0px));
+}
+
 @media (max-width: 639.98px) {
+  html:has([data-shell]):not(:has([data-pinned]:focus-within)) {
+    scroll-padding-top: calc(var(--top-bar, 56px) + var(--log-switch, 0px));
+  }
+
   html:has([data-surface='app']) {
-    scroll-padding-top: 56px;
     scroll-padding-bottom: calc(56px + env(safe-area-inset-bottom));
   }
 }

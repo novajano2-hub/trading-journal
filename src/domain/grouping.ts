@@ -46,9 +46,11 @@ function riskAfter(rebuilt: Trade, base: Trade): Cents | undefined {
  * position does not end flat. `base` is the record the trade keeps (id,
  * serial, journaling, levels); the fills decide everything else.
  *
- * Its swap is `base.swap`, added to `net` and not to `gross` (ledger R3). Its
- * risk is rewritten for the new size (`riskAfter`), and its MAE and MFE are
- * dropped, as they describe fills it no longer has.
+ * It is matched under `opts.costMethodOf`, as an import is, and carries that
+ * method as every trade of the account does. Its swap is `base.swap`, added to
+ * `net` and not to `gross` (ledger R3). Its risk is rewritten for the new size
+ * (`riskAfter`), and its MAE and MFE are dropped, as they describe fills it no
+ * longer has.
  */
 export function buildGroupedTrade(
   executions: readonly Execution[],
@@ -84,6 +86,9 @@ export function buildGroupedTrade(
     fees: built.fees,
     net: built.net + (base.swap ?? 0),
   };
+  // Built under the account's cost method (Plan 6C, C40): its stamp is the one the fills were matched under.
+  delete t.costMethod;
+  if (built.costMethod) t.costMethod = built.costMethod;
   if (base.targets) t.targets = copySide(base.targets);
   if (base.stops) t.stops = copySide(base.stops);
   // An exit and a close time exist only when the fills have them.

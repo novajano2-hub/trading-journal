@@ -1,12 +1,121 @@
 /*
- * Printing. The app prints as it looks, until a print layout is mounted: a
- * node marked `data-print-root`, a direct child of <body> (a note's PDF is
- * one; Plan 6C's report PDF is another). Then the page is the layout alone:
- * everything else is hidden on paper, and the layout reads in the light
- * palette whatever the app's theme is. On a screen the layout is off to the
- * side, drawn so that its images load and its fonts settle, and out of reach.
+ * Print.
+ *
+ * What the browser's print dialog makes of a page (Save as PDF writes the
+ * file; no library). This is the ONE print sheet for everything Keel prints:
+ * Plan 6C's Export PDF on Reports > Performance uses it now, and Plan 6B's
+ * note PDF shares it and adds its own section below (the note's `#print-note`
+ * rules), so nothing in the first section is specific to Performance.
+ *
+ * How a page takes part:
+ *   data-pinned         a pinned row (the sidebar, the rail, the top bar, the
+ *                       trade views' switch row, the edit bar): never prints
+ *   data-print='hide'   any other chrome (the tab bar, a skip link): never prints
+ *   data-print='keep'   a block that stays on one page (a chart card, a header)
+ *   print:hidden        (Tailwind) a control that is on screen and not on paper
+ *   hidden print:block  (Tailwind) a block that is on paper and not on screen
+ *   data-print-root     a print layout of its own, a direct child of <body>
+ *                       (a note's PDF): while one is mounted the page is that
+ *                       layout alone (see the last section)
+ *
+ * Always light: theme.css declares the graphite tokens inside `@media not
+ * print`, so paper gets the light set whatever the Appearance setting, and
+ * the rules below only set the ground to white (the app's own is periwinkle).
+ */
+
+/*
+ * The paper stays the user's (A4 or Letter): no `size`. The footer is the
+ * brand and the page count, in the page's margin boxes (Chrome and Edge from
+ * 131; elsewhere the margin boxes are ignored and the browser's own footer,
+ * if the user keeps it on, stands).
+ */
+@page {
+  margin: 14mm;
+
+  @bottom-left {
+    content: 'Keel';
+    font:
+      500 9pt system-ui,
+      sans-serif;
+    color: #636889;
+  }
+
+  @bottom-right {
+    content: 'Page ' counter(page) ' of ' counter(pages);
+    font:
+      500 9pt system-ui,
+      sans-serif;
+    color: #636889;
+  }
+}
+
+@media print {
+  html {
+    /* The swatches, the tones and the tints print as drawn, not as the browser's "background graphics" setting decides. */
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    /* Important: globals.css sets the app's own ground on these two, later in the cascade. */
+    background: #fff !important;
+    height: auto;
+  }
+
+  body {
+    background: #fff !important;
+    min-height: 0;
+  }
+
+  /* Paper has no depth, no hover and nothing that moves. */
+  *,
+  *::before,
+  *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* The app's chrome. */
+  [data-pinned],
+  [data-print='hide'] {
+    display: none !important;
+  }
+
+  /* What stays on one page: a table row, and what is marked to keep together. */
+  tr,
+  [data-print='keep'] {
+    break-inside: avoid;
+  }
+
+  /*
+   * A table header's sort button prints as its label. Chrome repeats a header
+   * on each page a table runs over, and leaves a button out of the repeat, so
+   * a labelled button would print its label on the first page only.
+   */
+  th button {
+    display: contents;
+  }
+
+  /* A heading is never the last line on a page. */
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+}
+
+/*
+ * A note's PDF (Plan 6B, B40). The report above prints the page itself with its
+ * chrome taken off; a note is printed from a print layout: the note drawn
+ * read-only into a node marked `data-print-root`, a direct child of <body>,
+ * mounted only while its print dialog is open (notes/print-host.tsx). The two
+ * share nothing but this sheet: the report's hooks (data-pinned, data-print)
+ * never touch the layout, and the layout's rule below only applies to a body
+ * that holds one, so a report print (no layout mounted) is unaffected and a
+ * note print hides the whole app whatever else is marked. The page margins and
+ * the footer are the sheet's own, above.
  */
 @media screen {
+  /* On a screen the layout is off to the side, drawn so that its images load and its fonts settle, and out of reach. */
   [data-print-root] {
     position: fixed;
     top: 0;
@@ -17,13 +126,7 @@
 }
 
 @media print {
-  @page {
-    margin: 16mm 14mm;
-  }
-
-  body:has(> [data-print-root]) {
-    background: #fff !important;
-  }
+  /* With a layout mounted, everything else in the body is hidden on paper. */
   body:has(> [data-print-root]) > :not([data-print-root]) {
     display: none !important;
   }
@@ -37,7 +140,7 @@
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
     background: #fff;
-    /* theme.css's light tokens, so a page printed from graphite is still ink on paper. */
+    /* theme.css's light tokens, so a layout is ink on paper whatever theme is set. */
     --bg: #ffffff;
     --surface-1: #ffffff;
     --sunken: #f0f1f8;

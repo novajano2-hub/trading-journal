@@ -7,7 +7,9 @@ export const metadata: Metadata = { robots: { index: false } };
 
 /*
  * `[data-surface='app']` switches theme.css to the app's tokens on <html> via
- * :has(), so Radix portals and the page ground follow it.
+ * :has(), so Radix portals and the page ground follow it. `data-shell` marks
+ * the one with the pinned bar (and a phone's tab bar) that the page's scroll
+ * padding keeps focus clear of: the welcome pages share the tokens, not that.
  */
 export default function AppGroupLayout({
   children,
@@ -18,6 +20,7 @@ export default function AppGroupLayout({
     // `--tab-bar`: how much of a phone's foot the tab bar takes, kept clear by the page.
     <div
       data-surface="app"
+      data-shell=""
       className="flex flex-1 flex-col [--tab-bar:0px] max-sm:[--tab-bar:calc(56px+env(safe-area-inset-bottom))]"
     >
       <DataProvider>
