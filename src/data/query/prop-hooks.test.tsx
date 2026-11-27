@@ -31,8 +31,6 @@ import {
   usePrefs,
   usePropTxns,
   useRemovePropTxn,
-  useSetCostMethod,
-  useTrades,
   useUpdatePropTxn,
 } from './hooks';
 import { DataProvider } from './provider';
@@ -278,7 +276,7 @@ describe('useCreateChallenges (C-02, C-04)', () => {
   });
 });
 
-describe('breaches and the cost method', () => {
+describe('breaches', () => {
   test('useMarkBreached marks for good, and the breach insights follow', async () => {
     const { Wrapper } = setup();
     const { result } = renderHook(
@@ -316,39 +314,6 @@ describe('breaches and the cost method', () => {
         }),
       ).rejects.toBeInstanceOf(ChallengeBreachedError);
     });
-  });
-
-  test('useSetCostMethod rebuilds the account and refreshes the trades and the account', async () => {
-    const { Wrapper } = setup();
-    const { result } = renderHook(
-      () => ({
-        accounts: useAccounts(),
-        trades: useTrades(),
-        set: useSetCostMethod(),
-      }),
-      { wrapper: Wrapper },
-    );
-    await waitFor(() => expect(result.current.trades.data).toBeDefined());
-    const own = (r: typeof result.current) =>
-      r.trades.data!.filter((t) => t.accountId === 'sample-futures');
-    expect(own(result.current).every((t) => t.costMethod === undefined)).toBe(
-      true,
-    );
-    await act(async () => {
-      await result.current.set.mutateAsync({
-        id: 'sample-futures',
-        method: 'lifo',
-      });
-    });
-    await waitFor(() =>
-      expect(own(result.current).every((t) => t.costMethod === 'lifo')).toBe(
-        true,
-      ),
-    );
-    expect(
-      result.current.accounts.data!.find((a) => a.id === 'sample-futures')!
-        .costMethod,
-    ).toBe('lifo');
   });
 });
 

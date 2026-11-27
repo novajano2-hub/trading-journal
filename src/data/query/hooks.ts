@@ -15,7 +15,6 @@ import type {
   CashFlow,
   Cents,
   Challenge,
-  CostMethod,
   DayRecord,
   DayShot,
   FrozenDay,
@@ -1104,18 +1103,5 @@ export function useMarkBreached(): UseMutationResult<
         ...(v.note !== undefined && { note: v.note }),
         on: v.on,
       }),
-  );
-}
-
-/** Rebuilds the account's trades under the method, in one transaction (C40). */
-export function useSetCostMethod(): UseMutationResult<
-  Account,
-  Error,
-  { id: string; method: CostMethod }
-> {
-  return useWorkspaceWrite(
-    'accounts.setCostMethod',
-    (r, ws, v: { id: string; method: CostMethod }) =>
-      r.accounts.setCostMethod(ws, v.id, v.method),
   );
 }
