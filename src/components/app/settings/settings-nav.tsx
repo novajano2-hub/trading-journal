@@ -3,6 +3,7 @@
 import {
   Bank,
   ClockCounterClockwise,
+  Notebook,
   SlidersHorizontal,
   Tag,
   User,
@@ -21,6 +22,7 @@ export const SETTINGS_NAV: readonly {
   { label: 'Accounts', href: '/app/settings/accounts', icon: Bank },
   { label: 'Trading', href: '/app/settings/trading', icon: SlidersHorizontal },
   { label: 'Tags', href: '/app/settings/tags', icon: Tag },
+  { label: 'Notebook', href: '/app/settings/notebook', icon: Notebook },
   {
     label: 'Logs',
     href: '/app/settings/import-history',
@@ -47,10 +49,18 @@ export function SettingsNav(): React.JSX.Element {
     if (el) setMore(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
   };
   useEffect(() => {
+    const nav = ref.current;
+    const open = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (nav && open) {
+      // The open section sits in the middle of the row, not off its end.
+      const at =
+        open.getBoundingClientRect().left - nav.getBoundingClientRect().left;
+      nav.scrollLeft += at - (nav.clientWidth - open.offsetWidth) / 2;
+    }
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-  }, []);
+  }, [pathname]);
   return (
     <div className="relative">
       <nav

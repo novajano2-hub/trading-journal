@@ -8,7 +8,10 @@ import type { Editor } from '@tiptap/core';
 import { EditorContent, useEditor, type Content } from '@tiptap/react';
 import { ClockCounterClockwise, X } from '@phosphor-icons/react/dist/ssr';
 import 'katex/dist/katex.min.css';
+import { usePrefs } from '@/data/query/hooks';
 import { useHasData } from '@/data/query/provider';
+import { DEFAULT_NOTE_TYPE, noteTypeOf } from '@/domain/note-type';
+import type { NoteType } from '@/domain/types';
 import { usePhone } from '@/lib/use-phone';
 import { FileViewer, type ViewerFile } from '../trades/file-viewer';
 import { BlockHandle } from './block-handle';
@@ -26,6 +29,7 @@ import { noteExtensions } from './extensions';
 import { createImageLink, fileIdOf } from './extensions/image-model';
 import { ImageIntake } from './image-intake';
 import { NoteBlocks, createBlockLink } from './note-blocks';
+import { noteTypeStyle } from './note-type-style';
 import { VersionHistory } from './version-history';
 import { VersionKeeper } from './version-keeper';
 import {
@@ -158,7 +162,27 @@ const asDoc = (v: unknown) =>
     ? (v as Record<string, unknown>)
     : EMPTY_DOC;
 
-export function NoteEditor({
+/**
+ * The editor, drawn at the sizes the note settings give (Settings > Notebook,
+ * B41): the Notebook, a trade's notes, the day page, a version preview and the
+ * print layout all come through here, so one setting reaches them all. With no
+ * app data behind it (a test, a bare embed) it reads the defaults.
+ */
+export function NoteEditor(props: NoteEditorProps): React.JSX.Element {
+  return useHasData() ? (
+    <SavedNoteType {...props} />
+  ) : (
+    <NoteEditorBox {...props} noteType={DEFAULT_NOTE_TYPE} />
+  );
+}
+
+function SavedNoteType(props: NoteEditorProps): React.JSX.Element {
+  const saved = usePrefs().data?.noteType;
+  return <NoteEditorBox {...props} noteType={noteTypeOf(saved)} />;
+}
+
+function NoteEditorBox({
+  noteType,
   value,
   onChange,
   label,
@@ -171,7 +195,7 @@ export function NoteEditor({
   embeds = 'live',
   templateSlot,
   canFullScreen = true,
-}: NoteEditorProps): React.JSX.Element {
+}: NoteEditorProps & { noteType: NoteType }): React.JSX.Element {
   const hasData = useHasData();
   const [slash, setSlash] = useState<SlashState | null>(null);
   const slashRef = useRef<SlashState | null>(null);
@@ -469,6 +493,7 @@ export function NoteEditor({
   return (
     <div
       ref={root}
+      style={noteTypeStyle(noteType)}
       {...(isFull
         ? {
             role: 'dialog',

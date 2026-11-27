@@ -266,6 +266,7 @@ const APP_ROUTES = [
   '/app/settings/accounts',
   '/app/settings/trading',
   '/app/settings/tags',
+  '/app/settings/notebook',
   '/app/settings/import-history',
 ];
 

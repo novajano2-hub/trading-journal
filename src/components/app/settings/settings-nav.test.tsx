@@ -14,7 +14,7 @@ function at(path: string) {
   render(<SettingsNav />);
 }
 
-test('lists the five sections, in order, and marks the open one', () => {
+test('lists the six sections, in order, with Notebook after Tags, and marks the open one', () => {
   at('/app/settings/accounts');
   const nav = screen.getByRole('navigation', { name: 'Settings' });
   const links = [...nav.querySelectorAll('a')];
@@ -23,11 +23,13 @@ test('lists the five sections, in order, and marks the open one', () => {
     'Accounts',
     'Trading',
     'Tags',
+    'Notebook',
     'Logs',
   ]);
   expect(links.map((a) => a.getAttribute('aria-current'))).toEqual([
     null,
     'page',
+    null,
     null,
     null,
     null,
@@ -37,8 +39,19 @@ test('lists the five sections, in order, and marks the open one', () => {
     '/app/settings/accounts',
     '/app/settings/trading',
     '/app/settings/tags',
+    '/app/settings/notebook',
     '/app/settings/import-history',
   ]);
+});
+
+test('Notebook is the note settings', () => {
+  at('/app/settings/notebook');
+  expect(
+    screen.getByRole('link', { name: 'Notebook' }).getAttribute('aria-current'),
+  ).toBe('page');
+  expect(
+    screen.getByRole('link', { name: 'Tags' }).getAttribute('aria-current'),
+  ).toBeNull();
 });
 
 test('Logs is the import history', () => {
@@ -49,6 +62,28 @@ test('Logs is the import history', () => {
   expect(
     screen.getByRole('link', { name: 'Profile' }).getAttribute('aria-current'),
   ).toBeNull();
+});
+
+test('on a phone the open section is brought to the middle of the pill row', () => {
+  // happy-dom has no layout: the row is 300 wide, and the open pill sits 400 along it, 80 wide.
+  const rect = (left: number) => ({ left }) as DOMRect;
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(
+    function (this: Element) {
+      return rect(this.getAttribute('aria-current') === 'page' ? 400 : 0);
+    },
+  );
+  const size = (tag: string, name: 'clientWidth' | 'offsetWidth', px: number) =>
+    vi.spyOn(HTMLElement.prototype, name, 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return this.tagName === tag ? px : name === 'offsetWidth' ? 80 : 0;
+    });
+  size('NAV', 'clientWidth', 300);
+  size('NAV', 'offsetWidth', 300);
+  at('/app/settings/notebook');
+  const nav = screen.getByRole('navigation', { name: 'Settings' });
+  expect(nav.scrollLeft).toBe(400 - (300 - 80) / 2);
+  vi.restoreAllMocks();
 });
 
 test('an edge fade shows while more sections are off-screen, and goes at the end', () => {
