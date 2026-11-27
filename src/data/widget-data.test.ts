@@ -20,6 +20,8 @@ import {
   applyFilters,
   EMPTY_FILTERS,
   selectedAccounts,
+  narrowToUnit,
+  resolveRange,
   type GlobalFilters,
 } from './filters';
 import { generateSampleWorkspace, SAMPLE_SEED } from './seed/generate';
@@ -651,22 +653,64 @@ describe('widgetData', () => {
     });
   });
 
-  test('default template data budget: the sample in under 100 ms', () => {
+  test('default template data budget: a filter change, filtered and computed, in under 100 ms on the sample', () => {
     const keys = [...DEFAULT_TEMPLATE.upper, ...DEFAULT_TEMPLATE.lower].map(
       (r) => r.key as WidgetKey,
     );
     expect(keys.length).toBeGreaterThanOrEqual(14);
-    const env = envOf(s, {
-      ctx: { ...CTX, range: { from: '2026-09-01', to: '2026-11-19' } },
-    });
-    widgetData(keys, env); // warm-up
-    const times: number[] = [];
-    for (let i = 0; i < 5; i++) {
-      const t0 = performance.now();
-      widgetData(keys, env);
-      times.push(performance.now() - t0);
+    const filterEnv = {
+      timeZone: NY,
+      today: TODAY,
+      accounts: s.accounts,
+      breakevenRange: CTX.breakevenRange,
+      pnlBasis: 'net' as const,
+    };
+    // What `useTradeSet` and `useWidgetData` do when the filters change: the trades the
+    // filters match, with and without the date range, narrowed to the unit, then the series.
+    const recompute = (filters: GlobalFilters) => {
+      const matched = applyFilters(s.trades, filters, filterEnv);
+      const dayMatched = applyFilters(
+        s.trades,
+        { ...filters, range: {} },
+        filterEnv,
+      );
+      return widgetData(keys, {
+        matched,
+        trades: narrowToUnit(matched, 'dollar'),
+        dayTrades: narrowToUnit(dayMatched, 'dollar'),
+        accounts: selectedAccounts(s.accounts, filters),
+        flows: [],
+        balanceTrades: s.trades,
+        ctx: { ...CTX, range: resolveRange(filters.range, TODAY) },
+        baseCurrency: 'USD',
+        today: TODAY,
+      });
+    };
+    const changes: GlobalFilters[] = [
+      { ...EMPTY_FILTERS, range: { from: '2026-09-01', to: '2026-11-19' } },
+      {
+        ...EMPTY_FILTERS,
+        range: { from: '2026-10-01', to: '2026-11-19' },
+        accountIds: [s.accounts[0]!.id],
+      },
+      {
+        ...EMPTY_FILTERS,
+        range: { from: '2026-08-01', to: '2026-11-19' },
+        outcomes: ['win', 'loss'],
+        weekdays: [1, 2, 3, 4, 5],
+      },
+    ];
+    for (const f of changes) recompute(f); // warm-up
+    for (const f of changes) {
+      const times: number[] = [];
+      for (let i = 0; i < 5; i++) {
+        const t0 = performance.now();
+        recompute(f);
+        times.push(performance.now() - t0);
+      }
+      // The median of five: one slow run on a busy machine does not fail it.
+      times.sort((a, b) => a - b);
+      expect(times[2]!, JSON.stringify(f)).toBeLessThan(100);
     }
-    times.sort((a, b) => a - b);
-    expect(times[2]!).toBeLessThan(100);
   });
 });
