@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { parseCsv } from '@/domain/import/csv';
 import { guessMapping } from '@/domain/import/mapping';
 import { planImport, type ImportContext } from '@/domain/import/plan';
@@ -16,6 +16,12 @@ import {
   type PlanReply,
   type PlanRequest,
 } from './plan-protocol';
+
+// `planImport` as it was, with its calls recorded: the cancel tests ask what was planned.
+vi.mock('@/domain/import/plan', async (original) => {
+  const real = await original<typeof import('@/domain/import/plan')>();
+  return { ...real, planImport: vi.fn(real.planImport) };
+});
 
 const H = 'Date/Time,Symbol,Buy/Sell,Quantity,Price\n';
 const T =
@@ -234,19 +240,36 @@ describe('planInWorker', () => {
     const two = () =>
       input(H + '2026-11-16 09:41:00,ESZ5,Buy,2,6010\n', ctx(), 'second');
 
+    /** The import ids `planImport` has been asked for, here or in a fake worker. */
+    const planned = () =>
+      vi.mocked(planImport).mock.calls.map(([, , , meta]) => meta.importId);
+    beforeEach(() => {
+      vi.mocked(planImport).mockClear();
+    });
+
     test('the request the worker is on is dropped and the worker ended, so a page that left stops it at once', async () => {
       const { plan, workers } = harness(true);
       const controller = new AbortController();
       const a = plan(one(), controller.signal).catch((e: unknown) => e);
       expect(workers[0]!.posted).toHaveLength(1);
+      // A reply the worker had already sent can still reach the client after it is ended, as a
+      // browser can deliver one: it is for no one, and it plans nothing on the main thread.
+      const late = () =>
+        workers[0]!.onmessage?.({
+          data: { id: workers[0]!.posted[0]!.id, error: 'late' },
+        } as MessageEvent<PlanReply>);
       controller.abort();
       expect(await a).toBe(controller.signal.reason);
       expect(workers[0]!.terminated).toBe(true);
-      // A late answer to it has no one to go to, and the next request has a worker of its own.
+      late();
+      await new Promise((r) => setTimeout(r, 20));
+      // The next request has a worker of its own, and the late reply does not reach it.
       const b = plan(two());
       expect(workers).toHaveLength(2);
+      late();
       workers[1]!.release(workers[1]!.posted[0]!.id);
       await expect(b).resolves.toStrictEqual(main(two()));
+      expect(planned()).not.toContain('imp1');
     });
 
     test('a request on the main thread is dropped before it is planned', async () => {
@@ -255,8 +278,12 @@ describe('planInWorker', () => {
       const a = plan(one(), controller.signal).catch((e: unknown) => e);
       controller.abort();
       expect(await a).toBe(controller.signal.reason);
+      // Its turn comes and goes with no later request to replace it: still nothing is planned.
+      await new Promise((r) => setTimeout(r, 20));
+      expect(planned()).toEqual([]);
       // The client is not left stuck: the next request is planned.
       await expect(plan(two())).resolves.toStrictEqual(main(two()));
+      expect(planned()).toEqual(['second', 'second']);
     });
 
     test('a request already cancelled is refused without waking a worker', async () => {
