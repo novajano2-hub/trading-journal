@@ -101,6 +101,22 @@ test('with no strategies it says so and offers the first one', async () => {
     url: '/app/strategies',
   });
   expect(await screen.findByText('No strategies yet.')).toBeTruthy();
+  // The chooser is on by default: New strategy opens it (templates.test.tsx
+  // covers the rest); with its box off the same control is a link to the form.
+  expect(screen.getAllByRole('button', { name: 'New strategy' })).toHaveLength(
+    2,
+  );
+});
+
+test('with the chooser off, New strategy is a link to the blank form', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => ({ ...fixtureSample(), strategies: [] }),
+  });
+  await repository.prefs.update({ strategyChooser: false });
+  renderApp(<StrategiesView />, { repository, url: '/app/strategies' });
+  expect(await screen.findByText('No strategies yet.')).toBeTruthy();
   const links = screen.getAllByRole('link', { name: 'New strategy' });
   expect(links[0]!.getAttribute('href')).toBe('/app/strategies/new');
 });

@@ -2,8 +2,8 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useId, useRef, useState } from 'react';
 import { DropdownMenu } from 'radix-ui';
 import {
   DotsThree,
@@ -18,6 +18,7 @@ import { Chip } from '@/components/ui/chip';
 import { StateGlyph } from '@/components/ui/state-glyph';
 import { MetricTip } from '@/components/ui/metric-tip';
 import { Segmented } from '@/components/ui/segmented';
+import { Tabs, panelId, tabId } from '@/components/ui/tabs';
 import { useRemoveStrategy, useUpdateStrategy } from '@/data/query/hooks';
 import type { Strategy } from '@/domain/types';
 import { FigureSourceContext, useDisplay } from '@/lib/display';
@@ -45,6 +46,9 @@ import {
   type StrategyFigures,
 } from './use-strategy-figures';
 import { RatioText } from '../ratio-text';
+import { writeParam } from '../reports/use-report-data';
+import { TemplateChooser, useChooserPref } from './template-chooser';
+import { TemplatesTab } from './templates-tab';
 
 type Status = Strategy['status'];
 
@@ -55,14 +59,39 @@ const MENU_ITEM =
 
 const NEW_LINK = buttonClasses('primary');
 
-function NewStrategyLink(): React.JSX.Element {
-  return (
+/**
+ * New strategy: while the chooser is on, a button that opens it; with its box
+ * off, a link straight to the blank form.
+ */
+function NewStrategyControl({
+  chooser,
+  onOpen,
+  buttonRef,
+}: {
+  chooser: boolean;
+  onOpen(): void;
+  buttonRef?: React.Ref<HTMLButtonElement>;
+}): React.JSX.Element {
+  return chooser ? (
+    <button
+      ref={buttonRef}
+      type="button"
+      aria-haspopup="dialog"
+      onClick={onOpen}
+      className={NEW_LINK}
+    >
+      <Plus size={16} weight="bold" aria-hidden="true" />
+      New strategy
+    </button>
+  ) : (
     <Link href="/app/strategies/new" className={NEW_LINK}>
       <Plus size={16} weight="bold" aria-hidden="true" />
       New strategy
     </Link>
   );
 }
+
+type Tab = 'mine' | 'templates';
 
 function Kpi({
   label,
@@ -320,8 +349,15 @@ export function StrategiesView(): React.JSX.Element {
   const queryClient = useQueryClient();
   const update = useUpdateStrategy();
   const remove = useRemoveStrategy();
+  const params = useSearchParams();
+  const chooser = useChooserPref();
+  const baseId = useId();
+  const newButton = useRef<HTMLButtonElement>(null);
   const [status, setStatus] = useState<Status>('active');
   const [deleting, setDeleting] = useState<string | null>(null);
+
+  const tab: Tab = params.get('tab') === 'templates' ? 'templates' : 'mine';
+  const chooserOpen = params.get('choose') === '1';
 
   if (error)
     return (
@@ -333,84 +369,125 @@ export function StrategiesView(): React.JSX.Element {
   if (!data) return <StrategySkeleton label="Loading your strategies" />;
 
   const all = data.strategies;
-  if (all.length === 0)
-    return (
-      <StateBlock
-        visual={<StateGlyph icon={ListChecks} />}
-        title="No strategies yet."
-        body="A strategy is a set of rules you grade each trade against. Start from Entry, Exit, Risk and Management, and make them yours."
-        actions={<NewStrategyLink />}
-      />
-    );
-
   const shown = all.filter((s) => s.status === status);
   const range = sharedRange(shown.map((s) => data.figures.get(s.id)!));
   const target = deleting ? all.find((s) => s.id === deleting) : undefined;
   const targetTrades = target ? data.figures.get(target.id)!.totalCount : 0;
   const { unassigned } = data;
+  const openChooser = () => writeParam('choose', '1');
 
   return (
     <FigureSourceContext.Provider value={data.source}>
       <div className="flex min-w-0 flex-col gap-4 px-5 pt-1 pb-5 lg:pt-0">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <Segmented
-            label="Status"
-            value={status}
-            onChange={setStatus}
+          <Tabs<Tab>
+            id={baseId}
+            label="Strategies view"
+            value={tab}
+            onChange={(next) =>
+              writeParam('tab', next === 'templates' ? 'templates' : null)
+            }
             coarseTargets
             options={[
-              { value: 'active', label: 'Active' },
-              { value: 'archived', label: 'Archived' },
+              { value: 'mine', label: 'My strategies' },
+              { value: 'templates', label: 'Templates' },
             ]}
           />
-          <span className="text-[12.5px] text-faint">
-            Figures follow the date range and accounts, on {data.basis} P&amp;L.
-          </span>
           <span className="ml-auto">
-            <NewStrategyLink />
+            <NewStrategyControl
+              chooser={chooser.on}
+              onOpen={openChooser}
+              buttonRef={newButton}
+            />
           </span>
         </div>
 
-        {update.isError ? (
-          <ArchiveFailed
-            name={
-              all.find((x) => x.id === update.variables?.id)?.name ??
-              'The strategy'
-            }
-            archiving={update.variables?.patch.status === 'archived'}
-          />
-        ) : null}
-
-        {shown.length === 0 ? (
-          <p className="px-1 py-8 text-center text-[14.5px] text-muted">
-            {status === 'active'
-              ? 'No active strategies. Unarchive one, or start a new strategy.'
-              : 'Nothing archived. Archive a strategy to set it aside without deleting it.'}
-          </p>
-        ) : (
-          shown.map((s) => (
-            <StrategyCard
-              key={s.id}
-              f={data.figures.get(s.id)!}
-              range={range}
-              basis={data.basis}
-              onArchive={() =>
-                update.mutate({
-                  id: s.id,
-                  patch: {
-                    status: s.status === 'archived' ? 'active' : 'archived',
-                  },
-                })
+        <div
+          role="tabpanel"
+          id={panelId(baseId)}
+          aria-labelledby={tabId(baseId, tab)}
+          className="flex min-w-0 flex-col gap-4"
+        >
+          {tab === 'templates' ? (
+            <TemplatesTab />
+          ) : all.length === 0 ? (
+            <StateBlock
+              visual={<StateGlyph icon={ListChecks} />}
+              title="No strategies yet."
+              body="A strategy is a set of rules you grade each trade against. Start from Entry, Exit, Risk and Management, and make them yours, or start from one of Keel's templates."
+              actions={
+                <NewStrategyControl chooser={chooser.on} onOpen={openChooser} />
               }
-              onDelete={() => setDeleting(s.id)}
-              unit={data.unit}
-              onClear={() => setFilters(EMPTY_FILTERS)}
             />
-          ))
-        )}
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <Segmented
+                  label="Status"
+                  value={status}
+                  onChange={setStatus}
+                  coarseTargets
+                  options={[
+                    { value: 'active', label: 'Active' },
+                    { value: 'archived', label: 'Archived' },
+                  ]}
+                />
+                <span className="text-[12.5px] text-faint">
+                  Figures follow the date range and accounts, on {data.basis}{' '}
+                  P&amp;L.
+                </span>
+              </div>
 
-        <UnassignedNote unassigned={unassigned} basis={data.basis} />
+              {update.isError ? (
+                <ArchiveFailed
+                  name={
+                    all.find((x) => x.id === update.variables?.id)?.name ??
+                    'The strategy'
+                  }
+                  archiving={update.variables?.patch.status === 'archived'}
+                />
+              ) : null}
+
+              {shown.length === 0 ? (
+                <p className="px-1 py-8 text-center text-[14.5px] text-muted">
+                  {status === 'active'
+                    ? 'No active strategies. Unarchive one, or start a new strategy.'
+                    : 'Nothing archived. Archive a strategy to set it aside without deleting it.'}
+                </p>
+              ) : (
+                shown.map((s) => (
+                  <StrategyCard
+                    key={s.id}
+                    f={data.figures.get(s.id)!}
+                    range={range}
+                    basis={data.basis}
+                    onArchive={() =>
+                      update.mutate({
+                        id: s.id,
+                        patch: {
+                          status:
+                            s.status === 'archived' ? 'active' : 'archived',
+                        },
+                      })
+                    }
+                    onDelete={() => setDeleting(s.id)}
+                    unit={data.unit}
+                    onClear={() => setFilters(EMPTY_FILTERS)}
+                  />
+                ))
+              )}
+
+              <UnassignedNote unassigned={unassigned} basis={data.basis} />
+            </>
+          )}
+        </div>
       </div>
+
+      <TemplateChooser
+        open={chooserOpen}
+        onOpenChange={(open) => writeParam('choose', open ? '1' : null)}
+        origin={newButton}
+      />
 
       <ConfirmDialog
         open={target !== undefined}

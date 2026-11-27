@@ -1,18 +1,23 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import {
   ArrowDown,
   ArrowUp,
   CaretLeft,
+  Info,
   Plus,
   Trash,
   Warning,
 } from '@phosphor-icons/react/dist/ssr';
 import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
+import {
+  templateById,
+  type StrategyTemplate,
+} from '@/content/strategy-templates';
 import {
   useCreateStrategy,
   useRemoveStrategy,
@@ -40,6 +45,8 @@ import {
   deleteBody,
 } from './strategy-style';
 import { NoStrategy, StrategySkeleton } from './strategy-states';
+import { useChooserPref } from './template-chooser';
+import { useCopyTemplate } from './use-copy-template';
 
 const INPUT =
   'block h-[38px] w-full rounded-control border border-line-2 bg-surface-1 px-3 text-[14px] font-[550] text-text shadow-[var(--shadow-chip)] transition-[border-color,box-shadow] duration-200 ease-[var(--ease-glide)] outline-none placeholder:text-faint hover:border-faint focus-visible:border-accent focus-visible:shadow-[0_0_0_3px_var(--accent-soft)] aria-invalid:border-muted pointer-coarse:h-11';
@@ -125,20 +132,29 @@ function Field({
 
 function StrategyEditor({
   initial,
+  fromTemplate,
 }: {
   initial?: Strategy;
+  /** A template the create form is filled from: nothing is saved until Create strategy. */
+  fromTemplate?: StrategyTemplate;
 }): React.JSX.Element {
   const router = useRouter();
   const create = useCreateStrategy();
   const update = useUpdateStrategy();
   const remove = useRemoveStrategy();
   const trades = useTrades();
+  const { attachCover } = useCopyTemplate();
+  const chooser = useChooserPref();
 
-  const [name, setName] = useState(initial?.name ?? '');
-  const [description, setDescription] = useState(initial?.description ?? '');
-  const [icon, setIcon] = useState<StrategyIcon>(initial?.icon ?? 'target');
+  const [name, setName] = useState(initial?.name ?? fromTemplate?.name ?? '');
+  const [description, setDescription] = useState(
+    initial?.description ?? fromTemplate?.description ?? '',
+  );
+  const [icon, setIcon] = useState<StrategyIcon>(
+    initial?.icon ?? fromTemplate?.icon ?? 'target',
+  );
   const [assets, setAssets] = useState<AssetClass[]>(
-    initial?.assetClasses ?? [],
+    initial?.assetClasses ?? fromTemplate?.assetClasses ?? [],
   );
   const [groups, setGroups] = useState<GroupDraft[]>(() =>
     initial
@@ -153,18 +169,33 @@ function StrategyEditor({
             showWhen: r.showWhen,
           })),
         }))
-      : DEFAULT_GROUPS.map((title) => ({ key: nextKey(), title, rules: [] })),
+      : fromTemplate
+        ? fromTemplate.groups.map((g) => ({
+            key: nextKey(),
+            title: g.title,
+            rules: g.rules.map((r) => ({
+              key: nextKey(),
+              text: r.text,
+              showWhen: r.showWhen,
+            })),
+          }))
+        : DEFAULT_GROUPS.map((title) => ({
+            key: nextKey(),
+            title,
+            rules: [],
+          })),
   );
   const [items, setItems] = useState<ItemDraft[]>(() =>
     (initial?.checklist ?? []).map((text) => ({ key: nextKey(), text })),
   );
   const [errors, setErrors] = useState<{ name?: string; groups?: string }>({});
   const [saveFailed, setSaveFailed] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [removingGroup, setRemovingGroup] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
   const groupRefs = useRef(new Map<number, HTMLInputElement>());
-  const pending = create.isPending || update.isPending;
+  const pending = saving || create.isPending || update.isPending;
 
   const patchGroup = (key: number, f: (g: GroupDraft) => GroupDraft) =>
     setGroups((gs) => gs.map((g) => (g.key === key ? f(g) : g)));
@@ -207,14 +238,20 @@ function StrategyEditor({
       checklist: items.map((i) => i.text.trim()).filter(Boolean),
       status: initial?.status ?? 'active',
       icon,
+      // A strategy made from a template keeps its link to it; an edit never touches the link.
+      ...(!initial && fromTemplate ? { templateId: fromTemplate.id } : {}),
     };
+    setSaving(true);
     try {
       const saved = initial
         ? await update.mutateAsync({ id: initial.id, patch: input })
         : await create.mutateAsync(input);
+      // The template's cover comes with it, as a photo of the strategy's own.
+      if (!initial && fromTemplate) await attachCover(saved.id, fromTemplate);
       router.push(`/app/strategies/${encodeURIComponent(saved.id)}`);
     } catch {
       setSaveFailed(true);
+      setSaving(false);
     }
   };
 
@@ -231,6 +268,8 @@ function StrategyEditor({
   const back = initial
     ? `/app/strategies/${encodeURIComponent(initial.id)}`
     : '/app/strategies';
+  // Cancel on a new strategy returns to the chooser it came from, while the chooser is on.
+  const cancel = !initial && chooser.on ? '/app/strategies?choose=1' : back;
 
   return (
     <div className="mx-auto flex w-full max-w-[860px] min-w-0 flex-col gap-4 px-5 pt-1 pb-8 lg:pt-0">
@@ -242,6 +281,19 @@ function StrategyEditor({
         <h1 className="mt-1 text-[22px] leading-7 font-semibold tracking-[-0.01em] text-text">
           {initial ? `Edit ${initial.name}` : 'New strategy'}
         </h1>
+        {fromTemplate && !initial ? (
+          <p className="mt-2.5 flex items-start gap-2 text-[13.5px] leading-[1.5] text-muted">
+            <Info
+              size={16}
+              aria-hidden="true"
+              className="mt-0.5 flex-none text-faint"
+            />
+            <span>
+              Filled from the {fromTemplate.name} template. Nothing is saved
+              until you create it, and its cover comes with it.
+            </span>
+          </p>
+        ) : null}
       </div>
 
       <form onSubmit={(e) => void submit(e)} noValidate className="contents">
@@ -604,7 +656,7 @@ function StrategyEditor({
           <Button type="submit" disabled={pending}>
             {initial ? 'Save strategy' : 'Create strategy'}
           </Button>
-          <Link href={back} className={buttonClasses('secondary')}>
+          <Link href={cancel} className={buttonClasses('secondary')}>
             Cancel
           </Link>
           <div aria-live="polite">
@@ -665,6 +717,14 @@ function StrategyEditor({
   );
 }
 
+/** The create form, empty or filled from the template the address names. */
+function CreateStrategy(): React.JSX.Element {
+  const template = templateById(useSearchParams().get('template') ?? undefined);
+  return (
+    <StrategyEditor key={template?.id ?? 'blank'} fromTemplate={template} />
+  );
+}
+
 /** Create (no id) or edit a strategy; the editor fills in once the strategy has loaded. */
 export function StrategyForm({
   strategyId,
@@ -672,7 +732,7 @@ export function StrategyForm({
   strategyId?: string;
 }): React.JSX.Element {
   const found = useStrategy(strategyId ?? '');
-  if (strategyId === undefined) return <StrategyEditor />;
+  if (strategyId === undefined) return <CreateStrategy />;
   if (found.isPending)
     return <StrategySkeleton label="Loading the strategy" rows={2} />;
   if (!found.data) return <NoStrategy />;
