@@ -1030,6 +1030,29 @@ test('a still-open trade takes the day note of its open date', async () => {
   ).toBe('/app/notebook/daily/2026-11-09');
 });
 
+test('the daily note tab takes a daily template from its toolbar, and the trade note tab has none (Keel has no trade-note templates)', async () => {
+  renderApp(<TradeView id="t-c" />, { sample: sample(), url: URL_C });
+  await screen.findByRole('textbox', { name: 'Trade note' });
+  await screen.findByRole('toolbar', { name: 'Formatting' });
+  expect(
+    screen.queryByRole('button', { name: 'Insert a template' }),
+  ).toBeNull();
+
+  fireEvent.click(screen.getByRole('radio', { name: 'Daily note' }));
+  const day = await screen.findByRole('textbox', { name: 'Daily note' });
+  fireEvent.keyDown(
+    await screen.findByRole('button', { name: 'Insert a template' }),
+    { key: 'Enter' },
+  );
+  // The daily templates, as the day card lists them, and no weekly or plan one.
+  expect(
+    await screen.findByRole('menuitem', { name: 'Daily game plan' }),
+  ).toBeTruthy();
+  expect(screen.queryByRole('menuitem', { name: 'Weekly recap' })).toBeNull();
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Daily game plan' }));
+  await within(day).findByText('What I will trade');
+});
+
 test('an archived account shows the day note read-only', async () => {
   renderApp(<TradeView id="t-c" />, {
     sample: sample({}, 'acc-b'),

@@ -472,6 +472,104 @@ test('Template, in the editor toolbar, inserts a template at the cursor', async 
   );
 });
 
+test('Escape in full screen leaves full screen and keeps the dialog open', async () => {
+  await renderApp();
+  const dialog = await open(TUE, 'Add note');
+  const box = await within(dialog).findByRole('textbox', {
+    name: 'Daily note',
+  });
+  fireEvent.click(
+    await within(dialog).findByRole('button', { name: 'Full screen' }),
+  );
+  await screen.findByRole('dialog', { name: 'Daily note, full screen' });
+
+  // The dialog's own Escape listener is on the document, ahead of the editor's:
+  // the editor's has to run first, take the key, and leave the dialog alone.
+  const escape = new KeyboardEvent('keydown', {
+    key: 'Escape',
+    bubbles: true,
+    cancelable: true,
+  });
+  act(() => {
+    box.dispatchEvent(escape);
+  });
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('dialog', { name: 'Daily note, full screen' }),
+    ).toBeNull(),
+  );
+  expect(screen.getByRole('dialog', { name: 'Day note' })).toBeTruthy();
+  expect(escape.defaultPrevented).toBe(true);
+
+  // With nothing in full screen, the same key is the dialog's: it closes.
+  act(() => {
+    box.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  });
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+});
+
+test('after a restore, the star saves on top of the restored text, not the copy the dialog opened with', async () => {
+  const earlier = {
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        content: [{ type: 'text', text: 'An earlier day' }],
+      },
+    ],
+  };
+  const { repo } = await renderApp({ journal: [dailyNote('2026-11-23')] });
+  await repo.noteVersions.keep(WS, 'note-2026-11-23', earlier, 'auto');
+  const dialog = await open(MON, 'View note');
+  await within(dialog).findByRole('textbox', { name: 'Daily note' });
+  fireEvent.click(
+    await within(dialog).findByRole('button', { name: 'Version history' }),
+  );
+  const history = await screen.findByRole('dialog', {
+    name: 'Version history',
+  });
+  fireEvent.click(
+    await within(history).findByRole('button', {
+      name: 'Restore this version',
+    }),
+  );
+  const ask = await screen.findByRole('dialog', {
+    name: 'Restore this version?',
+  });
+  // The journal is read back as it was before the restore (a read that has
+  // not caught up): the restore's own answer is what is newer.
+  const stale = await repo.journal.list(WS);
+  vi.spyOn(repo.journal, 'list').mockResolvedValue(stale);
+  await act(async () => {
+    fireEvent.click(within(ask).getByRole('button', { name: 'Restore' }));
+  });
+  await waitFor(async () =>
+    expect((await repo.journal.get(WS, 'note-2026-11-23'))!.body).toEqual(
+      earlier,
+    ),
+  );
+  await within(dialog).findByText(/^Restored the version from/);
+
+  fireEvent.click(
+    await within(dialog).findByRole('button', { name: 'Favourite' }),
+  );
+  await waitFor(async () =>
+    expect((await repo.journal.get(WS, 'note-2026-11-23'))!.favorite).toBe(
+      true,
+    ),
+  );
+  // Starring did not bring the old text back.
+  expect((await repo.journal.get(WS, 'note-2026-11-23'))!.body).toEqual(
+    earlier,
+  );
+});
+
 test('the summary row reads the date, the net and the count with the win rate, and expands to the trades', async () => {
   await renderApp();
   const dialog = await open(TUE, 'Add note');

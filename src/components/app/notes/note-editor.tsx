@@ -10,6 +10,7 @@ import { ClockCounterClockwise, X } from '@phosphor-icons/react/dist/ssr';
 import 'katex/dist/katex.min.css';
 import { usePrefs } from '@/data/query/hooks';
 import { useHasData } from '@/data/query/provider';
+import type { JournalEntry } from '@/domain/types';
 import { DEFAULT_NOTE_TYPE, noteTypeOf } from '@/domain/note-type';
 import type { NoteType } from '@/domain/types';
 import { usePhone } from '@/lib/use-phone';
@@ -87,6 +88,12 @@ export interface NoteEditorProps {
    * layer inside it would fill that box and not the window.
    */
   canFullScreen?: boolean;
+  /**
+   * A version was restored: the note as the store has it now. The editor has
+   * taken its body already; a host that keeps its own copy of the note (to save
+   * the title or the star on top of) takes this one in place of it.
+   */
+  onRestored?: (entry: JournalEntry) => void;
 }
 
 /** Marks everything on the page but the ancestors of `el` as out of reach (`inert`); returns the way to undo exactly that. */
@@ -195,6 +202,7 @@ function NoteEditorBox({
   embeds = 'live',
   templateSlot,
   canFullScreen = true,
+  onRestored,
 }: NoteEditorProps & { noteType: NoteType }): React.JSX.Element {
   const hasData = useHasData();
   const [slash, setSlash] = useState<SlashState | null>(null);
@@ -410,10 +418,13 @@ function NoteEditorBox({
     const release = inertAround(root.current);
     editor.commands.focus();
     // Escape leaves, unless something on top of the note is open (a menu, a
-    // dialog, the slash or emoji list, an offer to embed a link) or the
-    // focus is in a field that uses Escape itself (a caption, a time, the
-    // link address). Asked before anything handles the key: ProseMirror takes
-    // every Escape pressed in the text, so "taken already" cannot say which.
+    // dialog that does not hold the note, the slash or emoji list, an offer to
+    // embed a link) or the focus is in a field that uses Escape itself (a
+    // caption, a time, the link address). Asked before anything handles the
+    // key: ProseMirror takes every Escape pressed in the text, so "taken
+    // already" cannot say which; and a dialog that holds the note (the day
+    // note's) listens on the document, so this listens on the window, ahead of
+    // it, and keeps the key from it when it leaves.
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       const top = root.current;
@@ -432,13 +443,14 @@ function NoteEditorBox({
       for (const layer of document.querySelectorAll(
         '[role="menu"], [role="dialog"], [role="alertdialog"]',
       ))
-        if (layer !== top) return;
+        if (layer !== top && !layer.contains(top)) return;
       event.preventDefault();
+      event.stopPropagation();
       setFull(false);
     };
-    document.addEventListener('keydown', onKey, true);
+    window.addEventListener('keydown', onKey, true);
     return () => {
-      document.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('keydown', onKey, true);
       release();
       const back = fullFrom.current;
       if (back?.isConnected && back !== document.body) back.focus();
@@ -604,6 +616,7 @@ function NoteEditorBox({
             editor.commands.setContent(asDoc(entry.body), {
               emitUpdate: false,
             });
+            onRestored?.(entry);
             setRestored(`Restored the version from ${when}.`);
           }}
         />

@@ -429,6 +429,16 @@ function NoteBody({
       noteId={entry?.id}
       ensureNoteId={ensureNoteId}
       templateSlot={templateSlot}
+      // The store has the restored text: the next write (a star) builds on that
+      // note, and text typed before it that was still waiting is let go.
+      onRestored={(restored) => {
+        note.current = Promise.resolve(restored);
+        if (timer.current !== undefined) {
+          clearTimeout(timer.current);
+          timer.current = undefined;
+          onStatus('saved');
+        }
+      }}
       onChange={(doc) => {
         latest.current = doc;
         onStatus('saving');
@@ -603,11 +613,14 @@ export function DayNote({
   date,
   readOnly,
   handleRef,
+  templateSlot,
   onStatus,
 }: {
   date: string;
   readOnly: boolean;
   handleRef?: { current: NoteEditorHandle | null };
+  /** The daily templates, in the editor's toolbar. */
+  templateSlot?: TemplateSlot;
   onStatus(s: NoteStatus, error?: unknown): void;
 }): React.JSX.Element {
   const journal = useJournal();
@@ -638,6 +651,7 @@ export function DayNote({
         date={date}
         readOnly={readOnly || closed}
         handleRef={handleRef}
+        templateSlot={templateSlot}
         onStatus={onStatus}
       />
     </>

@@ -716,6 +716,60 @@ test('a choice puts focus back in the text, not on the button', async () => {
   editor.view.dom.remove();
 });
 
+test('a choice has the text focused by the next tick, before the closing menu has gone', async () => {
+  const { editor } = setup();
+  document.body.append(editor.view.dom);
+  await openMenu(STYLE);
+  fireEvent.click(
+    await screen.findByRole('menuitemradio', { name: 'Heading 2' }),
+  );
+  // One tick, no waiting for a frame: a key typed now must reach the text,
+  // not the menu that is still fading. (Tiptap's own focus waits a frame.)
+  await new Promise((r) => setTimeout(r, 0));
+  expect(document.activeElement).toBe(editor.view.dom);
+  editor.view.dom.remove();
+  await waitFor(() => expect(screen.queryAllByRole('menu')).toHaveLength(0));
+});
+
+test('a menu that is closing cannot pull focus or the pointer back: its class turns pointer events off', async () => {
+  // happy-dom applies no CSS, so what the browser does with the pointer over a
+  // fading menu is the e2e's to show; here, that the class is on every menu.
+  const { editor } = setup();
+  await openMenu(STYLE);
+  expect(screen.getByRole('menu').className).toContain(
+    'data-[state=closed]:pointer-events-none',
+  );
+  fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+  await waitFor(() => expect(screen.queryAllByRole('menu')).toHaveLength(0));
+
+  // A phone's sheet too.
+  cleanup();
+  window.innerWidth = 390;
+  render(<EditorToolbar editor={editor} />);
+  await openMenu('More tools');
+  expect(screen.getByRole('menu').className).toContain(
+    'data-[state=closed]:pointer-events-none',
+  );
+});
+
+test('on a phone More says, in the Dictate item, that the browser does the listening', async () => {
+  window.innerWidth = 390;
+  const { editor } = setup();
+  cleanup();
+  render(<EditorToolbar editor={editor} onDictate={() => {}} />);
+  await openMenu('More tools');
+  const item = await screen.findByRole('menuitem', { name: 'Dictate' });
+  // The wording of the desktop control, on the item, for a screen reader and for the eye (a phone has no tooltip).
+  expect(item.getAttribute('aria-description')).toBe(
+    "Your browser's speech service turns speech into text.",
+  );
+  expect(item.textContent).toContain(
+    "Your browser's speech service turns speech into text.",
+  );
+  fireEvent.keyDown(item, { key: 'Escape' });
+  await waitFor(() => expect(screen.queryAllByRole('menu')).toHaveLength(0));
+});
+
 test('a toggle has no room on the first line of a list item, and says so', async () => {
   const { editor } = setup(
     {

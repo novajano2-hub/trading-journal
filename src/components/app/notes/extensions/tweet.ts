@@ -31,11 +31,13 @@ export const Tweet = Node.create({
     ];
   },
   renderHTML({ node }) {
-    const url = String(node.attrs.url ?? '');
+    // A body can come from a file (an imported note): whatever address it holds,
+    // only an X post is written out as a link; anything else is written as nothing.
+    const url = parseTweetUrl(String(node.attrs.url ?? ''))?.url ?? '';
     return [
       'div',
       { 'data-keel-tweet': '', 'data-url': url },
-      ['a', { href: url }, url],
+      ['a', url === '' ? {} : { href: url }, url],
     ];
   },
 

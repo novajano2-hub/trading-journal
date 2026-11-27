@@ -66,6 +66,7 @@ import { formatDuration, formatInstrument, plural } from '@/lib/format';
 import { CARD, CardHeader, InstrumentName } from '../dashboard/shared';
 import { ConfirmDialog } from '../confirm-dialog';
 import { ManageTagsLink } from '../tag-picker';
+import { TemplateMenu } from '../day/template-menu';
 import { findDailyEntry } from '../notebook/notebook-model';
 import type { NoteEditorHandle } from '../notes/note-editor';
 import { NoteMenu } from '../notes/note-menu';
@@ -989,6 +990,20 @@ function NoteCard({
           date={date}
           readOnly={readOnly}
           handleRef={note}
+          // The daily templates, as the day card's toolbar has them. The trade note has none: Keel has no trade-note templates.
+          templateSlot={
+            readOnly
+              ? undefined
+              : (slot) => (
+                  <TemplateMenu
+                    {...slot}
+                    kind="daily-review"
+                    onPick={(t) =>
+                      note.current?.insertContent(structuredClone(t.body))
+                    }
+                  />
+                )
+          }
           onStatus={setStatus}
         />
       )}

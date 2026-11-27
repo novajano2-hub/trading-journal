@@ -15,6 +15,7 @@ import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
+import { usePrefs } from '@/data/query/hooks';
 import type { Repository } from '@/data/repository';
 import { pasteFiles } from '../__fixtures__/clipboard';
 import { renderApp } from '../__fixtures__/render-app';
@@ -65,22 +66,42 @@ function newRepo(): Repository {
   });
 }
 
+/** Says the profile's time zone once the app has read it (the blocks' clock reads the same query). */
+function ZoneProbe() {
+  const zone = usePrefs().data?.timeZone;
+  return <output aria-label="Profile zone">{zone ?? ''}</output>;
+}
+
 async function mount(
-  over: Partial<NoteEditorProps> & { repo?: Repository } = {},
+  over: Partial<NoteEditorProps> & {
+    repo?: Repository;
+    /** Waits until the app has the profile's time zone, so a clock is never the machine's. */
+    zone?: string;
+  } = {},
 ) {
-  const { repo = newRepo(), ...props } = over;
+  const { repo = newRepo(), zone, ...props } = over;
   const onChange = vi.fn();
   const handle: { current: NoteEditorHandle | null } = { current: null };
   const view = renderApp(
-    <NoteEditor
-      label="Note"
-      value={docOf(para())}
-      onChange={onChange}
-      handleRef={handle}
-      {...props}
-    />,
+    <>
+      {zone ? <ZoneProbe /> : null}
+      <NoteEditor
+        label="Note"
+        value={docOf(para())}
+        onChange={onChange}
+        handleRef={handle}
+        {...props}
+      />
+    </>,
     { repository: repo },
   );
+  if (zone) {
+    await waitFor(() =>
+      expect(screen.getByLabelText('Profile zone').textContent).toBe(zone),
+    );
+    // The clock takes the zone in an effect of the same render: let it run.
+    await act(async () => {});
+  }
   const textbox = await screen.findByRole('textbox', { name: 'Note' });
   const editor = (textbox as HTMLElement & { editor: Editor }).editor;
   await waitFor(() => expect(handle.current).not.toBeNull());
@@ -234,9 +255,16 @@ test('the slash menu shows Image only where the note can take images', async () 
 test('a timed list item starts with the time, in the profile time zone', async () => {
   const repo = newRepo();
   await repo.prefs.update({ timeZone: 'America/New_York' });
+  // The profile is read a moment after the editor opens (here, a slow store,
+  // as a busy full run makes it): the clock must not be the machine's zone's.
+  const get = repo.prefs.get.bind(repo.prefs);
+  vi.spyOn(repo.prefs, 'get').mockImplementation(async () => {
+    await new Promise((r) => setTimeout(r, 150));
+    return get();
+  });
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-11-24T14:41:00Z'));
-  const { editor, handle } = await mount({ repo });
+  const { editor, handle } = await mount({ repo, zone: 'America/New_York' });
   act(() => handle.current!.runSlashCommand('Timed list'));
   await waitFor(() => expect(kinds(editor)).toContain('timedList'));
   expect(find(editor, 'timedItem')[0]?.attrs?.time).toBe('09:41');

@@ -73,8 +73,6 @@ test('paste an image, format text, restore a version, export and import a note',
     .getByRole('menuitemradio', { name: 'Heading 2', exact: true })
     .click();
   await expect(body.locator('h2 strong')).toHaveText(FIRST);
-  // A menu gives the text its focus back as it closes: type once it has.
-  await expect(body).toBeFocused();
 
   // A second line, and a picture pasted after it: stored as the note's own file.
   await page.keyboard.press('End');
@@ -224,4 +222,41 @@ test('paste an image, format text, restore a version, export and import a note',
   await expect(refused).toContainText("That file isn't a Keel note.");
   await refused.getByRole('button', { name: 'Close' }).click();
   await expect(refused).toBeHidden();
+});
+
+test('typing straight after a toolbar menu choice lands in the note, not on the menu that is fading', async ({
+  page,
+}) => {
+  // Motion on: the closing menu stays in the page for its exit, under the pointer.
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/app/notebook');
+  await expect(page.getByRole('navigation', { name: 'Folders' })).toBeVisible({
+    timeout: 30_000,
+  });
+  await page.getByRole('button', { name: 'New', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Note', exact: true }).click();
+  await expect(page).toHaveURL(/\/app\/notebook\/[^/]+$/);
+  const body = page.getByRole('textbox', { name: 'Note', exact: true });
+  await body.click();
+  await page.keyboard.type('Range held');
+  await body.locator('p').first().selectText();
+
+  await page.getByRole('button', { name: /^Style:/ }).click();
+  const item = page.getByRole('menuitemradio', {
+    name: 'Heading 2',
+    exact: true,
+  });
+  const at = (await item.boundingBox())!;
+  await item.click();
+  // The pointer moves over the menu as it fades, and the keys come at once:
+  // neither may pull the keyboard to the menu (a space or Enter would choose
+  // the item again and undo the heading).
+  await page.mouse.move(at.x + 12, at.y + 10);
+  await page.keyboard.press('End');
+  await page.keyboard.type(' until the break held');
+  await page.mouse.move(at.x + 14, at.y + 12);
+  await page.keyboard.type(' and so did the plan');
+  await expect(body.locator('h2')).toHaveText(
+    'Range held until the break held and so did the plan',
+  );
 });

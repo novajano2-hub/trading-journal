@@ -140,6 +140,8 @@ test('the Templates menu lists yours, then the built-in templates, then See more
   await screen.findByRole('menuitem', { name: 'Daily game plan' });
   // Built-in templates sit with Keel's three, not under "Your templates".
   const menu = screen.getByRole('menu');
+  // A menu that is closing takes no pointer, so it cannot pull the keyboard back from the text.
+  expect(menu.className).toContain('data-[state=closed]:pointer-events-none');
   expect(
     [...menu.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent),
   ).toEqual([

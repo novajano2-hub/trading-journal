@@ -368,6 +368,29 @@ test('an embed is kept as its address, and only a real one', () => {
   expect(kinds(bad)).not.toContain('tweet');
 });
 
+test('a post whose stored address is not an X post writes no link (an imported file can carry any address)', () => {
+  const html = (url: unknown) =>
+    make(docOf({ type: 'tweet', attrs: { url } })).getHTML();
+  for (const url of [
+    'javascript:alert(1)',
+    'data:text/html,<script>1</script>',
+    'https://evil.test/keel/status/1860000000000000001',
+    'https://x.com/keel',
+    '',
+    null,
+  ]) {
+    const out = html(url);
+    expect(out, String(url)).not.toMatch(
+      /href=|javascript:|evil\.test|<script/,
+    );
+  }
+  // A real one keeps its link, and is normalised to x.com.
+  const real = html('https://twitter.com/keel/status/1860000000000000001');
+  expect(real).toContain(
+    'href="https://x.com/keel/status/1860000000000000001"',
+  );
+});
+
 // ---- moving a block ---------------------------------------------------------
 
 test('Move up and Move down move a block', () => {

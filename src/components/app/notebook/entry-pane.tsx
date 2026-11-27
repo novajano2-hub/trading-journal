@@ -390,6 +390,20 @@ export function EntryPane({
           // A draft has no id to own an image yet: its first image stores it.
           handleRef={handle}
           templateSlot={templateSlot}
+          // The store has the restored text: build the next save on that note,
+          // and let go of text typed before it that was still waiting.
+          onRestored={(restored) => {
+            base.current = restored;
+            delete draft.current.body;
+            if (
+              timer.current !== undefined &&
+              draft.current.title === undefined
+            ) {
+              clearTimeout(timer.current);
+              timer.current = undefined;
+              setStatus('saved');
+            }
+          }}
           noteId={isDraft ? undefined : entry.id}
           ensureNoteId={
             isDraft && ensure

@@ -1159,3 +1159,44 @@ test('exporting reads the title and tags on screen, and importing brings the fil
     expect(window.location.pathname).toBe(`/app/notebook/${made!.id}`),
   );
 });
+
+test('after a restore, the pane saves on top of the restored text, even when the journal is read back as it was before', async () => {
+  const earlier = para('An earlier plan');
+  const { repo } = await openWith('/app/notebook/n-plan', {
+    prepare: async (r) => {
+      await r.noteVersions.keep(WS, 'n-plan', earlier, 'auto');
+    },
+  });
+  const title = await screen.findByRole('textbox', { name: 'Note title' });
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Version history' }),
+  );
+  const dialog = await screen.findByRole('dialog', { name: 'Version history' });
+  fireEvent.click(
+    await within(dialog).findByRole('button', { name: 'Restore this version' }),
+  );
+  const ask = await screen.findByRole('dialog', {
+    name: 'Restore this version?',
+  });
+  // The journal is read again after the write, and what comes back is the note
+  // as it was before the restore (a read that has not caught up): the pane
+  // holds that copy, and the restore's own answer is what is newer.
+  const stale = await repo.journal.list(WS);
+  vi.spyOn(repo.journal, 'list').mockResolvedValue(stale);
+  await act(async () => {
+    fireEvent.click(within(ask).getByRole('button', { name: 'Restore' }));
+  });
+  await waitFor(async () =>
+    expect((await repo.journal.get(WS, 'n-plan'))!.body).toEqual(earlier),
+  );
+  await screen.findByText(/^Restored the version from/);
+
+  fireEvent.change(title, { target: { value: 'Retest plan, second take' } });
+  await waitFor(async () =>
+    expect((await repo.journal.get(WS, 'n-plan'))!.title).toBe(
+      'Retest plan, second take',
+    ),
+  );
+  // The title's save did not bring the old text back.
+  expect((await repo.journal.get(WS, 'n-plan'))!.body).toEqual(earlier);
+});
