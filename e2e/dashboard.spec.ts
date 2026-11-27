@@ -285,7 +285,7 @@ test.describe('on a touch phone', () => {
     page,
   }, info) => {
     test.skip(info.project.name !== 'mobile');
-    for (const width of [390, 360]) {
+    for (const width of [390, 375, 360]) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto('/app/dashboard');
       await ready(page);

@@ -130,7 +130,7 @@ function Arrows({
   onStep(by: -1 | 1): void;
 }): React.JSX.Element {
   return (
-    <span className="flex gap-1">
+    <span className="flex gap-1 max-sm:gap-0.5">
       <button
         type="button"
         aria-label={`Previous ${unit}`}
@@ -255,7 +255,7 @@ function MonthCard({
   const name = monthName(month);
   const stats = advanced ? prefs.calendarStats : (['net'] as const);
   const controls = (
-    <span className="flex flex-wrap items-center justify-end gap-1.5">
+    <span className="flex flex-wrap items-center justify-end gap-1.5 max-sm:gap-1">
       <Arrows
         unit="month"
         onStep={(by) => {
@@ -267,7 +267,7 @@ function MonthCard({
         <>
           <button
             type="button"
-            className={TEXT_BUTTON}
+            className={`${TEXT_BUTTON} max-sm:px-1.5`}
             onClick={() => {
               setChosen(undefined);
               setOpenDay(undefined);
