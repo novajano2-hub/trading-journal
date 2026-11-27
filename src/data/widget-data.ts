@@ -54,7 +54,7 @@ export interface WidgetEnv {
   /** The selected accounts, of every currency. */
   accounts: readonly Account[];
   flows: readonly CashFlow[];
-  /** Every trade of the selected accounts, whatever the other filters: the balance before a range is booked from them. */
+  /** Every trade of the workspace, whatever the filters; `widgetData` keeps the selected accounts' (the balance before a range is booked from them). */
   balanceTrades: readonly Trade[];
   /** The metric context: the date range resolved, and the unit when it narrows the trades. */
   ctx: MetricContext;
@@ -303,7 +303,10 @@ export function widgetData(
   const trades = ofCurrency(env.trades);
   const dayTrades = ofCurrency(env.dayTrades);
   const flows = env.flows.filter((f) => ids.has(f.accountId));
-  const balanceTrades = ofCurrency(env.balanceTrades);
+  // The selected accounts' trades only: the line starts from their balances, so another account's P&L has no place in it.
+  const balanceTrades = ofCurrency(env.balanceTrades).filter((t) =>
+    ids.has(t.accountId),
+  );
   const startingBalance = accounts.reduce((n, a) => n + a.startingBalance, 0);
 
   const days = lazy(() => dailyPnl(dayTrades, env.ctx));

@@ -16,7 +16,12 @@ import { winStreak } from '@/domain/metrics/streaks';
 import { summarize } from '@/domain/metrics/summary';
 import { throughDay } from '@/domain/metrics/through-day';
 import type { WidgetKey } from '@/domain/types';
-import { applyFilters, EMPTY_FILTERS, selectedAccounts } from './filters';
+import {
+  applyFilters,
+  EMPTY_FILTERS,
+  selectedAccounts,
+  type GlobalFilters,
+} from './filters';
 import { generateSampleWorkspace, SAMPLE_SEED } from './seed/generate';
 import type { SampleWorkspace } from './seed/generate';
 import { widgetData, type WidgetEnv } from './widget-data';
@@ -30,8 +35,13 @@ const CTX = {
   weekStart: 'sunday' as const,
 };
 
-function envOf(s: SampleWorkspace, over: Partial<WidgetEnv> = {}): WidgetEnv {
-  const matched = applyFilters(s.trades, EMPTY_FILTERS, {
+/** The env `useWidgetData` builds: the filters' trades and accounts, and every trade of the workspace for the balance. */
+function envOf(
+  s: SampleWorkspace,
+  over: Partial<WidgetEnv> = {},
+  filters: GlobalFilters = EMPTY_FILTERS,
+): WidgetEnv {
+  const matched = applyFilters(s.trades, filters, {
     timeZone: NY,
     today: TODAY,
     accounts: s.accounts,
@@ -42,7 +52,7 @@ function envOf(s: SampleWorkspace, over: Partial<WidgetEnv> = {}): WidgetEnv {
     matched,
     trades: matched,
     dayTrades: matched,
-    accounts: selectedAccounts(s.accounts, EMPTY_FILTERS),
+    accounts: selectedAccounts(s.accounts, filters),
     flows: [],
     balanceTrades: s.trades,
     ctx: CTX,
@@ -351,20 +361,27 @@ describe('widgetData', () => {
     });
 
     test('a point a day, the balance as balanceAt has it, and the net flows', () => {
-      const accounts = selectedAccounts(s.accounts, EMPTY_FILTERS);
-      const usd = accounts.filter((a) => a.currency === 'USD');
+      // One account of several: the line is that account's, not the workspace's.
+      const one = selectedAccounts(s.accounts, EMPTY_FILTERS).find(
+        (a) => a.currency === 'USD',
+      )!;
+      const usd = [one];
       const flows = [
-        flow('f1', usd[0]!.id, '2026-10-05', 1_000_00),
-        flow('f2', usd[0]!.id, '2026-10-20', -400_00),
-        flow('f3', usd[0]!.id, '2026-11-30', 9_999_00),
+        flow('f1', one.id, '2026-10-05', 1_000_00),
+        flow('f2', one.id, '2026-10-20', -400_00),
+        flow('f3', one.id, '2026-11-30', 9_999_00),
       ];
       const range = { from: '2026-10-01', to: '2026-11-19' };
-      const env = envOf(s, { flows, ctx: { ...CTX, range } });
+      const env = envOf(
+        s,
+        { flows, ctx: { ...CTX, range } },
+        {
+          ...EMPTY_FILTERS,
+          accountIds: [one.id],
+        },
+      );
       const { balance } = widgetData(['balance'], env).values;
       const points = balance!.points;
-      const everyTrade = env.balanceTrades.filter(
-        (t) => t.pnlCurrency === 'USD',
-      );
       expect(points.length).toBeGreaterThan(20);
       // Inside the range and in date order, with the two flows' days among them.
       expect(points[0]!.date >= range.from).toBe(true);
@@ -373,30 +390,86 @@ describe('widgetData', () => {
         [...new Set(points.map((p) => p.date))].sort(),
       );
       expect(points.some((p) => p.date === '2026-10-05')).toBe(true);
-      // Every point is the balance on its date.
-      for (const p of [points[0]!, points[7]!, points[points.length - 1]!])
+      // Every point is the selected account's balance on its date.
+      for (const p of points)
         expect(p.balance, p.date).toBe(
-          balanceAt(usd, flows, everyTrade, p.date, CTX),
+          balanceAt(usd, flows, env.balanceTrades, p.date, CTX),
         );
       // The flow dated after the range is not in the line; the two inside are, net.
       expect(points[points.length - 1]!.flows).toBe(1_000_00 - 400_00);
       expect(points[0]!.flows).toBe(0);
       // What `balance` held before is still there.
-      expect(balance!.startingBalance).toBe(
-        usd.reduce((n, a) => n + a.startingBalance, 0),
+      expect(balance!.startingBalance).toBe(one.startingBalance);
+    });
+
+    test('is the series balanceSeries makes from every trade of the selected accounts', () => {
+      const one = selectedAccounts(s.accounts, EMPTY_FILTERS)[1]!;
+      const env = envOf(s, {}, { ...EMPTY_FILTERS, accountIds: [one.id] });
+      const { balance } = widgetData(['balance'], env).values;
+      const days = dailyPnl(
+        env.balanceTrades.filter(
+          (t) => t.pnlCurrency === 'USD' && t.accountId === one.id,
+        ),
+        { ...CTX, pnlBasis: 'net' },
+      );
+      expect(balance!.points).toEqual(
+        balanceSeries(days, one.startingBalance, []),
       );
     });
 
-    test('is the series balanceSeries makes from every trade of the accounts', () => {
-      const env = envOf(s);
-      const { balance } = widgetData(['balance'], env).values;
-      const accounts = env.accounts.filter((a) => a.currency === 'USD');
-      const start = accounts.reduce((n, a) => n + a.startingBalance, 0);
-      const days = dailyPnl(
-        env.balanceTrades.filter((t) => t.pnlCurrency === 'USD'),
-        { ...CTX, pnlBasis: 'net' },
-      );
-      expect(balance!.points).toEqual(balanceSeries(days, start, []));
+    describe('only the accounts the filters select (F1)', () => {
+      const range = { from: '2026-10-01', to: '2026-11-19' };
+      const tradesOf = (id: string) =>
+        s.trades.filter((t) => t.accountId === id && t.pnlCurrency === 'USD');
+
+      test('two accounts in one currency, one selected: every point is that account alone', () => {
+        const [a, b] = selectedAccounts(s.accounts, EMPTY_FILTERS).filter(
+          (x) => x.currency === 'USD' && tradesOf(x.id).length > 50,
+        );
+        expect(a && b).toBeTruthy();
+        const env = envOf(
+          s,
+          { ctx: { ...CTX, range } },
+          { ...EMPTY_FILTERS, accountIds: [a!.id] },
+        );
+        expect(env.accounts).toEqual([a]);
+        const { points } = widgetData(['balance'], env).values.balance!;
+        expect(points.length).toBeGreaterThan(20);
+        for (const p of points)
+          expect(p.balance, p.date).toBe(
+            balanceAt([a!], [], s.trades, p.date, CTX),
+          );
+        // The other account trades inside the range, so leaving it out is what is being checked.
+        const last = points[points.length - 1]!;
+        expect(last.balance).not.toBe(
+          balanceAt([a!, b!], [], s.trades, last.date, CTX),
+        );
+        expect(
+          tradesOf(b!.id).some((t) => (t.closedAt ?? '') >= range.from),
+        ).toBe(true);
+      });
+
+      test('an archived account with trades next to an active one: its P&L is not in the line', () => {
+        const [a, b] = s.accounts.filter(
+          (x) => x.currency === 'USD' && tradesOf(x.id).length > 50,
+        );
+        const accounts = s.accounts.map((x) =>
+          x.id === b!.id ? { ...x, status: 'archived' as const } : x,
+        );
+        const sample = { ...s, accounts };
+        const env = envOf(sample, { ctx: { ...CTX, range } });
+        // With no account filter only the active accounts are selected.
+        expect(env.accounts.some((x) => x.id === b!.id)).toBe(false);
+        expect(env.accounts.some((x) => x.id === a!.id)).toBe(true);
+        const { points } = widgetData(['balance'], env).values.balance!;
+        expect(points.length).toBeGreaterThan(20);
+        const selected = env.accounts.filter((x) => x.currency === 'USD');
+        for (const p of points)
+          expect(p.balance, p.date).toBe(
+            balanceAt(selected, [], s.trades, p.date, CTX),
+          );
+        expect(tradesOf(b!.id).length).toBeGreaterThan(50);
+      });
     });
 
     test('a narrowing unit leaves the line empty: a balance has no value in it', () => {
