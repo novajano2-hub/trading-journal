@@ -49,6 +49,21 @@ export function FileViewer({
   if (index !== null && index !== last) setLast(index);
   const at = Math.min(index ?? last, Math.max(files.length - 1, 0));
   const file = files[at];
+  // The dialog stays on screen while it fades out, also after the last image
+  // is deleted and the list is empty: it keeps naming the image it showed
+  // last, never "Image 1 of 0".
+  const [seen, setSeen] = useState<{
+    at: number;
+    total: number;
+    name: string;
+  } | null>(null);
+  if (
+    file !== undefined &&
+    (seen?.at !== at || seen.total !== files.length || seen.name !== file.name)
+  )
+    setSeen({ at, total: files.length, name: file.name });
+  const place =
+    file === undefined ? seen : { at, total: files.length, name: file.name };
   // Only the image on show is read; the others wait their turn.
   const { url, status } = useFileUrl(open ? file?.id : undefined);
   const [deleting, setDeleting] = useState<ViewerFile | null>(null);
@@ -72,8 +87,8 @@ export function FileViewer({
         onOpenChange={(o) => !o && onClose()}
         origin={origin}
         returnFocus={origin}
-        title={`Image ${at + 1} of ${files.length}`}
-        description={file?.name}
+        title={place ? `Image ${place.at + 1} of ${place.total}` : 'Image'}
+        description={place?.name}
         size="full"
         footer={
           <div className="flex flex-wrap items-center gap-2 py-1">
