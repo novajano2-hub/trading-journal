@@ -74,7 +74,7 @@ const MONTHS = [
 ] as const;
 
 /** "12 Nov", from YYYY-MM-DD. */
-function shortDate(date: string): string {
+export function shortDate(date: string): string {
   const [, month, day] = date.split('-');
   return `${Number(day)} ${MONTHS[Number(month) - 1]}`;
 }

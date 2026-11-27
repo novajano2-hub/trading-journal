@@ -6,6 +6,7 @@ import {
   checkChallenge,
   drawdownLabel,
   findingText,
+  shortDate,
   shownChallenge,
   urgencyOf,
   type BreachFinding,
@@ -437,5 +438,13 @@ describe('urgencyOf and shownChallenge', () => {
     ]);
     expect(shownChallenge(done, undefined)?.c.id).toBe('c-passed');
     expect(shownChallenge([], undefined)).toBeUndefined();
+  });
+});
+
+describe('shortDate', () => {
+  test('a day and its three-letter month, with no leading zero: the one the prop pages share', () => {
+    expect(shortDate('2026-11-05')).toBe('5 Nov');
+    expect(shortDate('2026-09-30')).toBe('30 Sep');
+    expect(shortDate('2027-01-12')).toBe('12 Jan');
   });
 });

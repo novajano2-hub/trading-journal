@@ -16,34 +16,12 @@ import {
 import {
   drawdownLabel,
   findingText,
+  shortDate,
   type ChallengeCheck,
   type ChallengePhaseCheck,
 } from '@/domain/prop/challenge';
 import type { Cents, Challenge, ChallengeStep } from '@/domain/types';
 import { useDisplay } from '@/lib/display';
-
-// Spelled out, not read from Intl: the en-GB short month for September is
-// "Sept" in current engines, and Keel writes "Sep".
-const MONTHS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-] as const;
-
-/** "19 Nov" from YYYY-MM-DD. */
-export function dayMonth(date: string): string {
-  const [, m, d] = date.split('-');
-  return `${Number(d)} ${MONTHS[Number(m) - 1]}`;
-}
 
 /** "Thu 19 Nov". */
 function dayLabel(date: string): string {
@@ -51,12 +29,12 @@ function dayLabel(date: string): string {
     timeZone: 'UTC',
     weekday: 'short',
   }).format(new Date(`${date}T00:00:00Z`));
-  return `${weekday} ${dayMonth(date)}`;
+  return `${weekday} ${shortDate(date)}`;
 }
 
 /** "1 Oct 2026". */
 export function dateLabel(date: string): string {
-  return `${dayMonth(date)} ${date.slice(0, 4)}`;
+  return `${shortDate(date)} ${date.slice(0, 4)}`;
 }
 
 /** The phase the card reads: the funded one once the trader says so, else the current evaluation step. */

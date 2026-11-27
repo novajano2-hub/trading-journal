@@ -6,7 +6,9 @@ import { formatPct, plural } from './format';
 /*
  * The lines a calendar day stacks, as text: the grid's cell and the Calendar
  * image write the same ones from here, so the picture cannot drift from the
- * grid. Pure (no React); the grid puts its own nodes on top of these lines.
+ * grid. It holds no React nodes (the lines are text; the grid puts its own nodes
+ * on top of them), but it still imports the display helpers, so it is not
+ * free of the display hooks' module.
  */
 
 /** A figure as text and label; the view builds it from the display unit. */

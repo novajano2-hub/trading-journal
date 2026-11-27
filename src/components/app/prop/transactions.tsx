@@ -46,6 +46,7 @@ import {
   useRemovePropTxn,
   useUpdatePropTxn,
 } from '@/data/query/hooks';
+import { shortDate } from '@/domain/prop/challenge';
 import {
   TXN_CATEGORIES,
   TXN_CATEGORY_LABELS,
@@ -66,7 +67,7 @@ import type {
 import { FigureSourceContext, useDisplay } from '@/lib/display';
 import { usePhone } from '@/lib/use-phone';
 import { StrategyError, StrategySkeleton } from '../strategies/strategy-states';
-import { dateLabel, dayMonth } from './challenge-card';
+import { dateLabel } from './challenge-card';
 import { AddRow, AddSheet, useNewTxn } from './txn-add';
 
 const NO_TRADES: ReadonlyMap<string, Trade> = new Map();
@@ -95,11 +96,11 @@ const STATUS_ACTION: Record<PropTxnStatus, { label: string; icon: ReactNode }> =
 
 /** What a row is called on its buttons: its description, else its category and day. */
 const nameOf = (t: PropTxn): string =>
-  t.description ?? `${TXN_CATEGORY_LABELS[t.category]} on ${dayMonth(t.date)}`;
+  t.description ?? `${TXN_CATEGORY_LABELS[t.category]} on ${shortDate(t.date)}`;
 
 /** The day as the comp shows it ("18 Nov"), with the year only for another year than this one. */
 const dayOf = (date: string, today: string): string =>
-  date.slice(0, 4) === today.slice(0, 4) ? dayMonth(date) : dateLabel(date);
+  date.slice(0, 4) === today.slice(0, 4) ? shortDate(date) : dateLabel(date);
 
 /** Not reviewed is the quiet accent, reviewed the kept green, ignored an outline: the row no longer counts. */
 function StatusChip({ status }: { status: PropTxnStatus }): React.JSX.Element {

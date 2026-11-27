@@ -9,7 +9,7 @@ import { buttonClasses } from '@/components/ui/button-styles';
 import { SideChip } from '@/components/ui/chip';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { MetricId } from '@/content/metric-definitions';
-import type { ChallengePhaseCheck } from '@/domain/prop/challenge';
+import { shortDate, type ChallengePhaseCheck } from '@/domain/prop/challenge';
 import type { PhaseStats } from '@/domain/prop/phase';
 import { closedInOrder } from '@/domain/trade-status';
 import type { Account, Cents, Trade } from '@/domain/types';
@@ -25,7 +25,7 @@ import {
   signTone,
   TradeTime,
 } from '../dashboard/shared';
-import { dayMonth, RuleLines } from './challenge-card';
+import { RuleLines } from './challenge-card';
 
 /** How many of the phase's trades the card lists before it links to Trades. */
 const SHOWN = 5;
@@ -60,7 +60,9 @@ export function RulesCard({
         headingId={headingId}
         title={`${label} rules`}
         after={
-          startDate ? <Caption>Since {dayMonth(startDate)}</Caption> : undefined
+          startDate ? (
+            <Caption>Since {shortDate(startDate)}</Caption>
+          ) : undefined
         }
       />
       {phase && read ? (

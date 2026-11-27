@@ -14,13 +14,14 @@ import { Button } from '@/components/ui/button';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { MetricId } from '@/content/metric-definitions';
 import { metricContextOf } from '@/data/metrics';
+import { shortDate } from '@/domain/prop/challenge';
 import { totals } from '@/domain/prop/finance';
 import { TXN_CATEGORY_LABELS } from '@/domain/prop/transactions';
 import { localDate } from '@/domain/time';
 import type { Challenge, PropTxn, Trade, UserPrefs } from '@/domain/types';
 import { FigureSourceContext } from '@/lib/display';
 import { CARD, signTone } from '../dashboard/shared';
-import { dateLabel, dayMonth } from './challenge-card';
+import { dateLabel } from './challenge-card';
 import { Cash } from './prop-parts';
 import { fieldsOf, useNewTxn, type FieldName } from './txn-add';
 
@@ -57,7 +58,7 @@ const NO_CHALLENGES: readonly Challenge[] = [];
 
 /** The day as the Transactions tab shows it: the year only for another year than this one. */
 const dayOf = (date: string, today: string): string =>
-  date.slice(0, 4) === today.slice(0, 4) ? dayMonth(date) : dateLabel(date);
+  date.slice(0, 4) === today.slice(0, 4) ? shortDate(date) : dateLabel(date);
 
 /** The form's fields, in the comp's order, each with its visible label. */
 const FORM_FIELDS: readonly { name: FieldName; label: string }[] = [
