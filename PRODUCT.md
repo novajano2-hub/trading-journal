@@ -66,8 +66,8 @@ The claim we can make truthfully is the complete loop under one subscription.
 ## Capabilities and Constraints
 
 - **First milestone:** frontend only. App shell, marketing landing page and core app pages, driven by typed sample data shaped like the real domain model (accounts → trades → executions, tags, strategies, notes).
-- **Built in full in milestone 1:** Dashboard, Trades (log and detail), Calendar, Reports, Strategies, Notebook.
-- **Structure only in milestone 1:** Backtesting, Replay, Prop firms, Mentor & Spaces, AI assistant. They need market data, AI and multi-user backends later.
+- **Built in full in milestone 1:** Dashboard (widgets in layouts you save), Trades (log and detail), Calendar, Reports, Strategies, Notebook, Prop firms (the Prop firms dashboard, accounts and transactions).
+- **Structure only in milestone 1:** Backtesting, Replay, Mentor & Spaces, AI assistant. They need market data, AI and multi-user backends later.
 - **Deferred and tracked in the backlog:** trade copier (MT4/MT5 add-on), education/University, real broker auto-sync, licensed market data.
 - **Sources:** we rebuild the systems of TradeZella and MyTradingJourney, never their UI, copy or branding.
 

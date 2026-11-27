@@ -114,7 +114,7 @@ function Explore(): React.JSX.Element {
         href="/app/dashboard"
         icon={<SquaresFour size={18} aria-hidden="true" className={glyph()} />}
         title="Dashboard"
-        line="Your plan, what breaking it cost, and your results."
+        line="Your results as widgets, in a layout you save."
       />
       <Row
         href="/app/backtesting"

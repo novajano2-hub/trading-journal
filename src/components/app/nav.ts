@@ -81,8 +81,7 @@ export const APP_NAV: readonly NavItem[] = [
     group: 'modules',
     filterScoped: true,
     built: true,
-    summary:
-      'How well you kept your plan, what breaking it cost, and your results.',
+    summary: 'Your results as widgets, in a layout you save.',
   },
   {
     id: 'trades',
