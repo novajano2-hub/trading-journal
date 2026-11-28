@@ -14,7 +14,7 @@ import { SAMPLE_WORKSPACE } from '@/data/workspaces';
 import type { Challenge, UserPrefs } from '@/domain/types';
 import { renderApp } from './__fixtures__/render-app';
 import { viewport } from './__fixtures__/viewport';
-import { TopBar } from './top-bar';
+import { naturalWidth, nextChipsFit, TopBar } from './top-bar';
 
 vi.mock('next/navigation', () => import('./__fixtures__/navigation'));
 
@@ -57,7 +57,10 @@ function layOut({
   );
   vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(
     function (this: HTMLElement) {
-      return this.parentElement?.tagName === 'H1' ? titleWidth : 0;
+      if (this.parentElement?.tagName === 'H1') return titleWidth;
+      if (this.querySelector('[data-testid="chips"]')?.parentElement === this)
+        return chipsWidth;
+      return 0;
     },
   );
 }
@@ -154,6 +157,108 @@ test('chips that fit beside the title sit there', () => {
 test('chips that need more than the room take their own row', () => {
   layOut({ titleWidth: 115, chipsWidth: 517 });
   expect(renderBar().dataset.chips).toBe('wrapped');
+});
+
+/** An element whose scroll and client widths are given, as a layout would leave them. */
+function box(
+  tag: string,
+  {
+    scroll,
+    client = scroll,
+    clip = false,
+  }: { scroll: number; client?: number; clip?: boolean },
+  ...children: HTMLElement[]
+): HTMLElement {
+  const el = document.createElement(tag);
+  if (clip) el.style.overflowX = 'hidden';
+  Object.defineProperty(el, 'scrollWidth', { value: scroll });
+  Object.defineProperty(el, 'clientWidth', { value: client });
+  el.append(...children);
+  // Styles are computed for elements in the document only.
+  document.body.append(el);
+  return el;
+}
+
+test('a title or a chip row reads at its full width when the layout squeezes it, so neither layout changes the choice', () => {
+  // "Strategies > Opening range breakout" squeezed to nothing for a frame, as
+  // the bar's own row change eases in under Reduce motion: the crumb's box
+  // reads 129 (the words before the name), and the name hides 262 more.
+  const crumb = box(
+    'span',
+    { scroll: 129, client: 0 },
+    box('a', { scroll: 105 }),
+    box('span', { scroll: 262, client: 0, clip: true }),
+  );
+  expect(naturalWidth(crumb)).toBe(391);
+  // Laid out whole, it reads the same.
+  const whole = box(
+    'span',
+    { scroll: 391 },
+    box('a', { scroll: 105 }),
+    box('span', { scroll: 262, clip: true }),
+  );
+  expect(naturalWidth(whole)).toBe(391);
+  // The chips' scroller squeezed beside the title hides the rest of the row; a
+  // chip cut by its own maximum width inside it is not counted again.
+  const chips = box(
+    'div',
+    { scroll: 232 },
+    box(
+      'div',
+      { scroll: 476, client: 232, clip: true },
+      box('span', { scroll: 300, client: 208, clip: true }),
+    ),
+  );
+  expect(naturalWidth(chips)).toBe(476);
+  for (const el of [crumb, whole, chips]) el.remove();
+});
+
+test('the chips move beside the title only with room to spare, and leave as soon as they do not fit', () => {
+  // Before the first measure, and beside the title: they fit while narrower than the room.
+  expect(nextChipsFit('unknown', { chips: 516, room: 517 })).toBe('inline');
+  expect(nextChipsFit('unknown', { chips: 517, room: 517 })).toBe('wrapped');
+  expect(nextChipsFit('inline', { chips: 516, room: 517 })).toBe('inline');
+  expect(nextChipsFit('inline', { chips: 517, room: 517 })).toBe('wrapped');
+  // On their own row they stay there until they would fit with two pixels to
+  // spare, more than the two layouts' readings differ by: a bar at the edge
+  // settles instead of flipping between the two.
+  expect(nextChipsFit('wrapped', { chips: 516, room: 517 })).toBe('wrapped');
+  expect(nextChipsFit('wrapped', { chips: 515, room: 517 })).toBe('wrapped');
+  expect(nextChipsFit('wrapped', { chips: 514.9, room: 517 })).toBe('inline');
+  // The two layouts read the chips up to a pixel apart. Whichever layout a
+  // reading moves the bar to, that layout's own reading keeps it there.
+  const room = 517;
+  for (let chips = 500; chips <= 530; chips += 0.25)
+    for (const drift of [-1, -0.5, 0.5, 1])
+      for (const from of ['inline', 'wrapped'] as const) {
+        const to = nextChipsFit(from, { chips, room });
+        if (to === from) continue;
+        expect(
+          nextChipsFit(to, { chips: chips + drift, room }),
+          `${from} at ${chips}, then ${drift}`,
+        ).toBe(to);
+      }
+});
+
+test('the title keeps one flex whichever row the chips take, so a change of row never squeezes it', () => {
+  const flexOf = (h1: HTMLElement) =>
+    h1.className
+      .split(/\s+/)
+      .filter((c) => /(^|:)flex-(1|none|initial|auto)$/.test(c));
+  layOut({ titleWidth: 115, chipsWidth: 516 });
+  let bar = renderBar();
+  expect(bar.dataset.chips).toBe('inline');
+  expect(flexOf(within(bar).getByRole('heading', { level: 1 }))).toEqual([
+    'flex-initial',
+  ]);
+  cleanup();
+  vi.restoreAllMocks();
+  layOut({ titleWidth: 115, chipsWidth: 517 });
+  bar = renderBar();
+  expect(bar.dataset.chips).toBe('wrapped');
+  expect(flexOf(within(bar).getByRole('heading', { level: 1 }))).toEqual([
+    'flex-initial',
+  ]);
 });
 
 test('below sm the bar is one 56px row pinned to the top, unmeasured', () => {

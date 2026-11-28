@@ -21,10 +21,10 @@ const noDialog = (page: Page) =>
   expect(page.getByRole('dialog')).toHaveCount(0);
 
 /**
- * The sample's Trend pullback. Its name is short: on a strategy with a long
- * one (Opening range breakout) the top bar's chips-fit measurement can keep
- * flipping the header between 60, 68 and 140 px in headless Chrome at 1440,
- * and Playwright waits for ever on a click that never finds the page still.
+ * The sample's Trend pullback. (It was picked while the top bar flipped its
+ * layout every frame under Reduce motion on a strategy with a long name,
+ * Opening range breakout, at 1440; `top-bar-fit.spec.ts` now pins that the
+ * bar settles there.)
  */
 const STRATEGY = '/app/strategies/sample-strategy-2';
 const NAME = 'Trend pullback';

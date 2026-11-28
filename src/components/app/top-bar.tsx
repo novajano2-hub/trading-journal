@@ -52,9 +52,12 @@ const FIT: Record<'bar' | 'title' | 'breaker', Record<ChipsFit, string>> = {
     inline: 'sm:flex-nowrap',
     wrapped: 'sm:flex-wrap sm:pb-3',
   },
+  // The title keeps one flex in every fit (its words' width, shrinking only
+  // when even its own row is too short), so a change of fit never squeezes
+  // it, not even for the frame a change eases over under Reduce motion.
   title: {
-    unknown: 'sm:h-12 xl:mr-3 xl:h-[68px] xl:flex-none',
-    inline: 'sm:mr-3 sm:flex-none',
+    unknown: 'sm:h-12 xl:mr-3 xl:h-[68px]',
+    inline: 'sm:mr-3',
     wrapped: 'sm:h-12',
   },
   breaker: {
@@ -77,9 +80,53 @@ const IMPORT = `inline-flex h-[34px] flex-none items-center justify-center gap-[
 type Ref = RefObject<HTMLElement | null>;
 
 /**
- * Whether the chips fit beside the title, measured from `sm` up. The chips'
- * box is as wide as they need, up to the space it has, so it reads the same
- * either way: narrower than the room beside the title means they fit there.
+ * The width an element's content takes when nothing squeezes it: its scroll
+ * width, plus what each outermost clipped box inside it hides (the chips'
+ * scroller beside the title, a name cut short). The chips read the same on
+ * either row, so the choice below does not follow the layout it chose. A box
+ * cut by its own maximum width (a chip's label) sits inside a clipped box and
+ * is not counted twice. Text cut short can read a few pixels under its laid
+ * out width, which is why the title is never squeezed by a change of fit.
+ */
+export function naturalWidth(el: HTMLElement): number {
+  let hidden = 0;
+  const walk = (node: Element) => {
+    for (const child of node.children) {
+      if (!(child instanceof HTMLElement)) continue;
+      const overflow = getComputedStyle(child).overflowX;
+      if (overflow !== '' && overflow !== 'visible')
+        hidden += Math.max(0, child.scrollWidth - child.clientWidth);
+      else walk(child);
+    }
+  };
+  walk(el);
+  return el.scrollWidth + hidden;
+}
+
+/**
+ * Room the chips must leave before they move back beside the title: more
+ * than the pixel the two layouts' measurements can differ by, so a bar at the
+ * edge settles on one layout instead of flipping between them.
+ */
+const SLACK = 2;
+
+/**
+ * Where the chips go, from their natural width and the room beside the title.
+ * Before the first measure and beside the title they go there while they
+ * fit; from their own row they move up only with `SLACK` to spare.
+ */
+export function nextChipsFit(
+  current: ChipsFit,
+  { chips, room }: { chips: number; room: number },
+): Exclude<ChipsFit, 'unknown'> {
+  const spare = current === 'wrapped' ? SLACK : 0.5;
+  return chips < room - spare ? 'inline' : 'wrapped';
+}
+
+/**
+ * Whether the chips fit beside the title, measured from `sm` up: the chips'
+ * natural width against the room between the title's words and the first
+ * control, both read so that neither layout changes them (`naturalWidth`).
  */
 function useChipsFit({
   active,
@@ -112,12 +159,14 @@ function useChipsFit({
       const room =
         r.getBoundingClientRect().left -
         t.getBoundingClientRect().left -
-        t.scrollWidth -
+        naturalWidth(t) -
         TITLE_MARGIN -
         2 * GAP;
-      const next: ChipsFit =
-        c.getBoundingClientRect().width < room - 0.5 ? 'inline' : 'wrapped';
-      setFit((f) => (f === next ? f : next));
+      const chipsWidth = naturalWidth(c);
+      setFit((f) => {
+        const next = nextChipsFit(f, { chips: chipsWidth, room });
+        return f === next ? f : next;
+      });
     };
     measure();
     if (typeof ResizeObserver === 'undefined') return;
@@ -338,7 +387,7 @@ export function TopBar({
               />
             ) : (
               <h1
-                className={`flex h-[68px] min-w-0 flex-1 items-center text-[24px] leading-[1.2] font-[650] tracking-[-0.035em] max-sm:h-auto max-sm:flex-initial max-sm:text-[20px] ${FIT.title[fit]}`}
+                className={`flex h-[68px] min-w-0 flex-initial items-center text-[24px] leading-[1.2] font-[650] tracking-[-0.035em] max-sm:h-auto max-sm:text-[20px] ${FIT.title[fit]}`}
               >
                 <span
                   ref={title}
