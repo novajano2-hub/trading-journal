@@ -444,6 +444,34 @@ test("a fee rule's Create says what it waits for, and Privacy keeps a new rule f
   expect(await r.feeRules.list(S)).toEqual([]);
 });
 
+test("a target rule's Create says what it waits for", async () => {
+  show(repo());
+  const t = await card('Targets and stops');
+  const dialog = await addRule(t, /^Add rule for targets and stops/);
+  const make = within(dialog).getByRole('button', {
+    name: 'Create',
+  }) as HTMLButtonElement;
+  const reason = () =>
+    document.getElementById(make.getAttribute('aria-describedby') ?? '')
+      ?.textContent;
+  expect(make.disabled).toBe(true);
+  expect(reason()).toBe('Choose an account and an instrument.');
+  await pick(dialog, 'Instrument', 'Future');
+  await waitFor(() => expect(reason()).toBe('Choose an account.'));
+  await pick(dialog, 'Account', 'Futures main');
+  await waitFor(() => expect(reason()).toBe('Enter a target or a stop level.'));
+  expect(make.disabled).toBe(true);
+  fireEvent.change(
+    within(dialog).getByRole('textbox', { name: 'Stop level 1' }),
+    { target: { value: '8' } },
+  );
+  await waitFor(() => expect(make.disabled).toBe(false));
+  expect(make.getAttribute('aria-describedby')).toBeNull();
+  expect(
+    within(dialog).queryByText('Enter a target or a stop level.'),
+  ).toBeNull();
+});
+
 test('the unit select waits for an instrument', async () => {
   show(repo());
   const t = await card('Targets and stops');

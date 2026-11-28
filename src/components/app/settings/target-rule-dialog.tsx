@@ -122,6 +122,18 @@ export function TargetRuleDialog({
     d.rows.some((r) => r.value.trim() !== ''),
   );
   const ready = accountId !== '' && asset !== '' && hasLevel;
+  // While Create waits, a line says what for, and is its description.
+  const waiting =
+    accountId === '' && asset === ''
+      ? 'Choose an account and an instrument.'
+      : accountId === ''
+        ? 'Choose an account.'
+        : asset === ''
+          ? 'Choose an instrument.'
+          : !hasLevel
+            ? 'Enter a target or a stop level.'
+            : null;
+  const reasonId = waiting ? `${ids}-waiting` : undefined;
   const masked = display.unit === 'privacy';
 
   const submit = async () => {
@@ -181,6 +193,7 @@ export function TargetRuleDialog({
           disabled={!ready}
           busy={save.isPending}
           formId={`${ids}-form`}
+          reasonId={reasonId}
         />
       }
     >
@@ -249,6 +262,11 @@ export function TargetRuleDialog({
             onChange={setStop}
           />
         </div>
+        {waiting ? (
+          <p id={`${ids}-waiting`} className={`${FIELD_HINT} mt-2.5`}>
+            {waiting}
+          </p>
+        ) : null}
         <p className={`${FIELD_HINT} mt-2.5`}>
           A share becomes a quantity of each trade&apos;s largest position,
           rounded down. The last level takes what is left.
