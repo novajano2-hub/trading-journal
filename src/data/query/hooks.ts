@@ -1373,8 +1373,8 @@ export function useVersionKeeper(
 }
 
 /**
- * Brings a version's body back: the current body is kept as "before restore"
- * first, and only the body is written (not the title or tags). Resolves to the
+ * Brings a version's body back: the current body is kept first, as the version
+ * a restore replaced, and only the body is written (not the title or tags). Resolves to the
  * note as stored. Rejects with LockedDayError for a finished day's note.
  */
 export function useRestoreVersion(): UseMutationResult<
@@ -1439,7 +1439,7 @@ export function useRemoveFeeRule(): UseMutationResult<void, Error, string> {
   );
 }
 
-/** Apply to existing trades, for either kind of rule; resolves to how many trades changed. */
+/** Fill in logged trades, for either kind of rule; resolves to how many trades changed. */
 export function useApplyRule(): UseMutationResult<
   number,
   Error,

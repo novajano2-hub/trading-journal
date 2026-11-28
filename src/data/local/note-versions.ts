@@ -221,7 +221,7 @@ export function localNoteVersions(
     async restore(ws, noteId, versionId) {
       const db = await ctx.db();
       // What the journal's save needs, and the versions, in one transaction:
-      // the "before restore" row and the new body land together or not at all.
+      // the replaced text's version and the new body land together, or neither.
       return rwTx(
         db,
         [db.noteVersions, db.journal, db.days, db.meta, db.trackers],

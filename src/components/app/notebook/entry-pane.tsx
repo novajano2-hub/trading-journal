@@ -395,8 +395,8 @@ export function EntryPane({
           handleRef={handle}
           templateSlot={templateSlot}
           // Text still waiting, or the text of a write that failed, is saved
-          // before a restore, so the store keeps it as the "before restore"
-          // version; a write that fails again stops the restore (G-6).
+          // before a restore, so the store keeps it as the version the restore
+          // replaced; a write that fails again stops the restore (G-6).
           beforeRestore={async (body) => {
             if (timer.current !== undefined || failed.current) {
               draft.current.body = body;

@@ -437,8 +437,8 @@ function NoteBody({
       ensureNoteId={ensureNoteId}
       templateSlot={templateSlot}
       // Text still waiting, or held after a failed write, is saved before a
-      // restore (`settle`), so the store keeps it as the "before restore"
-      // version; a write that fails again stops the restore (G-6).
+      // restore (`settle`), so the store keeps it as the version the restore
+      // replaced; a write that fails again stops the restore (G-6).
       beforeRestore={async () => {
         await settle();
         if (failed.current) throw new Error('The note could not be saved.');

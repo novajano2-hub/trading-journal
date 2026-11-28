@@ -244,7 +244,7 @@ test('restore asks first, and does nothing until it is confirmed', async () => {
   });
 
   // The note has the version's text, its title and tags as they were, and the
-  // text it had is kept as "before restore".
+  // text it had is kept as the version the restore replaced.
   await waitFor(async () =>
     expect((await repo.journal.get(M, note.id))!.body).toEqual(
       doc('Wed 14:20'),
@@ -307,7 +307,7 @@ test("a locked daily note's history is read-only and restore is refused", async 
   ).toBeTruthy();
 
   // Even where a host forgot to say read-only, the store refuses and the
-  // dialog says why: nothing changes and no "before restore" appears.
+  // dialog says why: nothing changes and no replaced version appears.
   cleanup();
   const stale = await mount(repo, { noteId: note.id, readOnly: false });
   fireEvent.click(

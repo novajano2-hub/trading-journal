@@ -147,7 +147,7 @@ describe('fee rule storage', () => {
 });
 
 describe('applying a fee rule to existing trades', () => {
-  test('apply to existing counts and logs with source rule', async () => {
+  test('Fill in logged trades counts and logs with source rule', async () => {
     const { repo, acc, account, trip, manual, rows } = await rulesSetup();
     const other = await account('Other');
     const a = await trip(acc.id, 2, 6000, 6004);
@@ -295,7 +295,7 @@ describe('applying a fee rule to existing trades', () => {
     expect(await repo.trades.get(M, t.id)).toEqual(t);
   });
 
-  test('apply to existing never costs the fill that settled an expired option', async () => {
+  test('Fill in logged trades never costs the fill that settled an expired option', async () => {
     const { repo, acc, commit } = await rulesSetup();
     // Planned after the expiry, so the import closes the option at 0 with a fill of its own.
     await commit(

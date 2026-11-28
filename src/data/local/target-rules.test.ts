@@ -197,7 +197,7 @@ describe('target rule storage', () => {
 });
 
 describe('applying a target rule to existing trades', () => {
-  test('apply to existing counts and logs with source rule', async () => {
+  test('Fill in logged trades counts and logs with source rule', async () => {
     const { repo, acc, account, trip, manual, rows } = await rulesSetup();
     const other = await account('Other');
     const a = await trip(acc.id, 2, 6000, 6004);

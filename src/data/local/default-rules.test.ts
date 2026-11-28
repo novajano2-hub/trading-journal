@@ -379,7 +379,7 @@ describe('the rules on import', () => {
 });
 
 describe('manual trades', () => {
-  test('a manual trade is untouched on entry, and Apply to existing covers it', async () => {
+  test('a manual trade is untouched on entry, and Fill in logged trades covers it', async () => {
     const { repo, acc, trip } = await rulesSetup();
     const target = await repo.targetRules.create(M, targetInput(acc.id));
     const fee = await repo.feeRules.create(M, feeInput(acc.id));
@@ -426,7 +426,7 @@ describe('editing and deleting a rule', () => {
     expect(await repo.trades.list(M)).toEqual(before);
   });
 
-  test('editing a rule leaves applied values; only Apply to existing rewrites them', async () => {
+  test('editing a rule leaves applied values; only Fill in logged trades rewrites them', async () => {
     const { repo, acc, commit } = await rulesSetup();
     const target = await repo.targetRules.create(M, targetInput(acc.id));
     const fee = await repo.feeRules.create(M, feeInput(acc.id));

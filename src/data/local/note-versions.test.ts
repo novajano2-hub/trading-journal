@@ -142,7 +142,7 @@ test('restore keeps a before-restore version and restores the body only', async 
   expect(await repo.journal.get(M, n.id)).toEqual(restored);
 
   const list = await repo.noteVersions.list(M, n.id);
-  // The version stays; the text it replaced is kept as "before restore".
+  // The version stays; the text it replaced is kept, marked as replaced.
   expect(list.map((v) => [v.kind, v.body])).toEqual([
     ['before-restore', doc('draft two')],
     ['auto', doc('draft one')],
@@ -194,7 +194,7 @@ test("a locked daily note's history is read-only and restore is refused", async 
   expect((await repo.journal.get(M, note.id))!.body).toEqual(
     doc('after the close'),
   );
-  // The refusal left no "before restore" behind.
+  // The refusal left no replaced version behind.
   expect(await db.noteVersions.count()).toBe(before);
 });
 

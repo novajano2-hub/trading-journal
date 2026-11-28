@@ -10,7 +10,7 @@ import { readPrefs } from './prefs';
 import { feeRows, levelledBy, levelRows } from './rule-shared';
 
 /**
- * Apply to existing trades, for either kind: `change` is what the rule does
+ * Fill in logged trades, for either kind: `change` is what the rule does
  * to one trade of the rule's account that it matches (`levelledBy` or
  * `withFeeRule`). Throws NotFoundError for a missing account and
  * ArchivedAccountError for an archived one (its trades are read-only). Writes

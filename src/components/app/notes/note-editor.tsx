@@ -96,7 +96,7 @@ export interface NoteEditorProps {
   /**
    * Before a restore: the host saves what it still holds, `body` being the
    * editor's text now, and rejects when it can't (nothing is restored then), so
-   * the store keeps the text on screen as the "before restore" version.
+   * the store keeps the text on screen as the version the restore replaced.
    */
   beforeRestore?: (body: unknown) => Promise<void>;
 }

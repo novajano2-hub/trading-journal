@@ -872,7 +872,7 @@ test('kept versions list, restore and refresh the note and its list', async () =
   expect(version).toMatchObject({ noteId, kind: 'auto', body: doc('one') });
 
   // The note moves on, then a restore brings the version back: the journal
-  // and the list both refresh, and a "before restore" version is there.
+  // and the list both refresh, and the replaced text's version is there.
   await act(async () => {
     await result.current.save.mutateAsync({
       ...result.current.journal.data!.find((e) => e.id === noteId)!,

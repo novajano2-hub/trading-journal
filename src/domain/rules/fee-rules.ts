@@ -58,8 +58,8 @@ function costed(e: Execution, rule: FeeRule): Execution {
  * is `withFeeRule`'s question. With `fills` (execution ids) only those fills
  * may be written; which of them are entries and exits is still read from the
  * whole trade's position. The synthetic fill that settled an expired option is
- * never written: no broker charged it (spec §5.3), at import or by Apply to
- * existing trades.
+ * never written: no broker charged it (spec §5.3), at import or by Fill in
+ * logged trades.
  */
 export function applyFeeRule(
   t: Trade,
