@@ -381,10 +381,16 @@ describe('the fills new in an import', () => {
 
   test('a fill in scope that carries costs from the file keeps them, and the rule skips the scope', () => {
     const { t, exits } = carried();
+    // The entry an earlier import costed carries other costs than the rule's,
+    // so a rewrite of it would show.
     const filed = {
       ...t,
-      executions: t.executions.map((e) =>
-        e.id === exits[1]!.id ? { ...e, commission: 250 } : e,
+      executions: t.executions.map((e, i) =>
+        i === 0
+          ? { ...e, commission: 99, fees: 7 }
+          : e.id === exits[1]!.id
+            ? { ...e, commission: 250 }
+            : e,
       ),
     };
     const fresh = new Set(exits.map((e) => e.id));
@@ -398,7 +404,7 @@ describe('the fills new in an import', () => {
       fills: fresh,
     })!;
     expect(costs(over.executions)).toEqual([
-      [150, 20],
+      [99, 7],
       [150, 20],
       [150, 20],
     ]);
@@ -427,6 +433,41 @@ describe('the fills new in an import', () => {
     const { t } = carried();
     expect(
       withFeeRule(t, rule(), { ...run, fills: new Set() }),
+    ).toBeUndefined();
+  });
+});
+
+describe('the settlement of an expired option', () => {
+  const run = { override: false, accountCurrency: 'USD' };
+  /** Long 1 AAPL call, closed at 0 by the synthetic fill of its expiry. */
+  const expired = (): Trade =>
+    trade('AAPL  261120C00150000', [
+      ['buy', 1, 1.5],
+      ['sell', 1, 0, { id: 'a1:AAPL  261120C00150000:expiry' }],
+    ]);
+
+  test('is never a fill the rule costs, with or without scope or override', () => {
+    const t = expired();
+    expect(t.status).toBe('closed');
+    for (const o of [
+      run,
+      { ...run, override: true },
+      { ...run, fills: new Set(t.executions.map((e) => e.id)) },
+    ]) {
+      const out = withFeeRule(t, rule({ mode: 'per-contract' }), o)!;
+      expect(costs(out.executions)).toEqual([
+        [150, 20],
+        [0, 0],
+      ]);
+      expect(out.fees).toBe(170);
+    }
+  });
+
+  test('a rule on exits only changes nothing when the settlement is the only exit', () => {
+    const t = expired();
+    expect(withFeeRule(t, rule({ applyOn: 'exit' }), run)).toBeUndefined();
+    expect(
+      withFeeRule(t, rule({ applyOn: 'exit' }), { ...run, override: true }),
     ).toBeUndefined();
   });
 });

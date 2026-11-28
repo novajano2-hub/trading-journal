@@ -12,6 +12,21 @@ import { rwTx } from './tx';
 
 const KEEP_MS = NOTE_VERSION_DAYS * 86_400_000;
 
+/** How a body names a stored image: `keel-file:<id>` (the editor's `FILE_REF`). */
+const FILE_REF = 'keel-file:';
+
+/** Adds every stored file a body names, wherever in the body it sits, to `into`. */
+function addFileRefs(body: unknown, into: Set<string>): void {
+  if (typeof body === 'string') {
+    if (body.startsWith(FILE_REF) && body.length > FILE_REF.length)
+      into.add(body.slice(FILE_REF.length));
+  } else if (Array.isArray(body)) {
+    for (const item of body) addFileRefs(item, into);
+  } else if (body !== null && typeof body === 'object') {
+    for (const value of Object.values(body)) addFileRefs(value, into);
+  }
+}
+
 /** Newest first; two versions of one instant sort by id so the order is fixed. */
 function newestFirst(a: NoteVersion, b: NoteVersion): number {
   if (a.savedAt !== b.savedAt) return a.savedAt < b.savedAt ? 1 : -1;
@@ -60,9 +75,20 @@ export function localNoteVersions(
   ctx: LocalContext,
   journal: JournalRepo,
 ): NoteVersionsRepo {
-  /** Drops the note's versions older than 30 days; call where the note's versions were just read. */
+  /**
+   * Drops the note's versions older than 30 days, then the note's images that
+   * neither its body nor a kept version names (B56). Call where the note's
+   * versions were just read, inside an rw transaction that includes
+   * `db.noteVersions`, `db.journal` and `db.files`.
+   *
+   * Only images uploaded before the cutoff go: an image a purged version held
+   * was uploaded before that version was kept, and a newer one may be in the
+   * editor but not yet in the saved body.
+   */
   async function purge(
     db: KeelDb,
+    ws: string,
+    noteId: string,
     rows: readonly NoteVersion[],
   ): Promise<NoteVersion[]> {
     const cutoff = ctx.now().getTime() - KEEP_MS;
@@ -72,26 +98,46 @@ export function localNoteVersions(
       old.map((v): [string, string] => [v.workspaceId, v.id]),
     );
     const gone = new Set(old.map((v) => v.id));
-    return rows.filter((v) => !gone.has(v.id));
+    const kept = rows.filter((v) => !gone.has(v.id));
+
+    const named = new Set<string>();
+    addFileRefs((await db.journal.get([ws, noteId]))?.body, named);
+    for (const v of kept) addFileRefs(v.body, named);
+    const unheld = (
+      await db.files
+        .where('[workspaceId+owner]')
+        .equals([ws, `note:${noteId}`])
+        .toArray()
+    ).filter((f) => !named.has(f.id) && Date.parse(f.createdAt) < cutoff);
+    if (unheld.length > 0)
+      await db.files.bulkDelete(
+        unheld.map((f): [string, string] => [ws, f.id]),
+      );
+    return kept;
   }
 
   return {
     async list(ws, noteId) {
       const db = await ctx.db();
-      return rwTx(db, [db.noteVersions], async () => {
-        const rows = await purge(db, await versionsOf(db, ws, noteId));
+      return rwTx(db, [db.noteVersions, db.journal, db.files], async () => {
+        const rows = await purge(
+          db,
+          ws,
+          noteId,
+          await versionsOf(db, ws, noteId),
+        );
         return rows.sort(newestFirst);
       });
     },
 
     async keep(ws, noteId, body, kind) {
       const db = await ctx.db();
-      await rwTx(db, [db.noteVersions, db.journal], async () => {
+      await rwTx(db, [db.noteVersions, db.journal, db.files], async () => {
         if (!(await db.journal.get([ws, noteId])))
           throw new NotFoundError('journal entry', noteId);
-        const rows = (await purge(db, await versionsOf(db, ws, noteId))).sort(
-          newestFirst,
-        );
+        const rows = (
+          await purge(db, ws, noteId, await versionsOf(db, ws, noteId))
+        ).sort(newestFirst);
         if (rows[0] !== undefined && sameBody(rows[0].body, body)) return;
         await db.noteVersions.put({
           id: ctx.newId(),

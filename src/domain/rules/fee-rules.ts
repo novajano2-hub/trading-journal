@@ -1,4 +1,5 @@
 import { withCosts } from '../fill-costs';
+import { isExpirySettlement } from '../import/expiry';
 import { roundHalfAway } from '../money';
 import type { Cents, Execution, FeeRule, Trade } from '../types';
 import { ruleAssetError } from './match';
@@ -56,7 +57,9 @@ function costed(e: Execution, rule: FeeRule): Execution {
  * replaces whatever those fills carried: whether a trade may be written at all
  * is `withFeeRule`'s question. With `fills` (execution ids) only those fills
  * may be written; which of them are entries and exits is still read from the
- * whole trade's position.
+ * whole trade's position. The synthetic fill that settled an expired option is
+ * never written: no broker charged it (spec §5.3), at import or by Apply to
+ * existing trades.
  */
 export function applyFeeRule(
   t: Trade,
@@ -75,6 +78,7 @@ export function applyFeeRule(
   const legAt = new Map(order.map((index, at) => [index, legs[at]!]));
   return t.executions.map((e, index) =>
     (!fills || fills.has(e.id)) &&
+    !isExpirySettlement(e) &&
     (rule.applyOn === 'all' || legAt.get(index) === rule.applyOn)
       ? costed(e, rule)
       : { ...e },

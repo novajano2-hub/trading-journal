@@ -189,6 +189,64 @@ describe('the rules on import', () => {
     expect(t!.fees).toBe(170);
   });
 
+  test('a carried-on option the next import settles at its expiry costs its new broker fill only', async () => {
+    const { repo, acc, commit } = await rulesSetup();
+    await repo.feeRules.create(
+      M,
+      feeInput(acc.id, { assetClass: 'option', mode: 'per-contract' }),
+    );
+    // Expires 2026-11-27: still open when the first import is planned on the 21st.
+    const CALL = 'AAPL  261127C00150000';
+    await commit(H + `2026-11-18 10:00:00,${CALL},Buy,2,1.50,,\n`, 'imp-1');
+    const [open] = await repo.trades.list(M);
+    expect(open!.status).toBe('open');
+    expect(costs(open!)).toEqual([[300, 40]]);
+    // Planned after the expiry close: one contract is sold, the other settles at 0.
+    await commit(
+      H + `2026-11-24 10:00:00,${CALL},Sell,1,2.00,,\n`,
+      'imp-2',
+      acc.id,
+      '2026-11-28T00:00:00.000Z',
+    );
+    const [t] = await repo.trades.list(M);
+    expect(t!.id).toBe(open!.id);
+    expect(t!.status).toBe('closed');
+    expect(t!.executions.map((e) => e.id.endsWith(':expiry'))).toEqual([
+      false,
+      false,
+      true,
+    ]);
+    expect(costs(t!)).toEqual([
+      [300, 40],
+      [150, 20],
+      [0, 0],
+    ]);
+    expect(t!.fees).toBe(510);
+  });
+
+  test('a carried-on option whose only new fill is its expiry settlement is not costed', async () => {
+    const { repo, acc, commit } = await rulesSetup();
+    const CALL = 'AAPL  261127C00150000';
+    await commit(H + `2026-11-18 10:00:00,${CALL},Buy,1,1.50,,\n`, 'imp-1');
+    await repo.feeRules.create(M, feeInput(acc.id, { assetClass: 'option' }));
+    // A file of another symbol, planned after the expiry: the option settles on its own.
+    await commit(
+      H + '2026-11-24 09:30:00,ESZ5,Buy,1,6000,,\n',
+      'imp-2',
+      acc.id,
+      '2026-11-28T00:00:00.000Z',
+    );
+    const option = (await repo.trades.list(M)).find(
+      (t) => t.instrument.assetClass === 'option',
+    )!;
+    expect(option.status).toBe('closed');
+    expect(costs(option)).toEqual([
+      [0, 0],
+      [0, 0],
+    ]);
+    expect(option.fees).toBe(0);
+  });
+
   test('a trade left open before the rules existed is given no levels by the next import, and costs only on its new fill', async () => {
     const { repo, acc, commit } = await rulesSetup();
     await commit(H + '2026-11-16 09:30:00,ESZ5,Buy,2,6000,,\n', 'imp-1');

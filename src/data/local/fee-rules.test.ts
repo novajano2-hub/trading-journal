@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { feeInput, rulesSetup, M } from '../__fixtures__/rules';
+import { feeInput, H, rulesSetup, M } from '../__fixtures__/rules';
 import { ArchivedAccountError, NotFoundError } from '../repository';
 
 const costs = (t: { executions: { commission: number; fees: number }[] }) =>
@@ -293,6 +293,42 @@ describe('applying a fee rule to existing trades', () => {
       spy.mockRestore();
     }
     expect(await repo.trades.get(M, t.id)).toEqual(t);
+  });
+
+  test('apply to existing never costs the fill that settled an expired option', async () => {
+    const { repo, acc, commit } = await rulesSetup();
+    // Planned after the expiry, so the import closes the option at 0 with a fill of its own.
+    await commit(
+      H + '2026-11-18 10:00:00,AAPL  261120C00150000,Buy,2,1.50,,\n',
+      'imp-1',
+    );
+    const [before] = await repo.trades.list(M);
+    expect(before!.status).toBe('closed');
+    expect(costs(before!)).toEqual([
+      [0, 0],
+      [0, 0],
+    ]);
+    const rule = await repo.feeRules.create(
+      M,
+      feeInput(acc.id, { assetClass: 'option', mode: 'per-contract' }),
+    );
+    // On exits only, the settlement is the trade's one exit: nothing to write.
+    const exits = await repo.feeRules.create(
+      M,
+      feeInput(acc.id, { assetClass: 'option', applyOn: 'exit' }),
+    );
+    expect(await repo.feeRules.applyExisting(M, exits.id, true)).toBe(0);
+
+    for (const override of [false, true]) {
+      await repo.feeRules.applyExisting(M, rule.id, override);
+      const [t] = await repo.trades.list(M);
+      expect(costs(t!), String(override)).toEqual([
+        [300, 40],
+        [0, 0],
+      ]);
+      expect(t!.fees).toBe(340);
+      expect(t!.net).toBe(before!.net - 340);
+    }
   });
 
   test('an apply that changed trades makes a pending import plan stale', async () => {

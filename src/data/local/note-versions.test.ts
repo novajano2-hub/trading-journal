@@ -218,3 +218,75 @@ test('deleting a note for good deletes its versions, and the trash purge does to
   const left = await db.noteVersions.toArray();
   expect(left.map((v) => v.noteId)).toEqual([keep.id]);
 });
+
+/** A body with a paragraph and one block image of each file id (B56). */
+const withImages = (text: string, ...fileIds: string[]) => ({
+  type: 'doc',
+  content: [
+    { type: 'paragraph', content: [{ type: 'text', text }] },
+    ...fileIds.map((id) => ({
+      type: 'image',
+      attrs: { src: `keel-file:${id}`, width: null },
+    })),
+  ],
+});
+const png = () => ({
+  bytes: new ArrayBuffer(4),
+  type: 'image/png',
+  name: 'a.png',
+});
+
+test('an image removed from a note is deleted once no kept version holds it', async () => {
+  const { repo, db, tick } = setup('2026-10-01T12:00:00.000Z');
+  const n = await aNote(repo);
+  const other = await aNote(repo, 'another note');
+  const owner = `note:${n.id}`;
+  const gone = await repo.files.add(M, owner, png(), { images: true });
+  const inBody = await repo.files.add(M, owner, png(), { images: true });
+  const inVersion = await repo.files.add(M, owner, png(), { images: true });
+  const elsewhere = await repo.files.add(M, `note:${other.id}`, png(), {
+    images: true,
+  });
+  // Day 0: the body and its version hold the first two images.
+  const first = withImages('chart', gone.id, inBody.id);
+  await repo.journal.save(M, { ...n, body: first });
+  await repo.noteVersions.keep(M, n.id, first, 'auto');
+  // Day 20: the first image is removed and the third added, in a version too.
+  tick(20 * DAY);
+  const second = withImages('chart', inBody.id, inVersion.id);
+  await repo.journal.save(M, { ...n, body: second });
+  await repo.noteVersions.keep(M, n.id, second, 'auto');
+  // Day 25: the third image leaves the body; the day-20 version still holds it.
+  tick(5 * DAY);
+  await repo.journal.save(M, { ...n, body: withImages('chart', inBody.id) });
+  // An image uploaded now, before the editor saves the body that holds it.
+  const pending = await repo.files.add(M, owner, png(), { images: true });
+
+  // 29 days: the day-0 version is kept, so its images stay.
+  tick(4 * DAY);
+  await repo.noteVersions.list(M, n.id);
+  expect(await db.files.get([M, gone.id])).toBeDefined();
+
+  // 31 days: the day-0 version is purged and nothing else holds the first image.
+  tick(2 * DAY);
+  await repo.noteVersions.list(M, n.id);
+  const left = (await db.files.toArray()).map((f) => f.id).sort();
+  expect(left).toEqual(
+    [inBody.id, inVersion.id, pending.id, elsewhere.id].sort(),
+  );
+});
+
+test('the version purge on keep deletes the images no kept version holds', async () => {
+  const { repo, db, tick } = setup('2026-10-01T12:00:00.000Z');
+  const n = await aNote(repo);
+  const img = await repo.files.add(M, `note:${n.id}`, png(), { images: true });
+  const body = withImages('chart', img.id);
+  await repo.journal.save(M, { ...n, body });
+  await repo.noteVersions.keep(M, n.id, body, 'auto');
+  tick(DAY);
+  await repo.journal.save(M, { ...n, body: doc('no picture') });
+  tick(31 * DAY);
+  await repo.noteVersions.keep(M, n.id, doc('no picture now'), 'auto');
+  expect(await db.files.get([M, img.id])).toBeUndefined();
+  expect(await repo.noteVersions.list(M, n.id)).toHaveLength(1);
+});

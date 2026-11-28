@@ -86,21 +86,27 @@ export async function rulesSetup() {
       symbol,
     );
 
-  const plan = async (text: string, importId: string, accountId = acc.id) => {
+  /** Plans the file as of `now`: by default 2026-11-21, a minute later for each plan. */
+  const plan = async (
+    text: string,
+    importId: string,
+    accountId = acc.id,
+    now = new Date(Date.UTC(2026, 10, 21, 0, planned++)).toISOString(),
+  ) => {
     const parsed = parseCsv(text);
     return planImport(
       parsed,
       guessMapping(parsed, { sourceTimeZone: 'America/New_York' }),
       await repo.imports.context(M, accountId),
-      {
-        importId,
-        fileName: `${importId}.csv`,
-        now: new Date(Date.UTC(2026, 10, 21, 0, planned++)).toISOString(),
-      },
+      { importId, fileName: `${importId}.csv`, now },
     );
   };
-  const commit = async (text: string, importId: string, accountId = acc.id) =>
-    repo.imports.commit(M, await plan(text, importId, accountId));
+  const commit = async (
+    text: string,
+    importId: string,
+    accountId = acc.id,
+    now?: string,
+  ) => repo.imports.commit(M, await plan(text, importId, accountId, now));
 
   /** History rows without their ids and times, filtered by type. */
   const rows = async (...types: HistoryRow['type'][]) =>
