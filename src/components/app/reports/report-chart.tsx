@@ -64,6 +64,9 @@ const X_AXIS = 24;
 /** Tilted axis labels: a label's height over sin 45 is the least spacing, and how far they hang. */
 const TILT_STEP = 13;
 const TILT_MAX_CHARS = 14;
+/** How far a tilted label runs to the left of its anchor, about: its characters at 10.5px (6.6px each) over the 45 degree slant. */
+const tiltReach = (text: string): number =>
+  Math.ceil(text.length * 6.6 * Math.SQRT1_2);
 const MIN_LABEL_GAP = 52;
 const DEFAULT_WIDTH = 720;
 /**
@@ -192,11 +195,10 @@ function xTicks(
       text:
         c.text.length > tiltMax ? `${c.text.slice(0, tiltMax - 1)}…` : c.text,
     }));
-    const longest = Math.max(...shown.map((c) => c.text.length));
     return {
       ticks: shown,
       tilt,
-      hang: Math.ceil(longest * 6.6 * Math.SQRT1_2) + 24,
+      hang: Math.max(...shown.map((c) => tiltReach(c.text))) + 24,
     };
   }
   const out: typeof candidates = [];
@@ -917,7 +919,31 @@ function ChartBody({
         return band.scale.ticks.map((t) => fmt.tick(s.unit, t).length);
       }),
     );
-    const padL = Math.max(36, Math.ceil(widest * 6.4) + 16);
+    const keys = series[0]!.points.map((p) => p.key);
+    const axisAt = (left: number) =>
+      xTicks(
+        keys,
+        Math.max(40, width - left - PAD_R),
+        xLabel,
+        tiltLabels,
+        tiltMaxChars,
+      );
+    let padL = Math.max(36, Math.ceil(widest * 6.4) + 16);
+    let axis = axisAt(padL);
+    // A tilted label runs down to the left of its bar, so the first one would
+    // be cut at the chart's edge: the plot starts far enough in that it shows
+    // whole (its anchor, half a step into the plot, at least its reach in).
+    const first = axis.tilt ? axis.ticks[0] : undefined;
+    if (first) {
+      const half = 1 / (2 * n);
+      const need = Math.ceil(
+        (tiltReach(first.text) + 2 - (width - PAD_R) * half) / (1 - half),
+      );
+      if (need > padL) {
+        padL = need;
+        axis = axisAt(padL);
+      }
+    }
     const plotW = Math.max(40, width - padL - PAD_R);
     const bandHs = series.map((_, i) =>
       i === 0 || overlay ? bandH : Math.round(bandH * rowRatio),
@@ -926,13 +952,6 @@ function ChartBody({
       overlay
         ? 0
         : bandHs.slice(0, i).reduce((sum, h) => sum + h + BAND_GAP, 0),
-    );
-    const axis = xTicks(
-      series[0]!.points.map((p) => p.key),
-      plotW,
-      xLabel,
-      tiltLabels,
-      tiltMaxChars,
     );
     const axisH = axis.hang;
     return {

@@ -380,6 +380,25 @@ test('tiltMaxChars lets a name run longer, so every bar keeps a label of its own
   expect(new Set(labels).size).toBe(LONG.length);
 });
 
+test('a tilted first label shows whole: the plot starts far enough in that its name stays inside the chart', async () => {
+  const { container } = renderApp(
+    <ReportChart
+      label="By pattern"
+      xLabel={(k) => k}
+      tiltLabels
+      tiltMaxChars={30}
+      series={LONG_SERIES}
+    />,
+  );
+  await screen.findByRole('img', { name: 'By pattern' });
+  const [first] = [...container.querySelectorAll('[data-axis-label]')];
+  expect(first!.getAttribute('transform')).toContain('rotate(-45');
+  // Anchored at its end under the bar, the label runs down to the left: its
+  // characters at 10.5px (about 6.6px each) over the 45 degree slant.
+  const reach = first!.textContent!.length * 6.6 * Math.SQRT1_2;
+  expect(Number(first!.getAttribute('x')) - reach).toBeGreaterThanOrEqual(0);
+});
+
 test('few bars keep flat labels', async () => {
   const { container } = renderApp(
     <ReportChart
