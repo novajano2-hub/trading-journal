@@ -35,8 +35,10 @@ import {
 } from '../local/history';
 import { ruleLabel, tidySymbols } from '../local/rule-shared';
 import { SAMPLE_WORKSPACE } from '../workspaces';
-import { DAY_MS, NY, mondayOf, nyMs, parseYmd, ymd } from './calendar';
+import { DAY_MS, NY, nyMs, parseYmd, ymd } from './calendar';
+import type { TiptapNode } from './content';
 import { ACCOUNT_SPECS, feesFor, snap } from './instruments';
+import { weekFigures } from './journal';
 import type { Random } from './random';
 
 /**
@@ -44,8 +46,10 @@ import type { Random } from './random';
  * two merges and a split, a default target rule and fee rule, swap on the
  * forex trades, a missed trade per strategy, and the history rows those edits
  * would have written. Nothing here reads a stream the rest of the sample
- * draws from, so every value v7 had stays as it was; the trades a merge or
- * the split takes are rebuilt by the app's own grouping. No files.
+ * draws from, so every value v7 had stays as it was but the weekly recaps'
+ * figures, restated from the trades as they read after the grouping and the
+ * swap; the trades a merge or the split takes are rebuilt by the app's own
+ * grouping. No files.
  */
 
 const WS = SAMPLE_WORKSPACE.id;
@@ -74,6 +78,8 @@ const MISSED_CLASSES: readonly AssetClass[] = [
 
 export interface TradeDepth {
   trades: Trade[];
+  /** The journal, its weekly recaps restated from `trades` (`restateRecaps`). */
+  journal: JournalEntry[];
   history: HistoryRow[];
   targetRules: TargetRule[];
   feeRules: FeeRule[];
@@ -164,7 +170,8 @@ export function addTradeDepth(s: {
   const grouped = groupTrades(s.trades, s.journal, s.strategies, account);
   const levelled = addLevels(s.levelRng, grouped.trades, s.endDate);
   writes.push(...levelled.writes, ...grouped.writes);
-  const trades = addSwap(s.swapRng, levelled.trades, s.trades, s.journal);
+  const trades = addSwap(s.swapRng, levelled.trades, s.journal);
+  const journal = restateRecaps(s.journal, trades);
   const missedTrades = addMissedTrades(
     s.missedRng,
     trades,
@@ -198,6 +205,7 @@ export function addTradeDepth(s: {
 
   return {
     trades,
+    journal,
     history,
     targetRules: [esTargets, allTargets],
     feeRules: [microFees, allFees],
@@ -214,9 +222,11 @@ const hasLoserChecks = (t: Trade, loserRules: ReadonlySet<string>): boolean =>
   t.ruleChecks.some((c) => loserRules.has(c.ruleId));
 
 /**
- * Whether a note's words could read the trade's figures: a note is its own or
- * links it, or its day has a daily note. The grouping and the swap leave such
- * trades alone, so no note's figures or links change.
+ * Whether a note's words could read the trade's figures: a note in `journal`
+ * is its own or links it, or its day has a daily note. The grouping leaves
+ * such trades alone, so no note's links change; the swap leaves alone those
+ * the notes other than the weekly recaps read, so no trade note's or daily
+ * note's figures change.
  */
 function notedBy(journal: readonly JournalEntry[]): (t: Trade) => boolean {
   const linked = new Set(journal.flatMap((j) => j.linkedTradeIds));
@@ -538,77 +548,70 @@ function addLevels(
 // ---- swap ----------------------------------------------------------------------
 
 /**
- * Swap on the closed forex trades that no note's words read (`notedBy`), as a
- * closed-trades file gives it: small (10 cents to 1.20 dollars a lot), into
- * the net and not the gross, as the import adds it (ledger R3). The notes
- * were written from the trades with their swap, so a weekly recap's net, its
- * share of winners and its best and worst trades must read as they do: the
- * week's trades take their swap in pairs, a charge on one and the same credit
- * on the other, and a pair whose swap would turn a win into a loss, or reach
- * the week's best or worst trade, takes 0.00, as does a trade left over. The weeks sum to nothing, so
- * the forex evaluation's bounds stay where they were.
+ * Swap on every closed forex trade, as a closed-trades file gives it: the
+ * financing on the position, mostly a charge, sometimes a credit, sometimes
+ * nothing, and small (10 cents to 1.20 dollars a lot): the forex evaluation
+ * sits a few hundred dollars inside its bounds, and swap must not move it
+ * across one. It goes into the net and not the gross, as the import adds it
+ * (ledger R3). A trade whose own note or daily note states its result takes
+ * none (`notedBy`), as those notes say what the trade made; the weekly
+ * recaps are restated after it (`restateRecaps`).
  */
 function addSwap(
   rng: Random,
   trades: readonly Trade[],
-  /** The trades the notes were written from: before the grouping. */
-  written: readonly Trade[],
   journal: readonly JournalEntry[],
 ): Trade[] {
-  const noted = notedBy(journal);
-  const closedFx = trades.filter(
-    (t) => t.instrument.assetClass === 'forex' && t.status === 'closed',
-  );
-  // Every closed forex trade draws, so the stream does not depend on which take a swap.
-  const draws = new Map(
-    closedFx.map((t) => [
-      t.id,
-      {
-        none: rng.chance(0.15),
-        charge: rng.chance(0.5),
-        perLot: 0.1 + rng.next() * 1.1,
-      },
-    ]),
-  );
-  const weeks = new Map<string, Trade[]>();
-  for (const t of closedFx) {
-    if (noted(t)) continue;
-    const week = mondayOf(dayOf(t));
-    weeks.set(week, [...(weeks.get(week) ?? []), t]);
-  }
-  // A week's best and worst, as its recap read them: the closed trades of
-  // the accounts the journal was written from, before the grouping.
-  const journalled = new Set(ACCOUNT_SPECS.map((a) => a.id));
-  const recapped = written.filter(
-    (t) => t.status === 'closed' && journalled.has(t.accountId),
-  );
-  const swaps = new Map<string, number>();
-  for (const [week, own] of weeks) {
-    const friday = ymd(parseYmd(week) + 4 * DAY_MS);
-    const nets = recapped
-      .filter((t) => dayOf(t) >= week && dayOf(t) <= friday)
-      .map((t) => t.net);
-    const best = Math.max(...nets);
-    const worst = Math.min(...nets);
-    const keeps = (t: Trade, swap: number) =>
-      t.net + swap > 0 === t.net > 0 &&
-      t.net + swap < best &&
-      t.net + swap > worst;
-    for (let i = 0; i < own.length; i += 2) {
-      const a = own[i]!;
-      const b = own[i + 1];
-      const d = draws.get(a.id)!;
-      const size = Math.min(a.maxPosition, b?.maxPosition ?? 0);
-      const cents = Math.max(1, Math.round(size * d.perLot * 100));
-      const swap = d.charge ? -cents : cents;
-      const takes = b && !d.none && keeps(a, swap) && keeps(b, -swap);
-      swaps.set(a.id, takes ? swap : 0);
-      if (b) swaps.set(b.id, takes ? -swap : 0);
-    }
-  }
+  const noted = notedBy(journal.filter((j) => j.kind !== 'weekly-recap'));
   return trades.map((t) => {
-    const swap = swaps.get(t.id);
-    return swap === undefined ? t : { ...t, swap, net: t.net + swap };
+    if (t.instrument.assetClass !== 'forex' || t.status !== 'closed') return t;
+    // Every closed forex trade draws, so the stream does not depend on which take a swap.
+    const none = rng.chance(0.15);
+    const credit = rng.chance(0.25);
+    const perLot = 0.1 + rng.next() * 1.1;
+    if (noted(t)) return t;
+    if (none) return { ...t, swap: 0 };
+    const cents = Math.max(1, Math.round(t.maxPosition * perLot * 100));
+    const swap = credit ? cents : -cents;
+    return { ...t, swap, net: t.net + swap };
+  });
+}
+
+/**
+ * The weekly recaps as the week's trades read now: each recap's numbers
+ * line, its Best and Worst bullets and the trades it links come from its
+ * week's closed trades in the accounts the journal was written from, after
+ * the grouping and the swap, worded as `writeJournal` words them. Its title,
+ * date, time and "Next week" bullets stay; every other entry is as it was.
+ */
+function restateRecaps(
+  journal: readonly JournalEntry[],
+  trades: readonly Trade[],
+): JournalEntry[] {
+  const journalled = new Set(ACCOUNT_SPECS.map((a) => a.id));
+  const byDay = new Map<string, Trade[]>();
+  for (const t of trades) {
+    if (!journalled.has(t.accountId) || t.status !== 'closed') continue;
+    byDay.set(dayOf(t), [...(byDay.get(dayOf(t)) ?? []), t]);
+  }
+  return journal.map((j) => {
+    if (j.kind !== 'weekly-recap' || j.date === undefined) return j;
+    const friday = parseYmd(j.date);
+    const closed = [4, 3, 2, 1, 0].flatMap(
+      (back) => byDay.get(ymd(friday - back * DAY_MS)) ?? [],
+    );
+    if (closed.length === 0) return j;
+    const week = weekFigures(closed);
+    const body = j.body as { type: string; content: TiptapNode[] };
+    const [title, , , ...next] = body.content;
+    return {
+      ...j,
+      body: {
+        ...body,
+        content: [title!, week.numbers, week.bestAndWorst, ...next],
+      },
+      linkedTradeIds: week.linkedTradeIds,
+    };
   });
 }
 

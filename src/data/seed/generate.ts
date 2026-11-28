@@ -194,7 +194,8 @@ export function generateSampleWorkspace(opts: {
   const base = generateSampleBase(opts);
   // v8 (Plan 6B): levels, two merges and a split, the default rules, swap,
   // missed trades and their history, each from a stream of its own and after
-  // every draw of the base, so nothing in it moves.
+  // every draw of the base, so nothing in it moves but the weekly recaps'
+  // figures, restated from the trades as they then read (v10).
   const depth = addTradeDepth({
     trades: base.trades,
     journal: base.journal,
@@ -209,6 +210,7 @@ export function generateSampleWorkspace(opts: {
   return {
     ...base,
     trades: depth.trades,
+    journal: depth.journal,
     history: depth.history,
     targetRules: depth.targetRules,
     feeRules: depth.feeRules,

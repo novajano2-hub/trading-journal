@@ -10,7 +10,7 @@ import { closedInOrder } from '@/domain/trade-status';
 import { toCents } from '@/domain/money';
 import { localDate, localParts } from '@/domain/time';
 import { mistakeTags } from '@/domain/metrics/mistakes';
-import { strategyRules, type Trade } from '@/domain/types';
+import { strategyRules, type JournalEntry, type Trade } from '@/domain/types';
 import { gridStep, streaks } from '@/domain/tracker/summary';
 import { buildGroupedTrade } from '@/domain/grouping';
 import {
@@ -227,16 +227,34 @@ describe('sample workspace generator', () => {
     expect(baseHash).toBe(
       '08613e3b01d577685a0bf14a5686ffef7a84c944e8b31208864afdde8a67fbdd',
     );
+    // The weekly recaps are restated from the trades as they read now (v10):
+    // their numbers line, Best and Worst bullets and links are checked
+    // against the trades in "every note's figures read as the trades do";
+    // everything else of them is v7's.
+    type Doc = { type: string; content: unknown[] };
+    const unstated = (journal: readonly JournalEntry[]) =>
+      journal.map((j) => {
+        if (j.kind !== 'weekly-recap') return j;
+        const body = j.body as Doc;
+        expect(body.content, j.id).toHaveLength(5);
+        const [title, , , ...next] = body.content;
+        return {
+          ...j,
+          body: { ...body, content: [title, ...next] },
+          linkedTradeIds: [],
+        };
+      });
     const { trades: baseTrades, ...baseRest } = base;
     const { trades: v8Trades, ...v8Rest } = s;
     void [baseTrades, v8Trades];
     expect({
       ...v8Rest,
+      journal: unstated(v8Rest.journal),
       history: undefined,
       targetRules: undefined,
       feeRules: undefined,
       missedTrades: undefined,
-    }).toEqual(baseRest);
+    }).toEqual({ ...baseRest, journal: unstated(baseRest.journal) });
 
     // The trades the grouping took carry v7's fills, costs and P&L between them.
     const byId = new Map(s.trades.map((t) => [t.id, t]));
@@ -356,13 +374,16 @@ describe('sample workspace generator', () => {
     expect(pickRule(w.feeRules, mes)!.symbols).toEqual(['MES', 'MNQ']);
     expect(pickRule(w.feeRules, nq)!.symbols).toEqual([]);
 
-    // Swap on the closed forex trades no note reads (a note of their own or
-    // linking them, or a daily note on their day) and on nothing else: small,
-    // charges and the same credits in pairs; the net carries it and the gross
-    // does not.
-    const linked = new Set(w.journal.flatMap((j) => j.linkedTradeIds));
+    // Swap on the closed forex trades whose own note or daily note does not
+    // state their result (a trade note of their own, a note other than a
+    // weekly recap linking them, or a daily note on their day) and on nothing
+    // else: small, mostly charges, some credits, some nothing; the net
+    // carries it and the gross does not. The weekly recaps are restated with
+    // it ("every note's figures read as the trades do").
+    const stating = w.journal.filter((j) => j.kind !== 'weekly-recap');
+    const linked = new Set(stating.flatMap((j) => j.linkedTradeIds));
     const daily = new Set(
-      w.journal.flatMap((j) =>
+      stating.flatMap((j) =>
         j.kind === 'daily-review' && j.date ? [j.date] : [],
       ),
     );
@@ -379,11 +400,21 @@ describe('sample workspace generator', () => {
       t.swap === undefined ? [] : [t.swap],
     );
     expect(swaps.length).toBeGreaterThan(60);
-    const charges = swaps.filter((x) => x < 0);
-    expect(charges.length).toBeGreaterThan(20);
-    expect(swaps.filter((x) => x > 0).length).toBe(charges.length);
+    const charges = swaps.filter((x) => x < 0).length;
+    const credits = swaps.filter((x) => x > 0).length;
+    expect(credits).toBeGreaterThan(5);
+    expect(charges / (charges + credits)).toBeGreaterThan(0.65);
+    expect(charges / (charges + credits)).toBeLessThan(0.85);
     expect(swaps.some((x) => x === 0)).toBe(true);
-    expect(swaps.reduce((n, x) => n + x, 0)).toBe(0);
+    // A recap-linked trade takes swap too: its recap is restated.
+    const recapLinked = new Set(
+      w.journal
+        .filter((j) => j.kind === 'weekly-recap')
+        .flatMap((j) => j.linkedTradeIds),
+    );
+    expect(
+      w.trades.some((t) => recapLinked.has(t.id) && (t.swap ?? 0) !== 0),
+    ).toBe(true);
     for (const x of swaps) expect(Math.abs(x)).toBeLessThanOrEqual(3_000);
 
     // One missed trade per strategy, with exactly the fields the form has.
@@ -506,7 +537,7 @@ describe('sample workspace generator', () => {
   });
 
   test.each(['2026-11-19', '2026-11-20', '2026-11-27'])(
-    "the swap leaves every note's figures as they read: weekly recaps, daily notes and trade notes (end %s)",
+    "every note's figures read as the trades do: weekly recaps as the trades read now, daily notes and trade notes as they were written (end %s)",
     (endDate) => {
       const s = generateSampleWorkspace({ seed: SAMPLE_SEED, endDate });
       // As the journal writes its figures (seed/journal.ts).
@@ -522,8 +553,10 @@ describe('sample workspace generator', () => {
         ts.filter((t) => t.status === 'closed');
       const sum = (ts: readonly Trade[]) => ts.reduce((n, t) => n + t.net, 0);
 
-      // The notes were written before the merges and the split, which the
-      // history stamps after them: read the grouped trades as they were then.
+      // The daily and trade notes were written before the merges and the
+      // split, which the history stamps after them: read the grouped trades
+      // as they were then (no note of those reads a grouped trade). The
+      // weekly recaps are restated from the trades as they read now.
       const base = generateSampleBase({ seed: SAMPLE_SEED, endDate });
       const grouped = s.trades.filter((t) => t.grouping === 'manual');
       expect(grouped).toHaveLength(4);
@@ -539,10 +572,17 @@ describe('sample workspace generator', () => {
 
       const recaps = s.journal.filter((j) => j.kind === 'weekly-recap');
       expect(recaps.length).toBeGreaterThan(20);
+      const v7Recaps = new Map(
+        base.journal.map((j) => [j.id, textOf(j.body as Node)]),
+      );
+      let restated = 0;
       for (const r of recaps) {
         const monday = ymd(parseYmd(r.date!) - 4 * DAY_MS);
         const week = closed(
-          journalled.filter((t) => day(t) >= monday && day(t) <= r.date!),
+          s.trades.filter(
+            (t) =>
+              first.has(t.accountId) && day(t) >= monday && day(t) <= r.date!,
+          ),
         );
         const wins = week.filter((t) => t.net > 0).length;
         const best = week.reduce((a, b) => (b.net > a.net ? b : a));
@@ -557,7 +597,13 @@ describe('sample workspace generator', () => {
         expect(text, r.date).toContain(
           `Worst trade: ${worst.instrument.symbol} ${worst.direction}, ${money(worst.net)}.`,
         );
+        expect(r.linkedTradeIds, r.date).toEqual([
+          ...new Set([best.id, worst.id]),
+        ]);
+        if (text !== v7Recaps.get(r.id)) restated++;
       }
+      // The swap and the grouping move some recaps' figures from v7's.
+      expect(restated).toBeGreaterThan(0);
 
       const daily = s.journal.filter((j) => j.kind === 'daily-review');
       expect(daily.length).toBeGreaterThan(20);
