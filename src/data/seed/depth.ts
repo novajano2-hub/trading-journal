@@ -27,15 +27,15 @@ import {
 } from '@/domain/types';
 import {
   changeRows,
-  fieldChanges,
   lifecycleRow,
+  tradeChanges,
   tradeLabel,
   type FieldChange,
   type NewHistoryRow,
 } from '../local/history';
 import { ruleLabel, tidySymbols } from '../local/rule-shared';
 import { SAMPLE_WORKSPACE } from '../workspaces';
-import { DAY_MS, NY, nyMs, parseYmd, ymd } from './calendar';
+import { DAY_MS, NY, mondayOf, nyMs, parseYmd, ymd } from './calendar';
 import { ACCOUNT_SPECS, feesFor, snap } from './instruments';
 import type { Random } from './random';
 
@@ -100,11 +100,14 @@ export function addTradeDepth(s: {
   const writes: NewHistoryRow[][] = [];
   const account = s.accounts.find((a) => a.id === GROUP_ACCOUNT)!;
 
-  // The rules come first, as a trader sets them up before the edits below.
-  const targetRule: TargetRule = {
+  // The rules come first, as a trader sets them up before the edits below:
+  // two of each kind in the futures account, a rule naming symbols made
+  // first and one for all symbols after it, so the older symbol rule still
+  // rules its symbols over the newer one (B15, B18).
+  const rule = { workspaceId: WS, accountId: GROUP_ACCOUNT, createdAt: '' };
+  const esTargets: TargetRule = {
+    ...rule,
     id: 'sample-target-rule-1',
-    workspaceId: WS,
-    accountId: GROUP_ACCOUNT,
     assetClass: 'future',
     symbols: tidySymbols(['ES']),
     target: {
@@ -115,45 +118,53 @@ export function addTradeDepth(s: {
       ],
     },
     stop: { unit: 'ticks', levels: [{ value: 12, pct: 100 }] },
-    createdAt: '',
   };
-  const feeRule: FeeRule = {
+  const microFees: FeeRule = {
+    ...rule,
     id: 'sample-fee-rule-1',
-    workspaceId: WS,
-    accountId: GROUP_ACCOUNT,
+    assetClass: 'future',
+    symbols: tidySymbols(['MES', 'MNQ']),
+    mode: 'per-contract',
+    applyOn: 'all',
+    commission: 59,
+    fee: 35,
+  };
+  const allTargets: TargetRule = {
+    ...rule,
+    id: 'sample-target-rule-2',
+    assetClass: 'future',
+    symbols: tidySymbols([]),
+    target: { unit: 'ticks', levels: [{ value: 20, pct: 100 }] },
+    stop: { unit: 'ticks', levels: [{ value: 10, pct: 100 }] },
+  };
+  const allFees: FeeRule = {
+    ...rule,
+    id: 'sample-fee-rule-2',
     assetClass: 'future',
     symbols: tidySymbols([]),
     mode: 'per-contract',
     applyOn: 'all',
     commission: 225,
     fee: 35,
-    createdAt: '',
   };
-  const problem = targetRuleError(targetRule) ?? feeRuleError(feeRule);
-  if (problem) throw new Error(`sample rule: ${problem}`);
-  writes.push(
-    [
+  const rules = [esTargets, microFees, allTargets, allFees];
+  for (const r of rules) {
+    const problem = 'mode' in r ? feeRuleError(r) : targetRuleError(r);
+    if (problem) throw new Error(`sample rule: ${problem}`);
+    writes.push([
       lifecycleRow(
-        'target-rule',
+        'mode' in r ? 'fee-rule' : 'target-rule',
         'created',
-        targetRule.id,
-        ruleLabel(account, targetRule),
+        r.id,
+        ruleLabel(account, r),
       ),
-    ],
-    [
-      lifecycleRow(
-        'fee-rule',
-        'created',
-        feeRule.id,
-        ruleLabel(account, feeRule),
-      ),
-    ],
-  );
+    ]);
+  }
 
   const grouped = groupTrades(s.trades, s.journal, s.strategies, account);
   const levelled = addLevels(s.levelRng, grouped.trades, s.endDate);
   writes.push(...levelled.writes, ...grouped.writes);
-  const trades = addSwap(s.swapRng, levelled.trades);
+  const trades = addSwap(s.swapRng, levelled.trades, s.trades, s.journal);
   const missedTrades = addMissedTrades(
     s.missedRng,
     trades,
@@ -181,14 +192,15 @@ export function addTradeDepth(s: {
   history.forEach((row, i) => {
     row.id = `sample-history-${String(i + 1).padStart(4, '0')}`;
   });
-  targetRule.createdAt = history[0]!.at;
-  feeRule.createdAt = history[1]!.at;
+  rules.forEach((r, i) => {
+    r.createdAt = history[i]!.at;
+  });
 
   return {
     trades,
     history,
-    targetRules: [targetRule],
-    feeRules: [feeRule],
+    targetRules: [esTargets, allTargets],
+    feeRules: [microFees, allFees],
     missedTrades,
   };
 }
@@ -200,6 +212,22 @@ const dayOf = (t: Trade): string => localDate(t.openedAt, NY);
 /** Whether a trade carries a check of a rule graded only on a loss. */
 const hasLoserChecks = (t: Trade, loserRules: ReadonlySet<string>): boolean =>
   t.ruleChecks.some((c) => loserRules.has(c.ruleId));
+
+/**
+ * Whether a note's words could read the trade's figures: a note is its own or
+ * links it, or its day has a daily note. The grouping and the swap leave such
+ * trades alone, so no note's figures or links change.
+ */
+function notedBy(journal: readonly JournalEntry[]): (t: Trade) => boolean {
+  const linked = new Set(journal.flatMap((j) => j.linkedTradeIds));
+  const daily = new Set(
+    journal.flatMap((j) =>
+      j.kind === 'daily-review' && j.date !== undefined ? [j.date] : [],
+    ),
+  );
+  return (t) =>
+    t.noteId !== undefined || linked.has(t.id) || daily.has(dayOf(t));
+}
 
 /**
  * Two merges and a split in the futures account, built with the app's own
@@ -225,12 +253,7 @@ function groupTrades(
     accountCurrency: () => account.currency,
     costMethodOf: () => account.costMethod ?? 'fifo',
   };
-  const linked = new Set(journal.flatMap((j) => j.linkedTradeIds));
-  const noted = new Set(
-    journal.flatMap((j) =>
-      j.kind === 'daily-review' && j.date !== undefined ? [j.date] : [],
-    ),
-  );
+  const noted = notedBy(journal);
   const loserRules = new Set(
     strategies.flatMap((st) =>
       strategyRules(st)
@@ -239,12 +262,7 @@ function groupTrades(
     ),
   );
   const free = trades.filter(
-    (t) =>
-      t.accountId === account.id &&
-      t.status === 'closed' &&
-      t.noteId === undefined &&
-      !linked.has(t.id) &&
-      !noted.has(dayOf(t)),
+    (t) => t.accountId === account.id && t.status === 'closed' && !noted(t),
   );
   const writes: NewHistoryRow[][] = [];
   const label = (t: Trade) => tradeLabel(t, NY);
@@ -438,8 +456,8 @@ function targetUnit(t: Trade, single: boolean, roll: number): LevelUnit {
  * The stop is the trade's own stop on the whole position, so the stored risk
  * is the stop side's loss to the cent and no R moves; the target is its own
  * target, or that and one further out on half the position each. The single
- * stop and target stay, as every reader takes the levels first. A trade whose
- * levels would not be valid gets none. A trade hand grouped is left as it is.
+ * stop and target go, as a save in levels drops them. A trade whose levels
+ * would not be valid gets none. A trade hand grouped is left as it is.
  */
 function addLevels(
   rng: Random,
@@ -480,11 +498,15 @@ function addLevels(
             ]
           : [{ price: target, qty: size }];
     }
+    // A trade saved in levels leaves the single stop and target, as the
+    // trade page's save does (`applyTradePatch`, B14).
     const build = (plain: boolean): Trade => {
       const next: Trade = {
         ...t,
         stops: sideAt(t, 'stop', plain ? 'price' : stopUnit(t), stopAt),
       };
+      delete next.plannedStop;
+      delete next.plannedTarget;
       if (targetAt) {
         const unit = targetUnit(t, targetAt.length === 1, roll);
         next.targets = sideAt(t, 'target', plain ? 'price' : unit, targetAt);
@@ -498,15 +520,16 @@ function addLevels(
     if (!valid(next)) next = build(true);
     if (!valid(next)) return t;
 
-    if (localDate(t.openedAt, NY) >= since)
-      writes.push(
-        changeRows(
-          'trade',
-          t.id,
-          tradeLabel(next, NY),
-          fieldChanges(t, next, ['targets', 'stops']),
-        ),
-      );
+    // Logged as the trade page logs the save: a side that reads as it did
+    // (a single stop kept in Price at its size) is no change.
+    const rows = changeRows(
+      'trade',
+      t.id,
+      tradeLabel(next, NY),
+      tradeChanges(t, next),
+    );
+    if (localDate(t.openedAt, NY) >= since && rows.length > 0)
+      writes.push(rows);
     return next;
   });
   return { trades: out, writes };
@@ -515,23 +538,77 @@ function addLevels(
 // ---- swap ----------------------------------------------------------------------
 
 /**
- * Swap on every closed forex trade, as a closed-trades file gives it: the
- * financing on the position, mostly a charge, sometimes a credit, sometimes
- * nothing, and small (10 cents to 1.20 dollars a lot): the forex evaluation
- * sits a few hundred dollars inside its bounds, and swap must not move it
- * across one. It goes into the net and not the gross, as the import adds it
- * (ledger R3).
+ * Swap on the closed forex trades that no note's words read (`notedBy`), as a
+ * closed-trades file gives it: small (10 cents to 1.20 dollars a lot), into
+ * the net and not the gross, as the import adds it (ledger R3). The notes
+ * were written from the trades with their swap, so a weekly recap's net, its
+ * share of winners and its best and worst trades must read as they do: the
+ * week's trades take their swap in pairs, a charge on one and the same credit
+ * on the other, and a pair whose swap would turn a win into a loss, or reach
+ * the week's best or worst trade, takes 0.00, as does a trade left over. The weeks sum to nothing, so
+ * the forex evaluation's bounds stay where they were.
  */
-function addSwap(rng: Random, trades: readonly Trade[]): Trade[] {
+function addSwap(
+  rng: Random,
+  trades: readonly Trade[],
+  /** The trades the notes were written from: before the grouping. */
+  written: readonly Trade[],
+  journal: readonly JournalEntry[],
+): Trade[] {
+  const noted = notedBy(journal);
+  const closedFx = trades.filter(
+    (t) => t.instrument.assetClass === 'forex' && t.status === 'closed',
+  );
+  // Every closed forex trade draws, so the stream does not depend on which take a swap.
+  const draws = new Map(
+    closedFx.map((t) => [
+      t.id,
+      {
+        none: rng.chance(0.15),
+        charge: rng.chance(0.5),
+        perLot: 0.1 + rng.next() * 1.1,
+      },
+    ]),
+  );
+  const weeks = new Map<string, Trade[]>();
+  for (const t of closedFx) {
+    if (noted(t)) continue;
+    const week = mondayOf(dayOf(t));
+    weeks.set(week, [...(weeks.get(week) ?? []), t]);
+  }
+  // A week's best and worst, as its recap read them: the closed trades of
+  // the accounts the journal was written from, before the grouping.
+  const journalled = new Set(ACCOUNT_SPECS.map((a) => a.id));
+  const recapped = written.filter(
+    (t) => t.status === 'closed' && journalled.has(t.accountId),
+  );
+  const swaps = new Map<string, number>();
+  for (const [week, own] of weeks) {
+    const friday = ymd(parseYmd(week) + 4 * DAY_MS);
+    const nets = recapped
+      .filter((t) => dayOf(t) >= week && dayOf(t) <= friday)
+      .map((t) => t.net);
+    const best = Math.max(...nets);
+    const worst = Math.min(...nets);
+    const keeps = (t: Trade, swap: number) =>
+      t.net + swap > 0 === t.net > 0 &&
+      t.net + swap < best &&
+      t.net + swap > worst;
+    for (let i = 0; i < own.length; i += 2) {
+      const a = own[i]!;
+      const b = own[i + 1];
+      const d = draws.get(a.id)!;
+      const size = Math.min(a.maxPosition, b?.maxPosition ?? 0);
+      const cents = Math.max(1, Math.round(size * d.perLot * 100));
+      const swap = d.charge ? -cents : cents;
+      const takes = b && !d.none && keeps(a, swap) && keeps(b, -swap);
+      swaps.set(a.id, takes ? swap : 0);
+      if (b) swaps.set(b.id, takes ? -swap : 0);
+    }
+  }
   return trades.map((t) => {
-    if (t.instrument.assetClass !== 'forex' || t.status !== 'closed') return t;
-    const none = rng.chance(0.15);
-    const credit = rng.chance(0.25);
-    const perLot = 0.1 + rng.next() * 1.1;
-    if (none) return { ...t, swap: 0 };
-    const cents = Math.max(1, Math.round(t.maxPosition * perLot * 100));
-    const swap = credit ? cents : -cents;
-    return { ...t, swap, net: t.net + swap };
+    const swap = swaps.get(t.id);
+    return swap === undefined ? t : { ...t, swap, net: t.net + swap };
   });
 }
 

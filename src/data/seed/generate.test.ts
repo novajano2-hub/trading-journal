@@ -14,12 +14,15 @@ import { strategyRules, type Trade } from '@/domain/types';
 import { gridStep, streaks } from '@/domain/tracker/summary';
 import { buildGroupedTrade } from '@/domain/grouping';
 import {
+  levelPrice,
   levelProblems,
+  levelValueAt,
   plannedRMultiple,
   sidesOf,
   tradeRisk,
 } from '@/domain/risk';
 import { feeRuleError } from '@/domain/rules/fee-rules';
+import { pickRule } from '@/domain/rules/match';
 import { targetRuleError } from '@/domain/rules/target-rules';
 import { defaultSample } from '../local/context';
 import { scoreHistory } from '../routine';
@@ -145,54 +148,62 @@ describe('sample workspace generator', () => {
   });
 
   test('every existing sample value is unchanged', () => {
-    const { accounts, strategies, tagCategories, tags } = s;
-    // Only the routine's own notes are new; every other entry is hashed whole.
-    // v6 adds templateId to the daily notes, v7 the strategies, the breach reason
-    // and the breach date to the challenges; strip them so nothing else moved.
-    const journal = s.journal
-      .filter((j) => !j.id.startsWith('routine-note-'))
-      .map((j) => ({ ...j, templateId: undefined }));
-    const challenges = s.challenges.map(
-      ({ strategyIds, breachReason, breachedOn, ...kept }) => {
-        void [strategyIds, breachReason, breachedOn];
-        return kept;
-      },
-    );
-    // v8 gives trades levels, a swap and a hand grouping: strip them, and the
-    // swap from the net, and every trade a merge or the split left alone reads
-    // as v7 had it, by id (the hash is v7's over the same trades).
-    const touched = new Set<string>([...MERGED.flat(), SPLIT]);
-    const v7 = s.trades
-      .filter((t) => !touched.has(t.id) && !t.id.startsWith('split:'))
-      .map((t) => {
-        const { targets, stops, swap, grouping, ...rest } = t;
-        void [targets, stops, grouping];
-        return { ...rest, net: t.net - (swap ?? 0) };
-      });
-    const trades = Object.fromEntries(v7.map((t) => [t.id, t]));
-    const hash = createHash('sha256')
-      .update(
-        JSON.stringify({
-          accounts,
-          strategies,
-          tagCategories,
-          tags,
-          trades,
-          journal,
-          challenges,
-        }),
-      )
-      .digest('hex');
-    expect(hash).toBe(
-      '587b7cab2e9078145b0d9500e970fa5a05e5566fe6ee3a68b8896cd7bb3f15fe',
-    );
-
-    // The base is v7 whole (v7's own hash, every trade in it), and v8 changes
-    // nothing of it but the trades.
+    // The base is v7 whole (v7's own hash, every trade in it, below), and the
+    // depth changes nothing of it but the trades, each checked against its v7
+    // self here.
     const base = generateSampleBase({
       seed: SAMPLE_SEED,
       endDate: '2026-11-19',
     });
+    // v8 gives trades levels, a swap and a hand grouping. Strip them, and the
+    // swap from the net, and every trade a merge or the split left alone is
+    // its v7 self, by id. A trade saved in levels has left its single stop
+    // and target (v9, as `applyTradePatch` drops them): its levels sit at
+    // exactly those prices, its stop on the whole position, its first target
+    // at the target.
+    const touched = new Set<string>([...MERGED.flat(), SPLIT]);
+    const v7ById = new Map(base.trades.map((t) => [t.id, t]));
+    const kept = s.trades.filter(
+      (t) => !touched.has(t.id) && !t.id.startsWith('split:'),
+    );
+    expect(kept).toHaveLength(base.trades.length - touched.size);
+    let moved = 0;
+    for (const t of kept) {
+      const v7 = v7ById.get(t.id)!;
+      const { targets, stops, swap, grouping, ...rest } = t;
+      void grouping;
+      const legacy: Pick<Trade, 'plannedStop' | 'plannedTarget'> = {};
+      if (targets || stops) {
+        expect(t.plannedStop, t.id).toBeUndefined();
+        expect(t.plannedTarget, t.id).toBeUndefined();
+        const stop = stops!.levels[0]!;
+        expect(stops!.levels, t.id).toHaveLength(1);
+        expect(stop.qty, t.id).toBe(t.maxPosition);
+        expect(
+          levelPrice(t, 'stop', stops!.unit, stop) - v7.plannedStop!,
+        ).toBeCloseTo(0, 9);
+        // An Amount is the money at the target, to the cent, so its price
+        // follows the cents.
+        const first = targets?.levels[0];
+        if (targets?.unit === 'amount')
+          expect(first!.value).toBe(
+            levelValueAt(v7, 'target', 'amount', v7.plannedTarget!, first!.qty),
+          );
+        else if (targets)
+          expect(
+            levelPrice(t, 'target', targets.unit, first!) - v7.plannedTarget!,
+          ).toBeCloseTo(0, 9);
+        else expect(v7.plannedTarget, t.id).toBeUndefined();
+        legacy.plannedStop = v7.plannedStop;
+        if (v7.plannedTarget !== undefined)
+          legacy.plannedTarget = v7.plannedTarget;
+        moved++;
+      }
+      expect({ ...rest, ...legacy, net: t.net - (swap ?? 0) }, t.id).toEqual(
+        v7,
+      );
+    }
+    expect(moved).toBeGreaterThan(400);
     const baseHash = createHash('sha256')
       .update(
         JSON.stringify({
@@ -311,34 +322,68 @@ describe('sample workspace generator', () => {
     );
     expect(new Set(w.trades.map((t) => t.serial)).size).toBe(w.trades.length);
 
-    // One target rule and one fee rule, as the Settings cards save them.
-    expect(w.targetRules).toHaveLength(1);
-    expect(w.feeRules).toHaveLength(1);
+    // Two rules of each kind (B53), as the Settings cards save them: one
+    // naming symbols and a newer one for all symbols, so a symbol rule rules
+    // its symbols over the newer all-symbols rule, which rules the rest (B15).
+    expect(w.targetRules).toHaveLength(2);
+    expect(w.feeRules).toHaveLength(2);
     const accounts = new Set(w.accounts.map((a) => a.id));
     for (const rule of [...w.targetRules, ...w.feeRules]) {
       expect(rule.workspaceId).toBe('sample');
       expect(accounts.has(rule.accountId)).toBe(true);
       expect(rule.symbols.every((x) => x === x.toUpperCase())).toBe(true);
     }
-    expect(targetRuleError(w.targetRules[0]!)).toBeNull();
-    expect(w.targetRules[0]!.target && w.targetRules[0]!.stop).toBeDefined();
-    expect(feeRuleError(w.feeRules[0]!)).toBeNull();
+    for (const rule of w.targetRules) {
+      expect(targetRuleError(rule)).toBeNull();
+      expect(rule.target && rule.stop).toBeDefined();
+    }
+    for (const rule of w.feeRules) expect(feeRuleError(rule)).toBeNull();
+    for (const rules of [w.targetRules, w.feeRules]) {
+      const named = rules.filter((r) => r.symbols.length > 0);
+      const all = rules.filter((r) => r.symbols.length === 0);
+      expect([named.length, all.length]).toEqual([1, 1]);
+      expect(all[0]!.accountId).toBe(named[0]!.accountId);
+      expect(all[0]!.assetClass).toBe(named[0]!.assetClass);
+      expect(all[0]!.createdAt > named[0]!.createdAt).toBe(true);
+    }
+    const futureOf = (root: string) =>
+      w.trades.find(
+        (t) => t.accountId === 'sample-futures' && t.instrument.root === root,
+      )!;
+    const [es, mes, nq] = [futureOf('ES'), futureOf('MES'), futureOf('NQ')];
+    expect(pickRule(w.targetRules, es)!.symbols).toEqual(['ES']);
+    expect(pickRule(w.targetRules, mes)!.symbols).toEqual([]);
+    expect(pickRule(w.feeRules, mes)!.symbols).toEqual(['MES', 'MNQ']);
+    expect(pickRule(w.feeRules, nq)!.symbols).toEqual([]);
 
-    // Swap on every closed forex trade and on nothing else: small, mostly a
-    // charge, some credits; the net carries it and the gross does not.
+    // Swap on the closed forex trades no note reads (a note of their own or
+    // linking them, or a daily note on their day) and on nothing else: small,
+    // charges and the same credits in pairs; the net carries it and the gross
+    // does not.
+    const linked = new Set(w.journal.flatMap((j) => j.linkedTradeIds));
+    const daily = new Set(
+      w.journal.flatMap((j) =>
+        j.kind === 'daily-review' && j.date ? [j.date] : [],
+      ),
+    );
+    const noted = (t: Trade) =>
+      t.noteId !== undefined ||
+      linked.has(t.id) ||
+      daily.has(localDate(t.openedAt, NY));
     for (const t of w.trades) {
       expect(t.net, t.id).toBe(t.gross - t.fees + (t.swap ?? 0));
       const fx = t.instrument.assetClass === 'forex' && t.status === 'closed';
-      expect(t.swap !== undefined, t.id).toBe(fx);
+      expect(t.swap !== undefined, t.id).toBe(fx && !noted(t));
     }
     const swaps = w.trades.flatMap((t) =>
       t.swap === undefined ? [] : [t.swap],
     );
-    expect(swaps.length).toBeGreaterThan(100);
-    expect(swaps.filter((x) => x < 0).length / swaps.length).toBeGreaterThan(
-      0.5,
-    );
-    expect(swaps.some((x) => x > 0)).toBe(true);
+    expect(swaps.length).toBeGreaterThan(60);
+    const charges = swaps.filter((x) => x < 0);
+    expect(charges.length).toBeGreaterThan(20);
+    expect(swaps.filter((x) => x > 0).length).toBe(charges.length);
+    expect(swaps.some((x) => x === 0)).toBe(true);
+    expect(swaps.reduce((n, x) => n + x, 0)).toBe(0);
     for (const x of swaps) expect(Math.abs(x)).toBeLessThanOrEqual(3_000);
 
     // One missed trade per strategy, with exactly the fields the form has.
@@ -384,12 +429,19 @@ describe('sample workspace generator', () => {
           r.action === action && (field === undefined || r.field === field),
       );
     const created = rows('created');
-    expect(created.map((r) => [r.type, r.entityId])).toEqual([
-      ['target-rule', w.targetRules[0]!.id],
-      ['fee-rule', w.feeRules[0]!.id],
-    ]);
-    expect(w.targetRules[0]!.createdAt).toBe(created[0]!.at);
-    expect(w.feeRules[0]!.createdAt).toBe(created[1]!.at);
+    // Made in turn: the symbol rules, then the all-symbols rules.
+    const ruleOrder = [
+      ['target-rule', w.targetRules[0]!],
+      ['fee-rule', w.feeRules[0]!],
+      ['target-rule', w.targetRules[1]!],
+      ['fee-rule', w.feeRules[1]!],
+    ] as const;
+    expect(created.map((r) => [r.type, r.entityId])).toEqual(
+      ruleOrder.map(([type, rule]) => [type, rule.id]),
+    );
+    ruleOrder.forEach(([, rule], i) =>
+      expect(rule.createdAt).toBe(created[i]!.at),
+    );
     const merged = rows('merged', 'fills');
     expect(merged).toHaveLength(4);
     for (const [kept, gone] of MERGED) {
@@ -410,18 +462,39 @@ describe('sample workspace generator', () => {
     const since = ymd(parseYmd(w.endDate) - 30 * DAY_MS);
     const recent = levelled.filter((t) => localDate(t.openedAt, NY) >= since);
     expect(recent.length).toBeGreaterThan(20);
+    // The row's old value is the side as the trade read before (its single
+    // stop or target, as one Price level), so no row reads "None to 37
+    // ticks" for a trade that had a stop; a side that reads as it did logs
+    // nothing.
+    const v7ById = new Map(
+      generateSampleBase({
+        seed: SAMPLE_SEED,
+        endDate: '2026-11-19',
+      }).trades.map((t) => [t.id, t]),
+    );
     const levelRows = w.history.filter(
       (r) => r.field === 'targets' || r.field === 'stops',
     );
-    expect(levelRows).toHaveLength(
-      recent.reduce((n, t) => n + (t.targets ? 2 : 1), 0),
+    const json = (side: unknown) =>
+      side === undefined ? null : JSON.stringify(side);
+    expect(
+      levelRows.map((r) => [r.entityId, r.field, r.oldValue, r.newValue]),
+    ).toEqual(
+      recent.flatMap((t) =>
+        (['targets', 'stops'] as const).flatMap((field) => {
+          const before = json(sidesOf(v7ById.get(t.id)!)[field]);
+          const after = json(t[field]);
+          return before === after ? [] : [[t.id, field, before, after]];
+        }),
+      ),
     );
+    expect(levelRows.length).toBeGreaterThan(20);
     for (const r of levelRows) {
       const t = byId.get(r.entityId)!;
       expect(r).toMatchObject({ type: 'trade', action: 'edited' });
-      expect(r.oldValue).toBeNull();
-      expect(r.newValue).toBe(JSON.stringify(t[r.field as 'targets']));
       expect(localDate(t.openedAt, NY) >= since).toBe(true);
+      // Every side saved in levels was the trade's own stop or target.
+      expect(r.oldValue, t.id).not.toBeNull();
     }
     // The rows run oldest first: the rules, the levels, the merges, the split.
     expect(w.history.map((r) => r.at)).toEqual(
@@ -431,6 +504,86 @@ describe('sample workspace generator', () => {
     // No files: no photos, attachments or note images.
     expect('files' in w).toBe(false);
   });
+
+  test.each(['2026-11-19', '2026-11-20', '2026-11-27'])(
+    "the swap leaves every note's figures as they read: weekly recaps, daily notes and trade notes (end %s)",
+    (endDate) => {
+      const s = generateSampleWorkspace({ seed: SAMPLE_SEED, endDate });
+      // As the journal writes its figures (seed/journal.ts).
+      const money = (cents: number) => {
+        const abs = String(Math.abs(Math.round(cents / 100)));
+        return `${cents < 0 ? '-' : '+'}$${abs.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+      };
+      type Node = { text?: string; content?: Node[] };
+      const textOf = (n: Node): string =>
+        (n.text ?? '') + (n.content ?? []).map(textOf).join(' ');
+      const day = (t: Trade) => localDate(t.openedAt, NY);
+      const closed = (ts: readonly Trade[]) =>
+        ts.filter((t) => t.status === 'closed');
+      const sum = (ts: readonly Trade[]) => ts.reduce((n, t) => n + t.net, 0);
+
+      // The notes were written before the merges and the split, which the
+      // history stamps after them: read the grouped trades as they were then.
+      const base = generateSampleBase({ seed: SAMPLE_SEED, endDate });
+      const grouped = s.trades.filter((t) => t.grouping === 'manual');
+      expect(grouped).toHaveLength(4);
+      const now = new Set(s.trades.map((t) => t.id));
+      const then = new Set(grouped.map((t) => t.id));
+      const all = [
+        ...s.trades.filter((t) => t.grouping !== 'manual'),
+        ...base.trades.filter((t) => then.has(t.id) || !now.has(t.id)),
+      ];
+      const first = new Set(s.accounts.slice(0, 3).map((a) => a.id));
+      const journalled = all.filter((t) => first.has(t.accountId));
+      expect(all.some((t) => t.swap !== undefined && t.swap !== 0)).toBe(true);
+
+      const recaps = s.journal.filter((j) => j.kind === 'weekly-recap');
+      expect(recaps.length).toBeGreaterThan(20);
+      for (const r of recaps) {
+        const monday = ymd(parseYmd(r.date!) - 4 * DAY_MS);
+        const week = closed(
+          journalled.filter((t) => day(t) >= monday && day(t) <= r.date!),
+        );
+        const wins = week.filter((t) => t.net > 0).length;
+        const best = week.reduce((a, b) => (b.net > a.net ? b : a));
+        const worst = week.reduce((a, b) => (b.net < a.net ? b : a));
+        const text = textOf(r.body as Node);
+        expect(text, r.date).toContain(
+          `${week.length} closed trades, ${Math.round((wins / week.length) * 100)}% winners, net ${money(sum(week))}.`,
+        );
+        expect(text, r.date).toContain(
+          `Best trade: ${best.instrument.symbol} ${best.direction}, ${money(best.net)}.`,
+        );
+        expect(text, r.date).toContain(
+          `Worst trade: ${worst.instrument.symbol} ${worst.direction}, ${money(worst.net)}.`,
+        );
+      }
+
+      const daily = s.journal.filter((j) => j.kind === 'daily-review');
+      expect(daily.length).toBeGreaterThan(20);
+      for (const n of daily) {
+        // The routine's notes read every account; the daily notes the journal's.
+        const own = (
+          n.id.startsWith('routine-note-') ? all : journalled
+        ).filter((t) => day(t) === n.date);
+        const done = closed(own);
+        const won = done.filter((t) => t.net > 0).length;
+        expect(textOf(n.body as Node), n.date).toContain(
+          `${own.length} trades, ${won} won and ${done.length - won} did not. Net ${money(sum(done))} after costs.`,
+        );
+      }
+
+      const byId = new Map(all.map((t) => [t.id, t]));
+      const notes = s.journal.filter((j) => j.kind === 'trade-note');
+      expect(notes.length).toBeGreaterThan(30);
+      for (const n of notes) {
+        const t = byId.get(n.linkedTradeIds[0]!)!;
+        expect(textOf(n.body as Node), t.id).toContain(
+          `Result: ${money(t.net)} net.`,
+        );
+      }
+    },
+  );
 
   test('the history is stamped from the time the sample is written', async () => {
     const at = new Date('2026-11-23T15:00:00.000Z');
@@ -914,15 +1067,16 @@ describe('sample workspace generator', () => {
   });
 
   test('stops, targets and risk are set on most trades', () => {
-    const stop = s.trades.filter((t) => t.plannedStop !== undefined);
-    const target = s.trades.filter((t) => t.plannedTarget !== undefined);
+    // Read as every reader reads them: levels first, else the single stop and target.
+    const stop = s.trades.filter((t) => sidesOf(t).stops !== undefined);
+    const target = s.trades.filter((t) => sidesOf(t).targets !== undefined);
     expect(stop.length / s.trades.length).toBeGreaterThan(0.78);
     expect(stop.length / s.trades.length).toBeLessThan(0.92);
     expect(target.length / s.trades.length).toBeGreaterThan(0.5);
     expect(target.length / s.trades.length).toBeLessThan(0.7);
     for (const t of stop) expect(t.initialRisk!).toBeGreaterThan(0);
     for (const t of s.trades)
-      if (t.plannedStop === undefined) expect(t.initialRisk).toBeUndefined();
+      if (sidesOf(t).stops === undefined) expect(t.initialRisk).toBeUndefined();
   });
 
   test('MAE and MFE bracket the result', () => {

@@ -274,7 +274,7 @@ describe('the line and bar charts', () => {
     expect(said('cum-pnl')).toContain('By trading day');
     chartOf(
       'cum-pnl',
-      /^Cumulative net P&L by day, all time\. Ends at \+\$17,400\.66\.$/,
+      /^Cumulative net P&L by day, all time\. Ends at \+\$17,486\.25\.$/,
     );
     // The line is the accent over a soft area, as the other pages draw it.
     expect(
@@ -382,7 +382,7 @@ describe('the line and bar charts', () => {
     expect(said('daily-cum')).toContain('Running total, right scale');
     chartOf(
       'daily-cum',
-      /^Daily net P&L bars and the running total, \d+ days, all time\. Ends at \+\$17,400\.66\.$/,
+      /^Daily net P&L bars and the running total, \d+ days, all time\. Ends at \+\$17,486\.25\.$/,
     );
     expect(card.querySelectorAll('[data-mark="bar"]').length).toBeGreaterThan(
       100,
@@ -402,7 +402,7 @@ describe('the line and bar charts', () => {
     expect(said('drawdown')).toContain('By trading day');
     chartOf(
       'drawdown',
-      /^Drawdown from the daily P&L peak, all time\. Max drawdown −\$8,699\.98\.$/,
+      /^Drawdown from the daily P&L peak, all time\. Max drawdown −\$8,665\.36\.$/,
     );
     expect(
       widget('drawdown')

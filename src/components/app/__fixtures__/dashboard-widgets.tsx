@@ -19,7 +19,8 @@ import { DashboardView } from '../dashboard/dashboard-view';
 import { renderApp } from './render-app';
 
 // The sample as the app seeds it on 20 Nov 2026: 1,517 closed trades over six accounts
-// (v8 merged two pairs and split one, and its forex trades carry swap).
+// (v8 merged two pairs and split one; v9 gives some forex trades swap, in
+// pairs that sum to nothing each week, so the totals are the base's).
 let seeded: SampleWorkspace | undefined;
 export const theSample = (): SampleWorkspace =>
   (seeded ??= generateSampleWorkspace({

@@ -420,8 +420,8 @@ test('on a phone the rule dialogs are full-height sheets with their footer in vi
     );
   await page.goto('/app/settings/trading');
   await expect(targetsCard(page)).toBeVisible({ timeout: 30_000 });
-  // The sample workspace has a target rule of its own.
-  await expect(targetsCard(page).getByRole('listitem')).toHaveCount(1);
+  // The sample workspace has two target rules of its own: ES, and All symbols.
+  await expect(targetsCard(page).getByRole('listitem')).toHaveCount(2);
   expect(await overflow()).toBeLessThanOrEqual(0);
 
   await targetsCard(page)
@@ -453,7 +453,7 @@ test('on a phone the rule dialogs are full-height sheets with their footer in vi
   await expect(dialog).toBeHidden();
 
   // The rule is a two-line row under its account, with a menu.
-  await expect(targetsCard(page).getByRole('listitem')).toHaveCount(2);
+  await expect(targetsCard(page).getByRole('listitem')).toHaveCount(3);
   const row = targetsCard(page)
     .getByRole('listitem')
     .filter({ hasText: 'ES and MES' });
