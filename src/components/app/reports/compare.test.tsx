@@ -6,9 +6,11 @@ import {
   screen,
   within,
 } from '@testing-library/react';
+import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import { patternSample } from '@/data/__fixtures__/patterns-sample';
+import { createLocalRepository } from '@/data/local/local-repository';
 import { breakdownSample } from '../__fixtures__/breakdown-sample';
 import { commitNavigation, deferNavigation } from '../__fixtures__/navigation';
 import { renderApp } from '../__fixtures__/render-app';
@@ -346,6 +348,27 @@ test('two quick outcome ticks in a group before the address catches up both stic
   );
   expect(group.get('symbol')).toBe('ES');
   expect(group.get('outcome')?.split(',').sort()).toEqual(['loss', 'win']);
+});
+
+test('a Patterns pick whose patterns cannot be read says so, and shows no group as empty', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => patternSample(),
+  });
+  // The patterns read the days (the session starts); that read fails.
+  vi.spyOn(repository.days, 'list').mockRejectedValue(new Error('disk'));
+  renderApp(<CompareView />, {
+    repository,
+    url: '/app/reports/compare?pat=added-to-position',
+  });
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toContain("The comparison couldn't load.");
+  expect(
+    within(alert).getByRole('button', { name: 'Try again' }),
+  ).toBeTruthy();
+  expect(screen.queryByRole('table', { name: 'Comparison' })).toBeNull();
+  vi.restoreAllMocks();
 });
 
 test('a Patterns pick in the global filters narrows Group A, and both groups when each names it', async () => {

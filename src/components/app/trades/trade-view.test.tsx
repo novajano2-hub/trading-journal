@@ -10,6 +10,7 @@ import {
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
+import { KeelDb } from '@/data/local/db';
 import { createLocalRepository } from '@/data/local/local-repository';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import type { SampleWorkspace } from '@/data/seed/generate';
@@ -1324,20 +1325,29 @@ test('the Attachments card sits between Tags and rating and Notes, and takes a f
 });
 
 test("an archived account lists its trade's files without a way to add one", async () => {
-  const { repo } = renderApp(<TradeView id="t-c" />, {
+  const indexedDB = new IDBFactory();
+  const repository = createLocalRepository({
+    indexedDB,
+    IDBKeyRange,
     sample: sample({}, 'acc-b'),
+  });
+  // A file the trade kept from before its account was archived: the store
+  // refuses a new one now, so it is written as it was then.
+  await repository.trades.get(WS, 't-c');
+  await new KeelDb({ indexedDB, IDBKeyRange }).files.put({
+    id: 'kept',
+    workspaceId: WS,
+    owner: 'trade:t-c',
+    bytes: new Uint8Array(4).buffer,
+    type: 'application/pdf',
+    name: 'kept.pdf',
+    size: 4,
+    createdAt: '2026-11-09T15:00:00.000Z',
+  });
+  const { repo } = renderApp(<TradeView id="t-c" />, {
+    repository,
     url: URL_C,
   });
-  await repo.files.add(
-    WS,
-    'trade:t-c',
-    {
-      bytes: new Uint8Array(4).buffer,
-      type: 'application/pdf',
-      name: 'kept.pdf',
-    },
-    { images: false },
-  );
   const files = await screen.findByRole('region', { name: 'Attachments' });
   await waitFor(async () =>
     expect(await repo.files.list(WS, 'trade:t-c')).toHaveLength(1),

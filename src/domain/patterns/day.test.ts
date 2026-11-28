@@ -559,6 +559,29 @@ describe('waited-then-won', () => {
     expect(dayHit(r, D, 'waited-then-won')).toBeUndefined();
   });
 
+  test('an entry before the session start (overnight) is not the first entry: the wait runs to the first at or after it', () => {
+    const r = run([...first(2, 0, 0), ...first(14, 30, 0)], { sessions });
+    expect(dayHit(r, D, 'waited-then-won')).toEqual({
+      id: 'waited-then-won',
+      date: dateOf(D),
+      figures: { waitMinutes: 90, net: 200 },
+    });
+    // An entry at the start itself is a wait of none.
+    expect(
+      dayHit(
+        run([...first(2, 0, 0), ...first(13, 0, 0), ...first(15, 0, 0)], {
+          sessions,
+        }),
+        D,
+        'waited-then-won',
+      ),
+    ).toBeUndefined();
+    // No entry at or after the start: no wait to read.
+    expect(
+      dayHit(run(first(2, 0, 0), { sessions }), D, 'waited-then-won'),
+    ).toBeUndefined();
+  });
+
   test('a day that is not green does not', () => {
     expect(
       dayHit(run(first(15, 0, 0, -100), { sessions }), D, 'waited-then-won'),

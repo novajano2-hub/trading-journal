@@ -108,6 +108,21 @@ describe('tradesCsv', () => {
     ]);
   });
 
+  test('Realized R is empty while the trade is open, and Planned R still reads', () => {
+    const open = makeTrade({
+      status: 'open',
+      net: 5000,
+      avgEntry: 4500,
+      maxPosition: 1,
+      stops: { unit: 'price', levels: [{ value: 4495, qty: 1 }] },
+      targets: { unit: 'price', levels: [{ value: 4515, qty: 1 }] },
+      initialRisk: 25_000,
+    });
+    delete open.closedAt;
+    const csv = tradesCsv([open], ['realizedR', 'plannedR'], env);
+    expect(csv.split('\r\n')).toEqual(['Realized R,Planned R', ',3.00']);
+  });
+
   test("the Patterns column lists the trade's pattern names, none for a trade without", () => {
     const csv = tradesCsv(
       ['a', 'b'].map((id) => (id === 'a' ? loss : win)),

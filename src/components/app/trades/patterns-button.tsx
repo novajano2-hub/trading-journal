@@ -20,8 +20,6 @@ const PANEL =
 export interface PatternsFace {
   className: string;
   children: ReactNode;
-  /** The accessible name; by default "Patterns, 3" ("Patterns, none", and "Patterns" while the count is read). */
-  label?: string;
 }
 
 /**
@@ -68,12 +66,12 @@ export function PatternsPopover({
   const heading = useRef<HTMLHeadingElement>(null);
   const count = hits?.length;
   const look = face(count, phone);
-  // The count joins the name on every trigger, the desktop's as the phone's glyph: its text alone would read "Patterns3".
+  // The accessible name, "Patterns, 3" ("Patterns, none", and "Patterns" while the count is read): the
+  // count joins the name on every trigger, the desktop's as the phone's glyph, as its text alone would read "Patterns3".
   const label =
-    look.label ??
-    (count === undefined
+    count === undefined
       ? 'Patterns'
-      : `Patterns, ${count === 0 ? 'none' : count}`);
+      : `Patterns, ${count === 0 ? 'none' : count}`;
 
   if (hits === undefined || hits.length === 0) {
     // Kept in the tab order and describing itself, like the filter chips with nothing to filter.

@@ -84,10 +84,10 @@ const AMOUNT = /^-?(?:\d{1,3}(?:,\d{3})+|\d+)?(?:\.\d*)?$/;
  * negative amount in the fees. Null when it is not an amount: letters, a
  * second point, an exponent, a currency sign. A comma is a thousands mark
  * only, so a decimal comma is refused instead of read as dollars. A fraction
- * of a cent rounds.
+ * of a cent rounds. A pasted minus sign (U+2212) is a minus.
  */
 export function centsFromText(text: string): Cents | null {
-  const raw = text.replace(/\s/g, '');
+  const raw = text.replace(/\s/g, '').replace(/\u2212/g, '-');
   if (raw === '') return 0;
   if (!AMOUNT.test(raw) || !/\d/.test(raw)) return null;
   const cents = toCents(Number(raw.replace(/,/g, '')));

@@ -9,12 +9,14 @@ import {
 import type { LocalContext } from './context';
 import { isQuota } from './day-shots';
 import type { KeelDb } from './db';
+import { assertEditable } from './editable';
 import { refuseLockedNote } from './routine-today';
 import { rwTx } from './tx';
 
 const IMAGES: ReadonlySet<string> = new Set(IMAGE_TYPES);
 
 const NOTE_OWNER = 'note:';
+const TRADE_OWNER = 'trade:';
 
 /** Upload order: the creation time, then the id for files moved under one owner at the same instant. */
 function byUpload(a: StoredFile, b: StoredFile): number {
@@ -38,6 +40,24 @@ async function refuseLockedOwner(
     ws,
     await db.journal.get([ws, owner.slice(NOTE_OWNER.length)]),
   );
+}
+
+/**
+ * Throws ArchivedAccountError when `owner` is a trade in an archived account:
+ * its files are read-only with it (ruling M15), as its other fields are, and
+ * LockedDayError as `refuseLockedOwner` does. Call inside a transaction that
+ * includes `db.trades`, `db.accounts`, `db.journal` and `db.days`.
+ */
+async function refuseReadOnlyOwner(
+  db: KeelDb,
+  ws: string,
+  owner: string,
+): Promise<void> {
+  if (owner.startsWith(TRADE_OWNER))
+    await assertEditable(db, ws, [
+      await db.trades.get([ws, owner.slice(TRADE_OWNER.length)]),
+    ]);
+  await refuseLockedOwner(db, ws, owner);
 }
 
 /**
@@ -74,6 +94,15 @@ export async function moveOwnerFiles(
     .equals([ws, from])
     .modify({ owner: to });
 }
+
+/** What a write of one owner's files reads to refuse a read-only owner. */
+const ownerTables = (db: KeelDb) => [
+  db.files,
+  db.journal,
+  db.days,
+  db.trades,
+  db.accounts,
+];
 
 export function localFiles(ctx: LocalContext): FilesRepo {
   return {
@@ -119,8 +148,8 @@ export function localFiles(ctx: LocalContext): FilesRepo {
         throw new FileRejected('size');
       const db = await ctx.db();
       try {
-        return await rwTx(db, [db.files, db.journal, db.days], async () => {
-          await refuseLockedOwner(db, ws, owner);
+        return await rwTx(db, ownerTables(db), async () => {
+          await refuseReadOnlyOwner(db, ws, owner);
           const existing = await db.files
             .where('[workspaceId+owner]')
             .equals([ws, owner])
@@ -153,10 +182,10 @@ export function localFiles(ctx: LocalContext): FilesRepo {
 
     async remove(ws, id) {
       const db = await ctx.db();
-      await rwTx(db, [db.files, db.journal, db.days], async () => {
+      await rwTx(db, ownerTables(db), async () => {
         const stored = await db.files.get([ws, id]);
         if (!stored) throw new NotFoundError('file', id);
-        await refuseLockedOwner(db, ws, stored.owner);
+        await refuseReadOnlyOwner(db, ws, stored.owner);
         await db.files.delete([ws, id]);
       });
     },
@@ -164,9 +193,9 @@ export function localFiles(ctx: LocalContext): FilesRepo {
     async reassign(ws, from, to) {
       if (from === to) return;
       const db = await ctx.db();
-      await rwTx(db, [db.files, db.journal, db.days], async () => {
-        await refuseLockedOwner(db, ws, from);
-        await refuseLockedOwner(db, ws, to);
+      await rwTx(db, ownerTables(db), async () => {
+        await refuseReadOnlyOwner(db, ws, from);
+        await refuseReadOnlyOwner(db, ws, to);
         await moveOwnerFiles(db, ws, from, to);
       });
     },

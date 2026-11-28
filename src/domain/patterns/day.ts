@@ -197,7 +197,12 @@ const CHECKS: readonly (readonly [PatternId, Check])[] = [
     (d, _w, c) => {
       const session = c.env.sessions.get(d.date);
       if (!session || d.outcome !== 'win') return;
-      const waitMs = d.facts[0]!.open - Date.parse(session.start);
+      // The first entry at or after the start: an overnight trade entered
+      // before the session began is not a wait (it would read negative).
+      const start = Date.parse(session.start);
+      const first = d.facts.find((f) => f.open >= start);
+      if (!first) return;
+      const waitMs = first.open - start;
       if (!(waitMs >= T.waitedMs)) return;
       return { waitMinutes: waitMs / 60_000, net: d.net };
     },

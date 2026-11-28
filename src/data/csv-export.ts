@@ -74,7 +74,8 @@ export function tradesCsv(
         return fixed(roi === undefined ? undefined : roi * 100, 2);
       }
       case 'realizedR':
-        return fixed(rOf(t, 'net'), 2);
+        // Realized R needs a closed trade (spec §5.2 States).
+        return fixed(t.status === 'closed' ? rOf(t, 'net') : undefined, 2);
       case 'plannedR':
         return fixed(plannedR(t), 2);
       case 'duration': {

@@ -1,3 +1,4 @@
+import { sidesOf } from '@/domain/risk';
 import { localDate } from '@/domain/time';
 import type { HistoryRow, Trade } from '@/domain/types';
 import type { HistoryRepo } from '../repository';
@@ -117,14 +118,21 @@ const TRADE_FIELDS = [
   'fills',
 ] as const;
 
+/**
+ * The logged fields as a trade reads them: a trade never marked reviewed is
+ * not reviewed, and the sides read as `sidesOf` reads them, so a legacy stop
+ * or target is its one level and moving it into levels untouched is no change
+ * (as `levelRows` logs a rule's sides).
+ */
 function tradeView(t: Trade) {
+  const sides = sidesOf(t);
   return {
     strategyIds: t.strategyIds,
     tagIds: t.tagIds,
     rating: t.rating,
-    reviewed: t.reviewed,
-    targets: t.targets,
-    stops: t.stops,
+    reviewed: t.reviewed ?? false,
+    targets: sides.targets,
+    stops: sides.stops,
     noteId: t.noteId,
     accountId: t.accountId,
     swap: t.swap,

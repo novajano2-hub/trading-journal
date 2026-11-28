@@ -262,15 +262,52 @@ test('removing several trades removes the files of each', async () => {
   expect(await owners(db, S)).toEqual(['strategy:str-1']);
 });
 
+/** A file of an archived account's trade, stored as an earlier build could have (`add` refuses one now). */
+async function archivedFile(repo: ReturnType<typeof setup>['repo'], db: KeelDb) {
+  await repo.trades.get(S, 'f-3');
+  await db.files.put({
+    id: 'old-f3',
+    workspaceId: S,
+    owner: 'trade:f-3',
+    bytes: new ArrayBuffer(4),
+    type: 'image/png',
+    name: 'a.png',
+    size: 4,
+    createdAt: '2026-11-01T00:00:00.000Z',
+  });
+}
+
 test('a refused trade removal keeps the files', async () => {
   const { repo, db } = setup();
   // f-3 is in an archived account, so removing it is refused.
   await repo.files.add(S, 'trade:f-1', png(), { images: true });
-  await repo.files.add(S, 'trade:f-3', png(), { images: true });
+  await archivedFile(repo, db);
   await expect(repo.trades.remove(S, ['f-1', 'f-3'])).rejects.toBeInstanceOf(
     ArchivedAccountError,
   );
   expect(await owners(db, S)).toEqual(['trade:f-1', 'trade:f-3']);
+});
+
+test("an archived account's trade is read-only: its files are neither added, removed nor moved", async () => {
+  const { repo, db } = setup();
+  await archivedFile(repo, db);
+  await repo.files.add(S, 'trade:f-1', png(), { images: true });
+  await expect(
+    repo.files.add(S, 'trade:f-3', png(), { images: true }),
+  ).rejects.toBeInstanceOf(ArchivedAccountError);
+  await expect(repo.files.remove(S, 'old-f3')).rejects.toBeInstanceOf(
+    ArchivedAccountError,
+  );
+  await expect(
+    repo.files.reassign(S, 'trade:f-3', 'trade:f-1'),
+  ).rejects.toBeInstanceOf(ArchivedAccountError);
+  await expect(
+    repo.files.reassign(S, 'trade:f-1', 'trade:f-3'),
+  ).rejects.toBeInstanceOf(ArchivedAccountError);
+  expect(await owners(db, S)).toEqual(['trade:f-1', 'trade:f-3']);
+  // An active account's trade, a strategy and a note still take files.
+  await repo.files.add(S, 'trade:f-2', png(), { images: true });
+  await repo.files.add(S, 'strategy:str-1', png(), { images: true });
 });
 
 test('removing a strategy removes its photo', async () => {
@@ -288,7 +325,7 @@ test('clearing an account’s trades removes their files', async () => {
   // acc-a holds f-1 and f-2; acc-b holds f-3.
   await repo.files.add(S, 'trade:f-1', png(), { images: true });
   await repo.files.add(S, 'trade:f-2', png(), { images: true });
-  await repo.files.add(S, 'trade:f-3', png(), { images: true });
+  await archivedFile(repo, db);
   await repo.accounts.clearTrades(S, 'acc-a');
   expect(await owners(db, S)).toEqual(['trade:f-3']);
 });

@@ -109,3 +109,16 @@ test('the Day column carries the year, and only the Week view shortens it', () =
   rerender(<>{cellOf('day', t, { ...base, shortDay: true })}</>);
   expect(container.textContent).toBe('Thu 19 Nov');
 });
+
+test('Realized R reads None while the trade is open, as the trade page does (spec 5.2 States)', () => {
+  const open = makeTrade({
+    status: 'open',
+    net: 5000,
+    initialRisk: 10_000,
+    closedAt: undefined,
+  });
+  const env = { ctx: { pnlBasis: 'net' } } as unknown as CellEnv;
+  const { container } = render(<>{cellOf('realizedR', open, env)}</>);
+  expect(container.textContent).toBe('None');
+  expect(container.querySelector('span')!.className).toContain('text-faint');
+});

@@ -46,7 +46,7 @@ function PatternsControl({
           ? null
           : { figure: display.cash(net, true, currency), cents: net }
       }
-      trades={day?.stats?.trades ?? day?.trades.length ?? 0}
+      trades={day?.stats?.trades ?? 0}
       align="start"
     />
   );

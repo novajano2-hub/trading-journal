@@ -114,6 +114,40 @@ test('a trade with two strategies counts under each', async () => {
   ).toBe('5');
 });
 
+test('a strategy or tag named with " to " is one name, not a range', async () => {
+  const named = async (): Promise<SampleWorkspace> => {
+    const s = await breakdownSample();
+    s.strategies = s.strategies.map((x) =>
+      x.id === 'str-2' ? { ...x, name: 'Back to basics' } : x,
+    );
+    s.tags = s.tags.map((x) =>
+      x.id === 'tag-fomo' ? { ...x, name: 'stick to the plan' } : x,
+    );
+    return s;
+  };
+  const whole = (row: ReturnType<typeof rowOf>, name: string) => {
+    const cell = row.getAllByRole('cell')[0]!;
+    expect(cell.querySelector('b')!.textContent).toBe(name);
+    expect(cell.querySelector('.text-muted')).toBeNull();
+  };
+  renderApp(<StrategiesView />, {
+    sample: named,
+    url: '/app/reports/strategies',
+  });
+  const strategies = within(
+    await screen.findByTestId('reports-strategies'),
+  ).getByRole('table', { name: 'Strategies summary' });
+  whole(rowOf(strategies, /^Back to basics/), 'Back to basics');
+  cleanup();
+  renderApp(<TagsView />, { sample: named, url: '/app/reports/tags' });
+  const tags = within(await screen.findByTestId('reports-tags')).getByRole(
+    'table',
+    { name: /summary$/ },
+  );
+  // Tag names read in lower case.
+  whole(rowOf(tags, /^stick to the plan/), 'stick to the plan');
+});
+
 test('tags have a category select', async () => {
   renderApp(<TagsView />, {
     sample: breakdownSample,

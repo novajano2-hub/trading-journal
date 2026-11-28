@@ -146,7 +146,8 @@ test('an update writes one row per changed field', async () => {
         entityId: 'f-2',
         label: 'ESZ5 2026-11-17',
         field: 'reviewed',
-        oldValue: null,
+        // A trade never marked reviewed reads as not reviewed.
+        oldValue: false,
         newValue: true,
       },
     ]),
@@ -175,6 +176,44 @@ test('an update logs only the fields the trade really changed', async () => {
       ['f-1', 'tagIds', 'tag-fomo', 'tag-setup'],
     ]),
   );
+});
+
+test('reviewed reads as No until it is set, so setting it to No logs nothing', async () => {
+  const { repo, rows } = setup();
+  await repo.trades.update(S, 'f-2', { reviewed: false });
+  expect(await rows()).toEqual([]);
+  await repo.trades.update(S, 'f-2', { reviewed: undefined });
+  expect(await rows()).toEqual([]);
+});
+
+test('the first save of one side of a legacy trade logs that side only', async () => {
+  const { repo, db, rows } = setup();
+  const t = (await repo.trades.get(S, 'f-2'))!;
+  // The shape every trade had before levels: one stop and one target price.
+  const legacy = { ...t, plannedStop: 5990, plannedTarget: 6020 };
+  delete legacy.targets;
+  delete legacy.stops;
+  await db.trades.put(legacy);
+  const size = t.maxPosition;
+
+  await repo.trades.update(S, 'f-2', {
+    targets: { unit: 'price', levels: [{ value: 6030, qty: size }] },
+  });
+
+  // The stop moved into levels untouched: no row for it.
+  expect(
+    (await rows()).map((r) => [r.field, r.oldValue, r.newValue]),
+  ).toEqual([
+    [
+      'targets',
+      `{"unit":"price","levels":[{"value":6020,"qty":${size}}]}`,
+      `{"unit":"price","levels":[{"value":6030,"qty":${size}}]}`,
+    ],
+  ]);
+  expect((await repo.trades.get(S, 'f-2'))!.stops).toEqual({
+    unit: 'price',
+    levels: [{ value: 5990, qty: size }],
+  });
 });
 
 test('the label reads the open date in the profile time zone', async () => {

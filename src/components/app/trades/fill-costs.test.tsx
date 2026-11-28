@@ -272,6 +272,31 @@ test('a negative fee is a credit: the trade’s fees go down and its net goes up
   });
 });
 
+test('a negative commission is a credit too, typed with a pasted minus sign', async () => {
+  const { repo } = renderApp(<TradeView id="t-c" />, {
+    sample: sample(),
+    url: URL,
+  });
+  fireEvent.click(opener(await rowOf(1), 'commission'));
+  // U+2212, as a minus copied from a statement reads.
+  fireEvent.change(field('Commission'), { target: { value: '\u22122.25' } });
+  fireEvent.keyDown(field('Commission'), { key: 'Enter' });
+  await waitFor(async () => {
+    const t = (await repo.trades.get(WS, 't-c'))!;
+    // The commission went from $6.75 to a $2.25 credit: $9.00 less.
+    expect(t.executions[1]).toMatchObject({ fees: 105, commission: -225 });
+    expect(t.fees).toBe(3120 - 900);
+    expect(t.net).toBe(8130 + 900);
+  });
+  await waitFor(() =>
+    expect(screen.queryByRole('textbox', { name: 'Commission' })).toBeNull(),
+  );
+  const row = await rowOf(1);
+  expect(row.textContent).toContain('−$2.25');
+  fireEvent.click(opener(row, 'commission'));
+  expect(field('Commission').value).toBe('-2.25');
+});
+
 test('the note tells how a swap goes in the fees, unless the import already gave the trade its swap', async () => {
   renderApp(<TradeView id="t-c" />, { sample: sample(), url: URL });
   fireEvent.click(opener(await rowOf(0), 'commission'));

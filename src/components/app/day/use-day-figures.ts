@@ -11,7 +11,11 @@ import type { Trade } from '@/domain/types';
 /** One day of the page's accounts: its trades, its figures and the context that read them. */
 export interface DayFigures {
   trades: Trade[];
-  /** Undefined for a day with no trade in the base currency. */
+  /**
+   * The base currency's figures. Undefined only for a day with no trade on the
+   * page's accounts; a day of other-currency trades alone has figures of no
+   * trade (a count of 0 and a net of null).
+   */
   stats: DayStats | undefined;
   ctx: MetricContext;
 }

@@ -385,7 +385,9 @@ test('a negative commission or fee is a credit: saved as typed, and the trade’
   expect(made.fees).toBe(-300);
   expect(made.gross).toBe(50000);
   expect(made.net).toBe(50300);
-  expect(screen.queryByText('Enter fees as a positive amount.')).toBeNull();
+  expect(
+    screen.queryByText('Check fill 1: commission and fees must be numbers.'),
+  ).toBeNull();
 });
 
 test('a cost that is not an amount is refused at its fill, a decimal comma too', async () => {
@@ -396,7 +398,7 @@ test('a cost that is not an amount is refused at its fill, a decimal comma too',
   await fillFuture();
   addExit('1');
   const before = (await repo.trades.list(WS)).length;
-  for (const field of ['commission', 'fees'])
+  for (const field of ['commission', 'fees']) {
     for (const bad of ['abc', '2,43', '--', '-', '1e3', '$2']) {
       set(`Fill 1 ${field}`, bad);
       fireEvent.click(screen.getByRole('button', { name: 'Save trade' }));
@@ -410,6 +412,9 @@ test('a cost that is not an amount is refused at its fill, a decimal comma too',
       ).toContain(msg.id);
       expect((await repo.trades.list(WS)).length).toBe(before);
     }
+    // Cleared before the other field is tried, so each refusal is its own field's.
+    set(`Fill 1 ${field}`, '');
+  }
   expect(window.location.pathname).toBe('/app/trades/new');
 });
 

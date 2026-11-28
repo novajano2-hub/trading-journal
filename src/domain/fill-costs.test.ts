@@ -278,6 +278,13 @@ describe('centsFromText', () => {
     expect(centsFromText('-2,43')).toBeNull();
   });
 
+  test('a pasted minus sign (U+2212) reads as a minus', () => {
+    expect(centsFromText('\u22121.50')).toBe(-150);
+    expect(centsFromText(' \u22124.86 ')).toBe(-486);
+    expect(centsFromText('\u2212\u22121')).toBeNull();
+    expect(centsFromText('1\u2212')).toBeNull();
+  });
+
   test('a non-number is refused', () => {
     for (const bad of [
       '-',

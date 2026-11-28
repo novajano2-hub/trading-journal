@@ -1,4 +1,5 @@
 import { realizations } from '@/domain/metrics/realized';
+import { hasStop } from '@/domain/risk';
 import { localDate } from '@/domain/time';
 import { MON_TO_FRI, defaultVersion } from '@/domain/tracker/defaults';
 import type {
@@ -80,7 +81,7 @@ export function writeRoutine(
   // The noted days before endDate on which every trade has a strategy and a stop.
   const unplanned = new Set<string>();
   for (const t of trades)
-    if (t.strategyIds.length === 0 || t.plannedStop === undefined)
+    if (t.strategyIds.length === 0 || !hasStop(t))
       unplanned.add(localDate(t.openedAt, NY));
   const traded = new Set(trades.map((t) => localDate(t.openedAt, NY)));
   const keep = new Set(

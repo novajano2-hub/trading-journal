@@ -215,6 +215,38 @@ describe('merge', () => {
     expect(await db.files.count()).toBe(2);
   });
 
+  test("other notes' links to a removed source move to the merged trade, once each", async () => {
+    const { repo, acc, trip } = await setup();
+    const a = await trip(acc.id, ...TRIPS[0]!);
+    const b = await trip(acc.id, ...TRIPS[1]!);
+    const other = await trip(acc.id, ['16:00', '16:10'], 6000, 6001);
+    const noteB = await repo.journal.ensureTradeNote(M, b.id);
+    const note = (title: string, linkedTradeIds: string[]) =>
+      repo.journal.save(M, {
+        kind: 'note',
+        title,
+        body: { type: 'doc', content: [{ type: 'paragraph' }] },
+        linkedTradeIds,
+        tags: [],
+      });
+    const onlyB = await note('Only B', [b.id]);
+    const both = await note('Both', [b.id, other.id, a.id]);
+    const daily = await repo.journal.dailyNote(M, DAY);
+    await repo.journal.save(M, { ...daily, linkedTradeIds: [other.id, b.id] });
+
+    const kept = await repo.trades.merge(M, [a.id, b.id], [...ids(a), ...ids(b)]);
+    expect(kept.id).toBe(a.id);
+
+    const links = async (id: string) =>
+      (await repo.journal.get(M, id))!.linkedTradeIds;
+    expect(await links(onlyB.id)).toEqual([a.id]);
+    // Where the note already links the merged trade, it is linked once.
+    expect(await links(both.id)).toEqual([a.id, other.id]);
+    expect(await links(daily.id)).toEqual([other.id, a.id]);
+    // B's own note is unlinked and stays in Trade notes (spec §5.1).
+    expect(await links(noteB.id)).toEqual([]);
+  });
+
   test('a fill left out stays in its trade, which is rebuilt and logged', async () => {
     const { repo, acc, trip, rows, rowCount } = await setup();
     const a = await trip(acc.id, ...TRIPS[0]!);

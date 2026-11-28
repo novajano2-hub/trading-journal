@@ -24,7 +24,6 @@ import {
   type NewHistoryRow,
 } from './history';
 import { bumpImportRevision, releaseSpentFiles } from './imports';
-import { pruneJournalLinks } from './journal';
 import { readPrefs } from './prefs';
 import { rwTx } from './tx';
 
@@ -163,6 +162,41 @@ async function relocate(
   return moved.length;
 }
 
+/**
+ * After a merge, the notes that link a removed source link the trade that
+ * took its fills instead, once each (C-5). The removed sources' own notes
+ * (`ownNotes`, the domain's `unlinkNoteIds`) are unlinked instead and stay in
+ * Trade notes (spec §5.1). Call inside the merge's rw transaction, with
+ * `db.journal` in it.
+ */
+async function relinkNotes(
+  db: KeelDb,
+  ws: string,
+  removedIds: readonly string[],
+  keptId: string,
+  ownNotes: readonly string[],
+): Promise<void> {
+  if (removedIds.length === 0) return;
+  const gone = new Set(removedIds);
+  const own = new Set(ownNotes);
+  // The multiEntry index spans workspaces, so keep only this workspace's entries.
+  const hits = await db.journal
+    .where('linkedTradeIds')
+    .anyOf([...gone])
+    .filter((e) => e.workspaceId === ws)
+    .toArray();
+  for (const entry of new Map(hits.map((e) => [e.id, e])).values()) {
+    const linked = own.has(entry.id)
+      ? entry.linkedTradeIds.filter((id) => !gone.has(id))
+      : [
+          ...new Set(
+            entry.linkedTradeIds.map((id) => (gone.has(id) ? keptId : id)),
+          ),
+        ];
+    await db.journal.put({ ...entry, linkedTradeIds: linked });
+  }
+}
+
 export function localGrouping(
   ctx: LocalContext,
 ): Pick<TradesRepo, 'merge' | 'split' | 'move' | 'moveAccount'> {
@@ -175,7 +209,7 @@ export function localGrouping(
         const pick = new Set(picked);
         const refusal = canMerge(sources, pick);
         if (refusal) throw new GroupRefused(refusal);
-        const { kept, removedIds, changed } = mergeTrades(
+        const { kept, removedIds, changed, unlinkNoteIds } = mergeTrades(
           sources,
           pick,
           await buildOptions(db, ws, sources[0]!.accountId),
@@ -183,9 +217,10 @@ export function localGrouping(
 
         await db.trades.bulkDelete(removedIds.map((id) => [ws, id]));
         await db.trades.bulkPut([kept, ...changed]);
-        // A removed trade's note stays among the notes, linked to no trade, and
-        // its files go to the trade that took its fills.
-        await pruneJournalLinks(db, ws, removedIds);
+        // A removed trade's note stays among the notes, linked to no trade;
+        // other notes' links to it, and its files, go to the trade that took
+        // its fills.
+        await relinkNotes(db, ws, removedIds, kept.id, unlinkNoteIds);
         for (const id of removedIds)
           await moveOwnerFiles(db, ws, `trade:${id}`, `trade:${kept.id}`);
         await bumpImportRevision(db, ws);

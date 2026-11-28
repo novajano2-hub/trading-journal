@@ -208,14 +208,13 @@ export function TradeFiles({
           images: false,
         });
       } catch (e) {
+        // Any type is attached (`images: false`), so a refusal is the size or the store.
         problem(
           e instanceof FileRejected && e.reason === 'size'
             ? `${file.name} is over 10 MB.`
-            : e instanceof FileRejected && e.reason === 'type'
-              ? `${file.name} can't be attached.`
-              : e instanceof FileRejected
-                ? `Couldn't save ${file.name}. This browser has no room left.`
-                : `Couldn't save ${file.name}.`,
+            : e instanceof FileRejected
+              ? `Couldn't save ${file.name}. This browser has no room left.`
+              : `Couldn't save ${file.name}.`,
         );
       }
     }

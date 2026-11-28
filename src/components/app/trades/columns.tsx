@@ -191,7 +191,8 @@ function sortValue(
     case 'roi':
       return netRoiOf(t);
     case 'realizedR':
-      return rOf(t, env.ctx.pnlBasis);
+      // None while the trade is open, as the cell reads (spec §5.2 States).
+      return t.status === 'closed' ? rOf(t, env.ctx.pnlBasis) : undefined;
     case 'plannedR':
       return plannedR(t);
     case 'duration':
@@ -321,8 +322,8 @@ export function cellOf(id: ColumnId, t: Trade, env: CellEnv): React.ReactNode {
       );
     }
     case 'realizedR': {
-      if (t.status !== 'closed') return null;
-      const r = rOf(t, env.ctx.pnlBasis);
+      // Realized R needs a closed trade: an open one reads None, as on the trade page (spec §5.2 States).
+      const r = t.status === 'closed' ? rOf(t, env.ctx.pnlBasis) : undefined;
       return r === undefined ? (
         <span className="text-faint">None</span>
       ) : (
