@@ -362,6 +362,18 @@ test('the links back to a trade encode an id that holds a slash', async () => {
     expect(cancel.getAttribute('href')).toBe('/app/trades/acc%3AEUR%2FUSD%3Ax');
 });
 
+test('the commission and fee fields bring up a keyboard with a minus key, so a credit can be typed on a phone', async () => {
+  renderApp(<ManualTradeForm />, {
+    sample: sample(),
+    url: '/app/trades/new',
+  });
+  await fillFuture();
+  for (const name of ['Fill 1 commission', 'Fill 1 fees'])
+    expect(
+      screen.getByRole('textbox', { name }).getAttribute('inputmode'),
+    ).toBe('text');
+});
+
 test('a negative commission or fee is a credit: saved as typed, and the trade’s fees and net follow', async () => {
   const { repo } = renderApp(<ManualTradeForm />, {
     sample: sample(),

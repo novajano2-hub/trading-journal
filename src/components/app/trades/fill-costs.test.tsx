@@ -297,6 +297,14 @@ test('a negative commission is a credit too, typed with a pasted minus sign', as
   expect(field('Commission').value).toBe('-2.25');
 });
 
+test('a cost field brings up a keyboard with a minus key, so a credit can be typed on a phone', async () => {
+  renderApp(<TradeView id="t-c" />, { sample: sample(), url: URL });
+  fireEvent.click(opener(await rowOf(1), 'commission'));
+  // A decimal keypad (iOS) has no minus: a credit could not be typed.
+  expect(field('Commission').getAttribute('inputmode')).toBe('text');
+  expect(field('Exchange fee').getAttribute('inputmode')).toBe('text');
+});
+
 test('the note tells how a swap goes in the fees, unless the import already gave the trade its swap', async () => {
   renderApp(<TradeView id="t-c" />, { sample: sample(), url: URL });
   fireEvent.click(opener(await rowOf(0), 'commission'));

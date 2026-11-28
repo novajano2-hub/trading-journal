@@ -386,6 +386,64 @@ test('Create waits for an account, an instrument and a level, in either dialog',
   await waitFor(() => expect(make.disabled).toBe(false));
 });
 
+test("a fee rule's Create says what it waits for, and Privacy keeps a new rule from saving hidden amounts", async () => {
+  const r = repo();
+  show(r);
+  const f = await card('Commissions and fees');
+  const fee = await addRule(f, /^Add rule for commissions and fees/);
+  const make = within(fee).getByRole('button', {
+    name: 'Create',
+  }) as HTMLButtonElement;
+  const reason = () =>
+    document.getElementById(make.getAttribute('aria-describedby') ?? '')
+      ?.textContent;
+  expect(make.disabled).toBe(true);
+  expect(reason()).toBe('Choose an account and an instrument.');
+  await pick(fee, 'Account', 'Futures main');
+  await waitFor(() => expect(reason()).toBe('Choose an instrument.'));
+  await pick(fee, 'Instrument', 'Future');
+  await waitFor(() => expect(make.disabled).toBe(false));
+  expect(make.getAttribute('aria-describedby')).toBeNull();
+  fireEvent.click(within(fee).getByRole('switch', { name: 'All symbols' }));
+  await waitFor(() =>
+    expect(reason()).toBe('Name a symbol, or turn All symbols on.'),
+  );
+  fireEvent.click(within(fee).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  cleanup();
+
+  // Under Privacy the amounts can't be typed, so a new rule can't be made.
+  await r.prefs.update({ displayUnit: 'privacy' });
+  show(r);
+  const hidden = await addRule(
+    await card('Commissions and fees'),
+    /^Add rule for commissions and fees/,
+  );
+  await pick(hidden, 'Account', 'Futures main');
+  await pick(hidden, 'Instrument', 'Future');
+  const create = within(hidden).getByRole('button', {
+    name: 'Create',
+  }) as HTMLButtonElement;
+  const hint = 'Amounts are hidden by Privacy. Turn it off to edit them.';
+  await waitFor(() =>
+    expect(
+      document.getElementById(create.getAttribute('aria-describedby') ?? '')
+        ?.textContent,
+    ).toBe(hint),
+  );
+  expect(create.disabled).toBe(true);
+  // Each amount names the same line as its description.
+  for (const name of ['Commission', 'Fee']) {
+    const box = within(hidden).getByRole('textbox', { name });
+    expect(
+      document.getElementById(box.getAttribute('aria-describedby') ?? '')
+        ?.textContent,
+    ).toBe(hint);
+  }
+  fireEvent.submit(hidden.querySelector('form')!);
+  expect(await r.feeRules.list(S)).toEqual([]);
+});
+
 test('the unit select waits for an instrument', async () => {
   show(repo());
   const t = await card('Targets and stops');
@@ -687,7 +745,7 @@ test('Delete asks first and says what stays; the rule goes and what it filled st
   ).toBeTruthy();
 });
 
-test('Apply to existing shows the count and the override box', async () => {
+test('Fill in logged trades shows the count and the override box', async () => {
   const r = repo();
   // Two trades with nothing set, one with a stop of its own.
   await nq(r, '10');
@@ -696,9 +754,9 @@ test('Apply to existing shows the count and the override box', async () => {
   await r.targetRules.create(S, targetRule());
   show(r);
   const t = await card('Targets and stops');
-  await chooseFromMenu(/^Actions for Futures main/, 'Apply to existing trades');
+  await chooseFromMenu(/^Actions for Futures main/, 'Fill in logged trades');
   const dialog = await screen.findByRole('dialog', {
-    name: 'Apply this rule to existing trades?',
+    name: 'Fill in logged trades with this rule?',
   });
   expect(
     within(dialog).getByText(
@@ -718,21 +776,21 @@ test('Apply to existing shows the count and the override box', async () => {
   expect(within(dialog).getByText('2 trades')).toBeTruthy();
   expect(within(dialog).getByText(/will change\./)).toBeTruthy();
   expect(
-    within(dialog).getByRole('button', { name: 'Apply to 2 trades' }),
+    within(dialog).getByRole('button', { name: 'Fill in 2 trades' }),
   ).toBeTruthy();
   // Ticked it replaces: all three.
   fireEvent.click(box);
   expect(within(dialog).getByText('3 trades')).toBeTruthy();
   expect(
-    within(dialog).getByRole('button', { name: 'Apply to 3 trades' }),
+    within(dialog).getByRole('button', { name: 'Fill in 3 trades' }),
   ).toBeTruthy();
   fireEvent.click(box);
   expect(
-    within(dialog).getByRole('button', { name: 'Apply to 2 trades' }),
+    within(dialog).getByRole('button', { name: 'Fill in 2 trades' }),
   ).toBeTruthy();
 
   fireEvent.click(
-    within(dialog).getByRole('button', { name: 'Apply to 2 trades' }),
+    within(dialog).getByRole('button', { name: 'Fill in 2 trades' }),
   );
   const result = await within(t).findByRole('status', { name: 'Result' });
   expect(result.textContent).toContain('Changed 2 trades.');
@@ -743,19 +801,22 @@ test('Apply to existing shows the count and the override box', async () => {
   // The one with its own stop was left alone.
   expect(trades.find((x) => x.id === own.id)!.targets).toBeUndefined();
   // Nothing is left for the unticked run: the apply button waits.
-  await chooseFromMenu(/^Actions for Futures main/, 'Apply to existing trades');
+  await chooseFromMenu(/^Actions for Futures main/, 'Fill in logged trades');
   const again = await screen.findByRole('dialog', {
-    name: 'Apply this rule to existing trades?',
+    name: 'Fill in logged trades with this rule?',
   });
   expect(within(again).getByText('No trade will change.')).toBeTruthy();
   expect(
-    (within(again).getByRole('button', { name: 'Apply' }) as HTMLButtonElement)
-      .disabled,
+    (
+      within(again).getByRole('button', {
+        name: 'Fill in trades',
+      }) as HTMLButtonElement
+    ).disabled,
   ).toBe(true);
   // With the box ticked the one trade with its own stop changes.
   fireEvent.click(within(again).getByRole('checkbox'));
   fireEvent.click(
-    within(again).getByRole('button', { name: 'Apply to 1 trade' }),
+    within(again).getByRole('button', { name: 'Fill in 1 trade' }),
   );
   await waitFor(() =>
     expect(
@@ -769,7 +830,7 @@ test('Apply to existing shows the count and the override box', async () => {
   ).toHaveLength(3);
 });
 
-test('Apply to existing for a fee rule counts trades without costs, and the box replaces them', async () => {
+test('Fill in logged trades, for a fee rule, counts trades without costs, and the box replaces them', async () => {
   const r = repo();
   await nq(r, '10');
   await nq(r, '20');
@@ -799,9 +860,9 @@ test('Apply to existing for a fee rule counts trades without costs, and the box 
   await r.feeRules.create(S, feeRule());
   show(r);
   const f = await card('Commissions and fees');
-  await chooseFromMenu(/^Actions for Futures main/, 'Apply to existing trades');
+  await chooseFromMenu(/^Actions for Futures main/, 'Fill in logged trades');
   const dialog = await screen.findByRole('dialog', {
-    name: 'Apply this rule to existing trades?',
+    name: 'Fill in logged trades with this rule?',
   });
   expect(
     within(dialog).getByText(/It matches 3 trades in Futures main on NQ/),
@@ -814,7 +875,7 @@ test('Apply to existing for a fee rule counts trades without costs, and the box 
   fireEvent.click(within(dialog).getByRole('checkbox'));
   expect(within(dialog).getByText('3 trades')).toBeTruthy();
   fireEvent.click(
-    within(dialog).getByRole('button', { name: 'Apply to 3 trades' }),
+    within(dialog).getByRole('button', { name: 'Fill in 3 trades' }),
   );
   const result = await within(f).findByRole('status', { name: 'Result' });
   expect(result.textContent).toContain('Changed 3 trades.');
@@ -830,6 +891,84 @@ test('Apply to existing for a fee rule counts trades without costs, and the box 
   expect(within(f).queryByRole('status', { name: 'Result' })).toBeNull();
 });
 
+test('a fee rule leaves a trade settled in another currency alone, and the dialog counts it', async () => {
+  const r = repo();
+  const EURUSD = resolveInstrument('EURUSD')!;
+  const lot = (accountId: string, minute: string) =>
+    r.trades.createManual(S, {
+      accountId,
+      instrument: EURUSD,
+      fills: [
+        {
+          time: `2026-11-18T16:${minute}:00.000Z`,
+          side: 'buy',
+          qty: 1,
+          price: 1.1,
+          commission: 0,
+          fees: 0,
+        },
+        {
+          time: `2026-11-18T16:${minute}:30.000Z`,
+          side: 'sell',
+          qty: 1,
+          price: 1.1004,
+          commission: 0,
+          fees: 0,
+        },
+      ],
+    });
+  await lot('acc-a', '00');
+  // A EURUSD trade made in a euro account settles in euros, and keeps them
+  // when it is moved here (B6).
+  const euro = await r.accounts.create(S, {
+    name: 'Euro forex',
+    broker: '',
+    type: 'live',
+    currency: 'EUR',
+    startingBalance: 0,
+    status: 'active',
+  });
+  const moved = await lot(euro.id, '10');
+  expect(moved.pnlCurrency).toBe('EUR');
+  await r.trades.move(S, [moved.id], 'acc-a');
+  await r.feeRules.create(
+    S,
+    feeRule({ assetClass: 'forex', symbols: ['EURUSD'] }),
+  );
+  show(r);
+  await card('Commissions and fees');
+  await chooseFromMenu(/^Actions for Futures main/, 'Fill in logged trades');
+  const dialog = await screen.findByRole('dialog', {
+    name: 'Fill in logged trades with this rule?',
+  });
+  await waitFor(() =>
+    expect(dialog.textContent).toContain(
+      '1 trade settled in another currency is left as it is.',
+    ),
+  );
+  expect(within(dialog).getByText('1 trade')).toBeTruthy();
+  // With the box ticked it is still left alone.
+  fireEvent.click(within(dialog).getByRole('checkbox'));
+  expect(within(dialog).getByText('1 trade')).toBeTruthy();
+  expect(dialog.textContent).toContain(
+    '1 trade settled in another currency is left as it is.',
+  );
+});
+
+test('a target rule has no currency to skip, so its dialog says nothing of one', async () => {
+  const r = repo();
+  await nq(r, '10');
+  await r.targetRules.create(S, targetRule());
+  show(r);
+  await card('Targets and stops');
+  await chooseFromMenu(/^Actions for Futures main/, 'Fill in logged trades');
+  const dialog = await screen.findByRole('dialog', {
+    name: 'Fill in logged trades with this rule?',
+  });
+  await within(dialog).findByText('1 trade');
+  expect(dialog.textContent).not.toContain('another currency');
+});
+
 test('a rule in an archived account cannot be applied, and says so', async () => {
   const r = repo();
   await r.targetRules.create(
@@ -838,9 +977,9 @@ test('a rule in an archived account cannot be applied, and says so', async () =>
   );
   show(r);
   await card('Targets and stops');
-  await chooseFromMenu(/^Actions for Old demo/, 'Apply to existing trades');
+  await chooseFromMenu(/^Actions for Old demo/, 'Fill in logged trades');
   const dialog = await screen.findByRole('dialog', {
-    name: 'Apply this rule to existing trades?',
+    name: 'Fill in logged trades with this rule?',
   });
   expect(
     within(dialog).getByText(
@@ -848,8 +987,11 @@ test('a rule in an archived account cannot be applied, and says so', async () =>
     ),
   ).toBeTruthy();
   expect(
-    (within(dialog).getByRole('button', { name: 'Apply' }) as HTMLButtonElement)
-      .disabled,
+    (
+      within(dialog).getByRole('button', {
+        name: 'Fill in trades',
+      }) as HTMLButtonElement
+    ).disabled,
   ).toBe(true);
 });
 
@@ -891,13 +1033,13 @@ test('a save or an apply that fails says so, in the dialog, and writes nothing',
   expect((await targets(r))[0]!.target?.levels[0]?.value).toBe(50);
   expect((await targets(r))[0]!.id).toBe(made.id);
 
-  // Apply.
-  await chooseFromMenu(/^Actions for Futures main/, 'Apply to existing trades');
+  // Fill in.
+  await chooseFromMenu(/^Actions for Futures main/, 'Fill in logged trades');
   const apply = await screen.findByRole('dialog', {
-    name: 'Apply this rule to existing trades?',
+    name: 'Fill in logged trades with this rule?',
   });
   fireEvent.click(
-    await within(apply).findByRole('button', { name: 'Apply to 1 trade' }),
+    await within(apply).findByRole('button', { name: 'Fill in 1 trade' }),
   );
   expect((await within(apply).findByRole('alert')).textContent).toContain(
     "Couldn't apply the rule",
@@ -1010,10 +1152,10 @@ test('Privacy masks rule amounts and fee amounts, in the cards and in the dialog
   // The apply dialog's sentence hides them as well.
   await chooseFromMenu(
     /^Actions for Futures main, Future, NQ, commissions and fees/,
-    'Apply to existing trades',
+    'Fill in logged trades',
   );
   const apply = await screen.findByRole('dialog', {
-    name: 'Apply this rule to existing trades?',
+    name: 'Fill in logged trades with this rule?',
   });
   expect(everyString(apply).join(' ')).not.toMatch(/\$\s?\d/);
   expect(apply.textContent).toContain('$•••');

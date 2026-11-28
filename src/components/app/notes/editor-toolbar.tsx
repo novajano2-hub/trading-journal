@@ -874,9 +874,10 @@ export interface TemplateSlotProps {
   /** The button that opens the menu: use it as the menu's trigger. */
   trigger: React.ReactElement;
   open?: boolean;
-  onOpenChange?(open: boolean): void;
+  /** `away`: the menu closed on a choice that opened a dialog of its own, which has the keyboard. */
+  onOpenChange?(open: boolean, away?: boolean): void;
   /** Pass to the menu's content: keeps the keyboard in the text as the menu goes (see `TemplateMenu`). */
-  onCloseAutoFocus?(event: Event, picked: boolean): void;
+  onCloseAutoFocus?(event: Event, picked: boolean, away?: boolean): void;
 }
 
 /** Draws the host's own template menu on the toolbar's trigger (Insert's group). */
@@ -1072,16 +1073,17 @@ export function EditorToolbar({
                 />
               ),
               open: templateOpen,
-              onOpenChange: (next) => {
+              onOpenChange: (next, away) => {
                 setTemplateOpen(next);
-                // Closed without a choice: back to the text, not to a button that is not there.
-                if (!next) setTimeout(() => focusText(editor), 0);
+                // Closed without a choice: back to the text, not to a button
+                // that is not there. A manage item's dialog keeps the keyboard.
+                if (!next && !away) setTimeout(() => focusText(editor), 0);
               },
               // Picked or not, never to the anchor: it is hidden, and Radix
               // would send the keyboard there as the menu unmounts.
-              onCloseAutoFocus: (event) => {
+              onCloseAutoFocus: (event, _picked, away) => {
                 event.preventDefault();
-                focusText(editor);
+                if (!away) focusText(editor);
               },
             }
           : {

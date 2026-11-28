@@ -302,6 +302,55 @@ test('replacing a photo keeps the new one and deletes the old file', async () =>
   expect((await repo.strategies.get(WS, 'str-1'))!.photoId).toBe(kept[0]!.id);
 });
 
+test('a photo can be dropped on the field, which lights while a file is over it, and a refused one says why', async () => {
+  const { repo } = await createForm();
+  const zone = field().querySelector<HTMLElement>('[data-dropzone]')!;
+  expect(zone).toBeTruthy();
+  // Lit while a file is over it, also as the pointer crosses its children.
+  fireEvent.dragEnter(zone);
+  fireEvent.dragEnter(zone.firstElementChild!);
+  fireEvent.dragLeave(zone);
+  expect(zone.hasAttribute('data-over')).toBe(true);
+  fireEvent.dragLeave(zone.firstElementChild!);
+  expect(zone.hasAttribute('data-over')).toBe(false);
+  // A refused type says why, as the picker does.
+  fireEvent.dragEnter(zone);
+  fireEvent.drop(zone, {
+    dataTransfer: { files: [file('loop.gif', 'image/gif')] },
+  });
+  expect(zone.hasAttribute('data-over')).toBe(false);
+  expect((await screen.findByRole('alert')).textContent).toBe(
+    "loop.gif isn't a PNG, JPEG or WebP image.",
+  );
+  // A PNG is taken, and saved with the strategy.
+  fireEvent.drop(zone, {
+    dataTransfer: { files: [file('dropped.png', 'image/png')] },
+  });
+  expect(await within(field()).findByText('dropped.png')).toBeTruthy();
+  expect(screen.queryByRole('alert')).toBeNull();
+  fireEvent.change(screen.getByLabelText('Name'), {
+    target: { value: 'Dropped in' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Create strategy' }));
+  await waitFor(() => expect(here()).toMatch(CREATED));
+  const made = (await repo.strategies.list(WS)).find(
+    (x) => x.name === 'Dropped in',
+  )!;
+  expect(
+    (await repo.files.list(WS, `strategy:${made.id}`)).map((f) => f.name),
+  ).toEqual(['dropped.png']);
+});
+
+test('a photo dropped on a field that has one replaces it', async () => {
+  await editForm({ name: 'old.png', type: 'image/png' });
+  await within(field()).findByText('old.png');
+  fireEvent.drop(field().querySelector('[data-dropzone]')!, {
+    dataTransfer: { files: [file('new.jpg', 'image/jpeg')] },
+  });
+  expect(await within(field()).findByText('new.jpg')).toBeTruthy();
+  expect(within(field()).queryByText('old.png')).toBeNull();
+});
+
 test('leaving the form without saving changes nothing', async () => {
   const { repo, photoId } = await editForm({
     name: 'keep.png',

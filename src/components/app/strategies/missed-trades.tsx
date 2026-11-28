@@ -206,7 +206,8 @@ function MissedTradeDialog({
         <input
           id={`${ids}-${k}`}
           type="text"
-          inputMode="decimal"
+          // A credit is negative, and a decimal keypad has no minus.
+          inputMode="text"
           autoComplete="off"
           placeholder={masked ? undefined : '0.00'}
           readOnly={masked}

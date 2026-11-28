@@ -131,6 +131,15 @@ export function TemplateChooser({
   const router = useRouter();
   const [asset, setAsset] = useState<'all' | AssetClass>('all');
   const [query, setQuery] = useState('');
+  // Each opening starts from every template: no filter or search left from the last.
+  const [was, setWas] = useState(open);
+  if (open !== was) {
+    setWas(open);
+    if (open) {
+      setAsset('all');
+      setQuery('');
+    }
+  }
   const shown = filterTemplates(STRATEGY_TEMPLATES, {
     ...NO_FILTER,
     assets: asset === 'all' ? [] : [asset],

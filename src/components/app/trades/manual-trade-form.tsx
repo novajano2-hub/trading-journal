@@ -820,7 +820,8 @@ function Form({
                     <input
                       {...common}
                       type="text"
-                      inputMode="decimal"
+                      // A credit is negative, and a decimal keypad has no minus.
+                      inputMode="text"
                       autoComplete="off"
                       placeholder="0"
                       aria-label={`Fill ${n} commission`}
@@ -836,7 +837,8 @@ function Form({
                     <input
                       {...common}
                       type="text"
-                      inputMode="decimal"
+                      // A credit is negative, and a decimal keypad has no minus.
+                      inputMode="text"
                       autoComplete="off"
                       placeholder="0"
                       aria-label={`Fill ${n} fees`}

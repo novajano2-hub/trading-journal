@@ -30,13 +30,20 @@ interface Counts {
   /** Of those, how many change with the box unticked, and ticked. */
   plain: number;
   over: number;
+  /**
+   * Of those, the trades a fee rule leaves alone, ticked or not: they settle
+   * in another currency than the account's (a moved trade keeps its own, B6),
+   * and the rule's amounts are in the account's (B201).
+   */
+  otherCurrency: number;
 }
 
 /**
- * Apply to existing trades (spec §5.3, B16, B57): what the rule does, the
- * count of trades it covers, the override box, and how many will change, read
- * with the same functions the write uses so the count is what the result
- * will be. Ends in the toast line of its card, through `onDone`.
+ * Fill in logged trades (spec §5.3, B16, B57): what the rule does, the count
+ * of trades it covers, the override box, and how many will change, read with
+ * the same functions the write uses so the count is what the result will be.
+ * A fee rule also says how many trades it leaves alone for their currency.
+ * Ends in the toast line of its card, through `onDone`.
  */
 export function ApplyRuleDialog({
   open,
@@ -93,6 +100,10 @@ export function ApplyRuleDialog({
       matched: matched.length,
       plain: changes(false),
       over: changes(true),
+      otherCurrency:
+        applying.kind === 'fee'
+          ? matched.filter((t) => t.pnlCurrency !== account.currency).length
+          : 0,
     };
   }, [open, applying, trades, account]);
   if (open && !submitted && live && live !== held) setHeld(live);
@@ -142,16 +153,16 @@ export function ApplyRuleDialog({
       origin={origin}
       returnFocus={returnFocus}
       size="compact"
-      title="Apply this rule to existing trades?"
+      title="Fill in logged trades with this rule?"
       footer={
         <RuleFooter
           onCancel={() => onOpenChange(false)}
           label={
             apply.isPending
-              ? 'Applying...'
+              ? 'Filling in...'
               : will && !archived
-                ? `Apply to ${noun(will)}`
-                : 'Apply'
+                ? `Fill in ${noun(will)}`
+                : 'Fill in trades'
           }
           disabled={!will || archived}
           busy={apply.isPending}
@@ -250,6 +261,13 @@ export function ApplyRuleDialog({
               change is logged in Logs.
             </>
           )}
+          {!archived && counts && counts.otherCurrency > 0 ? (
+            <span className="mt-1 block text-[13px] text-muted">
+              {noun(counts.otherCurrency)} settled in another currency{' '}
+              {counts.otherCurrency === 1 ? 'is' : 'are'} left as{' '}
+              {counts.otherCurrency === 1 ? 'it is' : 'they are'}.
+            </span>
+          ) : null}
         </p>
         {failed ? (
           <p role="alert" className="mt-3 text-[13px] font-medium text-loss">

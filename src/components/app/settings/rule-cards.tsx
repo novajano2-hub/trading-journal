@@ -317,7 +317,7 @@ const feeLines = (
 /**
  * Settings > Trading's default rules (spec §5.3): the note that both kinds
  * fill in trades as they are imported, then a card for each kind. Every rule
- * has a menu: Apply to existing trades, Edit, Delete.
+ * has a menu: Fill in logged trades, Edit, Delete.
  */
 export function RuleCards(): React.JSX.Element | null {
   // Money is shown through Display, so nothing is drawn until the preferences are read: Privacy must never flash a figure.
@@ -364,8 +364,8 @@ function RuleCardsBody(): React.JSX.Element {
         />
         <span>
           Both kinds of rule below fill in trades as you import them. Trades
-          already in Keel, and trades you add by hand, change only when you use
-          Apply to existing trades on a rule.
+          already in Keel, and trades you add by hand, change only when you
+          choose Fill in logged trades on a rule.
         </span>
       </p>
 
@@ -383,7 +383,7 @@ function RuleCardsBody(): React.JSX.Element {
         menuKind="targets and stops"
         actions={(rule) => [
           {
-            label: 'Apply to existing trades',
+            label: 'Fill in logged trades',
             onSelect: (el) => openApply(el, { kind: 'target', rule }),
           },
           {
@@ -421,7 +421,7 @@ function RuleCardsBody(): React.JSX.Element {
         menuKind="commissions and fees"
         actions={(rule) => [
           {
-            label: 'Apply to existing trades',
+            label: 'Fill in logged trades',
             onSelect: (el) => openApply(el, { kind: 'fee', rule }),
           },
           {

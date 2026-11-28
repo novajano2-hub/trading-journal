@@ -49,20 +49,26 @@ export function DayPatterns({
   const hits =
     patterns === undefined ? undefined : (patterns.byDay.get(date) ?? []);
   const summary = (
-    <div className="flex flex-none items-baseline gap-2.5 px-4 pt-3 pb-2.5">
-      <b className="text-[15px] font-semibold tracking-[-0.015em] text-text">
-        {label}
-      </b>
-      {net ? (
-        <span
-          className={`text-[13.5px] font-semibold tabular-nums ${signTone(net.cents)}`}
-        >
-          <FigureText f={net.figure} />
+    <div className="flex-none px-4 pt-3 pb-2.5">
+      <div className="flex items-baseline gap-2.5">
+        <b className="text-[15px] font-semibold tracking-[-0.015em] text-text">
+          {label}
+        </b>
+        {net ? (
+          <span
+            className={`text-[13.5px] font-semibold tabular-nums ${signTone(net.cents)}`}
+          >
+            <FigureText f={net.figure} />
+          </span>
+        ) : null}
+        <span className="ml-auto text-[12.5px] text-faint tabular-nums">
+          {trades} {plural(trades, 'trade')}
         </span>
-      ) : null}
-      <span className="ml-auto text-[12.5px] text-faint tabular-nums">
-        {trades} {plural(trades, 'trade')}
-      </span>
+      </div>
+      {/* The net and count are the view's accounts; the patterns are not. */}
+      <p className="mt-0.5 text-[12px] leading-[1.4] text-faint">
+        Patterns are read across all your accounts.
+      </p>
     </div>
   );
   const face = (count: number | undefined, phone: boolean): PatternsFace =>

@@ -73,6 +73,11 @@ test('a day card lists its day patterns', async () => {
   );
   // It lists the day's patterns, not the trades': Added to the position and Loss after a loss are trade patterns.
   expect(pop.textContent).not.toContain('Loss after a loss');
+  // The head follows the view's accounts; the patterns read them all, and one faint line says so.
+  const scope = within(pop).getByText(
+    'Patterns are read across all your accounts.',
+  );
+  expect(scope.className).toContain('text-faint');
 });
 
 test('a day with no pattern has the control disabled, with its reason', async () => {

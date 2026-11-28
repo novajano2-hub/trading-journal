@@ -193,7 +193,8 @@ export function CostCell({
         <input
           ref={edit.inputRef(field)}
           type="text"
-          inputMode="decimal"
+          // A credit is negative, and a decimal keypad has no minus.
+          inputMode="text"
           autoComplete="off"
           aria-label={LABEL[field]}
           aria-invalid={bad || undefined}

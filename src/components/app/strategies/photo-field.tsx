@@ -85,8 +85,10 @@ function DraftThumb({ file }: { file: PhotoDraft }): React.JSX.Element {
 }
 
 /**
- * The strategy form's Photo (B48): PNG, JPEG or WebP up to 10 MB, with Replace
- * and Remove. What is chosen stays in the form until the strategy is saved. A
+ * The strategy form's Photo (B48): PNG, JPEG or WebP up to 10 MB, chosen or
+ * dropped on the field (spec §5.7), with Replace and Remove; a drop on a field
+ * with a photo replaces it. What is chosen stays in the form until the
+ * strategy is saved. A
  * photo already stored may be of any image type (a template's own SVG cover):
  * it shows, and it can be replaced or removed, but a new upload is never SVG
  * or GIF.
@@ -103,6 +105,10 @@ export function PhotoField({
 }): React.JSX.Element {
   const picker = useRef<HTMLInputElement>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  // The drop zone (spec §5.7): lit while a file is over it. Entering a child
+  // fires before leaving the parent, so a count keeps it lit across them.
+  const [over, setOver] = useState(false);
+  const depth = useRef(0);
 
   const take = async (file: File | undefined) => {
     if (!file) return;
@@ -140,7 +146,30 @@ export function PhotoField({
       <legend className="mb-1.5 block text-[12.5px] font-medium text-muted">
         Photo
       </legend>
-      <div className="flex items-center gap-3.5 max-sm:items-start">
+      <div
+        data-dropzone=""
+        data-over={over ? '' : undefined}
+        onDragEnter={() => {
+          if (loading) return;
+          depth.current += 1;
+          setOver(true);
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+        }}
+        onDragLeave={() => {
+          depth.current = Math.max(0, depth.current - 1);
+          if (depth.current === 0) setOver(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          depth.current = 0;
+          setOver(false);
+          if (loading) return;
+          void take(e.dataTransfer.files[0]);
+        }}
+        className={`-m-1.5 flex items-center gap-3.5 rounded-[12px] p-1.5 outline-offset-0 transition-colors duration-200 ease-(--ease-glide) max-sm:items-start motion-reduce:transition-none ${over ? 'bg-accent-soft outline-[1.5px] outline-accent outline-dashed' : ''}`}
+      >
         {loading ? (
           <span
             className={`${FRAME} motion-safe:animate-pulse`}

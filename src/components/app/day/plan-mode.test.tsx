@@ -176,6 +176,52 @@ test('See more templates opens Manage templates', async () => {
   expect(await screen.findByRole('dialog', { name: 'Templates' })).toBeTruthy();
 });
 
+test('Escape on the template menu hands the keyboard back to the Template button', async () => {
+  await open();
+  const button = await screen.findByRole('button', {
+    name: 'Insert a template',
+  });
+  fireEvent.keyDown(button, { key: 'Enter' });
+  await screen.findByRole('menuitem', { name: 'Daily game plan' });
+  fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+  await waitFor(() => expect(document.activeElement).toBe(button));
+});
+
+test('on a phone, Manage templates keeps the keyboard in the dialog it opens', async () => {
+  window.innerWidth = 390;
+  try {
+    await open();
+    const box = await editor();
+    fireEvent.keyDown(
+      await screen.findByRole('button', { name: 'More tools' }),
+      { key: 'Enter' },
+    );
+    const template = await screen.findByRole('menuitem', { name: 'Template' });
+    // The More menu's own entrance, before a pick lands.
+    await new Promise((r) => setTimeout(r, 400));
+    fireEvent.click(template);
+    const manage = await screen.findByRole('menuitem', {
+      name: 'Manage templates',
+    });
+    // Any move of the keyboard to the note (on a phone it brings up the
+    // keyboard and scrolls the note under the dialog) counts.
+    let pulled = 0;
+    box.addEventListener('focus', () => (pulled += 1));
+    fireEvent.click(manage);
+    const dialog = await screen.findByRole('dialog', { name: 'Templates' });
+    await waitFor(() =>
+      expect(dialog.contains(document.activeElement)).toBe(true),
+    );
+    // The template menu's closing does not pull it back to the note.
+    await new Promise((r) => setTimeout(r, 300));
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(pulled).toBe(0);
+  } finally {
+    window.innerWidth = 1024;
+  }
+});
+
 test('the template line names the template the note started from, even after the default changes', async () => {
   const repo = repository();
   await repo.journal.dailyNote(WS, TODAY);

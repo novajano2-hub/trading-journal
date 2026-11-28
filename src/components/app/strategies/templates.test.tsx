@@ -349,6 +349,34 @@ test('the chooser filters by asset class and searches name and asset class; Star
   expect(d.getByText('Start blank')).toBeTruthy();
 });
 
+test('the chooser opens fresh each time: no filter or search kept from before', async () => {
+  const { dialog } = await chooser();
+  const d = within(dialog);
+  fireEvent.click(d.getByRole('radio', { name: 'Forex' }));
+  fireEvent.change(d.getByRole('searchbox', { name: 'Search templates' }), {
+    target: { value: 'london' },
+  });
+  fireEvent.click(d.getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+
+  fireEvent.click(await screen.findByRole('button', { name: 'New strategy' }));
+  const again = within(
+    await screen.findByRole('dialog', { name: 'New strategy' }),
+  );
+  expect(
+    (
+      again.getByRole('searchbox', {
+        name: 'Search templates',
+      }) as HTMLInputElement
+    ).value,
+  ).toBe('');
+  expect(
+    (again.getByRole('radio', { name: 'All' }) as HTMLInputElement).checked,
+  ).toBe(true);
+  for (const t of STRATEGY_TEMPLATES)
+    expect(again.getByText(t.name)).toBeTruthy();
+});
+
 test('Start blank opens the empty form', async () => {
   const { dialog } = await chooser();
   fireEvent.click(within(dialog).getByRole('button', { name: /Start blank/ }));

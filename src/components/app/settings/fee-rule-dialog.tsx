@@ -116,13 +116,28 @@ export function FeeRuleDialog({
   }, [open, all, trades, accountId, asset]);
 
   const ready = accountId !== '' && asset !== '' && (all || symbols.length > 0);
+  // Under Privacy the amounts are hidden and can't be typed, so a new rule
+  // would save amounts nobody chose: Create waits, and the hint says why.
+  const hiddenNew = masked && !rule;
+  const hintId = `${ids}-privacy`;
+  const waiting =
+    accountId === '' && asset === ''
+      ? 'Choose an account and an instrument.'
+      : accountId === ''
+        ? 'Choose an account.'
+        : asset === ''
+          ? 'Choose an instrument.'
+          : !all && symbols.length === 0
+            ? 'Name a symbol, or turn All symbols on.'
+            : null;
+  const reasonId = waiting ? `${ids}-waiting` : hiddenNew ? hintId : undefined;
   const errors = {
     commission: centsOf(commission) === null,
     fee: centsOf(fee) === null,
   };
 
   const submit = async () => {
-    if (!ready) return;
+    if (!ready || hiddenNew) return;
     setAttempted(true);
     setFailed(null);
     const c = centsOf(commission);
@@ -176,7 +191,11 @@ export function FeeRuleDialog({
             inputMode="decimal"
             autoComplete="off"
             aria-invalid={attempted && bad ? true : undefined}
-            aria-describedby={attempted && bad ? `${id}-error` : undefined}
+            aria-describedby={
+              [masked ? hintId : '', attempted && bad ? `${id}-error` : '']
+                .filter(Boolean)
+                .join(' ') || undefined
+            }
             readOnly={masked}
             title={masked ? 'Hidden by Privacy' : undefined}
             value={
@@ -210,9 +229,10 @@ export function FeeRuleDialog({
         <RuleFooter
           onCancel={() => onOpenChange(false)}
           label={rule ? 'Save rule' : 'Create'}
-          disabled={!ready}
+          disabled={!ready || hiddenNew}
           busy={save.isPending}
           formId={`${ids}-form`}
+          reasonId={reasonId}
         />
       }
     >
@@ -305,8 +325,13 @@ export function FeeRuleDialog({
           {money(`${ids}-fee`, 'Fee', fee, setFee, errors.fee)}
         </div>
         {masked ? (
-          <p className={FIELD_HINT}>
+          <p id={hintId} className={FIELD_HINT}>
             Amounts are hidden by Privacy. Turn it off to edit them.
+          </p>
+        ) : null}
+        {waiting ? (
+          <p id={`${ids}-waiting`} className={`${FIELD_HINT} mt-2.5`}>
+            {waiting}
           </p>
         ) : null}
         <p className={`${FIELD_HINT} mt-2.5`}>

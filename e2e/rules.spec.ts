@@ -125,9 +125,9 @@ async function ruleMenu(card: Locator, item: string) {
 }
 
 const applyDialog = (page: Page) =>
-  page.getByRole('dialog', { name: 'Apply this rule to existing trades?' });
+  page.getByRole('dialog', { name: 'Fill in logged trades with this rule?' });
 
-test('default rules: create both kinds, import a file, see levels and fees on the new trades, then apply to existing without and with override', async ({
+test('default rules: create both kinds, import a file, see levels and fees on the new trades, then fill in logged trades without and with override', async ({
   page,
 }) => {
   test.skip(
@@ -277,7 +277,7 @@ test('default rules: create both kinds, import a file, see levels and fees on th
   await expect(fees).toContainText('−$7.00');
   await expect(fees).toContainText('$5.00 commission, $2.00 exchange');
 
-  // Apply to existing, a target rule, box unticked: only trades with no targets or stops. The rule has
+  // Fill in logged trades, a target rule, box unticked: only trades with no targets or stops. The rule has
   // changed since (12 points), and editing it left what it filled as it was.
   await page.goto('/app/settings/trading');
   await expect(targetsCard(page)).toBeVisible({ timeout: 30_000 });
@@ -296,7 +296,7 @@ test('default rules: create both kinds, import a file, see levels and fees on th
     ),
   ).toHaveLength(4);
 
-  await ruleMenu(targetsCard(page), 'Apply to existing trades');
+  await ruleMenu(targetsCard(page), 'Fill in logged trades');
   let apply = applyDialog(page);
   await expect(apply).toBeVisible();
   // 9 ES trades match; the 5 with nothing set are the ones that change.
@@ -308,7 +308,7 @@ test('default rules: create both kinds, import a file, see levels and fees on th
   });
   await expect(box).not.toBeChecked();
   await expect(apply.getByText('5 trades', { exact: true })).toBeVisible();
-  await apply.getByRole('button', { name: 'Apply to 5 trades' }).click();
+  await apply.getByRole('button', { name: 'Fill in 5 trades' }).click();
   await expect(apply).toBeHidden();
   await expect(
     targetsCard(page).getByRole('status', { name: 'Result' }),
@@ -320,17 +320,17 @@ test('default rules: create both kinds, import a file, see levels and fees on th
   expect(es.every((t) => t.stops?.levels[0]?.value === 5)).toBe(true);
 
   // Again, unticked: nothing is left to fill. Ticked: the four replace their 10 with 12.
-  await ruleMenu(targetsCard(page), 'Apply to existing trades');
+  await ruleMenu(targetsCard(page), 'Fill in logged trades');
   apply = applyDialog(page);
   await expect(apply.getByText('No trade will change.')).toBeVisible();
   await expect(
-    apply.getByRole('button', { name: 'Apply', exact: true }),
+    apply.getByRole('button', { name: 'Fill in trades', exact: true }),
   ).toBeDisabled();
   await apply
     .getByRole('checkbox', { name: /Replace targets and stops already set/ })
     .check({ force: true });
   await expect(apply.getByText('4 trades', { exact: true })).toBeVisible();
-  await apply.getByRole('button', { name: 'Apply to 4 trades' }).click();
+  await apply.getByRole('button', { name: 'Fill in 4 trades' }).click();
   await expect(apply).toBeHidden();
   await expect(
     targetsCard(page).getByRole('status', { name: 'Result' }),
@@ -349,13 +349,13 @@ test('default rules: create both kinds, import a file, see levels and fees on th
   await expect(dialog).toBeHidden();
   await expect(feesCard(page)).toContainText('$2.00 commission, $0.50 fee');
 
-  await ruleMenu(feesCard(page), 'Apply to existing trades');
+  await ruleMenu(feesCard(page), 'Fill in logged trades');
   apply = applyDialog(page);
   await expect(apply).toContainText(
     'It matches 14 futures trades in Rules account',
   );
   await expect(apply.getByText('8 trades', { exact: true })).toBeVisible();
-  await apply.getByRole('button', { name: 'Apply to 8 trades' }).click();
+  await apply.getByRole('button', { name: 'Fill in 8 trades' }).click();
   await expect(apply).toBeHidden();
   await expect(
     feesCard(page).getByRole('status', { name: 'Result' }),
@@ -368,14 +368,14 @@ test('default rules: create both kinds, import a file, see levels and fees on th
     expect(t.executions.every((e) => e.commission === e.qty * 125)).toBe(true);
 
   // Ticked, the six replace theirs.
-  await ruleMenu(feesCard(page), 'Apply to existing trades');
+  await ruleMenu(feesCard(page), 'Fill in logged trades');
   apply = applyDialog(page);
   await expect(apply.getByText('No trade will change.')).toBeVisible();
   await apply
     .getByRole('checkbox', { name: /Replace commissions and fees already set/ })
     .check({ force: true });
   await expect(apply.getByText('6 trades', { exact: true })).toBeVisible();
-  await apply.getByRole('button', { name: 'Apply to 6 trades' }).click();
+  await apply.getByRole('button', { name: 'Fill in 6 trades' }).click();
   await expect(apply).toBeHidden();
   await expect(
     feesCard(page).getByRole('status', { name: 'Result' }),
@@ -463,11 +463,9 @@ test('on a phone the rule dialogs are full-height sheets with their footer in vi
   await expect(row).toContainText('Targets 8 and 16 points, 50% each');
   expect(await overflow()).toBeLessThanOrEqual(0);
 
-  // Apply to existing opens its confirmation with the count and the box.
+  // Fill in logged trades opens its confirmation with the count and the box.
   await row.getByRole('button', { name: /^Actions for Futures live/ }).click();
-  await page
-    .getByRole('menuitem', { name: 'Apply to existing trades' })
-    .click();
+  await page.getByRole('menuitem', { name: 'Fill in logged trades' }).click();
   const apply = applyDialog(page);
   await expect(apply).toBeVisible();
   await expect(apply).toContainText(

@@ -789,6 +789,7 @@ export function RuleFooter({
   busy = false,
   formId,
   onConfirm,
+  reasonId,
 }: {
   onCancel(): void;
   label: string;
@@ -797,6 +798,8 @@ export function RuleFooter({
   /** Set: the button submits that form. */
   formId?: string;
   onConfirm?(): void;
+  /** The id of the line that says why the button is off: its description. */
+  reasonId?: string;
 }): React.JSX.Element {
   return (
     <div className="flex justify-end gap-2">
@@ -807,6 +810,7 @@ export function RuleFooter({
         type={formId ? 'submit' : 'button'}
         form={formId}
         disabled={disabled || busy}
+        aria-describedby={reasonId}
         onClick={onConfirm}
       >
         {label}

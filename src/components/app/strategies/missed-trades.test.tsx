@@ -203,6 +203,15 @@ test('a missed trade saves exactly its fields: symbol, date and time, price, com
   expect(screen.getByText('1 missed')).toBeTruthy();
 });
 
+test('the commission and fees fields bring up a keyboard with a minus key, as a credit reads', async () => {
+  await open();
+  const dialog = await openAdd();
+  for (const label of ['Commission', 'Fees'])
+    expect(within(dialog).getByLabelText(label).getAttribute('inputmode')).toBe(
+      'text',
+    );
+});
+
 test('a price, commission and fees can be left empty: they show as None', async () => {
   const { repo } = await open();
   const dialog = await openAdd();
