@@ -81,9 +81,26 @@ export function pctText(x: number | null, digits = 0): string {
   return x === null ? 'None' : `${(x * 100).toFixed(digits)}%`;
 }
 
-/** The delete confirmation's sentence, for the trades that lose the strategy. */
-export function deleteBody(n: number): string {
-  return n === 1
-    ? 'Its 1 trade keeps its data and loses this strategy.'
-    : `Its ${n} trades keep their data and lose this strategy.`;
+/**
+ * The delete confirmation's sentence, for the trades that lose the strategy;
+ * with `own`, the missed trades and photo that are deleted with it.
+ */
+export function deleteBody(
+  n: number,
+  own: { missed?: number; photo?: boolean } = {},
+): string {
+  const base =
+    n === 1
+      ? 'Its 1 trade keeps its data and loses this strategy.'
+      : `Its ${n} trades keep their data and lose this strategy.`;
+  const missed = own.missed ?? 0;
+  const goes = [
+    ...(missed > 0
+      ? [`${missed} missed ${missed === 1 ? 'trade' : 'trades'}`]
+      : []),
+    ...(own.photo ? ['photo'] : []),
+  ];
+  if (goes.length === 0) return base;
+  const are = goes.length > 1 || missed > 1 ? 'are' : 'is';
+  return `${base} Its ${goes.join(' and its ')} ${are} deleted with it.`;
 }

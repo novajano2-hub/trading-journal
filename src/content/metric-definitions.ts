@@ -22,6 +22,8 @@ export const METRIC_IDS = [
   'net-roi',
   'realized-r',
   'planned-r',
+  'planned-reward',
+  'planned-risk',
   'mae',
   'mfe',
   'sharpe',
@@ -105,6 +107,7 @@ export const METRIC_IDS = [
   'hold-time-breakevens',
   'commissions',
   'fill-fees',
+  'swap',
   'avg-win-loss',
   'longest-trade',
   'avg-day-length',
@@ -155,7 +158,27 @@ export const METRIC_IDS = [
   'tracker-history',
   'tracker-card',
   'tracker-follow-rate',
+  'patterns',
+  'pattern-held-longer',
+  'pattern-long-loss-hold',
+  'pattern-loss-after-loss',
+  'pattern-added-to-position',
+  'pattern-exited-in-parts',
+  'pattern-large-size',
+  'pattern-losses-outweighed',
+  'pattern-switched-sides-red',
+  'pattern-switched-sides-green',
+  'pattern-one-strong-trade',
+  'pattern-low-return',
+  'pattern-sized-up-after-wins',
+  'pattern-more-trades',
+  'pattern-waited-then-won',
+  'pattern-quick-reentries',
+  'pattern-rushed-red-day',
+  'pattern-busier-than-green',
+  'pattern-trades',
   'cost-method',
+  'ticks-per-contract',
 ] as const;
 
 export type MetricId = (typeof METRIC_IDS)[number];
@@ -216,6 +239,11 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     definition:
       "Closed trades in your filters. Open positions are counted apart, and aren't in the figures beside it.",
   },
+  'pattern-trades': {
+    label: 'Trades',
+    definition:
+      "Closed trades in your filters that the pattern fired on. A trade with two patterns is in both rows. A day pattern counts that day's trades, whichever of them it was read from.",
+  },
   pnl: {
     label: '{Basis} P&L',
     definition:
@@ -254,12 +282,22 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'realized-r': {
     label: 'Realized R',
     definition:
-      "The trade's {basis} P&L divided by the money it risked at its planned stop. +1R is a profit as large as that risk. None without a planned stop.",
+      "The trade's {basis} P&L divided by the money it risked: the loss if every stop level fills. +1R is a profit as large as that risk. It needs a stop but not a target, and a closed trade. None without them.",
   },
   'planned-r': {
     label: 'Planned R',
     definition:
-      'The distance from entry to your planned target divided by the distance from entry to your planned stop. It needs both.',
+      'Planned reward divided by planned risk: the profit if every target level fills over the loss if every stop level fills. It needs a target and a stop.',
+  },
+  'planned-reward': {
+    label: 'Planned reward',
+    definition:
+      "The profit if every target level fills: each level's quantity times its distance from the average entry, added up. None until the trade has a target and a stop.",
+  },
+  'planned-risk': {
+    label: 'Planned risk',
+    definition:
+      "The loss if every stop level fills: each level's quantity times its distance from the average entry, added up. A stop level that covers part of the position counts only that part. None until the trade has a target and a stop.",
   },
   mae: {
     label: 'MAE',
@@ -690,6 +728,11 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     definition:
       'The total of the exchange and regulatory fees on the fills of closed trades, apart from commissions. A trade typed in without fills counts its whole cost here.',
   },
+  swap: {
+    label: 'Swap',
+    definition:
+      'What your broker charged or paid for holding positions overnight, also called rollover or financing. A charge is negative and a credit positive. It sits inside net P&L and outside gross P&L. It comes from the Swap column of a closed-trades import, so a fills import and a trade typed in have none. On the Overview, the total over the closed trades in your filters; None when none of them has one.',
+  },
   'avg-win-loss': {
     label: 'Average win to loss',
     definition:
@@ -876,7 +919,7 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
   'day-commissions': {
     label: 'Commissions',
     definition:
-      'Fees and commissions on the closed trades: gross P&L minus net P&L.',
+      'The fees and commissions on the closed trades. A swap is a cost of its own and is not in it.',
   },
   'day-win-rate': {
     label: 'Win rate',
@@ -918,10 +961,105 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     definition:
       "The days that kept this rule, divided by the days it was decided, in the date range. A day still pending doesn't count, and a rule with no decided day reads 0%.",
   },
+  patterns: {
+    label: 'Patterns',
+    definition:
+      "How many behaviour patterns fired on a trade. Each one is read from the trade's fills and from your other trades in the 60 days before it, in every account. Patterns of a whole day are counted on the day, not on its trades. 0 when none fired.",
+  },
+  'pattern-held-longer': {
+    label: 'Held longer than usual',
+    definition:
+      'A closed trade held longer than 75% of your closed trades with the same outcome (wins against wins, losses against losses) in the 60 days before it was opened. Breakevens and open trades are left out. With less history it uses the trades there are.',
+  },
+  'pattern-long-loss-hold': {
+    label: 'Long hold on a loss',
+    definition:
+      'A loss held longer than half of your losses in the 60 days before it was opened, and larger than the average of those losses.',
+  },
+  'pattern-loss-after-loss': {
+    label: 'Loss after a loss',
+    definition:
+      'A losing trade opened within 30 seconds of the exit of another losing trade, in any account or instrument.',
+  },
+  'pattern-added-to-position': {
+    label: 'Added to the position',
+    definition:
+      "A trade opened in two or more entries. It needs the trade's fills, so a trade typed in without them never has it.",
+  },
+  'pattern-exited-in-parts': {
+    label: 'Exited in parts',
+    definition:
+      "A closed trade that was closed in two or more exits. It needs the trade's fills.",
+  },
+  'pattern-large-size': {
+    label: 'Large size',
+    definition:
+      'A trade whose size is above 75% of the trades you opened in the 60 days before it. Open trades count.',
+  },
+  'pattern-losses-outweighed': {
+    label: 'Losses outweighed wins',
+    definition:
+      'A red day on which you won half of your decided trades or more, but the average loss was at least twice the average win.',
+  },
+  'pattern-switched-sides-red': {
+    label: 'Switched sides, red',
+    definition:
+      'A red day with three or more changes of side, long to short or back, within one symbol. The symbol with the most changes counts; changes in different symbols are not added.',
+  },
+  'pattern-switched-sides-green': {
+    label: 'Switched sides, green',
+    definition:
+      'A green day with three or more changes of side, long to short or back, within one symbol. The symbol with the most changes counts; changes in different symbols are not added.',
+  },
+  'pattern-one-strong-trade': {
+    label: 'One strong trade',
+    definition:
+      'A day with a single trade, a win, with a realized R of 3 or more. It needs a stop on the trade, because R is measured against it.',
+  },
+  'pattern-low-return': {
+    label: 'Low return for the effort',
+    definition:
+      'A green day of three or more trades whose net P&L is below half of your average green day in the 60 days before it.',
+  },
+  'pattern-sized-up-after-wins': {
+    label: 'Sized up after wins',
+    definition:
+      'A trade larger than the one before it, after three or more wins in a row, that lost more than your average loss in the 60 days before the day.',
+  },
+  'pattern-more-trades': {
+    label: 'More trades than usual',
+    definition:
+      'A day with at least a third more trades than your daily average over the 60 days before it. Days without trades are not in the average.',
+  },
+  'pattern-waited-then-won': {
+    label: 'Waited, then won',
+    definition:
+      "A green day whose first entry came 90 minutes or more after the day's session started. It needs a session started with the day's timer.",
+  },
+  'pattern-quick-reentries': {
+    label: 'Quick re-entries after a loss',
+    definition:
+      'Two or more losing trades, each opened within one minute of the exit of an earlier losing trade.',
+  },
+  'pattern-rushed-red-day': {
+    label: 'Rushed red day',
+    definition:
+      'A red day of five or more trades with a median hold under 5 minutes and a median gap between trades under 2 minutes.',
+  },
+  'pattern-busier-than-green': {
+    label: 'Busier than a green day',
+    definition:
+      'A day with at least twice your average number of trades on green days in the 60 days before it.',
+  },
   'cost-method': {
     label: 'Cost method',
     definition:
       'Which lots an exit closes first: the oldest (FIFO), the newest (LIFO), or all at their average cost.',
+  },
+  'ticks-per-contract': {
+    label: 'Ticks per contract',
+    definition:
+      "A futures trade's ticks over the contracts its exits closed: how far the price moved for one contract, in the trade's direction, over the tick size. None before the first exit.",
   },
 };
 

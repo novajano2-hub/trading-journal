@@ -34,6 +34,8 @@ export interface CalendarDay {
   net: Cents;
   gross: Cents;
   fees: Cents;
+  /** The swap booked with the day's exits, apart from `fees`; inside the net, outside the gross. */
+  swap: Cents;
   trades: number;
   wins: number;
   losses: number;
@@ -165,6 +167,7 @@ function bookDays(
       net: s.net,
       gross: 0,
       fees: 0,
+      swap: 0,
       trades: s.tradeCount,
       wins: s.wins,
       losses: s.losses,
@@ -184,6 +187,7 @@ function bookDays(
       if (!day) continue;
       day.gross += x.gross;
       day.fees += x.fees;
+      day.swap += x.swap ?? 0;
       for (const u of ['r', 'ticks', 'pips', 'points'] as const) {
         const v = x.units[u];
         if (v !== null) day[u] = (day[u] ?? 0) + v;
@@ -237,6 +241,7 @@ const emptyDay = (
   net: 0,
   gross: 0,
   fees: 0,
+  swap: 0,
   trades: 0,
   wins: 0,
   losses: 0,

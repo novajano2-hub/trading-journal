@@ -86,6 +86,29 @@ describe('calendarMonth', () => {
     expect(dayOf(m, '2026-11-17')).toMatchObject({ net: 99700, trades: 1 });
   });
 
+  test('swap books with the last exit, in its own total apart from the fees', () => {
+    const [t] = heldTwoDays();
+    const swapped = { ...t!, swap: -486, net: t!.net - 486 };
+    const m = calendarMonth([swapped], [], '2026-11', ctx);
+    // The first exit's day is as it was; the last exit's day carries the swap.
+    expect(dayOf(m, '2026-11-16')).toMatchObject({
+      net: 49700,
+      gross: 50000,
+      fees: 300,
+      swap: 0,
+    });
+    expect(dayOf(m, '2026-11-17')).toMatchObject({
+      net: 99700 - 486,
+      gross: 100000,
+      fees: 300,
+      swap: -486,
+    });
+    // A trade without one leaves the field at 0.
+    expect(
+      dayOf(calendarMonth([t!], [], '2026-11', ctx), '2026-11-17')!.swap,
+    ).toBe(0);
+  });
+
   test('November 2026 runs Sunday to Saturday over five weeks by default', () => {
     const m = calendarMonth([], [], '2026-11', ctx);
     expect(m.weeks).toHaveLength(5);

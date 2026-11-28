@@ -2,6 +2,13 @@ import { TZDate } from '@date-fns/tz';
 import { canonicalSymbol } from '@/domain/trade-builder';
 import type { Execution, Instrument } from '@/domain/types';
 
+/** The id of the synthetic fill that closes an expired option ends with this. */
+const SETTLEMENT = ':expiry';
+
+/** Whether the execution is the synthetic fill that settled an expired option, not one a broker made. */
+export const isExpirySettlement = (e: Pick<Execution, 'id'>): boolean =>
+  e.id.endsWith(SETTLEMENT);
+
 export interface ExpiredOption {
   accountId: string;
   symbol: string; // canonical
@@ -52,7 +59,7 @@ export function settleExpiredOptions(
     if (inst?.assetClass !== 'option' || !inst.expiry || g.net === 0) continue;
     const close = expiryCloseUtc(inst.expiry);
     if (Date.parse(close) > Date.parse(asOf)) continue;
-    const id = `${g.accountId}:${g.symbol}:expiry`;
+    const id = `${g.accountId}:${g.symbol}${SETTLEMENT}`;
     out.push({
       id,
       accountId: g.accountId,

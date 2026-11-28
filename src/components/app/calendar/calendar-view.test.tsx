@@ -1118,6 +1118,46 @@ test('Day rating in the day panel carries a metric tip that says how it is worke
   );
 });
 
+/** One closed trade on 19 Nov: gross $530.00, fees $14.00, swap -$4.86, so net $511.14. */
+const SWAPPED = withTrades([
+  [
+    '2026-11-19',
+    51114,
+    { gross: 53000, fees: 1400, swap: -486, executions: [] },
+  ],
+]);
+
+async function panelOn(basis: 'net' | 'gross') {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: SWAPPED,
+  });
+  await repository.prefs.update({ pnlBasis: basis });
+  renderApp(<CalendarView />, { repository, url: url('&day=2026-11-19') });
+  const panel = await screen.findByRole('complementary', {
+    name: /Thu 19 Nov/,
+  });
+  return (label: string) =>
+    within(panel)
+      .getByRole('button', { name: label })
+      .closest('div')!
+      .querySelector('dd')!.textContent;
+}
+
+test('the day panel on the gross basis reads the net with the swap in it, and the fees apart', async () => {
+  const dd = await panelOn('gross');
+  expect(dd('Fees')).toBe('−$14.00');
+  // Gross less fees plus swap: 530.00 - 14.00 - 4.86.
+  expect(dd('Net')).toBe('+$511.14');
+});
+
+test('the day panel on the net basis reads the gross, and the fees without the swap', async () => {
+  const dd = await panelOn('net');
+  expect(dd('Fees')).toBe('−$14.00');
+  expect(dd('Gross')).toBe('+$530.00');
+});
+
 /** The SVG the open Calendar image panel previews. */
 async function previewSvg(month = 'November 2026') {
   const img = await screen.findByRole('img', {

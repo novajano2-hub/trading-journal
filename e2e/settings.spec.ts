@@ -172,3 +172,63 @@ test('Accounts: Back restores the search and filter after leaving the page', asy
     page.getByRole('button', { name: 'Clear filter Status: Active' }),
   ).toBeVisible();
 });
+
+test('an edit on a trade shows in the edit history on Logs, and the search narrows it', async ({
+  page,
+}) => {
+  await page.goto('/app/trades');
+  const log = page.getByRole('table', { name: 'Trades' });
+  await expect(log).toBeVisible({ timeout: 30_000 });
+  await log.locator('tbody tr').first().getByRole('link').first().click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    /Trade \d+\s*$/,
+  );
+
+  // Two edits of one trade: its review mark and its rating.
+  const reviewed = page.getByRole('button', { name: 'Reviewed' });
+  const was = await reviewed.getAttribute('aria-pressed');
+  await reviewed.click();
+  await expect(reviewed).toHaveAttribute(
+    'aria-pressed',
+    was === 'true' ? 'false' : 'true',
+  );
+  const rating = page.getByRole('radiogroup', { name: /^Rating:/ });
+  const stars =
+    (await rating.getAttribute('aria-label')) === 'Rating: 5 of 5' ? 4 : 5;
+  await rating
+    .locator('label', {
+      has: page.getByRole('radio', { name: `${stars} stars` }),
+    })
+    .click();
+  await expect(
+    page.getByRole('radiogroup', { name: `Rating: ${stars} of 5` }),
+  ).toBeVisible();
+
+  // Logs lists both first, in the profile's zone, by you; the sample's own
+  // edits (made before the page's clock) follow on more pages.
+  await page.goto('/app/settings/import-history');
+  const history = page.getByRole('table', { name: 'Edit history' });
+  await expect(history).toBeVisible({ timeout: 30_000 });
+  const rows = history.locator('tbody tr');
+  await expect(rows).toHaveCount(50);
+  await expect(rows.nth(0)).toContainText('20 Nov, 10:00 GMT−5');
+  await expect(rows.nth(0)).toContainText('Trade');
+  await expect(rows.nth(0)).toContainText(`Rating`);
+  await expect(rows.nth(0)).toContainText(`to ${stars} of 5`);
+  await expect(rows.nth(1)).toContainText('Reviewed');
+  await expect(rows.nth(1)).toContainText('Edited');
+  await expect(rows.nth(1)).toContainText('You');
+  await expect(rows.nth(1)).toContainText('20 Nov, 10:00 GMT−5');
+  await expect(rows.nth(2)).not.toContainText('20 Nov, 10:00');
+  await expect(page.getByText(/^1 to 50 of \d+$/)).toBeVisible();
+
+  // The search narrows them to the field asked for, then to none.
+  const search = page.getByRole('searchbox', { name: 'Search edit history' });
+  await search.fill('rating');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('Rating');
+  await expect(page.getByText('1 to 1 of 1')).toBeVisible();
+  await search.fill('strategy');
+  await expect(page.getByText('No changes match')).toBeVisible();
+  await expect(history).toBeHidden();
+});

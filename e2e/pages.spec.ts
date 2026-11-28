@@ -251,6 +251,7 @@ const APP_ROUTES = [
     'risk',
     'strategies',
     'tags',
+    'patterns',
     'options',
     'wins-losses',
     'compare',
@@ -268,6 +269,7 @@ const APP_ROUTES = [
   '/app/settings/accounts',
   '/app/settings/trading',
   '/app/settings/tags',
+  '/app/settings/notebook',
   '/app/settings/import-history',
 ];
 

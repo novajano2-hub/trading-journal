@@ -15,20 +15,27 @@ import type {
   CostMethod,
   DayRecord,
   DayShot,
+  FeeRule,
   FrozenDay,
+  HistoryRow,
   ImportJob,
   Instrument,
   JournalEntry,
+  MissedTrade,
   NoteFolder,
   NoteTemplate,
+  NoteVersion,
   PropTxn,
   Rule,
   RuleGroup,
   Side,
+  StoredFile,
+  StoredFileMeta,
   Strategy,
   SurveyAnswers,
   Tag,
   TagCategory,
+  TargetRule,
   Tracker,
   TrackerVersion,
   Trade,
@@ -191,9 +198,77 @@ export interface TradesRepo {
   /**
    * Also drops the ids from journal links. Missing ids are ignored. Throws
    * OpenImportedTradeError, deleting nothing, when any of them is an open
-   * trade with an `importId`; closed trades and trades without one delete.
+   * trade with an `importId`; closed trades, trades without one and trades
+   * grouped by hand (imports never touch those) delete.
    */
   remove(ws: string, ids: readonly string[]): Promise<void>;
+  /**
+   * Joins the trades `ids` by the executions `picked` (execution ids) into
+   * the earliest-opened one's trade, which is returned (B1 to B3): its id,
+   * serial, note, rating, levels and checks stay; tags and strategies are
+   * united; a source left with no execution is removed, its note unlinked
+   * (it stays in Trade notes) and its files moved to the merged trade; an
+   * execution not picked stays in its own trade. Every result is
+   * `grouping: 'manual'`, and each trade touched gets one `merged` history
+   * row. One transaction. Throws NotFoundError for a missing trade,
+   * ArchivedAccountError, nothing written, for a trade in an archived
+   * account, and `GroupRefused` (domain) for what `canMerge` refuses.
+   */
+  merge(
+    ws: string,
+    ids: readonly string[],
+    picked: readonly string[],
+  ): Promise<Trade>;
+  /**
+   * Moves the executions `moved` (ids) of one trade to a new trade with the
+   * next serial (B4). The original keeps its record, the new trade only its
+   * tags and strategies; each part is rebuilt, and both are
+   * `grouping: 'manual'`. Each gets one `split` history row. One
+   * transaction; same refusals as `merge`, with `canSplit`.
+   */
+  split(
+    ws: string,
+    id: string,
+    moved: readonly string[],
+  ): Promise<{ original: Trade; created: Trade }>;
+  /**
+   * Moves the trades to another account with everything attached to them
+   * (B6): note, tags, strategies, checks, levels, rating, files. A trade keeps
+   * its own P&L currency and figures; its fills sit in the new account. A
+   * trade already there is left alone. Returns how many moved; each has one
+   * `moved` history row (`field: 'accountId'`). Throws ArchivedAccountError
+   * when the destination or the account of any trade is archived,
+   * NotFoundError for a missing trade or account. One transaction.
+   */
+  move(ws: string, ids: readonly string[], accountId: string): Promise<number>;
+  /**
+   * `move` for every trade of an account. The account, its cash flows, its
+   * balance and its import jobs stay where they are. Returns how many moved.
+   */
+  moveAccount(
+    ws: string,
+    fromAccountId: string,
+    toAccountId: string,
+  ): Promise<number>;
+  /**
+   * Replaces the commission and fee of one execution (B58), in the trade's own
+   * currency. The trade's `fees` and `net` move by the change in what the fills
+   * cost, and `gross`, the swap, the currency and the excursions stay (a
+   * rebuild would change a closed-trades file's currency and drop its MAE and
+   * MFE). One `edited` history row, source you, for `fees` in raw cents; none
+   * when the fees do not change. Allowed on a finished day (B55): its frozen
+   * score stays. Moves the import state when anything changed. A negative
+   * cost is a credit (TradeZella takes a swap credit that way): it lowers the
+   * trade's `fees` and raises its `net`. Throws RangeError for costs that are
+   * not whole cents, NotFoundError for a missing trade or execution,
+   * ArchivedAccountError for a trade in an archived account. One transaction.
+   */
+  setFillCosts(
+    ws: string,
+    tradeId: string,
+    executionId: string,
+    costs: { commission: Cents; fees: Cents },
+  ): Promise<Trade>;
 }
 
 export type NewAccount = Omit<Account, 'id' | 'workspaceId'>;
@@ -232,7 +307,15 @@ export interface StrategiesRepo {
   /** By name. */
   list(ws: string): Promise<Strategy[]>;
   get(ws: string, id: string): Promise<Strategy | undefined>;
-  create(ws: string, input: NewStrategy): Promise<Strategy>;
+  /**
+   * With `photo` (a template's cover, or a photo chosen in the form), the file
+   * is stored as the strategy's own (`strategy:<id>`) and `photoId` names it,
+   * in the same transaction: one created row, and nothing written when either
+   * fails. A photo is one of IMAGE_TYPES or a template's SVG cover
+   * (FileRejected 'type'), up to SHOT_MAX_BYTES ('size'); a full store is
+   * FileRejected 'quota'.
+   */
+  create(ws: string, input: NewStrategy, photo?: NewFile): Promise<Strategy>;
   /** Groups and rules without an id get one; a rule that leaves drops its RuleChecks on its trades. */
   update(ws: string, id: string, patch: StrategyPatch): Promise<Strategy>;
   /** Takes it out of its trades' `strategyIds` and drops the checks of its rules there. */
@@ -364,7 +447,13 @@ export class StalePlanError extends Error {
 export type UndoResult =
   | { ok: true }
   /** A later active import in the account rebuilt one of this import's trades, or trades the symbol of one undo would restore; undo that one first. */
-  | { ok: false; reason: 'later-import-depends'; dependentJobId: string };
+  | { ok: false; reason: 'later-import-depends'; dependentJobId: string }
+  /**
+   * Trades of this import were merged, split or moved since (B8): the trades
+   * that now hold its fills, a trade grouped by hand or one moved to another
+   * account. Delete or regroup them first.
+   */
+  | { ok: false; reason: 'regrouped'; tradeIds: string[] };
 
 export interface ImportRepo {
   /** Newest commit first (then by `id`), without what dedupe and undo work from. */
@@ -388,7 +477,9 @@ export interface ImportRepo {
    * whose same-id replacement the user deleted, minus references to tags,
    * strategies, rules and notes deleted since. Refused while a later active
    * import in the account rebuilt one of its trades or has trades in the
-   * symbol of a trade the undo would restore. Throws NotFoundError for a
+   * symbol of a trade the undo would restore, and refused as `regrouped`
+   * while a trade grouped by hand holds fills of it or one of its trades
+   * moved to another account. Throws NotFoundError for a
    * missing job, and ArchivedAccountError, changing nothing, when the job's
    * account (or an account of a trade it would delete or restore) is
    * archived; an undone job is left as it is.
@@ -615,6 +706,194 @@ export interface DayShotsRepo {
   remove(ws: string, id: string): Promise<void>;
 }
 
+export const IMAGE_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+] as const;
+
+/** A file Keel won't keep: not an image where one is required, over 10 MB, or no room left in the browser's storage. */
+export class FileRejected extends Error {
+  override name = 'FileRejected';
+  constructor(readonly reason: 'type' | 'size' | 'quota') {
+    super(`The file was refused: ${reason}`);
+  }
+}
+
+export interface NewFile {
+  bytes: ArrayBuffer;
+  type: string;
+  name: string;
+}
+
+/**
+ * The one local file store: trade attachments (`trade:<id>`), note images
+ * (`note:<id>`) and strategy photos (`strategy:<id>`). 6A's `dayShots` stays
+ * its own store.
+ */
+export interface FilesRepo {
+  /**
+   * The owner's files in upload order, without their bytes (id, owner, type,
+   * name, size, createdAt): a list never holds the contents of every file.
+   * Read one file's bytes with `get` when it is shown.
+   */
+  list(ws: string, owner: string): Promise<StoredFileMeta[]>;
+  get(ws: string, id: string): Promise<StoredFile | undefined>;
+  /**
+   * With `images`, the type must be one of IMAGE_TYPES (FileRejected 'type'); any
+   * file over SHOT_MAX_BYTES is FileRejected 'size', and a full store FileRejected
+   * 'quota'. Throws LockedDayError for the owner `note:<id>` of a daily note on a
+   * finished date, and ArchivedAccountError for the owner `trade:<id>` of a
+   * trade in an archived account (its files are read-only with it).
+   */
+  add(
+    ws: string,
+    owner: string,
+    file: NewFile,
+    opts: { images: boolean },
+  ): Promise<StoredFile>;
+  /** Throws NotFoundError for a missing file, LockedDayError and ArchivedAccountError as `add` does. */
+  remove(ws: string, id: string): Promise<void>;
+  /** Moves every file of owner `from` to owner `to`, keeping ids and upload times (a merge moves its sources' files). Refuses either owner as `add` does. */
+  reassign(ws: string, from: string, to: string): Promise<void>;
+}
+
+/** How long a kept version of a note stays (B39). */
+export const NOTE_VERSION_DAYS = 30;
+
+/**
+ * Kept versions of a note's body (B39). A version is the body as it stood;
+ * the title, tags and folder are not part of one.
+ */
+export interface NoteVersionsRepo {
+  /**
+   * The note's versions, newest first. Removes the note's versions older than
+   * `NOTE_VERSION_DAYS` first. Reads on a finished day's note too.
+   */
+  list(ws: string, noteId: string): Promise<NoteVersion[]>;
+  /**
+   * Keeps `body` as a version of the note. Leaves it out when the note's newest
+   * version already holds that body. Throws NotFoundError for a note that is
+   * not stored (no version outlives its note).
+   */
+  keep(
+    ws: string,
+    noteId: string,
+    body: unknown,
+    kind: NoteVersion['kind'],
+  ): Promise<void>;
+  /**
+   * Keeps the note's current body as a `before-restore` version, then writes
+   * the version's body, and only that, through the journal's save (so the title,
+   * tags, folder and star stay). One transaction. Throws NotFoundError for a
+   * note or a version of another note that is not there, LockedDayError for a
+   * finished day's daily note (nothing is written then).
+   */
+  restore(ws: string, noteId: string, versionId: string): Promise<JournalEntry>;
+}
+
+/**
+ * The edit history (B26 to B28): one row per changed field, written by each
+ * repository write in the transaction that makes the change.
+ */
+export interface HistoryRepo {
+  /** Newest first. Removes the workspace's rows older than 30 days first (B28). */
+  list(ws: string): Promise<HistoryRow[]>;
+}
+
+/**
+ * The default target and stop rules (spec §5.3, B15 to B19, B57). A rule is
+ * for one account and one kind of instrument, with symbols or without (every
+ * symbol). New imports get the picked rule for each new trade; Apply to
+ * existing trades does it on demand. Creating, editing and deleting a rule
+ * leaves what it has already written on trades (B57), and each logs a row.
+ */
+export type NewTargetRule = Omit<
+  TargetRule,
+  'id' | 'workspaceId' | 'createdAt'
+>;
+/** A key set to undefined is left unchanged, except `target` and `stop`, which it clears. */
+export type TargetRulePatch = Partial<NewTargetRule>;
+export interface TargetRulesRepo {
+  /** Newest first. */
+  list(ws: string): Promise<TargetRule[]>;
+  /**
+   * Symbols are trimmed, upper-cased and listed once. Throws NotFoundError
+   * for an unknown account and RangeError for a rule that has neither a
+   * target nor a stop, a level that is not a number or takes a share of the
+   * position outside 0 to 100, or a unit the instrument does not have.
+   */
+  create(ws: string, input: NewTargetRule): Promise<TargetRule>;
+  /** As `create` for what the rule is then; it keeps its id and its creation time. Throws NotFoundError for an unknown rule or account. */
+  update(ws: string, id: string, patch: TargetRulePatch): Promise<TargetRule>;
+  /** What the rule has already written stays. Throws NotFoundError for an unknown rule. */
+  remove(ws: string, id: string): Promise<void>;
+  /**
+   * Writes the rule's levels on every trade of its account it matches, manual
+   * trades included (B16), in one transaction. Without `override` only a trade
+   * with neither a target nor a stop is filled; with it each side the rule
+   * gives replaces that side. Levels go through `applyTradePatch`, so the risk
+   * follows the stop. Each trade it changes gets one `edited` row with source
+   * `rule` per changed side. Returns how many trades changed. Throws
+   * NotFoundError for an unknown rule or account and ArchivedAccountError,
+   * writing nothing, for an archived account.
+   */
+  applyExisting(ws: string, id: string, override: boolean): Promise<number>;
+}
+
+/** The default commission and fee rules; see `TargetRulesRepo` for what they share. */
+export type NewFeeRule = Omit<FeeRule, 'id' | 'workspaceId' | 'createdAt'>;
+export type FeeRulePatch = Partial<NewFeeRule>;
+export interface FeeRulesRepo {
+  /** Newest first. */
+  list(ws: string): Promise<FeeRule[]>;
+  /**
+   * Throws NotFoundError for an unknown account and RangeError for a mode or
+   * an apply-on that is not one of the three, or a commission or fee that is
+   * not whole, non-negative cents.
+   */
+  create(ws: string, input: NewFeeRule): Promise<FeeRule>;
+  update(ws: string, id: string, patch: FeeRulePatch): Promise<FeeRule>;
+  /** Fees already applied stay. Throws NotFoundError for an unknown rule. */
+  remove(ws: string, id: string): Promise<void>;
+  /**
+   * Writes the rule's commission and fee on the executions of every matching
+   * trade of its account in the account's currency, in one transaction.
+   * Without `override` a trade with any costed fill is skipped; with it every
+   * fill the rule covers is replaced. The trade's fees and net follow. Each
+   * trade it changes gets one `edited` row, field `fees`, source `rule`.
+   * Returns how many trades changed; refusals as `TargetRulesRepo.applyExisting`.
+   */
+  applyExisting(ws: string, id: string, override: boolean): Promise<number>;
+}
+
+/**
+ * The missed trades of a strategy (spec §5.7, B43): trades the trader saw and
+ * skipped, kept in a table of their own so no figure, list, filter, report,
+ * calendar, tracker or pattern ever reads one. A missed trade is exactly a
+ * symbol, a hypothetical date and time, a price, a commission and fees: no
+ * side, no quantity. They log no history.
+ */
+export type NewMissedTrade = Omit<MissedTrade, 'id' | 'workspaceId'>;
+/** What an edit can change: everything but the strategy. A field sent as undefined is cleared when it is optional. */
+export type MissedTradePatch = Partial<Omit<NewMissedTrade, 'strategyId'>>;
+export interface MissedTradesRepo {
+  /** One strategy's missed trades, newest first. */
+  list(ws: string, strategyId: string): Promise<MissedTrade[]>;
+  /**
+   * Throws NotFoundError for an unknown strategy and RangeError for an empty
+   * symbol, a time that is not a real instant, a price that is not a finite
+   * number, or a commission or fee that is not whole cents. A negative cost is
+   * a credit. Only the named fields are kept.
+   */
+  create(ws: string, input: NewMissedTrade): Promise<MissedTrade>;
+  /** Throws NotFoundError for an unknown missed trade; RangeError as `create`. The strategy never changes. */
+  update(ws: string, id: string, patch: MissedTradePatch): Promise<MissedTrade>;
+  /** Throws NotFoundError for an unknown missed trade. */
+  remove(ws: string, id: string): Promise<void>;
+}
+
 export interface FirstRunInput {
   firstName: string;
   lastName: string;
@@ -647,6 +926,12 @@ export interface Repository {
   tracker: TrackerRepo;
   days: DaysRepo;
   dayShots: DayShotsRepo;
+  files: FilesRepo;
+  noteVersions: NoteVersionsRepo;
+  history: HistoryRepo;
+  targetRules: TargetRulesRepo;
+  feeRules: FeeRulesRepo;
+  missedTrades: MissedTradesRepo;
   imports: ImportRepo;
   onboarding: OnboardingRepo;
   propTxns: PropTxnsRepo;

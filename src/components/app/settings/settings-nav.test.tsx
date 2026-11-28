@@ -25,7 +25,7 @@ function at(path: string) {
   render(<SettingsNav />);
 }
 
-test('lists the five sections, in order, and marks the open one', () => {
+test('lists the six sections, in order, with Notebook after Tags, and marks the open one', () => {
   at('/app/settings/accounts');
   const nav = screen.getByRole('navigation', { name: 'Settings' });
   const links = [...nav.querySelectorAll('a')];
@@ -34,11 +34,13 @@ test('lists the five sections, in order, and marks the open one', () => {
     'Accounts',
     'Trading',
     'Tags',
+    'Notebook',
     'Logs',
   ]);
   expect(links.map((a) => a.getAttribute('aria-current'))).toEqual([
     null,
     'page',
+    null,
     null,
     null,
     null,
@@ -48,8 +50,19 @@ test('lists the five sections, in order, and marks the open one', () => {
     '/app/settings/accounts',
     '/app/settings/trading',
     '/app/settings/tags',
+    '/app/settings/notebook',
     '/app/settings/import-history',
   ]);
+});
+
+test('Notebook is the note settings', () => {
+  at('/app/settings/notebook');
+  expect(
+    screen.getByRole('link', { name: 'Notebook' }).getAttribute('aria-current'),
+  ).toBe('page');
+  expect(
+    screen.getByRole('link', { name: 'Tags' }).getAttribute('aria-current'),
+  ).toBeNull();
 });
 
 test('Logs is the import history', () => {
@@ -60,6 +73,28 @@ test('Logs is the import history', () => {
   expect(
     screen.getByRole('link', { name: 'Profile' }).getAttribute('aria-current'),
   ).toBeNull();
+});
+
+test('on a phone the open section is brought to the middle of the pill row', () => {
+  // happy-dom has no layout: the row is 300 wide, and the open pill sits 400 along it, 80 wide.
+  const rect = (left: number) => ({ left }) as DOMRect;
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(
+    function (this: Element) {
+      return rect(this.getAttribute('aria-current') === 'page' ? 400 : 0);
+    },
+  );
+  const size = (tag: string, name: 'clientWidth' | 'offsetWidth', px: number) =>
+    vi.spyOn(HTMLElement.prototype, name, 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return this.tagName === tag ? px : name === 'offsetWidth' ? 80 : 0;
+    });
+  size('NAV', 'clientWidth', 300);
+  size('NAV', 'offsetWidth', 300);
+  at('/app/settings/notebook');
+  const nav = screen.getByRole('navigation', { name: 'Settings' });
+  expect(nav.scrollLeft).toBe(400 - (300 - 80) / 2);
+  vi.restoreAllMocks();
 });
 
 test('an edge fade shows while more sections are off-screen, and goes at the end', () => {
@@ -113,7 +148,7 @@ function renderNav(collapsed: boolean, path = '/app/settings/accounts') {
   return screen.getByRole('navigation', { name: 'Settings' });
 }
 
-test('the sections sit in groups with a divider between: Profile, then Accounts, Trading, Tags and Logs', () => {
+test('the sections sit in groups with a divider between: Profile, then Accounts, Trading, Tags, Notebook and Logs', () => {
   const nav = renderNav(false);
   expect(items(nav)).toEqual([
     'Profile',
@@ -121,6 +156,7 @@ test('the sections sit in groups with a divider between: Profile, then Accounts,
     'Accounts',
     'Trading',
     'Tags',
+    'Notebook',
     'Logs',
   ]);
   // A divider is no stop for the keyboard or a screen reader.
@@ -132,7 +168,7 @@ test('the sections sit in groups with a divider between: Profile, then Accounts,
 test('the groups are data, so a page can be inserted into one', () => {
   expect(SETTINGS_NAV.map((group) => group.map((page) => page.label))).toEqual([
     ['Profile'],
-    ['Accounts', 'Trading', 'Tags', 'Logs'],
+    ['Accounts', 'Trading', 'Tags', 'Notebook', 'Logs'],
   ]);
   // Every page has its icon and its address under /app/settings.
   for (const page of SETTINGS_NAV.flat()) {
@@ -163,6 +199,7 @@ test('collapsed from lg, every page is an icon with its name for assistive tech,
     'Accounts',
     'Trading',
     'Tags',
+    'Notebook',
     'Logs',
   ]);
   for (const [label, href] of [
@@ -170,6 +207,7 @@ test('collapsed from lg, every page is an icon with its name for assistive tech,
     ['Accounts', '/app/settings/accounts'],
     ['Trading', '/app/settings/trading'],
     ['Tags', '/app/settings/tags'],
+    ['Notebook', '/app/settings/notebook'],
     ['Logs', '/app/settings/import-history'],
   ] as const) {
     const link = within(nav).getByRole('link', { name: label });
@@ -211,6 +249,7 @@ test('below lg a collapsed sidebar leaves the labelled pill row as it is: names 
     'Accounts',
     'Trading',
     'Tags',
+    'Notebook',
     'Logs',
   ]);
   const link = within(nav).getByRole('link', { name: 'Accounts' });

@@ -1039,3 +1039,107 @@ test('without ?new the new-account dialog still opens on a live account', async 
     (within(dialog).getByLabelText('Account type') as HTMLSelectElement).value,
   ).toBe('live');
 });
+
+test('the account menu moves every trade', async () => {
+  const r = repo();
+  await r.accounts.create('sample', {
+    name: 'Euro futures',
+    broker: '',
+    type: 'live',
+    currency: 'EUR',
+    startingBalance: 0,
+    status: 'active',
+  });
+  renderApp(<AccountsSettings />, { repository: r, url: URL });
+  await openMenu('Futures main');
+  // After Add a trade, as the comp has it.
+  const names = (await screen.findAllByRole('menuitem')).map(
+    (i) => i.textContent,
+  );
+  expect(names.slice(names.indexOf('Add a trade'))[1]).toBe('Move trades');
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Move trades' }));
+
+  const dialog = await screen.findByRole('dialog', {
+    name: 'Move the trades in Futures main',
+  });
+  expect(dialog.textContent).toContain(
+    'All 2 trades go to the account you pick. Futures main itself stays.',
+  );
+  // The account itself and the archived one are not offered.
+  const group = within(dialog).getByRole('radiogroup', { name: 'Account' });
+  expect(
+    within(group)
+      .getAllByRole('radio')
+      .map((x) => x.closest('label')!.querySelector('b')!.textContent),
+  ).toEqual(['Euro futures']);
+  const move = within(dialog).getByRole('button', {
+    name: 'Move 2 trades',
+  }) as HTMLButtonElement;
+  expect(move.disabled).toBe(true);
+  fireEvent.click(within(group).getByRole('radio', { name: /Euro futures/ }));
+  expect(dialog.textContent).toContain(
+    'These trades keep their own currency, USD, and every figure on them stays as it is.',
+  );
+  expect(dialog.textContent).toContain('There is no undo.');
+  fireEvent.click(move);
+
+  await waitFor(async () => {
+    const trades = await r.trades.list('sample');
+    expect(trades.filter((t) => t.accountId === 'acc-a')).toHaveLength(0);
+  });
+  const euro = (await r.accounts.list('sample')).find(
+    (a) => a.name === 'Euro futures',
+  )!;
+  const trades = await r.trades.list('sample');
+  expect(
+    trades
+      .filter((t) => t.accountId === euro.id)
+      .map((t) => t.id)
+      .sort(),
+  ).toEqual(['f-1', 'f-2']);
+  // Futures main stays, and says what happened.
+  expect(await rowOf('Futures main')).toBeTruthy();
+  expect(
+    (await screen.findByRole('status', { name: 'Moved' })).textContent,
+  ).toContain('Moved 2 trades to Euro futures.');
+});
+
+test('with no other active account, Move trades is off and says why', async () => {
+  // Futures main's only other account, Old demo, is archived.
+  renderApp(<AccountsSettings />, { repository: repo(), url: URL });
+  await openMenu('Futures main');
+  const move = await screen.findByRole('menuitem', { name: 'Move trades' });
+  expect(move.getAttribute('aria-disabled')).toBe('true');
+  // Still on the keyboard path, with its reason read as its description.
+  expect(move.hasAttribute('data-disabled')).toBe(false);
+  const reason = 'There is no other active account to move to.';
+  expect(move.textContent).toContain(reason);
+  expect(
+    document.getElementById(move.getAttribute('aria-describedby')!)
+      ?.textContent,
+  ).toBe(reason);
+  fireEvent.click(move);
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(screen.getByRole('menu')).toBeTruthy();
+});
+
+test('an archived account, and an account with no trades, offer no Move trades', async () => {
+  const r = repo();
+  await r.accounts.create('sample', {
+    name: 'Empty one',
+    broker: '',
+    type: 'live',
+    currency: 'USD',
+    startingBalance: 0,
+    status: 'active',
+  });
+  renderApp(<AccountsSettings />, { repository: r, url: URL });
+  await openMenu('Old demo');
+  await screen.findByRole('menuitem', { name: 'Unarchive' });
+  expect(screen.queryByRole('menuitem', { name: 'Move trades' })).toBeNull();
+  fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+  await openMenu('Empty one');
+  await screen.findByRole('menuitem', { name: 'Add a trade' });
+  expect(screen.queryByRole('menuitem', { name: 'Move trades' })).toBeNull();
+});

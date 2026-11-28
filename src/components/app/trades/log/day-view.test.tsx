@@ -349,6 +349,45 @@ test('daily notes in Trash, or any trade-level filter, leave their days out', as
   expect((await cards()).map(heading)).not.toContain('Sun 22 Nov 2026');
 });
 
+test('a Patterns pick keeps the days of the trades it fired on, and no note-only day', async () => {
+  const fill = (id: string, side: 'buy' | 'sell', time: string) => ({
+    id,
+    accountId: 'acc-a',
+    symbol: 'ESZ5',
+    side,
+    qty: 1,
+    price: 4500,
+    time,
+    fees: 0,
+    commission: 0,
+  });
+  // a1 (Tue 24 Nov) opened in two entries: Added to the position. Nothing else fired.
+  const scaled = trades().map((t) =>
+    t.id === 'a1'
+      ? {
+          ...t,
+          executions: [
+            fill('x1', 'buy', '2026-11-24T14:30:00Z'),
+            fill('x2', 'buy', '2026-11-24T14:35:00Z'),
+            fill('x3', 'sell', '2026-11-24T14:50:00Z'),
+          ],
+        }
+      : t,
+  );
+  await renderApp(<TradesDayView />, {
+    sample: sample({ trades: scaled }),
+    url: '/app/trades/day?pat=added-to-position',
+  });
+  // Mon 23 Nov's trade and the note-only Sun 22 Nov are left out; Tue 24 Nov keeps its one trade.
+  const found = await cards();
+  expect(found.map(heading)).toEqual(['Tue 24 Nov 2026']);
+  // The day's figures read the trades the pick kept: one of its three.
+  expect(
+    within(found[0]!).getByText('Trades').closest('div')!.querySelector('dd')!
+      .textContent,
+  ).toBe('1');
+});
+
 test('the card chart has $ labels and no time labels; the enlarged chart has three times', async () => {
   await renderApp(<TradesDayView />, {
     sample: sample(),

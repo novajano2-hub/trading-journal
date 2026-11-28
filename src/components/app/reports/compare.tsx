@@ -32,6 +32,7 @@ import { useGlobalFilters } from '@/data/query/derived';
 import {
   useAccounts,
   useCashFlows,
+  usePatterns,
   usePrefs,
   useStrategies,
   useTagCategories,
@@ -474,6 +475,10 @@ function Compared({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, known, today]);
 
+  // A Patterns pick (the global filters' own, which Group A and B start from) reads where the patterns
+  // fired over every trade of the workspace; without one nothing computes them.
+  const wantsPatterns = filters.some((f) => f.patterns.length > 0);
+  const patterns = usePatterns(wantsPatterns);
   const env = useMemo(
     () => ({
       timeZone: prefs.timeZone,
@@ -482,8 +487,9 @@ function Compared({
       breakevenRange: prefs.breakevenRange,
       pnlBasis: prefs.pnlBasis,
       weekStart: prefs.weekStart,
+      patterns: patterns.data,
     }),
-    [prefs, today, accounts],
+    [prefs, today, accounts, patterns.data],
   );
   // Each group narrows to the display unit, as every other report does.
   const unit = prefs.displayUnit;
@@ -686,6 +692,22 @@ function Compared({
   }).join('. ')}.`;
   const nA = results[0]!.summary.closedCount;
   const nB = results[1]!.summary.closedCount;
+
+  // A group with a Patterns pick has nothing to show until the patterns are read: never an empty group.
+  if (wantsPatterns && patterns.isError)
+    return (
+      <State
+        role="alert"
+        icon={Warning}
+        title="The comparison couldn't load."
+        actions={
+          <Button variant="secondary" onClick={() => window.location.reload()}>
+            Try again
+          </Button>
+        }
+      />
+    );
+  if (wantsPatterns && !patterns.data) return <ReportSkeleton />;
 
   return (
     <FigureSourceContext.Provider value={source}>

@@ -298,6 +298,33 @@ test('the filters the bucket links write each have a chip that clears only them'
   expect(rest).toEqual(EMPTY_FILTERS);
 });
 
+test("a Patterns pick is one chip, a More filters field, and one of Compare's unshown filters", () => {
+  const one = { ...EMPTY_FILTERS, patterns: ['large-size' as const] };
+  const chip = detailChips(one).find((c) => c.id === 'patterns')!;
+  expect(chip.label).toBe('Patterns: Large size');
+  expect(chip.clear(one).patterns).toEqual([]);
+  expect(
+    detailChips({
+      ...EMPTY_FILTERS,
+      patterns: ['held-longer' as const, 'large-size' as const],
+    }).find((c) => c.id === 'patterns')!.label,
+  ).toBe('Patterns: Held longer than usual or Large size');
+  // Past two names the chip counts them, as the Select all row does.
+  expect(
+    detailChips({
+      ...EMPTY_FILTERS,
+      patterns: ['held-longer', 'large-size', 'rushed-red-day'],
+    }).find((c) => c.id === 'patterns')!.label,
+  ).toBe('Patterns: 3 of 17');
+  expect(hasActiveFilters(one)).toBe(true);
+  expect(activeFilterCount(one)).toBe(1);
+  expect(unshownFilters(one)).toEqual(['Patterns']);
+  expect(withoutUnshown(one).patterns).toEqual([]);
+  expect(detailChips(EMPTY_FILTERS).some((c) => c.id === 'patterns')).toBe(
+    false,
+  );
+});
+
 test('accounts in words: all, each name, or a count once there are many', () => {
   const accts = [
     { id: 'a', name: 'Futures live' },

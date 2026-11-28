@@ -541,3 +541,115 @@ test('under Ticks a strategy with forex and futures reads only the futures: prof
   expect(value('rule-adherence')).toBe('None');
   expect(value('pnl')).toBe('+4.0 ticks');
 });
+
+/** A copy of the London range break template with no trades, and one whose template is gone. */
+async function copies(): Promise<SampleWorkspace> {
+  const fx = fixtureSample();
+  const base = {
+    workspaceId: SAMPLE_WORKSPACE.id,
+    description: 'Trade the break of the Asian session range.',
+    assetClasses: ['forex' as const],
+    groups: [
+      {
+        id: 'g-c',
+        title: 'Entry',
+        rules: [
+          {
+            id: 'r-c',
+            text: 'Enter on a 15-minute close',
+            showWhen: 'always' as const,
+          },
+        ],
+      },
+    ],
+    checklist: [],
+    status: 'active' as const,
+  };
+  fx.strategies.push(
+    {
+      ...base,
+      id: 'str-copy',
+      name: 'London range break',
+      templateId: 'london-range-break',
+    },
+    {
+      ...base,
+      id: 'str-gone',
+      name: 'Old template copy',
+      templateId: 'no-such-template',
+    },
+  );
+  return fx;
+}
+
+const openCopy = (id: string) =>
+  renderApp(<StrategyView id={id} />, {
+    sample: copies,
+    url: `/app/strategies/${id}`,
+  });
+
+test('a copy names its template, and lists the examples apart, labelled as examples', async () => {
+  openCopy('str-copy');
+  expect(
+    await screen.findByText(
+      'A copy of the London range break template by Keel. Yours to edit.',
+    ),
+  ).toBeTruthy();
+  const card = screen
+    .getByRole('heading', { name: 'Example trades' })
+    .closest('section')!;
+  expect(
+    within(card).getByText(
+      'From the template, to show the idea. Not your trades: no figure counts them.',
+    ),
+  ).toBeTruthy();
+  const table = within(card).getByRole('table', { name: 'Example trades' });
+  const rows = within(table).getAllByRole('row').slice(1);
+  expect(rows).toHaveLength(4);
+  expect(rows.map((r) => r.textContent)).toEqual([
+    expect.stringMatching(
+      /Example 1.*08:12.*GBPUSD.*Long.*1\.31120.*1\.31450.*\+2\.2R/,
+    ),
+    expect.stringMatching(
+      /Example 2.*08:31.*EURUSD.*Short.*1\.15610.*1\.15760.*−1\.0R/,
+    ),
+    expect.stringMatching(
+      /Example 3.*08:05.*EURUSD.*Long.*1\.15240.*1\.15540.*\+2\.0R/,
+    ),
+    expect.stringMatching(
+      /Example 4.*08:47.*GBPUSD.*Short.*1\.31880.*1\.32030.*−1\.0R/,
+    ),
+  ]);
+  // The phone list has the same four, each called an example.
+  const list = within(card).getByRole('list', {
+    name: 'Example trades, one card each',
+  });
+  expect(within(list).getAllByRole('listitem')).toHaveLength(4);
+  expect(within(list).getByText('Example 1, 08:12')).toBeTruthy();
+});
+
+test('the examples are not in the strategy page figures', async () => {
+  openCopy('str-copy');
+  const stats = (await screen.findByRole('heading', { name: 'Stats' })).closest(
+    'section',
+  )!;
+  // No trades behind this strategy: none of the example results is a stat.
+  expect(stats.textContent).not.toMatch(/2\.2R|\+\$|330/);
+  expect(within(stats).getByText('0 closed, 0 open')).toBeTruthy();
+  // The trade count is the trades' alone: four examples are not four trades.
+  expect(screen.getByRole('link', { name: 'View 0 trades' })).toBeTruthy();
+  expect(screen.queryByRole('link', { name: 'View 4 trades' })).toBeNull();
+});
+
+test('a strategy that is not a copy, or whose template is gone, lists no examples', async () => {
+  open();
+  await screen.findByRole('heading', { name: 'Stats' });
+  expect(screen.queryByRole('heading', { name: 'Example trades' })).toBeNull();
+  expect(screen.queryByText(/A copy of the/)).toBeNull();
+  cleanup();
+
+  openCopy('str-gone');
+  await screen.findByRole('heading', { name: 'Stats' });
+  expect(screen.queryByRole('heading', { name: 'Example trades' })).toBeNull();
+  expect(screen.queryByText(/A copy of the/)).toBeNull();
+});

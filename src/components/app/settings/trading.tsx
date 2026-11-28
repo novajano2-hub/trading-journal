@@ -12,6 +12,7 @@ import type {
   WeekStart,
 } from '@/domain/types';
 import { SaveStatus } from './profile';
+import { RuleCards } from './rule-cards';
 import { FieldError } from './settings-ui';
 
 const CLASSES: readonly { value: AssetClass; label: string }[] = [
@@ -187,7 +188,7 @@ function Breakeven(): React.JSX.Element | null {
 }
 
 /** The instruments you trade, the breakeven band, expired options and the default basis. */
-export function TradingSettings(): React.JSX.Element {
+function TradingCard(): React.JSX.Element {
   const prefs = usePrefs().data;
   const update = useUpdatePrefs();
   const [intent, setIntent] = useState<AssetClass[] | null>(null);
@@ -330,5 +331,18 @@ export function TradingSettings(): React.JSX.Element {
         <SaveStatus saving={update.isPending} failed={update.isError} />
       </div>
     </section>
+  );
+}
+
+/**
+ * Settings > Trading: the card of trading preferences, then the default target,
+ * stop and fee rules for imported trades (spec §5.3).
+ */
+export function TradingSettings(): React.JSX.Element {
+  return (
+    <>
+      <TradingCard />
+      <RuleCards />
+    </>
   );
 }

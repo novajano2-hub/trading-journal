@@ -72,6 +72,14 @@ export interface Trade {
   source?: 'import' | 'manual';
   /** The import that last built this trade. */
   importId?: string;
+  /** Several profit levels; `plannedTarget` stays the single-level form. */
+  targets?: LevelSide;
+  /** Several stop levels; `plannedStop` stays the single-level form. */
+  stops?: LevelSide;
+  /** Overnight financing, signed; already inside `net`. */
+  swap?: Cents;
+  /** Set when the user joined or split the trade by hand. */
+  grouping?: 'manual';
 }
 export type DrawdownType = 'static' | 'trailing' | 'eod-trailing';
 export interface PropRuleSet {
@@ -167,6 +175,10 @@ export interface Strategy {
   icon?: StrategyIcon;
   /** Stored for old data and ignored: every strategy wears the accent tile, its icon tells them apart. */
   tone?: StrategyTone;
+  /** A `files` row id: the strategy's cover photo. */
+  photoId?: string;
+  /** The template the strategy was copied from. */
+  templateId?: string;
 }
 /** A strategy's rules flattened: group order, then rule order. */
 export function strategyRules(s: Strategy): Rule[] {
@@ -340,6 +352,12 @@ export interface UserPrefs {
   weekColumns?: string[];
   /** Tips the user has dismissed. */
   seenTips?: string[];
+  /** The stat-card rows shown on a trade; undefined: all. */
+  tradeStats?: string[];
+  /** The note editor's type sizes and checked-item style. */
+  noteType?: NoteType;
+  /** Whether the strategy chooser shows when a strategy is created; undefined: on. */
+  strategyChooser?: boolean;
   dashboards?: { inUse: string; templates: DashTemplate[] };
   sidebar?: 'expanded' | 'collapsed';
   propLayout?: 'grid' | 'list';
@@ -505,4 +523,109 @@ export interface Onboarding {
   at: string;
   survey?: SurveyAnswers;
   existing?: true;
+}
+
+// ---- Plan 6B: trade depth ---------------------------------------------------
+
+export type LevelUnit =
+  'price' | 'movement' | 'amount' | 'ticks' | 'points' | 'pips';
+export interface Level {
+  value: number;
+  qty: number;
+}
+export interface LevelSide {
+  unit: LevelUnit;
+  levels: Level[];
+}
+export interface StoredFile {
+  id: string;
+  workspaceId: string;
+  /** `trade:<id>`, `note:<id>` or `strategy:<id>`. */
+  owner: string;
+  bytes: ArrayBuffer;
+  type: string;
+  name: string;
+  size: number;
+  createdAt: string;
+}
+/** A file's row without its contents: what a list holds; `FilesRepo.get` returns the bytes. */
+export type StoredFileMeta = Omit<StoredFile, 'bytes'>;
+export interface NoteVersion {
+  id: string;
+  workspaceId: string;
+  noteId: string;
+  body: unknown;
+  savedAt: string;
+  kind: 'auto' | 'before-restore';
+}
+export type HistoryType =
+  | 'trade'
+  | 'account'
+  | 'cash-flow'
+  | 'strategy'
+  | 'tag'
+  | 'tag-category'
+  | 'target-rule'
+  | 'fee-rule'
+  | 'import';
+export type HistoryAction =
+  'created' | 'edited' | 'deleted' | 'merged' | 'split' | 'moved' | 'undone';
+export type HistorySource = 'you' | 'import' | 'rule' | 'system';
+export interface HistoryRow {
+  id: string;
+  workspaceId: string;
+  at: string;
+  type: HistoryType;
+  action: HistoryAction;
+  source: HistorySource;
+  entityId: string;
+  label: string;
+  field?: string;
+  oldValue?: string | number | boolean | null;
+  newValue?: string | number | boolean | null;
+}
+export interface RuleLevel {
+  value: number;
+  pct: number;
+}
+export interface TargetRule {
+  id: string;
+  workspaceId: string;
+  accountId: string;
+  assetClass: AssetClass | 'future-option';
+  symbols: string[];
+  target?: { unit: LevelUnit; levels: RuleLevel[] };
+  stop?: { unit: LevelUnit; levels: RuleLevel[] };
+  createdAt: string;
+}
+export interface FeeRule {
+  id: string;
+  workspaceId: string;
+  accountId: string;
+  assetClass: AssetClass | 'future-option';
+  /** Empty: all symbols. */
+  symbols: string[];
+  mode: 'per-contract' | 'per-execution';
+  applyOn: 'all' | 'entry' | 'exit';
+  commission: Cents;
+  fee: Cents;
+  createdAt: string;
+}
+export interface MissedTrade {
+  id: string;
+  workspaceId: string;
+  strategyId: string;
+  symbol: string;
+  /** UTC ISO. */
+  at: string;
+  price?: number;
+  commission?: Cents;
+  fees?: Cents;
+}
+export interface NoteType {
+  h1: number;
+  h2: number;
+  h3: number;
+  body: number;
+  strikeChecked: boolean;
 }

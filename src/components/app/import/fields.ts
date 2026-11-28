@@ -26,6 +26,7 @@ export const FIELD_ORDER = {
     'exitPrice',
     'fees',
     'commission',
+    'swap',
     'pnl',
   ],
 } as const satisfies {
@@ -42,6 +43,7 @@ export const FIELD_LABEL: Record<FieldKey, string> = {
   price: 'Price',
   fees: 'Fees',
   commission: 'Commission',
+  swap: 'Swap',
   orderId: 'Order ID',
   openTime: 'Entry time',
   closeTime: 'Exit time',
@@ -55,6 +57,7 @@ export const FIELD_HINT: Partial<Record<FieldKey, string>> = {
   date: 'Only when the date is in its own column',
   time: 'Date and time of the fill',
   orderId: 'Keeps two fills of the same size apart',
+  swap: 'Overnight financing, signed: a charge is negative',
   pnl: "To check Keel's figure",
 };
 
@@ -85,4 +88,5 @@ export const MONEY_FIELDS: ReadonlySet<FieldKey> = new Set<FieldKey>([
   'pnl',
   'fees',
   'commission',
+  'swap',
 ]);

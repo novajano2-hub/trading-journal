@@ -7,9 +7,10 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
+import type { Editor } from '@tiptap/core';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, expect, onTestFinished, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import { LockedDayError, type Repository } from '@/data/repository';
@@ -246,7 +247,24 @@ async function closeBothWays(heading: string, name: 'Add note' | 'View note') {
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 }
 
-test('it is read-only with the lock line on a finished day (no Templates, star or menu), and refuses every write', async () => {
+/** The "..." menu of a note that cannot change: export and import stay, Move to Trash is not there. */
+async function menuKeeps(dialog: HTMLElement) {
+  fireEvent.keyDown(within(dialog).getByRole('button', { name: 'More' }), {
+    key: 'Enter',
+  });
+  const menu = await screen.findByRole('menu');
+  expect(
+    within(menu)
+      .getAllByRole('menuitem')
+      .map((i) => i.textContent),
+  ).toEqual(['Export as PDF', 'Export as Keel note', 'Import a Keel note']);
+  // It fades over a dialog: a closing menu takes no pointer (`!` beats Radix's inline value).
+  expect(menu.className).toContain('data-[state=closed]:pointer-events-none!');
+  fireEvent.keyDown(menu, { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+}
+
+test('it is read-only with the lock line on a finished day (no Template, star or Move to Trash), and refuses every write', async () => {
   const { repo } = await renderApp({
     journal: [dailyNote('2026-11-23')],
     days: [FINISHED_MON],
@@ -261,12 +279,13 @@ test('it is read-only with the lock line on a finished day (no Templates, star o
     'This day is closed. Its note is locked.',
   );
   expect(
-    within(dialog).queryByRole('button', { name: 'Templates' }),
+    within(dialog).queryByRole('button', { name: 'Insert a template' }),
   ).toBeNull();
   expect(
     within(dialog).queryByRole('button', { name: 'Favourite' }),
   ).toBeNull();
-  expect(within(dialog).queryByRole('button', { name: 'More' })).toBeNull();
+  // The menu keeps the note's export and import, and has no Move to Trash.
+  await menuKeeps(dialog);
   // Nothing to save: the footer button closes.
   expect(within(dialog).queryByRole('button', { name: 'Save' })).toBeNull();
   fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
@@ -371,7 +390,7 @@ test('a note in Trash opens with Restore, read-only', async () => {
     await within(dialog).findByText("This day's note is in Trash."),
   ).toBeTruthy();
   expect(within(dialog).getByRole('button', { name: 'Restore' })).toBeTruthy();
-  expect(within(dialog).queryByRole('button', { name: 'More' })).toBeNull();
+  await menuKeeps(dialog);
 });
 
 test('the star and Open in Notebook wait for the note, then the star favourites it and the link opens it', async () => {
@@ -431,15 +450,18 @@ test('the star and Open in Notebook wait for the note, then the star favourites 
   );
 });
 
-test('Templates inserts a template at the cursor', async () => {
+test('Template, in the editor toolbar, inserts a template at the cursor', async () => {
   const { repo } = await renderApp();
   const dialog = await open(TUE, 'Add note');
   const box = await within(dialog).findByRole('textbox', {
     name: 'Daily note',
   });
-  fireEvent.keyDown(within(dialog).getByRole('button', { name: 'Templates' }), {
-    key: 'Enter',
-  });
+  fireEvent.keyDown(
+    await within(dialog).findByRole('button', { name: 'Insert a template' }),
+    {
+      key: 'Enter',
+    },
+  );
   fireEvent.click(
     await screen.findByRole('menuitem', { name: 'Daily game plan' }),
   );
@@ -451,6 +473,292 @@ test('Templates inserts a template at the cursor', async () => {
       ).toContain('What I will trade'),
     { timeout: 3000 },
   );
+});
+
+test('Escape in full screen leaves full screen and keeps the dialog open', async () => {
+  await renderApp();
+  const dialog = await open(TUE, 'Add note');
+  const box = await within(dialog).findByRole('textbox', {
+    name: 'Daily note',
+  });
+  fireEvent.click(
+    await within(dialog).findByRole('button', { name: 'Full screen' }),
+  );
+  await screen.findByRole('dialog', { name: 'Daily note, full screen' });
+
+  // The dialog's own Escape listener is on the document, ahead of the editor's:
+  // the editor's has to run first, take the key, and leave the dialog alone.
+  const escape = new KeyboardEvent('keydown', {
+    key: 'Escape',
+    bubbles: true,
+    cancelable: true,
+  });
+  act(() => {
+    box.dispatchEvent(escape);
+  });
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('dialog', { name: 'Daily note, full screen' }),
+    ).toBeNull(),
+  );
+  expect(screen.getByRole('dialog', { name: 'Day note' })).toBeTruthy();
+  expect(escape.defaultPrevented).toBe(true);
+
+  // With nothing in full screen, the same key is the dialog's: it closes.
+  act(() => {
+    box.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  });
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+});
+
+test('after a restore, the star saves on top of the restored text, not the copy the dialog opened with', async () => {
+  const earlier = {
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        content: [{ type: 'text', text: 'An earlier day' }],
+      },
+    ],
+  };
+  const { repo } = await renderApp({ journal: [dailyNote('2026-11-23')] });
+  await repo.noteVersions.keep(WS, 'note-2026-11-23', earlier, 'auto');
+  const dialog = await open(MON, 'View note');
+  await within(dialog).findByRole('textbox', { name: 'Daily note' });
+  fireEvent.click(
+    await within(dialog).findByRole('button', { name: 'Version history' }),
+  );
+  const history = await screen.findByRole('dialog', {
+    name: 'Version history',
+  });
+  fireEvent.click(
+    await within(history).findByRole('button', {
+      name: 'Restore this version',
+    }),
+  );
+  const ask = await screen.findByRole('dialog', {
+    name: 'Restore this version?',
+  });
+  // The journal is read back as it was before the restore (a read that has
+  // not caught up): the restore's own answer is what is newer.
+  const stale = await repo.journal.list(WS);
+  vi.spyOn(repo.journal, 'list').mockResolvedValue(stale);
+  await act(async () => {
+    fireEvent.click(within(ask).getByRole('button', { name: 'Restore' }));
+  });
+  await waitFor(async () =>
+    expect((await repo.journal.get(WS, 'note-2026-11-23'))!.body).toEqual(
+      earlier,
+    ),
+  );
+  await within(dialog).findByText(/^Restored the version from/);
+
+  fireEvent.click(
+    await within(dialog).findByRole('button', { name: 'Favourite' }),
+  );
+  await waitFor(async () =>
+    expect((await repo.journal.get(WS, 'note-2026-11-23'))!.favorite).toBe(
+      true,
+    ),
+  );
+  // Starring did not bring the old text back.
+  expect((await repo.journal.get(WS, 'note-2026-11-23'))!.body).toEqual(
+    earlier,
+  );
+});
+
+test('a failed write followed by a restore does not flush the old text over the restored note, and the failure is let go', async () => {
+  const earlier = {
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        content: [{ type: 'text', text: 'An earlier day' }],
+      },
+    ],
+  };
+  const { repo } = await renderApp({ journal: [dailyNote('2026-11-23')] });
+  await repo.noteVersions.keep(WS, 'note-2026-11-23', earlier, 'auto');
+  const dialog = await open(MON, 'View note');
+  const box = await within(dialog).findByRole('textbox', {
+    name: 'Daily note',
+  });
+  // Typed text whose write fails: the dialog says so, and holds the text.
+  vi.spyOn(repo.journal, 'save').mockRejectedValueOnce(new Error('disk full'));
+  const editor = (box as unknown as { editor: Editor }).editor;
+  act(() => {
+    editor.commands.insertContent(' and then some typed text');
+  });
+  expect(
+    await within(dialog).findByText("Couldn't save. Press Save to try again.", {
+      exact: false,
+    }),
+  ).toBeTruthy();
+
+  // A restore lands (it is its own write, and it succeeds).
+  fireEvent.click(
+    await within(dialog).findByRole('button', { name: 'Version history' }),
+  );
+  const history = await screen.findByRole('dialog', {
+    name: 'Version history',
+  });
+  fireEvent.click(
+    await within(history).findByRole('button', {
+      name: 'Restore this version',
+    }),
+  );
+  const ask = await screen.findByRole('dialog', {
+    name: 'Restore this version?',
+  });
+  await act(async () => {
+    fireEvent.click(within(ask).getByRole('button', { name: 'Restore' }));
+  });
+  await within(dialog).findByText(/^Restored the version from/);
+  // The failure is let go with the text it was about.
+  await waitFor(() =>
+    expect(
+      within(dialog).queryByText("Couldn't save. Press Save to try again."),
+    ).toBeNull(),
+  );
+
+  // Save writes what is waiting: nothing is, so the restored note stands.
+  fireEvent.click(await within(dialog).findByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect((await repo.journal.get(WS, 'note-2026-11-23'))!.body).toEqual(
+    earlier,
+  );
+});
+
+/**
+ * Holds the editor's 600 ms save timer, so typed text stays waiting until
+ * something else writes it; every other timer runs as it would.
+ */
+const realSetTimeout = globalThis.setTimeout;
+function holdSaveTimer() {
+  vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+    fn: () => void,
+    ms?: number,
+    ...rest: unknown[]
+  ) =>
+    ms === 600
+      ? (0 as unknown as ReturnType<typeof setTimeout>)
+      : realSetTimeout(fn, ms, ...rest)) as typeof setTimeout);
+  onTestFinished(() => {
+    vi.restoreAllMocks();
+  });
+}
+
+const textOf = (body: unknown) => JSON.stringify(body);
+
+test('text still waiting to save is saved before a restore, and kept as the version before it', async () => {
+  const earlier = {
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        content: [{ type: 'text', text: 'An earlier day' }],
+      },
+    ],
+  };
+  const { repo } = await renderApp({ journal: [dailyNote('2026-11-23')] });
+  await repo.noteVersions.keep(WS, 'note-2026-11-23', earlier, 'auto');
+  const dialog = await open(MON, 'View note');
+  const box = await within(dialog).findByRole('textbox', {
+    name: 'Daily note',
+  });
+  holdSaveTimer();
+  const editor = (box as unknown as { editor: Editor }).editor;
+  act(() => {
+    editor.commands.insertContent(' and the typed close');
+  });
+  // The typing is on screen and not yet stored.
+  expect(
+    textOf((await repo.journal.get(WS, 'note-2026-11-23'))!.body),
+  ).not.toContain('the typed close');
+
+  fireEvent.click(
+    await within(dialog).findByRole('button', { name: 'Version history' }),
+  );
+  const history = await screen.findByRole('dialog', {
+    name: 'Version history',
+  });
+  fireEvent.click(
+    await within(history).findByRole('button', {
+      name: 'Restore this version',
+    }),
+  );
+  const ask = await screen.findByRole('dialog', {
+    name: 'Restore this version?',
+  });
+  await act(async () => {
+    fireEvent.click(within(ask).getByRole('button', { name: 'Restore' }));
+  });
+  await within(dialog).findByText(/^Restored the version from/);
+  expect((await repo.journal.get(WS, 'note-2026-11-23'))!.body).toEqual(
+    earlier,
+  );
+  // The text on screen before the restore is the version kept before it.
+  const [before] = await repo.noteVersions.list(WS, 'note-2026-11-23');
+  expect(before!.kind).toBe('before-restore');
+  expect(textOf(before!.body)).toContain('the typed close');
+});
+
+test('a restore whose waiting text cannot be saved first restores nothing, and says so', async () => {
+  const earlier = {
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        content: [{ type: 'text', text: 'An earlier day' }],
+      },
+    ],
+  };
+  const { repo } = await renderApp({ journal: [dailyNote('2026-11-23')] });
+  await repo.noteVersions.keep(WS, 'note-2026-11-23', earlier, 'auto');
+  const dialog = await open(MON, 'View note');
+  const box = await within(dialog).findByRole('textbox', {
+    name: 'Daily note',
+  });
+  holdSaveTimer();
+  const editor = (box as unknown as { editor: Editor }).editor;
+  act(() => {
+    editor.commands.insertContent(' and the typed close');
+  });
+  vi.spyOn(repo.journal, 'save').mockRejectedValue(new Error('disk full'));
+  fireEvent.click(
+    await within(dialog).findByRole('button', { name: 'Version history' }),
+  );
+  const history = await screen.findByRole('dialog', {
+    name: 'Version history',
+  });
+  fireEvent.click(
+    await within(history).findByRole('button', {
+      name: 'Restore this version',
+    }),
+  );
+  const ask = await screen.findByRole('dialog', {
+    name: 'Restore this version?',
+  });
+  await act(async () => {
+    fireEvent.click(within(ask).getByRole('button', { name: 'Restore' }));
+  });
+  expect(
+    await within(ask).findByText(
+      "Couldn't save the text you typed, so nothing was restored. Try again.",
+    ),
+  ).toBeTruthy();
+  // The stored note and its versions are as they were.
+  expect(
+    textOf((await repo.journal.get(WS, 'note-2026-11-23'))!.body),
+  ).toContain('About 2026-11-23');
+  expect(await repo.noteVersions.list(WS, 'note-2026-11-23')).toHaveLength(1);
+  expect(textOf(editor.getJSON())).toContain('the typed close');
 });
 
 test('the summary row reads the date, the net and the count with the win rate, and expands to the trades', async () => {

@@ -10,13 +10,16 @@ import {
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
+import { KeelDb } from '@/data/local/db';
 import { createLocalRepository } from '@/data/local/local-repository';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import type { SampleWorkspace } from '@/data/seed/generate';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import { resolveInstrument } from '@/domain/instruments';
 import type { Execution, Trade } from '@/domain/types';
+import { pasteFiles } from '../__fixtures__/clipboard';
 import { everyString } from '../__fixtures__/every-string';
+import { fakeIntersectionObserver } from '../__fixtures__/intersection';
 import { renderApp } from '../__fixtures__/render-app';
 import type { NoteEditorHandle } from '../notes/note-editor';
 import { NOTE_SAVE_DELAY_MS } from './trade-journal';
@@ -187,22 +190,27 @@ test('trade ids with a slash are encoded in every link', async () => {
   ).toBe('/app/trades/acc%3AEUR%2FUSD%3Ac/edit?symbol=ES');
 });
 
-test('setting the planned stop saves it and the realized R follows', async () => {
+test('adding a stop level saves it and the realized R follows', async () => {
   const { repo } = renderApp(<TradeView id="t-c" />, {
     sample: sample(),
     url: URL_C,
   });
   const head = await screen.findByRole('region', { name: 'Trade 1132' });
   expect(within(head).queryByText(R_FIGURE)).toBeNull();
-  const stop = screen.getByRole('textbox', { name: 'Planned stop' });
+  const stops = screen.getByRole('group', { name: 'Stops' });
+  fireEvent.click(within(stops).getByRole('button', { name: 'Add level' }));
+  const stop = screen.getByRole('textbox', { name: 'Stop level 1' });
   fireEvent.change(stop, { target: { value: '6304.75' } });
   fireEvent.blur(stop);
   await waitFor(async () =>
-    expect((await repo.trades.get(WS, 't-c'))?.plannedStop).toBe(6304.75),
+    expect((await repo.trades.get(WS, 't-c'))?.stops?.levels).toEqual([
+      { value: 6304.75, qty: 6 },
+    ]),
   );
-  // The risk comes from riskFromStop.
+  // The stored risk is the stop side's loss: 5 points on 6 contracts at $50.
   const saved = (await repo.trades.get(WS, 't-c'))!;
-  expect(saved.initialRisk).toBeGreaterThan(0);
+  expect(saved.initialRisk).toBe(150000);
+  expect(saved.plannedStop).toBeUndefined();
   await waitFor(() =>
     expect(within(head).getAllByText(R_FIGURE).length).toBe(1),
   );
@@ -429,6 +437,46 @@ test('the note editor stays mounted and focused across the first change', async 
   expect(document.activeElement).toBe(box);
 });
 
+test('an image pasted into a trade note stores the note, which owns the image', async () => {
+  fakeIntersectionObserver({ auto: true });
+  URL.createObjectURL = vi.fn(() => 'blob:trade-note');
+  URL.revokeObjectURL = vi.fn();
+  const { repo } = renderApp(<TradeView id="t-c" />, {
+    sample: sample(),
+    url: URL_C,
+  });
+  const box = await screen.findByRole('textbox', { name: 'Trade note' });
+  // The trade has no note yet; the first image makes it.
+  expect((await repo.trades.get(WS, 't-c'))?.noteId).toBeUndefined();
+  pasteFiles(box, [
+    new File([new Uint8Array([137, 80, 78, 71])], 'entry.png', {
+      type: 'image/png',
+    }),
+  ]);
+  await waitFor(
+    async () =>
+      expect((await repo.trades.get(WS, 't-c'))?.noteId).toBeDefined(),
+    { timeout: 3000 },
+  );
+  const noteId = (await repo.trades.get(WS, 't-c'))!.noteId!;
+  await waitFor(async () =>
+    expect(await repo.files.list(WS, `note:${noteId}`)).toHaveLength(1),
+  );
+  const [file] = await repo.files.list(WS, `note:${noteId}`);
+  // The saved body refers to the file, and the picture shows in the editor.
+  await waitFor(
+    async () =>
+      expect(
+        JSON.stringify((await repo.journal.get(WS, noteId))?.body),
+      ).toContain(`keel-file:${file!.id}`),
+    { timeout: 3000 },
+  );
+  expect(await screen.findByRole('img', { name: 'entry' })).toBeTruthy();
+  // The editor is the same one, still there.
+  expect(screen.getByRole('textbox', { name: 'Trade note' })).toBe(box);
+  vi.unstubAllGlobals();
+});
+
 test('an archived account makes the trade read-only', async () => {
   renderApp(<TradeView id="t-c" />, {
     sample: sample({}, 'acc-b'),
@@ -442,7 +490,12 @@ test('an archived account makes the trade read-only', async () => {
   ).toBe(true);
   expect(
     screen
-      .getByRole('textbox', { name: 'Planned stop' })
+      .getByRole('button', { name: 'Stops unit, Price' })
+      .hasAttribute('disabled'),
+  ).toBe(true);
+  expect(
+    within(screen.getByRole('group', { name: 'Targets' }))
+      .getByRole('button', { name: 'Add level' })
       .hasAttribute('disabled'),
   ).toBe(true);
   expect(
@@ -548,7 +601,7 @@ test('the Execution header gives a futures point value as a multiplier, with no 
   expect(head.textContent).not.toMatch(/\$|per point/);
 });
 
-test('the labels of realized R, planned R, MAE and MFE carry their definitions', async () => {
+test('the labels of the R figures, planned reward and risk, MAE and MFE carry their definitions', async () => {
   renderApp(<TradeView id="t-c" />, {
     sample: sample({ initialRisk: 15000 }),
     url: URL_C,
@@ -559,7 +612,14 @@ test('the labels of realized R, planned R, MAE and MFE carry their definitions',
       (e) => (e as HTMLElement).dataset.metricTip,
     );
   expect(tips(exec)).toEqual(
-    expect.arrayContaining(['realized-r', 'planned-r', 'mae', 'mfe']),
+    expect.arrayContaining([
+      'realized-r',
+      'planned-r',
+      'planned-reward',
+      'planned-risk',
+      'mae',
+      'mfe',
+    ]),
   );
   const head = screen.getByRole('region', { name: 'Trade 1132' });
   expect(tips(head)).toEqual(
@@ -618,14 +678,48 @@ test('an absent figure reads None and says what would add it, never a dash', asy
   const exec = await screen.findByRole('region', { name: 'Execution' });
   expect(exec.textContent).toContain('Planned RNone');
   expect(exec.textContent).toContain('Realized RNone');
-  // Under the headline R, with no planned R to compare it with.
-  expect(document.body.textContent).toContain('add a target for planned R');
+  // Under the headline R, with no planned R to compare it with: both sides are missing.
+  expect(document.body.textContent).toContain(
+    'add a target and a stop for planned R',
+  );
   expect(document.body.textContent).not.toContain('set a stop and target');
   expect(document.body.textContent).not.toContain('Not available');
   const texts = everyString(document.body);
   expect(texts).toContain('None');
   expect(texts.filter((s) => s.trim() === '-')).toEqual([]);
 });
+
+test.each<[Partial<Trade>, string]>([
+  [{ plannedTarget: 6319 }, 'add a stop for planned R'],
+  [{ plannedStop: 6304.75 }, 'add a target for planned R'],
+  [
+    { stops: { unit: 'price', levels: [{ value: 6304.75, qty: 6 }] } },
+    'add a target for planned R',
+  ],
+  [
+    { targets: { unit: 'price', levels: [{ value: 6319, qty: 6 }] } },
+    'add a stop for planned R',
+  ],
+  // Both sides, but the stop sits at the entry: nothing is at risk.
+  [
+    { plannedTarget: 6319, plannedStop: 6309.75 },
+    'no planned R with nothing at risk',
+  ],
+])(
+  'the headline names the side planned R is missing (%o)',
+  async (patch, hint) => {
+    renderApp(<TradeView id="t-c" />, { sample: sample(patch), url: URL_C });
+    const head = await screen.findByRole('region', { name: 'Trade 1132' });
+    await waitFor(() => expect(head.textContent).toContain(hint));
+    for (const other of [
+      'add a target for planned R',
+      'add a stop for planned R',
+      'add a target and a stop for planned R',
+      'no planned R with nothing at risk',
+    ].filter((h) => h !== hint))
+      expect(head.textContent).not.toContain(other);
+  },
+);
 
 test('at phone width Net, ROI and R share one row of three, and the crumb replaces Back to trades', async () => {
   renderApp(<TradeView id="t-c" />, {
@@ -655,6 +749,13 @@ test('a futures trade shows points, ticks, contracts and cost basis', async () =
   // 3.75 points on 6 contracts closed: 15 ticks each.
   expect(text).toContain('Points+22.5 pts');
   expect(text).toContain('Ticks+90.0 ticks');
+  expect(text).toContain('Ticks per contract+15.0 ticks');
+  // Its label carries its definition.
+  expect(
+    screen
+      .getByRole('region', { name: 'Execution' })
+      .querySelector('[data-metric-tip="ticks-per-contract"]'),
+  ).not.toBeNull();
   expect(text).toContain('Contracts6');
   expect(text).not.toContain('closed');
   // 6309.75 x 6 x 50.
@@ -971,6 +1072,29 @@ test('a still-open trade takes the day note of its open date', async () => {
   ).toBe('/app/notebook/daily/2026-11-09');
 });
 
+test('the daily note tab takes a daily template from its toolbar, and the trade note tab has none (Keel has no trade-note templates)', async () => {
+  renderApp(<TradeView id="t-c" />, { sample: sample(), url: URL_C });
+  await screen.findByRole('textbox', { name: 'Trade note' });
+  await screen.findByRole('toolbar', { name: 'Formatting' });
+  expect(
+    screen.queryByRole('button', { name: 'Insert a template' }),
+  ).toBeNull();
+
+  fireEvent.click(screen.getByRole('radio', { name: 'Daily note' }));
+  const day = await screen.findByRole('textbox', { name: 'Daily note' });
+  fireEvent.keyDown(
+    await screen.findByRole('button', { name: 'Insert a template' }),
+    { key: 'Enter' },
+  );
+  // The daily templates, as the day card lists them, and no weekly or plan one.
+  expect(
+    await screen.findByRole('menuitem', { name: 'Daily game plan' }),
+  ).toBeTruthy();
+  expect(screen.queryByRole('menuitem', { name: 'Weekly recap' })).toBeNull();
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Daily game plan' }));
+  await within(day).findByText('What I will trade');
+});
+
 test('an archived account shows the day note read-only', async () => {
   renderApp(<TradeView id="t-c" />, {
     sample: sample({}, 'acc-b'),
@@ -1013,6 +1137,26 @@ test('a partly closed futures trade reads Contracts as closed of opened', async 
   });
   await screen.findByRole('region', { name: 'Execution' });
   expect(execText()).toContain('Contracts3 of 5 closed');
+  // Ticks per contract is over the contracts closed, not the ones opened.
+  const ticks = Number(/Ticks\+([\d.]+) ticks/.exec(execText())![1]);
+  const per = Number(/Ticks per contract\+([\d.]+) ticks/.exec(execText())![1]);
+  expect(ticks).toBeGreaterThan(0);
+  expect(per).toBeCloseTo(ticks / 3, 1);
+});
+
+test('an open futures trade with no exit yet reads Ticks per contract as None', async () => {
+  renderApp(<TradeView id="t-c" />, {
+    sample: sample({
+      status: 'open',
+      closedAt: undefined,
+      avgExit: undefined,
+      executions: [fill('e1', 'buy', 2, 6310.5, '2026-11-09T16:00:00.000Z')],
+      maxPosition: 2,
+    }),
+    url: URL_C,
+  });
+  await screen.findByRole('region', { name: 'Execution' });
+  expect(execText()).toContain('Ticks per contractNone');
 });
 
 test('the day note opens with the default daily template and the first save keeps it', async () => {
@@ -1053,6 +1197,56 @@ test('the trade note tab does not read the journal', async () => {
   expect(list).not.toHaveBeenCalled();
 });
 
+test('the notes card exports the note in view, on the trade tab and on the daily tab', async () => {
+  const blobs: Blob[] = [];
+  URL.createObjectURL = vi.fn((b: Blob) => {
+    blobs.push(b);
+    return 'blob:note';
+  });
+  URL.revokeObjectURL = vi.fn();
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  renderApp(<TradeView id="t-c" />, { sample: sample(), url: URL_C });
+  await screen.findByRole('textbox', { name: 'Trade note' });
+  const exportKeel = async () => {
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: 'Export or import' }),
+      {
+        key: 'Enter',
+      },
+    );
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Export as Keel note' }),
+    );
+    await waitFor(() => expect(blobs.length).toBeGreaterThan(0));
+    return JSON.parse(await blobs.at(-1)!.text()) as {
+      kind: string;
+      title: string;
+    };
+  };
+  // A trade with no note yet exports an empty one, under a name that says whose it is.
+  const trade = await exportKeel();
+  expect(trade.kind).toBe('keel-note');
+  expect(trade.title).toMatch(/trade note$/);
+
+  fireEvent.click(screen.getByRole('radio', { name: 'Daily note' }));
+  await screen.findByRole('textbox', { name: 'Daily note' });
+  const count = blobs.length;
+  const day = await (async () => {
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: 'Export or import' }),
+      {
+        key: 'Enter',
+      },
+    );
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Export as Keel note' }),
+    );
+    await waitFor(() => expect(blobs.length).toBe(count + 1));
+    return JSON.parse(await blobs.at(-1)!.text()) as { title: string };
+  })();
+  expect(day.title).toMatch(/^Daily review, /);
+});
+
 test("the Daily note dates by the trader's zone, not the account's (K35)", async () => {
   const base = sample(
     {
@@ -1083,4 +1277,183 @@ test("the Daily note dates by the trader's zone, not the account's (K35)", async
     name: 'Open in the Notebook',
   });
   expect(link.getAttribute('href')).toBe('/app/notebook/daily/2026-11-19');
+});
+
+/** The ES trade with a swap of -$4.86 inside its net (gross $112.50, fees $31.20). */
+const swapped = (patch: Partial<Trade> = {}) =>
+  sample({ swap: -486, gross: 11250, net: 7644, ...patch });
+
+test('the Swap row follows Fees in the first grid, signed, and fills its last cell', async () => {
+  renderApp(<TradeView id="t-c" />, { sample: swapped(), url: URL_C });
+  await screen.findByRole('region', { name: 'Execution' });
+  const text = execText();
+  expect(text).toContain('Swap−$4.86from the import');
+  expect(text.indexOf('Fees')).toBeLessThan(text.indexOf('Swap'));
+  expect(text.indexOf('Swap')).toBeLessThan(text.indexOf('Cost basis'));
+  // Eight cells and no blank one: Swap shares the row with Gross P&L and Fees.
+  const swapCell = screen.getByText('Swap').closest('div')!;
+  const grid = swapCell.parentElement!;
+  expect(grid.children).toHaveLength(8);
+  expect(grid.querySelector('[aria-hidden="true"]')).toBeNull();
+  // A charge reads in the loss colour, as in the comp.
+  expect(swapCell.querySelector('b')!.className).toContain('text-loss');
+});
+
+test('a swap credit reads with a plus sign', async () => {
+  renderApp(<TradeView id="t-c" />, {
+    sample: swapped({ swap: 120, net: 8250 }),
+    url: URL_C,
+  });
+  await screen.findByRole('region', { name: 'Execution' });
+  expect(execText()).toContain('Swap+$1.20');
+});
+
+test('the header adds the swap to its sub-line so the figures add up to the net', async () => {
+  renderApp(<TradeView id="t-c" />, { sample: swapped(), url: URL_C });
+  const head = await screen.findByRole('region', { name: 'Trade 1132' });
+  expect(within(head).getByText('+$76.44')).toBeTruthy();
+  expect(head.textContent).toContain(
+    '+$112.50 gross, −$31.20 fees, −$4.86 swap',
+  );
+});
+
+test('a trade with no swap reads None on the row and leaves the header as it was', async () => {
+  renderApp(<TradeView id="t-c" />, { sample: sample(), url: URL_C });
+  const head = await screen.findByRole('region', { name: 'Trade 1132' });
+  expect(execText()).toContain('SwapNone');
+  expect(execText()).not.toContain('from the import');
+  expect(head.textContent).toContain('+$112.50 gross, −$31.20 fees');
+  expect(head.textContent).not.toContain('swap');
+});
+
+test('a swap of 0 reads $0.00 on the row and stays out of the header', async () => {
+  renderApp(<TradeView id="t-c" />, {
+    sample: sample({ swap: 0 }),
+    url: URL_C,
+  });
+  const head = await screen.findByRole('region', { name: 'Trade 1132' });
+  expect(execText()).toContain('Swap$0.00');
+  expect(head.textContent).not.toContain('swap');
+});
+
+test('the Swap label carries its definition', async () => {
+  renderApp(<TradeView id="t-c" />, { sample: swapped(), url: URL_C });
+  const exec = await screen.findByRole('region', { name: 'Execution' });
+  expect(exec.querySelector('[data-metric-tip="swap"]')).not.toBeNull();
+});
+
+test('Privacy masks swap in the row and in the header', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: swapped(),
+  });
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<TradeView id="t-c" />, { repository, url: URL_C });
+  const head = await screen.findByRole('region', { name: 'Trade 1132' });
+  expect(execText()).toContain('Swap−$•••hidden amount');
+  expect(head.textContent).toContain('swap');
+  expect(document.body.textContent).not.toContain('4.86');
+  expect(everyString(document.body).filter((s) => /\$\d/.test(s))).toEqual([]);
+});
+
+test('the Attachments card sits between Tags and rating and Notes, and takes a file on the trade', async () => {
+  const { repo } = renderApp(<TradeView id="t-c" />, {
+    sample: sample(),
+    url: URL_C,
+  });
+  const tags = await screen.findByRole('region', { name: 'Tags and rating' });
+  const files = screen.getByRole('region', { name: 'Attachments' });
+  const notes = screen.getByRole('region', { name: 'Notes' });
+  const follows = (a: Element, b: Element) =>
+    Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+  expect(follows(tags, files)).toBe(true);
+  expect(follows(files, notes)).toBe(true);
+  const input = files.querySelector('input[type="file"]') as HTMLInputElement;
+  fireEvent.change(input, {
+    target: {
+      files: [
+        new File([new Uint8Array(4)], 'plan.pdf', { type: 'application/pdf' }),
+      ],
+    },
+  });
+  await waitFor(async () =>
+    expect((await repo.files.list(WS, 'trade:t-c')).map((f) => f.name)).toEqual(
+      ['plan.pdf'],
+    ),
+  );
+  expect(await within(files).findByText('plan.pdf')).toBeTruthy();
+});
+
+test("an archived account lists its trade's files without a way to add one", async () => {
+  const indexedDB = new IDBFactory();
+  const repository = createLocalRepository({
+    indexedDB,
+    IDBKeyRange,
+    sample: sample({}, 'acc-b'),
+  });
+  // A file the trade kept from before its account was archived: the store
+  // refuses a new one now, so it is written as it was then.
+  await repository.trades.get(WS, 't-c');
+  await new KeelDb({ indexedDB, IDBKeyRange }).files.put({
+    id: 'kept',
+    workspaceId: WS,
+    owner: 'trade:t-c',
+    bytes: new Uint8Array(4).buffer,
+    type: 'application/pdf',
+    name: 'kept.pdf',
+    size: 4,
+    createdAt: '2026-11-09T15:00:00.000Z',
+  });
+  const { repo } = renderApp(<TradeView id="t-c" />, {
+    repository,
+    url: URL_C,
+  });
+  const files = await screen.findByRole('region', { name: 'Attachments' });
+  await waitFor(async () =>
+    expect(await repo.files.list(WS, 'trade:t-c')).toHaveLength(1),
+  );
+  expect(files.querySelector('input[type="file"]')).toBeNull();
+  expect(within(files).queryByText('Drop files here')).toBeNull();
+});
+
+test("the Patterns button counts the trade's patterns and opens them in the Execution card", async () => {
+  renderApp(<TradeView id="t-c" />, { sample: sample(), url: URL_C });
+  const card = await screen.findByRole('region', { name: 'Execution' });
+  // Four fills, two in and two out, and a size above the trades before it: three patterns.
+  const button = await waitFor(() => {
+    const b = within(card).getByRole('button', { name: /^Patterns/ });
+    expect(b.textContent).toBe('Patterns3');
+    return b;
+  });
+  // It sits beside Choose stats, ahead of it.
+  const chooser = within(card).getByRole('button', { name: 'Choose stats' });
+  expect(
+    button.compareDocumentPosition(chooser) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  fireEvent.click(button);
+  const pop = await screen.findByRole('dialog', {
+    name: 'Patterns on this trade',
+  });
+  expect(
+    within(pop)
+      .getAllByRole('listitem')
+      .map((li) => li.querySelector('[data-metric-tip]')!.textContent),
+  ).toEqual(['Added to the position', 'Exited in parts', 'Large size']);
+  expect(pop.textContent).toContain('Opened in 2 entries, 6 units in all.');
+  expect(pop.textContent).toContain(
+    'Closed in 2 exits at an average of 6,313.50, for +$112.50 gross.',
+  );
+});
+
+test('a trade with no pattern has the button disabled, reading 0', async () => {
+  renderApp(<TradeView id="t-a" />, {
+    sample: sample(),
+    url: '/app/trades/t-a',
+  });
+  const card = await screen.findByRole('region', { name: 'Execution' });
+  const button = within(card).getByRole('button', { name: /^Patterns/ });
+  await waitFor(() => expect(button.textContent).toBe('Patterns0'));
+  expect(button.getAttribute('aria-disabled')).toBe('true');
+  expect(button.getAttribute('title')).toBe('No patterns on this trade.');
 });

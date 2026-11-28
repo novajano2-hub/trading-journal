@@ -1,5 +1,5 @@
 import { instrumentKey, resolveInstrument } from '../instruments';
-import { riskFromStop } from '../metrics/summary';
+import { copySide, riskFromStop, tradeRisk } from '../risk';
 import {
   buildTrades,
   canonicalSymbol,
@@ -134,11 +134,14 @@ function buildFills(
 ): Built {
   const { kept, duplicateRows } = dedupe(fills, ctx.fingerprints);
   const symbols = new Set(kept.map((f) => canonicalSymbol(f.execution.symbol)));
-  // Hand-entered trades never merge with an import, not even to settle an expiry.
+  // Hand-entered trades never merge with an import, not even to settle an
+  // expiry, and neither do trades the user grouped by hand (B8): rebuilding
+  // one from its fills would cut it at a flat point again.
   const merged = ctx.openTrades.filter(
     (t) =>
       t.status === 'open' &&
       t.source !== 'manual' &&
+      t.grouping !== 'manual' &&
       (symbols.has(canonicalSymbol(t.instrument.symbol)) || expiredBy(t, now)),
   );
   const { executions, expired } = settleExpiredOptions(
@@ -174,13 +177,19 @@ function buildTrips(
     const t = built.trades[0];
     if (!t) continue;
     trades.push(t);
+    // The swap sits inside the net and outside the gross (B49), so the P&L
+    // checks below read gross and this net.
+    if (trip.swap !== undefined) {
+      t.swap = trip.swap;
+      t.net += trip.swap;
+    }
     const file = trip.filePnl;
     if (file === undefined) continue;
     filePnl[t.id] = file;
     if (t.pnlCurrency !== ctx.accountCurrency) {
       // A pair without the account currency: the file's figure is the conversion.
       t.gross = file;
-      t.net = file - t.fees;
+      t.net = file - t.fees + (t.swap ?? 0);
       t.pnlCurrency = ctx.accountCurrency;
     } else if (
       Math.abs(file - t.gross) > PNL_TOLERANCE &&
@@ -258,7 +267,10 @@ function mergedRisk(built: Trade, stored: Trade): Cents | undefined {
 /**
  * The rebuilt trade keeps the stored trade's identity and the user's journaling.
  * The planned stop, target and risk were set for the stored direction, so a
- * rebuild that flips it drops them.
+ * rebuild that flips it drops them. Levels keep their own quantities and
+ * units; the risk is the stop side's loss on the rebuilt trade (B14). A trade
+ * saved before levels keeps its single stop and target, and its derived risk
+ * follows the position as before.
  */
 function inherit(built: Trade, stored: Trade): Trade {
   const t: Trade = {
@@ -276,7 +288,10 @@ function inherit(built: Trade, stored: Trade): Trade {
   if (stored.plannedStop !== undefined) t.plannedStop = stored.plannedStop;
   if (stored.plannedTarget !== undefined)
     t.plannedTarget = stored.plannedTarget;
-  const risk = mergedRisk(built, stored);
+  if (stored.targets) t.targets = copySide(stored.targets);
+  if (stored.stops) t.stops = copySide(stored.stops);
+  const risk =
+    stored.targets || stored.stops ? tradeRisk(t) : mergedRisk(built, stored);
   if (risk !== undefined) t.initialRisk = risk;
   return t;
 }

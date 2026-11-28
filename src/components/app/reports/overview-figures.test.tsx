@@ -134,6 +134,7 @@ const NEW_IDS = [
   'hold-time-breakevens',
   'commissions',
   'fill-fees',
+  'swap',
 ];
 
 test('the months: best, lowest and the average, each named', async () => {
@@ -220,6 +221,49 @@ test('the costs: commissions and fees as separate totals', async () => {
   // Costs are signed negative, as the rest of the page signs them.
   expect(stat(card, 'commissions')).toBe('−$1.50');
   expect(stat(card, 'fill-fees')).toBe('−$0.50');
+});
+
+/** The figures sample with swap on two closed trades: -$4.86 and +$1.20. */
+async function swapSample(): Promise<SampleWorkspace> {
+  const s = await figuresSample();
+  s.trades = s.trades.map((t, i) =>
+    i === 0
+      ? { ...t, swap: -486, net: t.net - 486 }
+      : i === 1
+        ? { ...t, swap: 120, net: t.net + 120 }
+        : t,
+  );
+  return s;
+}
+
+test('the costs: swap is its own total, signed, apart from the fees', async () => {
+  renderApp(<OverviewView />, { sample: swapSample, url: URL });
+  const root = await screen.findByTestId('reports-overview');
+  const card = within(root).getByRole('region', { name: 'Costs' });
+  // -$4.86 and +$1.20; the fees are the same as without swap.
+  expect(stat(card, 'swap')).toBe('−$3.66');
+  expect(stat(card, 'commissions')).toBe('−$1.50');
+  expect(stat(card, 'fill-fees')).toBe('−$0.50');
+});
+
+test('the costs: swap reads None while no closed trade carries one', async () => {
+  const root = await page();
+  const card = within(root).getByRole('region', { name: 'Costs' });
+  expect(stat(card, 'swap')).toBe('None');
+});
+
+test('Privacy masks the swap total', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: swapSample,
+  });
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<OverviewView />, { repository, url: URL });
+  const root = await screen.findByTestId('reports-overview');
+  const card = within(root).getByRole('region', { name: 'Costs' });
+  expect(stat(card, 'swap')).not.toMatch(/\d/);
+  expect(card.textContent).not.toContain('3.66');
 });
 
 test('every new label carries its definition', async () => {

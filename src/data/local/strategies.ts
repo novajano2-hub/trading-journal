@@ -1,11 +1,30 @@
-import { strategyRules, type RuleGroup, type Strategy } from '@/domain/types';
 import {
+  strategyRules,
+  type RuleGroup,
+  type Strategy,
+  type StoredFile,
+} from '@/domain/types';
+import {
+  FileRejected,
+  IMAGE_TYPES,
   NotFoundError,
+  SHOT_MAX_BYTES,
+  type NewFile,
   type RuleGroupDraft,
   type StrategiesRepo,
 } from '../repository';
 import type { LocalContext } from './context';
+import { isQuota } from './day-shots';
 import type { KeelDb } from './db';
+import { deleteOwnerFiles } from './files';
+import {
+  changeRows,
+  fieldChanges,
+  lifecycleRow,
+  logHistory,
+  type FieldChange,
+} from './history';
+import { deleteStrategyMissedTrades } from './missed-trades';
 import { rwTx } from './tx';
 import { mergePatch } from '../merge';
 
@@ -32,6 +51,59 @@ async function onItsTrades(
     });
 }
 
+/** The strategy fields history keeps (B26); the groups read as `rules`, their count. */
+const LOGGED_FIELDS = [
+  'name',
+  'description',
+  'status',
+  'icon',
+  'photoId',
+  'rules',
+] as const;
+
+function loggedView(s: Strategy) {
+  return {
+    name: s.name,
+    description: s.description,
+    status: s.status,
+    icon: s.icon,
+    photoId: s.photoId,
+    rules: strategyRules(s).length,
+  };
+}
+
+/** The groups and rules as the trader reads them: titles, texts and when each is graded, without ids. */
+function rulesOf(s: Strategy): string {
+  return JSON.stringify(
+    s.groups.map((g) => [g.title, g.rules.map((r) => [r.text, r.showWhen])]),
+  );
+}
+
+/**
+ * The logged fields that differ between two versions of a strategy. Rules
+ * reworded, regrouped or reordered to the same count still show, as the same
+ * number on both sides, so the edit is not lost.
+ */
+function strategyChanges(before: Strategy, after: Strategy): FieldChange[] {
+  const changes = fieldChanges(loggedView(before), loggedView(after), [
+    ...LOGGED_FIELDS,
+  ]);
+  if (
+    !changes.some((c) => c.field === 'rules') &&
+    rulesOf(before) !== rulesOf(after)
+  ) {
+    const count = strategyRules(after).length;
+    changes.push({ field: 'rules', oldValue: count, newValue: count });
+  }
+  return changes;
+}
+
+/** What a strategy's photo may be: a picture, or the SVG a template's cover is drawn in. */
+const PHOTO_TYPES: ReadonlySet<string> = new Set([
+  ...IMAGE_TYPES,
+  'image/svg+xml',
+]);
+
 export function localStrategies(ctx: LocalContext): StrategiesRepo {
   const withIds = (groups: readonly RuleGroupDraft[]): RuleGroup[] =>
     groups.map((g) => ({
@@ -55,7 +127,10 @@ export function localStrategies(ctx: LocalContext): StrategiesRepo {
       return (await ctx.db()).strategies.get([ws, id]);
     },
 
-    async create(ws, input) {
+    async create(ws, input, photo?: NewFile) {
+      if (photo && !PHOTO_TYPES.has(photo.type)) throw new FileRejected('type');
+      if (photo && photo.bytes.byteLength > SHOT_MAX_BYTES)
+        throw new FileRejected('size');
       const db = await ctx.db();
       const strategy: Strategy = {
         ...input,
@@ -63,18 +138,46 @@ export function localStrategies(ctx: LocalContext): StrategiesRepo {
         id: ctx.newId(),
         workspaceId: ws,
       };
-      await db.strategies.put(strategy);
-      return strategy;
+      // The photo is the strategy's from the start: one write, one created row.
+      const file: StoredFile | undefined = photo && {
+        id: ctx.newId(),
+        workspaceId: ws,
+        owner: `strategy:${strategy.id}`,
+        bytes: photo.bytes,
+        type: photo.type,
+        name: photo.name,
+        size: photo.bytes.byteLength,
+        createdAt: ctx.now().toISOString(),
+      };
+      if (file) strategy.photoId = file.id;
+      try {
+        return await rwTx(db, [db.strategies, db.files, db.history], async () => {
+          if (file) await db.files.put(file);
+          await db.strategies.put(strategy);
+          await logHistory(
+            db,
+            ws,
+            [lifecycleRow('strategy', 'created', strategy.id, strategy.name)],
+            ctx,
+          );
+          return strategy;
+        });
+      } catch (error) {
+        if (file && isQuota(error)) throw new FileRejected('quota');
+        throw error;
+      }
     },
 
     async update(ws, id, patch) {
       const db = await ctx.db();
-      return rwTx(db, [db.strategies, db.trades], async () => {
+      const tables = [db.strategies, db.trades, db.files, db.history];
+      return rwTx(db, tables, async () => {
         const strategy = await db.strategies.get([ws, id]);
         if (!strategy) throw new NotFoundError('strategy', id);
         const { groups, ...rest } = patch;
         const next: Strategy = {
-          ...mergePatch(strategy, rest, ['icon', 'tone']),
+          // `photoId` sent as undefined clears the photo.
+          ...mergePatch(strategy, rest, ['icon', 'tone', 'photoId']),
           id,
           workspaceId: ws,
         };
@@ -87,30 +190,70 @@ export function localStrategies(ctx: LocalContext): StrategiesRepo {
           if (gone.size > 0) await onItsTrades(db, ws, id, gone, false);
         }
         await db.strategies.put(next);
+        // A photo that is cleared or replaced is deleted with the write (B56).
+        if (
+          strategy.photoId !== undefined &&
+          next.photoId !== strategy.photoId
+        ) {
+          const old = await db.files.get([ws, strategy.photoId]);
+          if (old?.owner === `strategy:${id}`)
+            await db.files.delete([ws, old.id]);
+        }
+        await logHistory(
+          db,
+          ws,
+          changeRows(
+            'strategy',
+            id,
+            next.name,
+            strategyChanges(strategy, next),
+          ),
+          ctx,
+        );
         return next;
       });
     },
 
     async remove(ws, id) {
       const db = await ctx.db();
-      await rwTx(db, [db.strategies, db.trades, db.challenges], async () => {
-        const strategy = await db.strategies.get([ws, id]);
-        if (!strategy) throw new NotFoundError('strategy', id);
-        await onItsTrades(db, ws, id, ruleIdsOf(strategy), true);
-        // A challenge traded with it no longer lists it.
-        const using = await db.challenges
-          .where('workspaceId')
-          .equals(ws)
-          .filter((c) => c.strategyIds?.includes(id) ?? false)
-          .toArray();
-        await db.challenges.bulkPut(
-          using.map((c) => ({
-            ...c,
-            strategyIds: c.strategyIds!.filter((s) => s !== id),
-          })),
-        );
-        await db.strategies.delete([ws, id]);
-      });
+      await rwTx(
+        db,
+        [
+          db.strategies,
+          db.trades,
+          db.files,
+          db.history,
+          db.challenges,
+          db.missedTrades,
+        ],
+        async () => {
+          const strategy = await db.strategies.get([ws, id]);
+          if (!strategy) throw new NotFoundError('strategy', id);
+          await onItsTrades(db, ws, id, ruleIdsOf(strategy), true);
+          // A challenge traded with it no longer lists it.
+          const using = await db.challenges
+            .where('workspaceId')
+            .equals(ws)
+            .filter((c) => c.strategyIds?.includes(id) ?? false)
+            .toArray();
+          await db.challenges.bulkPut(
+            using.map((c) => ({
+              ...c,
+              strategyIds: c.strategyIds!.filter((s) => s !== id),
+            })),
+          );
+          await db.strategies.delete([ws, id]);
+          await deleteOwnerFiles(db, ws, `strategy:${id}`);
+          await deleteStrategyMissedTrades(db, ws, id);
+          // One row for the strategy, not one per trade it leaves.
+          await logHistory(
+            db,
+            ws,
+            [lifecycleRow('strategy', 'deleted', id, strategy.name)],
+            ctx,
+          );
+        },
+      );
     },
   };
 }

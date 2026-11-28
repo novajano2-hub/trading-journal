@@ -59,4 +59,10 @@ export const DATA_TABLES = [
   'days',
   'dayShots',
   'propTxns',
+  'files',
+  'noteVersions',
+  'history',
+  'targetRules',
+  'feeRules',
+  'missedTrades',
 ] as const;

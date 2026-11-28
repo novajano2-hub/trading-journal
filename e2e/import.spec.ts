@@ -86,7 +86,8 @@ test('import a fills file in My workspace, see it in the log and the calendar, t
   // Import history lists it, and Undo takes it out again.
   await page.getByRole('link', { name: 'Settings', exact: true }).click();
   await page.getByRole('link', { name: 'Logs' }).click();
-  const history = page.getByRole('table');
+  // Logs holds the edit history's table too: this is the import log's.
+  const history = page.getByRole('table', { name: 'Import history' });
   await expect(history).toContainText('fills.csv');
   await expect(history).toContainText('Journey account');
   await history.getByRole('button', { name: 'Undo' }).click();

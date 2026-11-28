@@ -1,7 +1,12 @@
 import { describe, expect, test } from 'vitest';
+import {
+  LEGACY_AVG_PLANNED_R,
+  LEGACY_TRADES,
+} from '../__fixtures__/legacy-trades';
 import { makeTrade } from '../__fixtures__/trades';
 import { resolveInstrument } from '../instruments';
 import { costBasis, defaultMetricContext, pnlOf } from './context';
+import { rOf } from './units';
 import {
   costsOf,
   expectancyIn,
@@ -247,6 +252,60 @@ describe('summarize', () => {
   });
 });
 
+describe('Planned R reads the one risk model (Plan 6B, B14)', () => {
+  test.each(LEGACY_TRADES)(
+    'plannedR of a legacy trade is unchanged: $name',
+    ({ trade, plannedR: before, realizedR }) => {
+      // The figures the code gave before levels existed, to the last digit.
+      expect(plannedR(trade)).toBe(before);
+      expect(rOf(trade, 'net')).toBe(realizedR);
+    },
+  );
+
+  test('plannedR of a legacy trade is unchanged in a summary', () => {
+    const s = summarize(
+      LEGACY_TRADES.map((l) => l.trade),
+      ctx,
+    );
+    expect(s.avgPlannedR).toBe(LEGACY_AVG_PLANNED_R);
+    expect(s.plannedRTradeCount).toBe(LEGACY_TRADES.length);
+  });
+
+  test('plannedR of a level trade is its reward over its risk', () => {
+    const t = makeTrade({
+      net: 0,
+      instrument: resolveInstrument('AAPL')!,
+      avgEntry: 100,
+      maxPosition: 20,
+      targets: {
+        unit: 'price',
+        levels: [
+          { value: 107.5, qty: 10 },
+          { value: 117.5, qty: 10 },
+        ],
+      },
+      stops: { unit: 'price', levels: [{ value: 95, qty: 20 }] },
+    });
+    // 10 x 7.5 + 10 x 17.5 = 250 over 20 x 5 = 100.
+    expect(plannedR(t)).toBe(2.5);
+    const s = summarize([t], ctx);
+    expect(s).toMatchObject({ avgPlannedR: 2.5, plannedRTradeCount: 1 });
+  });
+
+  test('a level trade with only stops has no Planned R, and a figure for Realized R', () => {
+    const t = makeTrade({
+      net: -5000,
+      instrument: resolveInstrument('AAPL')!,
+      avgEntry: 100,
+      maxPosition: 20,
+      stops: { unit: 'price', levels: [{ value: 95, qty: 20 }] },
+      initialRisk: 10000,
+    });
+    expect(plannedR(t)).toBeUndefined();
+    expect(rOf(t, 'net')).toBe(-0.5);
+  });
+});
+
 describe('netRoi', () => {
   test('net over cost basis of closed trades; null when empty', () => {
     const a = makeTrade({ net: 10000 });
@@ -431,12 +490,17 @@ describe('costsOf', () => {
       executions: [fill(50, 100), fill(100, 200)],
     });
     const b = makeTrade({ net: 0, fees: 25, executions: [fill(5, 20)] });
-    expect(costsOf([a, b])).toEqual({ commissions: 320, fees: 155 });
+    expect(costsOf([a, b])).toEqual({
+      commissions: 320,
+      fees: 155,
+      swap: null,
+    });
   });
   test('a trade with no fills carries its total as fees', () => {
     expect(costsOf([makeTrade({ net: 0, fees: 40 })])).toEqual({
       commissions: 0,
       fees: 40,
+      swap: null,
     });
   });
   test('open trades are left out, as in gross to net', () => {
@@ -446,7 +510,23 @@ describe('costsOf', () => {
       fees: 25,
       executions: [fill(5, 20)],
     });
-    expect(costsOf([open])).toEqual({ commissions: 0, fees: 0 });
+    expect(costsOf([open])).toEqual({ commissions: 0, fees: 0, swap: null });
+  });
+  test('swap adds up apart from the fees, signed, over the trades that carry one', () => {
+    const a = makeTrade({ net: 0, fees: 100, swap: -486 });
+    const b = makeTrade({ net: 0, fees: 100, swap: 120 });
+    const none = makeTrade({ net: 0, fees: 100 });
+    expect(costsOf([a, b, none])).toEqual({
+      commissions: 0,
+      fees: 300,
+      swap: -366,
+    });
+  });
+  test('a swap of 0 is still a swap, so the total reads 0 and not None', () => {
+    expect(costsOf([makeTrade({ net: 0, swap: 0 })]).swap).toBe(0);
+    expect(
+      costsOf([makeTrade({ net: 0, swap: -50, status: 'open' })]).swap,
+    ).toBeNull();
   });
 });
 

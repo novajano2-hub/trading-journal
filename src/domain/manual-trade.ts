@@ -6,9 +6,9 @@ import {
   instrumentKey,
   resolveInstrument,
 } from './instruments';
-import { riskFromStop } from './metrics/summary';
+import { copySide, sidesOf, tradeRisk } from './risk';
 import { buildTrades, canonicalSymbol } from './trade-builder';
-import type { CostMethod, Instrument, Trade } from './types';
+import type { CostMethod, Instrument, LevelSide, Trade } from './types';
 
 export type ManualTradeError =
   'no-fills' | 'reversal' | 'option-fields' | 'multiplier' | 'bad-fill';
@@ -297,11 +297,71 @@ export function buildManualTrade(
 
   trade.id = id;
   trade.source = 'manual';
-  if (input.plannedStop !== undefined) {
-    trade.plannedStop = input.plannedStop;
-    trade.initialRisk = riskFromStop(trade, input.plannedStop);
-  }
+  // The form's one stop and one target are one Price level each, at the full
+  // size (B14); the risk is the stop side's loss, as everywhere else.
+  if (input.plannedStop !== undefined)
+    trade.stops = onePriceLevel(input.plannedStop, trade.maxPosition);
   if (input.plannedTarget !== undefined)
-    trade.plannedTarget = input.plannedTarget;
+    trade.targets = onePriceLevel(input.plannedTarget, trade.maxPosition);
+  const risk = tradeRisk(trade);
+  if (risk !== undefined) trade.initialRisk = risk;
   return { ok: true, trade };
+}
+
+function onePriceLevel(value: number, qty: number): LevelSide {
+  return { unit: 'price', levels: [{ value, qty }] };
+}
+
+/** How far a level's quantity may sit from the trade's size and still be all of it (0.1 + 0.2 lots). */
+const SIZE_EPS = 1e-9;
+
+/**
+ * The price the manual form shows for a side: a side that is one Price level
+ * on the whole position (`size`). Saving the form writes one level on the
+ * whole position, so a level on part of it, or on more than it, would be
+ * rewritten to the full size; like several levels or another unit, it is
+ * not one the form can show or edit, and the trade page owns it.
+ */
+export function formPriceOf(
+  side: LevelSide | undefined,
+  size: number,
+): number | undefined {
+  const [only, ...rest] = side?.levels ?? [];
+  return side?.unit === 'price' &&
+    only !== undefined &&
+    rest.length === 0 &&
+    Math.abs(only.qty - size) <= SIZE_EPS
+    ? only.value
+    : undefined;
+}
+
+/**
+ * A rebuilt manual trade with the sides of the stored one that the form could
+ * not show, which it therefore could not have changed: kept as they were, with
+ * the risk following them. A side the form did show follows the form, even
+ * when its box was emptied. A stop or target typed into the form replaces a
+ * hidden side.
+ */
+export function keepHiddenSides(
+  built: Trade,
+  old: Trade,
+  input: ManualTradeInput,
+): Trade {
+  const before = sidesOf(old);
+  const hidden = (side: LevelSide | undefined, typed: number | undefined) =>
+    side !== undefined &&
+    formPriceOf(side, old.maxPosition) === undefined &&
+    typed === undefined
+      ? side
+      : undefined;
+  const stops = hidden(before.stops, input.plannedStop);
+  const targets = hidden(before.targets, input.plannedTarget);
+  if (!stops && !targets) return built;
+  const next: Trade = { ...built };
+  if (stops) next.stops = copySide(stops);
+  if (targets) next.targets = copySide(targets);
+  const risk = tradeRisk(next);
+  if (risk === undefined) delete next.initialRisk;
+  else next.initialRisk = risk;
+  return next;
 }

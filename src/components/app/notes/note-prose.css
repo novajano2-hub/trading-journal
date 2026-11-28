@@ -1,11 +1,76 @@
 /*
- * How a note reads. Token colours only; the type follows DESIGN.md's ramp
- * (comp 10: 15px / 1.65 body, 15px semibold prompts, larger headings above).
+ * How a note reads. Token colours only; the type is set by the note settings
+ * below (headings and body), at a 1.65 line height.
  */
+
+/*
+ * The note settings (Settings > Notebook, B41): the sizes a note is drawn at
+ * and whether a ticked checklist item is crossed out. These are the defaults
+ * (28, 24, 20 and 14 px, crossed out). Every editor and read view sets its own
+ * on its box from the saved setting (note-type-style.ts), which wins here for
+ * everything inside it, so a note reads the same wherever it is drawn.
+ */
+:root {
+  --note-h1: 28px;
+  --note-h2: 24px;
+  --note-h3: 20px;
+  --note-body: 14px;
+  --note-checked-decoration: line-through;
+  /* Two sizes that follow H3 in proportion (note-type-style.ts): the day note's field label and a column's heading. */
+  --note-field-label: 13.5px;
+  --note-column-heading: 15px;
+}
+
+/*
+ * The toolbar's text colours, highlights and faces. A note stores these as
+ * tokens, so one note reads in light and in graphite: each ink is dark enough
+ * on white in light and light enough on graphite in dark (4.5:1 and above on
+ * the surface), and a highlight is that ink as a tint under the note's own
+ * text colour. Hues with a job elsewhere (gain, loss, info) are left out.
+ */
+:root,
+[data-print-root] {
+  --note-serif: ui-serif, Georgia, Cambria, 'Times New Roman', serif;
+  --note-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --note-ink-marigold: var(--warn);
+  --note-ink-clay: #a5562b;
+  --note-ink-rose: #b83a77;
+  --note-ink-orchid: #a63f99;
+  --note-ink-plum: #7e3f9e;
+  --note-ink-olive: #657015;
+  --note-ink-ultramarine: var(--accent-ink);
+  --note-ink-grey: var(--muted);
+}
+:root[data-theme='dark'] {
+  --note-ink-clay: #e0976c;
+  --note-ink-rose: #ec80b3;
+  --note-ink-orchid: #d97ccd;
+  --note-ink-plum: #c192df;
+  --note-ink-olive: #b5c23c;
+}
+:root,
+[data-print-root] {
+  --note-hl-marigold: color-mix(
+    in srgb,
+    var(--note-ink-marigold) 26%,
+    transparent
+  );
+  --note-hl-clay: color-mix(in srgb, var(--note-ink-clay) 24%, transparent);
+  --note-hl-rose: color-mix(in srgb, var(--note-ink-rose) 24%, transparent);
+  --note-hl-orchid: color-mix(in srgb, var(--note-ink-orchid) 24%, transparent);
+  --note-hl-plum: color-mix(in srgb, var(--note-ink-plum) 24%, transparent);
+  --note-hl-olive: color-mix(in srgb, var(--note-ink-olive) 26%, transparent);
+  --note-hl-ultramarine: color-mix(
+    in srgb,
+    var(--note-ink-ultramarine) 22%,
+    transparent
+  );
+  --note-hl-grey: color-mix(in srgb, var(--note-ink-grey) 22%, transparent);
+}
 .note-prose {
   margin-top: 6px;
   max-width: 68ch;
-  font-size: 15px;
+  font-size: var(--note-body);
   line-height: 1.65;
   color: var(--text);
   outline: none;
@@ -13,6 +78,19 @@
 }
 .note-prose:focus-visible {
   outline: none;
+}
+/* The settings page's preview: a note's type with no editor around it. */
+.note-prose.note-preview {
+  max-width: none;
+  margin-top: 0;
+}
+/* Nothing in it is touched, so its checkboxes need no 44px target. */
+@media (pointer: coarse) {
+  .note-prose.note-preview ul[data-type='taskList'] > li > label {
+    width: auto;
+    margin: 0;
+    height: 1.65em;
+  }
 }
 .note-prose > * + * {
   margin-top: 4px;
@@ -29,23 +107,24 @@
   color: var(--faint);
 }
 .note-prose h1 {
-  font-size: 26px;
+  font-size: var(--note-h1);
   font-weight: 600;
   letter-spacing: -0.03em;
   line-height: 1.15;
   margin-top: 22px;
 }
 .note-prose h2 {
-  font-size: 20px;
+  font-size: var(--note-h2);
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.25;
   margin-top: 20px;
 }
 .note-prose h3 {
-  font-size: 15px;
+  font-size: var(--note-h3);
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
   margin-top: 16px;
 }
 .note-prose > :first-child {
@@ -71,7 +150,7 @@
 }
 .note-prose pre {
   font-family: var(--font-mono);
-  font-size: 13.5px;
+  font-size: 0.96em;
   padding: 10px 12px;
   border-radius: 10px;
   background: var(--sunken);
@@ -80,6 +159,16 @@
 .note-prose pre code {
   padding: 0;
   background: none;
+}
+/* Highlight: a tint behind the text, which keeps its own colour. */
+.note-prose mark {
+  padding: 0 1px;
+  border-radius: 3px;
+  background: var(--note-hl-marigold);
+  color: inherit;
+}
+.note-prose u {
+  text-underline-offset: 0.18em;
 }
 .note-prose ul,
 .note-prose ol {
@@ -107,7 +196,11 @@
   margin: 18px 0;
 }
 
-/* Checklists wear the TaskCheckbox look. */
+/*
+ * Checklists wear the TaskCheckbox look. The editor draws an item as a bare
+ * `li[data-checked]` (the library's node view adds no `data-type` to it), so
+ * an item is whatever is a direct child of a task list.
+ */
 .note-prose ul[data-type='taskList'] {
   list-style: none;
   padding-left: 0;
@@ -115,23 +208,23 @@
 .note-prose ul[data-type='taskList'] ul[data-type='taskList'] {
   padding-left: 26px;
 }
-.note-prose li[data-type='taskItem'] {
+.note-prose ul[data-type='taskList'] > li {
   display: flex;
   align-items: flex-start;
   gap: 10px;
 }
-.note-prose li[data-type='taskItem'] > label {
+.note-prose ul[data-type='taskList'] > li > label {
   flex: none;
   display: grid;
   place-items: center;
   height: 1.65em;
   user-select: none;
 }
-.note-prose li[data-type='taskItem'] > div {
+.note-prose ul[data-type='taskList'] > li > div {
   flex: 1;
   min-width: 0;
 }
-.note-prose li[data-type='taskItem'] input[type='checkbox'] {
+.note-prose ul[data-type='taskList'] > li input[type='checkbox'] {
   appearance: none;
   display: grid;
   place-items: center;
@@ -147,25 +240,37 @@
     background-color 240ms var(--ease-glide),
     border-color 240ms var(--ease-glide);
 }
-.note-prose li[data-type='taskItem'] input[type='checkbox']:hover {
+.note-prose ul[data-type='taskList'] > li input[type='checkbox']:hover {
   border-color: color-mix(in srgb, var(--accent) 50%, transparent);
 }
-.note-prose li[data-type='taskItem'] input[type='checkbox']:checked {
+.note-prose ul[data-type='taskList'] > li input[type='checkbox']:checked {
   border-color: var(--gain-fill, var(--gain));
   background:
     url("data:image/svg+xml,%3Csvg viewBox='0 0 18 18' xmlns='http://www.w3.org/2000/svg' fill='none'%3E%3Cpath d='M4.75 9.5l3 3 5.5-6.5' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
       center / 18px 18px no-repeat,
     var(--gain-fill, var(--gain));
 }
-.note-prose li[data-type='taskItem'] input[type='checkbox']:focus-visible {
+.note-prose ul[data-type='taskList'] > li input[type='checkbox']:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.note-prose li[data-type='taskItem'][data-checked='true'] > div {
+.note-prose ul[data-type='taskList'] > li[data-checked='true'] > div {
   color: var(--muted);
 }
+/*
+ * Crossed out only when the setting says so, and only the item's own text: a
+ * line through a ticked item must not run on through the open items nested
+ * under it.
+ */
+.note-prose
+  ul[data-type='taskList']
+  > li[data-checked='true']
+  > div
+  > :not(ul):not(ol) {
+  text-decoration: var(--note-checked-decoration);
+}
 @media (pointer: coarse) {
-  .note-prose li[data-type='taskItem'] > label {
+  .note-prose ul[data-type='taskList'] > li > label {
     width: 44px;
     margin: -0.5em 0 -0.5em -13px;
     height: 2.65em;
@@ -237,7 +342,7 @@
   display: block;
   list-style: none;
   grid-column: 2;
-  font-size: 17px;
+  font-size: 1.2em;
   font-weight: 600;
   letter-spacing: -0.015em;
   line-height: 1.3;
@@ -250,6 +355,67 @@
   display: none;
 }
 
+/*
+ * Toggles: the same node as a collapsible section, set without its rule. A
+ * toggle's title reads as body text, a toggle heading's as the heading of its
+ * level, at the sizes the note settings give headings. The caret is as tall as
+ * the title's first line, so it stays level with it at any size.
+ */
+.note-prose div[data-type='details'][data-toggle] {
+  margin: 4px 0;
+  padding: 0;
+  border-top: 0;
+}
+.note-prose div[data-type='details'][data-toggle] > button {
+  margin-top: 0;
+  height: 1.65em;
+}
+.note-prose
+  div[data-type='details'][data-toggle='0']
+  :is(div[data-type='detailsSummary'], summary) {
+  font-size: var(--note-body);
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.65;
+  padding: 0;
+}
+.note-prose
+  div[data-type='details'][data-toggle='1']
+  :is(div[data-type='detailsSummary'], summary) {
+  font-size: var(--note-h1);
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  padding: 4px 0;
+}
+.note-prose
+  div[data-type='details'][data-toggle='2']
+  :is(div[data-type='detailsSummary'], summary) {
+  font-size: var(--note-h2);
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+  padding: 4px 0;
+}
+.note-prose
+  div[data-type='details'][data-toggle='3']
+  :is(div[data-type='detailsSummary'], summary) {
+  font-size: var(--note-h3);
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  padding: 4px 0;
+}
+.note-prose div[data-type='details'][data-toggle='1'] > button {
+  height: calc(var(--note-h1) * 1.15);
+  margin-top: 4px;
+}
+.note-prose div[data-type='details'][data-toggle='2'] > button {
+  height: calc(var(--note-h2) * 1.25);
+  margin-top: 4px;
+}
+.note-prose div[data-type='details'][data-toggle='3'] > button {
+  height: calc(var(--note-h3) * 1.3);
+  margin-top: 4px;
+}
+
 /* Tables take the app's table style: quiet header, hairline rows. */
 .note-prose .tableWrapper {
   overflow-x: auto;
@@ -258,7 +424,7 @@
 .note-prose table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: inherit;
 }
 .note-prose th,
 .note-prose td {
@@ -269,7 +435,7 @@
   vertical-align: top;
 }
 .note-prose th {
-  font-size: 12.5px;
+  font-size: 0.9em;
   font-weight: 500;
   color: var(--faint);
   background: var(--sunken);
@@ -293,7 +459,7 @@
  */
 .note-day .note-prose {
   max-width: none;
-  font-size: 14.5px;
+  font-size: var(--note-body);
   line-height: 1.6;
 }
 .note-day [role='toolbar'] {
@@ -302,7 +468,8 @@
 }
 .note-day .note-prose h3 {
   margin-top: 10px;
-  font-size: 13.5px;
+  /* The template's field label: 13.5px at the default H3, in proportion to it. */
+  font-size: var(--note-field-label);
   font-weight: 500;
   letter-spacing: 0;
   color: var(--muted);
@@ -314,7 +481,554 @@
 }
 .note-day .note-prose div[data-type='detailsSummary'],
 .note-day .note-prose summary {
-  font-size: 16px;
+  font-size: 1.15em;
   font-weight: 600;
   letter-spacing: -0.01em;
+}
+
+/*
+ * A toolbar menu on a phone is a sheet from the bottom edge (comp 05). Radix
+ * places a menu with an inline transform; this pins its wrapper to the edge.
+ */
+@media (max-width: 639.98px) {
+  [data-radix-popper-content-wrapper]:has(> .note-sheet) {
+    position: fixed !important;
+    inset: auto 0 0 0 !important;
+    transform: none !important;
+    min-width: 0 !important;
+  }
+}
+
+/*
+ * Images (comp 05, B32): a block image is a figure with its picture and a
+ * caption under it; an inline image sits in the line. A width is a percentage
+ * of the block the image is in (inline style); with none the picture keeps its
+ * own size, never wider than the block. The selected image gets the accent
+ * ring and four corner handles; a handle's hit area is wider than what is drawn.
+ */
+.note-prose .note-image {
+  position: relative;
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 14px 0 6px;
+}
+.note-prose .note-image-inline {
+  display: inline-block;
+  margin: 0;
+  vertical-align: middle;
+}
+.note-prose .note-image-frame {
+  position: relative;
+  border-radius: 8px;
+}
+.note-prose .note-image-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+.note-prose .note-image[data-selected] .note-image-frame,
+.note-prose .note-image-frame:has(.note-image-slider:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.note-prose .note-image-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  border: 2px solid var(--accent);
+  background: var(--surface-1);
+  touch-action: none;
+}
+.note-prose .note-image-handle::before {
+  content: '';
+  position: absolute;
+  inset: -9px;
+}
+.note-prose .note-image-handle[data-resize-handle='tl'] {
+  top: -7px;
+  left: -7px;
+  cursor: nwse-resize;
+}
+.note-prose .note-image-handle[data-resize-handle='br'] {
+  right: -7px;
+  bottom: -7px;
+  cursor: nwse-resize;
+}
+.note-prose .note-image-handle[data-resize-handle='tr'] {
+  top: -7px;
+  right: -7px;
+  cursor: nesw-resize;
+}
+.note-prose .note-image-handle[data-resize-handle='bl'] {
+  bottom: -7px;
+  left: -7px;
+  cursor: nesw-resize;
+}
+/* The keyboard's width control: there to be focused, not seen. */
+.note-prose .note-image-slider {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* Open larger: out of the way until the image is hovered, focused or selected. */
+.note-prose .note-image-open {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface-1) 90%, transparent);
+  box-shadow: var(--shadow-chip);
+  opacity: 0;
+}
+.note-prose .note-image:hover .note-image-open,
+.note-prose .note-image:focus-within .note-image-open,
+.note-prose .note-image[data-selected] .note-image-open {
+  opacity: 1;
+}
+.note-prose .note-image-open:focus-visible,
+.note-prose .note-image-caption-field:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.note-prose .note-image-caption,
+.note-prose .note-image-caption-field {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.note-prose .note-image-caption-field {
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.note-prose .note-image-caption-field::placeholder {
+  color: var(--faint);
+}
+.note-prose .note-image-caption-field:hover {
+  background: var(--sunken);
+}
+/* A picture still on its way, or one that is not there. */
+.note-prose .note-image-loading,
+.note-prose .note-image-missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-width: min(320px, 100%);
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  background: var(--sunken);
+  color: var(--muted);
+  font-size: 13.5px;
+}
+.note-prose .note-image-missing {
+  border: 1px dashed var(--line-2);
+}
+.note-prose .note-image-inline .note-image-loading,
+.note-prose .note-image-inline .note-image-missing {
+  display: inline-flex;
+  width: auto;
+  min-width: 0;
+  aspect-ratio: auto;
+  padding: 2px 8px;
+}
+@media (pointer: coarse) {
+  /* Drawn at 32px, 44px to touch. */
+  .note-prose .note-image-open {
+    width: 32px;
+    height: 32px;
+  }
+  .note-prose .note-image-open::before {
+    content: '';
+    position: absolute;
+    inset: -6px;
+  }
+  .note-prose .note-image-handle::before {
+    inset: -17px;
+  }
+  .note-prose .note-image-caption-field {
+    min-height: 44px;
+  }
+}
+@media print {
+  .note-prose .note-image-open,
+  .note-prose .note-image-handle,
+  .note-prose .note-image-slider {
+    display: none;
+  }
+}
+
+/*
+ * Block handles (comp 05, B54): a "+" and a grip beside the block the pointer
+ * is over, which takes a soft background. The body is indented 22px, and the
+ * handle (42px wide) reaches 20px into the card's padding, so it stays inside
+ * a card with that much. No hover (a phone), no handles.
+ */
+.note-with-handles .note-prose {
+  padding-left: 22px;
+}
+.note-block-handle {
+  z-index: 5;
+}
+.note-block-handle-inner {
+  display: flex;
+  gap: 2px;
+  padding-right: 4px;
+}
+.note-prose .note-block-hovered {
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--sunken) 55%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sunken) 55%, transparent);
+}
+@media (hover: none) {
+  .note-block-handle {
+    display: none;
+  }
+  .note-with-handles .note-prose {
+    padding-left: 0;
+  }
+}
+@media print {
+  .note-block-handle {
+    display: none;
+  }
+  .note-with-handles .note-prose {
+    padding-left: 0;
+  }
+  .note-prose .note-block-hovered {
+    background: none;
+    box-shadow: none;
+  }
+}
+
+/*
+ * Columns (comp 05, B36): two or three side by side in a dashed frame, as many
+ * as the node holds. Below `sm` they stack. The frame is editing chrome: the
+ * PDF has none.
+ */
+.note-prose div[data-type='columns'] {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  margin: 14px 0 6px;
+  border: 1px dashed var(--line-2);
+  border-radius: 8px;
+}
+.note-prose div[data-type='column'] {
+  min-width: 0;
+  padding: 8px 14px;
+}
+.note-prose div[data-type='column'] + div[data-type='column'] {
+  border-left: 1px dashed var(--line-2);
+}
+.note-prose div[data-type='column'] > :first-child {
+  margin-top: 0;
+}
+.note-prose div[data-type='column'] h3 {
+  /* A column's heading: 15px at the default H3, in proportion to it. */
+  font-size: var(--note-column-heading);
+  letter-spacing: -0.01em;
+}
+@media (max-width: 639.98px) {
+  .note-prose div[data-type='columns'] {
+    grid-auto-flow: row;
+  }
+  .note-prose div[data-type='column'] + div[data-type='column'] {
+    border-left: 0;
+    border-top: 1px dashed var(--line-2);
+  }
+}
+@media print {
+  .note-prose div[data-type='columns'],
+  .note-prose div[data-type='column'] + div[data-type='column'] {
+    border: 0;
+  }
+}
+
+/*
+ * A page break (B36): a dashed rule with its name in the editor, the end of
+ * the page in the PDF. The rule is ignored on screen, where nothing is paged.
+ */
+.note-prose div[data-type='page-break'] {
+  position: relative;
+  height: 0;
+  margin: 24px 0;
+  border-top: 1px dashed var(--line-2);
+  break-after: page;
+  page-break-after: always;
+}
+.note-prose div[data-type='page-break']::after {
+  content: 'Page break';
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  padding: 0 8px;
+  transform: translateX(-50%);
+  background: var(--surface-1);
+  color: var(--faint);
+  font-size: 11.5px;
+  line-height: 18px;
+}
+.note-prose div[data-type='page-break'].ProseMirror-selectednode {
+  border-top-color: var(--accent);
+}
+@media print {
+  .note-prose div[data-type='page-break'] {
+    margin: 0;
+    border: 0;
+  }
+  .note-prose div[data-type='page-break']::after {
+    display: none;
+  }
+}
+
+/* A timed list (comp 05, B34): the time in a box, then the item. */
+.note-prose ul[data-type='timed-list'] {
+  margin: 4px 0;
+  padding: 0;
+  list-style: none;
+}
+.note-prose li[data-type='timed-item'] {
+  display: flex;
+  gap: 12px;
+  padding: 2px 0;
+}
+.note-prose .note-timed-stamp {
+  flex: none;
+  width: 46px;
+}
+.note-prose .note-timed-time {
+  display: block;
+  width: 100%;
+  font: inherit;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.note-prose input.note-timed-time {
+  margin: 0 0 0 -4px;
+  width: 50px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  outline: none;
+}
+.note-prose input.note-timed-time:hover {
+  background: var(--sunken);
+}
+.note-prose input.note-timed-time:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.note-prose .note-timed-body {
+  flex: 1;
+  min-width: 0;
+}
+.note-prose .note-timed-body p:first-child {
+  margin-top: 0;
+}
+@media (pointer: coarse) {
+  /* A 44px target around a line-high box: the padding is taken back in the margin. */
+  .note-prose input.note-timed-time {
+    padding-block: 10px;
+    margin-block: -10px;
+  }
+}
+
+/*
+ * Link chips (comp 05, B34): a trade or a day in the line, a small chip that
+ * opens its page. What it shows is read when it is drawn. On touch the hit
+ * area grows past the drawn chip.
+ */
+.note-prose .note-chip-wrap {
+  display: inline;
+}
+.note-prose .note-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 7px;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-decoration: none;
+  vertical-align: 1px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.note-prose .note-chip svg {
+  flex: none;
+  color: var(--muted);
+}
+.note-prose .note-chip em {
+  color: var(--faint);
+  font-style: normal;
+  font-weight: 500;
+}
+.note-prose a.note-chip:hover {
+  background: color-mix(in srgb, var(--sunken) 70%, var(--surface-1));
+}
+.note-prose a.note-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.note-prose .note-chip-wrap[data-selected] .note-chip {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.note-prose .note-chip-missing {
+  color: var(--muted);
+  font-weight: 500;
+  cursor: default;
+}
+@media (pointer: coarse) {
+  .note-prose .note-chip {
+    height: 32px;
+  }
+  .note-prose .note-chip::after {
+    content: '';
+    position: absolute;
+    inset: -6px -2px;
+  }
+}
+
+/*
+ * Equations (B35): KaTeX draws them. One that does not parse shows its own
+ * text, marked, and never stops the note. KaTeX's stylesheet is imported by
+ * the editor, not by the app.
+ */
+.note-prose .tiptap-mathematics-render {
+  border-radius: 6px;
+}
+.note-prose .tiptap-mathematics-render--editable {
+  cursor: pointer;
+}
+.note-prose .tiptap-mathematics-render--editable:hover {
+  background: var(--sunken);
+}
+.note-prose div[data-type='block-math'] {
+  margin: 12px 0;
+  padding: 6px 8px;
+  overflow-x: auto;
+  text-align: center;
+}
+.note-prose .katex {
+  font-size: 1.1em;
+}
+.note-prose .block-math-error,
+.note-prose .inline-math-error {
+  background: color-mix(in srgb, var(--loss) 8%, transparent);
+  color: var(--loss);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  text-decoration: underline wavy;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.note-prose .ProseMirror-selectednode.tiptap-mathematics-render {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/*
+ * Embeds (B42, U4): a video in a 16 to 9 frame, or a post in X's own widget,
+ * with the source under it. The link is what shows offline, while a post
+ * loads, if it fails, and on paper.
+ */
+.note-prose .note-embed {
+  max-width: 640px;
+  margin: 14px 0 6px;
+}
+.note-prose .note-embed-frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--sunken);
+}
+.note-prose .note-embed-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.note-prose .note-embed-widget:not([data-ready]) {
+  height: 0;
+  overflow: hidden;
+}
+.note-prose .note-embed[data-selected] .note-embed-frame,
+.note-prose .note-embed[data-selected] .note-embed-widget[data-ready],
+.note-prose .note-embed[data-selected] .note-embed-link {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.note-prose .note-embed-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.note-prose .note-embed-link svg {
+  flex: none;
+}
+.note-prose .note-embed-note {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.note-prose .note-embed-source {
+  margin: 6px 0 0;
+  color: var(--faint);
+  font-size: 12px;
+}
+@media print {
+  .note-prose .note-embed-frame,
+  .note-prose .note-embed-widget,
+  .note-prose .note-embed-note {
+    display: none;
+  }
+  .note-prose .note-embed-link[hidden] {
+    display: flex !important;
+  }
 }

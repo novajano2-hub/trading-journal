@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { FigureText } from '@/components/product/figure-text';
-import type { Execution, Trade } from '@/domain/types';
+import { levelPrice, sidesOf, type LevelRole } from '@/domain/risk';
+import type { Execution, LevelSide, Trade } from '@/domain/types';
 import type { Display } from '@/lib/display';
 import { plural } from '@/lib/format';
 import { price } from '@/lib/format';
@@ -77,6 +78,32 @@ function triangle(x: number, y: number, up: boolean): string {
     : `M${x},${y + h} L${x + h},${y - h + 1} L${x - h},${y - h + 1} Z`;
 }
 
+/** One planned level of a side, at the price it sits at. */
+interface PlanLevel {
+  key: string;
+  role: LevelRole;
+  /** The level's place in its side, 1 based, and how many the side has. */
+  at: number;
+  of: number;
+  price: number;
+}
+
+/** The price of every level of a side, in the side's order. */
+function levelsOf(
+  trade: Trade,
+  role: LevelRole,
+  side: LevelSide | undefined,
+): PlanLevel[] {
+  if (!side) return [];
+  return side.levels.map((level, i) => ({
+    key: `${role}-${i}`,
+    role,
+    at: i + 1,
+    of: side.levels.length,
+    price: levelPrice(trade, role, side.unit, level),
+  }));
+}
+
 /**
  * Price against time, from the fills only: a marker per fill (a filled triangle
  * up for a buy, an open one down for a sell), joined by a dotted line, and
@@ -118,12 +145,15 @@ export function FillsTimeline({
         inset +
         ((Date.parse(iso) - t0) / span) * (plotW - inset * 2);
 
+  const sides = sidesOf(trade);
+  const targetLevels = levelsOf(trade, 'target', sides.targets);
+  const stopLevels = levelsOf(trade, 'stop', sides.stops);
   const prices = [
     ...fills.map((f) => f.price),
     trade.avgEntry,
     ...(trade.avgExit === undefined ? [] : [trade.avgExit]),
-    ...(trade.plannedTarget === undefined ? [] : [trade.plannedTarget]),
-    ...(trade.plannedStop === undefined ? [] : [trade.plannedStop]),
+    ...targetLevels.map((l) => l.price),
+    ...stopLevels.map((l) => l.price),
   ];
   const lo = Math.min(...prices);
   const hi = Math.max(...prices);
@@ -143,57 +173,49 @@ export function FillsTimeline({
 
   const entryLabel = narrow ? 'Entry' : 'Avg entry';
   const exitLabel = narrow ? 'Exit' : 'Avg exit';
-  const targetLabel = narrow ? 'Target' : 'Planned target';
-  const stopLabel = narrow ? 'Stop' : 'Planned stop';
+  // One level keeps the plain name; several are numbered.
+  const planLabel = (l: PlanLevel) => {
+    const name = l.role === 'target' ? 'Target' : 'Stop';
+    if (l.of > 1) return `${name} ${l.at}`;
+    return narrow ? name : `Planned ${name.toLowerCase()}`;
+  };
+  const planLine = (l: PlanLevel) => ({
+    key: l.key,
+    plan: `${l.role}-line`,
+    label: planLabel(l),
+    value: l.price,
+    line: l.role === 'target' ? 'stroke-gain-fill' : 'stroke-loss-fill',
+    text: l.role === 'target' ? 'fill-gain' : 'fill-loss',
+    dash: '4 4' as string | undefined,
+    width: 1.25,
+  });
   const lines = [
-    ...(trade.plannedTarget === undefined
-      ? []
-      : [
-          {
-            key: 'target',
-            label: targetLabel,
-            value: trade.plannedTarget,
-            line: 'stroke-gain-fill',
-            text: 'fill-gain',
-            dash: '4 4',
-            width: 1.25,
-          },
-        ]),
+    ...targetLevels.map(planLine),
     ...(trade.avgExit === undefined
       ? []
       : [
           {
             key: 'exit',
+            plan: undefined,
             label: exitLabel,
             value: trade.avgExit,
             line: 'stroke-muted',
             text: 'fill-muted',
-            dash: '2 3',
+            dash: '2 3' as string | undefined,
             width: 1.25,
           },
         ]),
     {
       key: 'entry',
+      plan: undefined,
       label: entryLabel,
       value: trade.avgEntry,
       line: 'stroke-accent',
       text: 'fill-accent-ink',
-      dash: undefined,
+      dash: undefined as string | undefined,
       width: 1.5,
     },
-    ...(trade.plannedStop === undefined
-      ? []
-      : [
-          {
-            key: 'stop',
-            label: stopLabel,
-            value: trade.plannedStop,
-            line: 'stroke-loss-fill',
-            text: 'fill-loss',
-            dash: '4 4',
-            width: 1.25,
-          },
-        ]),
+    ...stopLevels.map(planLine),
   ];
   // Labels at nearly the same height would overprint: spread them apart.
   const labelY = spread(
@@ -203,15 +225,21 @@ export function FillsTimeline({
   const xs = fills.map((f) => x(f.time));
   const zoneFrom = span === 0 ? MARGIN.left : Math.min(...xs);
   const zoneTo = span === 0 ? width - right : Math.max(...xs);
-  const zone = (to: number | undefined) =>
-    to === undefined
-      ? null
-      : {
-          y: Math.min(y(trade.avgEntry), y(to)),
-          h: Math.abs(y(trade.avgEntry) - y(to)),
-        };
-  const targetZone = zone(trade.plannedTarget);
-  const riskZone = zone(trade.plannedStop);
+  // A zone runs from the average entry to the farthest level of its side.
+  const zone = (levels: readonly PlanLevel[]) => {
+    if (levels.length === 0) return null;
+    const far = levels.reduce((a, l) =>
+      Math.abs(l.price - trade.avgEntry) > Math.abs(a.price - trade.avgEntry)
+        ? l
+        : a,
+    );
+    return {
+      y: Math.min(y(trade.avgEntry), y(far.price)),
+      h: Math.abs(y(trade.avgEntry) - y(far.price)),
+    };
+  };
+  const targetZone = zone(targetLevels);
+  const riskZone = zone(stopLevels);
   const held = positions(trade, fills);
   const maxHeld = Math.max(...held.map(Math.abs), 1);
   const level = (n: number) =>
@@ -287,11 +315,7 @@ export function FillsTimeline({
           {lines.map((l, i) => (
             <g key={l.key}>
               <line
-                data-plan={
-                  l.key === 'target' || l.key === 'stop'
-                    ? `${l.key}-line`
-                    : undefined
-                }
+                data-plan={l.plan}
                 x1={MARGIN.left}
                 x2={width - right + 6}
                 y1={y(l.value)}

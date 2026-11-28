@@ -231,3 +231,11 @@ export const price = (n: number, tick: number) => {
 export function trimmedPercent(ratio: number): string {
   return `${Number((ratio * 100).toFixed(2))}%`;
 }
+
+/** A file's size: "832 B", "412 KB", "1.5 MB" (1 KB is 1,024 bytes, like the 10 MB limit). */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (Math.round(kb) < 1024) return `${Math.round(kb)} KB`;
+  return `${Number((bytes / 1048576).toFixed(1))} MB`;
+}

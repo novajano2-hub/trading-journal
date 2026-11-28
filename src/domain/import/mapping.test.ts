@@ -60,6 +60,7 @@ test('a MetaTrader 4 statement is a closed-trade file', () => {
     closeTime: 8,
     exitPrice: 9,
     commission: 10,
+    swap: 12,
     pnl: 13,
   });
 });
@@ -78,8 +79,51 @@ test('a MetaTrader 5 positions report is a closed-trade file', () => {
     closeTime: 8,
     exitPrice: 9,
     commission: 10,
+    swap: 11,
     pnl: 12,
   });
+});
+
+test('a swap column is guessed and mapped', () => {
+  // The synonyms are swap, swaps, rollover and financing; one column each.
+  for (const name of ['Swap', 'Swaps', 'Rollover', 'Financing', 'Total Swap']) {
+    const m = g(
+      `Open Time,Close Time,Symbol,Side,Qty,Entry Price,Exit Price,Commission,${name},P&L\n`,
+    );
+    expect(m.kind, name).toBe('closed-trades');
+    expect(m.columns, name).toEqual({
+      openTime: 0,
+      closeTime: 1,
+      symbol: 2,
+      side: 3,
+      qty: 4,
+      entryPrice: 5,
+      exitPrice: 6,
+      commission: 7,
+      swap: 8,
+      pnl: 9,
+    });
+    // Swap is optional: a file without it is as ready as before.
+    expect(missingFields(m), name).toEqual([]);
+  }
+  expect(
+    g('Open Time,Close Time,Symbol,Side,Qty,Entry Price,Exit Price\n').columns,
+  ).not.toHaveProperty('swap');
+});
+
+test('a fills file has no swap column, even one named Swap', () => {
+  const m = g('Time,Symbol,Side,Qty,Price,Commission,Swap\n');
+  expect(m.kind).toBe('fills');
+  expect(m.columns).not.toHaveProperty('swap');
+});
+
+test("a swap amount with a decimal comma proves the file's decimal mark", () => {
+  const text =
+    'Open Time,Close Time,Symbol,Side,Qty,Entry Price,Exit Price,Swap\n' +
+    '2026-11-16 09:30,2026-11-16 09:45,ESZ5,Long,1,6000,6004,"-4,86"\n';
+  const m = g(text);
+  expect(m.decimal).toBe(',');
+  expect(detectDecimal(parseCsv(text), m)).toBe(',');
 });
 
 test('a semicolon file with day-first dates (Review Focus 3)', () => {

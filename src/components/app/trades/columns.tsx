@@ -20,6 +20,7 @@ import {
   type RowFacts,
 } from '@/data/trade-rows';
 import { type MetricContext } from '@/domain/metrics/context';
+import type { PatternHit } from '@/domain/patterns';
 import type { Trade } from '@/domain/types';
 import { formatDuration, formatQty, price } from '@/lib/format';
 import { formatUnitValue, tradeFigure, type Display } from '@/lib/display';
@@ -61,6 +62,12 @@ export interface CellEnv {
   facts: RowFacts;
   /** The Day column as "Thu 19 Nov", for the Week view's table; elsewhere it carries the year. */
   shortDay?: boolean;
+  /**
+   * The patterns that fired, by trade id (`usePatterns().byTrade`). The log's
+   * Patterns column and a phone row's count read it; the Day and Week views
+   * pass none and have no such column. `undefined` while they are computed.
+   */
+  patterns?: ReadonlyMap<string, readonly PatternHit[]>;
 }
 
 /** How a column's text sits. */
@@ -75,40 +82,54 @@ export const ALIGN: Partial<Record<ColumnId, 'right' | 'center'>> = {
   realizedR: 'right',
   plannedR: 'right',
   duration: 'right',
+  patterns: 'right',
   reviewed: 'center',
 };
 
 /**
- * Each column's width in px, as comp 01's colgroup has them for the defaults.
+ * Each column's width in px, close to comp 01's colgroup (comp 02 adds Patterns).
  * The table is fixed-layout, so a cell never pushes a neighbour: its text
- * truncates inside its own width. Qty holds "999,999" (shares, lots, coins).
+ * truncates inside its own width. Qty holds "25,000" (shares, lots, coins).
+ * The default columns sum to 1,152px with the select box, so they fit the
+ * log's card at 1440 with no sideways scroll: Strategy keeps room for "Opening
+ * range breakout" (its header is at least 165px there) and Tags, which ends in
+ * an ellipsis by design, takes what is left. Patterns is a count under a
+ * header whose sort mark hangs off its left (`HANG_SORT`).
  */
 export const COLUMN_WIDTHS: Record<ColumnId, number> = {
   open: 78,
   close: 78,
-  instrument: 90,
+  instrument: 88,
   account: 110,
   side: 50,
-  qty: 48,
+  qty: 46,
   entry: 62,
   exit: 62,
   gross: 72,
   fees: 58,
   net: 72,
-  roi: 58,
-  realizedR: 52,
+  roi: 54,
+  realizedR: 46,
   plannedR: 58,
   duration: 56,
-  strategies: 172,
-  tags: 130,
+  strategies: 166,
+  tags: 104,
   mistakes: 110,
-  rules: 76,
+  patterns: 50,
+  rules: 74,
   rating: 54,
   reviewed: 58,
   status: 72,
   ticker: 78,
   day: 116,
 };
+
+/**
+ * Columns whose sort mark hangs off the left of the header's label instead of
+ * taking room of its own, so a narrow column (a count) keeps its label inside
+ * its width and out of the next header.
+ */
+export const HANG_SORT = new Set<ColumnId>(['patterns']);
 
 /** Columns whose text starts after a gap, so a right-aligned neighbour's header never runs into it. */
 export const PAD_LEFT = new Set<ColumnId>(['strategies']);
@@ -127,6 +148,7 @@ const DESC_FIRST = new Set<ColumnId>([
   'realizedR',
   'plannedR',
   'duration',
+  'patterns',
   'rules',
   'rating',
   'reviewed',
@@ -169,7 +191,8 @@ function sortValue(
     case 'roi':
       return netRoiOf(t);
     case 'realizedR':
-      return rOf(t, env.ctx.pnlBasis);
+      // None while the trade is open, as the cell reads (spec §5.2 States).
+      return t.status === 'closed' ? rOf(t, env.ctx.pnlBasis) : undefined;
     case 'plannedR':
       return plannedR(t);
     case 'duration':
@@ -180,6 +203,10 @@ function sortValue(
       return env.facts.tagsOf(t)[0]?.name.toLowerCase();
     case 'mistakes':
       return env.facts.mistakesOf(t)[0]?.toLowerCase();
+    case 'patterns':
+      return env.patterns === undefined
+        ? undefined
+        : (env.patterns.get(t.id)?.length ?? 0);
     case 'rules': {
       const r = env.facts.rules(t);
       return r.checked === 0 ? undefined : r.kept / r.checked;
@@ -218,6 +245,19 @@ function Ratio({
       {formatUnitValue(unit, value, { currency, signed: true })}
     </span>
   );
+}
+
+/** How many patterns fired on a trade: a plain count, in the faint ink when none did; empty while they are computed. */
+export function PatternCount({
+  env,
+  trade,
+}: {
+  env: CellEnv;
+  trade: Trade;
+}): React.JSX.Element | null {
+  if (env.patterns === undefined) return null;
+  const n = env.patterns.get(trade.id)?.length ?? 0;
+  return <span className={n === 0 ? 'text-faint' : undefined}>{n}</span>;
 }
 
 export function cellOf(id: ColumnId, t: Trade, env: CellEnv): React.ReactNode {
@@ -282,8 +322,8 @@ export function cellOf(id: ColumnId, t: Trade, env: CellEnv): React.ReactNode {
       );
     }
     case 'realizedR': {
-      if (t.status !== 'closed') return null;
-      const r = rOf(t, env.ctx.pnlBasis);
+      // Realized R needs a closed trade: an open one reads None, as on the trade page (spec §5.2 States).
+      const r = t.status === 'closed' ? rOf(t, env.ctx.pnlBasis) : undefined;
       return r === undefined ? (
         <span className="text-faint">None</span>
       ) : (
@@ -310,6 +350,8 @@ export function cellOf(id: ColumnId, t: Trade, env: CellEnv): React.ReactNode {
       return <TagsCell tags={facts.tagsOf(t)} mistakes={facts.mistakesOf(t)} />;
     case 'mistakes':
       return <MistakesCell names={facts.mistakesOf(t)} />;
+    case 'patterns':
+      return <PatternCount env={env} trade={t} />;
     case 'rules':
       return <RulesCell rules={facts.rules(t)} />;
     case 'rating':

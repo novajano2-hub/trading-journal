@@ -1,5 +1,5 @@
-import { quoteToPnl } from '../currency';
-import { roundHalfEven, toCents } from '../money';
+import { roundHalfEven } from '../money';
+import { plannedRMultiple } from '../risk';
 import { isClosed } from '../trade-status';
 import type { Cents, Trade } from '../types';
 import {
@@ -46,27 +46,16 @@ export interface Summary {
   currencies: string[];
 }
 
-/** Planned R: |target - entry| / |entry - stop|; needs both a target and a stop distinct from the entry. */
+/**
+ * Planned R: planned reward over planned risk, from `domain/risk`. A trade
+ * saved before levels reads as it always did, |target - entry| / |entry - stop|,
+ * and needs a target and a stop distinct from the entry.
+ */
 export function plannedR(trade: Trade): number | undefined {
-  const { plannedStop: stop, plannedTarget: target, avgEntry } = trade;
-  if (stop === undefined || target === undefined) return undefined;
-  const risk = Math.abs(avgEntry - stop);
-  return risk === 0 ? undefined : Math.abs(target - avgEntry) / risk;
+  return plannedRMultiple(trade);
 }
 
-/**
- * Risk in cents implied by a stop price: |avgEntry - stop| x maxPosition x pointValue,
- * converted to the trade's P&L currency at the entry price.
- */
-export function riskFromStop(trade: Trade, stop: number): Cents {
-  const quote =
-    Math.abs(trade.avgEntry - stop) *
-    trade.maxPosition *
-    trade.instrument.pointValue;
-  return toCents(
-    quoteToPnl(quote, trade.instrument, trade.pnlCurrency, trade.avgEntry),
-  );
-}
+export { riskFromStop } from '../risk';
 
 const sum = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0);
 const ratio = (n: number, d: number): number | null => (d === 0 ? null : n / d);
@@ -384,15 +373,20 @@ export function holdTimes(
 /**
  * The commissions and the fees of the closed trades' fills, each in its own
  * total. A trade with no fills (typed in by hand) carries its whole cost as
- * fees. Their sum is `Summary.fees`.
+ * fees. Their sum is `Summary.fees`. Swap is a third total, signed (a charge
+ * is negative) and not part of `Summary.fees`: it is inside net, outside gross.
+ * It is null while no closed trade carries one, so the page can say None.
  */
 export function costsOf(trades: readonly Trade[]): {
   commissions: Cents;
   fees: Cents;
+  swap: Cents | null;
 } {
   let commissions = 0;
   let fees = 0;
+  let swap: Cents | null = null;
   for (const t of trades.filter(isClosed)) {
+    if (t.swap !== undefined) swap = (swap ?? 0) + t.swap;
     if (t.executions.length === 0) {
       fees += t.fees;
       continue;
@@ -402,5 +396,5 @@ export function costsOf(trades: readonly Trade[]): {
       fees += e.fees;
     }
   }
-  return { commissions, fees };
+  return { commissions, fees, swap };
 }

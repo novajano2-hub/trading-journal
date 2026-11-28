@@ -9,12 +9,15 @@ import {
   X,
 } from '@phosphor-icons/react/dist/ssr';
 import { MenuSelect } from '@/components/ui/menu-select';
-import { useSaveJournalEntry } from '@/data/query/hooks';
+import { useSaveJournalEntry, useTemplates } from '@/data/query/hooks';
 import type { JournalEntry, NoteFolder } from '@/domain/types';
 import { dayLabel } from '@/data/seed/calendar';
 import { LockLine, useDayFinished } from '../day/day-lock';
+import { TemplateMenu } from '../day/template-menu';
 import { NOTE_SAVE_DELAY_MS } from '../trades/trade-journal';
-import { NoteEditor } from '../notes/note-editor';
+import type { TemplateSlot } from '../notes/editor-toolbar';
+import { NoteEditor, type NoteEditorHandle } from '../notes/note-editor';
+import { NoteMenu } from '../notes/note-menu';
 import { DayCard, TradeStatsCard } from './day-card';
 import { LinkedTrades } from './linked-trades';
 import { KIND_LABEL } from './notebook-model';
@@ -47,6 +50,8 @@ export function EntryPane({
   entry,
   folders,
   ensure,
+  importFolderId,
+  onImported,
   onTrash,
   onRestore,
   onDeleteForever,
@@ -55,12 +60,18 @@ export function EntryPane({
   folders: readonly NoteFolder[];
   /** For a draft: the stored note, made if need be. */
   ensure?(): Promise<JournalEntry>;
+  /** The folder a note imported from this pane goes into (the Notebook's current one). */
+  importFolderId?: string;
+  /** Opens a note that was imported from this pane. */
+  onImported?(entry: JournalEntry): void;
   /** Moves the stored note with this id to Trash, once the pane has written what it held. */
   onTrash(id: string): void;
   onRestore(): void;
   onDeleteForever(): void;
 }): React.JSX.Element {
   const save = useSaveJournalEntry();
+  const handle = useRef<NoteEditorHandle | null>(null);
+  const templates = useTemplates().data;
   const trashed = entry.deletedAt !== undefined;
   // A daily note of a finished date is frozen with the day (K3).
   const closed = useDayFinished(
@@ -90,6 +101,8 @@ export function EntryPane({
   const draft = useRef<{ title?: string; body?: unknown }>({});
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const queue = useRef<Promise<void>>(Promise.resolve());
+  // The last write failed: the note on screen is not the stored one.
+  const failed = useRef(false);
 
   const commit = (extra: Partial<JournalEntry> = {}) => {
     if (timer.current !== undefined) clearTimeout(timer.current);
@@ -110,9 +123,11 @@ export function EntryPane({
         for (const k of Object.keys(next) as (keyof JournalEntry)[])
           if (next[k] === undefined) delete next[k];
         base.current = await save.mutateAsync(next);
+        failed.current = false;
         waiting.current -= 1;
         if (waiting.current === 0) setStatus('saved');
       } catch {
+        failed.current = true;
         waiting.current -= 1;
         setStatus('failed');
       }
@@ -155,6 +170,25 @@ export function EntryPane({
   };
 
   const day = entry.date;
+  // The templates of this note's kind, in the toolbar beside Insert (a plain
+  // note takes any; a trade note has none). A closed day's note, or one in
+  // Trash, takes none.
+  const templateKind = entry.kind === 'note' ? 'all' : entry.kind;
+  const hasTemplates = (templates ?? []).some(
+    (t) => templateKind === 'all' || t.kind === entry.kind,
+  );
+  const templateSlot: TemplateSlot | undefined =
+    frozen || entry.kind === 'trade-note' || !hasTemplates
+      ? undefined
+      : (slot) => (
+          <TemplateMenu
+            {...slot}
+            kind={templateKind}
+            onPick={(t) =>
+              handle.current?.insertContent(structuredClone(t.body))
+            }
+          />
+        );
   return (
     <article
       aria-label={entry.title || 'Untitled note'}
@@ -199,31 +233,40 @@ export function EntryPane({
           ) : null}
         </span>
         {frozen ? null : (
-          <>
-            <button
-              type="button"
-              aria-label="Favourite"
-              aria-pressed={shown.favorite === true}
-              onClick={() => commit({ favorite: shown.favorite !== true })}
-              className={`${BAR_BUTTON} px-2 ${shown.favorite ? 'text-accent' : ''}`}
-            >
-              <Star
-                size={16}
-                weight={shown.favorite ? 'fill' : 'regular'}
-                aria-hidden="true"
-              />
-            </button>
-            {isDraft ? null : (
-              <button
-                type="button"
-                aria-label="Move to Trash"
-                onClick={() => void trashNow()}
-                className={`${BAR_BUTTON} px-2 hover:text-loss`}
-              >
-                <Trash size={16} aria-hidden="true" />
-              </button>
-            )}
-          </>
+          <button
+            type="button"
+            aria-label="Favourite"
+            aria-pressed={shown.favorite === true}
+            onClick={() => commit({ favorite: shown.favorite !== true })}
+            className={`${BAR_BUTTON} px-2 ${shown.favorite ? 'text-accent' : ''}`}
+          >
+            <Star
+              size={16}
+              weight={shown.favorite ? 'fill' : 'regular'}
+              aria-hidden="true"
+            />
+          </button>
+        )}
+        {/* Export and import read the note as it stands, and work on a closed day's note and one in Trash too. */}
+        <NoteMenu
+          className={`${BAR_BUTTON} px-2 pointer-coarse:min-w-11 pointer-coarse:justify-center`}
+          folderId={importFolderId}
+          onImported={onImported}
+          read={() => ({
+            title,
+            tags: shown.tags,
+            body: handle.current?.getJSON() ?? base.current.body,
+          })}
+        />
+        {frozen || isDraft ? null : (
+          <button
+            type="button"
+            aria-label="Move to Trash"
+            onClick={() => void trashNow()}
+            className={`${BAR_BUTTON} px-2 hover:text-loss`}
+          >
+            <Trash size={16} aria-hidden="true" />
+          </button>
         )}
       </div>
 
@@ -348,6 +391,49 @@ export function EntryPane({
           value={seed}
           readOnly={frozen}
           placeholder="Write here, or type / for blocks"
+          // A draft has no id to own an image yet: its first image stores it.
+          handleRef={handle}
+          templateSlot={templateSlot}
+          // Text still waiting, or the text of a write that failed, is saved
+          // before a restore, so the store keeps it as the version the restore
+          // replaced; a write that fails again stops the restore (G-6).
+          beforeRestore={async (body) => {
+            if (timer.current !== undefined || failed.current) {
+              draft.current.body = body;
+              commit();
+            }
+            await queue.current;
+            if (failed.current) throw new Error('The note could not be saved.');
+          }}
+          // The store has the restored text: build the next save on that note,
+          // and let go of text typed before it that was still waiting.
+          onRestored={(restored) => {
+            base.current = restored;
+            delete draft.current.body;
+            if (
+              timer.current !== undefined &&
+              draft.current.title === undefined
+            ) {
+              clearTimeout(timer.current);
+              timer.current = undefined;
+            }
+            // Nothing left on its way: the pane reads Saved, not a failure from
+            // before the restore (G-15).
+            if (timer.current === undefined && waiting.current === 0) {
+              failed.current = false;
+              setStatus('saved');
+            }
+          }}
+          noteId={isDraft ? undefined : entry.id}
+          ensureNoteId={
+            isDraft && ensure
+              ? async () => {
+                  if (base.current.id === DRAFT_ID)
+                    base.current = await ensure();
+                  return base.current.id;
+                }
+              : undefined
+          }
           onChange={(doc) => {
             draft.current.body = doc;
             later();

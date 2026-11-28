@@ -2,13 +2,22 @@
 
 import {
   CaretRight,
+  MagnifyingGlass,
   Plus,
   SlidersHorizontal,
   X,
 } from '@phosphor-icons/react/dist/ssr';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Dialog, Popover } from 'radix-ui';
-import { useId, useState, useSyncExternalStore, type ReactNode } from 'react';
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
 import { RAISED } from '@/components/ui/button-styles';
 import { Chip } from '@/components/ui/chip';
 import { Segmented } from '@/components/ui/segmented';
@@ -27,13 +36,15 @@ import {
   SESSION_LABELS,
   type Session,
 } from '@/domain/metrics/breakdowns';
-import { usePrefs } from '@/data/query/hooks';
+import { usePatterns, usePrefs } from '@/data/query/hooks';
+import { PATTERNS, type PatternId } from '@/domain/patterns';
 import { rotateFromWeekStart } from '@/domain/week';
 import type { AssetClass, WeekStart } from '@/domain/types';
 import { enter, exit } from '@/lib/motion';
-import { FIELD } from './filter-chip';
+import { BOX, FIELD, GROUP_LABEL, ROW } from './filter-chip';
 import type { FilterOptions } from './filter-model';
 import { toggleId } from './filter-model';
+import { ToneChip } from './trades/pattern-text';
 
 const MD = '(min-width: 768px)';
 
@@ -322,6 +333,199 @@ function RangeField({
         {field('Max', max, setMax, (v) => [min, v])}
       </div>
     </fieldset>
+  );
+}
+
+/** The patterns of one level, A to Z, as the panel lists them. */
+const PATTERN_GROUPS = (['trade', 'day'] as const).map((level) => ({
+  title: level === 'trade' ? 'Trade patterns' : 'Day patterns',
+  patterns: PATTERNS.filter((p) => p.level === level).sort((a, b) =>
+    a.name.localeCompare(b.name),
+  ),
+}));
+
+/** One pattern: a box, its name (the box's name) and its tone word (the box's description). */
+function PatternRow({
+  id,
+  name,
+  tone,
+  on,
+  disabled,
+  onToggle,
+}: {
+  id: PatternId;
+  name: string;
+  tone: (typeof PATTERNS)[number]['tone'];
+  on: boolean;
+  disabled: boolean;
+  onToggle(): void;
+}): React.JSX.Element {
+  const nameId = useId();
+  const toneId = useId();
+  return (
+    <label
+      data-pattern={id}
+      className={`${ROW} ${disabled ? 'cursor-default opacity-60' : ''}`}
+    >
+      <input
+        type="checkbox"
+        checked={on}
+        disabled={disabled}
+        onChange={onToggle}
+        aria-labelledby={nameId}
+        aria-describedby={toneId}
+        className={BOX}
+      />
+      <span id={nameId} className="min-w-0 flex-1">
+        {name}
+      </span>
+      <span id={toneId}>
+        <ToneChip tone={tone} />
+      </span>
+    </label>
+  );
+}
+
+/**
+ * Patterns (spec §5.5, B24): a searchable multi-select of every pattern with
+ * Select all, in two groups, each with its tone word. A pick keeps the trades
+ * a pattern fired on and every trade of a day it fired on. Greyed while no
+ * pattern has fired on any of the workspace's trades, unless one is already
+ * picked (a link's), so it can still be taken off. Select all follows the
+ * search: it ticks, or clears, the patterns in view.
+ */
+function PatternsSection({
+  picked,
+  onChange,
+}: {
+  picked: readonly PatternId[];
+  onChange(next: PatternId[]): void;
+}): React.JSX.Element {
+  const patterns = usePatterns().data;
+  const [query, setQuery] = useState('');
+  const searchId = useId();
+  const selectAll = useRef<HTMLInputElement>(null);
+  const allId = useId();
+  const countId = useId();
+
+  const fired =
+    patterns !== undefined &&
+    (patterns.byTrade.size > 0 || patterns.byDay.size > 0);
+  const disabled = !fired && picked.length === 0;
+  const needle = query.trim().toLowerCase();
+  const groups = useMemo(
+    () =>
+      PATTERN_GROUPS.map((g) => ({
+        ...g,
+        patterns: g.patterns.filter((p) =>
+          p.name.toLowerCase().includes(needle),
+        ),
+      })).filter((g) => g.patterns.length > 0),
+    [needle],
+  );
+  const inView = groups.flatMap((g) => g.patterns.map((p) => p.id));
+  const pickedInView = inView.filter((id) => picked.includes(id));
+  const allIn = inView.length > 0 && pickedInView.length === inView.length;
+  const some = pickedInView.length > 0 && !allIn;
+  // Native boxes have a "partly" state only through the property.
+  useEffect(() => {
+    if (selectAll.current) selectAll.current.indeterminate = some;
+  }, [some]);
+
+  // Ids stay in the order the patterns are listed in, whichever order they were ticked.
+  const ordered = (ids: ReadonlySet<PatternId>) =>
+    PATTERNS.map((p) => p.id).filter((id) => ids.has(id));
+  const toggle = (id: PatternId) => {
+    const next = new Set(picked);
+    if (!next.delete(id)) next.add(id);
+    onChange(ordered(next));
+  };
+  const toggleAll = () => {
+    const next = new Set(picked);
+    for (const id of inView) {
+      if (allIn) next.delete(id);
+      else next.add(id);
+    }
+    onChange(ordered(next));
+  };
+
+  return (
+    <Section title="Patterns">
+      {disabled ? (
+        <p className="text-[13px] text-muted">
+          {patterns === undefined
+            ? 'Reading your patterns.'
+            : 'No pattern has fired on your trades yet.'}
+        </p>
+      ) : null}
+      <div className="relative">
+        <MagnifyingGlass
+          size={16}
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-faint"
+        />
+        <input
+          id={searchId}
+          type="search"
+          aria-label="Search patterns"
+          placeholder="Search patterns"
+          autoComplete="off"
+          disabled={disabled}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className={`${FIELD} pl-9 text-[13.5px] placeholder:text-faint disabled:opacity-60`}
+        />
+      </div>
+      <div className="-mx-2 -mt-1 flex flex-col">
+        <label
+          className={`${ROW} rounded-b-none border-b border-line font-semibold ${disabled ? 'cursor-default opacity-60' : ''}`}
+        >
+          <input
+            ref={selectAll}
+            type="checkbox"
+            checked={allIn}
+            disabled={disabled || inView.length === 0}
+            onChange={toggleAll}
+            aria-labelledby={allId}
+            aria-describedby={countId}
+            className={BOX}
+          />
+          <span id={allId} className="min-w-0 flex-1">
+            Select all
+          </span>
+          <span
+            id={countId}
+            className="text-[12.5px] font-normal text-faint tabular-nums"
+          >
+            {picked.length} of {PATTERNS.length}
+          </span>
+        </label>
+        <div className="flex max-h-[330px] flex-col overflow-y-auto max-sm:max-h-none">
+          {groups.length === 0 ? (
+            <p className="px-2 py-3 text-[13px] text-muted">
+              No pattern matches.
+            </p>
+          ) : (
+            groups.map((g) => (
+              <fieldset key={g.title} className="flex flex-col">
+                <legend className={GROUP_LABEL}>{g.title}</legend>
+                {g.patterns.map((p) => (
+                  <PatternRow
+                    key={p.id}
+                    id={p.id}
+                    name={p.name}
+                    tone={p.tone}
+                    on={picked.includes(p.id)}
+                    disabled={disabled}
+                    onToggle={() => toggle(p.id)}
+                  />
+                ))}
+              </fieldset>
+            ))
+          )}
+        </div>
+      </div>
+    </Section>
   );
 }
 
@@ -680,6 +884,11 @@ function Panel({
             />
           </div>
         </Section>
+
+        <PatternsSection
+          picked={draft.patterns}
+          onChange={(next) => patch({ patterns: next })}
+        />
 
         <Section title="Ranges">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

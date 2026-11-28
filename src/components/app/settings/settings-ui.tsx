@@ -3,7 +3,7 @@
 import { DotsThree, X } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { Dialog, DropdownMenu } from 'radix-ui';
-import { Fragment, useRef, type ReactNode, type RefObject } from 'react';
+import { Fragment, useId, useRef, type ReactNode, type RefObject } from 'react';
 
 /** Table header and cell looks shared by the settings tables (the comp's 46px rows). */
 export const TH =
@@ -18,10 +18,17 @@ export const MENU =
 export const MENU_ITEM =
   'flex min-h-9 cursor-pointer items-center rounded-[8px] px-2.5 text-[13.5px] outline-none data-[highlighted]:bg-sunken pointer-coarse:min-h-11';
 
+/** A row menu's action that is off: its name, then why, on a second line; still highlighted by the keyboard. */
+const MENU_ITEM_OFF =
+  'flex min-h-9 cursor-default flex-col justify-center gap-px rounded-[8px] px-2.5 py-1.5 text-[13.5px] text-faint outline-none data-[highlighted]:bg-sunken pointer-coarse:min-h-11';
+
 export interface MenuAction {
   label: string;
-  /** Not needed for a link. */
-  onSelect?(): void;
+  /**
+   * Not needed for a link. `from` is the menu's button, for a dialog that grows
+   * out of it and hands focus back (Plan 6B).
+   */
+  onSelect?(from: HTMLElement | null): void;
   /** A link: the item navigates instead of running `onSelect`. */
   href?: string;
   /** A glyph before the label, decorative. */
@@ -32,6 +39,12 @@ export interface MenuAction {
   danger?: boolean;
   /** Runs once the menu has closed, in place of returning focus to its button (to move it to a card, say). */
   afterClose?(): void;
+  /**
+   * Set: the action is off, and this says why, on a second line and as the
+   * item's description. It stays on the keyboard path; choosing it does
+   * nothing and leaves the menu open (Plan 6B).
+   */
+  offReason?: string;
 }
 
 /** A row's "..." menu: a 28px button (44px on touch) that opens its actions. */
@@ -44,9 +57,12 @@ export function RowMenu({
   actions: readonly MenuAction[];
 }): React.JSX.Element {
   const after = useRef<(() => void) | null>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const ids = useId();
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
+        ref={trigger}
         aria-label={label}
         className="inline-grid size-7 place-items-center rounded-[8px] border border-line text-muted outline-offset-2 hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:size-11"
       >
@@ -65,8 +81,9 @@ export function RowMenu({
             run();
           }}
         >
-          {actions.map((a) => {
+          {actions.map((a, index) => {
             const className = `${MENU_ITEM} ${a.icon ? 'gap-2.5' : ''} ${a.danger ? 'text-loss' : ''}`;
+            const off = a.offReason !== undefined;
             const content = (
               <>
                 {a.icon ? (
@@ -91,12 +108,29 @@ export function RowMenu({
                       {content}
                     </Link>
                   </DropdownMenu.Item>
+                ) : off ? (
+                  <DropdownMenu.Item
+                    aria-disabled
+                    aria-labelledby={`${ids}-${index}-label`}
+                    aria-describedby={`${ids}-${index}-reason`}
+                    title={a.offReason}
+                    className={MENU_ITEM_OFF}
+                    onSelect={(event) => event.preventDefault()}
+                  >
+                    <span id={`${ids}-${index}-label`}>{a.label}</span>
+                    <span
+                      id={`${ids}-${index}-reason`}
+                      className="text-[12px] leading-[1.4]"
+                    >
+                      {a.offReason}
+                    </span>
+                  </DropdownMenu.Item>
                 ) : (
                   <DropdownMenu.Item
                     className={className}
                     onSelect={() => {
                       after.current = a.afterClose ?? null;
-                      a.onSelect?.();
+                      a.onSelect?.(trigger.current);
                     }}
                   >
                     {content}

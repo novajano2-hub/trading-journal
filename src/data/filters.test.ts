@@ -3,10 +3,12 @@ import { makeTrade } from '../domain/__fixtures__/trades';
 import { resolveInstrument } from '../domain/instruments';
 import { summarize } from '../domain/metrics/summary';
 import type { Account, Trade } from '../domain/types';
+import { applyTradePatch } from './trade-patch';
 import {
   applyFilters,
   EMPTY_FILTERS,
   mergeFilterParams,
+  narrowToUnit,
   parseFilters,
   previousRange,
   queryString,
@@ -19,6 +21,7 @@ import {
   advancedFilterCount,
   type FilterEnv,
   DATE_PRESETS,
+  FILTER_PARAMS,
 } from './filters';
 
 const acct = (id: string, status: Account['status'] = 'active') =>
@@ -686,6 +689,31 @@ describe('the full filter set', () => {
     ).toEqual([]);
   });
 
+  test('the R filter keeps a level trade by its stop side', () => {
+    const levels = (unit: 'price', ...vs: number[]) => ({
+      unit,
+      levels: vs.map((value) => ({ value, qty: 1 })),
+    });
+    // One ES contract, $50 a point: a stop 10 points away risks $500.
+    const stopped = applyTradePatch(trade({ net: 100000 }), {
+      stops: levels('price', 4490),
+    });
+    // A target alone has no stop side, so no risk and no R.
+    const targeted = applyTradePatch(trade({ net: 100000 }), {
+      targets: levels('price', 4530),
+    });
+    // Both sides: the stop side alone is the risk.
+    const both = applyTradePatch(trade({ net: 100000 }), {
+      stops: levels('price', 4490),
+      targets: levels('price', 4530),
+    });
+    const old = trade({ net: 100000, plannedStop: 4490, initialRisk: 50000 });
+    const ts = [stopped, targeted, both, old];
+    expect(run(ts, { r: { min: 2, max: 2 } })).toEqual([stopped, both, old]);
+    expect(run(ts, { noInitialRisk: true })).toEqual([targeted]);
+    expect(narrowToUnit(ts, 'r')).toEqual([stopped, both, old]);
+  });
+
   test('sessions are cut in New York time, from the entry or the exit', () => {
     // November, so New York is UTC-5: 08:00 NY (london), 11:00 (new-york),
     // 17:00 (after hours), 20:00 (asia).
@@ -816,5 +844,108 @@ describe('previousRange', () => {
     });
     expect(previousRange({}, '2026-11-20')).toBeUndefined();
     expect(previousRange({ to: '2026-11-10' }, '2026-11-20')).toBeUndefined();
+  });
+});
+
+describe('the Patterns filter', () => {
+  // 10:00 New York on 2026-11-18 is 15:00Z.
+  const at = (hhmm: string, day = '2026-11-18') => `${day}T${hhmm}:00Z`;
+  const trade = (id: string, openedAt: string, closedAt: string) =>
+    makeTrade({ id, net: 100, accountId: 'a', openedAt, closedAt });
+  const a = trade('a', at('15:00'), at('15:10'));
+  const b = trade('b', at('16:00'), at('16:10'));
+  const c = trade('c', at('17:00'), at('17:10'));
+  const d = trade('d', at('15:00', '2026-11-19'), at('15:10', '2026-11-19'));
+  const all = [a, b, c, d];
+  // Trade `a` carries a trade pattern; the 18th carries a day pattern.
+  const index = {
+    byTrade: new Map([['a', [{ id: 'large-size' as const }]]]),
+    byDay: new Map([['2026-11-18', [{ id: 'rushed-red-day' as const }]]]),
+  };
+  const run = (patterns: GlobalFilters['patterns'], patternIndex = index) =>
+    applyFilters(
+      all,
+      { ...EMPTY_FILTERS, patterns },
+      {
+        ...env,
+        patterns: patternIndex,
+      },
+    );
+
+  test("the filter round-trips in the URL and keeps a day pattern's trades", () => {
+    const f: GlobalFilters = {
+      ...EMPTY_FILTERS,
+      patterns: ['rushed-red-day', 'large-size'],
+    };
+    // Written once, in the order the patterns are listed in; read back the same.
+    const qs = queryString(serializeFilters(f));
+    expect(qs).toBe('pat=large-size,rushed-red-day');
+    expect(parseFilters(new URLSearchParams(qs)).patterns).toEqual([
+      'large-size',
+      'rushed-red-day',
+    ]);
+    // Repeated keys read too; unknown ids and repeats are dropped.
+    expect(
+      parseFilters(
+        new URLSearchParams(
+          'pat=large-size&pat=nope&pat=large-size,held-longer',
+        ),
+      ).patterns,
+    ).toEqual(['held-longer', 'large-size']);
+    expect(FILTER_PARAMS).toContain('pat');
+    expect(mergeFilterParams(new URLSearchParams('page=2'), f).toString()).toBe(
+      'page=2&pat=large-size%2Crushed-red-day',
+    );
+    expect(serializeFilters(EMPTY_FILTERS).has('pat')).toBe(false);
+
+    // A trade pattern keeps the trades it fired on.
+    expect(run(['large-size']).map((t) => t.id)).toEqual(['a']);
+    // A day pattern keeps every trade of that day, and no other day's.
+    expect(run(['rushed-red-day']).map((t) => t.id)).toEqual(['a', 'b', 'c']);
+    // Any of the picks keeps a trade; none picked keeps all.
+    expect(run(['large-size', 'rushed-red-day']).map((t) => t.id)).toEqual([
+      'a',
+      'b',
+      'c',
+    ]);
+    expect(run([]).map((t) => t.id)).toEqual(['a', 'b', 'c', 'd']);
+    // A pattern that fired nowhere keeps nothing; so does a pick with no index.
+    expect(run(['held-longer'])).toEqual([]);
+    expect(
+      applyFilters(all, { ...EMPTY_FILTERS, patterns: ['large-size'] }, env),
+    ).toEqual([]);
+  });
+
+  test("a trade's day is the day it closed, an open trade's the day it opened (K37)", () => {
+    const overnight = trade('n', at('23:00'), at('13:00', '2026-11-19'));
+    const open = makeTrade({
+      id: 'o',
+      net: 0,
+      accountId: 'a',
+      status: 'open',
+      openedAt: at('16:30'),
+    });
+    const kept = applyFilters(
+      [overnight, open],
+      { ...EMPTY_FILTERS, patterns: ['rushed-red-day'] },
+      {
+        ...env,
+        patterns: {
+          byTrade: new Map(),
+          byDay: new Map([['2026-11-18', [{ id: 'rushed-red-day' as const }]]]),
+        },
+      },
+    );
+    // The overnight trade closed on the 19th (no pattern); the open one is the 18th's.
+    expect(kept.map((t) => t.id)).toEqual(['o']);
+  });
+
+  test('the advanced count and the unshown list count a Patterns pick once', () => {
+    expect(
+      advancedFilterCount({
+        ...EMPTY_FILTERS,
+        patterns: ['large-size', 'held-longer'],
+      }),
+    ).toBe(1);
   });
 });

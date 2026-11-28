@@ -9,7 +9,11 @@ import { classify } from '../domain/metrics/context';
 import { isClosed } from '../domain/trade-status';
 import type { DisplayUnit, Trade } from '../domain/types';
 import { applyFilters, EMPTY_FILTERS, narrowToUnit } from './filters';
-import { generateSampleWorkspace, SAMPLE_SEED } from './seed/generate';
+import {
+  generateSampleBase,
+  generateSampleWorkspace,
+  SAMPLE_SEED,
+} from './seed/generate';
 
 /** Spec §10 asks for 50 ms; the bound is 3x so load cannot flake it. */
 const BUDGET_MS = 150;
@@ -135,10 +139,11 @@ test('a unit that narrows the set rides in the context; the others do not', () =
 /**
  * The sample as TradeZella imported it (it ends on 20 Nov 2026), read in the
  * trader's New York days. The figures TradeZella showed on it are the pins
- * (Part 2 rulings).
+ * (Part 2 rulings). TradeZella read its fills, so the base: v8's hand
+ * grouping and swap are Keel edits a fills file does not carry.
  */
 describe('the sample under a narrowing unit, as TradeZella read it', () => {
-  const ws = generateSampleWorkspace({
+  const ws = generateSampleBase({
     seed: SAMPLE_SEED,
     endDate: '2026-11-20',
   });

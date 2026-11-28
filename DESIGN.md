@@ -711,6 +711,66 @@ Both are a `CARD` with a header and a collapsed body.
 
 The first run is three screens on the auth pages' centred layout: a welcome with one action, a six-step survey (a progress bar, Back from step 2, Continue disabled until the step is answered; one option per row, instruments two to a row on a phone, a type-ahead for the broker, a text box when Other is chosen) and the preferences dialog. The dialog is a centred 520px card (a full-height sheet below `sm`) that has no close control and cannot be skipped: first name, last name, username, currency (USD first) and time zone (US/Eastern first, shown as a GMT offset). Its submit makes "My account" and opens Home behind it. A quiet notice then says the new time zone is being applied to trades.
 
+#### Plan 6B components
+
+Trade depth, recorded from the shipped code: grouping, levels, the default rules, patterns, costs by hand, the stat choice, files, the note editor and its settings, the edit history, missed trades, templates and the photo. They use only the tokens above. Money goes through the display formatter, so Privacy masks it; a dialog is a `MorphDialog` (a full-height sheet with a fixed footer below `sm`), and a table becomes two-line rows on a phone.
+
+##### Levels block
+
+The trade page's Targets and Stops, one block per side: its name, a unit select (Price, Price movement and Amount always; Ticks and Points for futures and options on futures; Pips for forex), then a row per level of value and quantity, and Add level. The first quantity is the position, each new one what is left; a size helper in the quantity field turns a share of the position into a quantity. Leaving a field or Enter saves; a level on the wrong side of the entry, past the position or with no price or quantity shows its error inline and is not saved. Under Privacy an Amount level is read-only and masked.
+
+##### Grouping dialogs
+
+Merge, Split and Move, from the trade log's bulk bar (Move trades also from an account's menu). Merge and Split list the executions with a box each (Merge all ticked, the kept trade's own boxes ticked and off, with the reason; Split none ticked); under the list a sunken box, "What will happen", one line per effect with a faint dot. Move picks one of the other active accounts and says when the currencies differ. The footer has the count at the left (its own row on a phone), Cancel and the action. A Merge, Split or Move that cannot apply stays in the menu, focusable and `aria-disabled`, with its reason as its description.
+
+##### Rule cards and rule dialogs
+
+Settings > Trading has two cards, Targets and stops and Commissions and fees, under one note that both fill imported trades. Each lists its rules as a table of account, instrument, symbols and a summary of the levels or the costs, with a row menu (Fill in logged trades, Edit, Delete) and Add rule; a line and Add rule when empty. The dialogs pick an account and an instrument, take symbols as chips with type-ahead (All symbols for a fee rule), and the levels as the Levels block with a share in place of a quantity, or the fee mode, what it applies on, commission and fee. While Create waits, a hint line says what for and is its description. **Fill in logged trades** confirms with the count it matches, an override box, how many will change and, for a fee rule, how many trades it leaves alone for their currency; a toast line in the card gives the result.
+
+##### Patterns control
+
+A trigger with the count of patterns that fired opens a popover of them, one row each: the name, a tone word (Helps, Hurts, Neutral, in neutral chips) and a sentence with its figures. On the trade page it is a small secondary button, "Patterns" with its count and a caret; it is also the Patterns column in the log and a quick action on day cards (the day's net and trade count in the head, with a faint line that patterns read every account). Below `sm` the popover is a bottom sheet with Close. With no pattern the trigger is disabled with its reason and keeps its tab stop. The Patterns report uses the breakdown report's anatomy.
+
+##### Costs by hand
+
+A row of the trade page's Fills table opens its exchange fee and commission as two fields in the row, saved when the row is confirmed; one row is open at a time. The fields take a minus sign (a credit) and a pasted U+2212, and use a text keyboard on a phone so the minus can be typed.
+
+##### Choose stats
+
+A button on the Execution card opens a dialog with a search, a box and the current value per stat in page order, Reset to default, Cancel and Save. The header figures are not listed; the order never changes.
+
+##### Attachments and image viewer
+
+The trade page's Attachments card: a drop zone and a picker, images as thumbnails (loaded lazily) and other files as rows with a trash button, 10 MB each. An image opens the viewer, one image at a time at full size with Previous, Next and the arrow keys and a confirmed Delete; a note's images share it. Other files open as a download would, never under the app's origin.
+
+##### Note toolbar and blocks
+
+The editor's toolbar groups every function TradeZella has in Keel's own groups: Undo and Redo; the paragraph style, Font and Size; Bold, Italic and Underline, and a Format menu (strikethrough, inline code, superscript, subscript, clear formatting); Text colour, Highlight and Paragraph (alignment and indent); Link; Insert (rule, page break, image, inline image, table, columns, equation, toggles, embeds) and the host's template; then Dictate, Version history and Full screen. What does not fit the width goes into More tools; on a phone it is two rows of 44px targets. Blocks have a "+" and a grip on hover, the grip with a menu (Move up, Move down, Delete block). Images carry a caption; YouTube and X embeds show their source and fall back to a link; trade and day chips name what they link. A note's export and import sit in its own menu, the same on every note surface.
+
+##### Version history
+
+A dialog of the note's kept versions beside a read-only preview: Current first, then the versions newest first, each with its time; the one a restore replaced wears a "Replaced" chip. Restore asks first, saves the text on screen before it and keeps the current text as a version.
+
+##### Notebook settings
+
+Settings > Notebook: the sizes every note is drawn at (10 to 40 px), whether a ticked checklist item is crossed out, a live preview that follows the choices before they are saved, Use Keel's settings, and Save, which waits for a change.
+
+##### Edit history card
+
+Settings > Logs, under the import log: a table of every change in the last 30 days (Time, Record, Change, Action, Source), newest first, 50 to a page, with a search and Filter by type, action and source. A change reads as its field and its old and new values in words, through Display. Two-line rows on a phone.
+
+##### Missed trades card
+
+The last card of a strategy's left column: symbol, date and time, price, commission and fees, with Add, Edit and Delete, and "n missed" beside the trade count on the card and the page. Nothing else counts them.
+
+##### Template chooser and Templates tab
+
+New strategy opens the chooser while its box is on: Start blank or one of Keel's templates, with an asset filter, a search and the box ("Show templates when I make a strategy"). The Templates tab shows the same templates as cards: a drawn cover in the app's tokens, the name, style and asset chips, three figures from its example trades (labelled as theirs) and "+" to add a copy; a copied template is marked Added and "+" adds another.
+
+##### Photo field and cover band
+
+The strategy form's Photo: PNG, JPEG or WebP up to 10 MB, chosen or dropped (the field lights with a dashed accent outline while a file is over it), with Replace and Remove. The photo shows as a cover band on a `sunken` ground with a `line` rule under it, on the strategy's card and its page: a wide photo fills the band, a squarer one is shown whole.
+
 #### Plan 6C components
 
 The widget Dashboard and the Edge score are under App components above. The rest of Plan 6C, recorded from the shipped code: the collapsed sidebar, the Settings menu, the prop module, the print layout and the calendar snapshot. They use only the tokens above.

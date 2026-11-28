@@ -24,6 +24,7 @@ const day = (over: Partial<CalendarDay> = {}): CalendarDay => ({
   net: 20_000,
   gross: 20_500,
   fees: 500,
+  swap: 0,
   trades: 2,
   volume: 4,
   profitFactor: null,

@@ -274,7 +274,7 @@ describe('the line and bar charts', () => {
     expect(said('cum-pnl')).toContain('By trading day');
     chartOf(
       'cum-pnl',
-      /^Cumulative net P&L by day, all time\. Ends at \+\$17,486\.25\.$/,
+      /^Cumulative net P&L by day, all time\. Ends at \+\$17,441\.88\.$/,
     );
     // The line is the accent over a soft area, as the other pages draw it.
     expect(
@@ -382,7 +382,7 @@ describe('the line and bar charts', () => {
     expect(said('daily-cum')).toContain('Running total, right scale');
     chartOf(
       'daily-cum',
-      /^Daily net P&L bars and the running total, \d+ days, all time\. Ends at \+\$17,486\.25\.$/,
+      /^Daily net P&L bars and the running total, \d+ days, all time\. Ends at \+\$17,441\.88\.$/,
     );
     expect(card.querySelectorAll('[data-mark="bar"]').length).toBeGreaterThan(
       100,
@@ -402,7 +402,7 @@ describe('the line and bar charts', () => {
     expect(said('drawdown')).toContain('By trading day');
     chartOf(
       'drawdown',
-      /^Drawdown from the daily P&L peak, all time\. Max drawdown −\$8,665\.36\.$/,
+      /^Drawdown from the daily P&L peak, all time\. Max drawdown −\$8,690\.26\.$/,
     );
     expect(
       widget('drawdown')
@@ -562,7 +562,7 @@ describe('win rate, average win and average loss through the day (C14)', () => {
     expect(rows.length).toBeLessThanOrEqual(122);
     expect(
       within(rows[rows.length - 1]!).getByRole('rowheader').textContent,
-    ).toMatch(/, after 1,?518 trades$/);
+    ).toMatch(/, after 1,?517 trades$/);
   });
 
   test('in ticks the averages read in ticks', async () => {
@@ -854,7 +854,7 @@ describe('the trade scatters (C19)', () => {
     ].map((t) => t.textContent!);
     expect(xs.length).toBeGreaterThan(3);
     for (const t of xs) expect(t).toMatch(/^\d\d:00$/);
-    expect(dots('trade-time').length).toBe(1518);
+    expect(dots('trade-time').length).toBe(1517);
     expect(
       [...widget('trade-time').querySelectorAll('[data-axis-label="y"]')].some(
         (t) => t.textContent === '$0',

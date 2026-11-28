@@ -140,6 +140,33 @@ describe('dayInputs', () => {
     });
   });
 
+  test('a trade with only level stops counts as having a stop', () => {
+    const base = {
+      net: 100,
+      openedAt: '2026-11-19T15:00:00Z',
+      closedAt: '2026-11-19T15:05:00Z',
+    };
+    const trades = [
+      // Saved in levels: no plannedStop at all.
+      makeTrade({
+        ...base,
+        stops: { unit: 'price', levels: [{ value: 4490, qty: 1 }] },
+      }),
+      // Saved before levels.
+      makeTrade({ ...base, plannedStop: 4490 }),
+      // A target is not a stop, and a stop side with no levels is no stop.
+      makeTrade({
+        ...base,
+        targets: { unit: 'price', levels: [{ value: 4520, qty: 1 }] },
+      }),
+      makeTrade({ ...base, stops: { unit: 'price', levels: [] } }),
+    ];
+    expect(dayInputs(trades, '2026-11-19', env()).a1).toMatchObject({
+      opened: 4,
+      withStop: 2,
+    });
+  });
+
   test('a trade that exits outside the hours the same day is out of hours', () => {
     const t = makeTrade({
       net: 0,

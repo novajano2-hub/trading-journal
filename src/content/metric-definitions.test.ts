@@ -1,5 +1,10 @@
 import { expect, test } from 'vitest';
-import { METRIC_IDS, metricDefinition } from './metric-definitions';
+import { PATTERNS } from '@/domain/patterns';
+import {
+  METRIC_IDS,
+  metricDefinition,
+  type MetricId,
+} from './metric-definitions';
 
 test('every metric has a label and a definition', () => {
   for (const id of METRIC_IDS) {
@@ -92,6 +97,34 @@ test("the day's volume says it counts both sides", () => {
   expect(metricDefinition('day-volume', 'net').definition).toMatch(
     /both sides/,
   );
+});
+
+test('every pattern has a definition headed by its name, and the Patterns column has one', () => {
+  for (const p of PATTERNS) {
+    const id = `pattern-${p.id}` as MetricId;
+    expect(METRIC_IDS, p.id).toContain(id);
+    const d = metricDefinition(id, 'net');
+    expect(d.label).toBe(p.name);
+    expect(d.definition.length, p.id).toBeGreaterThan(30);
+    // The same wording whichever P&L basis is read.
+    expect(metricDefinition(id, 'gross')).toEqual(d);
+  }
+  expect(metricDefinition('patterns', 'net').label).toBe('Patterns');
+  expect(metricDefinition('patterns', 'net').definition).toMatch(/fills/);
+  // Thresholds the definitions quote are the ones the patterns use.
+  expect(metricDefinition('pattern-held-longer', 'net').definition).toContain(
+    '75%',
+  );
+  expect(
+    metricDefinition('pattern-loss-after-loss', 'net').definition,
+  ).toContain('30 seconds');
+});
+
+test("the patterns report's Trades column says a day pattern counts that day's trades", () => {
+  const d = metricDefinition('pattern-trades', 'net');
+  expect(d.label).toBe('Trades');
+  expect(d.definition).toContain('both rows');
+  expect(d.definition).toContain("day pattern counts that day's trades");
 });
 
 test('the upper dashboard widgets have a tip each, apart from the longest-streak ones', () => {

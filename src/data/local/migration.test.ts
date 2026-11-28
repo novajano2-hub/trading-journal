@@ -389,3 +389,78 @@ test('v3 to v4 keeps every v3 row and adds an empty propTxns', async () => {
   expect(await db.propTxns.count()).toBe(0);
   db.close();
 });
+
+// ---- version 4 to 5 (Plan 6B) ----------------------------------------------
+
+/** The stores as version 4 declared them: version 3's, plus the prop money ledger. */
+const V4_STORES = {
+  ...V3_STORES,
+  propTxns: '[workspaceId+id], workspaceId, [workspaceId+date]',
+};
+
+/** A version 4 database holding `rows` (by table) and `meta` records. */
+async function openV4(
+  indexedDB: IDBFactory,
+  rows: V2Rows = {},
+  meta: { key: string; value: unknown }[] = [],
+): Promise<void> {
+  const v4 = new Dexie(DB_NAME, { indexedDB, IDBKeyRange });
+  v4.version(4).stores(V4_STORES);
+  for (const [table, list] of Object.entries(rows))
+    await v4.table(table).bulkPut(list ?? []);
+  await v4.table('meta').bulkPut(meta);
+  v4.close();
+}
+
+test('the 6B upgrade (version 5) keeps every row and adds empty tables', async () => {
+  const indexedDB = new IDBFactory();
+  const trade = (ws: string) => ({
+    ...makeTrade({ id: `t-${ws}`, workspaceId: ws, net: 500 }),
+    plannedStop: 99,
+    initialRisk: 1_000,
+  });
+  const rows: V2Rows = {
+    trades: [trade(M), trade(S)],
+    accounts: [account(M), account(S)],
+    strategies: [M, S].map((ws) => ({
+      id: `s-${ws}`,
+      workspaceId: ws,
+      name: 'Breakout',
+    })),
+    journal: [v2Entry(M), v2Entry(S)],
+    days: [M, S].map((ws) => ({ id: '2026-11-20', workspaceId: ws })),
+    imports: [M, S].map((ws) => ({
+      id: `imp-${ws}`,
+      workspaceId: ws,
+      accountId: `a-${ws}`,
+      replacedTrades: [trade(ws)],
+    })),
+    // 6C's ledger rows ride through 6B's upgrade untouched.
+    propTxns: [M, S].map((ws) => ({
+      id: `pt-${ws}`,
+      workspaceId: ws,
+      date: '2026-11-20',
+    })),
+  };
+  await openV4(indexedDB, rows, [{ key: 'prefs', value: PREFS }, SEED_META]);
+  const db = new KeelDb({ indexedDB, IDBKeyRange });
+  await db.open();
+  for (const [table, list] of Object.entries(rows))
+    for (const row of list ?? []) {
+      const { workspaceId, id } = row as { workspaceId: string; id: string };
+      expect(await db.table(table).get([workspaceId, id])).toEqual(row);
+    }
+  expect((await db.meta.get('prefs'))?.value).toEqual(PREFS);
+  expect((await db.meta.get('seed:sample'))?.value).toEqual(SEED_META.value);
+  for (const table of [
+    'files',
+    'noteVersions',
+    'history',
+    'targetRules',
+    'feeRules',
+    'missedTrades',
+  ])
+    expect(await db.table(table).count()).toBe(0);
+  expect(db.verno).toBe(5);
+  db.close();
+});

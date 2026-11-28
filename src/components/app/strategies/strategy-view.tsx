@@ -10,11 +10,21 @@ import {
 import { FigureText } from '@/components/product/figure-text';
 import { Button } from '@/components/ui/button';
 import { buttonClasses } from '@/components/ui/button-styles';
-import { Chip } from '@/components/ui/chip';
+import { Chip, SideChip } from '@/components/ui/chip';
 import { MetricTip } from '@/components/ui/metric-tip';
 import type { MetricId } from '@/content/metric-definitions';
+import {
+  TEMPLATE_AUTHOR,
+  templateById,
+  type ExampleTrade,
+  type StrategyTemplate,
+} from '@/content/strategy-templates';
 import { EMPTY_FILTERS } from '@/data/filters';
-import { useStrategy, useUpdateStrategy } from '@/data/query/hooks';
+import {
+  useMissedTrades,
+  useStrategy,
+  useUpdateStrategy,
+} from '@/data/query/hooks';
 import type { RuleStat } from '@/domain/metrics/rules';
 import type { Rule, RuleGroup, Strategy } from '@/domain/types';
 import { FigureSourceContext, useDisplay } from '@/lib/display';
@@ -27,6 +37,8 @@ import {
   pctText,
 } from './strategy-style';
 import { EquityLine } from './equity-line';
+import { MissedTradesCard } from './missed-trades';
+import { PhotoBand } from './photo-field';
 import {
   ArchiveFailed,
   HiddenTrades,
@@ -408,24 +420,34 @@ function Stat({
 
 function Header({
   s,
+  template,
   tradeCount,
   tradesHref,
   leftOut,
 }: {
   s: Strategy;
+  /** The template this strategy was copied from, when Keel still has it. */
+  template: StrategyTemplate | undefined;
   tradeCount: number;
   /** Undefined when the filters cannot open the log on these trades alone. */
   tradesHref: string | undefined;
   leftOut: number;
 }): React.JSX.Element {
   const update = useUpdateStrategy();
+  const missed = useMissedTrades(s.id).data?.length ?? 0;
   const Glyph = STRATEGY_ICON_GLYPH[s.icon ?? 'target'];
   const archived = s.status === 'archived';
   return (
     <section
       aria-labelledby="strategy-h"
-      className={`${CARD} flex flex-wrap items-center gap-x-4 gap-y-3 px-[22px] py-4`}
+      className={`${CARD} flex flex-wrap items-center gap-x-4 gap-y-3 px-[22px] py-4 max-sm:px-4 max-sm:py-3.5`}
     >
+      {/* The photo is the header's band; the strategy's own icon stays beside its name. */}
+      <PhotoBand
+        photoId={s.photoId}
+        name={s.name}
+        className="-mx-[22px] -mt-4 mb-0.5 h-[140px] flex-none basis-[calc(100%+44px)] rounded-t-[15px] max-sm:-mx-4 max-sm:-mt-3.5 max-sm:h-[110px] max-sm:basis-[calc(100%+32px)]"
+      />
       <div className="min-w-0 flex-[1_1_260px]">
         <h2
           id="strategy-h"
@@ -445,6 +467,12 @@ function Header({
         {s.description ? (
           <p className="mt-0.5 text-[14px] leading-[1.5] text-muted">
             {s.description}
+          </p>
+        ) : null}
+        {template ? (
+          <p className="mt-1 text-[12.5px] leading-[1.45] text-faint">
+            A copy of the {template.name} template by {TEMPLATE_AUTHOR}. Yours
+            to edit.
           </p>
         ) : null}
       </div>
@@ -484,6 +512,11 @@ function Header({
             View {tradeCount} {plural(tradeCount, 'trade')}
           </Link>
         )}
+        {missed > 0 ? (
+          <span className="text-[13px] text-muted tabular-nums">
+            {missed} missed
+          </span>
+        ) : null}
       </div>
       <LeftOutNote count={leftOut} className="basis-full" />
       {tradesHref === undefined && tradeCount > 0 ? (
@@ -496,6 +529,128 @@ function Header({
           className="basis-full"
         />
       ) : null}
+    </section>
+  );
+}
+
+/** An example's result: its own R, or its net through the display when it has none. */
+function ExampleResult({ e }: { e: ExampleTrade }): React.JSX.Element {
+  const display = useDisplay();
+  if (e.r === undefined)
+    return (
+      <span className={signTone(e.net)}>
+        <FigureText f={display.cash(e.net)} />
+      </span>
+    );
+  return (
+    <span className={signTone(e.net)}>
+      {e.r < 0 ? '\u2212' : '+'}
+      {Math.abs(e.r).toFixed(1)}R
+    </span>
+  );
+}
+
+/** The clock time an example reads, as written (it has no real date). */
+const exampleTime = (e: ExampleTrade): string => e.openedAt.slice(11, 16);
+
+/**
+ * The template's example trades, apart from everything that counts: a
+ * copy's own figures read its trades and nothing here (B47).
+ */
+function ExamplesCard({ t }: { t: StrategyTemplate }): React.JSX.Element {
+  return (
+    <section aria-labelledby="examples-h" className={`${CARD} ${PAD}`}>
+      <CardHeader
+        headingId="examples-h"
+        title="Example trades"
+        after={
+          <span className="text-[12.5px] text-faint">
+            From the template, to show the idea. Not your trades: no figure
+            counts them.
+          </span>
+        }
+      />
+      {/* Under sm there is no room for six columns: one card per example. */}
+      <ul aria-label="Example trades, one card each" className="mt-2 sm:hidden">
+        {t.examples.map((e, i) => (
+          <li
+            key={i}
+            className="flex flex-col gap-1 border-b border-line/70 py-3 text-[13.5px] last:border-b-0"
+          >
+            <span className="flex items-baseline gap-2">
+              <b className="font-semibold text-text">{e.symbol}</b>
+              <span className="text-[12.5px] text-faint">
+                Example {i + 1}, {exampleTime(e)}
+              </span>
+              <b className="ml-auto font-semibold tabular-nums">
+                <ExampleResult e={e} />
+              </b>
+            </span>
+            <span className="flex items-center gap-2 text-[12.5px] text-muted">
+              <SideChip side={e.side} />
+              {e.entry !== undefined && e.exit !== undefined ? (
+                <span className="tabular-nums">
+                  {e.entry} to {e.exit}
+                </span>
+              ) : null}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-2 overflow-x-auto max-sm:hidden">
+        <table aria-label="Example trades" className="w-full text-[13.5px]">
+          <thead>
+            <tr className="border-b border-line">
+              <th scope="col" className={TH}>
+                Example
+              </th>
+              <th scope="col" className={TH}>
+                Symbol
+              </th>
+              <th scope="col" className={TH}>
+                Side
+              </th>
+              <th scope="col" className={`${TH} !text-right`}>
+                Entry
+              </th>
+              <th scope="col" className={`${TH} !text-right`}>
+                Exit
+              </th>
+              <th scope="col" className={`${TH} !text-right`}>
+                Result
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {t.examples.map((e, i) => (
+              <tr
+                key={i}
+                className="h-11 border-b border-line/70 last:border-b-0"
+              >
+                <td className={`${TD} text-muted`}>
+                  Example {i + 1}{' '}
+                  <b className="font-semibold text-text tabular-nums">
+                    {exampleTime(e)}
+                  </b>
+                </td>
+                <td className={`${TD} font-semibold text-text`}>{e.symbol}</td>
+                <td className={TD}>
+                  <SideChip side={e.side} />
+                </td>
+                <td className={`${TD} text-right tabular-nums`}>
+                  {e.entry ?? 'None'}
+                </td>
+                <td className={`${TD} text-right tabular-nums`}>
+                  {e.exit ?? 'None'}
+                </td>
+                <td className={`${TD} text-right tabular-nums`}>
+                  <ExampleResult e={e} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
@@ -516,6 +671,7 @@ function StrategyBody({
   // Read inside the provider, so every figure knows its trades.
   const display = useDisplay();
   const { summary } = f;
+  const template = templateById(s.templateId);
   const avgWin =
     summary.avgWin === null
       ? null
@@ -537,6 +693,7 @@ function StrategyBody({
       </Link>
       <Header
         s={s}
+        template={template}
         tradeCount={f.tradeCount}
         tradesHref={f.tradesHref}
         leftOut={f.leftOut}
@@ -599,6 +756,10 @@ function StrategyBody({
               )}
             </div>
           </section>
+
+          {template ? <ExamplesCard t={template} /> : null}
+
+          <MissedTradesCard strategy={s} />
         </div>
 
         <div className="flex min-w-0 flex-col gap-4">

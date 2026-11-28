@@ -7,6 +7,8 @@ import {
   within,
 } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
+import { patternSample } from '@/data/__fixtures__/patterns-sample';
+import { PATTERNS } from '@/domain/patterns';
 import { renderApp } from './__fixtures__/render-app';
 import { FilterBar } from './filter-bar';
 
@@ -14,8 +16,15 @@ vi.mock('next/navigation', () => import('./__fixtures__/navigation'));
 
 afterEach(cleanup);
 
-async function openPanel(url = '/app/dashboard'): Promise<HTMLElement> {
-  renderApp(<FilterBar />, { url });
+async function openPanel(
+  url = '/app/dashboard',
+  sample?: Parameters<typeof renderApp>[1] extends infer O
+    ? O extends { sample?: infer S }
+      ? S
+      : never
+    : never,
+): Promise<HTMLElement> {
+  renderApp(<FilterBar />, { url, sample });
   // The button is inert until the workspace loads, and then a new element.
   await waitFor(() =>
     expect(
@@ -188,4 +197,150 @@ test('the panel opens on the filters a link brought', async () => {
       }) as HTMLInputElement
     ).value,
   ).toBe('0');
+});
+
+const patternBoxes = (panel: HTMLElement) => {
+  const section = within(panel).getByRole('region', { name: 'Patterns' });
+  return {
+    section,
+    all: within(section).getByRole('checkbox', {
+      name: 'Select all',
+    }) as HTMLInputElement,
+  };
+};
+
+test('Select all ticks every pattern; the section is disabled when none fired', async () => {
+  // The fixture's trades carry no fills and no pattern: nothing to pick.
+  let panel = await openPanel();
+  let { section, all } = patternBoxes(panel);
+  expect(all.disabled).toBe(true);
+  expect(
+    (
+      within(section).getByRole('searchbox', {
+        name: 'Search patterns',
+      }) as HTMLInputElement
+    ).disabled,
+  ).toBe(true);
+  for (const box of within(section).getAllByRole('checkbox'))
+    expect((box as HTMLInputElement).disabled).toBe(true);
+  await waitFor(() =>
+    expect(section.textContent).toContain(
+      'No pattern has fired on your trades yet.',
+    ),
+  );
+  // All 17 are listed, in two groups, each with its tone word.
+  expect(within(section).getAllByRole('checkbox')).toHaveLength(18);
+  expect(within(section).getByText('Trade patterns')).toBeTruthy();
+  expect(within(section).getByText('Day patterns')).toBeTruthy();
+  cleanup();
+
+  // Once one has fired, the section is live.
+  panel = await openPanel('/app/dashboard', async () => patternSample());
+  ({ section, all } = patternBoxes(panel));
+  await waitFor(() => expect(all.disabled).toBe(false));
+  expect(section.textContent).not.toContain('No pattern has fired');
+  const names = (within(section).getAllByRole('checkbox') as HTMLInputElement[])
+    .filter((c) => c !== all)
+    .map((c) => c.getAttribute('aria-labelledby')!)
+    .map((id) => document.getElementById(id)!.textContent);
+  // Alphabetical within a group; trade patterns first.
+  expect(names).toEqual([
+    'Added to the position',
+    'Exited in parts',
+    'Held longer than usual',
+    'Large size',
+    'Long hold on a loss',
+    'Loss after a loss',
+    'Busier than a green day',
+    'Losses outweighed wins',
+    'Low return for the effort',
+    'More trades than usual',
+    'One strong trade',
+    'Quick re-entries after a loss',
+    'Rushed red day',
+    'Sized up after wins',
+    'Switched sides, green',
+    'Switched sides, red',
+    'Waited, then won',
+  ]);
+  expect(within(section).getAllByText('Hurts').length).toBeGreaterThan(5);
+  expect(within(section).getAllByText('Helps')).toHaveLength(2);
+  expect(within(section).getAllByText('Neutral')).toHaveLength(5);
+  expect(section.textContent).toContain('0 of 17');
+
+  // Select all ticks every pattern; Apply writes them all, and the button counts the field once.
+  fireEvent.click(all);
+  const boxes = () =>
+    (within(section).getAllByRole('checkbox') as HTMLInputElement[]).filter(
+      (c) => c !== all,
+    );
+  expect(boxes().every((c) => c.checked)).toBe(true);
+  expect(all.checked).toBe(true);
+  expect(section.textContent).toContain('17 of 17');
+  fireEvent.click(within(panel).getByRole('button', { name: 'Apply' }));
+  expect(window.location.search).toBe(
+    `?pat=${PATTERNS.map((p) => p.id).join(',')}`,
+  );
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'More filters, 1 active' }),
+  );
+  panel = await screen.findByRole('dialog', { name: 'More filters' });
+  ({ section, all } = patternBoxes(panel));
+  expect(all.checked).toBe(true);
+
+  // Select all again clears them.
+  fireEvent.click(all);
+  expect(boxes().some((c) => c.checked)).toBe(false);
+  expect(all.checked).toBe(false);
+});
+
+test('picking some patterns marks Select all as partly ticked; the search narrows the list and Select all follows it', async () => {
+  const panel = await openPanel('/app/dashboard', async () => patternSample());
+  const { section, all } = patternBoxes(panel);
+  await waitFor(() => expect(all.disabled).toBe(false));
+  fireEvent.click(
+    within(section).getByRole('checkbox', { name: 'Large size' }),
+  );
+  expect(all.checked).toBe(false);
+  expect(all.indeterminate).toBe(true);
+  expect(section.textContent).toContain('1 of 17');
+
+  fireEvent.change(
+    within(section).getByRole('searchbox', { name: 'Search patterns' }),
+    { target: { value: 'switched' } },
+  );
+  const shown = within(section)
+    .getAllByRole('checkbox')
+    .filter((c) => c !== all);
+  expect(shown).toHaveLength(2);
+  // The group with no match leaves too.
+  expect(within(section).queryByText('Trade patterns')).toBeNull();
+  fireEvent.click(all);
+  expect(shown.every((c) => (c as HTMLInputElement).checked)).toBe(true);
+  expect(section.textContent).toContain('3 of 17');
+  fireEvent.change(
+    within(section).getByRole('searchbox', { name: 'Search patterns' }),
+    { target: { value: 'zzz' } },
+  );
+  expect(section.textContent).toContain('No pattern matches.');
+  fireEvent.click(within(panel).getByRole('button', { name: 'Apply' }));
+  expect(window.location.search).toBe(
+    '?pat=large-size,switched-sides-red,switched-sides-green',
+  );
+});
+
+test('a pick from the address stays editable even when no pattern has fired, and Reset clears the picks', async () => {
+  const panel = await openPanel('/app/dashboard?pat=large-size');
+  const { section, all } = patternBoxes(panel);
+  const large = within(section).getByRole('checkbox', {
+    name: 'Large size',
+  }) as HTMLInputElement;
+  expect(large.checked).toBe(true);
+  expect(large.disabled).toBe(false);
+  expect(all.disabled).toBe(false);
+  fireEvent.click(within(panel).getByRole('button', { name: 'Reset' }));
+  expect(large.checked).toBe(false);
+  fireEvent.click(within(panel).getByRole('button', { name: 'Apply' }));
+  expect(window.location.search).toBe('');
 });

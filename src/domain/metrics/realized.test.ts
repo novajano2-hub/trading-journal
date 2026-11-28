@@ -114,6 +114,56 @@ describe('realizations', () => {
     ]);
   });
 
+  test('swap books with the last exit of a closed trade, so the exits still add up to the net', () => {
+    const t = {
+      ...built([
+        fill('e1', 'buy', 2, 5000, '2026-11-16T15:00:00.000Z', 300),
+        fill('x1', 'sell', 1, 5010, '2026-11-16T20:00:00.000Z', 150),
+        fill('x2', 'sell', 1, 5020, '2026-11-17T15:00:00.000Z', 150),
+      ]),
+    };
+    const swapped = { ...t, swap: -486, net: t.net - 486 };
+    const rs = realizations(swapped);
+    // Gross and fees are as without swap; only the last exit's net carries it.
+    expect(rs.map((r) => [r.gross, r.fees, r.net])).toEqual([
+      [50000, 300, 49700],
+      [100000, 300, 99700 - 486],
+    ]);
+    expect(rs.reduce((s, r) => s + r.net, 0)).toBe(swapped.net);
+    // The exit that books it says so; the others (and a trade with none) carry no swap field.
+    expect(rs.map((r) => r.swap)).toEqual([undefined, -486]);
+    expect(realizations(t).some((r) => 'swap' in r)).toBe(false);
+  });
+
+  test('a swap on a closed trade without fills is already in its one realization', () => {
+    const t = makeTrade({
+      net: 700 - 486,
+      gross: 700,
+      swap: -486,
+      closedAt: '2026-03-02T15:05:00Z',
+    });
+    expect(realizations(t)).toEqual([
+      {
+        tradeId: t.id,
+        time: '2026-03-02T15:05:00Z',
+        gross: 700,
+        fees: 0,
+        net: 214,
+        swap: -486,
+      },
+    ]);
+  });
+
+  test('an open trade books no swap', () => {
+    const t = built([
+      fill('e1', 'buy', 2, 5000, '2026-11-16T15:00:00.000Z', 300),
+      fill('x1', 'sell', 1, 5010, '2026-11-16T20:00:00.000Z', 150),
+    ]);
+    expect(realizations({ ...t, swap: -486 }).map((r) => r.net)).toEqual([
+      49700,
+    ]);
+  });
+
   test('the realizations of every closed fixture trade add up to the trade', () => {
     const closed = [
       ...fixtureSample().trades,

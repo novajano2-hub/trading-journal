@@ -41,6 +41,75 @@
         ],
         "createdAt": "2026-11-20T11:02:40.024Z",
         "reason": "Claude's call: archived decision-page sketch of a direction (two unchosen), not shipping code; its fonts belong to that sketch's world and predate DESIGN.md"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "sans\",system-ui,sans-serif",
+        "createdAt": "2026-11-25T14:47:28.233Z",
+        "reason": "Claude's call: parse artifact of shell.css's 'Instrument Sans', system-ui, sans-serif stack, which is DESIGN.md's face; the plan6b comps add no font"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/plan6b/**"
+        ],
+        "createdAt": "2026-11-25T16:24:07.080Z",
+        "reason": "Claude's call: hairline-divided stat strips and table rows (border-top/border-left dividers, not boxes) as in the approved 6A comps and shipped trade page; no text sits against a filled edge in the captures"
+      },
+      {
+        "rule": "nested-cards",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/plan6b/**"
+        ],
+        "createdAt": "2026-11-25T16:24:07.126Z",
+        "reason": "Claude's call: Keel's shipped card patterns (a drop zone or plan band inside a card, dialogs over cards), matching the approved 6A comps"
+      },
+      {
+        "rule": "design-system-radius",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/plan6b/**"
+        ],
+        "createdAt": "2026-11-25T16:24:07.168Z",
+        "reason": "Claude's call: DESIGN.md's own component radii (999px pills, 7px chips, control radii) and 6A shell.css values the scale parser misses"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/plan6b/**"
+        ],
+        "createdAt": "2026-11-25T16:24:07.214Z",
+        "reason": "Claude's call: 18px and 20px headings copied from the approved 6A shell.css and shipped pages"
+      },
+      {
+        "rule": "overused-font",
+        "value": "instrument sans",
+        "files": [
+          ".impeccable/mocks/plan6b/shell.css"
+        ],
+        "createdAt": "2026-11-25T16:24:14.685Z",
+        "reason": "Claude's call: Instrument Sans is DESIGN.md's own typeface; shell.css is the approved 6A shell copied"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#3843c6",
+        "files": [
+          ".impeccable/mocks/plan6b/shell.css"
+        ],
+        "createdAt": "2026-11-25T16:24:14.727Z",
+        "reason": "Claude's call: the accent hover from the approved 6A shell.css, copied unchanged"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(34,42,150,.4)",
+        "files": [
+          ".impeccable/mocks/plan6b/index.html"
+        ],
+        "createdAt": "2026-11-25T16:24:14.770Z",
+        "reason": "Claude's call: the comps gallery page's capture shadow, as in 6A's index; not a product surface"
       }
     ]
   }

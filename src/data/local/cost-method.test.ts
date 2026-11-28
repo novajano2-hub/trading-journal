@@ -351,6 +351,53 @@ describe("the account's method reaches what it builds", () => {
     expect('costMethod' in again).toBe(false);
   });
 
+  // Plan 6B meets Plan 6C: a trade grouped by hand is built under the method too.
+  test("a merge and a split build with the account's method", async () => {
+    const { repo, acc } = await mine();
+    await repo.accounts.setCostMethod(M, acc.id, 'lifo');
+    const instrument = resolveInstrument('ESZ5')!;
+    const f = (time: string, side: Side, price: number) => ({
+      time: `2026-11-16T${time}:00.000Z`,
+      side,
+      qty: 1,
+      price,
+      commission: 0,
+      fees: 0,
+    });
+    const a = await repo.trades.createManual(M, {
+      accountId: acc.id,
+      instrument,
+      fills: [
+        f('14:00', 'buy', 6000),
+        f('14:01', 'buy', 6010),
+        f('14:02', 'sell', 6020),
+      ],
+    });
+    const b = await repo.trades.createManual(M, {
+      accountId: acc.id,
+      instrument,
+      fills: [f('14:10', 'buy', 6030), f('14:11', 'sell', 6040)],
+    });
+    const fills = [...a.executions, ...b.executions].map((e) => e.id);
+    // LIFO closes the newest lot each time: 10 points twice, the 6000 lot left open (FIFO: 50 points).
+    const merged = await repo.trades.merge(M, [a.id, b.id], fills);
+    expect(merged).toMatchObject({
+      grouping: 'manual',
+      costMethod: 'lifo',
+      status: 'open',
+      gross: 100_000,
+    });
+    const { original, created } = await repo.trades.split(
+      M,
+      merged.id,
+      merged.executions.slice(3).map((e) => e.id),
+    );
+    expect(original).toMatchObject({ costMethod: 'lifo', gross: 50_000 });
+    expect(created).toMatchObject({ costMethod: 'lifo', gross: 50_000 });
+    // The stored rows say the same.
+    expect(await repo.trades.get(M, merged.id)).toEqual(original);
+  });
+
   test("an undo that restores trades rebuilds them with the account's current method", async () => {
     const { repo, acc, commit } = await mine();
     await commit(OPEN);

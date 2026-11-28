@@ -4,6 +4,7 @@ import { rotateFromWeekStart } from '../week';
 import { isClosed, type ClosedTrade } from '../trade-status';
 import { roundHalfEven } from '../money';
 import type { AssetClass, Cents, Trade, WeekStart } from '../types';
+import { PATTERNS } from '../patterns/defs';
 import { classify, type MetricContext, type PnlBasis } from './context';
 import { priceBuckets, priceKeyOf } from './price-ranges';
 import { rOf, summarize, volumeOf, type Summary } from './summary';
@@ -21,6 +22,7 @@ export type BreakdownKey =
   | 'symbol'
   | 'strategy'
   | 'tag'
+  | 'pattern'
   | 'size'
   | 'r'
   | 'month'
@@ -41,9 +43,24 @@ export const SYMBOL_KEYS: readonly BreakdownKey[] = [
   'symbol-top',
   'symbol-bottom',
 ];
+/**
+ * Where the patterns fired (`computePatterns`): the trade-level ones by trade
+ * id, the day-level ones by the day's local date.
+ */
+export interface PatternHits {
+  byTrade: ReadonlyMap<string, readonly { id: string }[]>;
+  byDay: ReadonlyMap<string, readonly { id: string }[]>;
+}
 export interface BreakdownOptions {
   strategyNames?: Record<string, string>;
   tagNames?: Record<string, string>;
+  /**
+   * What the pattern breakdown reads. A trade counts under each pattern that
+   * fired on it, and under each day pattern of the day it closed on (the log's
+   * day rule): a day pattern counts that day's trades. Without it the
+   * breakdown has no rows.
+   */
+  patterns?: PatternHits;
   /** Each tag's category name: the tag breakdown groups its rows by them. */
   tagCategoryNames?: Record<string, string>;
   /** Account names by id: the account breakdown labels its rows with them. */
@@ -331,6 +348,10 @@ export function bucketRange(
   };
 }
 
+const PATTERN_NAMES: ReadonlyMap<string, string> = new Map(
+  PATTERNS.map((p) => [p.id, p.name]),
+);
+
 const basisPnl = (s: Summary) => (s.basis === 'gross' ? s.grossPnl : s.netPnl);
 
 /** How a dimension reads a trade: the keys it files under, and the rows it always shows. */
@@ -436,6 +457,25 @@ function specOf(
         labelOf: (k) =>
           k === NONE ? 'No strategy' : (ctx.strategyNames?.[k] ?? k),
       };
+    case 'pattern': {
+      const hits = ctx.patterns;
+      return {
+        // A trade with no pattern files under no row: the breakdown has one row per pattern.
+        keysOf: (t) => {
+          if (!hits) return [];
+          const day = localDate(t.closedAt, ctx.timeZone);
+          return [
+            ...new Set(
+              [
+                ...(hits.byTrade.get(t.id) ?? []),
+                ...(hits.byDay.get(day) ?? []),
+              ].map((h) => h.id),
+            ),
+          ];
+        },
+        labelOf: (k) => PATTERN_NAMES.get(k) ?? k,
+      };
+    }
     case 'tag':
       return {
         keysOf: (t) =>

@@ -24,6 +24,7 @@ export const defaultSample: SampleSource = async (now) => {
   return generateSampleWorkspace({
     seed: SAMPLE_SEED,
     endDate: sampleEndDate(now.toISOString()),
+    now: now.toISOString(),
   });
 };
 
@@ -153,6 +154,10 @@ export async function writeSample(
   await db.propTxns.bulkPut(sample.propTxns);
   await db.trackers.put(sample.tracker);
   await db.days.bulkPut(sample.days);
+  await db.history.bulkPut(sample.history);
+  await db.targetRules.bulkPut(sample.targetRules);
+  await db.feeRules.bulkPut(sample.feeRules);
+  await db.missedTrades.bulkPut(sample.missedTrades);
   const seed: SeedMeta = {
     version: SAMPLE_SEED_VERSION,
     seed: sample.seed,

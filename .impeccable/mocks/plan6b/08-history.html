@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keel, Logs</title>
+<!-- Plan 6B comp 08 (spec 5.9). Logs holds the import log and the edit history as two cards on one page. ?theme=dark for graphite. -->
+<script src="shell.js"></script>
+<link rel="stylesheet" href="shell.css">
+<style>
+.htools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.htools .inp.sm { width: 300px; height: 32px; }
+.htools .fb { font-size: 12.5px; color: var(--faint); margin-left: 8px; }
+.htbl td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 58px; }
+.htbl .rt, .htbl .ft { display: block; font-size: 12px; color: var(--faint); line-height: 1.4; }
+.htbl .ri, .htbl .cf { display: block; font-weight: 550; overflow: hidden; text-overflow: ellipsis; }
+.htbl .ft { color: var(--muted); font-size: 12.5px; }
+.htbl td.tm2 { color: var(--muted); }
+.htbl .ov { color: var(--muted); }
+.htbl .src { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px; background: var(--sunken); color: var(--muted); font-size: 12px; font-weight: 550; }
+.hpager { display: flex; align-items: center; gap: 8px; padding: 12px 20px 4px; font-size: 12.5px; color: var(--faint); border-top: 1px solid var(--line); }
+.hpager .end { margin-left: auto; display: flex; gap: 6px; }
+.itbl td { white-space: nowrap; } .itbl td:last-child { overflow: visible; }
+.hrows .l1 { flex-wrap: wrap; gap: 2px 10px; }
+.hrows .l1 .when { margin-left: auto; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.hrows .l1 .rec { margin-left: 0 !important; font-size: 14px; font-weight: 600; }
+.hrows .l1 .rt2 { font-weight: 500; color: var(--faint); }
+.hrows .l2 { flex-wrap: wrap; }
+.hrows .l2 b { font-weight: 550; color: var(--text); }
+@media (max-width: 639.98px) { .htools .inp.sm { width: 100%; } .htools .fb { margin-left: 0; } }
+</style>
+</head>
+<body data-nav="settings" data-title="Settings">
+<main id="content" class="page">
+<div class="sgrid">
+  <nav class="snav" data-cur="logs"></nav>
+  <div class="stack">
+    <section class="card flush" aria-labelledby="ih-h">
+      <div class="hd px"><h2 id="ih-h">Import history</h2><div class="end"><a class="btn sm" href="#"><i data-i="ArrowLeft"></i>Back to Import</a></div></div>
+      <table class="stbl itbl only-desk" style="margin-top:8px;font-size:13px">
+        <colgroup><col><col style="width:15%"><col style="width:14%"><col style="width:7%"><col style="width:7%"><col style="width:10%"><col style="width:8%"><col style="width:11%"><col style="width:88px"></colgroup>
+        <thead><tr><th>File</th><th>Account</th><th>Date</th><th class="n">Rows</th><th class="n">Trades</th><th class="n">Duplicates</th><th class="n">Skipped</th><th>Status</th><th><span class="sr">Actions</span></th></tr></thead>
+        <tbody>
+          <tr><td class="b6">futures-live-24-nov.csv</td><td class="muted">Futures live</td><td class="muted">24 Nov, 17:05</td><td class="n">412</td><td class="n">38</td><td class="n">0</td><td class="n">2</td><td><span class="chip">Imported</span></td><td class="n"><button class="btn sm ghost">Undo</button></td></tr>
+          <tr><td class="b6">forex-eval-23-nov.csv</td><td class="muted">Forex evaluation</td><td class="muted">23 Nov, 16:48</td><td class="n">96</td><td class="n">11</td><td class="n">3</td><td class="n">0</td><td><span class="chip">Imported</span></td><td class="n"><button class="btn sm ghost">Undo</button></td></tr>
+        </tbody>
+      </table>
+      <ul class="prows only-phone px" style="margin-top:6px">
+        <li><a href="#"><span class="l1"><b style="margin:0" class="b6">futures-live-24-nov.csv</b></span><span class="l2"><span>Futures live</span><span>24 Nov, 17:05</span><span>38 trades</span></span></a></li>
+        <li><a href="#"><span class="l1"><b style="margin:0" class="b6">forex-eval-23-nov.csv</b></span><span class="l2"><span>Forex evaluation</span><span>23 Nov, 16:48</span><span>11 trades</span></span></a></li>
+      </ul>
+    </section>
+
+    <section class="card flush" aria-labelledby="eh-h">
+      <div class="hd px"><h2 id="eh-h">Edit history</h2><span class="cap">Changes from the last 30 days, in New York time</span></div>
+      <div class="htools px"><div class="inp sm"><i data-i="MagnifyingGlass" class="faint"></i><span class="faint">Search type, identifier or field</span></div>
+        <span class="fb">Filter by</span><button class="fchip">Type<i data-i="CaretDown:bold"></i></button><button class="fchip">Action<i data-i="CaretDown:bold"></i></button><button class="fchip">Source<i data-i="CaretDown:bold"></i></button></div>
+      <table class="stbl htbl only-desk" style="margin-top:10px;font-size:13px">
+        <colgroup><col style="width:19%"><col style="width:26%"><col><col style="width:11%"><col style="width:11%"></colgroup>
+        <thead><tr><th>Time</th><th>Record</th><th>Change</th><th>Action</th><th>Source</th></tr></thead>
+        <tbody id="hrows"></tbody>
+      </table>
+      <ul class="prows hrows only-phone px" id="hprows" style="margin-top:8px"></ul>
+      <div class="hpager"><span>1 to 6 of 6</span><span class="end"><button class="ibtn sm" aria-label="Previous page" aria-disabled="true"><i data-i="CaretLeft:bold"></i></button><button class="ibtn sm" aria-label="Next page" aria-disabled="true"><i data-i="CaretRight:bold"></i></button></span></div>
+    </section>
+  </div>
+</div>
+</main>
+<script>
+// [type, action, source, time, identifier, field, old, new]
+var H = [
+  ['Trade', 'Edited', 'You', '25 Nov, 16:42 GMT−5', '#1232, EURUSD', 'Stop level 2', '30.0 pips', '25.0 pips'],
+  ['Trade', 'Merged', 'You', '25 Nov, 10:14 GMT−5', '#1229, ES Dec 26', 'Executions', '3', '5'],
+  ['Trade', 'Moved', 'You', '25 Nov, 10:12 GMT−5', '#1188, MNQ Dec 26', 'Account', 'Futures 50K evaluation', 'Futures live'],
+  ['Trade', 'Edited', 'Rule', '24 Nov, 17:05 GMT−5', '#1240, ES Dec 26', 'Commission', '$0.00', '$5.16'],
+  ['Import', 'Created', 'Import', '24 Nov, 17:05 GMT−5', 'futures-live-24-nov.csv', 'Trades', null, '38'],
+  ['Account', 'Created', 'You', '23 Nov, 09:12 GMT−5', 'Futures 100K funded', null, null, null],
+];
+var nn = function (v) { return v === null ? 'None' : v; };
+var change = function (h) { return h[5] === null ? '<span class="none">None</span>' : '<b class="cf">' + h[5] + '</b><span class="ft">' + nn(h[6]) + ' to ' + h[7] + '</span>'; };
+document.getElementById('hrows').innerHTML = H.map(function (h) {
+  return '<tr><td class="tm2">' + h[3] + '</td><td><span class="rt">' + h[0] + '</span><span class="ri" title="' + h[4] + '">' + h[4] + '</span></td><td>' + change(h) + '</td><td>' + h[1] + '</td><td><span class="src">' + h[2] + '</span></td></tr>';
+}).join('');
+document.getElementById('hprows').innerHTML = H.map(function (h) {
+  var ch = h[5] === null ? '<span class="none">No field</span>' : '<span><b>' + h[5] + '</b>: ' + nn(h[6]) + ' to ' + h[7] + '</span>';
+  return '<li><a href="#"><span class="l1"><b class="rec"><span class="rt2">' + h[0] + '</span> ' + h[4] + '</b><span class="when">' + h[3].replace(' GMT', '&nbsp;GMT') + '</span></span><span class="l2">' + ch + '<span>' + h[1] + '</span><span>' + h[2] + '</span></span></a></li>';
+}).join('');
+</script>
+</body>
+</html>

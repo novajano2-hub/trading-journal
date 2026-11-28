@@ -17,6 +17,8 @@ import { useDisplay } from '@/lib/display';
 import { formatInstrument, plural } from '@/lib/format';
 import { CARD, CARD_PAD, signTone } from '../../dashboard/shared';
 import { MoodControl } from '../../routine/mood-control';
+import { QUICK } from '../../quick-action';
+import { DayPatterns } from '../day-patterns';
 import { usePhone } from '@/lib/use-phone';
 import { dayLabel } from '@/lib/time-format';
 import { dayQuery, dayReviewHref } from '@/lib/day-routes';
@@ -42,8 +44,7 @@ export function isLoggedDay(r: DayRecord | undefined): r is DayRecord {
 }
 
 /** A quick action in the card's header: Review, and the note action. */
-export const QUICK =
-  'inline-flex h-8 items-center gap-1.5 rounded-control px-2.5 text-[13px] font-medium text-muted no-underline outline-offset-0 hover:bg-sunken hover:text-text focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:h-11';
+export { QUICK };
 
 /**
  * A day's running-net chart and its seven figures (the card's body above the
@@ -237,6 +238,16 @@ export function DayCard({
             </Link>
           )}
           {noteAction}
+          <DayPatterns
+            date={group.date}
+            label={headerDate}
+            net={
+              net === null || group.stats.net === null
+                ? null
+                : { figure: net, cents: group.stats.net }
+            }
+            trades={group.stats.trades}
+          />
         </div>
       </header>
       {setMood.isError ? (

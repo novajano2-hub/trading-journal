@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle, Lock, Plus } from '@phosphor-icons/react/dist/ssr';
+import { CheckCircle, Lock, Plus, X } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
@@ -8,6 +8,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { ConfirmDialog, ConfirmFailure } from '@/components/app/confirm-dialog';
 import { CARD, CardHeader } from '@/components/app/dashboard/shared';
 import { writeParam } from '@/components/app/reports/use-report-data';
+import { MoveDialog } from '@/components/app/trades/move-dialog';
 import { SelectBox } from '@/components/app/trades/select-box';
 import { FigureText } from '@/components/product/figure-text';
 import { buttonClasses } from '@/components/ui/button-styles';
@@ -178,6 +179,14 @@ function AccountsBody(): React.JSX.Element {
   const [pickedId, setPickedId] = useState<string | null>(null);
   const cardRef = useRef<HTMLElement>(null);
   const phone = usePhone();
+  // Move trades: the account and its trades are kept while the dialog closes, so its words hold.
+  const [moving, setMoving] = useState<{
+    account: Account;
+    trades: Trade[];
+  } | null>(null);
+  const [moveOpen, setMoveOpen] = useState(false);
+  const moveFrom = useRef<HTMLElement | null>(null);
+  const [moved, setMoved] = useState<React.ReactNode>(null);
 
   // The search and filters live in the address; the copy changes at once and follows it.
   useEffect(() => {
@@ -324,6 +333,32 @@ function AccountsBody(): React.JSX.Element {
           },
         ]
       : []),
+    // Every trade of the account to another active account; an archived one is read-only.
+    // With no other active account to take them, it is off and says why (spec §5.1).
+    ...(account.status === 'active' && tradeCount > 0
+      ? [
+          {
+            label: 'Move trades',
+            ...(rows?.some(
+              (r) =>
+                r.account.status === 'active' && r.account.id !== account.id,
+            )
+              ? {}
+              : { offReason: 'There is no other active account to move to.' }),
+            onSelect: (from: HTMLElement | null) => {
+              moveFrom.current = from;
+              setMoved(null);
+              setMoving({
+                account,
+                trades: (trades ?? []).filter(
+                  (t) => t.accountId === account.id,
+                ),
+              });
+              setMoveOpen(true);
+            },
+          },
+        ]
+      : []),
     {
       label: 'Deposits and withdrawals',
       onSelect: () => {
@@ -407,6 +442,24 @@ function AccountsBody(): React.JSX.Element {
           >
             {failed}
           </p>
+        ) : null}
+
+        {moved ? (
+          <div
+            role="status"
+            aria-label="Moved"
+            className="mx-5 mt-3 flex items-start gap-3 rounded-control border border-line bg-surface-1 py-2.5 pr-2 pl-4 text-[13.5px] text-text shadow-[var(--shadow-chip)]"
+          >
+            <p className="min-w-0 flex-1 pt-0.5 text-pretty">{moved}</p>
+            <button
+              type="button"
+              aria-label="Dismiss"
+              onClick={() => setMoved(null)}
+              className="grid size-7 flex-none place-items-center rounded-chip text-muted hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:size-11"
+            >
+              <X size={14} aria-hidden="true" />
+            </button>
+          </div>
         ) : null}
 
         {rows && rows.length > 0 && !readFailed ? (
@@ -708,6 +761,17 @@ function AccountsBody(): React.JSX.Element {
           hasTrades={open ? countOf(open.id) > 0 : false}
           onClose={() => setDialog(null)}
         />
+        {moving ? (
+          <MoveDialog
+            open={moveOpen}
+            onOpenChange={setMoveOpen}
+            origin={moveFrom}
+            returnFocus={moveFrom}
+            trades={moving.trades}
+            from={moving.account}
+            onDone={setMoved}
+          />
+        ) : null}
         <ConfirmDialog
           open={dialog?.kind === 'clear'}
           title={`Clear the trades in ${dialog?.kind === 'clear' ? dialog.account.name : ''}?`}

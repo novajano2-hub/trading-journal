@@ -56,6 +56,32 @@ function daySummary(day: readonly Trade[]): string {
   return `${day.length} trades, ${w} won and ${closed.length - w} did not. Net ${money(net)} after costs.`;
 }
 
+/**
+ * What a weekly recap says of its week's closed trades (`closed`, in the
+ * order the days and the trades run): the numbers line, the Best and Worst
+ * bullets, and the two trades it links. `closed` is not empty.
+ */
+export function weekFigures(closed: readonly Trade[]): {
+  numbers: TiptapNode;
+  bestAndWorst: TiptapNode;
+  linkedTradeIds: string[];
+} {
+  const net = closed.reduce((s, t) => s + t.net, 0);
+  const wins = closed.filter((t) => t.net > 0).length;
+  const best = closed.reduce((a, b) => (b.net > a.net ? b : a));
+  const worst = closed.reduce((a, b) => (b.net < a.net ? b : a));
+  return {
+    numbers: paragraph(
+      `${closed.length} closed trades, ${Math.round((wins / closed.length) * 100)}% winners, net ${money(net)}.`,
+    ),
+    bestAndWorst: bullets([
+      `Best trade: ${best.instrument.symbol} ${best.direction}, ${money(best.net)}.`,
+      `Worst trade: ${worst.instrument.symbol} ${worst.direction}, ${money(worst.net)}.`,
+    ]),
+    linkedTradeIds: [...new Set([best.id, worst.id])],
+  };
+}
+
 /** Pre-market plans, weekly recaps and trade notes (kind `trade-note`), on the generator's main stream. */
 export function writeJournal(
   rng: Random,
@@ -123,27 +149,19 @@ export function writeJournal(
     const wt = wdays.flatMap((d) => byDay.get(d) ?? []);
     const closed = wt.filter((t) => t.status === 'closed');
     if (closed.length === 0) continue;
-    const net = closed.reduce((s, t) => s + t.net, 0);
-    const wins = closed.filter((t) => t.net > 0).length;
-    const best = closed.reduce((a, b) => (b.net > a.net ? b : a));
-    const worst = closed.reduce((a, b) => (b.net < a.net ? b : a));
+    const week = weekFigures(closed);
     add({
       kind: 'weekly-recap',
       date: friday,
       title: `Week of ${dayLabel(monday, false)}`,
       body: doc(
         heading('The week in numbers'),
-        paragraph(
-          `${closed.length} closed trades, ${Math.round((wins / closed.length) * 100)}% winners, net ${money(net)}.`,
-        ),
-        bullets([
-          `Best trade: ${best.instrument.symbol} ${best.direction}, ${money(best.net)}.`,
-          `Worst trade: ${worst.instrument.symbol} ${worst.direction}, ${money(worst.net)}.`,
-        ]),
+        week.numbers,
+        week.bestAndWorst,
         heading('Next week'),
         bullets(picks(rng, PHRASES.weeklyFocus, 2)),
       ),
-      linkedTradeIds: [...new Set([best.id, worst.id])],
+      linkedTradeIds: week.linkedTradeIds,
       updatedAt: nyIso(friday, 17, 30 + rng.int(0, 20)),
     });
   }

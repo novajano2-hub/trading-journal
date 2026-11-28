@@ -186,6 +186,11 @@ function finalize(
  * Re-run the match on a stored trade's executions under another cost method. Only the
  * figures derived from the executions change (average entry and exit, gross, fees,
  * net); every other field is kept. FIFO is stamped by omission, as `buildTrades` does.
+ *
+ * The executions are read leg by leg, as `buildGroup` does when it does not cut at a
+ * flat point: a trade grouped by hand (Plan 6B) may return to flat and change side, and
+ * each leg is matched in its own direction. A swap (also 6B) sits inside the net and
+ * outside the gross (R3), so it stays in the net as it was.
  */
 export function finalizeTrade(trade: Trade, method: CostMethod): Trade {
   const out: Trade = { ...trade };
@@ -194,7 +199,6 @@ export function finalizeTrade(trade: Trade, method: CostMethod): Trade {
   const first = trade.executions[0];
   if (!first) return out;
   const inst = trade.instrument;
-  const sign = trade.direction === 'long' ? 1 : -1;
   const d: Draft = {
     direction: trade.direction,
     executions: [...trade.executions],
@@ -209,11 +213,14 @@ export function finalizeTrade(trade: Trade, method: CostMethod): Trade {
   };
   let position = 0;
   for (const e of trade.executions) {
-    if ((e.side === 'buy') === (trade.direction === 'long')) {
+    // From flat a fill opens a leg on its own side; otherwise the leg runs the way the position does.
+    const leg =
+      position === 0 ? (e.side === 'buy' ? 1 : -1) : position > 0 ? 1 : -1;
+    if ((e.side === 'buy') === (leg === 1)) {
       d.lots.push({ qty: e.qty, price: e.price });
       d.entryQty += e.qty;
       d.entryNotional += e.qty * e.price;
-      position += sign * e.qty;
+      position += e.side === 'buy' ? e.qty : -e.qty;
       d.maxPosition = Math.max(d.maxPosition, Math.abs(position));
       continue;
     }
@@ -223,24 +230,37 @@ export function finalizeTrade(trade: Trade, method: CostMethod): Trade {
       closeQty,
       e.price,
       inst.pointValue,
-      sign,
+      leg,
       method,
     ).pnl;
     d.pnl += quoteToPnl(quotePnl, inst, trade.pnlCurrency, e.price);
     d.exitQty += closeQty;
     d.exitNotional += closeQty * e.price;
-    position -= sign * closeQty;
+    position -= leg * closeQty;
+    if (Math.abs(position) <= QTY_EPS) position = 0;
   }
   const derived = derive(d);
   delete out.avgExit;
-  return Object.assign(out, derived);
+  Object.assign(out, derived);
+  // `derive` has the net of the fills alone: the swap is booked on top of it, and not on the gross.
+  if (trade.swap !== undefined) out.net = derived.net + trade.swap;
+  return out;
 }
 
-function buildGroup(
+/**
+ * The trades one account makes in one instrument from its fills, which must be
+ * in time order. The position's every return to flat ends a trade, unless
+ * `cutAtFlat` is off: then the fills are one trade whatever the position does
+ * (the hand-made grouping of `grouping.ts`), open if it does not end flat. A
+ * trade of several legs keeps the direction of its first fill; each leg's
+ * P&L is still read in its own direction.
+ */
+export function buildGroup(
   fills: Execution[],
   inst: Instrument,
   accountId: string,
   opts: BuildOptions,
+  cutAtFlat = true,
 ): Trade[] {
   const pnlCurrency = pnlCurrencyFor(inst, opts.accountCurrency(accountId));
   const method = opts.costMethodOf?.(accountId) ?? 'fifo';
@@ -265,21 +285,31 @@ function buildGroup(
     position = direction === 'long' ? e.qty : -e.qty;
   };
 
+  // An entry: it adds to the position the fills so far hold, or, from flat, opens a leg.
+  const enter = (d: Draft, e: Execution): void => {
+    d.executions.push(e);
+    d.lots.push({ qty: e.qty, price: e.price });
+    d.entryQty += e.qty;
+    d.entryNotional += e.qty * e.price;
+    position += e.side === 'buy' ? e.qty : -e.qty;
+    d.maxPosition = Math.max(d.maxPosition, Math.abs(position));
+  };
+
   for (const f of fills) {
     if (draft === null) {
       open(f);
       continue;
     }
     const d: Draft = draft;
-    const sign = d.direction === 'long' ? 1 : -1;
-    const sameSide = (f.side === 'buy') === (d.direction === 'long');
-    if (sameSide) {
-      d.executions.push(f);
-      d.lots.push({ qty: f.qty, price: f.price });
-      d.entryQty += f.qty;
-      d.entryNotional += f.qty * f.price;
-      position += sign * f.qty;
-      d.maxPosition = Math.max(d.maxPosition, Math.abs(position));
+    // Flat inside a trade only happens when the trade is not cut there.
+    if (position === 0) {
+      enter(d, f);
+      continue;
+    }
+    // The leg's direction, which a trade of several legs does not keep in `d.direction`.
+    const sign = position > 0 ? 1 : -1;
+    if ((f.side === 'buy') === (sign === 1)) {
+      enter(d, f);
       continue;
     }
 
@@ -325,14 +355,21 @@ function buildGroup(
     if (Math.abs(position) <= QTY_EPS) {
       position = 0;
       d.closedAt = f.time;
-      trades.push(finalize(d, inst, accountId, 'closed', opts, method));
-      draft = null;
-      if (opening) open(opening);
+      if (cutAtFlat) {
+        trades.push(finalize(d, inst, accountId, 'closed', opts, method));
+        draft = null;
+        if (opening) open(opening);
+      } else if (opening) enter(d, opening);
     }
   }
 
-  if (draft !== null)
-    trades.push(finalize(draft, inst, accountId, 'open', opts, method));
+  if (draft !== null) {
+    // Only a trade that is not cut can be flat here: a cut trade ended at the flat point.
+    const flat = !cutAtFlat && position === 0;
+    trades.push(
+      finalize(draft, inst, accountId, flat ? 'closed' : 'open', opts, method),
+    );
+  }
   return trades;
 }
 

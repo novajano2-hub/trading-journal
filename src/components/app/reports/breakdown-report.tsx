@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useId, useMemo, type ReactNode } from 'react';
 import { FigureText } from '@/components/product/figure-text';
+import type { MetricId } from '@/content/metric-definitions';
 import {
   breakdown,
   breakdown2D,
@@ -32,6 +33,8 @@ import { useDisplay } from '@/lib/display';
 import { csvText, decimalOf, downloadCsv } from '@/lib/csv';
 import { formatPct, formatQty, plural } from '@/lib/format';
 import { CARD, CARD_PAD, CardHeader, signTone } from '../dashboard/shared';
+import { usePhone } from '@/lib/use-phone';
+import { BreakdownPhoneRows } from './breakdown-phone-rows';
 import { ColumnsChooser } from './columns-chooser';
 import { CrossAnalysis } from './cross-analysis';
 import {
@@ -189,6 +192,7 @@ const UNORDERED: ReadonlySet<BreakdownKey> = new Set([
   'symbol-bottom',
   'strategy',
   'tag',
+  'pattern',
   'side',
   'instrument',
   'account',
@@ -226,9 +230,19 @@ function chartValue(r: BreakdownRow, metric: SeriesMetric): number | null {
 const basisNet = (r: BreakdownRow) =>
   r.summary.basis === 'gross' ? r.summary.grossPnl : r.summary.netPnl;
 
-/** A label of the form "10:00 to 10:15": the first part in ink, the rest quiet. */
-function RowName({ text }: { text: string }): React.JSX.Element {
-  const at = text.indexOf(' to ');
+/**
+ * A bucket's label: a range of the form "10:00 to 10:15" has its first part in
+ * ink and the rest quiet. A named bucket (a symbol, a tag, a pattern) is one
+ * name, whatever words it holds ("Added to the position").
+ */
+function RowName({
+  text,
+  named,
+}: {
+  text: string;
+  named: boolean;
+}): React.JSX.Element {
+  const at = named ? -1 : text.indexOf(' to ');
   if (at === -1) return <b className="font-semibold text-text">{text}</b>;
   return (
     <>
@@ -243,12 +257,14 @@ function BucketName({
   text,
   href,
   count,
+  named,
 }: {
   text: string;
   href: string | undefined;
   count: number;
+  named: boolean;
 }): React.JSX.Element {
-  if (href === undefined) return <RowName text={text} />;
+  if (href === undefined) return <RowName text={text} named={named} />;
   return (
     <Link
       href={href}
@@ -256,7 +272,7 @@ function BucketName({
       aria-label={`${text}, open ${count} ${plural(count, 'trade')} in the trade log`}
       className="rounded-chip outline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center"
     >
-      <RowName text={text} />
+      <RowName text={text} named={named} />
     </Link>
   );
 }
@@ -315,6 +331,11 @@ export function BreakdownCards({
   controls,
   note,
   columnsBefore,
+  crossAnalysis = true,
+  whenEmpty,
+  tradesTip = 'trades',
+  tiltMaxChars,
+  phoneRows = false,
 }: {
   data: ReportData;
   /** Names the export: `keel-{report}-YYYY-MM-DD.csv`. */
@@ -347,6 +368,16 @@ export function BreakdownCards({
   note?: ReactNode;
   /** A column between the name and Trades: the tag's category. */
   columnsBefore?: SummaryColumn<BreakdownRow>[];
+  /** Whether "Cross-analyse by" is offered, and `?x=` read. Default true; the patterns report has none. */
+  crossAnalysis?: boolean;
+  /** Shown instead of the cards when no bucket holds a trade. */
+  whenEmpty?: ReactNode;
+  /** The Trades header's definition, when the rows count trades in a way of their own. Default: the plain one. */
+  tradesTip?: MetricId;
+  /** How long an axis label of the chart may run before it is cut; names that begin alike need more. */
+  tiltMaxChars?: number;
+  /** Below `sm` the table becomes two-line rows (name and net, then trades, win rate and profit factor), as comp 09 draws it. */
+  phoneRows?: boolean;
 }): React.JSX.Element {
   const { partition: p, ctx, basis, currency } = data;
   // The log lists every currency, so with more than one the link names this one.
@@ -359,13 +390,17 @@ export function BreakdownCards({
   );
   const params = useSearchParams();
   const display = useDisplay();
+  const phone = usePhone();
+  const rows = phoneRows && phone;
   const chartId = useId();
   const [expandSlot, setExpandSlot] = useExpandSlot();
   const rankId = useId();
   const tableId = useId();
-  const cross = CROSS_DIMS.find(
-    (d) => d.key === params.get('x') && !sameDimension(d.key, by),
-  );
+  const cross = crossAnalysis
+    ? CROSS_DIMS.find(
+        (d) => d.key === params.get('x') && !sameDimension(d.key, by),
+      )
+    : undefined;
   const metric =
     CROSS_METRICS.find((m) => m.value === params.get('xm'))?.value ?? 'net';
   const accounts = useAccounts().data;
@@ -616,6 +651,7 @@ export function BreakdownCards({
           text={describe(r)}
           href={hrefOfRow(r)}
           count={r.summary.closedCount}
+          named={UNORDERED.has(by)}
         />
       ),
       descFirst: false,
@@ -624,7 +660,7 @@ export function BreakdownCards({
     {
       id: 'trades',
       header: 'Trades',
-      tip: 'trades',
+      tip: tradesTip,
       align: 'right',
       value: (r) => r.summary.closedCount,
     },
@@ -841,6 +877,9 @@ export function BreakdownCards({
     downloadCsv(csv, `keel-${report}-${data.today}.csv`);
   };
 
+  // Past every hook: a report with no bucket to show says so once.
+  if (whenEmpty !== undefined && all.length === 0) return <>{whenEmpty}</>;
+
   return (
     <>
       <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
@@ -875,6 +914,7 @@ export function BreakdownCards({
               height={chartRows.length > 0 ? 230 : undefined}
               rowRatio={0.4}
               tiltLabels={UNORDERED.has(by)}
+              {...(tiltMaxChars !== undefined && { tiltMaxChars })}
               xLabel={(key) => short.get(key) ?? key}
               periodLabel={(key) => names.get(key) ?? key}
               extra={extra}
@@ -902,9 +942,12 @@ export function BreakdownCards({
               {best.map((r) => (
                 <li
                   key={r.key}
-                  className="grid grid-cols-[minmax(6.25rem,8.5rem)_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 border-b border-line/70 py-2 last:border-b-0"
+                  className={`grid ${by === 'pattern' ? 'grid-cols-[minmax(6.25rem,9.5rem)_minmax(0,1fr)_auto]' : 'grid-cols-[minmax(6.25rem,8.5rem)_minmax(0,1fr)_auto]'} items-center gap-x-3 gap-y-0.5 border-b border-line/70 py-2 last:border-b-0`}
                 >
-                  <b className="truncate text-[13.5px] font-semibold text-text">
+                  <b
+                    title={describe(r)}
+                    className="truncate text-[13.5px] font-semibold text-text"
+                  >
                     {describe(r)}
                   </b>
                   <span
@@ -982,7 +1025,9 @@ export function BreakdownCards({
             <span className="text-[12.5px] text-faint">
               {cross
                 ? 'Each cell is the trades in both'
-                : 'Click a header to sort'}
+                : rows
+                  ? 'Best net first'
+                  : 'Click a header to sort'}
             </span>
           }
           end={
@@ -996,21 +1041,23 @@ export function BreakdownCards({
                   hideLabel
                 />
               ) : null}
-              <ReportSelect
-                label="Cross-analyse by"
-                value={cross?.key ?? ''}
-                onChange={(v) => writeParam('x', v === '' ? null : v)}
-                options={[
-                  { value: '', label: 'None' },
-                  ...CROSS_DIMS.filter((d) => !sameDimension(d.key, by)).map(
-                    (d) => ({
-                      value: d.key,
-                      label: d.label,
-                    }),
-                  ),
-                ]}
-              />
-              {cross ? null : (
+              {crossAnalysis ? (
+                <ReportSelect
+                  label="Cross-analyse by"
+                  value={cross?.key ?? ''}
+                  onChange={(v) => writeParam('x', v === '' ? null : v)}
+                  options={[
+                    { value: '', label: 'None' },
+                    ...CROSS_DIMS.filter((d) => !sameDimension(d.key, by)).map(
+                      (d) => ({
+                        value: d.key,
+                        label: d.label,
+                      }),
+                    ),
+                  ]}
+                />
+              ) : null}
+              {cross || rows ? null : (
                 <ColumnsChooser
                   shown={shownIds}
                   labelOf={(id, fallback) =>
@@ -1078,6 +1125,25 @@ export function BreakdownCards({
                       ...(href && { href }),
                     };
               }}
+            />
+          ) : rows ? (
+            <BreakdownPhoneRows
+              label={tableName}
+              rows={tableRows.map((r) => ({
+                key: r.key,
+                name: describe(r),
+                href: hrefOfRow(r),
+                trades: r.summary.closedCount,
+                winRate: r.summary.winRate,
+                profitFactor: r.summary.profitFactor,
+                net:
+                  r.summary.closedCount === 0 ? (
+                    'None'
+                  ) : (
+                    <FigureText f={display.figure(sumOf(r), true, currency)} />
+                  ),
+                netTone: signTone(basisNet(r)),
+              }))}
             />
           ) : (
             <SummaryTable

@@ -328,6 +328,53 @@ test('removing a strategy takes it out of its trades and drops its rule checks t
   expect((await repo.trades.get(M, 'f-1'))?.strategyIds).toEqual(['str-1']);
 });
 
+test('a strategy keeps the template it was copied from, through edits, and its cover goes with it', async () => {
+  const { repo, make } = setup();
+  const made = await repo.strategies.create(S, {
+    name: 'London range break',
+    description: 'Trade the break of the Asian session range.',
+    assetClasses: ['forex'],
+    groups: [
+      {
+        title: 'Entry',
+        rules: [{ text: 'Enter on a close', showWhen: 'always' }],
+      },
+    ],
+    checklist: [],
+    status: 'active',
+    icon: 'clock',
+    templateId: 'london-range-break',
+  });
+  expect(made.templateId).toBe('london-range-break');
+
+  // A cover is a file the strategy owns; naming it as the photo is an ordinary edit.
+  const cover = await repo.files.add(
+    S,
+    `strategy:${made.id}`,
+    {
+      bytes: new Uint8Array([137, 80, 78, 71]).buffer,
+      type: 'image/png',
+      name: 'cover.png',
+    },
+    { images: true },
+  );
+  await repo.strategies.update(S, made.id, { photoId: cover.id });
+  const renamed = await repo.strategies.update(S, made.id, { name: 'Mine' });
+  expect(renamed).toMatchObject({
+    templateId: 'london-range-break',
+    photoId: cover.id,
+    name: 'Mine',
+  });
+  // Across instances, and other workspaces never see it.
+  expect((await make().strategies.get(S, made.id))?.templateId).toBe(
+    'london-range-break',
+  );
+  expect(await repo.strategies.get(M, made.id)).toBeUndefined();
+
+  await repo.strategies.remove(S, made.id);
+  expect(await repo.files.get(S, cover.id)).toBeUndefined();
+});
+
 test('removing a tag drops it from every trade', async () => {
   const { repo } = setup();
   await repo.trades.update(S, 'f-2', { tagIds: ['tag-fomo', 'tag-setup'] });

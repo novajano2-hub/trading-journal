@@ -12,6 +12,7 @@ import { fixtureSample } from '@/data/__fixtures__/sample';
 import type { SampleWorkspace } from '@/data/seed/generate';
 import { resolveInstrument } from '@/domain/instruments';
 import { buildManualTrade } from '@/domain/manual-trade';
+import type { Trade } from '@/domain/types';
 import { renderApp } from '../__fixtures__/render-app';
 import { ManualTradeForm } from './manual-trade-form';
 
@@ -22,8 +23,14 @@ afterEach(cleanup);
 
 const WS = fixtureSample().trades[0]!.workspaceId;
 
-/** The sample, with acc-a read in New York time, and optionally a manual ES trade tagged `tag-setup`. */
-function sample(withManual = false) {
+/** The sample, with acc-a read in New York time, and optionally a manual ES trade tagged `tag-setup`, with `plan` as its stop, target or levels. */
+function sample(
+  withManual = false,
+  plan: { plannedStop?: number; plannedTarget?: number } = {},
+  levels: Partial<Trade> = {},
+  /** The first fill's costs, in cents. */
+  costs: { commission: number; fees: number } = { commission: 0, fees: 0 },
+) {
   return async (): Promise<SampleWorkspace> => {
     const fx = fixtureSample();
     fx.accounts = fx.accounts.map((a) =>
@@ -40,8 +47,8 @@ function sample(withManual = false) {
               side: 'buy',
               qty: 2,
               price: 5000,
-              commission: 0,
-              fees: 0,
+              commission: costs.commission,
+              fees: costs.fees,
             },
             {
               time: '2026-11-19T15:00:00.000Z',
@@ -52,13 +59,14 @@ function sample(withManual = false) {
               fees: 0,
             },
           ],
+          ...plan,
         },
         { workspaceId: WS, serial: 900, accountCurrency: 'USD', id: 'man-1' },
       );
       if (!built.ok) throw new Error('fixture');
       fx.trades = [
         ...fx.trades,
-        { ...built.trade, tagIds: ['tag-setup'], rating: 3 },
+        { ...built.trade, tagIds: ['tag-setup'], rating: 3, ...levels },
       ];
     }
     return fx;
@@ -222,6 +230,97 @@ test('editing a manual trade keeps its tags and rating, and rebuilds the fills',
   });
 });
 
+test('editing a trade saved in levels shows its one stop and target, and saves them again', async () => {
+  const { repo } = renderApp(<ManualTradeForm tradeId="man-1" />, {
+    sample: sample(true, { plannedStop: 4990, plannedTarget: 5030 }),
+    url: '/app/trades/man-1/edit',
+  });
+  await screen.findByText(/^Times in New York, UTC-0[45]:00$/);
+  expect(
+    (screen.getByLabelText('Planned stop') as HTMLInputElement).value,
+  ).toBe('4990');
+  expect(
+    (screen.getByLabelText('Planned target') as HTMLInputElement).value,
+  ).toBe('5030');
+  // Two contracts are held until the second fill goes: the levels follow the size.
+  set('Planned stop', '4980');
+  fireEvent.click(screen.getByRole('button', { name: 'Save trade' }));
+  await waitFor(() =>
+    expect(window.location.pathname).toBe('/app/trades/man-1'),
+  );
+  const t = (await repo.trades.get(WS, 'man-1'))!;
+  expect(t.stops).toEqual({ unit: 'price', levels: [{ value: 4980, qty: 2 }] });
+  expect(t.targets).toEqual({
+    unit: 'price',
+    levels: [{ value: 5030, qty: 2 }],
+  });
+  expect(t.initialRisk).toBe(20 * 2 * 50 * 100);
+  expect(t).not.toHaveProperty('plannedStop');
+});
+
+test('editing the fills of a trade whose stops are several levels keeps them', async () => {
+  const stops = {
+    unit: 'price' as const,
+    levels: [
+      { value: 4990, qty: 1 },
+      { value: 4980, qty: 1 },
+    ],
+  };
+  const { repo } = renderApp(<ManualTradeForm tradeId="man-1" />, {
+    sample: sample(
+      true,
+      { plannedTarget: 5030 },
+      { stops, initialRisk: 150000 },
+    ),
+    url: '/app/trades/man-1/edit',
+  });
+  await screen.findByText(/^Times in New York, UTC-0[45]:00$/);
+  // The form has one box for a stop; several levels are the trade page's.
+  expect(
+    (screen.getByLabelText('Planned stop') as HTMLInputElement).value,
+  ).toBe('');
+  expect(
+    (screen.getByLabelText('Planned target') as HTMLInputElement).value,
+  ).toBe('5030');
+  set('Fill 2 price', '5020');
+  fireEvent.click(screen.getByRole('button', { name: 'Save trade' }));
+  await waitFor(() =>
+    expect(window.location.pathname).toBe('/app/trades/man-1'),
+  );
+  const t = (await repo.trades.get(WS, 'man-1'))!;
+  expect(t.stops).toEqual(stops);
+  expect(t.initialRisk).toBe(150000);
+  expect(t.executions[1]!.price).toBe(5020);
+});
+
+test('a stop on part of the position is not shown in the form, and a save keeps it as it was', async () => {
+  // One of the two contracts, saved on the trade page: $500 at risk.
+  const stops = {
+    unit: 'price' as const,
+    levels: [{ value: 4990, qty: 1 }],
+  };
+  const { repo } = renderApp(<ManualTradeForm tradeId="man-1" />, {
+    sample: sample(
+      true,
+      { plannedTarget: 5030 },
+      { stops, initialRisk: 50000 },
+    ),
+    url: '/app/trades/man-1/edit',
+  });
+  await screen.findByText(/^Times in New York, UTC-0[45]:00$/);
+  expect(
+    (screen.getByLabelText('Planned stop') as HTMLInputElement).value,
+  ).toBe('');
+  set('Fill 1 fees', '1.25');
+  fireEvent.click(screen.getByRole('button', { name: 'Save trade' }));
+  await waitFor(() =>
+    expect(window.location.pathname).toBe('/app/trades/man-1'),
+  );
+  const t = (await repo.trades.get(WS, 'man-1'))!;
+  expect(t.stops).toEqual(stops);
+  expect(t.initialRisk).toBe(50000);
+});
+
 test('an imported trade cannot be edited here', async () => {
   renderApp(<ManualTradeForm tradeId="f-1" />, {
     sample: sample(),
@@ -263,7 +362,47 @@ test('the links back to a trade encode an id that holds a slash', async () => {
     expect(cancel.getAttribute('href')).toBe('/app/trades/acc%3AEUR%2FUSD%3Ax');
 });
 
-test('a negative commission or fee is refused at its fill, not flipped', async () => {
+test('the commission and fee fields bring up a keyboard with a minus key, so a credit can be typed on a phone', async () => {
+  renderApp(<ManualTradeForm />, {
+    sample: sample(),
+    url: '/app/trades/new',
+  });
+  await fillFuture();
+  for (const name of ['Fill 1 commission', 'Fill 1 fees'])
+    expect(
+      screen.getByRole('textbox', { name }).getAttribute('inputmode'),
+    ).toBe('text');
+});
+
+test('a negative commission or fee is a credit: saved as typed, and the trade’s fees and net follow', async () => {
+  const { repo } = renderApp(<ManualTradeForm />, {
+    sample: sample(),
+    url: '/app/trades/new',
+  });
+  await fillFuture();
+  addExit('1');
+  set('Fill 1 commission', '-1.5');
+  set('Fill 1 fees', '-5');
+  set('Fill 2 commission', '3.50');
+  fireEvent.click(screen.getByRole('button', { name: 'Save trade' }));
+  await waitFor(() =>
+    expect(window.location.pathname).toMatch(/^\/app\/trades\/manual%3A/),
+  );
+  const made = (await repo.trades.list(WS)).find((t) => t.source === 'manual')!;
+  expect(made.executions.map((e) => [e.commission, e.fees])).toEqual([
+    [-150, -500],
+    [350, 0],
+  ]);
+  // -1.50 - 5.00 + 3.50 = -3.00 of fees: net is $3.00 over gross.
+  expect(made.fees).toBe(-300);
+  expect(made.gross).toBe(50000);
+  expect(made.net).toBe(50300);
+  expect(
+    screen.queryByText('Check fill 1: commission and fees must be numbers.'),
+  ).toBeNull();
+});
+
+test('a cost that is not an amount is refused at its fill, a decimal comma too', async () => {
   const { repo } = renderApp(<ManualTradeForm />, {
     sample: sample(),
     url: '/app/trades/new',
@@ -272,16 +411,66 @@ test('a negative commission or fee is refused at its fill, not flipped', async (
   addExit('1');
   const before = (await repo.trades.list(WS)).length;
   for (const field of ['commission', 'fees']) {
-    set(`Fill 1 ${field}`, '-1.5');
-    fireEvent.click(screen.getByRole('button', { name: 'Save trade' }));
-    const msg = await screen.findByText('Enter fees as a positive amount.');
-    expect(
-      screen.getByLabelText(`Fill 1 ${field}`).getAttribute('aria-describedby'),
-    ).toContain(msg.id);
-    expect((await repo.trades.list(WS)).length).toBe(before);
+    for (const bad of ['abc', '2,43', '--', '-', '1e3', '$2']) {
+      set(`Fill 1 ${field}`, bad);
+      fireEvent.click(screen.getByRole('button', { name: 'Save trade' }));
+      const msg = await screen.findByText(
+        'Check fill 1: commission and fees must be numbers.',
+      );
+      expect(
+        screen
+          .getByLabelText(`Fill 1 ${field}`)
+          .getAttribute('aria-describedby'),
+      ).toContain(msg.id);
+      expect((await repo.trades.list(WS)).length).toBe(before);
+    }
+    // Cleared before the other field is tried, so each refusal is its own field's.
     set(`Fill 1 ${field}`, '');
   }
   expect(window.location.pathname).toBe('/app/trades/new');
+});
+
+test('thousands commas and a blank cost still read: 1,234.50 is 123450 cents, blank is nothing', async () => {
+  const { repo } = renderApp(<ManualTradeForm />, {
+    sample: sample(),
+    url: '/app/trades/new',
+  });
+  await fillFuture();
+  addExit('1');
+  set('Fill 1 commission', '1,234.50');
+  fireEvent.click(screen.getByRole('button', { name: 'Save trade' }));
+  await waitFor(() =>
+    expect(window.location.pathname).toMatch(/^\/app\/trades\/manual%3A/),
+  );
+  const made = (await repo.trades.list(WS)).find((t) => t.source === 'manual')!;
+  expect(made.executions.map((e) => [e.commission, e.fees])).toEqual([
+    [123450, 0],
+    [0, 0],
+  ]);
+});
+
+test('a credit saved on a trade reopens in the form as typed, and saving it again keeps it', async () => {
+  const { repo } = renderApp(<ManualTradeForm tradeId="man-1" />, {
+    sample: sample(true, {}, {}, { commission: -150, fees: -500 }),
+    url: '/app/trades/man-1/edit',
+  });
+  await screen.findByText(/^Times in New York, UTC-0[45]:00$/);
+  expect((screen.getByLabelText('Fill 1 fees') as HTMLInputElement).value).toBe(
+    '-5',
+  );
+  expect(
+    (screen.getByLabelText('Fill 1 commission') as HTMLInputElement).value,
+  ).toBe('-1.5');
+  // Changing something else keeps both credits.
+  set('Fill 2 price', '5020');
+  fireEvent.click(screen.getByRole('button', { name: 'Save trade' }));
+  await waitFor(() =>
+    expect(window.location.pathname).toBe('/app/trades/man-1'),
+  );
+  const t = (await repo.trades.get(WS, 'man-1'))!;
+  expect(t.executions[0]).toMatchObject({ commission: -150, fees: -500 });
+  expect(t.fees).toBe(-650);
+  expect(t.net).toBe(t.gross + 650);
 });
 
 test('the account query parameter preselects an active account; an unknown or archived one is ignored', async () => {

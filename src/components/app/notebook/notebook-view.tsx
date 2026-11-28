@@ -398,8 +398,19 @@ export function NotebookView(): React.JSX.Element {
     </DropdownMenu.Root>
   );
 
+  // A note imported from a pane goes where New would put a plain note: the
+  // folder in view, else My notes, and opens.
+  const importFolder = current.startsWith('folder:')
+    ? current.slice('folder:'.length)
+    : undefined;
   const paneProps = {
     folders: userFolders,
+    importFolderId: importFolder,
+    onImported: (made: JournalEntry) => {
+      setQuery('');
+      if (importFolder === undefined) setChosen(folderOfKind('note'));
+      router.push(`/app/notebook/${encodeURIComponent(made.id)}`);
+    },
     onTrash: (id: string) => void moveToTrash(id),
     onRestore: () => open && void restoreNow(open),
     onDeleteForever: () => open && setForever(open),

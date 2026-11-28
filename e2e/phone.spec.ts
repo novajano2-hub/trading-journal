@@ -155,3 +155,46 @@ test('Accounts at 390: a box leads each two-line row and the bulk bar floats abo
     .boundingBox())!;
   expect(box.y + box.height).toBeLessThanOrEqual(tabs.y);
 });
+
+// The rating row of a trade with five stars is the widest thing on the page at
+// 390. With a coarse pointer the stars are 44px targets (228px for five), which
+// pushed "5 of 5" and Clear past the card and the page (451px wide). A fine
+// pointer has the same row at 28px stars, 20px too wide for its card.
+for (const touch of [false, true]) {
+  test.describe(`The trade page at 390, ${touch ? 'touch' : 'mouse'}`, () => {
+    test.use({ hasTouch: touch });
+
+    test('a five-star rating keeps its words and Clear inside the card, and the page no wider than the screen', async ({
+      page,
+    }) => {
+      await page.goto('/app/trades');
+      const list = page.getByRole('list', { name: 'Trades' });
+      await expect(list).toBeVisible({ timeout: 30_000 });
+      await list.getByRole('listitem').first().getByRole('link').click();
+      const tags = page.getByRole('region', { name: 'Tags and rating' });
+      await expect(tags).toBeVisible();
+      expect(
+        await page.evaluate(() => matchMedia('(pointer: coarse)').matches),
+      ).toBe(touch);
+
+      await tags
+        .locator('label', { has: page.getByRole('radio', { name: '5 stars' }) })
+        .click();
+      const clear = tags.getByRole('button', { name: 'Clear' });
+      await expect(clear).toBeVisible();
+      const [card, edge, label] = await Promise.all([
+        tags.boundingBox(),
+        clear.boundingBox(),
+        tags.getByText('5 of 5').boundingBox(),
+      ]);
+      expect(edge!.x + edge!.width).toBeLessThanOrEqual(card!.x + card!.width);
+      expect(label!.x + label!.width).toBeLessThanOrEqual(
+        card!.x + card!.width,
+      );
+      // The page is the screen's width: nothing hangs past 390.
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+      ).toBeLessThanOrEqual(page.viewportSize()!.width);
+    });
+  });
+}

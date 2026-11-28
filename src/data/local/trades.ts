@@ -1,5 +1,6 @@
-import { buildManualTrade } from '@/domain/manual-trade';
-import { strategyRules, type Trade } from '@/domain/types';
+import { fillCostsError, withFillCosts } from '@/domain/fill-costs';
+import { buildManualTrade, keepHiddenSides } from '@/domain/manual-trade';
+import { strategyRules, type HistoryRow, type Trade } from '@/domain/types';
 import {
   ArchivedAccountError,
   ManualTradeRejected,
@@ -12,8 +13,48 @@ import type { LocalContext } from './context';
 import type { KeelDb } from './db';
 import { rwTx } from './tx';
 import { assertEditable } from './editable';
+import { deleteOwnerFiles } from './files';
+import { localGrouping } from './grouping';
+import {
+  changeRows,
+  fieldChanges,
+  logHistory,
+  tradeChanges,
+  tradeLabel,
+} from './history';
 import { pruneJournalLinks } from './journal';
 import { bumpImportRevision } from './imports';
+import { readPrefs } from './prefs';
+
+type NewRow = Omit<HistoryRow, 'id' | 'workspaceId' | 'at'>;
+
+/** One edited row per logged field that `before` and `after` differ in. */
+function editRows(before: Trade, after: Trade, timeZone: string): NewRow[] {
+  const label = tradeLabel(after, timeZone);
+  return tradeChanges(before, after).map((change) => ({
+    type: 'trade',
+    action: 'edited',
+    source: 'you',
+    entityId: after.id,
+    label,
+    ...change,
+  }));
+}
+
+/** One row for a trade that came or went, with no field. */
+function lifeRow(
+  trade: Trade,
+  action: 'created' | 'deleted',
+  timeZone: string,
+): NewRow {
+  return {
+    type: 'trade',
+    action,
+    source: 'you',
+    entityId: trade.id,
+    label: tradeLabel(trade, timeZone),
+  };
+}
 
 /**
  * `patch` applied to the stored trades, which must all exist; leaving a
@@ -55,6 +96,8 @@ async function patched(
 
 export function localTrades(ctx: LocalContext): TradesRepo {
   return {
+    ...localGrouping(ctx),
+
     async list(ws) {
       const db = await ctx.db();
       const rows = await db.trades.where('workspaceId').equals(ws).toArray();
@@ -67,109 +110,209 @@ export function localTrades(ctx: LocalContext): TradesRepo {
 
     async update(ws, id, patch) {
       const db = await ctx.db();
-      return rwTx(db, [db.trades, db.strategies, db.accounts], async () => {
-        await assertEditable(db, ws, [await db.trades.get([ws, id])]);
-        const [next] = await patched(db, ws, [id], patch);
-        await db.trades.put(next!);
-        return next!;
-      });
+      return rwTx(
+        db,
+        [db.trades, db.strategies, db.accounts, db.history, db.meta],
+        async () => {
+          const before = await db.trades.get([ws, id]);
+          await assertEditable(db, ws, [before]);
+          const [next] = await patched(db, ws, [id], patch);
+          await db.trades.put(next!);
+          const { timeZone } = await readPrefs(db);
+          await logHistory(db, ws, editRows(before!, next!, timeZone), ctx);
+          return next!;
+        },
+      );
     },
 
     async updateMany(ws, ids, patch) {
       const db = await ctx.db();
-      return rwTx(db, [db.trades, db.strategies, db.accounts], async () => {
-        await assertEditable(
-          db,
-          ws,
-          await db.trades.bulkGet(ids.map((id): [string, string] => [ws, id])),
-        );
-        const next = await patched(db, ws, ids, patch);
-        await db.trades.bulkPut(next);
-        return next;
-      });
+      return rwTx(
+        db,
+        [db.trades, db.strategies, db.accounts, db.history, db.meta],
+        async () => {
+          const before = await db.trades.bulkGet(
+            ids.map((id): [string, string] => [ws, id]),
+          );
+          await assertEditable(db, ws, before);
+          const next = await patched(db, ws, ids, patch);
+          await db.trades.bulkPut(next);
+          const { timeZone } = await readPrefs(db);
+          await logHistory(
+            db,
+            ws,
+            next.flatMap((t, i) => editRows(before[i]!, t, timeZone)),
+            ctx,
+          );
+          return next;
+        },
+      );
     },
 
     async createManual(ws, input) {
       const db = await ctx.db();
       const id = `manual:${ctx.newId()}`;
-      return rwTx(db, [db.trades, db.accounts, db.meta], async () => {
-        const account = await db.accounts.get([ws, input.accountId]);
-        if (!account) throw new NotFoundError('account', input.accountId);
-        if (account.status === 'archived')
-          throw new ArchivedAccountError([account.id]);
-        let highest = 0;
-        await db.trades
-          .where('workspaceId')
-          .equals(ws)
-          .each((t) => {
-            highest = Math.max(highest, t.serial);
+      return rwTx(
+        db,
+        [db.trades, db.accounts, db.meta, db.history],
+        async () => {
+          const account = await db.accounts.get([ws, input.accountId]);
+          if (!account) throw new NotFoundError('account', input.accountId);
+          if (account.status === 'archived')
+            throw new ArchivedAccountError([account.id]);
+          let highest = 0;
+          await db.trades
+            .where('workspaceId')
+            .equals(ws)
+            .each((t) => {
+              highest = Math.max(highest, t.serial);
+            });
+          const built = buildManualTrade(input, {
+            workspaceId: ws,
+            serial: highest + 1,
+            accountCurrency: account.currency,
+            costMethod: account.costMethod,
+            id,
           });
-        const built = buildManualTrade(input, {
-          workspaceId: ws,
-          serial: highest + 1,
-          accountCurrency: account.currency,
-          costMethod: account.costMethod,
-          id,
-        });
-        if (!built.ok)
-          throw new ManualTradeRejected(built.error, built.fillIndex);
-        await db.trades.put(built.trade);
-        // A pending import preview took its serial before this trade existed.
-        await bumpImportRevision(db, ws);
-        return built.trade;
-      });
+          if (!built.ok)
+            throw new ManualTradeRejected(built.error, built.fillIndex);
+          await db.trades.put(built.trade);
+          // A pending import preview took its serial before this trade existed.
+          await bumpImportRevision(db, ws);
+          const { timeZone } = await readPrefs(db);
+          await logHistory(
+            db,
+            ws,
+            [lifeRow(built.trade, 'created', timeZone)],
+            ctx,
+          );
+          return built.trade;
+        },
+      );
     },
 
     async replaceManual(ws, id, input) {
       const db = await ctx.db();
-      return rwTx(db, [db.trades, db.accounts, db.meta], async () => {
-        const old = await db.trades.get([ws, id]);
-        if (!old) throw new NotFoundError('trade', id);
-        if (old.source !== 'manual')
-          throw new Error(
-            `Trade "${id}" was imported; only manual trades can be rebuilt`,
+      return rwTx(
+        db,
+        [db.trades, db.accounts, db.meta, db.history],
+        async () => {
+          const old = await db.trades.get([ws, id]);
+          if (!old) throw new NotFoundError('trade', id);
+          if (old.source !== 'manual')
+            throw new Error(
+              `Trade "${id}" was imported; only manual trades can be rebuilt`,
+            );
+          await assertEditable(db, ws, [old]);
+          const account = await db.accounts.get([ws, input.accountId]);
+          if (!account) throw new NotFoundError('account', input.accountId);
+          if (account.status === 'archived')
+            throw new ArchivedAccountError([account.id]);
+          const built = buildManualTrade(input, {
+            workspaceId: ws,
+            serial: old.serial,
+            accountCurrency: account.currency,
+            costMethod: account.costMethod,
+            id,
+          });
+          if (!built.ok)
+            throw new ManualTradeRejected(built.error, built.fillIndex);
+          // The journal stays; the figures and fills are rebuilt. The form
+          // edits one stop and one target; levels saved on the trade page
+          // that it cannot show stay as they were.
+          const next: Trade = keepHiddenSides(
+            {
+              ...built.trade,
+              strategyIds: old.strategyIds,
+              tagIds: old.tagIds,
+              ruleChecks: old.ruleChecks,
+            },
+            old,
+            input,
           );
-        await assertEditable(db, ws, [old]);
-        const account = await db.accounts.get([ws, input.accountId]);
-        if (!account) throw new NotFoundError('account', input.accountId);
-        if (account.status === 'archived')
-          throw new ArchivedAccountError([account.id]);
-        const built = buildManualTrade(input, {
-          workspaceId: ws,
-          serial: old.serial,
-          accountCurrency: account.currency,
-          costMethod: account.costMethod,
-          id,
-        });
-        if (!built.ok)
-          throw new ManualTradeRejected(built.error, built.fillIndex);
-        // The journal stays; the figures and fills are rebuilt.
-        const next: Trade = {
-          ...built.trade,
-          strategyIds: old.strategyIds,
-          tagIds: old.tagIds,
-          ruleChecks: old.ruleChecks,
-        };
-        for (const k of ['rating', 'noteId', 'reviewed'] as const)
-          if (old[k] !== undefined) Object.assign(next, { [k]: old[k] });
-        await db.trades.put(next);
-        await bumpImportRevision(db, ws);
-        return next;
-      });
+          for (const k of ['rating', 'noteId', 'reviewed', 'grouping'] as const)
+            if (old[k] !== undefined) Object.assign(next, { [k]: old[k] });
+          await db.trades.put(next);
+          await bumpImportRevision(db, ws);
+          const { timeZone } = await readPrefs(db);
+          await logHistory(db, ws, editRows(old, next, timeZone), ctx);
+          return next;
+        },
+      );
+    },
+
+    async setFillCosts(ws, tradeId, executionId, costs) {
+      const problem = fillCostsError(costs);
+      if (problem) throw new RangeError(problem);
+      const db = await ctx.db();
+      return rwTx(
+        db,
+        [db.trades, db.accounts, db.history, db.meta],
+        async () => {
+          const before = await db.trades.get([ws, tradeId]);
+          if (!before) throw new NotFoundError('trade', tradeId);
+          await assertEditable(db, ws, [before]);
+          if (!before.executions.some((e) => e.id === executionId))
+            throw new NotFoundError('execution', executionId);
+          // Nothing else of the trade is recomputed: no `buildGroupedTrade`.
+          const next = withFillCosts(before, executionId, costs);
+          if (!next) return before;
+          await db.trades.put(next);
+          // A pending import plan carries the stored open trades it would overwrite.
+          await bumpImportRevision(db, ws);
+          const { timeZone } = await readPrefs(db);
+          // The log holds the trade's fees, in raw cents. A cost moved between the commission and the fee leaves them as they were, and then there is no row.
+          await logHistory(
+            db,
+            ws,
+            changeRows(
+              'trade',
+              next.id,
+              tradeLabel(next, timeZone),
+              fieldChanges(before, next, ['fees']),
+            ),
+            ctx,
+          );
+          return next;
+        },
+      );
     },
 
     async remove(ws, ids) {
       const db = await ctx.db();
       const keys = ids.map((id): [string, string] => [ws, id]);
-      await rwTx(db, [db.trades, db.journal, db.accounts], async () => {
-        await assertEditable(db, ws, await db.trades.bulkGet(keys));
-        // Later imports' fills would have nothing to close (Plan 5 adds a tombstone flow).
-        for (const t of await db.trades.bulkGet(keys))
-          if (t?.status === 'open' && t.importId !== undefined)
-            throw new OpenImportedTradeError(t.id, t.importId);
-        await db.trades.bulkDelete(keys);
-        await pruneJournalLinks(db, ws, ids);
-      });
+      await rwTx(
+        db,
+        [db.trades, db.journal, db.accounts, db.files, db.history, db.meta],
+        async () => {
+          const held = await db.trades.bulkGet(keys);
+          await assertEditable(db, ws, held);
+          // Later imports' fills would have nothing to close (Plan 5 adds a
+          // tombstone flow). A trade grouped by hand is never handed to an
+          // import (B8), so nothing waits on it.
+          for (const t of held)
+            if (
+              t?.status === 'open' &&
+              t.importId !== undefined &&
+              t.grouping !== 'manual'
+            )
+              throw new OpenImportedTradeError(t.id, t.importId);
+          await db.trades.bulkDelete(keys);
+          const { timeZone } = await readPrefs(db);
+          await logHistory(
+            db,
+            ws,
+            held.flatMap((t) => (t ? [lifeRow(t, 'deleted', timeZone)] : [])),
+            ctx,
+          );
+          await pruneJournalLinks(db, ws, ids);
+          await deleteOwnerFiles(
+            db,
+            ws,
+            ids.map((id) => `trade:${id}`),
+          );
+        },
+      );
     },
   };
 }

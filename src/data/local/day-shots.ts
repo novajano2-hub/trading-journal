@@ -13,7 +13,7 @@ import { rwTx } from './tx';
 const TYPES: ReadonlySet<string> = new Set(['image/png', 'image/jpeg']);
 
 /** Dexie wraps the browser's error and keeps the original in `inner`. */
-function isQuota(error: unknown): boolean {
+export function isQuota(error: unknown): boolean {
   const e = error as { name?: string; inner?: unknown } | null;
   return (
     e?.name === 'QuotaExceededError' ||

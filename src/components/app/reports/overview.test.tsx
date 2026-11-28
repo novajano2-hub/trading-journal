@@ -189,6 +189,105 @@ test('Gross to net shows gross, fees and net, and how much the fees took', async
     expect(page.querySelector(`[data-metric-tip="${id}"]`), id).not.toBeNull();
 });
 
+/** One trade that lost $300.00 gross and was credited $500.00 in its fees (a swap credit): net +$200.00. */
+async function withCredit() {
+  const s = await breakdownSample();
+  s.trades = [
+    {
+      ...s.trades[0]!,
+      status: 'closed',
+      gross: -30000,
+      fees: -50000,
+      net: 20000,
+    },
+  ];
+  return s;
+}
+
+test('Gross to net with a fee credit: a credit is a gain, its bar stays inside the row, and the sentence says so', async () => {
+  renderApp(<OverviewView />, { sample: withCredit, url: URL });
+  const page = await ready();
+  const card = within(page).getByRole('region', { name: 'Gross to net' });
+  expect(stat(card, 'gross-pnl')).toBe('−$300.00');
+  expect(stat(card, 'fees')).toBe('+$500.00');
+  expect(stat(card, 'net-pnl')).toBe('+$200.00');
+  // The credit is the widest line: its bar is the full track, not wider, and it is not drawn as a charge.
+  const bar = card.querySelector(
+    '[data-figure="gross-net:fees"] [aria-hidden] > span',
+  ) as HTMLElement;
+  expect(bar.style.width).toBe('100%');
+  expect(bar.className).toContain('bg-gain-fill');
+  expect(bar.className).not.toContain('bg-loss-fill');
+  expect(
+    within(card).getByText('Fee credits outweighed the fees.'),
+  ).toBeTruthy();
+  expect(card.textContent).not.toContain('Fees took');
+  expect(card.textContent).not.toContain('on top of a gross loss');
+});
+
+/** As `withFees`, with $4.86 of swap on that trade too: gross $105.00, fees $5.00, swap -$4.86, net $95.14. */
+async function withSwap() {
+  const s = await breakdownSample();
+  s.trades[0] = {
+    ...s.trades[0]!,
+    gross: 10500,
+    fees: 500,
+    swap: -486,
+    net: 9514,
+  };
+  return s;
+}
+
+const figures = (card: HTMLElement) =>
+  [...card.querySelectorAll('[data-figure]')].map(
+    (e) => (e as HTMLElement).dataset.figure,
+  );
+
+test('Gross to net adds a Swap line between fees and net while a trade has one, so the four add up', async () => {
+  renderApp(<OverviewView />, { sample: withSwap, url: URL });
+  const page = await ready();
+  const card = within(page).getByRole('region', { name: 'Gross to net' });
+  expect(figures(card)).toEqual([
+    'gross-net:gross-pnl',
+    'gross-net:fees',
+    'gross-net:swap',
+    'gross-net:net-pnl',
+  ]);
+  expect(stat(card, 'gross-pnl')).toBe('+$130.00');
+  expect(stat(card, 'fees')).toBe('−$5.00');
+  expect(stat(card, 'swap')).toBe('−$4.86');
+  // 130.00 - 5.00 - 4.86.
+  expect(stat(card, 'net-pnl')).toBe('+$120.14');
+  expect(card.querySelector('[data-metric-tip="swap"]')).not.toBeNull();
+  // The fees' own sentence still reads the fees, not the swap.
+  expect(within(card).getByText(/Fees took 3\.8% of gross/)).toBeTruthy();
+});
+
+test('Gross to net has no Swap line while no closed trade carries one', async () => {
+  renderApp(<OverviewView />, { sample: withFees, url: URL });
+  const page = await ready();
+  const card = within(page).getByRole('region', { name: 'Gross to net' });
+  expect(figures(card)).toEqual([
+    'gross-net:gross-pnl',
+    'gross-net:fees',
+    'gross-net:net-pnl',
+  ]);
+});
+
+test('Privacy masks the Swap line of Gross to net', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: withSwap,
+  });
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  renderApp(<OverviewView />, { repository, url: URL });
+  const page = await ready();
+  const card = within(page).getByRole('region', { name: 'Gross to net' });
+  expect(stat(card, 'swap')).not.toMatch(/\d/);
+  expect(card.textContent).not.toContain('4.86');
+});
+
 test('the cost rows say what they are: Commissions and fees in Gross to net, Commissions and Fees in Costs, signed in overview-figures', async () => {
   renderApp(<OverviewView />, { sample: withFees, url: URL });
   const page = await ready();
@@ -199,7 +298,7 @@ test('the cost rows say what they are: Commissions and fees in Gross to net, Com
   const labels = [...costs.querySelectorAll('[data-stat]')].map((el) =>
     el.previousElementSibling?.textContent?.trim(),
   );
-  expect(labels).toEqual(['Commissions', 'Fees']);
+  expect(labels).toEqual(['Commissions', 'Fees', 'Swap']);
 });
 
 test('trade and day counts read in neutral ink: gain and loss colour are for signed money', async () => {

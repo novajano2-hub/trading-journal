@@ -10,7 +10,14 @@ import {
 import { dayLabel, parseYmd, ymd } from '../seed/calendar';
 import type { LocalContext } from './context';
 import { readPrefs } from './prefs';
-import { isLocked, routineNowIn, todayIn } from './routine-today';
+import {
+  isLocked,
+  isLockedNote,
+  refuseLockedNote,
+  routineNowIn,
+  todayIn,
+} from './routine-today';
+import { deleteNoteVersions, dropNoteFiles } from './note-versions';
 import { rwTx } from './tx';
 import type { KeelDb } from './db';
 
@@ -89,14 +96,25 @@ function byRecency(a: JournalEntry, b: JournalEntry): number {
   return a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0;
 }
 
-/** Deletes the entries and clears `noteId` on trades pointing at them. Call inside an rw transaction over `db.journal` and `db.trades`. */
+/** Deletes the entries, their kept versions and their image files but those another note or a template still shows (B56), and clears `noteId` on trades pointing at them. Call inside an rw transaction over `deleteTables`. */
 async function deleteEntries(
   db: KeelDb,
   ws: string,
   ids: readonly string[],
 ): Promise<void> {
+  if (ids.length === 0) return;
   const gone = new Set(ids);
   await db.journal.bulkDelete(ids.map((id): [string, string] => [ws, id]));
+  await deleteNoteVersions(db, ws, ids);
+  const files = await db.files
+    .where('[workspaceId+owner]')
+    .anyOf(ids.map((id): [string, string] => [ws, `note:${id}`]))
+    .primaryKeys();
+  await dropNoteFiles(
+    db,
+    ws,
+    files.map(([, id]) => id),
+  );
   await db.trades
     .where('workspaceId')
     .equals(ws)
@@ -106,27 +124,15 @@ async function deleteEntries(
     });
 }
 
-/** Whether `entry` is a daily note of a finished date. Call inside a transaction that includes `db.days`. */
-async function isLockedNote(
-  db: KeelDb,
-  ws: string,
-  entry: Pick<JournalEntry, 'kind' | 'date'> | undefined,
-): Promise<boolean> {
-  return (
-    entry?.kind === 'daily-review' &&
-    entry.date !== undefined &&
-    (await isLocked(db, ws, entry.date))
-  );
-}
-
-/** Throws LockedDayError for a daily note on a finished date. Call inside a transaction that includes `db.days`. */
-async function refuseLockedNote(
-  db: KeelDb,
-  ws: string,
-  entry: Pick<JournalEntry, 'kind' | 'date'> | undefined,
-): Promise<void> {
-  if (await isLockedNote(db, ws, entry)) throw new LockedDayError();
-}
+/** What deleting entries for good writes and reads (`deleteEntries`). */
+const deleteTables = (db: KeelDb) => [
+  db.journal,
+  db.trades,
+  db.days,
+  db.files,
+  db.noteVersions,
+  db.templates,
+];
 
 export function localJournal(ctx: LocalContext): JournalRepo {
   /** Sets or clears `deletedAt`. */
@@ -153,7 +159,7 @@ export function localJournal(ctx: LocalContext): JournalRepo {
       if (rows.some(expired)) {
         // A finished day's note is frozen, so the purge leaves it in Trash.
         const purged = new Set<string>();
-        await rwTx(db, [db.journal, db.trades, db.days], async () => {
+        await rwTx(db, deleteTables(db), async () => {
           for (const e of rows.filter(expired))
             if (!(await isLockedNote(db, ws, e))) purged.add(e.id);
           await deleteEntries(db, ws, [...purged]);
@@ -221,7 +227,7 @@ export function localJournal(ctx: LocalContext): JournalRepo {
 
     async remove(ws, id) {
       const db = await ctx.db();
-      await rwTx(db, [db.journal, db.trades, db.days], async () => {
+      await rwTx(db, deleteTables(db), async () => {
         const entry = await db.journal.get([ws, id]);
         if (!entry) throw new NotFoundError('journal entry', id);
         await refuseLockedNote(db, ws, entry);

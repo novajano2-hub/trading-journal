@@ -293,7 +293,7 @@ test('Privacy masks the review tiles and the trade amounts', async () => {
   expect(table.textContent).not.toContain('245');
 });
 
-test('review keeps Templates but has no template line, Change template or tip', async () => {
+test('review keeps the Template control but has no template line, Change template or tip', async () => {
   const repo = repository();
   // The tip is unseen: it belongs to plan mode.
   renderApp(<DayView date={GREEN} mode="review" />, {
@@ -301,7 +301,11 @@ test('review keeps Templates but has no template line, Change template or tip', 
     url: `/app/day/${GREEN}/review`,
   });
   await screen.findByRole('textbox', { name: 'Daily note' });
-  expect(screen.getByRole('button', { name: 'Templates' })).toBeTruthy();
+  expect(
+    await screen.findByRole('button', { name: 'Insert a template' }),
+  ).toBeTruthy();
+  // The note's export and import sit in the card's header, in plan and review.
+  expect(screen.getByRole('button', { name: 'Export or import' })).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Change template' })).toBeNull();
   expect(screen.queryByText(/^From the/)).toBeNull();
   expect(screen.queryByRole('note', { name: 'Tip' })).toBeNull();

@@ -6,6 +6,7 @@ import {
   type BreakdownOptions,
 } from '../domain/metrics/breakdowns';
 import type { MetricContext } from '../domain/metrics/context';
+import { computePatterns, PATTERNS } from '../domain/patterns';
 import { makeTrade } from '../domain/__fixtures__/trades';
 import type { Trade } from '../domain/types';
 import { isClosed } from '../domain/trade-status';
@@ -941,5 +942,75 @@ describe('every "Other" branch opens the trades it folded', () => {
     check(ws.trades, 'weekday', lastTwo);
     check(ws.trades, 'hour', firstHalf);
     check(ws.trades, 'hour', lastTwo, { timeBasis: 'exit' });
+  });
+});
+
+describe('a pattern bucket opens exactly the trades it counted', () => {
+  // The patterns of the whole sample, read as the app reads them; the log filters by the same index.
+  const patterns = computePatterns(ws.trades, {
+    timeZone: TZ,
+    breakevenRange: { unit: 'amount', from: 0, to: 0 },
+    sessions: new Map(),
+  });
+  const withPatterns: FilterEnv = { ...env, patterns };
+  const ids = (href: string) => {
+    const f = parseFilters(new URL(href, 'http://keel.test').searchParams);
+    return applyFilters(ws.trades, f, withPatterns)
+      .filter((t) => t.status === (f.status ?? 'closed'))
+      .map((t) => t.id)
+      .sort();
+  };
+  const bases: [string, GlobalFilters][] = [
+    ['no filters', EMPTY_FILTERS],
+    [
+      'a date range',
+      { ...EMPTY_FILTERS, range: { from: '2026-09-01', to: '2026-11-13' } },
+    ],
+    ['long only', { ...EMPTY_FILTERS, side: 'long' }],
+  ];
+  for (const [name, base] of bases)
+    test(`every row of the breakdown links to its trades, ${name}`, () => {
+      const set = applyFilters(ws.trades, base, withPatterns);
+      const rows = breakdown(set, 'pattern', { ...ctxOf(), patterns });
+      expect(rows.length).toBeGreaterThan(2);
+      for (const row of rows) {
+        const href = bucketHref(base, 'pattern', row.key);
+        expect(href, row.key).toBeDefined();
+        expect(ids(href!), row.key).toEqual([...row.tradeIds].sort());
+      }
+    });
+
+  test('a day pattern row links to the trades of its days, the log reading the day as the breakdown does', () => {
+    const day = PATTERNS.find(
+      (p) =>
+        p.level === 'day' &&
+        [...patterns.byDay.values()].some((h) => h.some((x) => x.id === p.id)),
+    )!;
+    const rows = breakdown(ws.trades, 'pattern', { ...ctxOf(), patterns });
+    const row = rows.find((r) => r.key === day.id)!;
+    expect(row.tradeIds.length).toBeGreaterThan(0);
+    expect(ids(bucketHref(EMPTY_FILTERS, 'pattern', day.id)!)).toEqual(
+      [...row.tradeIds].sort(),
+    );
+  });
+
+  test('the bucket stays inside what the page already picks, and an unknown key is no link', () => {
+    const base: GlobalFilters = {
+      ...EMPTY_FILTERS,
+      patterns: ['large-size', 'held-longer'],
+    };
+    expect(bucketFilters(base, 'pattern', 'large-size')?.patterns).toEqual([
+      'large-size',
+    ]);
+    // One filter cannot say "any of these, and also that one".
+    expect(bucketFilters(base, 'pattern', 'exited-in-parts')).toBeNull();
+    expect(bucketFilters(EMPTY_FILTERS, 'pattern', 'nope')).toBeNull();
+    expect(
+      bucketFilters(
+        { ...EMPTY_FILTERS, status: 'open' },
+        'pattern',
+        'large-size',
+      ),
+    ).toBeNull();
   });
 });

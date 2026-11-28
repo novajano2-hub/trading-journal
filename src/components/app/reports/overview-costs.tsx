@@ -3,7 +3,11 @@
 import { Stat, StatCard, useMoney } from './overview-stat';
 import type { ReportData } from './use-report-data';
 
-/** Overview: the commissions and the fees of the fills, as separate totals. */
+/**
+ * Overview: the commissions and the fees of the fills, and the swap, as
+ * separate totals. Swap is signed as the files give it (a charge is negative)
+ * and reads None while no closed trade carries one.
+ */
 export function OverviewCosts({
   data,
 }: {
@@ -18,6 +22,9 @@ export function OverviewCosts({
       </Stat>
       <Stat id="fill-fees" data={data}>
         {money(c.fees === 0 ? 0 : -c.fees)}
+      </Stat>
+      <Stat id="swap" data={data}>
+        {money(c.swap)}
       </Stat>
     </StatCard>
   );

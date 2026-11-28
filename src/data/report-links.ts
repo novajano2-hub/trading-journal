@@ -6,6 +6,7 @@ import {
   type Session,
 } from '../domain/metrics/breakdowns';
 import { priceSpan } from '../domain/metrics/price-ranges';
+import { PATTERNS, type PatternId } from '../domain/patterns/defs';
 import type { AssetClass } from '../domain/types';
 import {
   queryString,
@@ -189,6 +190,12 @@ export function bucketFilters(
       return next
         ? { ...base, tagIds: next.ids, tagMatch: next.match, noTags: false }
         : null;
+    }
+    case 'pattern': {
+      // The log keeps a trade the pattern fired on, or whose day it fired on: the rows' own rule.
+      if (!PATTERNS.some((p) => p.id === key)) return null;
+      const patterns = oneOf(base.patterns, key as PatternId);
+      return patterns ? { ...base, patterns } : null;
     }
     case 'weekday': {
       const day = WEEKDAY_NUMBER[key];

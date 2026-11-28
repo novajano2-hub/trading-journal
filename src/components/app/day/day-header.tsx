@@ -5,13 +5,16 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { Popover } from 'radix-ui';
 import { usePrefs } from '@/data/query/hooks';
+import { useDisplay } from '@/lib/display';
 import type { DayMode } from '@/lib/day-routes';
 import { dayHref, dayQuery } from '@/lib/day-routes';
 import { dayLabel } from '@/lib/time-format';
 import { useBelowLg } from '@/lib/use-phone';
 import { Chip } from '@/components/ui/chip';
 import { MonthPicker } from '../routine/month-picker';
+import { DayPatterns } from '../trades/day-patterns';
 import { useDayFinished } from './day-lock';
+import { useDayFigures } from './use-day-figures';
 import { useDaySession } from './session-button';
 import { StageBar } from './stage-bar';
 
@@ -20,9 +23,38 @@ const PANEL =
 const TITLE =
   'text-[24px] leading-[1.2] font-[650] tracking-[-0.035em] whitespace-nowrap max-sm:text-[20px]';
 
+/** The day's Patterns control (spec §5.5), after the date: its net is the page's own, net after costs in the base currency. */
+function PatternsControl({
+  date,
+  label,
+}: {
+  date: string;
+  label: string;
+}): React.JSX.Element {
+  const display = useDisplay();
+  const day = useDayFigures(date);
+  const currency = usePrefs().data?.baseCurrency;
+  // No net when the scoped accounts have no base-currency trade (or none closed) that day, as the day card has none:
+  // the day's patterns read every account, so a $0.00 here would sit above real patterns.
+  const net = day?.stats?.net ?? null;
+  return (
+    <DayPatterns
+      date={date}
+      label={label}
+      net={
+        net === null
+          ? null
+          : { figure: display.cash(net, true, currency), cents: net }
+      }
+      trades={day?.stats?.trades ?? 0}
+      align="start"
+    />
+  );
+}
+
 /**
- * The day page's place in the top bar (K25): the date, then from `sm` the
- * stage bar. In plan the date is a plain label; in review it is a popover of
+ * The day page's place in the top bar (K25): the date, the Patterns control,
+ * then from `sm` the stage bar. In plan the date is a plain label; in review it is a popover of
  * months that opens any day's page. Below `lg` the stage bar moves under the
  * bar (`DayView`).
  */
@@ -106,6 +138,7 @@ export function DayHeader({
           Closed
         </Chip>
       ) : null}
+      <PatternsControl date={date} label={label} />
       {stacked ? null : (
         <StageBar
           date={date}

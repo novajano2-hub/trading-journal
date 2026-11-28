@@ -7,7 +7,9 @@ import {
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { ImportContext, ImportPlan } from '@/domain/import/plan';
+import { computePatterns, type PatternEnv } from '@/domain/patterns';
 import { useHydrated } from '@/lib/use-hydrated';
 import type {
   Account,
@@ -17,15 +19,22 @@ import type {
   Challenge,
   DayRecord,
   DayShot,
+  FeeRule,
   FrozenDay,
+  HistoryRow,
   ImportJob,
   JournalEntry,
+  MissedTrade,
   NoteFolder,
   NoteTemplate,
+  NoteVersion,
   PropTxn,
+  StoredFile,
+  StoredFileMeta,
   Strategy,
   Tag,
   TagCategory,
+  TargetRule,
   Tracker,
   TrackerVersion,
   Trade,
@@ -41,7 +50,11 @@ import type {
   NewCashFlow,
   NewChallengeAccount,
   NewChallengeEntry,
+  NewFeeRule,
+  NewFile,
+  NewMissedTrade,
   NewPropTxn,
+  NewTargetRule,
   ChallengePatch,
   PropTxnPatch,
   FirstRunInput,
@@ -188,8 +201,142 @@ export function useDayShots(date: string): UseQueryResult<DayShot[]> {
   );
 }
 
+/**
+ * The owner's files (`trade:<id>`, `note:<id>` or `strategy:<id>`), in upload
+ * order, as metadata only: no bytes (see `useReadFile`).
+ */
+export function useFiles(
+  owner: string,
+  /** False reads nothing: a form with no owner yet. */
+  enabled = true,
+): UseQueryResult<StoredFileMeta[]> {
+  return useWorkspaceQuery(
+    (ws) => keys.files(ws, owner),
+    (r, ws) => r.files.list(ws, owner),
+    enabled,
+  );
+}
+
+/**
+ * Reads one file with its bytes, on demand. The bytes are not kept: the result
+ * goes to the caller (an object URL, a download) and nothing stays in the
+ * query cache, so a note full of images holds each once. Resolves to
+ * `undefined` for a file that is gone.
+ */
+export function useReadFile(): (id: string) => Promise<StoredFile | undefined> {
+  const repo = useRepository();
+  const qc = useQueryClient();
+  return useCallback(
+    async (id) => {
+      const ws = (await qc.ensureQueryData(activeWorkspaceQuery(repo))).id;
+      return repo.files.get(ws, id);
+    },
+    [repo, qc],
+  );
+}
+
+/** The last 30 days of edits in the active workspace, newest first. */
+export function useHistory(): UseQueryResult<HistoryRow[]> {
+  return useWorkspaceQuery(keys.history, (r, ws) => r.history.list(ws));
+}
+
+/** The default target and stop rules of the active workspace, newest first. */
+export function useTargetRules(): UseQueryResult<TargetRule[]> {
+  return useWorkspaceQuery(keys.targetRules, (r, ws) => r.targetRules.list(ws));
+}
+
+/** The default commission and fee rules of the active workspace, newest first. */
+export function useFeeRules(): UseQueryResult<FeeRule[]> {
+  return useWorkspaceQuery(keys.feeRules, (r, ws) => r.feeRules.list(ws));
+}
+
+/**
+ * One strategy's missed trades, newest first (B43). Idle while `strategyId`
+ * is undefined. Kept apart: no figure, filter, report or pattern reads them.
+ */
+export function useMissedTrades(
+  strategyId: string | undefined,
+): UseQueryResult<MissedTrade[]> {
+  return useWorkspaceQuery(
+    (ws) => keys.missedTrades(ws, strategyId ?? ''),
+    (r, ws) => r.missedTrades.list(ws, strategyId!),
+    strategyId !== undefined,
+  );
+}
+
 export function useTrades(): UseQueryResult<Trade[]> {
   return useWorkspaceQuery(keys.trades, (r, ws) => r.trades.list(ws));
+}
+
+/** Every pattern of the workspace's trades: by trade id and by day (Plan 6B §5.5). */
+export type PatternResult = ReturnType<typeof computePatterns>;
+
+/** The last result per trades array: every reader of the same trades, prefs and sessions shares one computation. */
+const patternMemo = new WeakMap<
+  readonly Trade[],
+  { key: string; value: PatternResult }
+>();
+
+function patternsFor(trades: readonly Trade[], env: PatternEnv): PatternResult {
+  const key = JSON.stringify([
+    env.timeZone,
+    env.breakevenRange,
+    env.pnlBasis,
+    [...env.sessions],
+  ]);
+  const memo = patternMemo.get(trades);
+  if (memo?.key === key) return memo.value;
+  const value = computePatterns(trades, env);
+  patternMemo.set(trades, { key, value });
+  return value;
+}
+
+/**
+ * The patterns of every trade in the active workspace, all accounts, never
+ * stored (B20): `byTrade` by trade id, `byDay` by the day's local date. It
+ * reads all of the workspace's trades, not a filtered set, so a trade's
+ * result is the same wherever it is shown. Computed again only when the
+ * trades, the profile's zone, breakeven range or P&L basis, or the days'
+ * session starts change. `enabled: false` computes nothing and stays pending
+ * (the filters read it only while a pattern is picked).
+ */
+export function usePatterns(enabled = true): UseQueryResult<PatternResult> {
+  const trades = useTrades();
+  const prefs = usePrefs();
+  // The same query `useDays` holds, left idle while nobody needs the patterns.
+  const days = useWorkspaceQuery(
+    keys.days,
+    (r, ws) => r.days.list(ws),
+    enabled,
+  );
+  const tradeList = trades.data;
+  const prefsData = prefs.data;
+  const dayList = days.data;
+  const data = useMemo(() => {
+    if (!enabled || !tradeList || !prefsData || !dayList) return undefined;
+    return patternsFor(tradeList, {
+      timeZone: prefsData.timeZone,
+      breakevenRange: prefsData.breakevenRange,
+      pnlBasis: prefsData.pnlBasis,
+      sessions: new Map(
+        dayList.flatMap((d) => (d.session ? [[d.id, d.session] as const] : [])),
+      ),
+    });
+  }, [enabled, tradeList, prefsData, dayList]);
+  const failed = [trades, prefs, days].find((q) => q.isError);
+  const status = failed ? 'error' : data === undefined ? 'pending' : 'success';
+  // The trades' result with the computed data and one status for the three reads.
+  return {
+    ...trades,
+    data,
+    error: failed?.error ?? null,
+    status,
+    isPending: status === 'pending',
+    isSuccess: status === 'success',
+    isError: status === 'error',
+    isLoadingError: status === 'error',
+    isRefetchError: false,
+  } as unknown as UseQueryResult<PatternResult>;
 }
 
 export function useTrade(id: string): UseQueryResult<Trade | null> {
@@ -631,6 +778,82 @@ export function useRemoveTrades(): UseMutationResult<
   );
 }
 
+/** Joins trades by the executions picked (B1 to B3); resolves to the merged trade. */
+export function useMergeTrades(): UseMutationResult<
+  Trade,
+  Error,
+  { ids: readonly string[]; picked: readonly string[] }
+> {
+  return useWorkspaceWrite(
+    'trades.merge',
+    (r, ws, v: { ids: readonly string[]; picked: readonly string[] }) =>
+      r.trades.merge(ws, v.ids, v.picked),
+  );
+}
+
+/** Moves the executions `moved` of one trade to a new trade (B4). */
+export function useSplitTrade(): UseMutationResult<
+  { original: Trade; created: Trade },
+  Error,
+  { id: string; moved: readonly string[] }
+> {
+  return useWorkspaceWrite(
+    'trades.split',
+    (r, ws, v: { id: string; moved: readonly string[] }) =>
+      r.trades.split(ws, v.id, v.moved),
+  );
+}
+
+/** Replaces the commission and fee of one execution (B58); resolves to the trade with its fees and net recomputed. */
+export function useSetFillCosts(): UseMutationResult<
+  Trade,
+  Error,
+  {
+    tradeId: string;
+    executionId: string;
+    costs: { commission: Cents; fees: Cents };
+  }
+> {
+  return useWorkspaceWrite(
+    'trades.setFillCosts',
+    (
+      r,
+      ws,
+      v: {
+        tradeId: string;
+        executionId: string;
+        costs: { commission: Cents; fees: Cents };
+      },
+    ) => r.trades.setFillCosts(ws, v.tradeId, v.executionId, v.costs),
+  );
+}
+
+/** Moves trades to another account (B6); resolves to how many moved. */
+export function useMoveTrades(): UseMutationResult<
+  number,
+  Error,
+  { ids: readonly string[]; accountId: string }
+> {
+  return useWorkspaceWrite(
+    'trades.move',
+    (r, ws, v: { ids: readonly string[]; accountId: string }) =>
+      r.trades.move(ws, v.ids, v.accountId),
+  );
+}
+
+/** Moves every trade of an account to another (B7); resolves to how many moved. */
+export function useMoveAccountTrades(): UseMutationResult<
+  number,
+  Error,
+  { from: string; to: string }
+> {
+  return useWorkspaceWrite(
+    'trades.move',
+    (r, ws, v: { from: string; to: string }) =>
+      r.trades.moveAccount(ws, v.from, v.to),
+  );
+}
+
 export function useCreateStrategy(): UseMutationResult<
   Strategy,
   Error,
@@ -638,6 +861,23 @@ export function useCreateStrategy(): UseMutationResult<
 > {
   return useWorkspaceWrite('strategies.create', (r, ws, v: NewStrategy) =>
     r.strategies.create(ws, v),
+  );
+}
+
+/**
+ * Creates a strategy with its photo in one write (a template's cover, or the
+ * photo the form was given): one created row, and no file left behind when
+ * the write fails.
+ */
+export function useCreateStrategyWithPhoto(): UseMutationResult<
+  Strategy,
+  Error,
+  { input: NewStrategy; photo: NewFile }
+> {
+  return useWorkspaceWrite(
+    'strategies.create',
+    (r, ws, v: { input: NewStrategy; photo: NewFile }) =>
+      r.strategies.create(ws, v.input, v.photo),
   );
 }
 
@@ -1015,6 +1255,205 @@ export function useRemoveDayShot(): UseMutationResult<
   );
 }
 
+export function useAddFile(): UseMutationResult<
+  StoredFile,
+  Error,
+  { owner: string; file: NewFile; images: boolean }
+> {
+  return useWorkspaceWrite(
+    'files.add',
+    (r, ws, v: { owner: string; file: NewFile; images: boolean }) =>
+      r.files.add(ws, v.owner, v.file, { images: v.images }),
+  );
+}
+
+export function useRemoveFile(): UseMutationResult<
+  void,
+  Error,
+  { id: string }
+> {
+  return useWorkspaceWrite('files.remove', (r, ws, v: { id: string }) =>
+    r.files.remove(ws, v.id),
+  );
+}
+
+/**
+ * A stored note's kept versions, newest first (B39). Idle while `noteId` is
+ * unknown (a note that is not stored yet has none). Reading purges those older
+ * than 30 days.
+ */
+export function useNoteVersions(
+  noteId: string | undefined,
+): UseQueryResult<NoteVersion[]> {
+  return useWorkspaceQuery(
+    (ws) => keys.noteVersions(ws, noteId ?? ''),
+    (r, ws) => r.noteVersions.list(ws, noteId!),
+    noteId !== undefined,
+  );
+}
+
+/** Keeps a body as a version of a stored note; a body the newest version already holds is left out. */
+export function useKeepVersion(): UseMutationResult<
+  void,
+  Error,
+  { noteId: string; body: unknown; kind: NoteVersion['kind'] }
+> {
+  return useWorkspaceWrite(
+    'noteVersions.keep',
+    (r, ws, v: { noteId: string; body: unknown; kind: NoteVersion['kind'] }) =>
+      r.noteVersions.keep(ws, v.noteId, v.body, v.kind),
+  );
+}
+
+/** An edited note goes this long without a version before one is kept (B39). */
+export const VERSION_IDLE_MS = 5 * 60_000;
+
+/**
+ * Keeps versions of an open note as it is edited (B39). `body` is the note's
+ * text as last edited, and `undefined` while it has not been edited, so
+ * opening a note keeps nothing.
+ * - A version is kept `VERSION_IDLE_MS` after an edit that no version has
+ *   caught up with: the newest text then, however much was typed meanwhile.
+ * - Leaving the note (or the page) keeps what is typed since the last one.
+ * - A note with no id yet (not stored) starts its five minutes when it has one.
+ * A version that could not be written is tried again on the next chance.
+ */
+export function useVersionKeeper(
+  noteId: string | undefined,
+  body: unknown,
+  idleMs = VERSION_IDLE_MS,
+): void {
+  const { mutate } = useKeepVersion();
+  const latest = useRef({ noteId, body });
+  const seen = useRef<unknown>(undefined);
+  // Text typed that no kept version holds yet.
+  const dirty = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const write = useRef(mutate);
+  const flushRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    write.current = mutate;
+    flushRef.current = () => {
+      if (timer.current !== undefined) clearTimeout(timer.current);
+      timer.current = undefined;
+      const { noteId: id, body: text } = latest.current;
+      if (!dirty.current || id === undefined || text === undefined) return;
+      dirty.current = false;
+      write.current(
+        { noteId: id, body: text, kind: 'auto' },
+        {
+          // Not kept: what is still typed stays to be kept on leaving.
+          onError: () => {
+            dirty.current = true;
+          },
+        },
+      );
+    };
+  });
+
+  useEffect(() => {
+    latest.current = { noteId, body };
+    if (body !== undefined && body !== seen.current) {
+      seen.current = body;
+      dirty.current = true;
+    }
+    if (dirty.current && noteId !== undefined && timer.current === undefined)
+      timer.current = setTimeout(() => flushRef.current(), idleMs);
+  }, [noteId, body, idleMs]);
+
+  useEffect(() => {
+    const leave = () => flushRef.current();
+    window.addEventListener('pagehide', leave);
+    return () => {
+      window.removeEventListener('pagehide', leave);
+      leave();
+    };
+  }, []);
+}
+
+/**
+ * Brings a version's body back: the current body is kept first, as the version
+ * a restore replaced, and only the body is written (not the title or tags). Resolves to the
+ * note as stored. Rejects with LockedDayError for a finished day's note.
+ */
+export function useRestoreVersion(): UseMutationResult<
+  JournalEntry,
+  Error,
+  { noteId: string; versionId: string }
+> {
+  return useWorkspaceWrite(
+    'noteVersions.restore',
+    (r, ws, v: { noteId: string; versionId: string }) =>
+      r.noteVersions.restore(ws, v.noteId, v.versionId),
+  );
+}
+
+/**
+ * Creates a target and stop rule, or, with `id`, edits it to be `rule`: a side
+ * `rule` leaves out is cleared. Resolves to the rule as stored.
+ */
+export function useSaveTargetRule(): UseMutationResult<
+  TargetRule,
+  Error,
+  { id?: string; rule: NewTargetRule }
+> {
+  return useWorkspaceWrite(
+    'targetRules.save',
+    (r, ws, v: { id?: string; rule: NewTargetRule }) =>
+      v.id === undefined
+        ? r.targetRules.create(ws, v.rule)
+        : r.targetRules.update(ws, v.id, {
+            target: undefined,
+            stop: undefined,
+            ...v.rule,
+          }),
+  );
+}
+
+/** Creates a commission and fee rule, or, with `id`, edits it to be `rule`. Resolves to the rule as stored. */
+export function useSaveFeeRule(): UseMutationResult<
+  FeeRule,
+  Error,
+  { id?: string; rule: NewFeeRule }
+> {
+  return useWorkspaceWrite(
+    'feeRules.save',
+    (r, ws, v: { id?: string; rule: NewFeeRule }) =>
+      v.id === undefined
+        ? r.feeRules.create(ws, v.rule)
+        : r.feeRules.update(ws, v.id, v.rule),
+  );
+}
+
+/** What the rule has already written on trades stays (B57). */
+export function useRemoveTargetRule(): UseMutationResult<void, Error, string> {
+  return useWorkspaceWrite('targetRules.remove', (r, ws, id: string) =>
+    r.targetRules.remove(ws, id),
+  );
+}
+
+export function useRemoveFeeRule(): UseMutationResult<void, Error, string> {
+  return useWorkspaceWrite('feeRules.remove', (r, ws, id: string) =>
+    r.feeRules.remove(ws, id),
+  );
+}
+
+/** Fill in logged trades, for either kind of rule; resolves to how many trades changed. */
+export function useApplyRule(): UseMutationResult<
+  number,
+  Error,
+  { kind: 'target' | 'fee'; id: string; override: boolean }
+> {
+  return useWorkspaceWrite(
+    'rules.apply',
+    (r, ws, v: { kind: 'target' | 'fee'; id: string; override: boolean }) =>
+      v.kind === 'target'
+        ? r.targetRules.applyExisting(ws, v.id, v.override)
+        : r.feeRules.applyExisting(ws, v.id, v.override),
+  );
+}
+
 /** The first run's one write (K47, K55): prefs, My account, and My workspace active. */
 export function useCompleteFirstRun(): UseMutationResult<
   void,
@@ -1103,5 +1542,52 @@ export function useMarkBreached(): UseMutationResult<
         ...(v.note !== undefined && { note: v.note }),
         on: v.on,
       }),
+  );
+}
+
+/**
+ * Adds a missed trade (no `id`) or edits one (its `id`; the strategy never
+ * changes). An optional field left undefined is cleared on an edit. Rejects
+ * with NotFoundError or RangeError as the repository does.
+ */
+export function useSaveMissedTrade(): UseMutationResult<
+  MissedTrade,
+  Error,
+  { id?: string; missed: NewMissedTrade }
+> {
+  return useWorkspaceWrite(
+    'missedTrades.save',
+    (r, ws, v: { id?: string; missed: NewMissedTrade }) => {
+      if (v.id === undefined) return r.missedTrades.create(ws, v.missed);
+      const { symbol, at, price, commission, fees } = v.missed;
+      return r.missedTrades.update(ws, v.id, {
+        symbol,
+        at,
+        price,
+        commission,
+        fees,
+      });
+    },
+  );
+}
+
+export function useRemoveMissedTrade(): UseMutationResult<void, Error, string> {
+  return useWorkspaceWrite('missedTrades.remove', (r, ws, id: string) =>
+    r.missedTrades.remove(ws, id),
+  );
+}
+
+/**
+ * The trades of My workspace, whichever workspace is active: Import history
+ * names the trades that stand in an undo's way, and imports land only there
+ * (Plan 6B fix wave, C-4).
+ */
+export function useUserTrades(): UseQueryResult<Trade[]> {
+  const repo = useRepository();
+  return useFirstFrame(
+    useQuery({
+      queryKey: keys.trades(USER_WORKSPACE.id),
+      queryFn: () => repo.trades.list(USER_WORKSPACE.id),
+    }),
   );
 }

@@ -11,6 +11,7 @@ import { CalendarReportView } from './calendar-report';
 import { CompareView } from './compare';
 import { DayTimeView } from './day-time-report';
 import { OptionsView } from './options-report';
+import { PatternsView } from './patterns-report';
 import { OverviewView } from './overview';
 import { ScrollFade } from '@/components/ui/scroll-fade';
 import { PerformanceView } from './performance';
@@ -75,7 +76,7 @@ const SIMPLE_TABS: {
 
 /**
  * The tabs every report sits under: Overview, Performance, the Reports menu
- * (Day & time, Symbols, Risk, Strategies, Tags, Options, Wins vs losses),
+ * (Day & time, Symbols, Risk, Strategies, Tags, Patterns, Options, Wins vs losses),
  * Compare and Calendar. The menu's tab stays current while any of its reports
  * is open. Links carry the global filters. Render inside `<Suspense>`.
  */
@@ -183,6 +184,8 @@ function ReportBody({
       return <StrategiesView />;
     case 'tags':
       return <TagsView />;
+    case 'patterns':
+      return <PatternsView />;
     case 'options':
       return <OptionsView />;
     case 'wins-losses':

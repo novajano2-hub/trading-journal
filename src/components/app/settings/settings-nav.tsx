@@ -3,6 +3,7 @@
 import {
   Bank,
   ClockCounterClockwise,
+  Notebook,
   SlidersHorizontal,
   Tag,
   User,
@@ -22,8 +23,8 @@ export interface SettingsPage {
 
 /**
  * The sections in their groups, a divider between groups (C48): Profile, then
- * Accounts, Trading, Tags and Logs. A new section goes into its group in
- * place, in the order it reads (Plan 6B's Notebook sits between Tags and Logs).
+ * Accounts, Trading, Tags, Notebook and Logs. A new section goes into its group
+ * in place, in the order it reads (Plan 6B's Notebook sits between Tags and Logs).
  */
 export const SETTINGS_NAV: readonly (readonly SettingsPage[])[] = [
   [{ label: 'Profile', href: '/app/settings/profile', icon: User }],
@@ -35,6 +36,7 @@ export const SETTINGS_NAV: readonly (readonly SettingsPage[])[] = [
       icon: SlidersHorizontal,
     },
     { label: 'Tags', href: '/app/settings/tags', icon: Tag },
+    { label: 'Notebook', href: '/app/settings/notebook', icon: Notebook },
     {
       label: 'Logs',
       href: '/app/settings/import-history',
@@ -74,10 +76,18 @@ export function SettingsNav({
     if (el) setMore(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
   };
   useEffect(() => {
+    const nav = ref.current;
+    const open = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (nav && open) {
+      // The open section sits in the middle of the row, not off its end.
+      const at =
+        open.getBoundingClientRect().left - nav.getBoundingClientRect().left;
+      nav.scrollLeft += at - (nav.clientWidth - open.offsetWidth) / 2;
+    }
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-  }, []);
+  }, [pathname]);
   // The icons are named where the words are gone: not in the labelled row below lg.
   const tips = collapsed && !belowLg;
   return (

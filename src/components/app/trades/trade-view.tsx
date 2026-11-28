@@ -3,7 +3,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   CaretLeft,
   CaretRight,
@@ -25,12 +25,17 @@ import { metricContextOf } from '@/data/metrics';
 import { useGlobalFilters, useTradeSet } from '@/data/query/derived';
 import {
   useAccounts,
+  useJournal,
+  useJournalEntry,
+  usePatterns,
   usePrefs,
   useRemoveTrades,
   useStrategies,
   useTagCategories,
   useTags,
   useTrade,
+  useUnsetPrefs,
+  useUpdatePrefs,
   useUpdateTrades,
 } from '@/data/query/hooks';
 import { StorageUnavailableError } from '@/data/repository';
@@ -43,12 +48,8 @@ import {
 } from '@/data/trade-patch';
 import { closedQty, moneyPerPip } from '@/domain/metrics/units';
 import { costBasis, type MetricContext } from '@/domain/metrics/context';
-import {
-  plannedR,
-  riskFromStop,
-  rOf,
-  tradeVolume,
-} from '@/domain/metrics/summary';
+import { plannedReward, plannedRisk, sidesOf } from '@/domain/risk';
+import { plannedR, rOf, tradeVolume } from '@/domain/metrics/summary';
 import {
   strategyRules,
   type Execution,
@@ -65,14 +66,28 @@ import { formatDuration, formatInstrument, plural } from '@/lib/format';
 import { CARD, CardHeader, InstrumentName } from '../dashboard/shared';
 import { ConfirmDialog } from '../confirm-dialog';
 import { ManageTagsLink } from '../tag-picker';
+import { TemplateMenu } from '../day/template-menu';
+import { findDailyEntry } from '../notebook/notebook-model';
 import type { NoteEditorHandle } from '../notes/note-editor';
+import { NoteMenu } from '../notes/note-menu';
 import { price } from '@/lib/format';
 import { StatusChip } from './cells';
 import { qty } from './columns';
+import {
+  CostCell,
+  FillCostsNote,
+  rowKeys,
+  RowControls,
+  useFillCosts,
+} from './fill-costs';
 import { FillsTimeline, positions, sortedFills } from './fills-timeline';
+import { LevelsBlock, noun } from './levels-block';
 import { RatingRow } from '../routine/rating-row';
 import { RuleChecklist } from './rule-checklist';
-import { clock } from '@/lib/time-format';
+import { PatternsButton } from './patterns-button';
+import { StatsChooser, type StatChoice } from './stats-chooser';
+import { TradeFiles } from './trade-files';
+import { clock, dayLabel as dayName } from '@/lib/time-format';
 import { clockOnDay, dayLabel } from './trade-time';
 import {
   DayNote,
@@ -83,6 +98,8 @@ import {
 } from './trade-journal';
 
 const PAD = 'px-5 pt-[18px] pb-4';
+
+const EMPTY_DOC = { type: 'doc', content: [{ type: 'paragraph' }] };
 
 type Save = (patch: TradePatch | ((t: Trade) => TradePatch)) => void;
 
@@ -134,62 +151,6 @@ function Message({
   );
 }
 
-/** A price field that reads like a figure and saves when you leave it, or press Enter. */
-function PriceField({
-  label,
-  value,
-  tick,
-  disabled,
-  onCommit,
-}: {
-  label: string;
-  value: number | undefined;
-  tick: number;
-  disabled: boolean;
-  onCommit(next: number | undefined): void;
-}): React.JSX.Element {
-  const shown = value === undefined ? '' : price(value, tick);
-  const [text, setText] = useState(shown);
-  const [seen, setSeen] = useState(value);
-  // A saved value that changed elsewhere replaces what is typed.
-  if (seen !== value) {
-    setSeen(value);
-    setText(shown);
-  }
-  const commit = () => {
-    const raw = text.replace(/[,\s]/g, '');
-    if (raw === '') {
-      setText('');
-      if (value !== undefined) onCommit(undefined);
-      return;
-    }
-    const n = Number(raw);
-    if (!Number.isFinite(n) || n <= 0) {
-      setText(shown);
-      return;
-    }
-    setText(price(n, tick));
-    if (n !== value) onCommit(n);
-  };
-  return (
-    <input
-      type="text"
-      inputMode="decimal"
-      aria-label={label}
-      placeholder="Not set"
-      value={text}
-      disabled={disabled}
-      onChange={(e) => setText(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') e.currentTarget.blur();
-        if (e.key === 'Escape') setText(shown);
-      }}
-      className="-mx-1.5 mt-0.5 block h-8 w-[calc(100%+12px)] rounded-[8px] border border-transparent bg-transparent px-1.5 text-[17px] font-semibold tracking-[-0.02em] text-text tabular-nums placeholder:text-[14px] placeholder:font-normal placeholder:tracking-normal placeholder:text-faint hover:border-line-2 focus-visible:border-accent focus-visible:bg-surface-1 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-transparent pointer-coarse:h-11"
-    />
-  );
-}
-
 function Stat({
   label,
   tip,
@@ -207,7 +168,7 @@ function Stat({
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <div className="min-w-0 bg-surface-1 px-3.5 py-3 first:pl-0 sm:[&:nth-child(4n+1)]:pl-0 sm:[&:not(:nth-child(4n+1))]:pl-4">
+    <div className="min-w-0 bg-surface-1 px-3.5 py-3 first:pl-0 max-sm:[&:nth-child(2n+1)]:pl-0 sm:[&:nth-child(4n+1)]:pl-0 sm:[&:not(:nth-child(4n+1))]:pl-4">
       <span className="block text-xs text-faint">
         {tip && basis ? (
           <MetricTip id={tip} basis={basis}>
@@ -234,36 +195,76 @@ function Stat({
 const tone = (cents: number) =>
   cents < 0 ? 'text-loss' : cents > 0 ? 'text-gain' : '';
 
-function noun(t: Trade, n: number): string {
-  const c = t.instrument.assetClass;
-  const one =
-    c === 'future' || c === 'option'
-      ? 'contract'
-      : c === 'stock'
-        ? 'share'
-        : 'unit';
-  return plural(n, one);
-}
-
 function sum(list: readonly Execution[], pick: (e: Execution) => number) {
   return list.reduce((n, e) => n + pick(e), 0);
 }
 
-function Stats({
-  trade,
-  display,
-  basis,
-  ctx,
-  readOnly,
-  save,
-}: {
-  trade: Trade;
-  display: Display;
-  basis: 'net' | 'gross';
-  ctx: MetricContext;
-  readOnly: boolean;
-  save: Save;
-}): React.JSX.Element {
+/**
+ * The Execution card's rows in the order the page draws them: what "Choose
+ * stats" lists (B51). The first eight sit in the first grid, Targets and Stops
+ * are the plan's two level blocks, then the four figures the plan makes, then
+ * MAE, MFE and the unit rows the instrument has. Swap follows Fees.
+ */
+export const STAT_IDS = [
+  'avg-entry',
+  'avg-exit',
+  'quantity',
+  'duration',
+  'gross-pnl',
+  'fees',
+  'swap',
+  'cost-basis',
+  'targets',
+  'stops',
+  'planned-r',
+  'realized-r',
+  'planned-reward',
+  'planned-risk',
+  'mae',
+  'mfe',
+  'points',
+  'ticks',
+  'ticks-per-contract',
+  'contracts',
+  'pips',
+  'money-per-pip',
+] as const;
+export type StatId = (typeof STAT_IDS)[number];
+
+const FIRST_IDS: readonly StatId[] = STAT_IDS.slice(0, 8);
+const PLAN_IDS: readonly StatId[] = [
+  'planned-r',
+  'realized-r',
+  'planned-reward',
+  'planned-risk',
+];
+const LAST_IDS: readonly StatId[] = STAT_IDS.slice(14);
+
+/** One stat as the card and the chooser both read it. */
+interface StatDef {
+  label: string;
+  /** The figure; undefined when the trade has none, and `absent` says so. */
+  value?: React.ReactNode;
+  /** What a missing figure reads: None unless said. */
+  absent?: string;
+  /** The metric whose definition the label carries. */
+  tip?: MetricId;
+  tone?: string;
+  sub?: React.ReactNode;
+}
+type StatDefs = Partial<Record<StatId, StatDef>>;
+
+/**
+ * Every stat this trade has, keyed by id. A stat the instrument lacks (Points
+ * on a forex trade) is absent. The same figures the reports read, so the page
+ * agrees with them.
+ */
+function statDefs(
+  trade: Trade,
+  display: Display,
+  basis: 'net' | 'gross',
+  ctx: MetricContext,
+): StatDefs {
   const cur = trade.pnlCurrency;
   const tick = trade.instrument.tickSize;
   const cash = (cents: number, signed = true) => (
@@ -280,269 +281,436 @@ function Stats({
     trade.avgExit === undefined
       ? undefined
       : (trade.avgExit - trade.avgEntry) * dir;
-  const r = rOf(trade, basis);
+  // Realized R needs a closed trade (spec §5.2).
+  const r = trade.status === 'open' ? undefined : rOf(trade, basis);
   const planned = plannedR(trade);
   const rText = (n: number, signed: boolean) =>
     formatUnitValue('r', n, { currency: cur, signed });
-  const rewardMoney =
-    trade.plannedTarget === undefined
-      ? undefined
-      : riskFromStop(trade, trade.plannedTarget);
-  const stopPoints =
-    trade.plannedStop === undefined
-      ? undefined
-      : Math.abs(trade.avgEntry - trade.plannedStop);
-  const targetPoints =
-    trade.plannedTarget === undefined
-      ? undefined
-      : Math.abs(trade.plannedTarget - trade.avgEntry);
+  // The plan: the sides as the trade has them (levels, or the old single
+  // stop and target read as one level each), and the figures they make.
+  const sides = sidesOf(trade);
+  const reward = plannedReward(trade);
+  const risk = plannedRisk(trade);
+  const needsBoth = 'needs a target and a stop';
   const per = future ? 'points' : `per ${noun(trade, 1)}`;
   const held = heldMs(trade);
-
-  // The unit rows: the same functions every report reads, so the page agrees
-  // with them. A row the asset class lacks is absent.
   const fig = tradeFigure(trade, ctx);
-  const forex = trade.instrument.assetClass === 'forex';
-  const unitRows: React.ReactNode[] = [];
+  const levels = (n: number | undefined) =>
+    n === undefined ? undefined : `${n} ${plural(n, 'level')}`;
+  const realizedSub =
+    r !== undefined && trade.initialRisk !== undefined ? (
+      <>
+        {basis} over {cash(trade.initialRisk, false)} risk
+      </>
+    ) : sides.stops === undefined ? (
+      'needs a stop'
+    ) : trade.status === 'open' ? (
+      'after the trade closes'
+    ) : (
+      'needs a risk above 0'
+    );
+
+  const defs: StatDefs = {
+    'avg-entry': {
+      label: 'Avg entry',
+      value: price(trade.avgEntry, tick),
+      sub: `${entries.length} ${plural(entries.length, into)}, ${qty(sum(entries, (e) => e.qty))} ${noun(
+        trade,
+        sum(entries, (e) => e.qty),
+      )}`,
+    },
+    'avg-exit': {
+      label: 'Avg exit',
+      value:
+        trade.avgExit === undefined ? undefined : price(trade.avgExit, tick),
+      sub:
+        trade.avgExit === undefined
+          ? 'Still open'
+          : `${exits.length} ${plural(exits.length, into === 'buy' ? 'sell' : 'buy')}, ${qty(sum(exits, (e) => e.qty))} ${noun(
+              trade,
+              sum(exits, (e) => e.qty),
+            )}`,
+    },
+    quantity: {
+      label: 'Quantity',
+      value: qty(trade.maxPosition),
+      sub: `max position, ${noun(trade, 2)}`,
+    },
+    duration: {
+      label: 'Duration',
+      value: held === undefined ? undefined : formatDuration(held),
+      absent: 'Open',
+      sub: held === undefined ? 'since entry' : 'entry to flat',
+    },
+    'gross-pnl': {
+      label: 'Gross P&L',
+      value: cash(trade.gross),
+      tone: tone(trade.gross),
+      sub:
+        move === undefined
+          ? undefined
+          : `${move > 0 ? '+' : move < 0 ? '−' : ''}${price(Math.abs(move), tick)} ${per} on ${qty(trade.maxPosition)}`,
+    },
+    fees: {
+      label: 'Fees',
+      value: cash(-trade.fees),
+      sub: (
+        <>
+          {cash(commission, false)} commission, {cash(exchange, false)} exchange
+        </>
+      ),
+    },
+    swap: {
+      label: 'Swap',
+      tip: 'swap',
+      value: trade.swap === undefined ? undefined : cash(trade.swap),
+      tone: trade.swap === undefined ? '' : tone(trade.swap),
+      sub: trade.swap === undefined ? undefined : 'from the import',
+    },
+    'cost-basis': {
+      label: 'Cost basis',
+      value: cash(costBasis(trade), false),
+      sub: 'entry price x size',
+    },
+    // The two level blocks are drawn by the plan; the chooser lists how many levels each has.
+    targets: { label: 'Targets', value: levels(sides.targets?.levels.length) },
+    stops: { label: 'Stops', value: levels(sides.stops?.levels.length) },
+    'planned-r': {
+      label: 'Planned R',
+      tip: 'planned-r',
+      value: planned === undefined ? undefined : rText(planned, false),
+      sub:
+        planned !== undefined
+          ? 'reward over risk'
+          : reward === undefined
+            ? needsBoth
+            : 'needs a risk above 0',
+    },
+    'realized-r': {
+      label: 'Realized R',
+      tip: 'realized-r',
+      value: r === undefined ? undefined : rText(r, true),
+      tone: r === undefined ? '' : tone(r),
+      sub: realizedSub,
+    },
+    'planned-reward': {
+      label: 'Planned reward',
+      tip: 'planned-reward',
+      value: reward === undefined ? undefined : cash(reward, false),
+      sub: reward === undefined ? needsBoth : 'if every target fills',
+    },
+    'planned-risk': {
+      label: 'Planned risk',
+      tip: 'planned-risk',
+      value: risk === undefined ? undefined : cash(risk, false),
+      sub: risk === undefined ? needsBoth : 'if every stop fills',
+    },
+    mae: {
+      label: 'MAE',
+      tip: 'mae',
+      value: trade.mae === undefined ? undefined : cash(trade.mae),
+      absent: 'Not recorded',
+      tone: trade.mae === undefined ? '' : tone(trade.mae),
+      sub: 'worst open P&L',
+    },
+    mfe: {
+      label: 'MFE',
+      tip: 'mfe',
+      value: trade.mfe === undefined ? undefined : cash(trade.mfe),
+      absent: 'Not recorded',
+      tone: trade.mfe === undefined ? '' : tone(trade.mfe),
+      sub: 'best open P&L',
+    },
+  };
+
+  // The unit rows; a row the asset class lacks is absent.
   if (future) {
     const opened = tradeVolume(trade);
     const closed = closedQty(trade);
-    const units = (key: 'points' | 'ticks', label: string) => {
+    const units = (key: 'points' | 'ticks', label: string): StatDef => {
       const v = fig[key];
-      return (
-        <Stat
-          key={key}
-          label={label}
-          tone={v === null || v === undefined ? '' : tone(v)}
-        >
-          {v === null || v === undefined ? (
-            <span className="text-[14px] font-normal text-faint">None</span>
-          ) : (
-            formatUnitValue(key, v, { currency: cur, signed: true })
-          )}
-        </Stat>
-      );
+      return {
+        label,
+        value:
+          v === null || v === undefined
+            ? undefined
+            : formatUnitValue(key, v, { currency: cur, signed: true }),
+        tone: v === null || v === undefined ? '' : tone(v),
+      };
     };
-    unitRows.push(
-      units('points', 'Points'),
-      units('ticks', 'Ticks'),
-      <Stat key="contracts" label="Contracts">
-        {closed < opened - 1e-9
+    defs.points = units('points', 'Points');
+    defs.ticks = units('ticks', 'Ticks');
+    // Ticks over the contracts the exits closed (record §10): None before an exit.
+    const ticks = fig.ticks;
+    const perContract =
+      ticks === null || ticks === undefined || !(closed > 0)
+        ? undefined
+        : ticks / closed;
+    defs['ticks-per-contract'] = {
+      label: 'Ticks per contract',
+      tip: 'ticks-per-contract',
+      value:
+        perContract === undefined
+          ? undefined
+          : formatUnitValue('ticks', perContract, {
+              currency: cur,
+              signed: true,
+            }),
+      tone: perContract === undefined ? '' : tone(perContract),
+    };
+    defs.contracts = {
+      label: 'Contracts',
+      value:
+        closed < opened - 1e-9
           ? `${qty(closed)} of ${qty(opened)} closed`
-          : qty(opened)}
-      </Stat>,
-    );
+          : qty(opened),
+    };
   }
-  if (forex) {
+  if (trade.instrument.assetClass === 'forex') {
     const pips = fig.pips ?? null;
     const perPip = moneyPerPip(trade);
-    unitRows.push(
-      <Stat
-        key="pips"
-        label="Pips"
-        tone={pips === null ? '' : tone(pips)}
-        sub="per lot"
-      >
-        {pips === null ? (
-          <span className="text-[14px] font-normal text-faint">None</span>
-        ) : (
-          formatUnitValue('pips', pips, { currency: cur, signed: true })
-        )}
-      </Stat>,
-      <Stat key="per-pip" label="Money per pip" sub="gross P&L over pips">
-        {perPip === null ? (
-          <span className="text-[14px] font-normal text-faint">None</span>
-        ) : (
-          cash(perPip, false)
-        )}
-      </Stat>,
-    );
+    defs.pips = {
+      label: 'Pips',
+      value:
+        pips === null
+          ? undefined
+          : formatUnitValue('pips', pips, { currency: cur, signed: true }),
+      tone: pips === null ? '' : tone(pips),
+      sub: 'per lot',
+    };
+    defs['money-per-pip'] = {
+      label: 'Money per pip',
+      value: perPip === null ? undefined : cash(perPip, false),
+      sub: 'gross P&L over pips',
+    };
   }
-  unitRows.push(
-    <Stat key="basis" label="Cost basis" sub="entry price x size">
-      {cash(costBasis(trade), false)}
-    </Stat>,
-  );
+  return defs;
+}
+
+const NONE = 'text-[14px] font-normal text-faint';
+
+function Stats({
+  trade,
+  defs,
+  shown,
+  basis,
+  readOnly,
+  save,
+}: {
+  trade: Trade;
+  defs: StatDefs;
+  /** The ids the user wants on the card; the trade's own lack of a stat is `defs`. */
+  shown: ReadonlySet<string>;
+  basis: 'net' | 'gross';
+  readOnly: boolean;
+  save: Save;
+}): React.JSX.Element {
+  const tick = trade.instrument.tickSize;
+  const sides = sidesOf(trade);
+  const on = (ids: readonly StatId[]) =>
+    ids.filter((id) => shown.has(id) && defs[id] !== undefined);
+  const first = on(FIRST_IDS);
+  const derived = on(PLAN_IDS);
+  const last = on(LAST_IDS);
+  const targets = shown.has('targets');
+  const stops = shown.has('stops');
+  const planned = targets || stops || derived.length > 0;
+
   // Whole rows only, so the hairlines between cells never show an empty one.
-  const fillers = (4 - (unitRows.length % 4)) % 4;
+  const GRID =
+    'grid grid-cols-2 gap-px bg-line sm:grid-cols-4 [&>div]:border-0';
+  const cells = (ids: readonly StatId[], name: string) => (
+    <>
+      {ids.map((id) => {
+        const def = defs[id]!;
+        return (
+          <Stat
+            key={id}
+            label={def.label}
+            tip={def.tip}
+            basis={basis}
+            tone={def.tone}
+            sub={def.sub}
+          >
+            {def.value ?? <span className={NONE}>{def.absent ?? 'None'}</span>}
+          </Stat>
+        );
+      })}
+      {Array.from({ length: (4 - (ids.length % 4)) % 4 }, (_, i) => (
+        <div key={`${name}-${i}`} aria-hidden="true" className="bg-surface-1" />
+      ))}
+    </>
+  );
+
+  if (first.length + derived.length + last.length === 0 && !targets && !stops)
+    return (
+      <p className="mt-3.5 border-t border-line pt-3.5 text-[13.5px] text-muted">
+        No stats to show. Choose stats picks what this card lists.
+      </p>
+    );
 
   return (
-    <div className="mt-3.5 grid grid-cols-2 gap-px border-t border-line bg-line sm:grid-cols-4 [&>div]:border-0">
-      <Stat
-        label="Avg entry"
-        sub={`${entries.length} ${plural(entries.length, into)}, ${qty(sum(entries, (e) => e.qty))} ${noun(
-          trade,
-          sum(entries, (e) => e.qty),
-        )}`}
-      >
-        {price(trade.avgEntry, tick)}
-      </Stat>
-      <Stat
-        label="Avg exit"
-        sub={
-          trade.avgExit === undefined
-            ? 'Still open'
-            : `${exits.length} ${plural(exits.length, into === 'buy' ? 'sell' : 'buy')}, ${qty(sum(exits, (e) => e.qty))} ${noun(
-                trade,
-                sum(exits, (e) => e.qty),
-              )}`
-        }
-      >
-        {trade.avgExit === undefined ? (
-          <span className="text-[14px] font-normal text-faint">None</span>
-        ) : (
-          price(trade.avgExit, tick)
-        )}
-      </Stat>
-      <Stat label="Quantity" sub={`max position, ${noun(trade, 2)}`}>
-        {qty(trade.maxPosition)}
-      </Stat>
-      <Stat
-        label="Duration"
-        sub={held === undefined ? 'since entry' : 'entry to flat'}
-      >
-        {held === undefined ? (
-          <span className="text-[14px] font-normal text-faint">Open</span>
-        ) : (
-          formatDuration(held)
-        )}
-      </Stat>
-      <Stat
-        label="Gross P&L"
-        tone={tone(trade.gross)}
-        sub={
-          move === undefined
-            ? undefined
-            : `${move > 0 ? '+' : move < 0 ? '−' : ''}${price(Math.abs(move), tick)} ${per} on ${qty(trade.maxPosition)}`
-        }
-      >
-        {cash(trade.gross)}
-      </Stat>
-      <Stat
-        label="Fees"
-        sub={
-          <>
-            {cash(commission, false)} commission, {cash(exchange, false)}{' '}
-            exchange
-          </>
-        }
-      >
-        {cash(-trade.fees)}
-      </Stat>
-      <Stat
-        label="Planned stop"
-        sub={
-          trade.initialRisk !== undefined && stopPoints !== undefined ? (
-            <>
-              risk {cash(trade.initialRisk, false)}, {price(stopPoints, tick)}{' '}
-              {future ? 'points' : 'away'}
-            </>
-          ) : (
-            'Where you would be wrong'
-          )
-        }
-      >
-        <PriceField
-          label="Planned stop"
-          value={trade.plannedStop}
-          tick={tick}
-          disabled={readOnly}
-          onCommit={(next) => save({ plannedStop: next })}
-        />
-      </Stat>
-      <Stat
-        label="Planned target"
-        sub={
-          rewardMoney !== undefined && targetPoints !== undefined ? (
-            <>
-              reward {cash(rewardMoney, false)}, {price(targetPoints, tick)}{' '}
-              {future ? 'points' : 'away'}
-            </>
-          ) : (
-            'Where you would take profit'
-          )
-        }
-      >
-        <PriceField
-          label="Planned target"
-          value={trade.plannedTarget}
-          tick={tick}
-          disabled={readOnly}
-          onCommit={(next) => save({ plannedTarget: next })}
-        />
-      </Stat>
-      <Stat
-        label="Planned R"
-        tip="planned-r"
-        basis={basis}
-        sub={
-          planned === undefined
-            ? 'needs a stop and a target'
-            : 'target over stop'
-        }
-      >
-        {planned === undefined ? (
-          <span className="text-[14px] font-normal text-faint">None</span>
-        ) : (
-          rText(planned, false)
-        )}
-      </Stat>
-      <Stat
-        label="Realized R"
-        tip="realized-r"
-        basis={basis}
-        tone={r === undefined ? '' : tone(r)}
-        sub={
-          r === undefined || trade.initialRisk === undefined ? (
-            'needs a planned stop'
-          ) : (
-            <>
-              {basis} over {cash(trade.initialRisk, false)} risk
-            </>
-          )
-        }
-      >
-        {r === undefined ? (
-          <span className="text-[14px] font-normal text-faint">None</span>
-        ) : (
-          rText(r, true)
-        )}
-      </Stat>
-      <Stat
-        label="MAE"
-        tip="mae"
-        basis={basis}
-        tone={trade.mae === undefined ? '' : tone(trade.mae)}
-        sub="worst open P&L"
-      >
-        {trade.mae === undefined ? (
-          <span className="text-[14px] font-normal text-faint">
-            Not recorded
-          </span>
-        ) : (
-          cash(trade.mae)
-        )}
-      </Stat>
-      <Stat
-        label="MFE"
-        tip="mfe"
-        basis={basis}
-        tone={trade.mfe === undefined ? '' : tone(trade.mfe)}
-        sub="best open P&L"
-      >
-        {trade.mfe === undefined ? (
-          <span className="text-[14px] font-normal text-faint">
-            Not recorded
-          </span>
-        ) : (
-          cash(trade.mfe)
-        )}
-      </Stat>
-      {unitRows}
-      {Array.from({ length: fillers }, (_, i) => (
-        <div key={`fill-${i}`} aria-hidden="true" className="bg-surface-1" />
-      ))}
+    <div className="mt-3.5">
+      {first.length > 0 ? (
+        <div className={`border-t border-line ${GRID}`}>
+          {cells(first, 'first')}
+        </div>
+      ) : null}
+
+      {planned ? (
+        <div
+          role="group"
+          aria-labelledby="plan-h"
+          className="border-t border-line pt-3.5 pb-1.5"
+        >
+          <b id="plan-h" className="text-[13.5px] font-semibold">
+            Plan
+          </b>
+          {targets || stops ? (
+            <div
+              aria-hidden="true"
+              className="mt-2 grid grid-cols-[128px_minmax(0,1fr)] gap-x-[18px] max-sm:hidden"
+            >
+              <span />
+              <span className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_32px] gap-x-2 pb-1 text-xs text-faint">
+                <span>Level</span>
+                <span>Quantity</span>
+              </span>
+            </div>
+          ) : null}
+          {targets ? (
+            <LevelsBlock
+              trade={trade}
+              side="target"
+              value={sides.targets}
+              readOnly={readOnly}
+              onCommit={(next) => save({ targets: next })}
+            />
+          ) : null}
+          {targets && stops ? (
+            <p className="my-2.5 flex items-center gap-2.5 text-[12.5px] whitespace-nowrap text-faint before:h-0 before:flex-none before:basis-[128px] before:border-t before:border-dashed before:border-line-2 after:h-0 after:flex-1 after:border-t after:border-dashed after:border-line-2 max-sm:before:flex-1 max-sm:before:basis-0">
+              <span>
+                Avg entry{' '}
+                <b className="font-semibold text-text tabular-nums">
+                  {price(trade.avgEntry, tick)}
+                </b>
+                , {qty(trade.maxPosition)} {noun(trade, trade.maxPosition)}
+              </span>
+            </p>
+          ) : null}
+          {stops ? (
+            <LevelsBlock
+              trade={trade}
+              side="stop"
+              value={sides.stops}
+              readOnly={readOnly}
+              onCommit={(next) => save({ stops: next })}
+            />
+          ) : null}
+          {derived.length > 0 ? (
+            <div
+              className={`${targets || stops ? 'mt-3 ' : 'mt-2 '}border-t border-line ${GRID}`}
+            >
+              {cells(derived, 'plan')}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {last.length > 0 ? (
+        <div className={`border-t border-line ${GRID}`}>
+          {cells(last, 'last')}
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+/**
+ * The Execution card: its stats as the reader chose them, and the Choose stats
+ * dialog (B51). The choice is the reader's own, so an archived account's trade
+ * can still change it.
+ */
+function ExecutionCard({
+  trade,
+  display,
+  basis,
+  ctx,
+  readOnly,
+  save,
+}: {
+  trade: Trade;
+  display: Display;
+  basis: 'net' | 'gross';
+  ctx: MetricContext;
+  readOnly: boolean;
+  save: Save;
+}): React.JSX.Element {
+  const prefs = usePrefs().data!;
+  const update = useUpdatePrefs();
+  const unset = useUnsetPrefs();
+  // Every pattern of the workspace's trades; this trade's own are the button's.
+  const patterns = usePatterns().data;
+  const defs = statDefs(trade, display, basis, ctx);
+  const shown: readonly string[] = prefs.tradeStats ?? STAT_IDS;
+  const rows: StatChoice[] = STAT_IDS.map((id) => {
+    const def = defs[id];
+    return {
+      id,
+      label: def?.label ?? id,
+      value:
+        def === undefined ? undefined : (def.value ?? def.absent ?? 'None'),
+      listed: def !== undefined,
+    };
+  });
+
+  return (
+    <section aria-labelledby="exec-h" className={`${CARD} ${PAD}`}>
+      <CardHeader
+        headingId="exec-h"
+        title="Execution"
+        after={
+          <span className="text-[12.5px] text-faint">
+            {trade.instrument.symbol}
+            {trade.instrument.pointValue !== 1 ? (
+              // A multiplier on the price move, a plain number: nothing for Privacy to hide.
+              <>
+                , ×
+                {trade.instrument.pointValue.toLocaleString('en-US', {
+                  maximumFractionDigits: 6,
+                })}{' '}
+                multiplier
+              </>
+            ) : null}
+          </span>
+        }
+        end={
+          <span className="flex flex-wrap items-center justify-end gap-2">
+            <PatternsButton
+              hits={
+                patterns ? (patterns.byTrade.get(trade.id) ?? []) : undefined
+              }
+            />
+            <StatsChooser
+              rows={rows}
+              shown={shown}
+              onSave={async (next) => {
+                if (next === undefined) await unset.mutateAsync(['tradeStats']);
+                else await update.mutateAsync({ tradeStats: next });
+              }}
+            />
+          </span>
+        }
+      />
+      <Stats
+        trade={trade}
+        defs={defs}
+        shown={new Set(shown)}
+        basis={basis}
+        readOnly={readOnly}
+        save={save}
+      />
+    </section>
   );
 }
 
@@ -550,11 +718,14 @@ function Executions({
   trade,
   timeZone,
   display,
+  readOnly,
 }: {
   trade: Trade;
   timeZone: string;
   display: Display;
+  readOnly: boolean;
 }): React.JSX.Element {
+  const edit = useFillCosts(trade, display, readOnly);
   const fills = sortedFills(trade);
   const held = positions(trade, fills);
   const tick = trade.instrument.tickSize;
@@ -562,91 +733,133 @@ function Executions({
     <FigureText f={display.cash(cents, false, trade.pnlCurrency)} />
   );
   const TH =
-    'h-9 border-b border-line pr-3.5 text-left text-xs font-medium text-faint last:pr-0';
+    'h-9 border-b border-line pr-3.5 text-left text-xs font-medium whitespace-nowrap text-faint last:pr-0';
   const TD = 'h-9 border-b border-line/70 pr-3.5 last:pr-0';
   return (
-    <div className="relative mt-3.5 overflow-x-auto">
-      <table
-        aria-label="Executions"
-        className="w-full min-w-[560px] border-collapse text-[13.5px]"
+    <>
+      {/* The cost buttons reach 6px past the column, so the scroller's padding keeps their focus ring and its edge from scrolling. */}
+      <div
+        ref={(el) => edit.setScroller(el)}
+        className="relative -mx-1.5 mt-3.5 overflow-x-auto px-1.5"
       >
-        <thead>
-          <tr>
-            <th scope="col" className={TH}>
-              Time
-            </th>
-            <th scope="col" className={TH}>
-              Side
-            </th>
-            <th scope="col" className={`${TH} text-right`}>
-              Quantity
-            </th>
-            <th scope="col" className={`${TH} text-right`}>
-              Price
-            </th>
-            <th scope="col" className={`${TH} text-right`}>
-              Position
-            </th>
-            <th scope="col" className={`${TH} text-right`}>
-              Exchange fees
-            </th>
-            <th scope="col" className={`${TH} text-right`}>
-              Commission
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {fills.map((f, i) => (
-            <tr key={f.id}>
-              <td
-                className={`${TD} font-semibold whitespace-nowrap tabular-nums`}
-              >
-                {clockOnDay(f.time, trade.openedAt, timeZone)}
-              </td>
-              <td className={TD}>
-                <span className="inline-flex h-[22px] items-center rounded-[7px] bg-sunken px-2 text-xs font-semibold text-muted">
-                  {f.side === 'buy' ? 'Buy' : 'Sell'}
-                </span>
-              </td>
-              <td className={`${TD} text-right tabular-nums`}>{qty(f.qty)}</td>
-              <td className={`${TD} text-right font-medium tabular-nums`}>
-                {price(f.price, tick)}
-              </td>
-              <td
-                className={`${TD} text-right tabular-nums ${held[i] === 0 ? 'text-faint' : ''}`}
-              >
-                {held[i] === 0
-                  ? 'Flat'
-                  : `${held[i]! > 0 ? '+' : '−'}${qty(Math.abs(held[i]!))}`}
-              </td>
-              <td className={`${TD} text-right text-muted tabular-nums`}>
-                {cash(f.fees)}
-              </td>
-              <td className={`${TD} text-right text-muted tabular-nums`}>
-                {cash(f.commission)}
-              </td>
+        <table
+          aria-label="Executions"
+          className="w-full min-w-[560px] border-collapse text-[13.5px]"
+        >
+          <thead>
+            <tr>
+              <th scope="col" className={TH}>
+                Time
+              </th>
+              <th scope="col" className={TH}>
+                Side
+              </th>
+              <th scope="col" className={`${TH} text-right`}>
+                Quantity
+              </th>
+              <th scope="col" className={`${TH} text-right`}>
+                Price
+              </th>
+              <th scope="col" className={`${TH} text-right`}>
+                Position
+              </th>
+              <th scope="col" className={`${TH} text-right`}>
+                Exchange fees
+              </th>
+              <th scope="col" className={`${TH} text-right`}>
+                Commission
+              </th>
+              {edit.openId !== null ? (
+                <th scope="col" className={`${TH} w-[76px]`}>
+                  <span className="sr-only">Save the row</span>
+                </th>
+              ) : null}
             </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr className="font-semibold text-text">
-            <td className="h-[38px] pr-3.5">Total</td>
-            <td />
-            <td className="pr-3.5 text-right tabular-nums">
-              {qty(sum(fills, (e) => e.qty))}
-            </td>
-            <td />
-            <td />
-            <td className="pr-3.5 text-right tabular-nums">
-              {cash(sum(fills, (e) => e.fees))}
-            </td>
-            <td className="text-right tabular-nums">
-              {cash(sum(fills, (e) => e.commission))}
-            </td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {fills.map((f, i) => {
+              const open = edit.openId === f.id;
+              const when = `${f.side} at ${clockOnDay(f.time, trade.openedAt, timeZone)}`;
+              return (
+                <tr
+                  key={f.id}
+                  className={open ? 'bg-accent-soft/55' : undefined}
+                  onKeyDown={open ? rowKeys(edit, f) : undefined}
+                >
+                  <td
+                    className={`${TD} font-semibold whitespace-nowrap tabular-nums`}
+                  >
+                    {clockOnDay(f.time, trade.openedAt, timeZone)}
+                  </td>
+                  <td className={TD}>
+                    <span className="inline-flex h-[22px] items-center rounded-[7px] bg-sunken px-2 text-xs font-semibold text-muted">
+                      {f.side === 'buy' ? 'Buy' : 'Sell'}
+                    </span>
+                  </td>
+                  <td className={`${TD} text-right tabular-nums`}>
+                    {qty(f.qty)}
+                  </td>
+                  <td className={`${TD} text-right font-medium tabular-nums`}>
+                    {price(f.price, tick)}
+                  </td>
+                  <td
+                    className={`${TD} text-right tabular-nums ${held[i] === 0 ? 'text-faint' : ''}`}
+                  >
+                    {held[i] === 0
+                      ? 'Flat'
+                      : `${held[i]! > 0 ? '+' : '−'}${qty(Math.abs(held[i]!))}`}
+                  </td>
+                  <td className={`${TD} text-right text-muted tabular-nums`}>
+                    <CostCell
+                      edit={edit}
+                      fill={f}
+                      field="fees"
+                      when={when}
+                      figure={cash(f.fees)}
+                    />
+                  </td>
+                  <td className={`${TD} text-right text-muted tabular-nums`}>
+                    <CostCell
+                      edit={edit}
+                      fill={f}
+                      field="commission"
+                      when={when}
+                      figure={cash(f.commission)}
+                    />
+                  </td>
+                  {edit.openId !== null ? (
+                    <td className={TD}>
+                      {open ? <RowControls edit={edit} fill={f} /> : null}
+                    </td>
+                  ) : null}
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr className="font-semibold text-text">
+              <td className="h-[38px] pr-3.5">Total</td>
+              <td />
+              <td className="pr-3.5 text-right tabular-nums">
+                {qty(sum(fills, (e) => e.qty))}
+              </td>
+              <td />
+              <td />
+              <td className="pr-3.5 text-right tabular-nums">
+                {cash(sum(fills, (e) => e.fees))}
+              </td>
+              <td
+                className={`text-right tabular-nums ${edit.openId !== null ? 'pr-3.5' : ''}`}
+              >
+                {cash(sum(fills, (e) => e.commission))}
+              </td>
+              {edit.openId !== null ? <td /> : null}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <FillCostsNote edit={edit} />
+    </>
   );
 }
 
@@ -726,6 +939,15 @@ function NoteCard({
   );
   const [which, setWhich] = useState<'trade' | 'day'>('trade');
   const date = dayNoteDate(trade, timeZone);
+  // Export and import act on the note in view, as the editor holds it.
+  const ownHandle = useRef<NoteEditorHandle | null>(null);
+  const note = handleRef ?? ownHandle;
+  const tradeEntry = useJournalEntry(trade.noteId ?? '').data ?? undefined;
+  const dayEntry = findDailyEntry(
+    useJournal({ enabled: which === 'day' }).data,
+    date,
+  );
+  const entry = which === 'trade' ? tradeEntry : dayEntry;
   const switchTo = (next: 'trade' | 'day') => {
     setWhich(next);
     setStatus('idle');
@@ -761,13 +983,24 @@ function NoteCard({
           ]}
           onChange={switchTo}
         />
+        <NoteMenu
+          read={() => ({
+            title:
+              entry?.title ??
+              (which === 'trade'
+                ? `${trade.instrument.symbol} trade note`
+                : `Daily review, ${dayName(date)}`),
+            tags: entry?.tags ?? [],
+            body: note.current?.getJSON() ?? entry?.body ?? EMPTY_DOC,
+          })}
+        />
       </div>
       {which === 'trade' ? (
         <TradeNote
           key={trade.id}
           trade={trade}
           readOnly={readOnly}
-          handleRef={handleRef}
+          handleRef={note}
           onStatus={setStatus}
         />
       ) : (
@@ -775,7 +1008,21 @@ function NoteCard({
           key={date}
           date={date}
           readOnly={readOnly}
-          handleRef={handleRef}
+          handleRef={note}
+          // The daily templates, as the day card's toolbar has them. The trade note has none: Keel has no trade-note templates.
+          templateSlot={
+            readOnly
+              ? undefined
+              : (slot) => (
+                  <TemplateMenu
+                    {...slot}
+                    kind="daily-review"
+                    onPick={(t) =>
+                      note.current?.insertContent(structuredClone(t.body))
+                    }
+                  />
+                )
+          }
           onStatus={setStatus}
         />
       )}
@@ -842,8 +1089,23 @@ function TradePage({
   }, [set.data?.trades, trade]);
 
   const roi = netRoiOf(trade);
-  const r = rOf(trade, basis);
+  // The header's sub-line adds the swap so its figures add up to the net; a
+  // trade with none, or a swap of nothing, reads as it always did.
+  const swap =
+    trade.swap === undefined || trade.swap === 0 ? undefined : trade.swap;
+  // Realized R needs a closed trade (spec §5.2).
+  const r = trade.status === 'open' ? undefined : rOf(trade, basis);
   const planned = plannedR(trade);
+  // Under the headline R: the side planned R still needs, or why it has none.
+  const plan = sidesOf(trade);
+  const missingPlan =
+    plan.targets === undefined && plan.stops === undefined
+      ? 'add a target and a stop for planned R'
+      : plan.targets === undefined
+        ? 'add a target for planned R'
+        : plan.stops === undefined
+          ? 'add a stop for planned R'
+          : 'no planned R with nothing at risk';
   const fig = display.ofTrade(trade);
   const money = pnlTone(basis === 'gross' ? trade.gross : trade.net);
   const strategyNames = trade.strategyIds.flatMap(
@@ -995,7 +1257,16 @@ function TradePage({
             </span>{' '}
             <span className="whitespace-nowrap">
               <FigureText f={display.cash(-trade.fees, true, cur)} /> fees
+              {swap === undefined ? '' : ','}
             </span>
+            {swap === undefined ? null : (
+              <>
+                {' '}
+                <span className="whitespace-nowrap">
+                  <FigureText f={display.cash(swap, true, cur)} /> swap
+                </span>
+              </>
+            )}
           </small>
         </div>
         <div className="min-w-0 lg:border-l lg:border-line lg:px-7">
@@ -1027,7 +1298,7 @@ function TradePage({
           </b>
           <small className="block text-xs text-faint">
             {planned === undefined
-              ? 'add a target for planned R'
+              ? missingPlan
               : `of ${formatUnitValue('r', planned, { currency: cur, signed: false })} planned`}
           </small>
         </div>
@@ -1049,35 +1320,14 @@ function TradePage({
 
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
         <div className="flex min-w-0 flex-col gap-4">
-          <section aria-labelledby="exec-h" className={`${CARD} ${PAD}`}>
-            <CardHeader
-              headingId="exec-h"
-              title="Execution"
-              after={
-                <span className="text-[12.5px] text-faint">
-                  {trade.instrument.symbol}
-                  {trade.instrument.pointValue !== 1 ? (
-                    // A multiplier on the price move, a plain number: nothing for Privacy to hide.
-                    <>
-                      , ×
-                      {trade.instrument.pointValue.toLocaleString('en-US', {
-                        maximumFractionDigits: 6,
-                      })}{' '}
-                      multiplier
-                    </>
-                  ) : null}
-                </span>
-              }
-            />
-            <Stats
-              trade={trade}
-              display={display}
-              basis={basis}
-              ctx={ctx}
-              readOnly={readOnly}
-              save={save}
-            />
-          </section>
+          <ExecutionCard
+            trade={trade}
+            display={display}
+            basis={basis}
+            ctx={ctx}
+            readOnly={readOnly}
+            save={save}
+          />
 
           <section aria-labelledby="fills-h" className={`${CARD} ${PAD}`}>
             <CardHeader
@@ -1101,7 +1351,12 @@ function TradePage({
               Plotted from your fills only. The price path between fills needs
               market data, which Keel does not have yet.
             </p>
-            <Executions trade={trade} timeZone={timeZone} display={display} />
+            <Executions
+              trade={trade}
+              timeZone={timeZone}
+              display={display}
+              readOnly={readOnly}
+            />
           </section>
         </div>
 
@@ -1148,6 +1403,8 @@ function TradePage({
             />
           </section>
 
+          <TradeFiles trade={trade} readOnly={readOnly} />
+
           <NoteCard
             trade={trade}
             timeZone={prefs.timeZone}
@@ -1178,6 +1435,8 @@ function pnlTone(cents: number): string {
 }
 
 function Legend({ trade }: { trade: Trade }): React.JSX.Element {
+  // The chart's zones: one for each side the trade has, saved either way.
+  const sides = sidesOf(trade);
   return (
     <span className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
       <span className="inline-flex items-center gap-1.5">
@@ -1201,7 +1460,7 @@ function Legend({ trade }: { trade: Trade }): React.JSX.Element {
         </svg>
         Sell
       </span>
-      {trade.plannedTarget === undefined ? null : (
+      {sides.targets === undefined ? null : (
         <span className="inline-flex items-center gap-1.5">
           <i
             aria-hidden="true"
@@ -1210,7 +1469,7 @@ function Legend({ trade }: { trade: Trade }): React.JSX.Element {
           Target zone
         </span>
       )}
-      {trade.plannedStop === undefined ? null : (
+      {sides.stops === undefined ? null : (
         <span className="inline-flex items-center gap-1.5">
           <i
             aria-hidden="true"

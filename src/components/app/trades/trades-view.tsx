@@ -35,6 +35,7 @@ import {
   useAccounts,
   useCashFlows,
   useJournal,
+  usePatterns,
   usePrefs,
   useStrategies,
   useTagCategories,
@@ -79,6 +80,7 @@ import { SelectBox } from './select-box';
 import {
   ALIGN,
   COLUMN_WIDTHS,
+  HANG_SORT,
   PAD_LEFT,
   buildColumns,
   features,
@@ -294,6 +296,7 @@ function SortButton({
 const HEADER_TIPS: Partial<Record<ColumnId, MetricId>> = {
   roi: 'net-roi',
   realizedR: 'realized-r',
+  patterns: 'patterns',
 };
 
 function SortMark({
@@ -350,6 +353,8 @@ export function TradesView(): React.JSX.Element {
   const tags = useTags().data;
   const journal = useJournal().data;
   const categories = useTagCategories().data;
+  // Every pattern of the workspace's trades, not of the filtered set (B20).
+  const patterns = usePatterns().data;
   const noteText = useMemo(() => noteIndex(journal ?? []), [journal]);
   const updatePrefs = useUpdatePrefs();
   const queryClient = useQueryClient();
@@ -379,6 +384,8 @@ export function TradesView(): React.JSX.Element {
     ids: readonly string[];
   }>({ key: '', ids: [] });
   const [result, setResult] = useState<React.ReactNode>(null);
+  // Where the keyboard lands once a merge, split or move is in and its bar has gone.
+  const logRef = useRef<HTMLElement>(null);
 
   // A pending save shows at once, as the Display menu's does.
   const pendingColumns = updatePrefs.isPending
@@ -457,8 +464,10 @@ export function TradesView(): React.JSX.Element {
   const rows = model?.rows ?? NO_ROWS;
   const cellEnv: CellEnv | undefined = useMemo(
     () =>
-      ctx && timeZone && facts ? { timeZone, ctx, display, facts } : undefined,
-    [ctx, timeZone, facts, display],
+      ctx && timeZone && facts
+        ? { timeZone, ctx, display, facts, patterns: patterns?.byTrade }
+        : undefined,
+    [ctx, timeZone, facts, display, patterns],
   );
   const columns = useMemo(
     () => (cellEnv ? buildColumns(columnIds, cellEnv) : []),
@@ -698,6 +707,7 @@ export function TradesView(): React.JSX.Element {
         tags: tags ?? [],
         categories: categories ?? [],
         ctx: ctx!,
+        patterns: patterns?.byTrade,
       }),
       today,
     );
@@ -773,8 +783,10 @@ export function TradesView(): React.JSX.Element {
       ) : null}
 
       <section
+        ref={logRef}
+        tabIndex={-1}
         aria-label="Trade log"
-        className={`${CARD} min-w-0 overflow-hidden`}
+        className={`${CARD} min-w-0 overflow-hidden outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent`}
       >
         <div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-3">
           <Segmented<Status>
@@ -1005,7 +1017,7 @@ export function TradesView(): React.JSX.Element {
                               {canSort ? (
                                 HEADER_TIPS[id] ? (
                                   <span
-                                    className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}
+                                    className={`relative inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}
                                   >
                                     <MetricTip
                                       id={HEADER_TIPS[id]}
@@ -1014,12 +1026,21 @@ export function TradesView(): React.JSX.Element {
                                     >
                                       {COLUMN_LABELS[id].label}
                                     </MetricTip>
-                                    <SortButton
-                                      label={`Sort by ${COLUMN_LABELS[id].label}`}
-                                      align={align}
-                                      sorted={sorted}
-                                      onClick={header.column.getToggleSortingHandler()}
-                                    />
+                                    {/* A narrow column's mark hangs off the label's left, in no room of its own. */}
+                                    <span
+                                      className={
+                                        HANG_SORT.has(id)
+                                          ? 'absolute top-1/2 right-full -translate-y-1/2'
+                                          : 'contents'
+                                      }
+                                    >
+                                      <SortButton
+                                        label={`Sort by ${COLUMN_LABELS[id].label}`}
+                                        align={align}
+                                        sorted={sorted}
+                                        onClick={header.column.getToggleSortingHandler()}
+                                      />
+                                    </span>
                                   </span>
                                 ) : (
                                   <SortButton
@@ -1146,6 +1167,7 @@ export function TradesView(): React.JSX.Element {
             onClear={() => setChosen([])}
             onExport={() => exportCsv(selected)}
             onResult={setResult}
+            landing={logRef}
           />
         </div>
       ) : null}

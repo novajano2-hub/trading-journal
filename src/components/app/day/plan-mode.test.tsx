@@ -101,7 +101,7 @@ test('Templates inserts at the cursor, mid-document, and keeps the rest', async 
     ],
   });
   tiptap.commands.setTextSelection(1 + 'First line'.length);
-  await pick('Templates', 'Daily game plan');
+  await pick('Insert a template', 'Daily game plan');
   await within(box).findByText('What I will trade');
   const text = box.textContent ?? '';
   // Not appended: the template sits between the two lines.
@@ -131,12 +131,17 @@ test('the Templates menu lists yours, then the built-in templates, then See more
     isDefault: false,
   });
   await open(TODAY, { repo });
-  fireEvent.keyDown(await screen.findByRole('button', { name: 'Templates' }), {
-    key: 'Enter',
-  });
+  fireEvent.keyDown(
+    await screen.findByRole('button', { name: 'Insert a template' }),
+    {
+      key: 'Enter',
+    },
+  );
   await screen.findByRole('menuitem', { name: 'Daily game plan' });
   // Built-in templates sit with Keel's three, not under "Your templates".
   const menu = screen.getByRole('menu');
+  // A menu that is closing takes no pointer, so it cannot pull the keyboard back from the text.
+  expect(menu.className).toContain('data-[state=closed]:pointer-events-none!');
   expect(
     [...menu.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent),
   ).toEqual([
@@ -159,13 +164,62 @@ test('the Templates menu lists yours, then the built-in templates, then See more
 
 test('See more templates opens Manage templates', async () => {
   await open();
-  fireEvent.keyDown(await screen.findByRole('button', { name: 'Templates' }), {
-    key: 'Enter',
-  });
+  fireEvent.keyDown(
+    await screen.findByRole('button', { name: 'Insert a template' }),
+    {
+      key: 'Enter',
+    },
+  );
   fireEvent.click(
     await screen.findByRole('menuitem', { name: 'See more templates' }),
   );
   expect(await screen.findByRole('dialog', { name: 'Templates' })).toBeTruthy();
+});
+
+test('Escape on the template menu hands the keyboard back to the Template button', async () => {
+  await open();
+  const button = await screen.findByRole('button', {
+    name: 'Insert a template',
+  });
+  fireEvent.keyDown(button, { key: 'Enter' });
+  await screen.findByRole('menuitem', { name: 'Daily game plan' });
+  fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+  await waitFor(() => expect(document.activeElement).toBe(button));
+});
+
+test('on a phone, Manage templates keeps the keyboard in the dialog it opens', async () => {
+  window.innerWidth = 390;
+  try {
+    await open();
+    const box = await editor();
+    fireEvent.keyDown(
+      await screen.findByRole('button', { name: 'More tools' }),
+      { key: 'Enter' },
+    );
+    const template = await screen.findByRole('menuitem', { name: 'Template' });
+    // The More menu's own entrance, before a pick lands.
+    await new Promise((r) => setTimeout(r, 400));
+    fireEvent.click(template);
+    const manage = await screen.findByRole('menuitem', {
+      name: 'Manage templates',
+    });
+    // Any move of the keyboard to the note (on a phone it brings up the
+    // keyboard and scrolls the note under the dialog) counts.
+    let pulled = 0;
+    box.addEventListener('focus', () => (pulled += 1));
+    fireEvent.click(manage);
+    const dialog = await screen.findByRole('dialog', { name: 'Templates' });
+    await waitFor(() =>
+      expect(dialog.contains(document.activeElement)).toBe(true),
+    );
+    // The template menu's closing does not pull it back to the note.
+    await new Promise((r) => setTimeout(r, 300));
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(pulled).toBe(0);
+  } finally {
+    window.innerWidth = 1024;
+  }
 });
 
 test('the template line names the template the note started from, even after the default changes', async () => {
@@ -263,7 +317,7 @@ test('the tip shows once, in the flow above the note, and Got it closes it', asy
   );
   cleanup();
   await open(TODAY, { repo });
-  await screen.findByRole('button', { name: 'Templates' });
+  await screen.findByRole('button', { name: 'Insert a template' });
   expect(screen.queryByRole('note', { name: 'Tip' })).toBeNull();
 });
 

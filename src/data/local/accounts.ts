@@ -1,3 +1,4 @@
+import type { Account } from '@/domain/types';
 import {
   ArchivedAccountError,
   NotFoundError,
@@ -5,10 +6,49 @@ import {
 } from '../repository';
 import type { LocalContext } from './context';
 import { applyCostMethod } from './cost-method';
-import { bumpImportRevision } from './imports';
+import type { KeelDb } from './db';
+import { deleteOwnerFiles } from './files';
+import { changeRows, fieldChanges, lifecycleRow, logHistory } from './history';
+import { bumpImportRevision, droppedOwners } from './imports';
 import { rwTx } from './tx';
 import { pruneJournalLinks } from './journal';
 import { mergePatch } from '../merge';
+
+/** The account fields history keeps (B26). */
+const LOGGED_FIELDS = [
+  'name',
+  'broker',
+  'type',
+  'currency',
+  'startingBalance',
+  'status',
+  'costMethod',
+] as const;
+
+/** The account as history compares it: FIFO is stored as unset, so it reads as `fifo` (C40). */
+const logged = (a: Account): Account => ({
+  ...a,
+  costMethod: a.costMethod ?? 'fifo',
+});
+
+/**
+ * Deletes the files of the trades the account's active imports dropped: the
+ * imports go with the account's trades, so nothing can bring those back. Call
+ * inside an rw transaction over `db.imports`, `db.trades` and `db.files`,
+ * before the jobs are deleted.
+ */
+async function deleteDroppedFiles(
+  db: KeelDb,
+  ws: string,
+  accountId: string,
+): Promise<void> {
+  const jobs = await db.imports
+    .where('[workspaceId+accountId]')
+    .equals([ws, accountId])
+    .filter((j) => j.status === 'active')
+    .toArray();
+  await deleteOwnerFiles(db, ws, await droppedOwners(db, ws, jobs));
+}
 
 export function localAccounts(ctx: LocalContext): AccountsRepo {
   return {
@@ -23,55 +63,105 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
       const account = { ...input, id: ctx.newId(), workspaceId: ws };
       // FIFO is the unset method.
       if (account.costMethod === 'fifo') delete account.costMethod;
-      await db.accounts.put(account);
-      return account;
+      return rwTx(db, [db.accounts, db.history], async () => {
+        await db.accounts.put(account);
+        await logHistory(
+          db,
+          ws,
+          [lifecycleRow('account', 'created', account.id, account.name)],
+          ctx,
+        );
+        return account;
+      });
     },
 
     async update(ws, id, patch) {
       const db = await ctx.db();
-      return rwTx(db, [db.accounts, db.trades, db.meta], async () => {
-        const account = await db.accounts.get([ws, id]);
-        if (!account) throw new NotFoundError('account', id);
-        const next = {
-          ...mergePatch(account, patch, [
-            'propRules',
-            'timeZone',
-            'importMapping',
-          ]),
-          id,
-          workspaceId: ws,
-        };
-        // A change of method rebuilds the account's trades: the same path as setCostMethod.
-        const method = patch.costMethod;
-        if (method !== undefined && method !== (account.costMethod ?? 'fifo')) {
-          if (account.status === 'archived')
+      // The trades and meta tables are for a change of cost method (C40), which rebuilds the account's trades.
+      return rwTx(
+        db,
+        [db.accounts, db.trades, db.meta, db.history],
+        async () => {
+          const account = await db.accounts.get([ws, id]);
+          if (!account) throw new NotFoundError('account', id);
+          const next = {
+            ...mergePatch(account, patch, [
+              'propRules',
+              'timeZone',
+              'importMapping',
+            ]),
+            id,
+            workspaceId: ws,
+          };
+          // A change of method rebuilds the account's trades: the same path as setCostMethod.
+          const method = patch.costMethod;
+          const rebuild =
+            method !== undefined && method !== (account.costMethod ?? 'fifo');
+          if (rebuild && account.status === 'archived')
             throw new ArchivedAccountError([id]);
-          return applyCostMethod(
+          let saved = next;
+          if (rebuild) {
+            saved = await applyCostMethod(
+              db,
+              next,
+              method,
+              account.costMethod ?? 'fifo',
+            );
+          } else {
+            if (next.costMethod === 'fifo') delete next.costMethod;
+            await db.accounts.put(next);
+          }
+          await logHistory(
             db,
-            next,
-            method,
-            account.costMethod ?? 'fifo',
+            ws,
+            changeRows(
+              'account',
+              id,
+              next.name,
+              fieldChanges(logged(account), logged(next), LOGGED_FIELDS),
+            ),
+            ctx,
           );
-        }
-        if (next.costMethod === 'fifo') delete next.costMethod;
-        await db.accounts.put(next);
-        return next;
-      });
+          return saved;
+        },
+      );
     },
 
     async remove(ws, id) {
       const db = await ctx.db();
       await rwTx(
         db,
-        [db.accounts, db.trades, db.imports, db.cashflows, db.challenges],
+        [
+          db.accounts,
+          db.trades,
+          db.imports,
+          db.cashflows,
+          db.challenges,
+          db.files,
+          db.history,
+          db.targetRules,
+          db.feeRules,
+        ],
         async () => {
-          if (!(await db.accounts.get([ws, id])))
-            throw new NotFoundError('account', id);
+          const account = await db.accounts.get([ws, id]);
+          if (!account) throw new NotFoundError('account', id);
           const trades = await db.trades
             .where('[workspaceId+accountId]')
             .equals([ws, id])
             .count();
           if (trades > 0) throw new Error('account has trades');
+          // Its default rules go with it, as its cash flows do.
+          await db.targetRules
+            .where('workspaceId')
+            .equals(ws)
+            .filter((r) => r.accountId === id)
+            .delete();
+          await db.feeRules
+            .where('workspaceId')
+            .equals(ws)
+            .filter((r) => r.accountId === id)
+            .delete();
+          await deleteDroppedFiles(db, ws, id);
           // Undone imports keep their history rows; they go with the account.
           await db.imports
             .where('[workspaceId+accountId]')
@@ -96,44 +186,89 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
             })),
           );
           await db.accounts.delete([ws, id]);
+          // Its cash flows, import jobs and default rules go with it, under this one row.
+          await logHistory(
+            db,
+            ws,
+            [lifecycleRow('account', 'deleted', id, account.name)],
+            ctx,
+          );
         },
       );
     },
 
     async setCostMethod(ws, id, method) {
       const db = await ctx.db();
-      return rwTx(db, [db.accounts, db.trades, db.meta], async () => {
-        const account = await db.accounts.get([ws, id]);
-        if (!account) throw new NotFoundError('account', id);
-        if (account.status === 'archived') throw new ArchivedAccountError([id]);
-        return applyCostMethod(db, account, method);
-      });
+      return rwTx(
+        db,
+        [db.accounts, db.trades, db.meta, db.history],
+        async () => {
+          const account = await db.accounts.get([ws, id]);
+          if (!account) throw new NotFoundError('account', id);
+          if (account.status === 'archived')
+            throw new ArchivedAccountError([id]);
+          const next = await applyCostMethod(db, account, method);
+          await logHistory(
+            db,
+            ws,
+            changeRows(
+              'account',
+              id,
+              next.name,
+              fieldChanges(logged(account), logged(next), ['costMethod']),
+            ),
+            ctx,
+          );
+          return next;
+        },
+      );
     },
 
     async clearTrades(ws, id) {
       const db = await ctx.db();
       return rwTx(
         db,
-        [db.accounts, db.trades, db.journal, db.imports, db.meta],
+        [
+          db.accounts,
+          db.trades,
+          db.journal,
+          db.imports,
+          db.meta,
+          db.files,
+          db.history,
+        ],
         async () => {
-          if (!(await db.accounts.get([ws, id])))
-            throw new NotFoundError('account', id);
+          const account = await db.accounts.get([ws, id]);
+          if (!account) throw new NotFoundError('account', id);
           const tradeKeys = await db.trades
             .where('[workspaceId+accountId]')
             .equals([ws, id])
             .primaryKeys();
           await db.trades.bulkDelete(tradeKeys);
-          await pruneJournalLinks(
+          const tradeIds = tradeKeys.map(([, tradeId]) => tradeId);
+          await pruneJournalLinks(db, ws, tradeIds);
+          await deleteOwnerFiles(
             db,
             ws,
-            tradeKeys.map(([, tradeId]) => tradeId),
+            tradeIds.map((tradeId) => `trade:${tradeId}`),
           );
+          await deleteDroppedFiles(db, ws, id);
           await db.imports
             .where('[workspaceId+accountId]')
             .equals([ws, id])
             .delete();
           // A plan made before this would write onto trades that are gone.
           await bumpImportRevision(db, ws);
+          // One row for the account, not one per trade it loses.
+          if (tradeKeys.length > 0)
+            await logHistory(
+              db,
+              ws,
+              changeRows('account', id, account.name, [
+                { field: 'trades', oldValue: tradeKeys.length, newValue: 0 },
+              ]),
+              ctx,
+            );
           return tradeKeys.length;
         },
       );

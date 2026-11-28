@@ -14,8 +14,19 @@ import { USER_WORKSPACE } from '../workspaces';
 import type { LocalContext } from './context';
 import type { KeelDb } from './db';
 import { assertEditable } from './editable';
+import { deleteOwnerFiles } from './files';
+import {
+  changeRows,
+  lifecycleRow,
+  logHistory,
+  tradeChanges,
+  tradeLabel,
+  type NewHistoryRow,
+} from './history';
 import { META, type ImportJobRecord } from './schema';
 import { pruneJournalLinks } from './journal';
+import { readPrefs } from './prefs';
+import { withDefaultRules } from './rule-shared';
 import { rebuiltUnder } from './cost-method';
 import { rwTx } from './tx';
 
@@ -115,6 +126,117 @@ async function blockingImport(
     .sort((a, b) => b.revision - a.revision)[0]?.id;
 }
 
+/** The trades still carrying the job's id, as the import left them or since regrouped. */
+function builtBy(db: KeelDb, ws: string, jobId: string): Promise<Trade[]> {
+  return db.trades
+    .where('[workspaceId+importId]')
+    .equals([ws, jobId])
+    .toArray();
+}
+
+/**
+ * The trades an undo of `job` would bring back: those it replaced, unless the
+ * job wrote a trade under the same id that the user has since deleted (that
+ * deletion stands).
+ */
+function restoredBy(job: ImportJobRecord, built: readonly Trade[]): Trade[] {
+  const wrote = new Set(job.tradeIds);
+  const remaining = new Set(built.map((t) => t.id));
+  return job.replacedTrades.filter(
+    (t) => !wrote.has(t.id) || remaining.has(t.id),
+  );
+}
+
+/**
+ * The stored trades that now regroup what `job` wrote (B8): a trade of it that
+ * was moved to another account, or any trade grouped by hand that is one of
+ * its own (`built`) or holds a fill of it (a merge took one in, whichever
+ * import the merged trade carries; a fill's id starts with its import's id).
+ * Read from the trades, never from the history, which is purged after 30
+ * days. A trade the user deleted is no regrouping: its fills are gone. Call
+ * inside a transaction that includes `db.trades`.
+ */
+async function regroupedTrades(
+  db: KeelDb,
+  ws: string,
+  job: ImportJobRecord,
+  built: readonly Trade[],
+): Promise<string[]> {
+  const out = new Set<string>();
+  for (const t of built)
+    if (t.grouping === 'manual' || t.accountId !== job.accountId) out.add(t.id);
+  const prefix = `${job.id}:`;
+  await db.trades
+    .where('workspaceId')
+    .equals(ws)
+    .filter(
+      (t) =>
+        t.grouping === 'manual' &&
+        t.executions.some((e) => e.id.startsWith(prefix)),
+    )
+    .each((t) => {
+      out.add(t.id);
+    });
+  return [...out];
+}
+
+/**
+ * The owners (`trade:<id>`) of the trades the jobs replaced and no trade they
+ * wrote continues, that are not stored now. Undoing a job brings such a trade
+ * back, so its files wait for that. Call inside a transaction that includes
+ * `db.trades`.
+ */
+export async function droppedOwners(
+  db: KeelDb,
+  ws: string,
+  jobs: readonly ImportJobRecord[],
+): Promise<string[]> {
+  const dropped = jobs.flatMap((j) => {
+    const wrote = new Set(j.tradeIds);
+    return j.replacedTrades.filter((t) => !wrote.has(t.id)).map((t) => t.id);
+  });
+  if (dropped.length === 0) return [];
+  const stored = await db.trades.bulkGet(
+    dropped.map((id): [string, string] => [ws, id]),
+  );
+  return dropped.flatMap((id, i) => (stored[i] ? [] : [`trade:${id}`]));
+}
+
+/**
+ * Deletes the files of the trades an account's active imports dropped, for
+ * each import that can no longer be undone: a later import depends on it, or
+ * its trades were regrouped (the two refusals `undo` makes). Until then they
+ * wait for an undo to bring their trade back. Call inside the rw transaction
+ * of the write that may have ended an undo (an import commit, a merge, split
+ * or move), with `db.imports`, `db.trades` and `db.files` in it.
+ */
+export async function releaseSpentFiles(
+  db: KeelDb,
+  ws: string,
+  accountId: string,
+): Promise<void> {
+  const jobs = (
+    await db.imports
+      .where('[workspaceId+accountId]')
+      .equals([ws, accountId])
+      .toArray()
+  ).filter((j) => j.status === 'active');
+  for (const job of jobs) {
+    const owners = await droppedOwners(db, ws, [job]);
+    if (owners.length === 0) continue;
+    const held = await db.files
+      .where('[workspaceId+owner]')
+      .anyOf(owners.map((o): [string, string] => [ws, o]))
+      .count();
+    if (held === 0) continue;
+    const built = await builtBy(db, ws, job.id);
+    const spent =
+      (await regroupedTrades(db, ws, job, built)).length > 0 ||
+      (await blockingImport(db, ws, job, restoredBy(job, built))) !== undefined;
+    if (spent) await deleteOwnerFiles(db, ws, owners);
+  }
+}
+
 /**
  * The trades as they can be written now: references to tags, strategies,
  * rules and notes deleted since the snapshot (an undo's replaced trades, a
@@ -162,6 +284,43 @@ async function withLiveReferences(
 
 const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
+/**
+ * The import's one history row (B27), then the system's edits: a stored open
+ * option the plan settled at expiry gains its closing fill, and that edit is
+ * the system's, not the import's (B26). A trade the file itself opens and
+ * settles is not an edit: it is one of the import's trades.
+ */
+function commitRows(
+  job: ImportJob,
+  plan: ImportPlan,
+  timeZone: string,
+): NewHistoryRow[] {
+  const settled = new Set(
+    plan.flags
+      .filter((f) => f.code === 'expired-worthless')
+      .map((f) => f.tradeId),
+  );
+  const stored = new Map(plan.replacedTrades.map((t) => [t.id, t]));
+  return [
+    {
+      ...lifecycleRow('import', 'created', job.id, job.fileName, 'import'),
+      field: 'trades',
+      newValue: job.tradeCount,
+    },
+    ...plan.trades.flatMap((t) => {
+      const before = stored.get(t.id);
+      if (!before || !settled.has(t.id)) return [];
+      return changeRows(
+        'trade',
+        t.id,
+        tradeLabel(t, timeZone),
+        tradeChanges(before, t).filter((c) => c.field === 'fills'),
+        'system',
+      );
+    }),
+  ];
+}
+
 export function localImports(ctx: LocalContext): ImportRepo {
   return {
     async list(ws) {
@@ -193,7 +352,13 @@ export function localImports(ctx: LocalContext): ImportRepo {
           const openTrades = await db.trades
             .where('[workspaceId+accountId]')
             .equals([ws, accountId])
-            .filter((t) => t.status === 'open' && t.source !== 'manual')
+            // A trade grouped by hand is never rebuilt by an import (B8).
+            .filter(
+              (t) =>
+                t.status === 'open' &&
+                t.source !== 'manual' &&
+                t.grouping !== 'manual',
+            )
             .toArray();
           const jobs = await db.imports
             .where('[workspaceId+accountId]')
@@ -245,10 +410,14 @@ export function localImports(ctx: LocalContext): ImportRepo {
           db.tags,
           db.strategies,
           db.meta,
+          db.files,
+          db.history,
+          db.targetRules,
+          db.feeRules,
         ],
         async () => {
-          if (!(await db.accounts.get([ws, plan.accountId])))
-            throw new StalePlanError('account-removed');
+          const account = await db.accounts.get([ws, plan.accountId]);
+          if (!account) throw new StalePlanError('account-removed');
           // A commit or undo since then moved the open trades, fingerprints
           // and serials the plan was made from.
           if ((await importRevision(db, ws)) !== plan.importRevision)
@@ -263,6 +432,8 @@ export function localImports(ctx: LocalContext): ImportRepo {
           );
           // A replaced trade that no written trade continues under its id is gone.
           const written = new Set(tradeIds);
+          // Its files stay, so undoing this import brings the trade back with
+          // them; an earlier import this one now depends on loses its own.
           await pruneJournalLinks(
             db,
             ws,
@@ -270,10 +441,18 @@ export function localImports(ctx: LocalContext): ImportRepo {
               .map((t) => t.id)
               .filter((id) => !written.has(id)),
           );
-          // The plan carries journaling read with its context.
-          await db.trades.bulkPut(
-            await withLiveReferences(db, ws, plan.trades),
+          // The account's default rules give each new trade its levels (B15,
+          // B17) and the fills this import brought their costs (B18); a trade
+          // the import carries on keeps its levels.
+          const ruled = await withDefaultRules(
+            db,
+            ws,
+            account,
+            plan.trades,
+            new Map(plan.replacedTrades.map((t) => [t.id, t])),
           );
+          // The plan carries journaling read with its context.
+          await db.trades.bulkPut(await withLiveReferences(db, ws, ruled));
           await db.imports.put({
             ...job,
             fingerprints: plan.fingerprints,
@@ -288,6 +467,9 @@ export function localImports(ctx: LocalContext): ImportRepo {
               ...plan.mapping.overrides,
             },
           });
+          await releaseSpentFiles(db, ws, plan.accountId);
+          const { timeZone } = await readPrefs(db);
+          await logHistory(db, ws, commitRows(job, plan, timeZone), ctx);
         },
       );
       return job;
@@ -305,6 +487,8 @@ export function localImports(ctx: LocalContext): ImportRepo {
           db.strategies,
           db.meta,
           db.accounts,
+          db.files,
+          db.history,
         ],
         async (): Promise<UndoResult> => {
           const job = await db.imports.get([ws, jobId]);
@@ -316,17 +500,16 @@ export function localImports(ctx: LocalContext): ImportRepo {
           if (archived)
             throw new ArchivedAccountError([job.accountId], job.tradeIds);
           // Trades the user has deleted since the import are simply not found.
-          const built = await db.trades
-            .where('[workspaceId+importId]')
-            .equals([ws, jobId])
-            .toArray();
+          const built = await builtBy(db, ws, jobId);
+          // Undoing would delete trades that were merged, split or moved, and
+          // leave their fills where the undo cannot reach (B8).
+          const regrouped = await regroupedTrades(db, ws, job, built);
+          if (regrouped.length > 0)
+            return { ok: false, reason: 'regrouped', tradeIds: regrouped };
           // A replaced trade comes back unless the job wrote a trade under its
           // id that the user has since deleted: that deletion stands.
-          const wrote = new Set(job.tradeIds);
+          const restored = restoredBy(job, built);
           const remaining = new Set(built.map((t) => t.id));
-          const restored = job.replacedTrades.filter(
-            (t) => !wrote.has(t.id) || remaining.has(t.id),
-          );
           await assertEditable(db, ws, [...built, ...restored]);
           const blocker = await blockingImport(db, ws, job, restored);
           if (blocker)
@@ -339,10 +522,12 @@ export function localImports(ctx: LocalContext): ImportRepo {
           await db.trades.bulkDelete(built.map((t) => [ws, t.id]));
           // A restored trade keeps its id, so its journal links stay.
           const restoredIds = new Set(restored.map((t) => t.id));
-          await pruneJournalLinks(
+          const gone = [...remaining].filter((id) => !restoredIds.has(id));
+          await pruneJournalLinks(db, ws, gone);
+          await deleteOwnerFiles(
             db,
             ws,
-            [...remaining].filter((id) => !restoredIds.has(id)),
+            gone.map((id) => `trade:${id}`),
           );
           // The snapshot was built under the method of its day: the account's current one rebuilds it (C40).
           const live = await withLiveReferences(db, ws, restored);
@@ -361,6 +546,25 @@ export function localImports(ctx: LocalContext): ImportRepo {
             undoneAt: ctx.now().toISOString(),
           });
           await bumpImportRevision(db, ws);
+          await logHistory(
+            db,
+            ws,
+            [
+              {
+                ...lifecycleRow(
+                  'import',
+                  'undone',
+                  jobId,
+                  job.fileName,
+                  'import',
+                ),
+                field: 'trades',
+                oldValue: job.tradeCount,
+                newValue: 0,
+              },
+            ],
+            ctx,
+          );
           return { ok: true };
         },
       );

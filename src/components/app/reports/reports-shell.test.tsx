@@ -67,6 +67,7 @@ test('the Reports tab stays current while one of its reports is open, and its me
     'Risk',
     'Strategies',
     'Tags',
+    'Patterns',
     'Options',
     'Wins vs losses',
   ]);
@@ -75,7 +76,7 @@ test('the Reports tab stays current while one of its reports is open, and its me
 });
 
 test('only the known report keys are reports', () => {
-  expect(REPORT_KEYS).toHaveLength(10);
+  expect(REPORT_KEYS).toHaveLength(11);
   expect(isReportKey('performance')).toBe(true);
   expect(isReportKey('overview')).toBe(false);
   expect(isReportKey('nope')).toBe(false);

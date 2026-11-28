@@ -22,6 +22,7 @@ import type {
 } from '@/domain/types';
 import { localDate } from '@/domain/time';
 import { dayLabel } from './trade-time';
+import type { TemplateSlot } from '../notes/editor-toolbar';
 import { NoteEditor, type NoteEditorHandle } from '../notes/note-editor';
 import { TagPicker } from '../tag-picker';
 import { findDailyEntry } from '../notebook/notebook-model';
@@ -268,6 +269,7 @@ function NoteBody({
   handleRef,
   stamp,
   controlRef,
+  templateSlot,
   onStatus,
 }: {
   label: string;
@@ -283,6 +285,8 @@ function NoteBody({
   stamp?: { current: Partial<JournalEntry> | undefined };
   /** Receives the editor's `NoteControl`. */
   controlRef?: { current: NoteControl | null };
+  /** The host's template menu, drawn in the editor's toolbar. */
+  templateSlot?: TemplateSlot;
   onStatus(s: NoteStatus, error?: unknown): void;
 }): React.JSX.Element {
   const save = useSaveJournalEntry();
@@ -317,6 +321,13 @@ function NoteBody({
   const flush = () => {
     timer.current = undefined;
     const body = latest.current;
+    // Nothing typed since the note loaded or was restored: nothing to write. A
+    // write that failed after a restore let its text go must not save an
+    // empty body over the restored note (G-11).
+    if (body === undefined) {
+      failed.current = false;
+      return;
+    }
     waiting.current += 1;
     queue.current = queue.current.then(async () => {
       try {
@@ -406,6 +417,15 @@ function NoteBody({
     [],
   );
 
+  // The note owns its images (`note:<id>`), so an image needs a note: the one
+  // the trade or day has, or the one the first change would make.
+  const ensureNoteId = async () => {
+    const pending = (note.current ??= ensureRef.current());
+    pending.catch(() => {
+      if (note.current === pending) note.current = null;
+    });
+    return (await pending).id;
+  };
   return (
     <NoteEditor
       label={label}
@@ -413,6 +433,29 @@ function NoteBody({
       readOnly={readOnly}
       handleRef={handleRef}
       placeholder={placeholder}
+      noteId={entry?.id}
+      ensureNoteId={ensureNoteId}
+      templateSlot={templateSlot}
+      // Text still waiting, or held after a failed write, is saved before a
+      // restore (`settle`), so the store keeps it as the version the restore
+      // replaced; a write that fails again stops the restore (G-6).
+      beforeRestore={async () => {
+        await settle();
+        if (failed.current) throw new Error('The note could not be saved.');
+      }}
+      // The store has the restored text: the next write (a star) builds on that
+      // note. Text typed before it, waiting or held after a failed write, is let
+      // go with the failure, or the next settle would write it over the restore.
+      onRestored={(restored) => {
+        note.current = Promise.resolve(restored);
+        if (timer.current !== undefined) {
+          clearTimeout(timer.current);
+          timer.current = undefined;
+        }
+        latest.current = undefined;
+        failed.current = false;
+        onStatus('saved');
+      }}
       onChange={(doc) => {
         latest.current = doc;
         onStatus('saving');
@@ -487,6 +530,7 @@ export function DayNoteBinding({
   handleRef,
   stamp,
   controlRef,
+  templateSlot,
   onStatus,
 }: {
   date: string;
@@ -495,6 +539,8 @@ export function DayNoteBinding({
   stamp?: { current: Partial<JournalEntry> | undefined };
   /** Receives the editor's `NoteControl`: settle what is waiting, or change the note's fields in its queue. */
   controlRef?: { current: NoteControl | null };
+  /** The host's template menu, drawn in the editor's toolbar. */
+  templateSlot?: TemplateSlot;
   onStatus(s: NoteStatus, error?: unknown): void;
 }): React.JSX.Element {
   const journal = useJournal();
@@ -569,6 +615,7 @@ export function DayNoteBinding({
         handleRef={handleRef}
         stamp={stamp}
         controlRef={controlRef}
+        templateSlot={templateSlot}
         onStatus={onStatus}
       />
     </>
@@ -583,11 +630,14 @@ export function DayNote({
   date,
   readOnly,
   handleRef,
+  templateSlot,
   onStatus,
 }: {
   date: string;
   readOnly: boolean;
   handleRef?: { current: NoteEditorHandle | null };
+  /** The daily templates, in the editor's toolbar. */
+  templateSlot?: TemplateSlot;
   onStatus(s: NoteStatus, error?: unknown): void;
 }): React.JSX.Element {
   const journal = useJournal();
@@ -618,6 +668,7 @@ export function DayNote({
         date={date}
         readOnly={readOnly || closed}
         handleRef={handleRef}
+        templateSlot={templateSlot}
         onStatus={onStatus}
       />
     </>

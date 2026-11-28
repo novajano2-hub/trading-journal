@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { resolveInstrument } from './instruments';
 import { realizations } from './metrics/realized';
 import {
+  buildGroup,
   buildTrades,
   finalizeTrade,
   matchLots,
@@ -310,6 +311,8 @@ describe('a symbol with a very long history', () => {
 
 describe('cost methods (#49)', () => {
   const T5 = '2026-03-02T15:04:00Z';
+  const T6 = '2026-03-02T15:05:00Z';
+  const T7 = '2026-03-02T15:06:00Z';
   const build2 = (
     fills: Execution[],
     symbol: string,
@@ -444,5 +447,74 @@ describe('cost methods (#49)', () => {
       status: 'open',
       costMethod: 'average',
     });
+  });
+
+  // Plan 6B meets Plan 6C: a swap sits inside the net and outside the gross
+  // (R3), and a hand-grouped trade may return to flat and change side.
+  test('finalizeTrade keeps the swap in the net and out of the gross', () => {
+    const fills = [
+      fill('f1', 'buy', 100, 10, T1),
+      fill('f2', 'buy', 100, 15, T2),
+      fill('f3', 'sell', 100, 20, T3),
+    ];
+    const plain = at(build2(fills, 'AAPL', 'fifo'), 0);
+    const swapped: Trade = { ...plain, swap: -486, net: plain.net - 486 };
+    const lifo = finalizeTrade(swapped, 'lifo');
+    const without = finalizeTrade(plain, 'lifo');
+    expect(lifo.swap).toBe(-486);
+    expect(lifo.gross).toBe(without.gross);
+    expect(lifo.net).toBe(without.net - 486);
+    // Back under FIFO it is the trade it was.
+    expect(finalizeTrade(lifo, 'fifo')).toEqual(swapped);
+  });
+
+  test("finalizeTrade reads a hand-grouped trade's legs: a flat point and a change of side inside it", () => {
+    const inst = resolveInstrument('AAPL')!;
+    const fills = [
+      // Long leg: two lots, one sold, the rest sold at once (flat).
+      fill('g1', 'buy', 1, 10, T1),
+      fill('g2', 'buy', 1, 14, T2),
+      fill('g3', 'sell', 1, 20, T3),
+      fill('g4', 'sell', 1, 12, T4),
+      // Short leg, from flat: two lots, one covered.
+      fill('g5', 'sell', 1, 30, T5),
+      fill('g6', 'sell', 1, 28, T6),
+      fill('g7', 'buy', 1, 25, T7),
+    ].map((f) => ({ ...f, symbol: 'AAPL' }));
+    const group = (method: CostMethod): Trade => {
+      const [t, ...rest] = buildGroup(
+        fills,
+        inst,
+        'a1',
+        {
+          workspaceId: 'w',
+          startSerial: 1,
+          resolve: (s) => resolveInstrument(s),
+          accountCurrency: () => 'USD',
+          costMethodOf: () => method,
+        },
+        false,
+      );
+      if (!t || rest.length > 0) throw new Error('one trade');
+      return t;
+    };
+    const fifo = group('fifo');
+    const lifo = group('lifo');
+    // The short leg's open part is what the methods disagree on: 5 or 3 a share.
+    expect(fifo.gross).toBe(1300);
+    expect(lifo.gross).toBe(1100);
+    for (const method of METHODS) {
+      const rebuilt = finalizeTrade(group('fifo'), method);
+      const want = group(method);
+      expect(rebuilt).toMatchObject({
+        gross: want.gross,
+        fees: want.fees,
+        net: want.net,
+        avgEntry: want.avgEntry,
+        avgExit: want.avgExit,
+        maxPosition: want.maxPosition,
+      });
+      expect(rebuilt.costMethod).toBe(want.costMethod);
+    }
   });
 });

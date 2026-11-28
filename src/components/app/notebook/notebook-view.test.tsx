@@ -7,9 +7,10 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
+import type { Editor } from '@tiptap/core';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, expect, onTestFinished, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import type { SampleWorkspace } from '@/data/seed/generate';
@@ -18,6 +19,8 @@ import { SAMPLE_WORKSPACE } from '@/data/workspaces';
 import { makeTrade } from '@/domain/__fixtures__/trades';
 import { resolveInstrument } from '@/domain/instruments';
 import type { JournalEntry } from '@/domain/types';
+import { pasteFiles } from '../__fixtures__/clipboard';
+import { fakeIntersectionObserver } from '../__fixtures__/intersection';
 import { renderApp } from '../__fixtures__/render-app';
 import { NotebookView } from './notebook-view';
 
@@ -452,6 +455,39 @@ test('a day with no trades says so, and visiting it writes nothing until an edit
   );
   expect(await dailyNotes(repo, '2026-11-21')).toHaveLength(1);
   expect(screen.getByRole('textbox', { name: 'Note title' })).toBe(title);
+});
+
+test("an image pasted into a draft day stores the day's note first, and the note owns it", async () => {
+  fakeIntersectionObserver({ auto: true });
+  URL.createObjectURL = vi.fn(() => 'blob:draft');
+  URL.revokeObjectURL = vi.fn();
+  const { repo } = await openWith('/app/notebook/daily/2026-11-21');
+  const box = await screen.findByRole('textbox', { name: 'Note' });
+  expect(await dailyNotes(repo, '2026-11-21')).toHaveLength(0);
+  pasteFiles(box, [
+    new File([new Uint8Array([137, 80, 78, 71])], 'open.png', {
+      type: 'image/png',
+    }),
+  ]);
+  await waitFor(
+    async () => expect(await dailyNotes(repo, '2026-11-21')).toHaveLength(1),
+    { timeout: 3000 },
+  );
+  const note = (await dailyNotes(repo, '2026-11-21'))[0]!;
+  await waitFor(async () =>
+    expect(await repo.files.list(WS, `note:${note.id}`)).toHaveLength(1),
+  );
+  // One note, not two, and the picture is in the body it saves.
+  await waitFor(
+    async () =>
+      expect(
+        JSON.stringify((await dailyNotes(repo, '2026-11-21'))[0]!.body),
+      ).toContain('keel-file:'),
+    { timeout: 3000 },
+  );
+  expect(await dailyNotes(repo, '2026-11-21')).toHaveLength(1);
+  expect(await screen.findByRole('img', { name: 'open' })).toBeTruthy();
+  vi.unstubAllGlobals();
 });
 
 test('a tag on a draft day makes its note too', async () => {
@@ -965,4 +1001,290 @@ test('a malformed note row in storage never breaks the Notebook: it lists as an 
   // Read whole, it is a plain note in My notes.
   fireEvent.click(within(folders).getByRole('button', { name: /My notes/ }));
   await listed();
+});
+
+// ---- Task 21: export and import, templates in the toolbar ----------------------
+
+test('a note has Template in its toolbar, its own kind’s templates for a daily note or a recap, any for a plain note, none for a trade note', async () => {
+  await openWith('/app/notebook/daily-2026-11-19');
+  await screen.findByRole('toolbar', { name: 'Formatting' });
+  // A daily note takes the daily templates.
+  const trigger = await screen.findByRole('button', {
+    name: 'Insert a template',
+  });
+  fireEvent.keyDown(trigger, { key: 'Enter' });
+  expect(
+    await screen.findByRole('menuitem', { name: 'Daily game plan' }),
+  ).toBeTruthy();
+  fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+  cleanup();
+
+  // A weekly recap takes the weekly one, and no daily template.
+  await openWith('/app/notebook/n-wk');
+  fireEvent.keyDown(
+    await screen.findByRole('button', { name: 'Insert a template' }),
+    { key: 'Enter' },
+  );
+  expect(
+    await screen.findByRole('menuitem', { name: 'Weekly recap' }),
+  ).toBeTruthy();
+  expect(
+    screen.queryByRole('menuitem', { name: 'Daily game plan' }),
+  ).toBeNull();
+  fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+  cleanup();
+
+  // A plain note takes any template.
+  await openWith('/app/notebook/n-plan');
+  fireEvent.keyDown(
+    await screen.findByRole('button', { name: 'Insert a template' }),
+    { key: 'Enter' },
+  );
+  expect(
+    await screen.findByRole('menuitem', { name: 'Daily game plan' }),
+  ).toBeTruthy();
+  expect(screen.getByRole('menuitem', { name: 'Weekly recap' })).toBeTruthy();
+  fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+  cleanup();
+
+  // A trade note has none.
+  await openWith('/app/notebook/trade-note-0', {
+    edit: (fx) => {
+      fx.journal[0]!.id = 'trade-note-0';
+    },
+  });
+  await screen.findByRole('toolbar', { name: 'Formatting' });
+  expect(
+    screen.queryByRole('button', { name: 'Insert a template' }),
+  ).toBeNull();
+});
+
+test('every note has Export or import in its header, a note in Trash and a version history too', async () => {
+  await openWith('/app/notebook/n-plan', {
+    prepare: async (r) => {
+      await r.journal.trash(WS, 'n-idea');
+    },
+  });
+  expect(
+    await screen.findByRole('button', { name: 'Export or import' }),
+  ).toBeTruthy();
+  // The history is in the toolbar of a note that can change.
+  expect(screen.getByRole('button', { name: 'Version history' })).toBeTruthy();
+  cleanup();
+
+  // A note in Trash reads only: no toolbar, but the header's menu and the history stay.
+  await openWith('/app/notebook/n-idea', {
+    prepare: async (r) => {
+      await r.journal.trash(WS, 'n-idea');
+    },
+  });
+  expect(
+    await screen.findByRole('button', { name: 'Export or import' }),
+  ).toBeTruthy();
+  expect(screen.queryByRole('toolbar')).toBeNull();
+  expect(
+    await screen.findByRole('button', { name: 'Version history' }),
+  ).toBeTruthy();
+});
+
+test('exporting reads the title and tags on screen, and importing brings the file in as a new note in the open folder and opens it', async () => {
+  const blobs: Blob[] = [];
+  URL.createObjectURL = vi.fn((b: Blob) => {
+    blobs.push(b);
+    return 'blob:note';
+  });
+  URL.revokeObjectURL = vi.fn();
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  // The note is in the Ideas folder; the folder is picked, as a person does.
+  const { repo } = await openWith('/app/notebook/n-idea', {
+    prepare: async (r, ideasId) => {
+      await r.journal.save(WS, {
+        ...(await r.journal.get(WS, 'n-idea'))!,
+        folderId: ideasId,
+      });
+    },
+  });
+
+  await screen.findByRole('navigation', { name: 'Folders' });
+  fireEvent.click(
+    await within(rail()).findByRole('button', { name: /^Ideas/ }),
+  );
+  // The title is edited and not yet saved: the file still has what is on screen.
+  const title = await screen.findByRole('textbox', { name: 'Note title' });
+  fireEvent.change(title, { target: { value: 'Idea, reworded' } });
+  fireEvent.keyDown(screen.getByRole('button', { name: 'Export or import' }), {
+    key: 'Enter',
+  });
+  fireEvent.click(
+    await screen.findByRole('menuitem', { name: 'Export as Keel note' }),
+  );
+  await waitFor(() => expect(blobs).toHaveLength(1));
+  const file = JSON.parse(await blobs[0]!.text()) as { title: string };
+  expect(file.title).toBe('Idea, reworded');
+
+  // Import it back: a new note in the Ideas folder, open on screen.
+  fireEvent.keyDown(screen.getByRole('button', { name: 'Export or import' }), {
+    key: 'Enter',
+  });
+  fireEvent.click(
+    await screen.findByRole('menuitem', { name: 'Import a Keel note' }),
+  );
+  const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+  fireEvent.change(input, {
+    target: {
+      files: [
+        new File(
+          [JSON.stringify({ ...file, kind: 'keel-note', version: 1 })],
+          'idea.json',
+        ),
+      ],
+    },
+  });
+  await waitFor(async () =>
+    expect(
+      (await repo.journal.list(WS)).filter((e) => e.title === 'Idea, reworded'),
+    ).toHaveLength(1),
+  );
+  const [made] = (await repo.journal.list(WS)).filter(
+    (e) => e.title === 'Idea, reworded',
+  );
+  expect(made).toMatchObject({ kind: 'note' });
+  expect(made!.folderId).toBeDefined();
+  expect(
+    (await repo.folders.list(WS)).find((f) => f.id === made!.folderId)?.name,
+  ).toBe('Ideas');
+  await waitFor(() =>
+    expect(window.location.pathname).toBe(`/app/notebook/${made!.id}`),
+  );
+});
+
+test('after a restore, the pane saves on top of the restored text, even when the journal is read back as it was before', async () => {
+  const earlier = para('An earlier plan');
+  const { repo } = await openWith('/app/notebook/n-plan', {
+    prepare: async (r) => {
+      await r.noteVersions.keep(WS, 'n-plan', earlier, 'auto');
+    },
+  });
+  const title = await screen.findByRole('textbox', { name: 'Note title' });
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Version history' }),
+  );
+  const dialog = await screen.findByRole('dialog', { name: 'Version history' });
+  fireEvent.click(
+    await within(dialog).findByRole('button', { name: 'Restore this version' }),
+  );
+  const ask = await screen.findByRole('dialog', {
+    name: 'Restore this version?',
+  });
+  // The journal is read again after the write, and what comes back is the note
+  // as it was before the restore (a read that has not caught up): the pane
+  // holds that copy, and the restore's own answer is what is newer.
+  const stale = await repo.journal.list(WS);
+  vi.spyOn(repo.journal, 'list').mockResolvedValue(stale);
+  await act(async () => {
+    fireEvent.click(within(ask).getByRole('button', { name: 'Restore' }));
+  });
+  await waitFor(async () =>
+    expect((await repo.journal.get(WS, 'n-plan'))!.body).toEqual(earlier),
+  );
+  await screen.findByText(/^Restored the version from/);
+
+  fireEvent.change(title, { target: { value: 'Retest plan, second take' } });
+  await waitFor(async () =>
+    expect((await repo.journal.get(WS, 'n-plan'))!.title).toBe(
+      'Retest plan, second take',
+    ),
+  );
+  // The title's save did not bring the old text back.
+  expect((await repo.journal.get(WS, 'n-plan'))!.body).toEqual(earlier);
+});
+
+/** Holds the pane's 600 ms save timer, so typed text stays waiting until something else writes it. */
+const realSetTimeout = globalThis.setTimeout;
+function holdSaveTimer() {
+  vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+    fn: () => void,
+    ms?: number,
+    ...rest: unknown[]
+  ) =>
+    ms === 600
+      ? (0 as unknown as ReturnType<typeof setTimeout>)
+      : realSetTimeout(fn, ms, ...rest)) as typeof setTimeout);
+  onTestFinished(() => {
+    vi.restoreAllMocks();
+  });
+}
+
+async function restoreNewest() {
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Version history' }),
+  );
+  const dialog = await screen.findByRole('dialog', { name: 'Version history' });
+  fireEvent.click(
+    await within(dialog).findByRole('button', { name: 'Restore this version' }),
+  );
+  const ask = await screen.findByRole('dialog', {
+    name: 'Restore this version?',
+  });
+  await act(async () => {
+    fireEvent.click(within(ask).getByRole('button', { name: 'Restore' }));
+  });
+  return ask;
+}
+
+test('text still waiting in the pane is saved before a restore, and kept as the version before it', async () => {
+  const earlier = para('An earlier plan');
+  const { repo } = await openWith('/app/notebook/n-plan', {
+    prepare: async (r) => {
+      await r.noteVersions.keep(WS, 'n-plan', earlier, 'auto');
+    },
+  });
+  const box = await screen.findByRole('textbox', { name: 'Note' });
+  holdSaveTimer();
+  const editor = (box as unknown as { editor: Editor }).editor;
+  act(() => {
+    editor.commands.insertContent(' and a typed retest');
+  });
+  expect(
+    JSON.stringify((await repo.journal.get(WS, 'n-plan'))!.body),
+  ).not.toContain('a typed retest');
+
+  await restoreNewest();
+  await screen.findByText(/^Restored the version from/);
+  expect((await repo.journal.get(WS, 'n-plan'))!.body).toEqual(earlier);
+  const [before] = await repo.noteVersions.list(WS, 'n-plan');
+  expect(before!.kind).toBe('before-restore');
+  expect(JSON.stringify(before!.body)).toContain('a typed retest');
+});
+
+test('a write that failed, then a restore: the pane reads Saved, not the failure', async () => {
+  const earlier = para('An earlier plan');
+  const { repo } = await openWith('/app/notebook/n-plan', {
+    prepare: async (r) => {
+      await r.noteVersions.keep(WS, 'n-plan', earlier, 'auto');
+    },
+  });
+  const box = await screen.findByRole('textbox', { name: 'Note' });
+  vi.spyOn(repo.journal, 'save').mockRejectedValueOnce(new Error('disk full'));
+  const editor = (box as unknown as { editor: Editor }).editor;
+  act(() => {
+    editor.commands.insertContent(' and a typed retest');
+  });
+  expect(
+    await screen.findByText("Couldn't save. Keep typing to retry.", undefined, {
+      timeout: 3000,
+    }),
+  ).toBeTruthy();
+
+  await restoreNewest();
+  await screen.findByText(/^Restored the version from/);
+  expect((await repo.journal.get(WS, 'n-plan'))!.body).toEqual(earlier);
+  await waitFor(() =>
+    expect(screen.queryByText("Couldn't save. Keep typing to retry.")).toBeNull(),
+  );
+  expect(screen.getByText('Saved')).toBeTruthy();
+  vi.restoreAllMocks();
 });

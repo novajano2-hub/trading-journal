@@ -5,13 +5,19 @@ import type {
   Challenge,
   DayRecord,
   DayShot,
+  FeeRule,
+  HistoryRow,
   JournalEntry,
+  MissedTrade,
   NoteFolder,
+  NoteVersion,
   NoteTemplate,
   PropTxn,
   Strategy,
+  StoredFile,
   Tag,
   TagCategory,
+  TargetRule,
   Tracker,
   Trade,
 } from '@/domain/types';
@@ -37,6 +43,12 @@ export class KeelDb extends Dexie {
   declare readonly days: Table<DayRecord, Key>;
   declare readonly dayShots: Table<DayShot, Key>;
   declare readonly propTxns: Table<PropTxn, Key>;
+  declare readonly files: Table<StoredFile, Key>;
+  declare readonly noteVersions: Table<NoteVersion, Key>;
+  declare readonly history: Table<HistoryRow, Key>;
+  declare readonly targetRules: Table<TargetRule, Key>;
+  declare readonly feeRules: Table<FeeRule, Key>;
+  declare readonly missedTrades: Table<MissedTrade, Key>;
   declare readonly meta: Table<MetaRecord, string>;
 
   /** Opens nothing: Dexie connects on `open()` or the first query. */
@@ -80,6 +92,15 @@ export class KeelDb extends Dexie {
     // The prop money ledger: one new, empty table. No row is rewritten.
     this.version(4).stores({
       propTxns: '[workspaceId+id], workspaceId, [workspaceId+date]',
+    });
+    // Plan 6B: new empty tables only; every new field is optional, so no row is rewritten.
+    this.version(5).stores({
+      files: '[workspaceId+id], workspaceId, [workspaceId+owner]',
+      noteVersions: '[workspaceId+id], workspaceId, [workspaceId+noteId]',
+      history: '[workspaceId+id], workspaceId, [workspaceId+at]',
+      targetRules: '[workspaceId+id], workspaceId',
+      feeRules: '[workspaceId+id], workspaceId',
+      missedTrades: '[workspaceId+id], workspaceId, [workspaceId+strategyId]',
     });
   }
 }

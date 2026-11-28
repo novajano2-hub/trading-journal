@@ -14,6 +14,9 @@
  *   data-print='keep'   a block that stays on one page (a chart card, a header)
  *   print:hidden        (Tailwind) a control that is on screen and not on paper
  *   hidden print:block  (Tailwind) a block that is on paper and not on screen
+ *   data-print-root     a print layout of its own, a direct child of <body>
+ *                       (a note's PDF): while one is mounted the page is that
+ *                       layout alone (see the last section)
  *
  * Always light: theme.css declares the graphite tokens inside `@media not
  * print`, so paper gets the light set whatever the Appearance setting, and
@@ -97,5 +100,96 @@
   h2,
   h3 {
     break-after: avoid;
+  }
+}
+
+/*
+ * A note's PDF (Plan 6B, B40). The report above prints the page itself with its
+ * chrome taken off; a note is printed from a print layout: the note drawn
+ * read-only into a node marked `data-print-root`, a direct child of <body>,
+ * mounted only while its print dialog is open (notes/print-host.tsx). The two
+ * share nothing but this sheet: the report's hooks (data-pinned, data-print)
+ * never touch the layout, and the layout's rule below only applies to a body
+ * that holds one, so a report print (no layout mounted) is unaffected and a
+ * note print hides the whole app whatever else is marked. The page margins and
+ * the footer are the sheet's own, above.
+ */
+@media screen {
+  /* On a screen the layout is off to the side, drawn so that its images load and its fonts settle, and out of reach. */
+  [data-print-root] {
+    position: fixed;
+    top: 0;
+    left: -10000px;
+    width: 794px;
+    pointer-events: none;
+  }
+}
+
+@media print {
+  /* With a layout mounted, everything else in the body is hidden on paper. */
+  body:has(> [data-print-root]) > :not([data-print-root]) {
+    display: none !important;
+  }
+
+  [data-print-root] {
+    display: block;
+    position: static;
+    width: auto;
+    margin: 0;
+    color-scheme: light;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    background: #fff;
+    /* theme.css's light tokens, so a layout is ink on paper whatever theme is set. */
+    --bg: #ffffff;
+    --surface-1: #ffffff;
+    --sunken: #f0f1f8;
+    --line: #e7e9f3;
+    --line-2: #d5d8ea;
+    --text: #121633;
+    --muted: #4b5175;
+    --faint: #636889;
+    --accent: #2b35af;
+    --accent-ink: #2b35af;
+    --accent-soft: #eeeffc;
+    --accent-tint: #dcdff8;
+    --gain: #0a7a52;
+    --loss: #c22e3a;
+    --warn: #9a5700;
+    --info: #0a6f94;
+    color: var(--text);
+    font-family: var(--font-sans);
+  }
+
+  [data-print-root] .print-title {
+    margin: 0 0 4pt;
+    font-size: 22pt;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+  [data-print-root] .print-tags {
+    margin: 0 0 12pt;
+    font-size: 10pt;
+    color: var(--muted);
+  }
+  [data-print-root] .note-prose {
+    max-width: none;
+    margin-top: 0;
+  }
+  [data-print-root] a {
+    color: inherit;
+    text-decoration: underline;
+  }
+  [data-print-root] h1,
+  [data-print-root] h2,
+  [data-print-root] h3 {
+    break-after: avoid;
+  }
+  [data-print-root] figure,
+  [data-print-root] tr,
+  [data-print-root] pre,
+  [data-print-root] blockquote {
+    break-inside: avoid;
   }
 }

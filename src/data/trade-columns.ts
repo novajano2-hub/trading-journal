@@ -19,6 +19,7 @@ export type ColumnId =
   | 'strategies'
   | 'tags'
   | 'mistakes'
+  | 'patterns'
   | 'rules'
   | 'rating'
   | 'reviewed'
@@ -46,6 +47,7 @@ export const ALL_COLUMNS: readonly ColumnId[] = [
   'strategies',
   'tags',
   'mistakes',
+  'patterns',
   'rules',
   'rating',
   'reviewed',
@@ -69,6 +71,7 @@ export const DEFAULT_COLUMNS: ColumnId[] = [
   'duration',
   'strategies',
   'tags',
+  'patterns',
   'rules',
   'rating',
   'reviewed',
@@ -96,8 +99,13 @@ export const WEEK_COLUMNS: ColumnId[] = ['day', ...DAY_COLUMNS];
 /**
  * Columns the Day and Week views offer beyond the trade log's. 'ticker' and
  * 'day' are not in ALL_COLUMNS, so the trade log's menu and CSV are unchanged.
+ * 'patterns' is the All view's alone: TradeZella's Day and Week tables don't
+ * show it, and a Day table has no patterns to count.
  */
-export const DAY_CHOICES: readonly ColumnId[] = [...ALL_COLUMNS, 'ticker'];
+export const DAY_CHOICES: readonly ColumnId[] = [
+  ...ALL_COLUMNS.filter((id) => id !== 'patterns'),
+  'ticker',
+];
 export const WEEK_CHOICES: readonly ColumnId[] = ['day', ...DAY_CHOICES];
 
 /** A column header as the table shows it, and as the CSV does where it differs. */
@@ -121,6 +129,7 @@ export const COLUMN_LABELS: Record<ColumnId, { label: string; csv?: string }> =
     strategies: { label: 'Strategy', csv: 'Strategies' },
     tags: { label: 'Tags' },
     mistakes: { label: 'Mistake', csv: 'Mistakes' },
+    patterns: { label: 'Patterns' },
     rules: { label: 'Rules' },
     rating: { label: 'Rating' },
     reviewed: { label: 'Reviewed' },
