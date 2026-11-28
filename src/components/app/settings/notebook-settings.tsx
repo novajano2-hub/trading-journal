@@ -29,8 +29,8 @@ const FIELDS: readonly { key: Size; label: string }[] = [
   { key: 'body', label: 'Body' },
 ];
 
-/** What the last save or reset did, until the next change. */
-type Said = '' | 'Saved' | 'Back to the defaults' | 'failed';
+/** What the last save, or the last return to Keel's settings, did, until the next change. */
+type Said = '' | 'Saved' | "Using Keel's settings" | 'failed';
 
 const SIZES = Array.from(
   { length: NOTE_SIZE_MAX - NOTE_SIZE_MIN + 1 },
@@ -118,7 +118,7 @@ function SizeField({
   );
 }
 
-/** What a save or a reset did, for the eye and for a screen reader. */
+/** What a save or a return to Keel's settings did, for the eye and for a screen reader. */
 function Status({ said }: { said: Said }): React.JSX.Element {
   const failed = said === 'failed';
   return (
@@ -136,7 +136,7 @@ function Status({ said }: { said: Said }): React.JSX.Element {
 /**
  * Settings > Notebook: the sizes every note is drawn at, whether a ticked
  * checklist item is crossed out, a preview that follows the choices before
- * they are saved, Reset to default (which forgets the saved setting) and
+ * they are saved, Use Keel's settings (which forgets the saved setting) and
  * Save, which waits for a change (B41).
  */
 export function NotebookSettings(): React.JSX.Element {
@@ -185,9 +185,9 @@ export function NotebookSettings(): React.JSX.Element {
     // The choices go back at once; the saved setting is forgotten behind them.
     setHeld({ key, draft: { ...DEFAULT_NOTE_TYPE } });
     // Nothing saved means nothing to forget.
-    if (prefs.noteType === undefined) return setSaid('Back to the defaults');
+    if (prefs.noteType === undefined) return setSaid("Using Keel's settings");
     unset.mutate(['noteType'], {
-      onSuccess: () => setSaid('Back to the defaults'),
+      onSuccess: () => setSaid("Using Keel's settings"),
       onError: () => setSaid('failed'),
     });
   };
@@ -254,7 +254,7 @@ export function NotebookSettings(): React.JSX.Element {
           disabled={busy}
           className={`${BUTTON_SIZE.md} -ml-[15px] inline-flex items-center justify-center rounded-control text-accent-ink transition-colors duration-120 hover:bg-sunken disabled:opacity-50`}
         >
-          Reset to default
+          Use Keel&apos;s settings
         </button>
         <div className="ml-auto flex items-center gap-3">
           <Status said={said} />

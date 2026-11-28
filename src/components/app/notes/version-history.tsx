@@ -96,7 +96,7 @@ export interface VersionHistoryProps {
   /**
    * Runs first when a restore is confirmed: the host saves the text it still
    * holds (typing on its way, or held after a failed write), so the version the
-   * restore keeps as "before restore" is the text on screen. A rejection stops
+   * restore keeps (marked Replaced) is the text on screen. A rejection stops
    * the restore, and the dialog says so.
    */
   beforeRestore?: () => Promise<void>;
@@ -174,7 +174,8 @@ export function VersionHistory({
                 {clock(v.savedAt, timeZone, false)}
               </span>
               {v.kind === 'before-restore' ? (
-                <Chip className="ml-auto">Before restore</Chip>
+                // The text a restore replaced, kept so it can come back.
+                <Chip className="ml-auto">Replaced</Chip>
               ) : null}
             </button>
           ))}

@@ -678,14 +678,48 @@ test('an absent figure reads None and says what would add it, never a dash', asy
   const exec = await screen.findByRole('region', { name: 'Execution' });
   expect(exec.textContent).toContain('Planned RNone');
   expect(exec.textContent).toContain('Realized RNone');
-  // Under the headline R, with no planned R to compare it with.
-  expect(document.body.textContent).toContain('add a target for planned R');
+  // Under the headline R, with no planned R to compare it with: both sides are missing.
+  expect(document.body.textContent).toContain(
+    'add a target and a stop for planned R',
+  );
   expect(document.body.textContent).not.toContain('set a stop and target');
   expect(document.body.textContent).not.toContain('Not available');
   const texts = everyString(document.body);
   expect(texts).toContain('None');
   expect(texts.filter((s) => s.trim() === '-')).toEqual([]);
 });
+
+test.each<[Partial<Trade>, string]>([
+  [{ plannedTarget: 6319 }, 'add a stop for planned R'],
+  [{ plannedStop: 6304.75 }, 'add a target for planned R'],
+  [
+    { stops: { unit: 'price', levels: [{ value: 6304.75, qty: 6 }] } },
+    'add a target for planned R',
+  ],
+  [
+    { targets: { unit: 'price', levels: [{ value: 6319, qty: 6 }] } },
+    'add a stop for planned R',
+  ],
+  // Both sides, but the stop sits at the entry: nothing is at risk.
+  [
+    { plannedTarget: 6319, plannedStop: 6309.75 },
+    'no planned R with nothing at risk',
+  ],
+])(
+  'the headline names the side planned R is missing (%o)',
+  async (patch, hint) => {
+    renderApp(<TradeView id="t-c" />, { sample: sample(patch), url: URL_C });
+    const head = await screen.findByRole('region', { name: 'Trade 1132' });
+    await waitFor(() => expect(head.textContent).toContain(hint));
+    for (const other of [
+      'add a target for planned R',
+      'add a stop for planned R',
+      'add a target and a stop for planned R',
+      'no planned R with nothing at risk',
+    ].filter((h) => h !== hint))
+      expect(head.textContent).not.toContain(other);
+  },
+);
 
 test('at phone width Net, ROI and R share one row of three, and the crumb replaces Back to trades', async () => {
   renderApp(<TradeView id="t-c" />, {
@@ -715,6 +749,13 @@ test('a futures trade shows points, ticks, contracts and cost basis', async () =
   // 3.75 points on 6 contracts closed: 15 ticks each.
   expect(text).toContain('Points+22.5 pts');
   expect(text).toContain('Ticks+90.0 ticks');
+  expect(text).toContain('Ticks per contract+15.0 ticks');
+  // Its label carries its definition.
+  expect(
+    screen
+      .getByRole('region', { name: 'Execution' })
+      .querySelector('[data-metric-tip="ticks-per-contract"]'),
+  ).not.toBeNull();
   expect(text).toContain('Contracts6');
   expect(text).not.toContain('closed');
   // 6309.75 x 6 x 50.
@@ -1096,6 +1137,26 @@ test('a partly closed futures trade reads Contracts as closed of opened', async 
   });
   await screen.findByRole('region', { name: 'Execution' });
   expect(execText()).toContain('Contracts3 of 5 closed');
+  // Ticks per contract is over the contracts closed, not the ones opened.
+  const ticks = Number(/Ticks\+([\d.]+) ticks/.exec(execText())![1]);
+  const per = Number(/Ticks per contract\+([\d.]+) ticks/.exec(execText())![1]);
+  expect(ticks).toBeGreaterThan(0);
+  expect(per).toBeCloseTo(ticks / 3, 1);
+});
+
+test('an open futures trade with no exit yet reads Ticks per contract as None', async () => {
+  renderApp(<TradeView id="t-c" />, {
+    sample: sample({
+      status: 'open',
+      closedAt: undefined,
+      avgExit: undefined,
+      executions: [fill('e1', 'buy', 2, 6310.5, '2026-11-09T16:00:00.000Z')],
+      maxPosition: 2,
+    }),
+    url: URL_C,
+  });
+  await screen.findByRole('region', { name: 'Execution' });
+  expect(execText()).toContain('Ticks per contractNone');
 });
 
 test('the day note opens with the default daily template and the first save keeps it', async () => {
@@ -1380,7 +1441,9 @@ test("the Patterns button counts the trade's patterns and opens them in the Exec
       .map((li) => li.querySelector('[data-metric-tip]')!.textContent),
   ).toEqual(['Added to the position', 'Exited in parts', 'Large size']);
   expect(pop.textContent).toContain('Opened in 2 entries, 6 units in all.');
-  expect(pop.textContent).toContain('Closed in 2 exits.');
+  expect(pop.textContent).toContain(
+    'Closed in 2 exits at an average of 6,313.50, for +$112.50 gross.',
+  );
 });
 
 test('a trade with no pattern has the button disabled, reading 0', async () => {

@@ -224,6 +224,7 @@ export const STAT_IDS = [
   'mfe',
   'points',
   'ticks',
+  'ticks-per-contract',
   'contracts',
   'pips',
   'money-per-pip',
@@ -439,6 +440,24 @@ function statDefs(
     };
     defs.points = units('points', 'Points');
     defs.ticks = units('ticks', 'Ticks');
+    // Ticks over the contracts the exits closed (record §10): None before an exit.
+    const ticks = fig.ticks;
+    const perContract =
+      ticks === null || ticks === undefined || !(closed > 0)
+        ? undefined
+        : ticks / closed;
+    defs['ticks-per-contract'] = {
+      label: 'Ticks per contract',
+      tip: 'ticks-per-contract',
+      value:
+        perContract === undefined
+          ? undefined
+          : formatUnitValue('ticks', perContract, {
+              currency: cur,
+              signed: true,
+            }),
+      tone: perContract === undefined ? '' : tone(perContract),
+    };
     defs.contracts = {
       label: 'Contracts',
       value:
@@ -1077,6 +1096,16 @@ function TradePage({
   // Realized R needs a closed trade (spec §5.2).
   const r = trade.status === 'open' ? undefined : rOf(trade, basis);
   const planned = plannedR(trade);
+  // Under the headline R: the side planned R still needs, or why it has none.
+  const plan = sidesOf(trade);
+  const missingPlan =
+    plan.targets === undefined && plan.stops === undefined
+      ? 'add a target and a stop for planned R'
+      : plan.targets === undefined
+        ? 'add a target for planned R'
+        : plan.stops === undefined
+          ? 'add a stop for planned R'
+          : 'no planned R with nothing at risk';
   const fig = display.ofTrade(trade);
   const money = pnlTone(basis === 'gross' ? trade.gross : trade.net);
   const strategyNames = trade.strategyIds.flatMap(
@@ -1269,7 +1298,7 @@ function TradePage({
           </b>
           <small className="block text-xs text-faint">
             {planned === undefined
-              ? 'add a target for planned R'
+              ? missingPlan
               : `of ${formatUnitValue('r', planned, { currency: cur, signed: false })} planned`}
           </small>
         </div>

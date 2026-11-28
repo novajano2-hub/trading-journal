@@ -89,7 +89,15 @@ const CHECKS: readonly (readonly [PatternId, Check])[] = [
       if (x.close === undefined) return;
       const exits = count(x.trade, false);
       if (exits < T.scaledFills) return;
-      return { exits };
+      // T15's text gives the parts, the average exit and the gross P&L; the
+      // tick lets the sentence write the price as the trade page does.
+      const { avgExit, gross, instrument } = x.trade;
+      return {
+        exits,
+        ...(avgExit === undefined ? {} : { avgExit }),
+        gross,
+        tick: instrument.tickSize,
+      };
     },
   ],
   [

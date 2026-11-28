@@ -218,22 +218,22 @@ The next Dexie version adds six workspace tables. All join `DATA_TABLES`, so a w
 | --- | --- | --- |
 | Page | `trading.tsx` (Settings > Trading), `settings-ui.tsx` | Two cards on Settings > Trading, after its existing cards: "Targets and stops" and "Commissions and fees", under one note that both apply to imported trades (Keel's grouping: trade settings in one place; no new nav entry) |
 | Rule dialogs | `MorphDialog`, the tag picker's chip input for symbols, `LevelsBlock`'s unit and level rows (with % in place of quantity) | `TargetRuleDialog`, `FeeRuleDialog` |
-| Engine | `src/domain/import/plan.ts` (where fills become trades) | `applyTargetRules(trade, rules)` and `applyFeeRules(fills, rules)`, pure; run in the import commit; "apply to existing" runs them over matching trades in one transaction |
+| Engine | `src/domain/import/plan.ts` (where fills become trades) | `applyTargetRules(trade, rules)` and `applyFeeRules(fills, rules)`, pure; run in the import commit; "Fill in logged trades" runs them over matching trades in one transaction |
 
 **Behaviour in Keel** (B15 to B19)
 
 - One account per rule; the instrument is required; symbols are optional, empty meaning every symbol (B15). Precedence: a rule naming the symbol beats one that doesn't; then the newest (B15, B18).
-- New imports get both kinds. Manual trades aren't touched on entry; "Apply to existing trades" covers every matching trade, manual included (B16).
+- New imports get both kinds. Manual trades aren't touched on entry; "Fill in logged trades" covers every matching trade, manual included (B16).
 - A % becomes a quantity rounded down to the instrument's step; the last level takes the remainder (B17).
 - Fee maths: per contract is the amount times the fill's quantity; per execution is the amount once per fill; amounts are in the account's currency (B18). A trade lacks costs when none of its fills has a commission or fee, as TZ leaves alone any trade that already carries costs [help 6954370]; at import the unit is the fills new in that import (a closing fill that joins a trade opened by an earlier import is costed unless the file gave it costs, since TZ skips "rows that already carry fees" [plan5-features §7]): without override, only such trades get the rule, on every matching fill; with override, every matching fill's commission and fee are replaced.
-- The synthetic fill that closes an expired option at 0 (Keel's settlement, no broker's execution) is never costed: not at import, not by Apply to existing trades and not in its count, with or without override. A rule on exits only changes nothing on an option whose one exit is that fill.
-- Each card lists its rules as a table: account, instrument, symbols, and a summary (the levels, or the costs), with a menu of Apply to existing trades, Edit and Delete (B19). TZ only showed the empty state.
-- Editing or deleting either kind of rule leaves values already applied, as TZ's fee rule does [help 6954370]; only Apply to existing trades rewrites them (B57).
+- The synthetic fill that closes an expired option at 0 (Keel's settlement, no broker's execution) is never costed: not at import, not by Fill in logged trades and not in its count, with or without override. A rule on exits only changes nothing on an option whose one exit is that fill.
+- Each card lists its rules as a table: account, instrument, symbols, and a summary (the levels, or the costs), with a menu of Fill in logged trades, Edit and Delete (B19). TZ only showed the empty state.
+- Editing or deleting either kind of rule leaves values already applied, as TZ's fee rule does [help 6954370]; only Fill in logged trades rewrites them (B57).
 - The dialogs open with TZ's defaults: each level at 100%; All symbols on; Mode per execution; Apply on all executions; commission and fee 0.00 [inv-3 116, 117].
 - The Instrument list is Keel's six asset classes plus "Future option" (an option with `optionOn: 'future'`), mapping TZ's seven [help 12053164].
 - Every change a rule makes is logged with the source "Rule" (§5.9).
 
-**States:** an empty card (a line and Add rule), the note always, a confirmation for Apply to existing trades with the override box and the count of trades it will touch, a toast with the count changed.
+**States:** an empty card (a line and Add rule), the note always, a confirmation for Fill in logged trades ("Fill in logged trades with this rule?") with the override box and the count of trades it will touch, a toast with the count changed.
 
 **Phone:** rules as two-line rows; dialogs as sheets.
 
@@ -343,9 +343,9 @@ The next Dexie version adds six workspace tables. All join `DATA_TABLES`, so a w
 - Block handles: hovering a block shows a "+" (opens the slash menu there) and a drag handle to move it [inv-2 055] (B54). Equations render with KaTeX, a new dependency (B35). Columns come in two or three; a page break shows as a dashed rule and breaks the PDF page (B36).
 - Full screen fills the window over the app; Escape or the control leaves it (B37).
 - Voice uses the browser's speech recognition where it exists, and is hidden where it doesn't; the control says the browser's speech service does the recognition (B38; U4).
-- Version history: a version is kept when an edited note goes 5 minutes without one, on leaving the editor, and before a restore; versions older than 30 days are removed; restore asks, keeps the current as "before restore", and brings back the body (images by reference) (B39). Files referenced by a kept version are not deleted.
+- Version history: a version is kept when an edited note goes 5 minutes without one, on leaving the editor, and before a restore; versions older than 30 days are removed; restore asks, keeps the current as a version marked "Replaced", and brings back the body (images by reference) (B39). Files referenced by a kept version are not deleted.
 - Export: "PDF" opens the browser's print dialog on a print layout; "Keel note" downloads the note file. Import reads a Keel note file into a new note in the current folder (B40).
-- Note settings: the four sizes (defaults 28, 24, 20 and 14 px), each 10 to 40 px; a box, on, that crosses out ticked checklist items; a live preview; Reset to default; Save, disabled until changed (B41).
+- Note settings: the four sizes (defaults 28, 24, 20 and 14 px), each 10 to 40 px; a box, on, that crosses out ticked checklist items; a live preview; "Use Keel's settings", which forgets the saved sizes and box (its status line reads "Using Keel's settings"); Save, disabled until changed (B41).
 - A finished day's note (6A lock): images, restores and imports are refused, the version history dialog is read-only.
 - Embeds (U4): a pasted YouTube or X link offers to embed it, and the slash menu has both. An embed loads only while its note is open and online (YouTube through its privacy-enhanced domain), shows the source under it, and falls back to the plain link offline (B42).
 
@@ -448,10 +448,10 @@ Every row below is Keel's call (TradeZella unknown). "Basis" names the evidence 
 | Id | Question | Keel's call | Basis |
 | --- | --- | --- | --- |
 | B15 | Rule scope and precedence | One account; instrument required; symbols optional (empty is all); a symbol match beats none, then the newest | The dialog [inv-3 116]; one rule per type advised [help 12053164] |
-| B16 | Manual trades | Not on entry; included by Apply to existing trades | "Newly uploaded" [inv-3 114]; "matching trades" [help 12053164] |
+| B16 | Manual trades | Not on entry; included by Fill in logged trades | "Newly uploaded" [inv-3 114]; "matching trades" [help 12053164] |
 | B17 | % to quantity | A % of the trade's max position when the rule is applied, rounded down to the instrument's step; the last level takes the remainder. A trade that grows later is not re-levelled. A Price-unit level that falls on the wrong side for a trade skips that side for that trade | None seen |
 | B18 | Fee maths and precedence | Per fill: per contract is the amount × the fill's quantity, per execution the amount once; account currency; a fill "lacks" costs when its commission and fee are both zero; override replaces both. The rule writes the execution's values, and the trade's fees and net are recomputed. A symbol rule beats an all-symbols rule, then the newest | [help 6954370] |
-| B19 | The rule list | A table in each card: account, instrument, symbols, summary, a menu (Apply to existing trades, Edit, Delete) | Only the empty state seen [inv-3 114-115] |
+| B19 | The rule list | A table in each card: account, instrument, symbols, summary, a menu (Fill in logged trades, Edit, Delete) | Only the empty state seen [inv-3 114-115] |
 
 **Patterns**
 
@@ -519,7 +519,7 @@ Every row below is Keel's call (TradeZella unknown). "Basis" names the evidence 
 | B53 | Sample seed | Two merged trades and one split; levels on a third of trades; two default rules of each kind; swap on forex trades; files none; a missed trade per strategy; history rows for the seed's edits, stamped relative to the seed time so the 30-day purge keeps them for a month | The sample shows every state |
 | B55 | Trade edits on a finished day | Allowed, as today (6A locks the note, ticks, rating, mood, session and shots, not trades). The day's frozen score stays (6A K3); its displayed P&L follows the trades | 6A spec §5.1, K3 |
 | B56 | When files are deleted | Deleting a trade or strategy deletes its files. A note's files go when the note is purged from Trash. At the 30-day version purge, a note's image files referenced neither by its body nor by a kept version are deleted (a scan of that note's bodies) | Versions keep images [help 17516125] |
-| B57 | Editing or deleting a default rule | Values already applied stay; only Apply to existing trades rewrites them | Fee rule delete [help 6954370]; target rule UNKNOWN (record §2.2) |
+| B57 | Editing or deleting a default rule | Values already applied stay; only Fill in logged trades rewrites them | Fee rule delete [help 6954370]; target rule UNKNOWN (record §2.2) |
 | B58 | Costs by hand: when it saves | When the row is confirmed; recomputes the trade; logged | The row's confirm tick [help 6387098] |
 | B59 | Picking a template in the chooser | Opens the create form filled from it, unsaved | "Presumably pre-fills" (record §6.2, INFERRED) |
 | B60 | Swap and the places that derive costs | Swap is a cost of its own, never part of "commissions" or "fees": wherever a view derives a cost as gross minus net, it uses the trades' fees instead; the Overview's Gross to net shows a Swap line (only when some trade has a swap) so gross, fees, swap and net add up | TZ lists Total swap beside commissions and fees [help 5829394]; net includes swap (B49) |
@@ -553,14 +553,14 @@ The owner took the recommendation on all four questions, and approved this doc o
 1. Trade page: target and stop blocks, swap, the stat choice, attachments, the patterns button and popover.
 2. Trade log: the Patterns column; the bulk bar with Merge, Split and Move; the merge dialog.
 3. The split dialog and the move dialog.
-4. Settings > Trading with the two rule cards, the target rule dialog, the fee rule dialog, and Apply to existing trades.
+4. Settings > Trading with the two rule cards, the target rule dialog, the fee rule dialog, and Fill in logged trades.
 5. Notes: the editor with the full toolbar, an image with a caption, columns, the slash menu; the version history panel.
 6. Settings > Notebook with the preview.
 7. Strategies: the chooser; the Templates tab; a strategy with its photo and its missed trades.
 8. Settings > Logs: History.
 9. Patterns: the day card's popover and the Patterns report.
 
-**Copy:** every label is Keel's own, from the comps. Never used: Zella, Zella Insights, Zella Scale, Insights (as a feature name), Rules & Fees, Transfer data, Transfer trades, Customize Info, Select Default, Update (as a save button), Show every time I create a strategy, Create your own, Browse templates, Target in Price, Add PT, Add SL, Initial target, Trade risk, Total swap, Held onto loser, Strength, Area to improve, Reset to defaults, Old value, New value.
+**Copy:** every label is Keel's own, from the comps. Never used: Zella, Zella Insights, Zella Scale, Insights (as a feature name), Rules & Fees, Transfer data, Transfer trades, Customize Info, Select Default, Update (as a save button), Show every time I create a strategy, Create your own, Browse templates, Target in Price, Add PT, Add SL, Initial target, Trade risk, Total swap, Held onto loser, Strength, Area to improve, Reset to defaults, Old value, New value; and, as TZ's own labels or a near copy of one: Apply to existing trades, Before restore, and Reset to default on Settings > Notebook (P6B-B207 to B209; the stat chooser's Reset to default stands, TZ's word there being Select Default).
 
 **Wiring:** module, hook and query-key names; invalidation (a trade change refreshes patterns, the tracker and the day views); the history write inside each repository transaction.
 

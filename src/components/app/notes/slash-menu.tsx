@@ -32,8 +32,10 @@ const align = (value: 'left' | 'center' | 'right' | 'justify') => (c: Chain) =>
 
 /**
  * Every block the "/" menu offers, in the comp's order (comp 05): text, lists,
- * quote and code, the folding blocks, table and divider, the layouts, the
- * links, alignment, then the embeds.
+ * quote and code, the folding blocks, table and divider, the links,
+ * alignment, then the embeds. It is TradeZella's slash list and nothing more
+ * (record §5.3): columns, the page break and equations are blocks of the
+ * toolbar's Insert menu, where TradeZella has them (B35, B36; record §5.2).
  */
 export const SLASH_ITEMS: SlashItem[] = [
   {
@@ -137,31 +139,6 @@ export const SLASH_ITEMS: SlashItem[] = [
     hint: 'A line between sections',
     keywords: ['rule', 'line', 'hr', 'horizontal'],
     run: (c) => c.setHorizontalRule(),
-  },
-  {
-    label: 'Two columns',
-    hint: 'Two blocks side by side',
-    keywords: ['layout', 'side'],
-    run: (c) => c.insertColumns(2),
-  },
-  {
-    label: 'Three columns',
-    hint: 'Three blocks side by side',
-    keywords: ['layout', 'side'],
-    run: (c) => c.insertColumns(3),
-  },
-  {
-    label: 'Page break',
-    hint: 'Where the PDF starts a new page',
-    keywords: ['pdf', 'print'],
-    run: (c) => c.setPageBreak(),
-  },
-  {
-    label: 'Equation',
-    hint: 'A formula, written in LaTeX',
-    keywords: ['math', 'formula', 'latex', 'katex'],
-    available: (e) => e.storage.keelBlocks?.canAsk('equation') ?? false,
-    run: (c) => c.askEquation(false),
   },
   {
     label: 'Image',

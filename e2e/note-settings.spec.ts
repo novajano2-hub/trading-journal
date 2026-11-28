@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }, info) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
 });
 
-test('sizes and the cross-out saved in settings reach a note, and Reset to default takes them back', async ({
+test("sizes and the cross-out saved in settings reach a note, and Use Keel's settings takes them back", async ({
   page,
 }) => {
   // A new note: a heading, a line of text and a ticked checklist item.
@@ -61,17 +61,17 @@ test('sizes and the cross-out saved in settings reach a note, and Reset to defau
   await expect(body).toHaveCSS('font-size', '18px');
   await expect(ticked).toHaveCSS('text-decoration-line', 'none');
 
-  // Reset to default forgets them, and the note reads as it did.
+  // Use Keel's settings forgets them, and the note reads as it did.
   await page.goto('/app/settings/notebook');
   await expect(page.getByLabel('Heading 2')).toHaveValue('30', {
     timeout: 30_000,
   });
-  await page.getByRole('button', { name: 'Reset to default' }).click();
+  await page.getByRole('button', { name: "Use Keel's settings" }).click();
   await expect(page.getByLabel('Heading 2')).toHaveValue('24');
   await expect(page.getByLabel('Body')).toHaveValue('14');
   // Forgotten for good once the page says so.
   await expect(page.getByRole('status', { name: 'Save status' })).toHaveText(
-    'Back to the defaults',
+    "Using Keel's settings",
   );
   await page.goto(noteUrl);
   await expect(heading).toHaveCSS('font-size', '24px', { timeout: 30_000 });

@@ -131,8 +131,8 @@ test('paste an image, format text, restore a version, export and import a note',
   // What was replaced is kept, marked as saved before the restore.
   await page.getByRole('button', { name: 'Version history' }).click();
   await expect(history).toBeVisible();
-  await expect(history.getByText('Before restore')).toBeVisible();
-  await versions.getByRole('button', { name: /Before restore/ }).click();
+  await expect(history.getByText('Replaced')).toBeVisible();
+  await versions.getByRole('button', { name: /Replaced/ }).click();
   await expect(preview).toContainText('EDITED');
   await history.getByRole('button', { name: 'Close' }).last().click();
   await expect(history).toBeHidden();

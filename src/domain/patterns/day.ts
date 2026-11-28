@@ -185,10 +185,18 @@ const CHECKS: readonly (readonly [PatternId, Check])[] = [
       const { num, den } = T.moreTradesOver;
       // At least `num/den` over the daily average, without dividing.
       if (den * d.facts.length * w.days < (den + num) * w.tradeCount) return;
+      // D10's text follows the day's result: its net, and 1 green, -1 red,
+      // 0 flat by the breakeven range; neither while no trade has closed.
       return {
         trades: d.facts.length,
         average: w.tradeCount / w.days,
         days: w.days,
+        ...(d.outcome === undefined
+          ? {}
+          : {
+              net: d.net,
+              result: d.outcome === 'win' ? 1 : d.outcome === 'loss' ? -1 : 0,
+            }),
       };
     },
   ],

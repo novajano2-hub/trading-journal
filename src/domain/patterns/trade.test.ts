@@ -307,12 +307,35 @@ describe('added-to-position', () => {
 });
 
 describe('exited-in-parts', () => {
-  test('flags two or more exits', () => {
-    const t = mk({ open: X, volume: 2, entries: 1, exits: 2 });
+  test('flags two or more exits, with the average exit, the gross P&L and the tick to read the price by', () => {
+    const t = mk({
+      open: X,
+      volume: 2,
+      entries: 1,
+      exits: 2,
+      net: 1050,
+      extra: { avgExit: 4512.25, gross: 1150, fees: 100 },
+    });
     expect(tradeHit(run([t]), t, 'exited-in-parts')).toEqual({
       id: 'exited-in-parts',
       tradeId: t.id,
-      figures: { exits: 2 },
+      figures: { exits: 2, avgExit: 4512.25, gross: 1150, tick: 0.25 },
+    });
+  });
+
+  test('a losing trade carries its gross loss, signed', () => {
+    const t = mk({
+      open: X,
+      volume: 3,
+      entries: 1,
+      exits: 3,
+      net: -2400,
+      extra: { avgExit: 4490.5, gross: -2300, fees: 100 },
+    });
+    expect(tradeHit(run([t]), t, 'exited-in-parts')?.figures).toMatchObject({
+      exits: 3,
+      avgExit: 4490.5,
+      gross: -2300,
     });
   });
 

@@ -178,6 +178,7 @@ export const METRIC_IDS = [
   'pattern-busier-than-green',
   'pattern-trades',
   'cost-method',
+  'ticks-per-contract',
 ] as const;
 
 export type MetricId = (typeof METRIC_IDS)[number];
@@ -1054,6 +1055,11 @@ const DEFINITIONS: Record<MetricId, { label: string; definition: string }> = {
     label: 'Cost method',
     definition:
       'Which lots an exit closes first: the oldest (FIFO), the newest (LIFO), or all at their average cost.',
+  },
+  'ticks-per-contract': {
+    label: 'Ticks per contract',
+    definition:
+      "A futures trade's ticks over the contracts its exits closed: how far the price moved for one contract, in the trade's direction, over the tick size. None before the first exit.",
   },
 };
 

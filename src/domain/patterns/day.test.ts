@@ -477,13 +477,42 @@ describe('more-trades', () => {
   const threes = () => [95, 96, 97].flatMap((n) => greenDay(n, 3));
   const fours = () => [95, 96, 97].flatMap((n) => greenDay(n, 4));
 
-  test('flags a count a third over the 60-day daily average', () => {
+  test("flags a count a third over the 60-day daily average, with the day's net and result", () => {
     const r = run([...threes(), ...greenDay(D, 4)]);
     expect(dayHit(r, D, 'more-trades')).toEqual({
       id: 'more-trades',
       date: dateOf(D),
-      figures: { trades: 4, average: 3, days: 3 },
+      figures: { trades: 4, average: 3, days: 3, net: 400, result: 1 },
     });
+  });
+
+  test('the result reads the day by the breakeven range: red, green or flat', () => {
+    const red = run([...threes(), ...onDay(D, [100, -150, -150, 100])]);
+    expect(dayHit(red, D, 'more-trades')?.figures).toMatchObject({
+      net: -100,
+      result: -1,
+    });
+    const flat = run([...threes(), ...onDay(D, [100, -100, 50, -50])]);
+    expect(dayHit(flat, D, 'more-trades')?.figures).toMatchObject({
+      net: 0,
+      result: 0,
+    });
+    // Inside a wider range a small green net is flat too.
+    const narrow = run([...threes(), ...onDay(D, [100, -50, 25, -25])], {
+      breakevenRange: { unit: 'amount', from: -100, to: 100 },
+    });
+    expect(dayHit(narrow, D, 'more-trades')?.figures).toMatchObject({
+      net: 50,
+      result: 0,
+    });
+  });
+
+  test('a day with no trade closed yet has no net or result to give', () => {
+    const today = [0, 1, 2, 3].map((i) =>
+      mk({ open: at(D, 15, i), status: 'open' }),
+    );
+    const hit = dayHit(run([...threes(), ...today]), D, 'more-trades');
+    expect(hit?.figures).toEqual({ trades: 4, average: 3, days: 3 });
   });
 
   test('the average count itself is not more', () => {

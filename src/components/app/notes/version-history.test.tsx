@@ -140,7 +140,7 @@ test('with no earlier version it says so, and offers nothing to restore', async 
   expect(await within(none).findByText('No earlier versions yet')).toBeTruthy();
 });
 
-test('it lists Current, then the versions by day with their times, and marks a "before restore"', async () => {
+test('it lists Current, then the versions by day with their times, and marks the text a restore replaced', async () => {
   const repo = newRepo();
   const note = await seed(repo);
   const dialog = await mount(repo, { noteId: note.id });
@@ -158,7 +158,7 @@ test('it lists Current, then the versions by day with their times, and marks a "
     [
       'CurrentNow',
       'Today',
-      '15:58Before restore',
+      '15:58Replaced',
       '14:20',
       'Yesterday',
       '17:05',
@@ -166,6 +166,8 @@ test('it lists Current, then the versions by day with their times, and marks a "
       '18:12',
     ].join(''),
   );
+  // Keel's own word for it: never the other product's name for that version.
+  expect(dialog.textContent).not.toMatch(/before restore/i);
 });
 
 test('the newest version is open in a read-only preview, and choosing another changes it', async () => {

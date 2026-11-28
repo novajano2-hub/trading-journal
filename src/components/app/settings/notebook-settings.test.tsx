@@ -12,6 +12,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import type { NoteType } from '@/domain/types';
+import { everyString } from '../__fixtures__/every-string';
 import { loadNoteProseCss } from '../__fixtures__/note-prose-css';
 import { renderApp } from '../__fixtures__/render-app';
 import { NotebookSettings } from './notebook-settings';
@@ -92,10 +93,12 @@ test('the box that crosses out ticked checklist items is on by default', async (
   expect(box.checked).toBe(true);
 });
 
-test('Keel says "Reset to default" and "Cross out", not the other product\'s words', async () => {
+test('Keel says "Use Keel\'s settings" and "Cross out", not the other product\'s words or a near copy of them', async () => {
   show(repo());
-  await screen.findByRole('button', { name: 'Reset to default' });
-  expect(screen.queryByText(/reset to defaults/i)).toBeNull();
+  await screen.findByRole('button', { name: "Use Keel's settings" });
+  // Neither "reset" nor "default(s)" anywhere on the card, in any form.
+  const card = screen.getByRole('region', { name: 'Note text' });
+  expect(everyString(card).join(' ')).not.toMatch(/reset|default/i);
   expect(screen.queryByText(/strike through/i)).toBeNull();
 });
 
@@ -254,21 +257,21 @@ test('a save that fails says so and keeps the edit', async () => {
   ).toBe(false);
 });
 
-test('Reset to default clears the pref', async () => {
+test("Use Keel's settings clears the pref", async () => {
   const r = repo();
   await r.prefs.update({ noteType: CUSTOM });
   show(r);
   await waitFor(async () =>
     expect((await select('Heading 1')).value).toBe('32'),
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Reset to default' }));
+  fireEvent.click(screen.getByRole('button', { name: "Use Keel's settings" }));
   // The stored setting is gone, not rewritten as the default values, and the page says so.
   await waitFor(async () =>
     expect((await r.prefs.saved()).noteType).toBeUndefined(),
   );
   expect(
     (await screen.findByRole('status', { name: 'Save status' })).textContent,
-  ).toBe('Back to the defaults');
+  ).toBe("Using Keel's settings");
   expect((await r.prefs.get()).noteType).toBeUndefined();
   // And the page reads the defaults again.
   await waitFor(async () =>
@@ -291,14 +294,14 @@ test('Reset to default clears the pref', async () => {
   ).toBe(true);
 });
 
-test('Reset to default also drops a change that was not saved', async () => {
+test("Use Keel's settings also drops a change that was not saved", async () => {
   const r = repo();
   show(r);
   choose(await select('Heading 2'), 31);
   fireEvent.click(
     screen.getByRole('checkbox', { name: 'Cross out ticked checklist items' }),
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Reset to default' }));
+  fireEvent.click(screen.getByRole('button', { name: "Use Keel's settings" }));
   await waitFor(async () =>
     expect((await select('Heading 2')).value).toBe('24'),
   );
@@ -316,7 +319,7 @@ test('Reset to default also drops a change that was not saved', async () => {
   expect((await r.prefs.saved()).noteType).toBeUndefined();
 });
 
-test('a reset that fails says so', async () => {
+test("a Use Keel's settings that fails says so", async () => {
   const r = repo();
   await r.prefs.update({ noteType: CUSTOM });
   vi.spyOn(r.prefs, 'unset').mockRejectedValue(new Error('disk full'));
@@ -324,7 +327,7 @@ test('a reset that fails says so', async () => {
   await waitFor(async () =>
     expect((await select('Heading 1')).value).toBe('32'),
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Reset to default' }));
+  fireEvent.click(screen.getByRole('button', { name: "Use Keel's settings" }));
   expect(
     (await screen.findByRole('status', { name: 'Save status' })).textContent,
   ).toBe("Couldn't save that. Try again.");

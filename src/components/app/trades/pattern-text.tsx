@@ -12,7 +12,13 @@ import {
   type PatternId,
 } from '@/domain/patterns';
 import { useDisplay } from '@/lib/display';
-import { formatDuration, formatMinutes, formatQty, plural } from '@/lib/format';
+import {
+  formatDuration,
+  formatMinutes,
+  formatQty,
+  plural,
+  price,
+} from '@/lib/format';
 
 /** B25: a pattern's tone is a word, never a colour (green and red stay for money). */
 export const TONE_WORDS: Record<PatternDef['tone'], string> = {
@@ -94,7 +100,17 @@ export function PatternSentence({
         </>
       );
     case 'exited-in-parts':
-      return <>Closed in {n('exits')} exits.</>;
+      // T15: the parts, the average exit (a price, not money: Privacy leaves
+      // it) and the gross P&L, signed.
+      return (
+        <>
+          Closed in {n('exits')} exits
+          {f.avgExit === undefined
+            ? ''
+            : ` at an average of ${price(f.avgExit, n('tick'))}`}
+          , for {net(n('gross'))} gross.
+        </>
+      );
     case 'large-size':
       return (
         <>
@@ -143,10 +159,22 @@ export function PatternSentence({
         </>
       );
     case 'more-trades':
+      // D10's text follows the day's result (none while no trade has closed).
       return (
         <>
           {n('trades')} trades, against a daily average of {mean(n('average'))}{' '}
           in the past 60 days.
+          {f.result === undefined ? null : (
+            <>
+              {' '}
+              {f.result > 0
+                ? 'The day still closed green'
+                : f.result < 0
+                  ? 'The day closed red'
+                  : 'The day closed flat'}
+              , at {net(n('net'))}.
+            </>
+          )}
         </>
       );
     case 'waited-then-won':

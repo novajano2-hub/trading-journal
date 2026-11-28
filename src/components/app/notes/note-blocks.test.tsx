@@ -144,45 +144,48 @@ async function slash(editor: Editor, name: string) {
 
 // ---- the slash menu ----------------------------------------------------------
 
-test('the slash list includes justify, and every block the editor has', () => {
+test("the slash list is TradeZella's slash list and nothing more, justify included", () => {
   const labels = SLASH_ITEMS.map((i) => i.label);
   expect(labels).toContain('Align justify');
   expect(filterSlashItems('justify').map((i) => i.label)).toEqual([
     'Align justify',
   ]);
-  for (const label of [
-    'Normal text',
-    'Heading 1',
-    'Heading 2',
-    'Heading 3',
-    'Bulleted list',
-    'Numbered list',
-    'Checklist',
-    'Timed list',
-    'Quote',
-    'Code block',
-    'Collapsible section',
-    'Toggle',
-    'Toggle heading 1',
-    'Toggle heading 2',
-    'Toggle heading 3',
-    'Table',
-    'Divider',
-    'Two columns',
-    'Three columns',
-    'Page break',
-    'Equation',
-    'Image',
-    'Trade',
-    'Day',
-    'Align left',
-    'Align centre',
-    'Align right',
-    'Align justify',
-    'YouTube video',
-    'Post from X',
-  ])
-    expect(labels, label).toContain(label);
+  // The record's slash list [help 8410320], in Keel's words: text and
+  // headings, the lists, table, image, trade and day, quote, code block,
+  // divider, the toggles, collapsible section, the alignments and the embeds.
+  expect([...labels].sort()).toEqual(
+    [
+      'Normal text',
+      'Heading 1',
+      'Heading 2',
+      'Heading 3',
+      'Bulleted list',
+      'Numbered list',
+      'Checklist',
+      'Timed list',
+      'Quote',
+      'Code block',
+      'Collapsible section',
+      'Toggle',
+      'Toggle heading 1',
+      'Toggle heading 2',
+      'Toggle heading 3',
+      'Table',
+      'Divider',
+      'Image',
+      'Trade',
+      'Day',
+      'Align left',
+      'Align centre',
+      'Align right',
+      'Align justify',
+      'YouTube video',
+      'Post from X',
+    ].sort(),
+  );
+  // Columns, the page break and equations are Insert's, as TradeZella has them (B35, B36).
+  for (const word of ['column', 'page break', 'equation', 'math', 'latex'])
+    expect(filterSlashItems(word), word).toEqual([]);
   // Found by the word a person from elsewhere would type.
   expect(filterSlashItems('tweet').map((i) => i.label)).toEqual([
     'Post from X',
@@ -217,9 +220,6 @@ test.each([
     'Toggle heading 3',
     (e: Editor) => find(e, 'details')[0]?.attrs?.toggle === 3,
   ],
-  ['Two columns', (e: Editor) => find(e, 'column').length === 2],
-  ['Three columns', (e: Editor) => find(e, 'column').length === 3],
-  ['Page break', (e: Editor) => kinds(e).includes('pageBreak')],
   [
     'Align justify',
     (e: Editor) => find(e, 'paragraph')[0]?.attrs?.textAlign === 'justify',
@@ -231,6 +231,27 @@ test.each([
 ] as const)('the slash item %s does what it says', async (name, check) => {
   const { editor } = await mount();
   await slash(editor, name);
+  await waitFor(() => expect(check(editor)).toBe(true));
+});
+
+/** Opens the toolbar's Insert menu and picks an item, as a person does. */
+async function insert(name: string) {
+  fireEvent.keyDown(screen.getByRole('button', { name: 'Insert' }), {
+    key: 'Enter',
+  });
+  fireEvent.click(await screen.findByRole('menuitem', { name }));
+}
+
+test.each([
+  ['Two columns', (e: Editor) => find(e, 'column').length === 2],
+  ['Three columns', (e: Editor) => find(e, 'column').length === 3],
+  ['Page break', (e: Editor) => kinds(e).includes('pageBreak')],
+] as const)('the Insert item %s does what it says', async (name, check) => {
+  const { editor } = await mount();
+  act(() => {
+    editor.commands.focus('end');
+  });
+  await insert(name);
   await waitFor(() => expect(check(editor)).toBe(true));
 });
 
@@ -432,7 +453,10 @@ test('the Day item takes a date and puts a day chip in the note', async () => {
 
 test('the Equation item takes LaTeX, shows it, and keeps a bad one out until it parses', async () => {
   const { editor } = await mount();
-  await slash(editor, 'Equation');
+  act(() => {
+    editor.commands.focus('end');
+  });
+  await insert('Equation');
   const dialog = await screen.findByRole('dialog', { name: 'Equation' });
   const field = within(dialog).getByRole('textbox', { name: 'LaTeX' });
   fireEvent.change(field, { target: { value: '\\frac{a' } });

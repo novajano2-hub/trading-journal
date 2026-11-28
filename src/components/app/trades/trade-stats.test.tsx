@@ -102,6 +102,7 @@ const FUTURES_LABELS = [
   'MFE',
   'Points',
   'Ticks',
+  'Ticks per contract',
   'Contracts',
 ];
 
@@ -114,8 +115,11 @@ test('every row is on by default', async () => {
 
   const d = await openChooser();
   const boxes = within(d).getAllByRole('checkbox') as HTMLInputElement[];
-  // The 17 cells above and the two level blocks.
-  expect(boxes).toHaveLength(19);
+  // The 18 cells above and the two level blocks.
+  expect(boxes).toHaveLength(20);
+  expect(
+    within(d).getByRole('checkbox', { name: 'Ticks per contract' }),
+  ).toBeTruthy();
   expect(boxes.every((b) => b.checked)).toBe(true);
   // The header figures are not in the list; they always show.
   for (const header of ['Net P&L', 'Net ROI'])
@@ -230,8 +234,11 @@ test('a row hidden here is still ticked in the chooser of a trade that lacks it'
     expect((await repo.prefs.get()).tradeStats).toBeDefined(),
   );
   const saved = (await repo.prefs.get()).tradeStats!;
-  for (const id of ['points', 'ticks', 'contracts'])
+  for (const id of ['points', 'ticks', 'ticks-per-contract', 'contracts'])
     expect(saved).toContain(id);
+  expect(
+    within(d).queryByRole('checkbox', { name: 'Ticks per contract' }),
+  ).toBeNull();
   expect(saved).not.toContain('swap');
 });
 

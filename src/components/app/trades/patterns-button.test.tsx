@@ -189,7 +189,7 @@ const FIGURES: Record<PatternId, Record<string, number>> = {
   },
   'loss-after-loss': { gapMs: 0, priorLoss: 4_000 },
   'added-to-position': { entries: 3, volume: 1.5 },
-  'exited-in-parts': { exits: 2 },
+  'exited-in-parts': { exits: 2, avgExit: 1.1542, gross: 2_350, tick: 0.00001 },
   'large-size': { volume: 12, limit: 8, sample: 50 },
   'losses-outweighed': {
     winRate: 0.6,
@@ -208,7 +208,13 @@ const FIGURES: Record<PatternId, Record<string, number>> = {
     loss: 30_000,
     avgLoss: 9_000,
   },
-  'more-trades': { trades: 12, average: 7.3333, days: 40 },
+  'more-trades': {
+    trades: 12,
+    average: 7.3333,
+    days: 40,
+    net: -9_000,
+    result: -1,
+  },
   'waited-then-won': { waitMinutes: 135, net: 25_000 },
   'quick-reentries': { trades: 2, loss: 18_000 },
   'rushed-red-day': {
@@ -219,6 +225,95 @@ const FIGURES: Record<PatternId, Record<string, number>> = {
   },
   'busier-than-green': { trades: 14, average: 5.5, greenDays: 20 },
 };
+
+/** One sentence, rendered alone, as its text once the display has loaded. */
+async function sentence(
+  hit: PatternHit,
+  repository?: ReturnType<typeof createLocalRepository>,
+): Promise<string> {
+  const { container } = renderApp(
+    <p data-testid="s">
+      <PatternSentence hit={hit} />
+    </p>,
+    repository ? { repository } : {},
+  );
+  const p = container.querySelector('[data-testid="s"]')!;
+  // With Privacy on, once the preferences are read the money is masked.
+  await waitFor(() =>
+    expect(p.textContent).toMatch(repository ? /\$•••/ : /\$/),
+  );
+  const text = p.textContent ?? '';
+  cleanup();
+  return text;
+}
+
+test('Exited in parts gives the parts, the average exit and the gross P&L', async () => {
+  const hit: PatternHit = {
+    id: 'exited-in-parts',
+    tradeId: 't',
+    figures: { exits: 3, avgExit: 6618.75, gross: 12_340, tick: 0.25 },
+  };
+  expect(await sentence(hit)).toBe(
+    'Closed in 3 exits at an average of 6,618.75, for +$123.40 gross.',
+  );
+  // A loss reads with its sign; a forex price with its pip digits.
+  expect(
+    await sentence({
+      ...hit,
+      figures: { exits: 2, avgExit: 1.1542, gross: -2_350, tick: 0.00001 },
+    }),
+  ).toBe('Closed in 2 exits at an average of 1.15420, for −$23.50 gross.');
+});
+
+test('More trades than usual says how the day ended: red, still green, or flat', async () => {
+  const hit = (net: number, result: number): PatternHit => ({
+    id: 'more-trades',
+    date: '2026-11-18',
+    figures: { trades: 12, average: 7.3333, days: 40, net, result },
+  });
+  const lead = '12 trades, against a daily average of 7.3 in the past 60 days.';
+  expect(await sentence(hit(-9_000, -1))).toBe(
+    `${lead} The day closed red, at −$90.00.`,
+  );
+  expect(await sentence(hit(30_000, 1))).toBe(
+    `${lead} The day still closed green, at +$300.00.`,
+  );
+  expect(await sentence(hit(500, 0))).toBe(
+    `${lead} The day closed flat, at +$5.00.`,
+  );
+});
+
+test('Privacy hides the gross of Exited in parts and the net of More trades than usual', async () => {
+  const repository = createLocalRepository({
+    indexedDB: new IDBFactory(),
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+  await repository.prefs.update({ displayUnit: 'privacy' });
+  const parts = await sentence(
+    {
+      id: 'exited-in-parts',
+      tradeId: 't',
+      figures: { exits: 3, avgExit: 6618.75, gross: 12_340, tick: 0.25 },
+    },
+    repository,
+  );
+  expect(parts).toContain('$•••');
+  expect(parts).not.toContain('123.40');
+  // A price is not money: it stays.
+  expect(parts).toContain('6,618.75');
+  const day = await sentence(
+    {
+      id: 'more-trades',
+      date: '2026-11-18',
+      figures: { trades: 12, average: 7.3, days: 40, net: -9_000, result: -1 },
+    },
+    repository,
+  );
+  expect(day).toContain('$•••');
+  expect(day).not.toContain('90.00');
+  expect(day).toContain('closed red');
+});
 
 test('every pattern writes a sentence from its figures, in Keel words', () => {
   const hitOf = (id: PatternId): PatternHit => ({
