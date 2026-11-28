@@ -23,10 +23,15 @@ import { isClosed } from '../domain/trade-status';
 import { defaultPrefs } from './repository';
 import { applyFilters, EMPTY_FILTERS, narrowToUnit } from './filters';
 import { metricContextOf, metricsByCurrency } from './metrics';
-import { generateSampleWorkspace, SAMPLE_SEED } from './seed/generate';
+import { generateSampleBase, SAMPLE_SEED } from './seed/generate';
 
-/** The catalogue's series on the sample TradeZella imported (Futures live), against the figures the metrics bundle gives. */
-const ws = generateSampleWorkspace({
+/**
+ * The catalogue's series on the sample TradeZella imported (Futures live),
+ * against the figures the metrics bundle gives. TradeZella read its fills, so
+ * the base: v8's hand grouping and swap are Keel edits a fills file does not
+ * carry.
+ */
+const ws = generateSampleBase({
   seed: SAMPLE_SEED,
   endDate: '2026-11-20',
 });

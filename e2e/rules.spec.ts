@@ -420,7 +420,8 @@ test('on a phone the rule dialogs are full-height sheets with their footer in vi
     );
   await page.goto('/app/settings/trading');
   await expect(targetsCard(page)).toBeVisible({ timeout: 30_000 });
-  await expect(targetsCard(page).getByText(/No rules yet/)).toBeVisible();
+  // The sample workspace has a target rule of its own.
+  await expect(targetsCard(page).getByRole('listitem')).toHaveCount(1);
   expect(await overflow()).toBeLessThanOrEqual(0);
 
   await targetsCard(page)
@@ -452,8 +453,10 @@ test('on a phone the rule dialogs are full-height sheets with their footer in vi
   await expect(dialog).toBeHidden();
 
   // The rule is a two-line row under its account, with a menu.
-  const row = targetsCard(page).getByRole('listitem');
-  await expect(row).toHaveCount(1);
+  await expect(targetsCard(page).getByRole('listitem')).toHaveCount(2);
+  const row = targetsCard(page)
+    .getByRole('listitem')
+    .filter({ hasText: 'ES and MES' });
   await expect(row.locator('[data-line]')).toHaveCount(2);
   await expect(row).toContainText('Futures live');
   await expect(row).toContainText('Future, ES and MES');

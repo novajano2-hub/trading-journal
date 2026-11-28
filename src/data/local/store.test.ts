@@ -56,6 +56,84 @@ test('seeds the sample once, on first use, shared across instances', async () =>
   ).toBe(3);
 });
 
+test('the sample writes its edit history, default rules and missed trades', async () => {
+  const indexedDB = new IDBFactory();
+  const now = new Date('2026-11-20T15:00:00.000Z');
+  const seeded = async (): Promise<SampleWorkspace> => ({
+    ...fixtureSample(),
+    history: [
+      {
+        id: 'sample-history-1',
+        workspaceId: 'sample',
+        at: '2026-11-20T14:00:00.000Z',
+        type: 'trade',
+        action: 'edited',
+        source: 'you',
+        entityId: 'f-1',
+        label: 'ESZ5 2026-11-16',
+        field: 'stops',
+        oldValue: null,
+        newValue: '{"unit":"price","levels":[{"value":5995,"qty":1}]}',
+      },
+    ],
+    targetRules: [
+      {
+        id: 'sample-target-rule-1',
+        workspaceId: 'sample',
+        accountId: 'acc-a',
+        assetClass: 'future',
+        symbols: ['ES'],
+        stop: { unit: 'ticks', levels: [{ value: 12, pct: 100 }] },
+        createdAt: '2026-11-20T13:00:00.000Z',
+      },
+    ],
+    feeRules: [
+      {
+        id: 'sample-fee-rule-1',
+        workspaceId: 'sample',
+        accountId: 'acc-a',
+        assetClass: 'future',
+        symbols: [],
+        mode: 'per-contract',
+        applyOn: 'all',
+        commission: 225,
+        fee: 35,
+        createdAt: '2026-11-20T13:01:00.000Z',
+      },
+    ],
+    missedTrades: [
+      {
+        id: 'sample-missed-1',
+        workspaceId: 'sample',
+        strategyId: 'str-1',
+        symbol: 'ES',
+        at: '2026-11-18T15:10:00.000Z',
+        price: 6001.25,
+        commission: 225,
+        fees: 35,
+      },
+    ],
+  });
+  const repo = createLocalRepository({
+    indexedDB,
+    IDBKeyRange,
+    sample: seeded,
+    now: () => now,
+  });
+  const s = await seeded();
+  expect(await repo.history.list('sample')).toEqual(s.history);
+  expect(await repo.targetRules.list('sample')).toEqual(s.targetRules);
+  expect(await repo.feeRules.list('sample')).toEqual(s.feeRules);
+  expect(await repo.missedTrades.list('sample', 'str-1')).toEqual(
+    s.missedTrades,
+  );
+  // A reset writes them again, and My workspace never gets them.
+  await repo.workspaces.resetSample();
+  expect(await repo.history.list('sample')).toEqual(s.history);
+  expect(await repo.history.list('mine')).toEqual([]);
+  expect(await repo.targetRules.list('mine')).toEqual([]);
+});
+
 test('a stalled database fails with StorageUnavailableError', async () => {
   const stalled = { open: () => ({}) } as unknown as IDBFactory; // a request that never fires
   await expect(

@@ -51,7 +51,8 @@ const UPPER: WidgetKey[] = [
   'avg-drawdown',
 ];
 
-// The sample as the app seeds it on 20 Nov 2026: 1,518 closed trades over six accounts.
+// The sample as the app seeds it on 20 Nov 2026: 1,517 closed trades over six accounts
+// (v8 merged two pairs and split one, and its forex trades carry swap).
 let seeded: SampleWorkspace | undefined;
 const theSample = () =>
   (seeded ??= generateSampleWorkspace({
@@ -173,27 +174,27 @@ describe('over the sample', () => {
     const card = widget('net-pnl');
     expect(card.tagName).toBe('SECTION');
     expect(said('net-pnl')).toContain('Net P&L');
-    expect(said('net-pnl')).toContain('+$17,486.25');
-    expect(said('net-pnl')).toContain('1,518 trades');
+    expect(said('net-pnl')).toContain('+$17,400.66');
+    expect(said('net-pnl')).toContain('1,517 trades');
     expect(said('net-pnl')).not.toMatch(/fee/i);
     // The figure is gain-toned.
-    expect(card.querySelector('.text-gain')?.textContent).toBe('+$17,486.25');
+    expect(card.querySelector('.text-gain')?.textContent).toBe('+$17,400.66');
   });
 
   test('balance and P&L: the balance at the range end, the closed net under it', async () => {
     await renderUpper();
     expect(said('balance-pnl')).toContain('Account balance and P&L');
-    expect(said('balance-pnl')).toContain('$392,486.25');
-    expect(said('balance-pnl')).toContain('+$17,486.25 net P&L, all time');
+    expect(said('balance-pnl')).toContain('$392,400.66');
+    expect(said('balance-pnl')).toContain('+$17,400.66 net P&L, all time');
   });
 
   test('trade win rate: the rate, won, breakeven and lost, and a split bar of the three counts', async () => {
     await renderUpper();
     expect(said('trade-win')).toContain('Trade win rate');
     expect(said('trade-win')).toContain('48.8%');
-    expect(said('trade-win')).toContain('741 won, 0 breakeven, 777 lost');
+    expect(said('trade-win')).toContain('740 won, 0 breakeven, 777 lost');
     expect(segments('trade-win')).toEqual([
-      ['gain', 741],
+      ['gain', 740],
       ['loss', 777],
     ]);
   });
@@ -224,23 +225,23 @@ describe('over the sample', () => {
     await renderUpper();
     expect(said('win-loss-ratio')).toContain('Average win to loss');
     expect(said('win-loss-ratio')).toContain('1.19');
-    expect(said('win-loss-ratio')).toContain('+$201.44 / −$169.60');
+    expect(said('win-loss-ratio')).toContain('+$201.36 / −$169.38');
     const bar = segments('win-loss-ratio')!;
     expect(bar.map(([tone]) => tone)).toEqual(['gain', 'loss']);
-    expect(bar[0]![1] / bar[1]![1]).toBeCloseTo(1.1877, 3);
+    expect(bar[0]![1] / bar[1]![1]).toBeCloseTo(1.1888, 3);
     // Each amount carries its own tone.
     const toned = [
       ...widget('win-loss-ratio').querySelectorAll('.text-gain, .text-loss'),
     ];
-    expect(toned.map((e) => e.textContent)).toEqual(['+$201.44', '−$169.60']);
+    expect(toned.map((e) => e.textContent)).toEqual(['+$201.36', '−$169.38']);
   });
 
   test('trade expectancy: the figure and nothing under it', async () => {
     await renderUpper();
     expect(said('expectancy')).toContain('Trade expectancy');
-    expect(said('expectancy')).toContain('+$11.52');
+    expect(said('expectancy')).toContain('+$11.47');
     // TradeZella's card has no line of its own under the figure.
-    expect(said('expectancy')).not.toMatch(/per closed trade|1,518/);
+    expect(said('expectancy')).not.toMatch(/per closed trade|1,517/);
   });
 
   test('the streaks count winning runs ending at the last day and the last trade: 0 days after a losing day', async () => {
@@ -261,17 +262,17 @@ describe('over the sample', () => {
   test('max drawdown: the fall in dollars and as a share of the high, with the day it bottomed', async () => {
     await renderUpper();
     expect(said('max-drawdown')).toContain('Max drawdown');
-    expect(said('max-drawdown')).toContain('−$8,665.36');
+    expect(said('max-drawdown')).toContain('−$8,699.98');
     expect(said('max-drawdown')).toContain('2.2% of the high, on 27 Oct');
     expect(
       widget('max-drawdown').querySelector('.text-loss')?.textContent,
-    ).toBe('−$8,665.36');
+    ).toBe('−$8,699.98');
   });
 
   test('average drawdown with no date range is the drawdown today, from the high', async () => {
     await renderUpper();
     expect(said('avg-drawdown')).toContain('Average drawdown');
-    expect(said('avg-drawdown')).toContain('−$1,057.85');
+    expect(said('avg-drawdown')).toContain('−$1,120.26');
     expect(said('avg-drawdown')).toContain(
       'today, from the high; no date range set',
     );
@@ -282,7 +283,7 @@ describe('over the sample', () => {
       keys: ['avg-drawdown'],
       url: '/app/dashboard?from=2026-01-01&to=2026-11-19',
     });
-    expect(said('avg-drawdown')).toContain('−$1,944.46');
+    expect(said('avg-drawdown')).toContain('−$1,957.36');
     // No line of its own under the figure (a day count is not on TradeZella's card).
     expect(said('avg-drawdown')).not.toMatch(/under a high|89/);
     expect(said('avg-drawdown')).not.toContain('no date range set');
@@ -463,7 +464,7 @@ describe('Privacy', () => {
   test('hides every amount, the profit factor and the ratio; counts and percentages stay', async () => {
     await renderUpper({ prefs: { displayUnit: 'privacy' } });
     expect(said('net-pnl')).toContain('+$•••');
-    expect(said('net-pnl')).toContain('1,518 trades');
+    expect(said('net-pnl')).toContain('1,517 trades');
     expect(said('balance-pnl')).toContain('$•••');
     expect(said('balance-pnl')).toContain('+$••• net P&L');
     expect(said('profit-factor')).toContain('•••');
@@ -474,7 +475,7 @@ describe('Privacy', () => {
     expect(said('avg-drawdown')).toContain('−$•••');
     // Percentages, counts and streaks are not amounts.
     expect(said('trade-win')).toContain('48.8%');
-    expect(said('trade-win')).toContain('741 won, 0 breakeven, 777 lost');
+    expect(said('trade-win')).toContain('740 won, 0 breakeven, 777 lost');
     expect(said('day-win')).toContain('60.3%');
     expect(said('max-drawdown')).toContain('2.2% of the high');
     expect(said('trade-streak')).toContain('1 trade');
@@ -487,7 +488,7 @@ describe('Privacy', () => {
     expect(segments('win-loss-ratio')).toEqual([]);
     // The counts' bars stay.
     expect(segments('trade-win')).toEqual([
-      ['gain', 741],
+      ['gain', 740],
       ['loss', 777],
     ]);
   });
@@ -518,7 +519,7 @@ describe('no trades', () => {
       keys: ['balance-pnl'],
       url: '/app/dashboard?symbol=ZZZ',
     });
-    expect(said('balance-pnl')).toContain('$392,486.25');
+    expect(said('balance-pnl')).toContain('$392,400.66');
     expect(said('balance-pnl')).toContain('$0.00 net P&L, all time');
   });
 

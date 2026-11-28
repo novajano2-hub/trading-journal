@@ -10,12 +10,16 @@ import {
   type Account,
   type AssetClass,
   type Execution,
+  type FeeRule,
+  type HistoryRow,
   type JournalEntry,
+  type MissedTrade,
   type Rule,
   type Side,
   type Challenge,
   type DayRecord,
   type PropTxn,
+  type TargetRule,
   type Tracker,
   type Strategy,
   type Tag,
@@ -49,6 +53,7 @@ import {
   type AccountSpec,
   type InstSpec,
 } from './instruments';
+import { addTradeDepth, defaultSeedTime } from './depth';
 import { writeDailyNotes, writeJournal } from './journal';
 import { addPropFinances, addPropFirms } from './prop';
 import { writeRoutine } from './routine';
@@ -74,7 +79,20 @@ export interface SampleWorkspace {
   propTxns: PropTxn[];
   tracker: Tracker;
   days: DayRecord[];
+  /** The edit history of v8's edits, stamped just before the seed time. */
+  history: HistoryRow[];
+  /** The default rules (v8). */
+  targetRules: TargetRule[];
+  feeRules: FeeRule[];
+  /** One per strategy (v8). */
+  missedTrades: MissedTrade[];
 }
+
+/** The sample before Plan 6B's trade depth: v7's content. */
+export type SampleBase = Omit<
+  SampleWorkspace,
+  'history' | 'targetRules' | 'feeRules' | 'missedTrades'
+>;
 
 /** The last weekday strictly before `now`'s New York date. */
 export function sampleEndDate(now: string): string {
@@ -166,7 +184,48 @@ function durationMin(rng: Random, cls: AssetClass): number {
 export function generateSampleWorkspace(opts: {
   seed: number;
   endDate: string;
+  /**
+   * When the sample is written (ISO): its edit history is stamped in the
+   * hours before it, so the 30-day purge keeps it for a month. Default: 08:00
+   * in New York the day after the end date.
+   */
+  now?: string;
 }): SampleWorkspace {
+  const base = generateSampleBase(opts);
+  // v8 (Plan 6B): levels, two merges and a split, the default rules, swap,
+  // missed trades and their history, each from a stream of its own and after
+  // every draw of the base, so nothing in it moves.
+  const depth = addTradeDepth({
+    trades: base.trades,
+    journal: base.journal,
+    accounts: base.accounts,
+    strategies: base.strategies,
+    endDate: base.endDate,
+    now: opts.now ?? defaultSeedTime(base.endDate),
+    levelRng: createRandom(opts.seed + 109),
+    swapRng: createRandom(opts.seed + 110),
+    missedRng: createRandom(opts.seed + 111),
+  });
+  return {
+    ...base,
+    trades: depth.trades,
+    history: depth.history,
+    targetRules: depth.targetRules,
+    feeRules: depth.feeRules,
+    missedTrades: depth.missedTrades,
+  };
+}
+
+/**
+ * The sample before Plan 6B's trade depth (v7's content): every trade as its
+ * fills build it, with no hand grouping and no swap. A fills file of the
+ * sample gives these trades, so this is the sample TradeZella imported, and
+ * the tests that pin TradeZella's figures read it.
+ */
+export function generateSampleBase(opts: {
+  seed: number;
+  endDate: string;
+}): SampleBase {
   const endDate = normalizeEndDate(opts.endDate);
   const rng = createRandom(opts.seed);
   const days = weekdaysEnding(endDate, WEEKDAYS);

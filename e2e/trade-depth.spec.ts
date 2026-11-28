@@ -24,6 +24,7 @@ interface StoredTrade {
   }[];
 }
 interface StoredHistory {
+  id: string;
   type: string;
   action: string;
   source: string;
@@ -58,9 +59,12 @@ const trades = (page: Page) =>
   readStore<StoredTrade>(page, 'trades').then(
     (all) => new Map(all.map((t) => [t.serial, t])),
   );
-const grouped = (page: Page) =>
+/** The merge, split and move rows written since `seen` was read: the sample brings some of its own. */
+const grouped = (page: Page, seen: ReadonlySet<string>) =>
   readStore<StoredHistory>(page, 'history').then((rows) =>
-    rows.filter((r) => ['merged', 'split', 'moved'].includes(r.action)),
+    rows.filter(
+      (r) => !seen.has(r.id) && ['merged', 'split', 'moved'].includes(r.action),
+    ),
   );
 
 const log = (page: Page) => page.getByRole('table', { name: 'Trades' });
@@ -96,6 +100,15 @@ test('merge two trades, split one back, move one; the history logs each', async 
   const newer = await serialOf(0);
   const older = await serialOf(1);
   const before = await trades(page);
+  // The sample has merged and split trades of its own, with their history.
+  const seen = new Set(
+    (await readStore<StoredHistory>(page, 'history')).map((r) => r.id),
+  );
+  const groupedBefore = new Set(
+    [...before.values()]
+      .filter((t) => t.grouping === 'manual')
+      .map((t) => t.id),
+  );
   const fillsOlder = before.get(older)!.executions.length;
   const fillsNewer = before.get(newer)!.executions.length;
   const keptId = before.get(older)!.id;
@@ -126,7 +139,7 @@ test('merge two trades, split one back, move one; the history logs each', async 
   expect(merged.id).toBe(keptId);
   expect(merged.executions).toHaveLength(total);
   expect(merged.grouping).toBe('manual');
-  let history = await grouped(page);
+  let history = await grouped(page, seen);
   const merges = history.filter((r) => r.action === 'merged');
   expect(merges).toHaveLength(2);
   expect(merges).toEqual(
@@ -170,12 +183,14 @@ test('merge two trades, split one back, move one; the history logs each', async 
   await expect(toast(page)).toContainText(`Split trade ${older}.`);
 
   now = await trades(page);
-  const parts = [...now.values()].filter((t) => t.grouping === 'manual');
+  const parts = [...now.values()].filter(
+    (t) => t.grouping === 'manual' && !groupedBefore.has(t.id),
+  );
   expect(parts).toHaveLength(2);
   expect(now.get(older)!.executions).toHaveLength(fillsOlder);
   const created = parts.find((t) => t.serial !== older)!;
   expect(created.executions).toHaveLength(fillsNewer);
-  history = await grouped(page);
+  history = await grouped(page, seen);
   const splits = history.filter((r) => r.action === 'split');
   expect(splits).toHaveLength(2);
   expect(splits).toEqual(
@@ -232,7 +247,7 @@ test('merge two trades, split one back, move one; the history logs each', async 
   );
   // It keeps its own currency (B6).
   expect(moved.pnlCurrency).toBe(created.pnlCurrency);
-  history = await grouped(page);
+  history = await grouped(page, seen);
   expect(history.filter((r) => r.action === 'moved')).toEqual([
     expect.objectContaining({
       type: 'trade',

@@ -168,6 +168,10 @@ export function fixtureSample(): SampleWorkspace {
     ],
     challenges: [],
     propTxns: [],
+    history: [],
+    targetRules: [],
+    feeRules: [],
+    missedTrades: [],
     journal: [
       {
         id: 'j-1',

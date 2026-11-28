@@ -100,9 +100,11 @@ test('a missed trade is added, edited and deleted, and counts in no figure', asy
     .getByRole('link', { name: /^View \d+ trades?$/ })
     .innerText();
 
+  // The sample gives each strategy one missed trade of its own.
   const card = page.getByRole('region', { name: 'Missed trades' });
-  await expect(card.getByText('No missed trades yet.')).toBeVisible();
-  await expect(page.getByText(/\d+ missed/)).toHaveCount(0);
+  const table = card.getByRole('table', { name: 'Missed trades' });
+  await expect(table.getByRole('row')).toHaveCount(2);
+  await expect(page.getByText('1 missed')).toBeVisible();
 
   // Add: exactly a symbol, a date and time, a price, a commission and fees.
   await card.getByRole('button', { name: 'Add a missed trade' }).click();
@@ -116,7 +118,6 @@ test('a missed trade is added, edited and deleted, and counts in no figure', asy
   await dialog.getByRole('button', { name: 'Add', exact: true }).click();
   await noDialog(page);
 
-  const table = card.getByRole('table', { name: 'Missed trades' });
   const row = table.getByRole('row').nth(1);
   await expect(row).toContainText('Tue 24 Nov');
   await expect(row).toContainText('10:42');
@@ -125,7 +126,7 @@ test('a missed trade is added, edited and deleted, and counts in no figure', asy
   await expect(row).toContainText('$2.58');
   await expect(row).toContainText('$2.76');
   // Counted beside the trades, and in no figure: the stats and the trade count are as they were.
-  await expect(page.getByText('1 missed')).toBeVisible();
+  await expect(page.getByText('2 missed')).toBeVisible();
   await expect.poll(() => stats.innerText()).toBe(figures);
   await expect(
     page.getByRole('link', { name: /^View \d+ trades?$/ }),
@@ -153,7 +154,7 @@ test('a missed trade is added, edited and deleted, and counts in no figure', asy
   const listed = page
     .getByRole('heading', { name: NAME })
     .locator('xpath=ancestor::article');
-  await expect(listed.getByText(/1 missed/)).toBeVisible({ timeout: 30_000 });
+  await expect(listed.getByText(/2 missed/)).toBeVisible({ timeout: 30_000 });
   await page.goto(STRATEGY);
 
   // Delete asks first.
@@ -163,8 +164,9 @@ test('a missed trade is added, edited and deleted, and counts in no figure', asy
   });
   await confirm.getByRole('button', { name: 'Delete' }).click();
   await noDialog(page);
-  await expect(card.getByText('No missed trades yet.')).toBeVisible();
-  await expect(page.getByText(/\d+ missed/)).toHaveCount(0);
+  await expect(table.getByRole('row')).toHaveCount(2);
+  await expect(table).not.toContainText('NQ');
+  await expect(page.getByText('1 missed')).toBeVisible();
   await expect.poll(() => stats.innerText()).toBe(figures);
 });
 
@@ -251,10 +253,10 @@ test('on a phone a missed trade is two lines, its form is a sheet, and nothing o
 }, info) => {
   test.skip(info.project.name !== 'mobile', 'the phone layout');
   await page.goto(STRATEGY);
+  // The sample's own missed trade is there first.
   const card = page.getByRole('region', { name: 'Missed trades' });
-  await expect(card.getByText('No missed trades yet.')).toBeVisible({
-    timeout: 30_000,
-  });
+  const rows = card.getByRole('list', { name: 'Missed trades, one row each' });
+  await expect(rows.getByRole('listitem')).toHaveCount(1, { timeout: 30_000 });
   await card.getByRole('button', { name: 'Add a missed trade' }).click();
   const dialog = page.getByRole('dialog', { name: 'Add a missed trade' });
   // A full-height sheet with its footer fixed.
@@ -272,8 +274,8 @@ test('on a phone a missed trade is two lines, its form is a sheet, and nothing o
   await dialog.getByRole('button', { name: 'Add', exact: true }).click();
   await noDialog(page);
 
-  const rows = card.getByRole('list', { name: 'Missed trades, one row each' });
-  const row = rows.getByRole('listitem').first();
+  await expect(rows.getByRole('listitem')).toHaveCount(2);
+  const row = rows.getByRole('listitem').filter({ hasText: 'EURUSD' });
   await expect(row).toContainText('EURUSD');
   await expect(row).toContainText('1.1584');
   await expect(row).toContainText('Wed 18 Nov 14:20');

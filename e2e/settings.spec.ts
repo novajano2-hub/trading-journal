@@ -204,12 +204,13 @@ test('an edit on a trade shows in the edit history on Logs, and the search narro
     page.getByRole('radiogroup', { name: `Rating: ${stars} of 5` }),
   ).toBeVisible();
 
-  // Logs lists both, in the profile's zone, by you.
+  // Logs lists both first, in the profile's zone, by you; the sample's own
+  // edits (made before the page's clock) follow on more pages.
   await page.goto('/app/settings/import-history');
   const history = page.getByRole('table', { name: 'Edit history' });
   await expect(history).toBeVisible({ timeout: 30_000 });
   const rows = history.locator('tbody tr');
-  await expect(rows).toHaveCount(2);
+  await expect(rows).toHaveCount(50);
   await expect(rows.nth(0)).toContainText('20 Nov, 10:00 GMT−5');
   await expect(rows.nth(0)).toContainText('Trade');
   await expect(rows.nth(0)).toContainText(`Rating`);
@@ -217,7 +218,9 @@ test('an edit on a trade shows in the edit history on Logs, and the search narro
   await expect(rows.nth(1)).toContainText('Reviewed');
   await expect(rows.nth(1)).toContainText('Edited');
   await expect(rows.nth(1)).toContainText('You');
-  await expect(page.getByText('1 to 2 of 2')).toBeVisible();
+  await expect(rows.nth(1)).toContainText('20 Nov, 10:00 GMT−5');
+  await expect(rows.nth(2)).not.toContainText('20 Nov, 10:00');
+  await expect(page.getByText(/^1 to 50 of \d+$/)).toBeVisible();
 
   // The search narrows them to the field asked for, then to none.
   const search = page.getByRole('searchbox', { name: 'Search edit history' });

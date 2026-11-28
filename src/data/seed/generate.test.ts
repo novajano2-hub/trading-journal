@@ -12,9 +12,20 @@ import { localDate, localParts } from '@/domain/time';
 import { mistakeTags } from '@/domain/metrics/mistakes';
 import { strategyRules, type Trade } from '@/domain/types';
 import { gridStep, streaks } from '@/domain/tracker/summary';
-import { scoreHistory } from '../routine';
-import { nyMs } from './calendar';
+import { buildGroupedTrade } from '@/domain/grouping';
 import {
+  levelProblems,
+  plannedRMultiple,
+  sidesOf,
+  tradeRisk,
+} from '@/domain/risk';
+import { feeRuleError } from '@/domain/rules/fee-rules';
+import { targetRuleError } from '@/domain/rules/target-rules';
+import { defaultSample } from '../local/context';
+import { scoreHistory } from '../routine';
+import { DAY_MS, nyMs, parseYmd, ymd } from './calendar';
+import {
+  generateSampleBase,
   generateSampleWorkspace,
   SAMPLE_SEED,
   sampleEndDate,
@@ -22,6 +33,63 @@ import {
 } from './generate';
 
 const NY = 'America/New_York';
+
+/**
+ * The v7 trades (seed SAMPLE_SEED, end 2026-11-19) that v8's grouping took:
+ * two pairs merged, the first of each keeping its record, and one split.
+ */
+const MERGED = [
+  [
+    'sample-futures:ESZ6:sample-fill-02138',
+    'sample-futures:ESZ6:sample-fill-02140',
+  ],
+  [
+    'sample-futures:ESZ6:sample-fill-02209',
+    'sample-futures:ESZ6:sample-fill-02212',
+  ],
+] as const;
+const SPLIT = 'sample-futures:MESZ6:sample-fill-01564';
+/** Their v7 figures and fills, pinned before v8. */
+const V7_FIGURES: Record<
+  string,
+  { gross: number; fees: number; net: number; fills: string[] }
+> = {
+  'sample-futures:ESZ6:sample-fill-02138': {
+    gross: 22500,
+    fees: 520,
+    net: 21980,
+    fills: ['sample-fill-02138', 'sample-fill-02139'],
+  },
+  'sample-futures:ESZ6:sample-fill-02140': {
+    gross: -25000,
+    fees: 520,
+    net: -25520,
+    fills: ['sample-fill-02140', 'sample-fill-02142'],
+  },
+  'sample-futures:ESZ6:sample-fill-02209': {
+    gross: 26250,
+    fees: 520,
+    net: 25730,
+    fills: ['sample-fill-02209', 'sample-fill-02211'],
+  },
+  'sample-futures:ESZ6:sample-fill-02212': {
+    gross: 12500,
+    fees: 520,
+    net: 11980,
+    fills: ['sample-fill-02212', 'sample-fill-02215'],
+  },
+  'sample-futures:MESZ6:sample-fill-01564': {
+    gross: 14000,
+    fees: 2080,
+    net: 11920,
+    fills: [
+      'sample-fill-01564',
+      'sample-fill-01565',
+      'sample-fill-01566',
+      'sample-fill-01567',
+    ],
+  },
+};
 
 describe('sample workspace generator', () => {
   let s: SampleWorkspace;
@@ -76,8 +144,8 @@ describe('sample workspace generator', () => {
     for (const j of daily) expect(j.templateId).toBe('template-daily-review');
   });
 
-  test('v7 leaves every existing sample value unchanged', () => {
-    const { accounts, strategies, tagCategories, tags, trades } = s;
+  test('every existing sample value is unchanged', () => {
+    const { accounts, strategies, tagCategories, tags } = s;
     // Only the routine's own notes are new; every other entry is hashed whole.
     // v6 adds templateId to the daily notes, v7 the strategies, the breach reason
     // and the breach date to the challenges; strip them so nothing else moved.
@@ -90,6 +158,18 @@ describe('sample workspace generator', () => {
         return kept;
       },
     );
+    // v8 gives trades levels, a swap and a hand grouping: strip them, and the
+    // swap from the net, and every trade a merge or the split left alone reads
+    // as v7 had it, by id (the hash is v7's over the same trades).
+    const touched = new Set<string>([...MERGED.flat(), SPLIT]);
+    const v7 = s.trades
+      .filter((t) => !touched.has(t.id) && !t.id.startsWith('split:'))
+      .map((t) => {
+        const { targets, stops, swap, grouping, ...rest } = t;
+        void [targets, stops, grouping];
+        return { ...rest, net: t.net - (swap ?? 0) };
+      });
+    const trades = Object.fromEntries(v7.map((t) => [t.id, t]));
     const hash = createHash('sha256')
       .update(
         JSON.stringify({
@@ -104,8 +184,263 @@ describe('sample workspace generator', () => {
       )
       .digest('hex');
     expect(hash).toBe(
+      '587b7cab2e9078145b0d9500e970fa5a05e5566fe6ee3a68b8896cd7bb3f15fe',
+    );
+
+    // The base is v7 whole (v7's own hash, every trade in it), and v8 changes
+    // nothing of it but the trades.
+    const base = generateSampleBase({
+      seed: SAMPLE_SEED,
+      endDate: '2026-11-19',
+    });
+    const baseHash = createHash('sha256')
+      .update(
+        JSON.stringify({
+          accounts: base.accounts,
+          strategies: base.strategies,
+          tagCategories: base.tagCategories,
+          tags: base.tags,
+          trades: base.trades,
+          journal: base.journal
+            .filter((j) => !j.id.startsWith('routine-note-'))
+            .map((j) => ({ ...j, templateId: undefined })),
+          challenges: base.challenges.map(
+            ({ strategyIds, breachReason, breachedOn, ...kept }) => {
+              void [strategyIds, breachReason, breachedOn];
+              return kept;
+            },
+          ),
+        }),
+      )
+      .digest('hex');
+    expect(baseHash).toBe(
       '08613e3b01d577685a0bf14a5686ffef7a84c944e8b31208864afdde8a67fbdd',
     );
+    const { trades: baseTrades, ...baseRest } = base;
+    const { trades: v8Trades, ...v8Rest } = s;
+    void [baseTrades, v8Trades];
+    expect({
+      ...v8Rest,
+      history: undefined,
+      targetRules: undefined,
+      feeRules: undefined,
+      missedTrades: undefined,
+    }).toEqual(baseRest);
+
+    // The trades the grouping took carry v7's fills, costs and P&L between them.
+    const byId = new Map(s.trades.map((t) => [t.id, t]));
+    for (const [kept, gone] of MERGED) {
+      expect(byId.has(gone)).toBe(false);
+      const t = byId.get(kept)!;
+      expect(t.grouping).toBe('manual');
+      expect(t.executions.map((e) => e.id).sort()).toEqual(
+        [...V7_FIGURES[kept]!.fills, ...V7_FIGURES[gone]!.fills].sort(),
+      );
+      for (const k of ['gross', 'fees', 'net'] as const)
+        expect(t[k]).toBe(V7_FIGURES[kept]![k] + V7_FIGURES[gone]![k]);
+    }
+    const parts = s.trades.filter(
+      (t) => t.id === SPLIT || t.id.startsWith('split:'),
+    );
+    expect(parts.map((t) => t.grouping)).toEqual(['manual', 'manual']);
+    expect(parts.flatMap((t) => t.executions.map((e) => e.id)).sort()).toEqual(
+      V7_FIGURES[SPLIT]!.fills,
+    );
+    for (const k of ['gross', 'fees', 'net'] as const)
+      expect(parts.reduce((n, t) => n + t[k], 0)).toBe(V7_FIGURES[SPLIT]![k]);
+  });
+
+  test('the sample shows every new state', () => {
+    const NOW = '2026-11-20T15:00:00.000Z';
+    const w = generateSampleWorkspace({
+      seed: SAMPLE_SEED,
+      endDate: '2026-11-19',
+      now: NOW,
+    });
+    const byId = new Map(w.trades.map((t) => [t.id, t]));
+
+    // Levels on about a third of the trades: both sides on about half of
+    // those, stops alone on the rest; each is valid, its stop side's loss is
+    // the stored risk, and Planned R reads only with both sides.
+    const levelled = w.trades.filter((t) => t.targets || t.stops);
+    expect(levelled.length / w.trades.length).toBeGreaterThan(0.28);
+    expect(levelled.length / w.trades.length).toBeLessThan(0.38);
+    const both = levelled.filter((t) => t.targets && t.stops);
+    const stopsOnly = levelled.filter((t) => !t.targets && t.stops);
+    expect(both.length + stopsOnly.length).toBe(levelled.length);
+    expect(both.length / levelled.length).toBeGreaterThan(0.4);
+    expect(both.length / levelled.length).toBeLessThan(0.6);
+    for (const t of levelled) {
+      expect(levelProblems(t, sidesOf(t)), t.id).toEqual([]);
+      expect(tradeRisk(t), t.id).toBe(t.initialRisk);
+    }
+    for (const t of stopsOnly) {
+      expect(sidesOf(t).targets).toBeUndefined();
+      expect(plannedRMultiple(t)).toBeUndefined();
+    }
+    for (const t of both) {
+      expect(plannedRMultiple(t)!, t.id).toBeGreaterThanOrEqual(1);
+      expect(plannedRMultiple(t)!, t.id).toBeLessThanOrEqual(6);
+    }
+    expect(both.some((t) => t.targets!.levels.length >= 2)).toBe(true);
+    const units = new Set(
+      levelled.flatMap((t) => [t.stops!.unit, t.targets?.unit]),
+    );
+    for (const unit of ['price', 'ticks', 'pips', 'amount'] as const)
+      expect(units.has(unit), unit).toBe(true);
+
+    // Two merged trades and one split, as the app's grouping builds them.
+    const manual = w.trades.filter((t) => t.grouping === 'manual');
+    expect(manual).toHaveLength(4);
+    const opts = {
+      workspaceId: 'sample',
+      startSerial: 0,
+      resolve: () => null,
+      accountCurrency: () => 'USD',
+      costMethodOf: () => 'fifo' as const,
+    };
+    for (const t of manual) {
+      expect(buildGroupedTrade(t.executions, t, opts)).toEqual(t);
+      expect(t.fees).toBe(
+        t.executions.reduce((n, e) => n + e.commission + e.fees, 0),
+      );
+    }
+    const part = manual.find((t) => t.id.startsWith('split:'))!;
+    expect(part.serial).toBe(
+      Math.max(...w.trades.filter((t) => t !== part).map((t) => t.serial)) + 1,
+    );
+    expect(new Set(w.trades.map((t) => t.serial)).size).toBe(w.trades.length);
+
+    // One target rule and one fee rule, as the Settings cards save them.
+    expect(w.targetRules).toHaveLength(1);
+    expect(w.feeRules).toHaveLength(1);
+    const accounts = new Set(w.accounts.map((a) => a.id));
+    for (const rule of [...w.targetRules, ...w.feeRules]) {
+      expect(rule.workspaceId).toBe('sample');
+      expect(accounts.has(rule.accountId)).toBe(true);
+      expect(rule.symbols.every((x) => x === x.toUpperCase())).toBe(true);
+    }
+    expect(targetRuleError(w.targetRules[0]!)).toBeNull();
+    expect(w.targetRules[0]!.target && w.targetRules[0]!.stop).toBeDefined();
+    expect(feeRuleError(w.feeRules[0]!)).toBeNull();
+
+    // Swap on every closed forex trade and on nothing else: small, mostly a
+    // charge, some credits; the net carries it and the gross does not.
+    for (const t of w.trades) {
+      expect(t.net, t.id).toBe(t.gross - t.fees + (t.swap ?? 0));
+      const fx = t.instrument.assetClass === 'forex' && t.status === 'closed';
+      expect(t.swap !== undefined, t.id).toBe(fx);
+    }
+    const swaps = w.trades.flatMap((t) =>
+      t.swap === undefined ? [] : [t.swap],
+    );
+    expect(swaps.length).toBeGreaterThan(100);
+    expect(swaps.filter((x) => x < 0).length / swaps.length).toBeGreaterThan(
+      0.5,
+    );
+    expect(swaps.some((x) => x > 0)).toBe(true);
+    for (const x of swaps) expect(Math.abs(x)).toBeLessThanOrEqual(3_000);
+
+    // One missed trade per strategy, with exactly the fields the form has.
+    expect(w.missedTrades.map((m) => m.strategyId).sort()).toEqual(
+      w.strategies.map((x) => x.id).sort(),
+    );
+    for (const m of w.missedTrades) {
+      expect(Object.keys(m).sort()).toEqual([
+        'at',
+        'commission',
+        'fees',
+        'id',
+        'price',
+        'strategyId',
+        'symbol',
+        'workspaceId',
+      ]);
+      expect(m.workspaceId).toBe('sample');
+      expect(m.symbol).not.toBe('');
+      expect(m.price!).toBeGreaterThan(0);
+      expect(Number.isSafeInteger(m.commission)).toBe(true);
+      expect(Number.isSafeInteger(m.fees)).toBe(true);
+      expect(new Date(m.at).toISOString()).toBe(m.at);
+      expect(localDate(m.at, NY) <= w.endDate).toBe(true);
+    }
+
+    // History for those edits, stamped in the hours before the seed time
+    // and after the last fill, so the 30-day purge keeps them for a month.
+    const lastFill = Math.max(
+      ...w.trades.flatMap((t) => t.executions.map((e) => Date.parse(e.time))),
+    );
+    expect(new Set(w.history.map((r) => r.id)).size).toBe(w.history.length);
+    for (const r of w.history) {
+      expect(r.workspaceId).toBe('sample');
+      expect(r.source).toBe('you');
+      expect(Date.parse(r.at)).toBeLessThan(Date.parse(NOW));
+      expect(Date.parse(r.at)).toBeGreaterThan(lastFill);
+      expect(Date.parse(NOW) - Date.parse(r.at)).toBeLessThan(6 * 3_600_000);
+    }
+    const rows = (action: string, field?: string) =>
+      w.history.filter(
+        (r) =>
+          r.action === action && (field === undefined || r.field === field),
+      );
+    const created = rows('created');
+    expect(created.map((r) => [r.type, r.entityId])).toEqual([
+      ['target-rule', w.targetRules[0]!.id],
+      ['fee-rule', w.feeRules[0]!.id],
+    ]);
+    expect(w.targetRules[0]!.createdAt).toBe(created[0]!.at);
+    expect(w.feeRules[0]!.createdAt).toBe(created[1]!.at);
+    const merged = rows('merged', 'fills');
+    expect(merged).toHaveLength(4);
+    for (const [kept, gone] of MERGED) {
+      const k = byId.get(kept)!;
+      expect(merged.filter((r) => r.entityId === kept)).toEqual([
+        expect.objectContaining({ oldValue: 2, newValue: k.executions.length }),
+      ]);
+      expect(merged.filter((r) => r.entityId === gone)).toEqual([
+        expect.objectContaining({ oldValue: 2, newValue: 0 }),
+      ]);
+    }
+    const split = rows('split', 'fills');
+    expect(split.map((r) => [r.entityId, r.oldValue, r.newValue])).toEqual([
+      [SPLIT, 4, 2],
+      [part.id, 0, 2],
+    ]);
+    // Each level edit of the last 30 days is logged as the trade page logs it.
+    const since = ymd(parseYmd(w.endDate) - 30 * DAY_MS);
+    const recent = levelled.filter((t) => localDate(t.openedAt, NY) >= since);
+    expect(recent.length).toBeGreaterThan(20);
+    const levelRows = w.history.filter(
+      (r) => r.field === 'targets' || r.field === 'stops',
+    );
+    expect(levelRows).toHaveLength(
+      recent.reduce((n, t) => n + (t.targets ? 2 : 1), 0),
+    );
+    for (const r of levelRows) {
+      const t = byId.get(r.entityId)!;
+      expect(r).toMatchObject({ type: 'trade', action: 'edited' });
+      expect(r.oldValue).toBeNull();
+      expect(r.newValue).toBe(JSON.stringify(t[r.field as 'targets']));
+      expect(localDate(t.openedAt, NY) >= since).toBe(true);
+    }
+    // The rows run oldest first: the rules, the levels, the merges, the split.
+    expect(w.history.map((r) => r.at)).toEqual(
+      [...w.history.map((r) => r.at)].sort(),
+    );
+
+    // No files: no photos, attachments or note images.
+    expect('files' in w).toBe(false);
+  });
+
+  test('the history is stamped from the time the sample is written', async () => {
+    const at = new Date('2026-11-23T15:00:00.000Z');
+    const w = await defaultSample(at);
+    expect(w.endDate).toBe('2026-11-20');
+    expect(w.history.length).toBeGreaterThan(0);
+    for (const r of w.history) {
+      expect(Date.parse(r.at)).toBeLessThan(at.getTime());
+      expect(at.getTime() - Date.parse(r.at)).toBeLessThan(6 * 3_600_000);
+    }
   });
 
   test("the first three accounts' trades and their totals are as Plan 4 pinned them", () => {
@@ -113,12 +448,19 @@ describe('sample workspace generator', () => {
     const own = s.trades.filter((t) => first.has(t.accountId));
     const total = (f: (t: Trade) => number) =>
       own.reduce((sum, t) => sum + f(t), 0);
-    expect(own).toHaveLength(1233);
-    expect(own.filter((t) => t.status === 'closed')).toHaveLength(1229);
-    expect(total((t) => t.net)).toBe(1_646_295);
+    // v8: the two merges each take a trade and the split adds one (1,233 in
+    // v7), the swap is in the net, and the grouped trades' risks follow their
+    // new positions; v7's five carried 69,250 of the 14,369,935.
+    expect(own).toHaveLength(1232);
+    expect(own.filter((t) => t.status === 'closed')).toHaveLength(1228);
+    expect(total((t) => t.net - (t.swap ?? 0))).toBe(1_646_295);
     expect(total((t) => t.gross)).toBe(2_577_713);
     expect(total((t) => t.fees)).toBe(931_418);
-    expect(total((t) => t.initialRisk ?? 0)).toBe(14_369_935);
+    expect(
+      own
+        .filter((t) => t.grouping !== 'manual')
+        .reduce((sum, t) => sum + (t.initialRisk ?? 0), 0),
+    ).toBe(14_369_935 - 69_250);
     expect(own.filter((t) => t.noteId !== undefined)).toHaveLength(40);
   });
 
@@ -129,11 +471,13 @@ describe('sample workspace generator', () => {
     });
     const jpy = live.trades.filter((t) => t.instrument.symbol === 'USDJPY');
     const pinned = jpy.find((t) => t.avgEntry === 153.757)!;
-    expect([pinned.gross, pinned.fees, pinned.net]).toEqual([
+    // v8 adds swap to the net of a closed forex trade: what rounds is the net before it.
+    const beforeSwap = (t: Trade) => t.net - (t.swap ?? 0);
+    expect([pinned.gross, pinned.fees, beforeSwap(pinned)]).toEqual([
       -39593, 1400, -40993,
     ]);
     expect(jpy).toHaveLength(45);
-    expect(jpy.reduce((n, t) => n + t.net, 0)).toBe(-128_916);
+    expect(jpy.reduce((n, t) => n + beforeSwap(t), 0)).toBe(-128_916);
     const eth = live.trades.find(
       (t) =>
         t.instrument.symbol === 'ETHUSD' &&
@@ -141,11 +485,12 @@ describe('sample workspace generator', () => {
         t.fees === 467,
     )!;
     expect(eth.net).toBe(5704);
-    for (const t of live.trades) expect(t.net).toBe(t.gross - t.fees);
+    for (const t of live.trades)
+      expect(t.net).toBe(t.gross - t.fees + (t.swap ?? 0));
     const other = (sym: string) =>
       live.trades
         .filter((t) => t.instrument.symbol === sym)
-        .reduce((n, t) => n + t.net, 0);
+        .reduce((n, t) => n + beforeSwap(t), 0);
     expect([other('EURUSD'), other('GBPUSD'), other('AUDUSD')]).toEqual([
       20900, 287710, 165560,
     ]);
@@ -398,9 +743,16 @@ describe('sample workspace generator', () => {
     expect(new Set(s.trades.map((t) => t.instrument.assetClass))).toEqual(
       new Set(['future', 'forex', 'stock', 'option', 'crypto']),
     );
-    expect(s.trades.map((t) => t.serial)).toEqual(
-      s.trades.map((_, i) => i + 1),
-    );
+    // Serials run from 1 in v7's order. v8's merges leave a gap where each
+    // trade they took was (973 and 1005), and the split's new trade takes the
+    // next serial after v7's last, as the app numbers it.
+    const v7Count = s.trades.length + 1;
+    expect(s.trades.map((t) => t.serial)).toEqual([
+      ...Array.from({ length: v7Count }, (_, i) => i + 1).filter(
+        (n) => n !== 973 && n !== 1005,
+      ),
+      v7Count + 1,
+    ]);
     expect(
       s.trades.every(
         (t) =>

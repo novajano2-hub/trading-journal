@@ -2,6 +2,6 @@
  * The version of the sample workspace's content. Bump it whenever the
  * generator's output changes (a new account, challenge, note or strategy): a
  * browser whose stored sample carries a different version regenerates it on
- * open. Version 1 is a sample stored before versions existed; 3 is the one whose net rounds once per trade (E71); 4 recolours the tag categories off the hues that have jobs; 5 adds the progress tracker's history; 6 records the daily template on the sample daily notes; 7 adds the prop transactions and the challenges' strategies and breach reason and date.
+ * open. Version 1 is a sample stored before versions existed; 3 is the one whose net rounds once per trade (E71); 4 recolours the tag categories off the hues that have jobs; 5 adds the progress tracker's history; 6 records the daily template on the sample daily notes; 7 adds the prop transactions and the challenges' strategies and breach reason and date; 8 adds Plan 6B's trade depth: levels, two merges and a split, swap on the forex trades, a default target and fee rule, a missed trade per strategy, and the edit history of those edits.
  */
-export const SAMPLE_SEED_VERSION = 7;
+export const SAMPLE_SEED_VERSION = 8;
