@@ -27,6 +27,62 @@ function addFileRefs(body: unknown, into: Set<string>): void {
   }
 }
 
+/**
+ * For each of `ids`, the first note that still shows it: its body or a kept
+ * version names it (`note:<id>`), or `null` when only a template does. An id
+ * nothing names is absent. Reads every journal body, kept version and
+ * template of the workspace. Call inside a transaction that includes
+ * `db.journal`, `db.noteVersions` and `db.templates`.
+ */
+async function shownBy(
+  db: KeelDb,
+  ws: string,
+  ids: ReadonlySet<string>,
+): Promise<Map<string, string | null>> {
+  const found = new Map<string, string | null>();
+  const read = (body: unknown, owner: string | null) => {
+    const refs = new Set<string>();
+    addFileRefs(body, refs);
+    for (const id of refs)
+      if (ids.has(id) && !found.has(id)) found.set(id, owner);
+  };
+  for (const e of await db.journal.where('workspaceId').equals(ws).toArray())
+    read(e.body, `note:${e.id}`);
+  for (const v of await db.noteVersions
+    .where('workspaceId')
+    .equals(ws)
+    .toArray())
+    read(v.body, `note:${v.noteId}`);
+  for (const t of await db.templates.where('workspaceId').equals(ws).toArray())
+    read(t.body, null);
+  return found;
+}
+
+/**
+ * Deletes the note images `ids`, which their own note no longer shows, unless
+ * another body in the workspace still does (B56): an image copied across
+ * notes keeps its `keel-file:` reference, and a Keel note import keeps the
+ * ones the workspace still has. One that another note's body or kept version
+ * names moves to that note, so it goes when that note stops showing it; one
+ * only a template names stays as it is. The workspace's bodies are read only
+ * when there is an image to delete. Call inside an rw transaction that
+ * includes `db.files`, `db.journal`, `db.noteVersions` and `db.templates`,
+ * after the notes and versions that no longer count are deleted.
+ */
+export async function dropNoteFiles(
+  db: KeelDb,
+  ws: string,
+  ids: readonly string[],
+): Promise<void> {
+  if (ids.length === 0) return;
+  const showing = await shownBy(db, ws, new Set(ids));
+  const gone = ids.filter((id) => !showing.has(id));
+  if (gone.length > 0)
+    await db.files.bulkDelete(gone.map((id): [string, string] => [ws, id]));
+  for (const [id, owner] of showing)
+    if (owner !== null) await db.files.update([ws, id], { owner });
+}
+
 /** Newest first; two versions of one instant sort by id so the order is fixed. */
 function newestFirst(a: NoteVersion, b: NoteVersion): number {
   if (a.savedAt !== b.savedAt) return a.savedAt < b.savedAt ? 1 : -1;
@@ -77,9 +133,10 @@ export function localNoteVersions(
 ): NoteVersionsRepo {
   /**
    * Drops the note's versions older than 30 days, then the note's images that
-   * neither its body nor a kept version names (B56). Call where the note's
-   * versions were just read, inside an rw transaction that includes
-   * `db.noteVersions`, `db.journal` and `db.files`.
+   * neither its body, a kept version nor `keeping` (the body a keep is about
+   * to store) names, unless another body in the workspace still shows them
+   * (`dropNoteFiles`, B56). Call where the note's versions were just read,
+   * inside an rw transaction that includes `noteTables`.
    *
    * Only images uploaded before the cutoff go: an image a purged version held
    * was uploaded before that version was kept, and a newer one may be in the
@@ -90,6 +147,7 @@ export function localNoteVersions(
     ws: string,
     noteId: string,
     rows: readonly NoteVersion[],
+    keeping?: unknown,
   ): Promise<NoteVersion[]> {
     const cutoff = ctx.now().getTime() - KEEP_MS;
     const old = rows.filter((v) => Date.parse(v.savedAt) < cutoff);
@@ -102,6 +160,7 @@ export function localNoteVersions(
 
     const named = new Set<string>();
     addFileRefs((await db.journal.get([ws, noteId]))?.body, named);
+    addFileRefs(keeping, named);
     for (const v of kept) addFileRefs(v.body, named);
     const unheld = (
       await db.files
@@ -109,17 +168,26 @@ export function localNoteVersions(
         .equals([ws, `note:${noteId}`])
         .toArray()
     ).filter((f) => !named.has(f.id) && Date.parse(f.createdAt) < cutoff);
-    if (unheld.length > 0)
-      await db.files.bulkDelete(
-        unheld.map((f): [string, string] => [ws, f.id]),
-      );
+    await dropNoteFiles(
+      db,
+      ws,
+      unheld.map((f) => f.id),
+    );
     return kept;
   }
+
+  /** What a read or keep of the versions writes and reads (the purge). */
+  const noteTables = (db: KeelDb) => [
+    db.noteVersions,
+    db.journal,
+    db.files,
+    db.templates,
+  ];
 
   return {
     async list(ws, noteId) {
       const db = await ctx.db();
-      return rwTx(db, [db.noteVersions, db.journal, db.files], async () => {
+      return rwTx(db, noteTables(db), async () => {
         const rows = await purge(
           db,
           ws,
@@ -132,11 +200,11 @@ export function localNoteVersions(
 
     async keep(ws, noteId, body, kind) {
       const db = await ctx.db();
-      await rwTx(db, [db.noteVersions, db.journal, db.files], async () => {
+      await rwTx(db, noteTables(db), async () => {
         if (!(await db.journal.get([ws, noteId])))
           throw new NotFoundError('journal entry', noteId);
         const rows = (
-          await purge(db, ws, noteId, await versionsOf(db, ws, noteId))
+          await purge(db, ws, noteId, await versionsOf(db, ws, noteId), body)
         ).sort(newestFirst);
         if (rows[0] !== undefined && sameBody(rows[0].body, body)) return;
         await db.noteVersions.put({

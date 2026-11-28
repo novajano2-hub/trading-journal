@@ -290,3 +290,82 @@ test('the version purge on keep deletes the images no kept version holds', async
   expect(await db.files.get([M, img.id])).toBeUndefined();
   expect(await repo.noteVersions.list(M, n.id)).toHaveLength(1);
 });
+
+test("an image another note shows stays when its own note's version purge drops it, and goes once no note shows it", async () => {
+  const { repo, db, tick } = setup('2026-10-01T12:00:00.000Z');
+  const a = await aNote(repo);
+  const b = await aNote(repo, 'b');
+  const img = await repo.files.add(M, `note:${a.id}`, png(), { images: true });
+  // Day 0: A shows its image, and B shows it too (an image copied across
+  // notes keeps its `keel-file:` reference).
+  const shown = withImages('chart', img.id);
+  await repo.journal.save(M, { ...a, body: shown });
+  await repo.noteVersions.keep(M, a.id, shown, 'auto');
+  await repo.journal.save(M, { ...b, body: withImages('copied', img.id) });
+  await repo.noteVersions.keep(M, b.id, withImages('copied', img.id), 'auto');
+  // Day 1: A drops the image.
+  tick(DAY);
+  await repo.journal.save(M, { ...a, body: doc('no picture') });
+
+  // Day 32: A's day-0 version is purged, but B still shows the image: it
+  // stays, and moves to B, the note that shows it now.
+  tick(31 * DAY);
+  await repo.noteVersions.list(M, a.id);
+  expect((await db.files.get([M, img.id]))?.owner).toBe(`note:${b.id}`);
+
+  // B drops it too: B's own purge (its day-0 version goes) deletes it.
+  await repo.journal.save(M, { ...b, body: doc('no picture either') });
+  await repo.noteVersions.list(M, b.id);
+  expect(await db.files.get([M, img.id])).toBeUndefined();
+});
+
+test('an image a kept version of another note or a template names stays through the purge', async () => {
+  const { repo, db, tick } = setup('2026-10-01T12:00:00.000Z');
+  const a = await aNote(repo);
+  const b = await aNote(repo, 'b');
+  const kept = await repo.files.add(M, `note:${a.id}`, png(), { images: true });
+  const inTemplate = await repo.files.add(M, `note:${a.id}`, png(), {
+    images: true,
+  });
+  const shown = withImages('chart', kept.id, inTemplate.id);
+  await repo.journal.save(M, { ...a, body: shown });
+  await repo.noteVersions.keep(M, a.id, shown, 'auto');
+  await repo.templates.save(M, {
+    kind: 'note',
+    name: 'With a chart',
+    body: withImages('template', inTemplate.id),
+    isDefault: false,
+  });
+  tick(DAY);
+  await repo.journal.save(M, { ...a, body: doc('no picture') });
+  // Day 20: B keeps a version that shows the first image, then drops it.
+  tick(19 * DAY);
+  await repo.noteVersions.keep(M, b.id, withImages('pasted', kept.id), 'auto');
+  await repo.journal.save(M, { ...b, body: doc('b without it') });
+
+  tick(12 * DAY);
+  await repo.noteVersions.list(M, a.id);
+  // B's kept version names the first: it moves to B. Only a template names
+  // the second: it stays where it is.
+  expect((await db.files.get([M, kept.id]))?.owner).toBe(`note:${b.id}`);
+  expect((await db.files.get([M, inTemplate.id]))?.owner).toBe(`note:${a.id}`);
+});
+
+test('keep never deletes an image the body it is keeping names', async () => {
+  const { repo, db, tick } = setup('2026-10-01T12:00:00.000Z');
+  const n = await aNote(repo);
+  const img = await repo.files.add(M, `note:${n.id}`, png(), { images: true });
+  const shown = withImages('chart', img.id);
+  await repo.journal.save(M, { ...n, body: shown });
+  await repo.noteVersions.keep(M, n.id, shown, 'auto');
+  tick(DAY);
+  await repo.journal.save(M, { ...n, body: doc('no picture') });
+  // Day 32: the image is back in the editor (an undo) and kept as a version
+  // before the editor's save reaches the stored body.
+  tick(31 * DAY);
+  await repo.noteVersions.keep(M, n.id, withImages('back', img.id), 'auto');
+  expect(await db.files.get([M, img.id])).toBeDefined();
+  expect((await repo.noteVersions.list(M, n.id)).map((v) => v.body)).toEqual([
+    withImages('back', img.id),
+  ]);
+});

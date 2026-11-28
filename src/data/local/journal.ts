@@ -17,8 +17,7 @@ import {
   routineNowIn,
   todayIn,
 } from './routine-today';
-import { deleteOwnerFiles } from './files';
-import { deleteNoteVersions } from './note-versions';
+import { deleteNoteVersions, dropNoteFiles } from './note-versions';
 import { rwTx } from './tx';
 import type { KeelDb } from './db';
 
@@ -97,20 +96,25 @@ function byRecency(a: JournalEntry, b: JournalEntry): number {
   return a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0;
 }
 
-/** Deletes the entries, their image files (B56) and their kept versions, and clears `noteId` on trades pointing at them. Call inside an rw transaction over `db.journal`, `db.trades`, `db.files` and `db.noteVersions`. */
+/** Deletes the entries, their kept versions and their image files but those another note or a template still shows (B56), and clears `noteId` on trades pointing at them. Call inside an rw transaction over `deleteTables`. */
 async function deleteEntries(
   db: KeelDb,
   ws: string,
   ids: readonly string[],
 ): Promise<void> {
+  if (ids.length === 0) return;
   const gone = new Set(ids);
   await db.journal.bulkDelete(ids.map((id): [string, string] => [ws, id]));
-  await deleteOwnerFiles(
+  await deleteNoteVersions(db, ws, ids);
+  const files = await db.files
+    .where('[workspaceId+owner]')
+    .anyOf(ids.map((id): [string, string] => [ws, `note:${id}`]))
+    .primaryKeys();
+  await dropNoteFiles(
     db,
     ws,
-    ids.map((id) => `note:${id}`),
+    files.map(([, id]) => id),
   );
-  await deleteNoteVersions(db, ws, ids);
   await db.trades
     .where('workspaceId')
     .equals(ws)
@@ -119,6 +123,16 @@ async function deleteEntries(
       delete t.noteId;
     });
 }
+
+/** What deleting entries for good writes and reads (`deleteEntries`). */
+const deleteTables = (db: KeelDb) => [
+  db.journal,
+  db.trades,
+  db.days,
+  db.files,
+  db.noteVersions,
+  db.templates,
+];
 
 export function localJournal(ctx: LocalContext): JournalRepo {
   /** Sets or clears `deletedAt`. */
@@ -145,15 +159,11 @@ export function localJournal(ctx: LocalContext): JournalRepo {
       if (rows.some(expired)) {
         // A finished day's note is frozen, so the purge leaves it in Trash.
         const purged = new Set<string>();
-        await rwTx(
-          db,
-          [db.journal, db.trades, db.days, db.files, db.noteVersions],
-          async () => {
-            for (const e of rows.filter(expired))
-              if (!(await isLockedNote(db, ws, e))) purged.add(e.id);
-            await deleteEntries(db, ws, [...purged]);
-          },
-        );
+        await rwTx(db, deleteTables(db), async () => {
+          for (const e of rows.filter(expired))
+            if (!(await isLockedNote(db, ws, e))) purged.add(e.id);
+          await deleteEntries(db, ws, [...purged]);
+        });
         rows = rows.filter((e) => !purged.has(e.id));
       }
       return rows.map(whole).sort(byRecency);
@@ -217,16 +227,12 @@ export function localJournal(ctx: LocalContext): JournalRepo {
 
     async remove(ws, id) {
       const db = await ctx.db();
-      await rwTx(
-        db,
-        [db.journal, db.trades, db.days, db.files, db.noteVersions],
-        async () => {
-          const entry = await db.journal.get([ws, id]);
-          if (!entry) throw new NotFoundError('journal entry', id);
-          await refuseLockedNote(db, ws, entry);
-          await deleteEntries(db, ws, [id]);
-        },
-      );
+      await rwTx(db, deleteTables(db), async () => {
+        const entry = await db.journal.get([ws, id]);
+        if (!entry) throw new NotFoundError('journal entry', id);
+        await refuseLockedNote(db, ws, entry);
+        await deleteEntries(db, ws, [id]);
+      });
     },
 
     trash: (ws, id) => setTrashed(ws, id, true),

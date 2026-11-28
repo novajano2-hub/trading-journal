@@ -263,7 +263,10 @@ test('removing several trades removes the files of each', async () => {
 });
 
 /** A file of an archived account's trade, stored as an earlier build could have (`add` refuses one now). */
-async function archivedFile(repo: ReturnType<typeof setup>['repo'], db: KeelDb) {
+async function archivedFile(
+  repo: ReturnType<typeof setup>['repo'],
+  db: KeelDb,
+) {
   await repo.trades.get(S, 'f-3');
   await db.files.put({
     id: 'old-f3',
@@ -361,6 +364,73 @@ test('deleting a note for good removes its files', async () => {
   await repo.files.add(S, 'trade:f-1', png(), { images: true });
   await repo.journal.remove(S, 'j-1');
   expect(await owners(db, S)).toEqual(['trade:f-1']);
+});
+
+/** A body that shows each file id as a block image. */
+const showing = (...fileIds: string[]) => ({
+  type: 'doc',
+  content: fileIds.map((id) => ({
+    type: 'image',
+    attrs: { src: `keel-file:${id}`, width: null },
+  })),
+});
+
+test('purging a trashed note, or deleting one for good, keeps the images another note or a template still shows', async () => {
+  const now = new Date('2026-11-01T12:00:00.000Z');
+  const { repo, make, db } = setup({ now: () => now });
+  const note = (title: string) =>
+    repo.journal.save(M, {
+      kind: 'note',
+      title,
+      body: showing(),
+      linkedTradeIds: [],
+      tags: [],
+    });
+  const [a, b, c, d] = [
+    await note('A'),
+    await note('B'),
+    await note('C'),
+    await note('D'),
+  ];
+  const add = (owner: string) =>
+    repo.files.add(M, owner, png(), { images: true });
+  const [inB, inCsVersion, inTemplate, aOnly] = [
+    await add(`note:${a.id}`),
+    await add(`note:${a.id}`),
+    await add(`note:${a.id}`),
+    await add(`note:${a.id}`),
+  ];
+  const [dInB, dOnly] = [await add(`note:${d.id}`), await add(`note:${d.id}`)];
+  await repo.journal.save(M, {
+    ...a,
+    body: showing(inB.id, inCsVersion.id, inTemplate.id, aOnly.id),
+  });
+  // B shows one of A's images and one of D's (copied across notes); a kept
+  // version of C shows another of A's; a template shows a third.
+  await repo.journal.save(M, { ...b, body: showing(inB.id, dInB.id) });
+  await repo.noteVersions.keep(M, c.id, showing(inCsVersion.id), 'auto');
+  await repo.templates.save(M, {
+    kind: 'note',
+    name: 'With a chart',
+    body: showing(inTemplate.id),
+    isDefault: false,
+  });
+  await repo.journal.trash(M, a.id);
+
+  // A is purged from Trash 31 days on: what another note shows moves to that
+  // note, what only a template shows stays, and A's own image goes.
+  const after = make({ now: () => new Date(+now + 31 * DAY) });
+  expect((await after.journal.list(M)).map((e) => e.id)).not.toContain(a.id);
+  const ownerOf = async (id: string) => (await db.files.get([M, id]))?.owner;
+  expect(await ownerOf(inB.id)).toBe(`note:${b.id}`);
+  expect(await ownerOf(inCsVersion.id)).toBe(`note:${c.id}`);
+  expect(await ownerOf(inTemplate.id)).toBe(`note:${a.id}`);
+  expect(await ownerOf(aOnly.id)).toBeUndefined();
+
+  // Deleting D for good: the same.
+  await after.journal.remove(M, d.id);
+  expect(await ownerOf(dInB.id)).toBe(`note:${b.id}`);
+  expect(await ownerOf(dOnly.id)).toBeUndefined();
 });
 
 // ---- the day lock -----------------------------------------------------------
