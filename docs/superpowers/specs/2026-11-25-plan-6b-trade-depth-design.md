@@ -11,7 +11,7 @@
 3. `DESIGN.md` and `PRODUCT.md`.
 4. The Plan 5 rulings, and the approved Plan 6A spec (`2026-11-25-plan-6a-daily-routine-design.md`), whose seams this plan picks up.
 
-Where TZ is unknown this doc decides, as a **Keel's call (TradeZella unknown)** with an id (B1 to B60, all listed in §6.1; "B" for 6B, so they never clash with 6A's K ids). The owner's decisions are in §6.2 (U1 to U4).
+Where TZ is unknown this doc decides, as a **Keel's call (TradeZella unknown)** with an id (B1 to B61, all listed in §6.1; "B" for 6B, so they never clash with 6A's K ids). The owner's decisions are in §6.2 (U1 to U4).
 
 ## 1. Intent and why
 
@@ -231,6 +231,7 @@ The next Dexie version adds six workspace tables. All join `DATA_TABLES`, so a w
 - Editing or deleting either kind of rule leaves values already applied, as TZ's fee rule does [help 6954370]; only Fill in logged trades rewrites them (B57).
 - The dialogs open with TZ's defaults: each level at 100%; All symbols on; Mode per execution; Apply on all executions; commission and fee 0.00 [inv-3 116, 117].
 - The Instrument list is Keel's six asset classes plus "Future option" (an option with `optionOn: 'future'`), mapping TZ's seven [help 12053164].
+- A fee rule leaves alone a trade settled in a currency other than its account's, and Fill in logged trades says how many it left (B61).
 - Every change a rule makes is logged with the source "Rule" (§5.9).
 
 **States:** an empty card (a line and Add rule), the note always, a confirmation for Fill in logged trades ("Fill in logged trades with this rule?") with the override box and the count of trades it will touch, a toast with the count changed.
@@ -452,6 +453,7 @@ Every row below is Keel's call (TradeZella unknown). "Basis" names the evidence 
 | B17 | % to quantity | A % of the trade's max position when the rule is applied, rounded down to the instrument's step; the last level takes the remainder. A trade that grows later is not re-levelled. A Price-unit level that falls on the wrong side for a trade skips that side for that trade | None seen |
 | B18 | Fee maths and precedence | Per fill: per contract is the amount × the fill's quantity, per execution the amount once; account currency; a fill "lacks" costs when its commission and fee are both zero; override replaces both. The rule writes the execution's values, and the trade's fees and net are recomputed. A symbol rule beats an all-symbols rule, then the newest | [help 6954370] |
 | B19 | The rule list | A table in each card: account, instrument, symbols, summary, a menu (Fill in logged trades, Edit, Delete) | Only the empty state seen [inv-3 114-115] |
+| B61 | A fee rule and a trade settled in another currency | A fee rule's amounts are in its account's currency, so it leaves alone a trade whose P&L currency is not the account's (a trade moved in from an account in another currency keeps its own, B6), at import and in Fill in logged trades. Fill in logged trades counts those trades and says they are left as they are. A target rule has no currency and covers them | TradeZella's fee amounts are in the account's currency [help 6954370]; how it treats a trade in another currency is unknown. Added after the parity audit (P6B-B201) |
 
 **Patterns**
 

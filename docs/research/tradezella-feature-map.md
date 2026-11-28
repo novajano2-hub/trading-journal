@@ -30,8 +30,8 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | X4 | Display unit switch: dollars, % return, R-multiple (built as seven units in one Display menu, beside the Gross/Net choice, and shown on every money figure) | Spec has gross/net; Gap 5 | P5, Done |
 | X5 | Privacy mode that hides every money figure (for screen sharing) | New | P5, Done |
 | X6 | Display in ticks, pips or points per instrument (moved into Plan 5) | New | P5, Done |
-| X7 | Trade-behaviour flags computed by rules, not AI: two losses in a row, a winner that gave back its whole gain, holding a loser too long, adding to or reducing a position, an unusually large size. They work as filters and on trades | New | P6 |
-| X8 | Field-level history of edits (entity, field, old value, new value, source: you, import or the app) | New | P6 |
+| X7 | Trade-behaviour flags computed by rules, not AI: two losses in a row, a winner that gave back its whole gain, holding a loser too long, adding to or reducing a position, an unusually large size. They work as filters and on trades. **Built in Plan 6B (Tasks 16 to 18), the fills-only set:** 17 patterns read from the fills and the day's trades, each with a tone word and a sentence with its figures, as a log column, a trade-page button, a filter, on the day cards and the day page, and a Patterns report. The patterns that need the price path, and D8, wait with #14 (E200) | Built (partly) | P6, Done in Plan 6B (BACKLOG #40) |
+| X8 | Field-level history of edits (entity, field, old value, new value, source: you, import or the app). **Built in Plan 6B (Tasks 3, 4 and 25):** every logged write records its fields and source in its own transaction; Settings > Logs lists 30 days with search and filters | Built | P6, Done in Plan 6B (BACKLOG #42) |
 | X9 | Extra metrics: Sharpe, Sortino, max winning/losing streaks by day, avg daily win %, longest trading day | New | P5, Done |
 | X10 | Shell polish: collapse the sidebar to icons on desktop, and the Settings navigation likewise (with E52 and E55). **Built in Plan 6C (Task 17)** | Built | P6, Done in Plan 6C (BACKLOG #50) |
 
@@ -46,9 +46,9 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | TR5 | Net ROI column, plus % display | Gap 5 | P5, Done |
 | TR6 | Export trades to CSV | Backlog #7 | P5, Done |
 | TR7 | Day-grouped view (one card per day with its net and a link to that day's note) and a week view, with a mini month calendar to jump between dates. **Built in Plan 6A (Tasks 14 to 17):** `/app/trades/day` and `/app/trades/week`, the mini calendar, the note dialog and the mood quick action. Rows read newest open time first. Left out: the insights and replay quick actions (E151, E153) and the scale strip (#52). | Built | P6, Done in Plan 6A |
-| TR8 | Merge and split trades by hand | Gap 3, E10 | P6 |
-| TR9 | Move trades to another account | Research "Later" | P6 |
-| TR10 | Trade scale: where a trade's P&L sits between the largest loss and largest win of the set, as a trade-log column, a trade-page row, a strip on week cards and an average on reports. The two ends are not settled | New (recording) | P6 (BACKLOG #52, with TR7) |
+| TR8 | Merge and split trades by hand. **Built in Plan 6B (Tasks 8 to 10):** Merge and Split in the trade log's bulk bar, each a dialog of the executions to pick and what will happen | Built | P6, Done in Plan 6B (BACKLOG #38) |
+| TR9 | Move trades to another account. **Built in Plan 6B (Tasks 8 to 10):** Move in the bulk bar and Move trades in an account's menu; a moved trade keeps everything on it and its own currency. A move into an account with another cost method is E201 | Built | P6, Done in Plan 6B (BACKLOG #38) |
+| TR10 | Trade scale: where a trade's P&L sits between two ends, as a trade-log column, a trade-page row, a strip on week cards and an average on reports. Corrected (Plan 6B spec 7): the ends are not the set's largest loss and largest win; TradeZella defines it as potential versus actual [help 7218420], and the evidence points at MAE and MFE, so it needs the price path inside a trade | New (recording) | B#52 (moved to the market-data plan with #14, U1) |
 
 ## Adding trades by hand
 
@@ -63,10 +63,10 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 |---|---|---|---|
 | TD1 | Stats, fills, rule checklist, tags, rating and notes | Spec | P5, Done |
 | TD2 | One note per trade, stored in the notebook's Trade notes folder. It is titled with the symbol and date and shows the trade's stats | Gap 14 | P5, Done |
-| TD3 | Several profit targets and stop losses per trade, each with a share of the position (partials), feeding planned R | Gap 7 | P6 |
-| TD4 | Chart screenshots attached to a trade (stored locally) | Backlog #5 | P6 |
-| TD5 | Swap and financing per trade, read from the import and shown on the trade page and the Overview | New (recording) | B#55 (with E27) |
-| TD6 | Choose which fields the trade page lists | New (recording) | B#56 |
+| TD3 | Several profit targets and stop losses per trade, each with a share of the position (partials), feeding planned R. **Built in Plan 6B (Tasks 5 to 7):** Targets and Stops on the trade page, each side in a unit of its own with a quantity per level, planned reward, risk and R in money | Built | P6, Done in Plan 6B (BACKLOG #39) |
+| TD4 | Chart screenshots attached to a trade (stored locally). **Built in Plan 6B (Tasks 2 and 15):** attachments on the trade page, images as thumbnails with a viewer and other files as rows, 10 MB each, in a local files store | Built | P6, Done in Plan 6B (BACKLOG #43) |
+| TD5 | Swap per trade, read from the import and shown on the trade page and the Overview. **Built in Plan 6B (Tasks 13 and 14):** in the net, never in the fees; on the trade page and in the Overview's costs and Gross to net. TradeZella has no financing field (spec 7) | Built | Done in Plan 6B (BACKLOG #55) |
+| TD6 | Choose which fields the trade page lists. **Built in Plan 6B (Task 15):** Choose stats on the Execution card, per user, in a fixed order; the header figures stay | Built | Done in Plan 6B (BACKLOG #56) |
 | TD7 | Share a trade by link, as a read-only page | New (recording) | B#57 (like NB10) |
 
 ## Import (`/app/import`)
@@ -116,11 +116,11 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | ST3 | Per-rule stats: follow rate, and P&L, win rate and profit factor when followed | Gap 12 | P5, Done |
 | ST4 | Active and archived strategies | New | P5, Done |
 | ST5 | A strategy's icon or colour, and a description | New | P5, Done |
-| ST6 | Missed trades logged against a strategy | Research "Later" | P6 |
-| ST7 | A template gallery of ready-made strategies to copy, written by us (never copied from theirs), with example trades | New | P6 |
+| ST6 | Missed trades logged against a strategy. **Built in Plan 6B (Task 24):** on the strategy's page with TradeZella's fields only, kept out of every figure | Built | P6, Done in Plan 6B (BACKLOG #44) |
+| ST7 | A template gallery of ready-made strategies to copy, written by us (never copied from theirs), with example trades. **Built in Plan 6B (Tasks 23 and 24):** six Keel-written templates with example trades labelled as examples, a chooser on New strategy and a Templates tab | Built | P6, Done in Plan 6B (BACKLOG #44) |
 | ST8 | Share a strategy, or have strategies shared with you | Backlog #19 | B#19 |
 | ST9 | Backtest a strategy on a historical session | Backlog #16 | B#16 |
-| ST10 | A cover photo for a strategy, stored locally | New (recording) | P6 (BACKLOG #53, with NB7) |
+| ST10 | A cover photo for a strategy, stored locally. **Built in Plan 6B (Task 24):** a Photo field (chosen or dropped) and a cover band on the card and the page; the icon stays, and there is no strategy colour (ruling 41) | Built | P6, Done in Plan 6B (BACKLOG #53) |
 
 ## Notebook (`/app/notebook`)
 
@@ -132,9 +132,9 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | NB4 | A daily note keyed by its date, showing that day's P&L; a default daily template (prep, session log, end-of-day recap) that every new day starts from; a template manager | Spec + New | P5, Done |
 | NB5 | Tags on notes, separate from trade tags | Gap 14 | P5, Done |
 | NB6 | Rich text: headings, lists, checklists, bold/italic, links, quotes, collapsible sections, tables, a slash menu | Spec (rich text) | P5, Done |
-| NB7 | Images in notes, column layouts, colours and highlights, font settings | Research "Later" + New | P6 |
-| NB8 | Version history of a note | Research "Later" | P6 |
-| NB9 | Voice dictation (the browser's speech input) | New | P6 |
+| NB7 | Images in notes, column layouts, colours and highlights, font settings. **Built in Plan 6B (Tasks 19 to 22):** images with captions, columns, text colours and highlights, alignment, toggles, equations, embeds, timed lists, trade and day chips, block handles, full screen, export and import, and Settings > Notebook with a live preview | Built | P6, Done in Plan 6B (BACKLOG #43) |
+| NB8 | Version history of a note. **Built in Plan 6B (Task 21):** versions kept for 30 days, with a preview and restore | Built | P6, Done in Plan 6B (BACKLOG #43) |
+| NB9 | Voice dictation (the browser's speech input). **Built in Plan 6B (Task 21):** where the browser has speech recognition, and the control says whose service it uses (U4) | Built | P6, Done in Plan 6B (BACKLOG #43) |
 | NB10 | Share a note by link | Research "Later" | B#1 |
 
 ## Day page (plan and review)
@@ -182,8 +182,8 @@ Nothing is dropped: whatever isn't in Plan 5 or Plan 6 is in the backlog, and yo
 | SE1 | Profile: name, time zone, base currency | Spec, E30 | P5, Done |
 | SE2 | Trading preferences: instruments you trade, breakeven range in $ or %, settle expired options automatically | Spec + New | P5, Done |
 | SE3 | Tags: categories with colour, tags with an optional description and their trade counts; you make as many categories as you like, each with its own colour; Mistakes is a role a category can have (the Mistakes column and the mistake figures read it), and Custom tags is the default | Spec + Gap 15 | P5, Done |
-| SE4 | Default stop and target rules per account, instrument and symbols, applied to newly imported trades | Gap 7 | P6 |
-| SE5 | Default commission and fee rules per account and instrument, applied to fills that lack them | Research "Later" | P6 |
+| SE4 | Default stop and target rules per account, instrument and symbols, applied to newly imported trades. **Built in Plan 6B (Tasks 11 and 12):** the Targets and stops card on Settings > Trading, with Fill in logged trades | Built | P6, Done in Plan 6B (BACKLOG #39) |
+| SE5 | Default commission and fee rules per account and instrument, applied to fills that lack them. **Built in Plan 6B (Tasks 11 and 12):** the Commissions and fees card on Settings > Trading, with Fill in logged trades | Built | P6, Done in Plan 6B (BACKLOG #39) |
 | SE6 | Email recaps, reminders | Backlog #26 | B#26 |
 | SE7 | Subscription and plan limits | Backlog #3 | B#3 |
 | SE8 | AI settings and an AI-assistant connector for Keel itself | Backlog #22 | B#22 |
