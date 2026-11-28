@@ -16,6 +16,7 @@ import {
 import { ArchivedAccountError } from '@/data/repository';
 import type { ImportJob } from '@/domain/types';
 import { plural } from '@/lib/format';
+import { HistoryCard } from './history-card';
 
 /** Why an archived account's import has no Undo (ruling M15: its trades are read-only). */
 const ARCHIVED_UNDO =
@@ -235,6 +236,8 @@ export function ImportHistory() {
           </div>
         )}
       </section>
+
+      <HistoryCard />
 
       <ConfirmDialog
         open={asking !== null}

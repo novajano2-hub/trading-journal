@@ -142,6 +142,35 @@ test('every logged account field logs when it changes', async () => {
   ]);
 });
 
+test('a change of cost method logs one row', async () => {
+  const { repo, rows, at } = setup();
+  // acc-a has no method stored: FIFO, the default, reads as `fifo`.
+  await repo.accounts.update(S, 'acc-a', { costMethod: 'lifo' });
+  at(T1);
+  // The same method again, or a method sent with nothing else changed, logs nothing.
+  await repo.accounts.update(S, 'acc-a', { costMethod: 'lifo' });
+  at(T2);
+  await repo.accounts.update(S, 'acc-a', { costMethod: 'fifo' });
+  at(T3);
+  await repo.accounts.setCostMethod(S, 'acc-a', 'average');
+  const edit = (at: string, oldValue: string, newValue: string) =>
+    row({
+      at,
+      type: 'account',
+      action: 'edited',
+      entityId: 'acc-a',
+      label: 'Futures main',
+      field: 'costMethod',
+      oldValue,
+      newValue,
+    });
+  expect(await rows()).toEqual([
+    edit(T0, 'fifo', 'lifo'),
+    edit(T2, 'lifo', 'fifo'),
+    edit(T3, 'fifo', 'average'),
+  ]);
+});
+
 test('clearing an account logs one row for it, not one per trade', async () => {
   const { repo, rows, at } = setup();
   expect(await repo.accounts.clearTrades(S, 'acc-a')).toBe(2);

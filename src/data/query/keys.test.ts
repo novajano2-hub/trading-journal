@@ -193,6 +193,7 @@ test('every write of a logged record makes the edit history stale', () => {
     'feeRules.save',
     'feeRules.remove',
     'rules.apply',
+    'accounts.setCostMethod',
   ] as const)
     expect(invalidationsFor(write, 'mine'), write).toContainEqual(
       keys.history('mine'),
@@ -300,7 +301,8 @@ test('Plan 6C writes invalidate what they change', () => {
     // A quantity and its new accounts are written together.
     ['challenges.createMany', k('challenges', 'accounts')],
     // The rebuild rewrites the account's trades, and the import context carries the method.
-    ['accounts.setCostMethod', k('accounts', 'trades', 'imports')],
+    // ...and logs the change of method (6B).
+    ['accounts.setCostMethod', k('accounts', 'trades', 'imports', 'history')],
     // A strategy leaves the challenges that list it, and takes its photo and its missed trades and leaves a history row (6B).
     [
       'strategies.remove',

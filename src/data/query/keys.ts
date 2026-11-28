@@ -343,6 +343,11 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
       return [keys.propTxns(ws)];
     // The rebuild rewrites the account's trades, and the import context carries the method.
     case 'accounts.setCostMethod':
-      return [keys.accounts(ws), keys.trades(ws), keys.imports(ws)];
+      return [
+        keys.accounts(ws),
+        keys.trades(ws),
+        keys.imports(ws),
+        keys.history(ws),
+      ];
   }
 }

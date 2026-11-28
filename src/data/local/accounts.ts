@@ -1,3 +1,4 @@
+import type { Account } from '@/domain/types';
 import {
   ArchivedAccountError,
   NotFoundError,
@@ -21,7 +22,14 @@ const LOGGED_FIELDS = [
   'currency',
   'startingBalance',
   'status',
+  'costMethod',
 ] as const;
+
+/** The account as history compares it: FIFO is stored as unset, so it reads as `fifo` (C40). */
+const logged = (a: Account): Account => ({
+  ...a,
+  costMethod: a.costMethod ?? 'fifo',
+});
 
 /**
  * Deletes the files of the trades the account's active imports dropped: the
@@ -110,7 +118,7 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
               'account',
               id,
               next.name,
-              fieldChanges(account, next, LOGGED_FIELDS),
+              fieldChanges(logged(account), logged(next), LOGGED_FIELDS),
             ),
             ctx,
           );
@@ -191,12 +199,29 @@ export function localAccounts(ctx: LocalContext): AccountsRepo {
 
     async setCostMethod(ws, id, method) {
       const db = await ctx.db();
-      return rwTx(db, [db.accounts, db.trades, db.meta], async () => {
-        const account = await db.accounts.get([ws, id]);
-        if (!account) throw new NotFoundError('account', id);
-        if (account.status === 'archived') throw new ArchivedAccountError([id]);
-        return applyCostMethod(db, account, method);
-      });
+      return rwTx(
+        db,
+        [db.accounts, db.trades, db.meta, db.history],
+        async () => {
+          const account = await db.accounts.get([ws, id]);
+          if (!account) throw new NotFoundError('account', id);
+          if (account.status === 'archived')
+            throw new ArchivedAccountError([id]);
+          const next = await applyCostMethod(db, account, method);
+          await logHistory(
+            db,
+            ws,
+            changeRows(
+              'account',
+              id,
+              next.name,
+              fieldChanges(logged(account), logged(next), ['costMethod']),
+            ),
+            ctx,
+          );
+          return next;
+        },
+      );
     },
 
     async clearTrades(ws, id) {
