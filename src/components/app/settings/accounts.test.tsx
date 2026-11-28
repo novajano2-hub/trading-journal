@@ -1104,6 +1104,25 @@ test('the account menu moves every trade', async () => {
   ).toContain('Moved 2 trades to Euro futures.');
 });
 
+test('with no other active account, Move trades is off and says why', async () => {
+  // Futures main's only other account, Old demo, is archived.
+  renderApp(<AccountsSettings />, { repository: repo(), url: URL });
+  await openMenu('Futures main');
+  const move = await screen.findByRole('menuitem', { name: 'Move trades' });
+  expect(move.getAttribute('aria-disabled')).toBe('true');
+  // Still on the keyboard path, with its reason read as its description.
+  expect(move.hasAttribute('data-disabled')).toBe(false);
+  const reason = 'There is no other active account to move to.';
+  expect(move.textContent).toContain(reason);
+  expect(
+    document.getElementById(move.getAttribute('aria-describedby')!)
+      ?.textContent,
+  ).toBe(reason);
+  fireEvent.click(move);
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(screen.getByRole('menu')).toBeTruthy();
+});
+
 test('an archived account, and an account with no trades, offer no Move trades', async () => {
   const r = repo();
   await r.accounts.create('sample', {

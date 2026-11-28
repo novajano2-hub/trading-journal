@@ -1,7 +1,13 @@
 'use client';
 
 import { ArrowsMerge, ArrowsSplit } from '@phosphor-icons/react/dist/ssr';
-import { useMemo, useState, type ReactNode, type RefObject } from 'react';
+import {
+  useId,
+  useMemo,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { Button } from '@/components/ui/button';
 import { MorphDialog } from '@/components/ui/morph-dialog';
 import {
@@ -164,6 +170,7 @@ function FillsList({
   onAll,
   zone,
   kind,
+  fixed,
 }: {
   rows: readonly FillRow[];
   ticked: ReadonlySet<string>;
@@ -171,6 +178,8 @@ function FillsList({
   onAll(on: boolean): void;
   zone: string;
   kind: 'merge' | 'split';
+  /** Boxes that cannot change (a merge's kept trade's own fills), and the id of the line that says why. */
+  fixed?: { ids: ReadonlySet<string>; reasonId: string };
 }): React.JSX.Element {
   const phone = usePhone();
   const first = rows[0];
@@ -191,6 +200,18 @@ function FillsList({
     const w = words(r);
     return `${w.time} ${w.side} ${w.qty} at ${w.price}${kind === 'merge' ? `, trade ${r.serial}` : ''}`;
   };
+  const box = (r: FillRow, on: boolean) => {
+    const off = fixed?.ids.has(r.exec.id) ?? false;
+    return (
+      <SelectBox
+        label={label(r)}
+        checked={on}
+        disabled={off}
+        describedBy={off ? fixed?.reasonId : undefined}
+        onChange={(next) => onToggle(r.exec.id, next)}
+      />
+    );
+  };
 
   if (phone)
     return (
@@ -203,13 +224,7 @@ function FillsList({
               key={r.exec.id}
               className={`flex items-center gap-3 border-t border-line/70 first:border-t-0 ${on && kind === 'split' ? '-mx-5 bg-accent-soft/70 px-5' : ''}`}
             >
-              <span className={BOX}>
-                <SelectBox
-                  label={label(r)}
-                  checked={on}
-                  onChange={(next) => onToggle(r.exec.id, next)}
-                />
-              </span>
+              <span className={BOX}>{box(r, on)}</span>
               <div className="flex min-h-[60px] min-w-0 flex-1 flex-col justify-center gap-1 py-2">
                 <span
                   data-line="1"
@@ -285,13 +300,7 @@ function FillsList({
               className={on && kind === 'split' ? 'bg-accent-soft/70' : ''}
             >
               <td className={TD}>
-                <span className={`${BOX} block`}>
-                  <SelectBox
-                    label={label(r)}
-                    checked={on}
-                    onChange={(next) => onToggle(r.exec.id, next)}
-                  />
-                </span>
+                <span className={`${BOX} block`}>{box(r, on)}</span>
               </td>
               {kind === 'merge' ? (
                 <td className={`${TD} text-muted tabular-nums`}>{r.serial}</td>
@@ -409,6 +418,17 @@ export function MergeDialog({
 
   const refusal = canMerge(trades, picked);
   const keeper = refusal === null ? mergeKeeper(trades, picked) : undefined;
+  // The kept trade keeps every fill it has, ticked or not (B2): its boxes are
+  // ticked and fixed, and a line says why. Unticking all frees them.
+  const reasonId = useId();
+  const own = useMemo(
+    () => new Set(keeper?.executions.map((e) => e.id) ?? []),
+    [keeper],
+  );
+  const ticked = useMemo(
+    () => (own.size === 0 ? picked : new Set([...picked, ...own])),
+    [picked, own],
+  );
   const given = (t: Trade) =>
     t.executions.filter((e) => picked.has(e.id)).length;
   const others = keeper ? trades.filter((t) => t.id !== keeper.id) : [];
@@ -442,7 +462,7 @@ export function MergeDialog({
     try {
       const kept = await merge.mutateAsync({
         ids: trades.map((t) => t.id),
-        picked: [...picked],
+        picked: [...ticked],
       });
       const joined = trades.filter((t) => given(t) > 0).length;
       onOpenChange(false);
@@ -468,7 +488,7 @@ export function MergeDialog({
       }
       footer={
         <GroupFooter
-          caption={`${picked.size} of ${rows.length} executions ticked`}
+          caption={`${ticked.size} of ${rows.length} executions ticked`}
           onCancel={() => onOpenChange(false)}
           disabled={refusal !== null || merge.isPending}
           icon={<ArrowsMerge size={16} aria-hidden="true" />}
@@ -479,14 +499,21 @@ export function MergeDialog({
     >
       <FillsList
         rows={rows}
-        ticked={picked}
+        ticked={ticked}
         onToggle={toggle}
         onAll={(on) =>
           setPicked(on ? new Set(rows.map((r) => r.exec.id)) : new Set())
         }
         zone={zone}
         kind="merge"
+        fixed={keeper ? { ids: own, reasonId } : undefined}
       />
+      {keeper ? (
+        <p id={reasonId} className="mt-2 text-[12.5px] text-faint">
+          Trade {keeper.serial} keeps all of its own executions, so their boxes
+          stay ticked.
+        </p>
+      ) : null}
       <WhatBox title="What will happen">
         {keeper ? (
           <>
@@ -496,7 +523,7 @@ export function MergeDialog({
                 ? 'opened first'
                 : 'opened first of the trades with ticked executions'}
               , so it keeps its record (note, rating, rule checks) and{' '}
-              {total === picked.size
+              {total === rows.length
                 ? `takes all ${count(total)}`
                 : `ends with ${count(total)}`}
               .

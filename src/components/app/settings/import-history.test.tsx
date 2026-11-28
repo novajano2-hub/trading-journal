@@ -15,7 +15,7 @@ import { parseCsv } from '@/domain/import/csv';
 import { guessMapping } from '@/domain/import/mapping';
 import { planImport } from '@/domain/import/plan';
 import { renderApp } from '../__fixtures__/render-app';
-import { ImportHistory } from './import-history';
+import { ImportHistory, regroupedSubject } from './import-history';
 
 vi.mock('next/navigation', () => import('../__fixtures__/navigation'));
 MotionGlobalConfig.skipAnimations = true;
@@ -102,6 +102,32 @@ test('lists the jobs newest first with their counts and status', async () => {
     expect(within(table).getByRole('columnheader', { name })).toBeTruthy();
 });
 
+test('on a phone each import is a two-line row, with its Undo, and no table scrolls sideways', async () => {
+  window.innerWidth = 390;
+  try {
+    await seeded();
+    const list = await screen.findByRole('list', { name: 'Import history' });
+    // No wide table to scroll: the rows are the list's.
+    expect(screen.queryByRole('table', { name: 'Import history' })).toBeNull();
+    const rows = within(list).getAllByRole('listitem');
+    expect(rows).toHaveLength(2);
+    const [second, first] = rows as [HTMLElement, HTMLElement];
+    const line = (row: HTMLElement, n: 1 | 2) =>
+      row.querySelector(`[data-line="${n}"]`)!.textContent;
+    expect(line(second, 1)).toContain('second.csv');
+    expect(line(second, 1)).toContain('Active');
+    expect(line(second, 2)).toContain('Futures');
+    expect(line(second, 2)).toContain('21 Nov 2026');
+    expect(line(second, 2)).toContain('1 trade');
+    expect(line(first, 1)).toContain('first.csv');
+    // Undo is on the row, with a 44px target on a coarse pointer.
+    const undo = within(first).getByRole('button', { name: 'Undo first.csv' });
+    expect(undo.className).toContain('pointer-coarse:h-11');
+  } finally {
+    window.innerWidth = 1024;
+  }
+});
+
 test('Undo asks first, then marks the job Undone and removes its trades', async () => {
   const repo = await seeded();
   const rows = (await screen.findAllByRole('row')).slice(1);
@@ -156,6 +182,26 @@ test("an archived account's imports offer no Undo, and say why (M6)", async () =
   );
 });
 
+test('a refusal names one trade, a few, or the first three and how many more', () => {
+  const t = (serial: number, symbol: string) => ({
+    serial,
+    instrument: { symbol },
+  });
+  expect(regroupedSubject([t(4, 'ESZ5')])).toBe('Trade 4 (ESZ5) was');
+  expect(regroupedSubject([t(9, 'NQZ5'), t(4, 'ESZ5')])).toBe(
+    'Trades 4 (ESZ5) and 9 (NQZ5) were',
+  );
+  expect(
+    regroupedSubject([
+      t(1, 'ESZ5'),
+      t(2, 'ESZ5'),
+      t(3, 'NQZ5'),
+      t(5, 'ESZ5'),
+      t(8, 'ESZ5'),
+    ]),
+  ).toBe('Trades 1 (ESZ5), 2 (ESZ5), 3 (NQZ5) and 2 more were');
+});
+
 test('an undo refused for regrouping says why', async () => {
   const repo = await seeded(false, async (r) => {
     // A trade of first.csv moved to another account since.
@@ -178,8 +224,12 @@ test('an undo refused for regrouping says why', async () => {
   );
   fireEvent.click(await screen.findByRole('button', { name: 'Undo import' }));
   const alert = await screen.findByRole('alert');
+  // It names the trade that stands in the way, by its number and symbol.
+  const moved = (await repo.trades.list('mine')).find(
+    (t) => t.importId === 'first.csv',
+  )!;
   expect(alert.textContent).toBe(
-    "first.csv can't be undone. Some of its trades were merged, split or moved since it came in, and Keel can't take that back. Delete those trades, or move them back to Futures, then undo the import.",
+    `first.csv can't be undone. Trade ${moved.serial} (ESZ5) was merged, split or moved since it came in, and Keel can't take that back. Delete it, or move it back to Futures, then undo the import.`,
   );
   // Nothing was removed, and the job is still active.
   expect(await repo.trades.list('mine')).toHaveLength(2);

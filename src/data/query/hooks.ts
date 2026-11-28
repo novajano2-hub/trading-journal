@@ -1576,3 +1576,18 @@ export function useRemoveMissedTrade(): UseMutationResult<void, Error, string> {
     r.missedTrades.remove(ws, id),
   );
 }
+
+/**
+ * The trades of My workspace, whichever workspace is active: Import history
+ * names the trades that stand in an undo's way, and imports land only there
+ * (Plan 6B fix wave, C-4).
+ */
+export function useUserTrades(): UseQueryResult<Trade[]> {
+  const repo = useRepository();
+  return useFirstFrame(
+    useQuery({
+      queryKey: keys.trades(USER_WORKSPACE.id),
+      queryFn: () => repo.trades.list(USER_WORKSPACE.id),
+    }),
+  );
+}

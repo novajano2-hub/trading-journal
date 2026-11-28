@@ -334,10 +334,17 @@ function AccountsBody(): React.JSX.Element {
         ]
       : []),
     // Every trade of the account to another active account; an archived one is read-only.
+    // With no other active account to take them, it is off and says why (spec §5.1).
     ...(account.status === 'active' && tradeCount > 0
       ? [
           {
             label: 'Move trades',
+            ...(rows?.some(
+              (r) =>
+                r.account.status === 'active' && r.account.id !== account.id,
+            )
+              ? {}
+              : { offReason: 'There is no other active account to move to.' }),
             onSelect: (from: HTMLElement | null) => {
               moveFrom.current = from;
               setMoved(null);

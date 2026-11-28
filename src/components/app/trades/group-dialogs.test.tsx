@@ -205,6 +205,37 @@ describe('the menu', () => {
     expect((await item(/^Merge/)).getAttribute('aria-disabled')).toBeNull();
   });
 
+  test('an item that is off keeps its place on the keyboard path and gives its reason as its description', async () => {
+    await setup();
+    await pick(1, 3);
+    await openMenu();
+    const merge = await item(/^Merge/);
+    // Opened from the keyboard, the first item takes the focus though it is off.
+    await waitFor(() => expect(document.activeElement).toBe(merge));
+    expect(merge.getAttribute('aria-disabled')).toBe('true');
+    expect(merge.hasAttribute('data-disabled')).toBe(false);
+    // Named by its label alone; the reason is its description.
+    const labelled = document.getElementById(
+      merge.getAttribute('aria-labelledby')!,
+    );
+    expect(labelled?.textContent).toBe('Merge');
+    const described = document.getElementById(
+      merge.getAttribute('aria-describedby')!,
+    );
+    expect(described?.textContent).toBe(
+      'Merge needs one account and one instrument.',
+    );
+    // The arrow keys reach the next item, Split, off for two trades too.
+    fireEvent.keyDown(merge, { key: 'ArrowDown' });
+    const split = await item(/^Split/);
+    await waitFor(() => expect(document.activeElement).toBe(split));
+    // Choosing an item that is off opens nothing, and the menu stays.
+    fireEvent.keyDown(split, { key: 'Enter' });
+    fireEvent.click(merge);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('menu')).toBeTruthy();
+  });
+
   test('Split needs exactly one trade with two or more fills', async () => {
     await setup();
     // Two trades: one at a time.
@@ -301,6 +332,57 @@ describe('merge', () => {
     ).toContain('Merged 2 trades into trade 1.');
     // The selection is spent: its bar is gone.
     await waitFor(() => expect(screen.queryByRole('toolbar')).toBeNull());
+    // The keyboard lands on the log, not on the page's body.
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('region', { name: 'Trade log' }),
+      ),
+    );
+  });
+
+  test("the kept trade's own executions stay in it: their boxes are ticked and off, with the reason", async () => {
+    await setup();
+    await pick(1, 2);
+    await openMenu();
+    fireEvent.click(await item(/^Merge/));
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Merge 2 trades',
+    });
+    const table = within(dialog).getByRole('table', { name: 'Executions' });
+    const box = (name: RegExp) =>
+      within(table).getByRole('checkbox', { name }) as HTMLInputElement;
+    // Trade 1 opened first, so it keeps its record and every fill it has.
+    const kept = [/^09:41:12/, /^09:44:30/, /^09:52:05/].map(box);
+    for (const b of kept) {
+      expect(b.checked).toBe(true);
+      expect(b.disabled).toBe(true);
+      expect(
+        document.getElementById(b.getAttribute('aria-describedby')!)
+          ?.textContent,
+      ).toBe(
+        'Trade 1 keeps all of its own executions, so their boxes stay ticked.',
+      );
+    }
+    fireEvent.click(kept[0]!);
+    expect(kept[0]!.checked).toBe(true);
+    expect(dialog.textContent).toContain('5 of 5 executions ticked');
+    // Trade 2's fills join only when ticked.
+    const joining = box(/^09:58:40/);
+    expect(joining.disabled).toBe(false);
+    expect(joining.getAttribute('aria-describedby')).toBeNull();
+    fireEvent.click(joining);
+    expect(joining.checked).toBe(false);
+    expect(dialog.textContent).toContain('4 of 5 executions ticked');
+    // Unticking all leaves no trade to keep, and every box is free again.
+    fireEvent.click(
+      within(table).getByRole('checkbox', { name: 'Select all executions' }),
+    );
+    fireEvent.click(
+      within(table).getByRole('checkbox', { name: 'Select all executions' }),
+    );
+    expect(dialog.textContent).toContain('0 of 5 executions ticked');
+    for (const b of [/^09:41:12/, /^09:44:30/, /^09:52:05/].map(box))
+      expect(b.disabled).toBe(false);
   });
 
   test('trades in an archived account are left out of a merge, and the menu says so', async () => {
@@ -379,6 +461,11 @@ describe('split', () => {
     expect(
       (await screen.findByRole('status', { name: 'Result' })).textContent,
     ).toContain('Split trade 6. Trade 8 takes the 2 executions you moved.');
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('region', { name: 'Trade log' }),
+      ),
+    );
   });
 });
 
@@ -429,6 +516,11 @@ describe('move', () => {
     expect(
       (await screen.findByRole('status', { name: 'Result' })).textContent,
     ).toContain('Moved 2 trades to Euro futures.');
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('region', { name: 'Trade log' }),
+      ),
+    );
   });
 
   test('a selection in two accounts lists neither of them', async () => {

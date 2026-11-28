@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState, type RefObject } from 'react';
 import { DropdownMenu, Popover } from 'radix-ui';
 import {
   ArrowsLeftRight,
@@ -167,9 +167,14 @@ export function groupReasons(
 }
 
 const MENU_ITEM_TWO =
-  'flex min-h-9 cursor-pointer flex-col justify-center gap-px rounded-[8px] px-2.5 py-1.5 text-[13.5px] outline-none data-[disabled]:cursor-default data-[disabled]:text-faint data-[highlighted]:bg-sunken pointer-coarse:min-h-11';
+  'flex min-h-9 cursor-pointer flex-col justify-center gap-px rounded-[8px] px-2.5 py-1.5 text-[13.5px] outline-none aria-disabled:cursor-default aria-disabled:text-faint data-[highlighted]:bg-sunken pointer-coarse:min-h-11';
 
-/** One entry of the grouping menu: its icon and name, and when it is off, why, on a second line. */
+/**
+ * One entry of the grouping menu: its icon and name, and when it is off, why,
+ * on a second line. An entry that is off stays on the keyboard path, so the
+ * arrow keys and a screen reader still reach it and hear its reason (its
+ * description); choosing it does nothing and leaves the menu open.
+ */
 function GroupItem({
   icon,
   label,
@@ -183,20 +188,32 @@ function GroupItem({
   off?: boolean;
   onSelect(): void;
 }): React.JSX.Element {
+  const ids = useId();
   return (
     <DropdownMenu.Item
-      disabled={off}
-      onSelect={onSelect}
+      aria-disabled={off || undefined}
+      aria-labelledby={`${ids}-label`}
+      aria-describedby={reason ? `${ids}-reason` : undefined}
+      onSelect={(event) => {
+        if (off) {
+          event.preventDefault();
+          return;
+        }
+        onSelect();
+      }}
       // The reason is also the item's tooltip (spec 5.1).
       title={reason ?? undefined}
       className={MENU_ITEM_TWO}
     >
       <span className="flex items-center gap-2.5">
         {icon}
-        {label}
+        <span id={`${ids}-label`}>{label}</span>
       </span>
       {reason ? (
-        <span className="pl-[26px] text-[12px] leading-[1.4] text-faint">
+        <span
+          id={`${ids}-reason`}
+          className="pl-[26px] text-[12px] leading-[1.4] text-faint"
+        >
           {reason}
         </span>
       ) : null}
@@ -216,6 +233,7 @@ export function BulkBar({
   onClear,
   onExport,
   onResult,
+  landing,
 }: {
   /** The selected trades. */
   trades: readonly Trade[];
@@ -225,6 +243,11 @@ export function BulkBar({
   onClear(): void;
   onExport(): void;
   onResult(result: React.ReactNode): void;
+  /**
+   * Where the keyboard goes once a merge, split or move is in: the bar leaves
+   * with its selection, so its menu button is no longer there to return to.
+   */
+  landing?: RefObject<HTMLElement | null>;
 }): React.JSX.Element {
   const update = useUpdateTrades();
   const remove = useRemoveTrades();
@@ -240,6 +263,20 @@ export function BulkBar({
   const menuButton = useRef<HTMLButtonElement>(null);
   // An item that opens a dialog keeps the menu from taking focus back from it.
   const opening = useRef(false);
+  // Set once a grouping is in. The dialog hands focus back after the bar has
+  // gone, so it reads where to go then: the menu button while the bar stays
+  // (a cancel), the host's landing once the write is in.
+  const done = useRef(false);
+  const back = useMemo(
+    (): RefObject<HTMLElement | null> => ({
+      get current() {
+        return done.current
+          ? (landing?.current ?? null)
+          : (menuButton.current ?? null);
+      },
+    }),
+    [landing],
+  );
 
   // Archived accounts are read-only: only the other trades are edited.
   const locked = trades.filter((t) => archivedAccountIds.has(t.accountId));
@@ -281,16 +318,18 @@ export function BulkBar({
     trades.length === 1 && editable.length === 1 ? editable[0] : undefined;
   const choose = (which: 'merge' | 'split' | 'move') => {
     opening.current = true;
+    done.current = false;
     setGrouping(which);
   };
   const grouped = {
     origin: menuButton,
-    returnFocus: menuButton,
+    returnFocus: back,
     onOpenChange: (next: boolean) => {
       if (!next) setGrouping(null);
     },
     // The write is in: say so in the log's toast, and let the selection go.
     onDone: (message: React.ReactNode) => {
+      done.current = true;
       onResult(message);
       onClear();
     },

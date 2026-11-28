@@ -384,6 +384,8 @@ export function TradesView(): React.JSX.Element {
     ids: readonly string[];
   }>({ key: '', ids: [] });
   const [result, setResult] = useState<React.ReactNode>(null);
+  // Where the keyboard lands once a merge, split or move is in and its bar has gone.
+  const logRef = useRef<HTMLElement>(null);
 
   // A pending save shows at once, as the Display menu's does.
   const pendingColumns = updatePrefs.isPending
@@ -781,8 +783,10 @@ export function TradesView(): React.JSX.Element {
       ) : null}
 
       <section
+        ref={logRef}
+        tabIndex={-1}
         aria-label="Trade log"
-        className={`${CARD} min-w-0 overflow-hidden`}
+        className={`${CARD} min-w-0 overflow-hidden outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent`}
       >
         <div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-3">
           <Segmented<Status>
@@ -1163,6 +1167,7 @@ export function TradesView(): React.JSX.Element {
             onClear={() => setChosen([])}
             onExport={() => exportCsv(selected)}
             onResult={setResult}
+            landing={logRef}
           />
         </div>
       ) : null}
