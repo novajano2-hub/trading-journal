@@ -26,6 +26,8 @@ import { ConfirmDialog, ConfirmFailure } from '../confirm-dialog';
 const CURRENT = 'current';
 const CLOSED_DAY = "This day is closed, so its note can't be restored.";
 const READ_ONLY = "This note is read only, so a version can't be restored.";
+const UNSAVED =
+  "Couldn't save the text you typed, so nothing was restored. Try again.";
 
 const ROW =
   'flex min-h-10 w-full items-center gap-2 rounded-[8px] px-2.5 text-left text-[13.5px] font-medium text-text outline-offset-0 hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent aria-[current=true]:bg-accent-soft aria-[current=true]:font-semibold aria-[current=true]:text-accent-ink pointer-coarse:min-h-11';
@@ -91,6 +93,13 @@ export interface VersionHistoryProps {
   preview(body: unknown): ReactNode;
   /** The note as stored after a restore, the version it came from, and that version's time as the dialog shows it ("Wed 25 Nov, 14:20"). */
   onRestored(entry: JournalEntry, version: NoteVersion, when: string): void;
+  /**
+   * Runs first when a restore is confirmed: the host saves the text it still
+   * holds (typing on its way, or held after a failed write), so the version the
+   * restore keeps as "before restore" is the text on screen. A rejection stops
+   * the restore, and the dialog says so.
+   */
+  beforeRestore?: () => Promise<void>;
 }
 
 export function VersionHistory({
@@ -103,6 +112,7 @@ export function VersionHistory({
   current,
   preview,
   onRestored,
+  beforeRestore,
 }: VersionHistoryProps): React.JSX.Element | null {
   const timeZone = usePrefs().data?.timeZone ?? 'UTC';
   const title = useJournalEntry(noteId ?? '').data?.title;
@@ -260,6 +270,13 @@ export function VersionHistory({
         confirmLabel="Restore"
         onConfirm={async () => {
           if (!noteId || !version) return;
+          if (beforeRestore) {
+            try {
+              await beforeRestore();
+            } catch {
+              throw new ConfirmFailure(UNSAVED);
+            }
+          }
           let entry: JournalEntry;
           try {
             entry = await restore.mutateAsync({

@@ -93,6 +93,12 @@ export interface NoteEditorProps {
    * the title or the star on top of) takes this one in place of it.
    */
   onRestored?: (entry: JournalEntry) => void;
+  /**
+   * Before a restore: the host saves what it still holds, `body` being the
+   * editor's text now, and rejects when it can't (nothing is restored then), so
+   * the store keeps the text on screen as the "before restore" version.
+   */
+  beforeRestore?: (body: unknown) => Promise<void>;
 }
 
 /** Marks everything on the page but the ancestors of `el` as out of reach (`inert`); returns the way to undo exactly that. */
@@ -202,6 +208,7 @@ function NoteEditorBox({
   templateSlot,
   canFullScreen = true,
   onRestored,
+  beforeRestore,
 }: NoteEditorProps & { noteType: NoteType }): React.JSX.Element {
   const hasData = useHasData();
   const [slash, setSlash] = useState<SlashState | null>(null);
@@ -611,6 +618,9 @@ function NoteEditorBox({
           preview={(body) => (
             <NotePreview body={body} label="Version preview" />
           )}
+          beforeRestore={
+            beforeRestore && (() => beforeRestore(editor.getJSON()))
+          }
           onRestored={(entry, _version, when) => {
             editor.commands.setContent(asDoc(entry.body), {
               emitUpdate: false,

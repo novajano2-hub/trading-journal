@@ -307,7 +307,15 @@ export interface StrategiesRepo {
   /** By name. */
   list(ws: string): Promise<Strategy[]>;
   get(ws: string, id: string): Promise<Strategy | undefined>;
-  create(ws: string, input: NewStrategy): Promise<Strategy>;
+  /**
+   * With `photo` (a template's cover, or a photo chosen in the form), the file
+   * is stored as the strategy's own (`strategy:<id>`) and `photoId` names it,
+   * in the same transaction: one created row, and nothing written when either
+   * fails. A photo is one of IMAGE_TYPES or a template's SVG cover
+   * (FileRejected 'type'), up to SHOT_MAX_BYTES ('size'); a full store is
+   * FileRejected 'quota'.
+   */
+  create(ws: string, input: NewStrategy, photo?: NewFile): Promise<Strategy>;
   /** Groups and rules without an id get one; a rule that leaves drops its RuleChecks on its trades. */
   update(ws: string, id: string, patch: StrategyPatch): Promise<Strategy>;
   /** Takes it out of its trades' `strategyIds` and drops the checks of its rules there. */
@@ -736,7 +744,8 @@ export interface FilesRepo {
    * With `images`, the type must be one of IMAGE_TYPES (FileRejected 'type'); any
    * file over SHOT_MAX_BYTES is FileRejected 'size', and a full store FileRejected
    * 'quota'. Throws LockedDayError for the owner `note:<id>` of a daily note on a
-   * finished date.
+   * finished date, and ArchivedAccountError for the owner `trade:<id>` of a
+   * trade in an archived account (its files are read-only with it).
    */
   add(
     ws: string,
@@ -744,9 +753,9 @@ export interface FilesRepo {
     file: NewFile,
     opts: { images: boolean },
   ): Promise<StoredFile>;
-  /** Throws NotFoundError for a missing file, LockedDayError as `add` does. */
+  /** Throws NotFoundError for a missing file, LockedDayError and ArchivedAccountError as `add` does. */
   remove(ws: string, id: string): Promise<void>;
-  /** Moves every file of owner `from` to owner `to`, keeping ids and upload times (a merge moves its sources' files). */
+  /** Moves every file of owner `from` to owner `to`, keeping ids and upload times (a merge moves its sources' files). Refuses either owner as `add` does. */
   reassign(ws: string, from: string, to: string): Promise<void>;
 }
 

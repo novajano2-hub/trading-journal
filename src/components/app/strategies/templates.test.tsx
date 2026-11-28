@@ -11,6 +11,7 @@ import { MotionGlobalConfig } from 'motion/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { fixtureSample } from '@/data/__fixtures__/sample';
+import { KeelDb } from '@/data/local/db';
 import { createLocalRepository } from '@/data/local/local-repository';
 import {
   STRATEGY_TEMPLATES,
@@ -195,6 +196,89 @@ test('+ creates a copy and opens it', async () => {
       t.strategyIds.includes(copy!.id),
     ),
   ).toEqual([]);
+});
+
+test('a copy is one write: one created row, and its cover is its photo from the start', async () => {
+  const { repo } = await templatesTab();
+  const before = (await repo.history.list(WS)).length;
+  fireEvent.click(addButton(LONDON.name));
+  await waitFor(() => expect(here()).toMatch(/^\/app\/strategies\/[^/?]+$/));
+  const [copy] = await copiesOf(repo, LONDON.id);
+  const rows = (await repo.history.list(WS)).filter(
+    (r) => r.entityId === copy!.id,
+  );
+  expect(rows.map((r) => [r.type, r.action, r.field])).toEqual([
+    ['strategy', 'created', undefined],
+  ]);
+  expect(await repo.history.list(WS)).toHaveLength(before + 1);
+  expect(
+    (await repo.files.list(WS, `strategy:${copy!.id}`)).map((f) => f.id),
+  ).toEqual([copy!.photoId]);
+});
+
+test('a copy whose write fails leaves no strategy and no file behind', async () => {
+  const indexedDB = new IDBFactory();
+  const repository = createLocalRepository({
+    indexedDB,
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+  renderApp(<StrategiesView />, {
+    repository,
+    url: '/app/strategies?tab=templates',
+  });
+  await screen.findByRole('heading', { name: LONDON.name });
+  const db = new KeelDb({ indexedDB, IDBKeyRange });
+  const allFiles = async () =>
+    (await db.files.where('workspaceId').equals(WS).toArray()).map(
+      (f) => f.owner,
+    );
+  const before = await allFiles();
+  const strategies = (await repository.strategies.list(WS)).length;
+  // The history row cannot be written, so the write that makes the copy fails.
+  const ids = vi.spyOn(crypto, 'randomUUID').mockImplementation(() => {
+    throw new Error('no row id');
+  });
+  try {
+    fireEvent.click(addButton(LONDON.name));
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      "Couldn't add a copy",
+    );
+  } finally {
+    ids.mockRestore();
+  }
+  expect(await repository.strategies.list(WS)).toHaveLength(strategies);
+  // No cover is left owned by a strategy that was never made.
+  expect(await allFiles()).toEqual(before);
+});
+
+test('a copy never leaves a cover its strategy does not point at, whatever a later write does', async () => {
+  const indexedDB = new IDBFactory();
+  const repository = createLocalRepository({
+    indexedDB,
+    IDBKeyRange,
+    sample: async () => fixtureSample(),
+  });
+  // Any edit of a strategy fails: a copy must not need one.
+  repository.strategies.update = async () => {
+    throw new Error('no edit');
+  };
+  renderApp(<StrategiesView />, {
+    repository,
+    url: '/app/strategies?tab=templates',
+  });
+  await screen.findByRole('heading', { name: LONDON.name });
+  fireEvent.click(addButton(LONDON.name));
+  await waitFor(() => expect(here()).toMatch(/^\/app\/strategies\/[^/?]+$/));
+  const [copy] = (await repository.strategies.list(WS)).filter(
+    (x) => x.templateId === LONDON.id,
+  );
+  const db = new KeelDb({ indexedDB, IDBKeyRange });
+  const covers = await db.files
+    .where('[workspaceId+owner]')
+    .equals([WS, `strategy:${copy!.id}`])
+    .toArray();
+  expect(covers.map((f) => f.id)).toEqual([copy!.photoId]);
 });
 
 test('a copied template is marked added and can be copied again', async () => {

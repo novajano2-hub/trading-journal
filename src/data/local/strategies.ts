@@ -1,10 +1,20 @@
-import { strategyRules, type RuleGroup, type Strategy } from '@/domain/types';
 import {
+  strategyRules,
+  type RuleGroup,
+  type Strategy,
+  type StoredFile,
+} from '@/domain/types';
+import {
+  FileRejected,
+  IMAGE_TYPES,
   NotFoundError,
+  SHOT_MAX_BYTES,
+  type NewFile,
   type RuleGroupDraft,
   type StrategiesRepo,
 } from '../repository';
 import type { LocalContext } from './context';
+import { isQuota } from './day-shots';
 import type { KeelDb } from './db';
 import { deleteOwnerFiles } from './files';
 import {
@@ -88,6 +98,12 @@ function strategyChanges(before: Strategy, after: Strategy): FieldChange[] {
   return changes;
 }
 
+/** What a strategy's photo may be: a picture, or the SVG a template's cover is drawn in. */
+const PHOTO_TYPES: ReadonlySet<string> = new Set([
+  ...IMAGE_TYPES,
+  'image/svg+xml',
+]);
+
 export function localStrategies(ctx: LocalContext): StrategiesRepo {
   const withIds = (groups: readonly RuleGroupDraft[]): RuleGroup[] =>
     groups.map((g) => ({
@@ -111,7 +127,10 @@ export function localStrategies(ctx: LocalContext): StrategiesRepo {
       return (await ctx.db()).strategies.get([ws, id]);
     },
 
-    async create(ws, input) {
+    async create(ws, input, photo?: NewFile) {
+      if (photo && !PHOTO_TYPES.has(photo.type)) throw new FileRejected('type');
+      if (photo && photo.bytes.byteLength > SHOT_MAX_BYTES)
+        throw new FileRejected('size');
       const db = await ctx.db();
       const strategy: Strategy = {
         ...input,
@@ -119,16 +138,34 @@ export function localStrategies(ctx: LocalContext): StrategiesRepo {
         id: ctx.newId(),
         workspaceId: ws,
       };
-      return rwTx(db, [db.strategies, db.history], async () => {
-        await db.strategies.put(strategy);
-        await logHistory(
-          db,
-          ws,
-          [lifecycleRow('strategy', 'created', strategy.id, strategy.name)],
-          ctx,
-        );
-        return strategy;
-      });
+      // The photo is the strategy's from the start: one write, one created row.
+      const file: StoredFile | undefined = photo && {
+        id: ctx.newId(),
+        workspaceId: ws,
+        owner: `strategy:${strategy.id}`,
+        bytes: photo.bytes,
+        type: photo.type,
+        name: photo.name,
+        size: photo.bytes.byteLength,
+        createdAt: ctx.now().toISOString(),
+      };
+      if (file) strategy.photoId = file.id;
+      try {
+        return await rwTx(db, [db.strategies, db.files, db.history], async () => {
+          if (file) await db.files.put(file);
+          await db.strategies.put(strategy);
+          await logHistory(
+            db,
+            ws,
+            [lifecycleRow('strategy', 'created', strategy.id, strategy.name)],
+            ctx,
+          );
+          return strategy;
+        });
+      } catch (error) {
+        if (file && isQuota(error)) throw new FileRejected('quota');
+        throw error;
+      }
     },
 
     async update(ws, id, patch) {

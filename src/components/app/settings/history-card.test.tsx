@@ -528,52 +528,6 @@ test('times read in the profile zone with its GMT offset', async () => {
   ).toBeTruthy();
 });
 
-test('a photo stored as a strategy is made reads as part of its creation', async () => {
-  await show([
-    // Made with a photo: the photo is linked a moment after the strategy exists.
-    row({
-      at: '2026-11-20T15:00:00.400Z',
-      type: 'strategy',
-      entityId: 'str-2',
-      label: 'Gap fill',
-      field: 'photoId',
-      oldValue: null,
-      newValue: 'file-1',
-    }),
-    row({
-      at: '2026-11-20T15:00:00.000Z',
-      type: 'strategy',
-      action: 'created',
-      entityId: 'str-2',
-      label: 'Gap fill',
-    }),
-    // A photo added later is its own change.
-    row({
-      at: '2026-11-21T15:00:00.000Z',
-      type: 'strategy',
-      entityId: 'str-1',
-      label: 'Opening range breakout',
-      field: 'photoId',
-      oldValue: null,
-      newValue: 'file-2',
-    }),
-    row({
-      at: '2026-11-20T09:00:00.000Z',
-      type: 'strategy',
-      action: 'created',
-      entityId: 'str-1',
-      label: 'Opening range breakout',
-    }),
-  ]);
-  const t = await table();
-  expect(bodyRows(t).map((r) => `${cells(r)[1]} | ${cells(r)[2]}`)).toEqual([
-    'Strategy Opening range breakout | Photo None to A photo',
-    'Strategy Gap fill | None',
-    'Strategy Opening range breakout | None',
-  ]);
-  expect(count()).toBe('1 to 3 of 3');
-});
-
 test('on a phone each change is two lines: the time and the record, then the change, action and source', async () => {
   vi.spyOn(window, 'matchMedia').mockImplementation(
     (q) =>

@@ -1,10 +1,6 @@
 'use client';
 
-import {
-  useAddFile,
-  useCreateStrategy,
-  useUpdateStrategy,
-} from '@/data/query/hooks';
+import { useCreateStrategyWithPhoto } from '@/data/query/hooks';
 import type { NewStrategy } from '@/data/repository';
 import type { StrategyTemplate } from '@/content/strategy-templates';
 import type { Strategy } from '@/domain/types';
@@ -32,50 +28,21 @@ export function newStrategyFrom(t: StrategyTemplate): NewStrategy {
 }
 
 /**
- * Copying a template: `copy` creates the strategy and gives it the template's
- * cover as a photo it owns; `attachCover` is that second step alone, for the
- * create form once a strategy filled from a template is saved. A cover that
- * cannot be kept (no room left) never undoes the strategy: it is made without
- * a photo.
+ * Copying a template: `copy` creates the strategy with the template's cover as
+ * a photo it owns, in one write (one created row, and no cover left behind
+ * when it fails). A cover that cannot be kept (no room left) fails the copy,
+ * and the caller says so: nothing is made.
  */
 export function useCopyTemplate(): {
   copy(t: StrategyTemplate): Promise<Strategy>;
-  attachCover(
-    strategyId: string,
-    t: StrategyTemplate,
-  ): Promise<Strategy | null>;
 } {
-  const create = useCreateStrategy();
-  const addFile = useAddFile();
-  const update = useUpdateStrategy();
-
-  const attachCover = async (
-    strategyId: string,
-    t: StrategyTemplate,
-  ): Promise<Strategy | null> => {
-    try {
-      const file = await coverFile(t);
-      const stored = await addFile.mutateAsync({
-        owner: `strategy:${strategyId}`,
-        file,
-        // A photo is a PNG, JPEG or WebP; the SVG is Keel's own drawing, kept
-        // as it is where the browser cannot draw it to a PNG.
-        images: file.type !== 'image/svg+xml',
-      });
-      return await update.mutateAsync({
-        id: strategyId,
-        patch: { photoId: stored.id },
-      });
-    } catch {
-      return null;
-    }
-  };
-
+  const create = useCreateStrategyWithPhoto();
   return {
-    attachCover,
     async copy(t) {
-      const made = await create.mutateAsync(newStrategyFrom(t));
-      return (await attachCover(made.id, t)) ?? made;
+      return create.mutateAsync({
+        input: newStrategyFrom(t),
+        photo: await coverFile(t),
+      });
     },
   };
 }

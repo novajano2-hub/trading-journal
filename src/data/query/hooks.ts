@@ -217,17 +217,6 @@ export function useFiles(
   );
 }
 
-/** One stored file, `null` once it is gone; waits while `id` is undefined. */
-export function useFile(
-  id: string | undefined,
-): UseQueryResult<StoredFile | null> {
-  return useWorkspaceQuery(
-    (ws) => keys.file(ws, id ?? ''),
-    async (r, ws) => (await r.files.get(ws, id!)) ?? null,
-    id !== undefined,
-  );
-}
-
 /**
  * Reads one file with its bytes, on demand. The bytes are not kept: the result
  * goes to the caller (an object URL, a download) and nothing stays in the
@@ -872,6 +861,23 @@ export function useCreateStrategy(): UseMutationResult<
 > {
   return useWorkspaceWrite('strategies.create', (r, ws, v: NewStrategy) =>
     r.strategies.create(ws, v),
+  );
+}
+
+/**
+ * Creates a strategy with its photo in one write (a template's cover, or the
+ * photo the form was given): one created row, and no file left behind when
+ * the write fails.
+ */
+export function useCreateStrategyWithPhoto(): UseMutationResult<
+  Strategy,
+  Error,
+  { input: NewStrategy; photo: NewFile }
+> {
+  return useWorkspaceWrite(
+    'strategies.create',
+    (r, ws, v: { input: NewStrategy; photo: NewFile }) =>
+      r.strategies.create(ws, v.input, v.photo),
   );
 }
 

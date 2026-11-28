@@ -321,6 +321,13 @@ function NoteBody({
   const flush = () => {
     timer.current = undefined;
     const body = latest.current;
+    // Nothing typed since the note loaded or was restored: nothing to write. A
+    // write that failed after a restore let its text go must not save an
+    // empty body over the restored note (G-11).
+    if (body === undefined) {
+      failed.current = false;
+      return;
+    }
     waiting.current += 1;
     queue.current = queue.current.then(async () => {
       try {
@@ -429,6 +436,13 @@ function NoteBody({
       noteId={entry?.id}
       ensureNoteId={ensureNoteId}
       templateSlot={templateSlot}
+      // Text still waiting, or held after a failed write, is saved before a
+      // restore (`settle`), so the store keeps it as the "before restore"
+      // version; a write that fails again stops the restore (G-6).
+      beforeRestore={async () => {
+        await settle();
+        if (failed.current) throw new Error('The note could not be saved.');
+      }}
       // The store has the restored text: the next write (a star) builds on that
       // note. Text typed before it, waiting or held after a failed write, is let
       // go with the failure, or the next settle would write it over the restore.

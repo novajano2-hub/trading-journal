@@ -7,9 +7,10 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
+import type { Editor } from '@tiptap/core';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, expect, onTestFinished, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import type { SampleWorkspace } from '@/data/seed/generate';
@@ -1199,4 +1200,91 @@ test('after a restore, the pane saves on top of the restored text, even when the
   );
   // The title's save did not bring the old text back.
   expect((await repo.journal.get(WS, 'n-plan'))!.body).toEqual(earlier);
+});
+
+/** Holds the pane's 600 ms save timer, so typed text stays waiting until something else writes it. */
+const realSetTimeout = globalThis.setTimeout;
+function holdSaveTimer() {
+  vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+    fn: () => void,
+    ms?: number,
+    ...rest: unknown[]
+  ) =>
+    ms === 600
+      ? (0 as unknown as ReturnType<typeof setTimeout>)
+      : realSetTimeout(fn, ms, ...rest)) as typeof setTimeout);
+  onTestFinished(() => {
+    vi.restoreAllMocks();
+  });
+}
+
+async function restoreNewest() {
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Version history' }),
+  );
+  const dialog = await screen.findByRole('dialog', { name: 'Version history' });
+  fireEvent.click(
+    await within(dialog).findByRole('button', { name: 'Restore this version' }),
+  );
+  const ask = await screen.findByRole('dialog', {
+    name: 'Restore this version?',
+  });
+  await act(async () => {
+    fireEvent.click(within(ask).getByRole('button', { name: 'Restore' }));
+  });
+  return ask;
+}
+
+test('text still waiting in the pane is saved before a restore, and kept as the version before it', async () => {
+  const earlier = para('An earlier plan');
+  const { repo } = await openWith('/app/notebook/n-plan', {
+    prepare: async (r) => {
+      await r.noteVersions.keep(WS, 'n-plan', earlier, 'auto');
+    },
+  });
+  const box = await screen.findByRole('textbox', { name: 'Note' });
+  holdSaveTimer();
+  const editor = (box as unknown as { editor: Editor }).editor;
+  act(() => {
+    editor.commands.insertContent(' and a typed retest');
+  });
+  expect(
+    JSON.stringify((await repo.journal.get(WS, 'n-plan'))!.body),
+  ).not.toContain('a typed retest');
+
+  await restoreNewest();
+  await screen.findByText(/^Restored the version from/);
+  expect((await repo.journal.get(WS, 'n-plan'))!.body).toEqual(earlier);
+  const [before] = await repo.noteVersions.list(WS, 'n-plan');
+  expect(before!.kind).toBe('before-restore');
+  expect(JSON.stringify(before!.body)).toContain('a typed retest');
+});
+
+test('a write that failed, then a restore: the pane reads Saved, not the failure', async () => {
+  const earlier = para('An earlier plan');
+  const { repo } = await openWith('/app/notebook/n-plan', {
+    prepare: async (r) => {
+      await r.noteVersions.keep(WS, 'n-plan', earlier, 'auto');
+    },
+  });
+  const box = await screen.findByRole('textbox', { name: 'Note' });
+  vi.spyOn(repo.journal, 'save').mockRejectedValueOnce(new Error('disk full'));
+  const editor = (box as unknown as { editor: Editor }).editor;
+  act(() => {
+    editor.commands.insertContent(' and a typed retest');
+  });
+  expect(
+    await screen.findByText("Couldn't save. Keep typing to retry.", undefined, {
+      timeout: 3000,
+    }),
+  ).toBeTruthy();
+
+  await restoreNewest();
+  await screen.findByText(/^Restored the version from/);
+  expect((await repo.journal.get(WS, 'n-plan'))!.body).toEqual(earlier);
+  await waitFor(() =>
+    expect(screen.queryByText("Couldn't save. Keep typing to retry.")).toBeNull(),
+  );
+  expect(screen.getByText('Saved')).toBeTruthy();
+  vi.restoreAllMocks();
 });

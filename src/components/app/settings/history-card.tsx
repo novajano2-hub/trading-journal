@@ -33,7 +33,6 @@ import {
   ACTION_LABEL,
   ACTION_OPTIONS,
   fieldLabel,
-  foldCreations,
   historyTime,
   matches,
   orderRows,
@@ -173,7 +172,7 @@ export function HistoryCard(): React.JSX.Element {
   };
 
   const ordered = useMemo(
-    () => orderRows(foldCreations(history.data ?? NO_ROWS)),
+    () => orderRows(history.data ?? NO_ROWS),
     [history.data],
   );
   const shown = useMemo(

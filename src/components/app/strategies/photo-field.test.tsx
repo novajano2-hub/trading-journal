@@ -339,10 +339,11 @@ test('a form filled from a template shows its cover as the photo, which can be r
   expect(await repo.files.list(WS, `strategy:${made.id}`)).toEqual([]);
 });
 
-test('a strategy saved without its photo says so, and saving again does not make a second one', async () => {
+test('a new strategy whose photo cannot be kept is not made, says so, and saving again makes one', async () => {
   const { repo } = await createForm();
-  const add = vi
-    .spyOn(repo.files, 'add')
+  // The strategy and its photo are one write: a full store refuses both.
+  const create = vi
+    .spyOn(repo.strategies, 'create')
     .mockRejectedValueOnce(new FileRejected('quota'));
   fireEvent.change(screen.getByLabelText('Name'), {
     target: { value: 'Half saved' },
@@ -352,16 +353,16 @@ test('a strategy saved without its photo says so, and saving again does not make
   fireEvent.click(screen.getByRole('button', { name: 'Create strategy' }));
   expect(
     await screen.findByText(
-      'The strategy is saved, but its photo was not: this browser has no room left. Try the photo again.',
+      'The photo could not be saved: this browser has no room left, so nothing was saved. Try again.',
     ),
   ).toBeTruthy();
   expect(here()).toBe('/app/strategies/new');
   expect(
     (await repo.strategies.list(WS)).filter((s) => s.name === 'Half saved'),
-  ).toHaveLength(1);
+  ).toHaveLength(0);
 
-  // Again: the same strategy takes the photo.
-  add.mockRestore();
+  // Again: one strategy, with the photo, logged once as created.
+  create.mockRestore();
   await act(async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create strategy' }));
   });
@@ -371,6 +372,14 @@ test('a strategy saved without its photo says so, and saving again does not make
   );
   expect(made).toHaveLength(1);
   expect(made[0]!.photoId).toBeDefined();
+  expect(
+    (await repo.files.list(WS, `strategy:${made[0]!.id}`)).map((f) => f.id),
+  ).toEqual([made[0]!.photoId]);
+  expect(
+    (await repo.history.list(WS))
+      .filter((r) => r.entityId === made[0]!.id)
+      .map((r) => r.action),
+  ).toEqual(['created']);
 });
 
 test('saving before the photo has loaded leaves it alone', async () => {

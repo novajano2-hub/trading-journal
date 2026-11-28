@@ -236,8 +236,9 @@ export function invalidationsFor(write: WriteKind, ws: string): QueryKey[] {
     case 'cashFlows.update':
     case 'cashFlows.remove':
       return [keys.cashFlows(ws), keys.history(ws)];
+    // A strategy can be made with its photo (B56's owner).
     case 'strategies.create':
-      return [keys.strategies(ws), keys.history(ws)];
+      return [keys.strategies(ws), keys.history(ws), keys.filesAll(ws)];
     // A photo that is cleared or replaced is deleted with the write (B56).
     case 'strategies.update':
       return [

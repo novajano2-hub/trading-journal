@@ -395,45 +395,57 @@ test('missed trades never reach the summary, the log or patterns', async () => {
   expect(await repo.missedTrades.list(S, 'str-1')).toHaveLength(3);
 });
 
-test('no trade list, filter, summary, report, calendar, tracker or pattern reads a missed trade', () => {
-  const root = 'src';
-  const sources = readdirSync(root, { recursive: true, encoding: 'utf8' })
+/** The app's source files (tests left out), as paths under `src/`. */
+function sourceFiles(): string[] {
+  return readdirSync('src', { recursive: true, encoding: 'utf8' })
     .map((f) => f.replaceAll('\\', '/'))
     .filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f));
-  const readers = sources.filter((f) =>
-    /missedTrades|MissedTrade/.test(readFileSync(`${root}/${f}`, 'utf8')),
-  );
+}
+const reading = (pattern: RegExp) =>
+  sourceFiles().filter((f) => pattern.test(readFileSync(`src/${f}`, 'utf8')));
+
+test('no trade list, filter, summary, report, calendar, tracker or pattern reads a missed trade', () => {
+  const readers = reading(/missedTrades|MissedTrade/);
   // The strategy page and its form read them; the sanity check that the scan sees real files.
   expect(readers).toContain('components/app/strategies/missed-trades.tsx');
   expect(readers).toContain('data/local/missed-trades.ts');
 
-  // Everything that builds a figure, a list, a filter, a report, a day, a tracker or a pattern.
-  const apart = [
-    'domain/',
-    'components/app/trades/',
-    'components/app/calendar/',
-    'components/app/reports/',
-    'components/app/dashboard/',
-    'components/app/progress/',
-    'components/app/day/',
-    'components/app/notebook/',
-    'components/app/notes/',
-    'components/app/import/',
-    'components/app/prop/',
-    'components/app/settings/',
-    'data/filters.ts',
-    'data/metrics.ts',
-    'data/day-log.ts',
-    'data/report-links.ts',
-    'data/query/derived.ts',
-    'data/local/trades.ts',
-    'data/local/days.ts',
-    'data/local/tracker.ts',
-    'lib/',
-  ];
-  // Only the type may live in the domain.
-  const leaks = readers.filter(
-    (f) => f !== 'domain/types.ts' && apart.some((a) => f.startsWith(a)),
-  );
-  expect(leaks).toEqual([]);
+  // Only these may name a missed trade: the store, the strategy pages that
+  // show them, and the sample that seeds them. Anything else (a figure, a list,
+  // a filter, a report, a day, a tracker, a pattern, a strategy's stats) is a
+  // place a missed trade must never reach, so a new reader fails here.
+  const allowed = new Set([
+    'components/app/strategies/missed-trades.tsx',
+    'components/app/strategies/strategies-view.tsx',
+    'components/app/strategies/strategy-form.tsx',
+    'components/app/strategies/strategy-view.tsx',
+    'data/__fixtures__/sample.ts',
+    'data/local/context.ts',
+    'data/local/db.ts',
+    'data/local/local-repository.ts',
+    'data/local/missed-trades.ts',
+    'data/local/schema.ts',
+    'data/local/strategies.ts',
+    'data/query/hooks.ts',
+    'data/query/keys.ts',
+    'data/repository.ts',
+    'data/seed/depth.ts',
+    'data/seed/generate.ts',
+    'domain/types.ts',
+  ]);
+  expect(readers.filter((f) => !allowed.has(f))).toEqual([]);
+});
+
+test("a template's example figures reach only the template cards, never a real figure", () => {
+  const readers = reading(/\b(STRATEGY_TEMPLATES|exampleStats)\b/);
+  expect(readers).toContain('content/strategy-templates.ts');
+  // The chooser and the Templates tab list them; a card draws a template's
+  // examples, labelled as examples (B44). Nothing that builds a figure does.
+  const allowed = new Set([
+    'content/strategy-templates.ts',
+    'components/app/strategies/template-card.tsx',
+    'components/app/strategies/template-chooser.tsx',
+    'components/app/strategies/templates-tab.tsx',
+  ]);
+  expect(readers.filter((f) => !allowed.has(f))).toEqual([]);
 });

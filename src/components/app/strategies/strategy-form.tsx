@@ -28,6 +28,7 @@ import {
 import {
   useAddFile,
   useCreateStrategy,
+  useCreateStrategyWithPhoto,
   useFiles,
   useMissedTrades,
   useRemoveFile,
@@ -144,14 +145,12 @@ function Field({
 }
 
 /** Why a photo was not kept, for the line under the buttons. */
-function photoText(e: unknown, strategySaved: boolean): string {
+function photoText(e: unknown): string {
   const why =
     e instanceof FileRejected && e.reason === 'quota'
       ? ': this browser has no room left'
       : '';
-  return strategySaved
-    ? `The strategy is saved, but its photo was not${why}. Try the photo again.`
-    : `The photo could not be saved${why}, so nothing was saved. Try again.`;
+  return `The photo could not be saved${why}, so nothing was saved. Try again.`;
 }
 
 function StrategyEditor({
@@ -164,6 +163,7 @@ function StrategyEditor({
 }): React.JSX.Element {
   const router = useRouter();
   const create = useCreateStrategy();
+  const createWithPhoto = useCreateStrategyWithPhoto();
   const update = useUpdateStrategy();
   const remove = useRemoveStrategy();
   const trades = useTrades();
@@ -319,7 +319,7 @@ function StrategyEditor({
         try {
           uploaded = await store(existing, draft);
         } catch (e) {
-          setPhotoFailed(photoText(e, false));
+          setPhotoFailed(photoText(e));
           return setSaving(false);
         }
         photoPatch = { photoId: uploaded.id };
@@ -339,7 +339,10 @@ function StrategyEditor({
               id: existing,
               patch: { ...input, ...photoPatch },
             })
-          : await create.mutateAsync(input);
+          : draft
+            ? // A new strategy and its photo are one write: one created row, no file left behind.
+              await createWithPhoto.mutateAsync({ input, photo: draft })
+            : await create.mutateAsync(input);
       } catch (e) {
         // Nothing points at the file just stored: it goes too.
         if (uploaded) {
@@ -349,21 +352,13 @@ function StrategyEditor({
             /* an orphan the strategy's deletion cleans up */
           }
         }
+        if (!existing && draft && e instanceof FileRejected) {
+          setPhotoFailed(photoText(e));
+          return setSaving(false);
+        }
         throw e;
       }
       made.current = saved.id;
-      if (!existing && draft) {
-        try {
-          const file = await store(saved.id, draft);
-          await update.mutateAsync({
-            id: saved.id,
-            patch: { photoId: file.id },
-          });
-        } catch (e) {
-          setPhotoFailed(photoText(e, true));
-          return setSaving(false);
-        }
-      }
       router.push(`/app/strategies/${encodeURIComponent(saved.id)}`);
     } catch {
       setSaveFailed(true);

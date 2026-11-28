@@ -101,6 +101,8 @@ export function EntryPane({
   const draft = useRef<{ title?: string; body?: unknown }>({});
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const queue = useRef<Promise<void>>(Promise.resolve());
+  // The last write failed: the note on screen is not the stored one.
+  const failed = useRef(false);
 
   const commit = (extra: Partial<JournalEntry> = {}) => {
     if (timer.current !== undefined) clearTimeout(timer.current);
@@ -121,9 +123,11 @@ export function EntryPane({
         for (const k of Object.keys(next) as (keyof JournalEntry)[])
           if (next[k] === undefined) delete next[k];
         base.current = await save.mutateAsync(next);
+        failed.current = false;
         waiting.current -= 1;
         if (waiting.current === 0) setStatus('saved');
       } catch {
+        failed.current = true;
         waiting.current -= 1;
         setStatus('failed');
       }
@@ -390,6 +394,17 @@ export function EntryPane({
           // A draft has no id to own an image yet: its first image stores it.
           handleRef={handle}
           templateSlot={templateSlot}
+          // Text still waiting, or the text of a write that failed, is saved
+          // before a restore, so the store keeps it as the "before restore"
+          // version; a write that fails again stops the restore (G-6).
+          beforeRestore={async (body) => {
+            if (timer.current !== undefined || failed.current) {
+              draft.current.body = body;
+              commit();
+            }
+            await queue.current;
+            if (failed.current) throw new Error('The note could not be saved.');
+          }}
           // The store has the restored text: build the next save on that note,
           // and let go of text typed before it that was still waiting.
           onRestored={(restored) => {
@@ -401,6 +416,11 @@ export function EntryPane({
             ) {
               clearTimeout(timer.current);
               timer.current = undefined;
+            }
+            // Nothing left on its way: the pane reads Saved, not a failure from
+            // before the restore (G-15).
+            if (timer.current === undefined && waiting.current === 0) {
+              failed.current = false;
               setStatus('saved');
             }
           }}

@@ -649,6 +649,79 @@ test('a failed strategy write leaves no row', async () => {
   expect(await rows()).toEqual([]);
 });
 
+const newStrategy = {
+  name: 'London break',
+  description: '',
+  assetClasses: ['forex' as const],
+  groups: [],
+  checklist: [],
+  status: 'active' as const,
+};
+const cover = (type = 'image/svg+xml', bytes = 4) => ({
+  bytes: new ArrayBuffer(bytes),
+  type,
+  name: 'london-range-break.svg',
+});
+
+test('a strategy made with its photo is one write: one created row, and the photo is its own file', async () => {
+  const { repo, db, rows } = setup();
+  const made = await repo.strategies.create(S, newStrategy, cover());
+  expect(made.photoId).toBeDefined();
+  expect(await repo.strategies.get(S, made.id)).toEqual(made);
+  const files = await repo.files.list(S, `strategy:${made.id}`);
+  expect(files.map((f) => [f.id, f.type, f.name, f.size])).toEqual([
+    [made.photoId, 'image/svg+xml', 'london-range-break.svg', 4],
+  ]);
+  expect(await rows()).toEqual([
+    row({
+      at: T0,
+      type: 'strategy',
+      action: 'created',
+      entityId: made.id,
+      label: 'London break',
+    }),
+  ]);
+  // A chosen photo is a picture too.
+  const png = await repo.strategies.create(S, newStrategy, cover('image/png'));
+  expect(await db.files.get([S, png.photoId!])).toMatchObject({
+    owner: `strategy:${png.id}`,
+  });
+});
+
+test('a strategy whose photo cannot be kept is not made, and leaves no file and no row', async () => {
+  const { repo, db, rows } = setup();
+  const count = async () => [
+    (await repo.strategies.list(S)).length,
+    await db.files.where('workspaceId').equals(S).count(),
+  ];
+  const before = await count();
+  await expect(
+    repo.strategies.create(S, newStrategy, cover('application/pdf')),
+  ).rejects.toMatchObject({ name: 'FileRejected', reason: 'type' });
+  await expect(
+    repo.strategies.create(S, newStrategy, cover('image/png', 11 * 1024 * 1024)),
+  ).rejects.toMatchObject({ name: 'FileRejected', reason: 'size' });
+  // The history row cannot be written: the strategy and its photo, both put
+  // by then, go back with it. The strategy's and the file's ids are made
+  // first (two ids); the row's id is the third.
+  const real = crypto.randomUUID.bind(crypto);
+  let made = 0;
+  const ids = vi.spyOn(crypto, 'randomUUID').mockImplementation(() => {
+    if (++made <= 2) return real();
+    throw new Error('no row id');
+  });
+  try {
+    await expect(
+      repo.strategies.create(S, newStrategy, cover()),
+    ).rejects.toThrow('no row id');
+  } finally {
+    ids.mockRestore();
+  }
+  expect(made).toBe(3);
+  expect(await count()).toEqual(before);
+  expect(await rows()).toEqual([]);
+});
+
 // ---- Tags -------------------------------------------------------------------
 
 test('tag create, edit and delete each log', async () => {

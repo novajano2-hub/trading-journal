@@ -334,35 +334,6 @@ export function zoneWords(timeZone: string): string {
   return city ? `${city.replaceAll('_', ' ')} time` : gmtLabel(timeZone);
 }
 
-/** A strategy's photo is stored a moment after the strategy is made: within this, it reads as part of the creation. */
-const FOLD_MS = 10_000;
-
-/**
- * Leaves out the photo row that only completes a creation: a strategy made
- * with a photo is written, then its photo is stored and linked, so history
- * holds a created row and, a moment later, a photo set from none. Read
- * together, they are one creation.
- */
-export function foldCreations(rows: readonly HistoryRow[]): HistoryRow[] {
-  const made = new Map<string, number>();
-  for (const r of rows)
-    if (r.type === 'strategy' && r.action === 'created')
-      made.set(r.entityId, Date.parse(r.at));
-  return rows.filter((r) => {
-    if (
-      r.type !== 'strategy' ||
-      r.action !== 'edited' ||
-      r.field !== 'photoId' ||
-      (r.oldValue !== null && r.oldValue !== undefined)
-    )
-      return true;
-    const created = made.get(r.entityId);
-    if (created === undefined) return true;
-    const after = Date.parse(r.at) - created;
-    return !(after >= 0 && after <= FOLD_MS);
-  });
-}
-
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 /**

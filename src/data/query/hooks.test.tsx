@@ -23,7 +23,6 @@ import {
   useApplyRule,
   useEnsureTradeNote,
   useFeeRules,
-  useFile,
   useFiles,
   useHistory,
   useJournal,
@@ -172,12 +171,9 @@ test('a bulk update, a trade note and a daily note refresh what they change', as
 test('file hooks list an owner’s files; adding and removing refresh them', async () => {
   const { result } = renderHook(
     () => {
-      const [id, setId] = useState<string | undefined>(undefined);
       return {
-        setId,
         files: useFiles('trade:f-1'),
         elsewhere: useFiles('trade:f-2'),
-        one: useFile(id),
         add: useAddFile(),
         remove: useRemoveFile(),
       };
@@ -185,8 +181,6 @@ test('file hooks list an owner’s files; adding and removing refresh them', asy
     { wrapper: wrapper() },
   );
   await waitFor(() => expect(result.current.files.data).toEqual([]));
-  // A file read waits while it has no id.
-  expect(result.current.one.data).toBeUndefined();
   let added = '';
   await act(async () => {
     const stored = await result.current.add.mutateAsync({
@@ -216,13 +210,10 @@ test('file hooks list an owner’s files; adding and removing refresh them', asy
   });
   expect(result.current.files.data).toHaveLength(1);
 
-  act(() => result.current.setId(added));
-  await waitFor(() => expect(result.current.one.data?.name).toBe('plan.pdf'));
   await act(async () => {
     await result.current.remove.mutateAsync({ id: added });
   });
   await waitFor(() => expect(result.current.files.data).toEqual([]));
-  await waitFor(() => expect(result.current.one.data).toBeNull());
 });
 
 test('useReadFile reads one file with its bytes, and the list keeps none', async () => {

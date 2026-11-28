@@ -10,7 +10,7 @@ import {
 import type { Editor } from '@tiptap/core';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { MotionGlobalConfig } from 'motion/react';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, expect, onTestFinished, test, vi } from 'vitest';
 import { fixtureSample } from '@/data/__fixtures__/sample';
 import { createLocalRepository } from '@/data/local/local-repository';
 import { LockedDayError, type Repository } from '@/data/repository';
@@ -633,6 +633,132 @@ test('a failed write followed by a restore does not flush the old text over the 
   expect((await repo.journal.get(WS, 'note-2026-11-23'))!.body).toEqual(
     earlier,
   );
+});
+
+/**
+ * Holds the editor's 600 ms save timer, so typed text stays waiting until
+ * something else writes it; every other timer runs as it would.
+ */
+const realSetTimeout = globalThis.setTimeout;
+function holdSaveTimer() {
+  vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+    fn: () => void,
+    ms?: number,
+    ...rest: unknown[]
+  ) =>
+    ms === 600
+      ? (0 as unknown as ReturnType<typeof setTimeout>)
+      : realSetTimeout(fn, ms, ...rest)) as typeof setTimeout);
+  onTestFinished(() => {
+    vi.restoreAllMocks();
+  });
+}
+
+const textOf = (body: unknown) => JSON.stringify(body);
+
+test('text still waiting to save is saved before a restore, and kept as the version before it', async () => {
+  const earlier = {
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        content: [{ type: 'text', text: 'An earlier day' }],
+      },
+    ],
+  };
+  const { repo } = await renderApp({ journal: [dailyNote('2026-11-23')] });
+  await repo.noteVersions.keep(WS, 'note-2026-11-23', earlier, 'auto');
+  const dialog = await open(MON, 'View note');
+  const box = await within(dialog).findByRole('textbox', {
+    name: 'Daily note',
+  });
+  holdSaveTimer();
+  const editor = (box as unknown as { editor: Editor }).editor;
+  act(() => {
+    editor.commands.insertContent(' and the typed close');
+  });
+  // The typing is on screen and not yet stored.
+  expect(
+    textOf((await repo.journal.get(WS, 'note-2026-11-23'))!.body),
+  ).not.toContain('the typed close');
+
+  fireEvent.click(
+    await within(dialog).findByRole('button', { name: 'Version history' }),
+  );
+  const history = await screen.findByRole('dialog', {
+    name: 'Version history',
+  });
+  fireEvent.click(
+    await within(history).findByRole('button', {
+      name: 'Restore this version',
+    }),
+  );
+  const ask = await screen.findByRole('dialog', {
+    name: 'Restore this version?',
+  });
+  await act(async () => {
+    fireEvent.click(within(ask).getByRole('button', { name: 'Restore' }));
+  });
+  await within(dialog).findByText(/^Restored the version from/);
+  expect((await repo.journal.get(WS, 'note-2026-11-23'))!.body).toEqual(
+    earlier,
+  );
+  // The text on screen before the restore is the version kept before it.
+  const [before] = await repo.noteVersions.list(WS, 'note-2026-11-23');
+  expect(before!.kind).toBe('before-restore');
+  expect(textOf(before!.body)).toContain('the typed close');
+});
+
+test('a restore whose waiting text cannot be saved first restores nothing, and says so', async () => {
+  const earlier = {
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        content: [{ type: 'text', text: 'An earlier day' }],
+      },
+    ],
+  };
+  const { repo } = await renderApp({ journal: [dailyNote('2026-11-23')] });
+  await repo.noteVersions.keep(WS, 'note-2026-11-23', earlier, 'auto');
+  const dialog = await open(MON, 'View note');
+  const box = await within(dialog).findByRole('textbox', {
+    name: 'Daily note',
+  });
+  holdSaveTimer();
+  const editor = (box as unknown as { editor: Editor }).editor;
+  act(() => {
+    editor.commands.insertContent(' and the typed close');
+  });
+  vi.spyOn(repo.journal, 'save').mockRejectedValue(new Error('disk full'));
+  fireEvent.click(
+    await within(dialog).findByRole('button', { name: 'Version history' }),
+  );
+  const history = await screen.findByRole('dialog', {
+    name: 'Version history',
+  });
+  fireEvent.click(
+    await within(history).findByRole('button', {
+      name: 'Restore this version',
+    }),
+  );
+  const ask = await screen.findByRole('dialog', {
+    name: 'Restore this version?',
+  });
+  await act(async () => {
+    fireEvent.click(within(ask).getByRole('button', { name: 'Restore' }));
+  });
+  expect(
+    await within(ask).findByText(
+      "Couldn't save the text you typed, so nothing was restored. Try again.",
+    ),
+  ).toBeTruthy();
+  // The stored note and its versions are as they were.
+  expect(
+    textOf((await repo.journal.get(WS, 'note-2026-11-23'))!.body),
+  ).toContain('About 2026-11-23');
+  expect(await repo.noteVersions.list(WS, 'note-2026-11-23')).toHaveLength(1);
+  expect(textOf(editor.getJSON())).toContain('the typed close');
 });
 
 test('the summary row reads the date, the net and the count with the win rate, and expands to the trades', async () => {
